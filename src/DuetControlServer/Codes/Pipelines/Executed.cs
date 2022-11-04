@@ -6,27 +6,27 @@ using DuetControlServer.Codes.Handlers;
 using System;
 using System.Threading.Tasks;
 
-namespace DuetControlServer.Codes.PipelineStages
+namespace DuetControlServer.Codes.Pipelines
 {
     /// <summary>
-    /// Pipeline stage to be called when a code has been resolved or cancelled.
-    /// This is the only pipeline stage that cannot maintain more than one state
+    /// Pipeline element for dealing with codes that have been resolved or cancelled.
+    /// This is the only pipeline stage that cannot maintain more than one stack level
     /// </summary>
-    public class Executed : PipelineStage
+    public class Executed : PipelineBase
     {
         /// <summary>
         /// Constructor of this class
         /// </summary>
-        /// <param name="pipeline">Corresponding pipeline</param>
-        public Executed(PipelineChannel pipeline) : base(Codes.PipelineStage.Executed, pipeline)
+        /// <param name="processor">Channel processor</param>
+        public Executed(ChannelProcessor processor) : base(PipelineStage.Executed, processor)
         {
-            _state = _states.Peek();
+            _stackItem = _stack.Peek();
         }
 
         /// <summary>
         /// The only state for this 
         /// </summary>
-        private readonly Pipeline _state;
+        private readonly PipelineStackItem _stackItem;
 
         /// <summary>
         /// Process an incoming code
@@ -114,14 +114,14 @@ namespace DuetControlServer.Codes.PipelineStages
             }
             catch (Exception e) when ((e is OperationCanceledException) != Program.CancellationToken.IsCancellationRequested)
             {
-                Pipeline.Logger.Error(e, "Executed interceptor threw an exception when finishing code {0}", code);
+                Processor.Logger.Error(e, "Executed interceptor threw an exception when finishing code {0}", code);
                 code.SetException(e);
             }
             finally
             {
                 if (code.Result != null)
                 {
-                    Pipeline.Logger.Debug("Finished code {0}", code);
+                    Processor.Logger.Debug("Finished code {0}", code);
                     if (code.Flags.HasFlag(CodeFlags.Asynchronous))
                     {
                         if (code.Channel == CodeChannel.File)
@@ -137,7 +137,7 @@ namespace DuetControlServer.Codes.PipelineStages
                 }
                 else
                 {
-                    Pipeline.Logger.Debug("Cancelled code {0}", code);
+                    Processor.Logger.Debug("Cancelled code {0}", code);
                     code.SetCancelled();
                 }
             }
@@ -150,11 +150,11 @@ namespace DuetControlServer.Codes.PipelineStages
         /// <returns>Asynchronous task</returns>
         public override void WriteCode(Commands.Code code)
         {
-            if (!_state.PendingCodes.Writer.TryWrite(code))
+            if (!_stackItem.PendingCodes.Writer.TryWrite(code))
             {
                 // Allocate an extra task only if we cannot store the executed code yet. Should never get here!
-                Pipeline.Logger.Warn("Pipeline failed to store code immediately so waiting synchronously for it to be added");
-                _state.PendingCodes.Writer.WriteAsync(code).AsTask().Wait();
+                Processor.Logger.Warn("Pipeline failed to store code immediately so waiting synchronously for it to be added");
+                _stackItem.PendingCodes.Writer.WriteAsync(code).AsTask().Wait();
             }
         }
 
@@ -163,6 +163,6 @@ namespace DuetControlServer.Codes.PipelineStages
         /// </summary>
         /// <param name="code">Code to enqueue</param>
         /// <returns>Asynchronous task</returns>
-        public override ValueTask WriteCodeAsync(Commands.Code code) => _state.PendingCodes.Writer.WriteAsync(code);
+        public override ValueTask WriteCodeAsync(Commands.Code code) => _stackItem.PendingCodes.Writer.WriteAsync(code);
     }
 }

@@ -3,18 +3,18 @@ using DuetAPI.Connection;
 using System;
 using System.Threading.Tasks;
 
-namespace DuetControlServer.Codes.PipelineStages
+namespace DuetControlServer.Codes.Pipelines
 {
     /// <summary>
-    /// Send incoming codes to preprocessors (pre stage)
+    /// Pipeline element for sending codes to code interceptors (post stage)
     /// </summary>
-    public class Post : PipelineStage
+    public class Post : PipelineBase
     {
         /// <summary>
         /// Constructor of this class
         /// </summary>
-        /// <param name="pipeline">Corresponding pipeline</param>
-        public Post(PipelineChannel pipeline) : base(Codes.PipelineStage.Post, pipeline) { }
+        /// <param name="processor">Channel processor</param>
+        public Post(ChannelProcessor processor) : base(PipelineStage.Post, processor) { }
 
         /// <summary>
         /// Process an incoming code
@@ -29,20 +29,20 @@ namespace DuetControlServer.Codes.PipelineStages
                 {
                     bool resolved = await IPC.Processors.CodeInterception.Intercept(code, InterceptionMode.Post);
                     code.Flags |= CodeFlags.IsPostProcessed;
-                    await Pipeline.WriteCodeAsync(code, resolved ? Codes.PipelineStage.Executed : Codes.PipelineStage.Firmware);
+                    await Processor.WriteCodeAsync(code, resolved ? PipelineStage.Executed : PipelineStage.Firmware);
                 }
                 catch (Exception e)
                 {
                     if (e is not OperationCanceledException)
                     {
-                        Pipeline.Logger.Error(e, "Failed to execute code {0} on post stage", code);
+                        Processor.Logger.Error(e, "Failed to execute code {0} on post stage", code);
                     }
-                    Processor.CancelCode(code, e);
+                    Codes.Processor.CancelCode(code, e);
                 }
             }
             else
             {
-                await Pipeline.WriteCodeAsync(code, Codes.PipelineStage.Firmware);
+                await Processor.WriteCodeAsync(code, PipelineStage.Firmware);
             }
         }
     }

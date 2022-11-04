@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about a network interface
@@ -8,6 +10,7 @@
         /// <summary>
         /// List of active protocols
         /// </summary>
+        [SbcProperty(false)]
         public ModelCollection<NetworkProtocol> ActiveProtocols { get; } = new ModelCollection<NetworkProtocol>();
 
         /// <summary>
@@ -23,6 +26,7 @@
         /// <summary>
         /// Configured IPv4 address of the network adapter
         /// </summary>
+        [SbcProperty(false)]
         public string ConfiguredIP
         {
             get => _configuredIP;
@@ -33,6 +37,7 @@
         /// <summary>
         /// Configured IPv4 DNS server fo the network adapter
         /// </summary>
+        [SbcProperty(false)]
         public string DnsServer
         {
             get => _dnsServer;
@@ -42,7 +47,7 @@
 
         /// <summary>
         /// Version of the network interface or null if unknown.
-        /// This is primarily intended for the ESP8266-based network interfaces as used on the Duet WiFi
+        /// This is only reported by ESP-based boards in standalone mode
         /// </summary>
         public string FirmwareVersion
         {
@@ -72,7 +77,8 @@
         private string _mac;
 
         /// <summary>
-        /// Number of reconnect attempts or null if unknown
+        /// Number of reconnect attempts or null if unknown.
+        /// This is only reported by ESP-based boards in standalone mode
         /// </summary>
         public int? NumReconnects
         {
@@ -84,6 +90,7 @@
         /// <summary>
         /// Signal of the WiFi adapter (only WiFi, in dBm, or null if unknown)
         /// </summary>
+        [SbcProperty(false)]
         public int? Signal
         {
             get => _signal;
@@ -94,6 +101,7 @@
         /// <summary>
         /// Speed of the network interface (in MBit, null if unknown, 0 if not connected)
         /// </summary>
+        [SbcProperty(false)]
         public int? Speed
         {
             get => _speed;

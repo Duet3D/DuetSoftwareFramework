@@ -1,20 +1,20 @@
 ﻿using DuetControlServer.Commands;
 using System.Threading.Tasks;
 
-namespace DuetControlServer.Codes.PipelineStages
+namespace DuetControlServer.Codes.Pipelines
 {
     /// <summary>
     /// Dummy stage for codes ready to be sent to the firmware.
     /// This class is not used by the pipeline itself but indirectly from the SPI channel processor
     /// </summary>
     /// <seealso cref="SPI.Channel.Processor"/>
-    public class Firmware : PipelineStage
+    public class Firmware : PipelineBase
     {
         /// <summary>
         /// Constructor of this class
         /// </summary>
-        /// <param name="pipeline">Corresponding pipeline</param>
-        public Firmware(PipelineChannel pipeline) : base(Codes.PipelineStage.Firmware, pipeline) { }
+        /// <param name="processor">Channel processor</param>
+        public Firmware(ChannelProcessor processor) : base(PipelineStage.Firmware, processor) { }
 
         /// <summary>
         /// Wait for the pipeline stage to become idle
@@ -33,6 +33,6 @@ namespace DuetControlServer.Codes.PipelineStages
         /// </summary>
         /// <param name="code">Code to process</param>
         /// <returns>Asynchronous task</returns>
-        public override Task ProcessCodeAsync(Commands.Code code) => null;
+        public override Task ProcessCodeAsync(Code code) => null;
     }
 }

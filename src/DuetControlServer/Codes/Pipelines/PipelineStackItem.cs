@@ -5,22 +5,22 @@ using System;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
-namespace DuetControlServer.Codes.PipelineStages
+namespace DuetControlServer.Codes.Pipelines
 {
     /// <summary>
-    /// Pipeline state for pipeline stages
+    /// Class representing an execution level on a given pipeline.
+    /// This is the effective target for incoming codes
     /// </summary>
-    public class Pipeline
+    public class PipelineStackItem
     {
         /// <summary>
         /// Constructor of this class
         /// </summary>
-        /// <param name="processDelegate">Function to invoke on initialization</param>
+        /// <param name="pipeline">Pipeline holding this stack item</param>
         /// <param name="macro">Current macro file or null if not present</param>
-        /// <param name="unbounded">Whether this state may hold an unlimited number of codes</param>
-        public Pipeline(PipelineStage stage, Macro macro)
+        public PipelineStackItem(PipelineBase pipeline, Macro macro)
         {
-            if (stage.Stage != Codes.PipelineStage.Executed)
+            if (pipeline.Stage != PipelineStage.Executed)
             {
                 PendingCodes = Channel.CreateBounded<Code>(new BoundedChannelOptions(Settings.MaxCodesPerInput)
                 {
@@ -40,13 +40,13 @@ namespace DuetControlServer.Codes.PipelineStages
             Macro = macro;
 
             // Feed incoming codes to the code handler
-            if (stage.Stage != Codes.PipelineStage.Firmware)
+            if (pipeline.Stage != PipelineStage.Firmware)
             {
                 ProcessorTask = Task.Factory.StartNew(async delegate
                 {
                     await foreach (Code code in PendingCodes.Reader.ReadAllAsync(Program.CancellationToken))
                     {
-                        if (code.CancellationToken.IsCancellationRequested && stage.Stage != Codes.PipelineStage.Executed)
+                        if (code.CancellationToken.IsCancellationRequested && pipeline.Stage != PipelineStage.Executed)
                         {
                             Processor.CancelCode(code);
                             continue;
@@ -59,12 +59,12 @@ namespace DuetControlServer.Codes.PipelineStages
 
                         try
                         {
-                            code.Stage = stage.Stage;
-                            await stage.ProcessCodeAsync(code);
+                            code.Stage = pipeline.Stage;
+                            await pipeline.ProcessCodeAsync(code);
                         }
                         catch (Exception e)
                         {
-                            stage.Pipeline.Logger.Error(e, "Failed to process code in stage {0}", stage.Stage);
+                            pipeline.Processor.Logger.Error(e, "Failed to process code in stage {0}", pipeline.Stage);
                         }
                         finally
                         {
@@ -96,7 +96,7 @@ namespace DuetControlServer.Codes.PipelineStages
         /// <summary>
         /// Internal task processing incoming codes
         /// </summary>
-        public readonly Task ProcessorTask;
+        internal readonly Task ProcessorTask;
 
         /// <summary>
         /// Indicates if the pipeline state is busy processing codes

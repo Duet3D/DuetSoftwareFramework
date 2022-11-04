@@ -3,18 +3,18 @@ using DuetAPI.Connection;
 using System;
 using System.Threading.Tasks;
 
-namespace DuetControlServer.Codes.PipelineStages
+namespace DuetControlServer.Codes.Pipelines
 {
     /// <summary>
-    /// Send incoming codes to preprocessors (pre stage)
+    /// Pipeline element for sending codes to code interceptors (pre stage)
     /// </summary>
-    public class Pre : PipelineStage
+    public class Pre : PipelineBase
     {
         /// <summary>
         /// Constructor of this class
         /// </summary>
-        /// <param name="pipeline">Corresponding pipeline</param>
-        public Pre(PipelineChannel pipeline) : base(Codes.PipelineStage.Pre, pipeline) { }
+        /// <param name="processor">Channel processor</param>
+        public Pre(ChannelProcessor processor) : base(PipelineStage.Pre, processor) { }
 
         /// <summary>
         /// Process an incoming code
@@ -29,20 +29,20 @@ namespace DuetControlServer.Codes.PipelineStages
                 {
                     bool resolved = await IPC.Processors.CodeInterception.Intercept(code, InterceptionMode.Pre);
                     code.Flags |= CodeFlags.IsPreProcessed;
-                    await Pipeline.WriteCodeAsync(code, resolved ? Codes.PipelineStage.Executed : Codes.PipelineStage.ProcessInternally);
+                    await Processor.WriteCodeAsync(code, resolved ? PipelineStage.Executed : PipelineStage.ProcessInternally);
                 }
                 catch (Exception e)
                 {
                     if (e is not OperationCanceledException)
                     {
-                        Pipeline.Logger.Error(e, "Failed to execute code {0} on pre stage", code);
+                        Processor.Logger.Error(e, "Failed to execute code {0} on pre stage", code);
                     }
-                    Processor.CancelCode(code, e);
+                    Codes.Processor.CancelCode(code, e);
                 }
             }
             else
             {
-                await Pipeline.WriteCodeAsync(code, Codes.PipelineStage.ProcessInternally);
+                await Processor.WriteCodeAsync(code, PipelineStage.ProcessInternally);
             }
         }
     }

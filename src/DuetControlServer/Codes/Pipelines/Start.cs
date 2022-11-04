@@ -3,18 +3,18 @@ using Nito.AsyncEx;
 using System;
 using System.Threading.Tasks;
 
-namespace DuetControlServer.Codes.PipelineStages
+namespace DuetControlServer.Codes.Pipelines
 {
     /// <summary>
-    /// Initial scheduler for codes being started
+    /// Initial pipeline element for codes being started
     /// </summary>
-    public class Start : PipelineStage
+    public class Start : PipelineBase
     {
         /// <summary>
         /// Constructor of this class
         /// </summary>
-        /// <param name="pipeline">Corresponding pipeline</param>
-        public Start(PipelineChannel pipeline) : base(Codes.PipelineStage.Start, pipeline) { }
+        /// <param name="processor">Channel processor</param>
+        public Start(ChannelProcessor processor) : base(PipelineStage.Start, processor) { }
 
         /// <summary>
         /// Counter for unbuffered codes
@@ -45,27 +45,27 @@ namespace DuetControlServer.Codes.PipelineStages
                 // Log it
                 if (code.Flags.HasFlag(CodeFlags.IsPrioritized))
                 {
-                    Pipeline.Logger.Debug("Starting code {0} (prioritized)", code);
+                    Processor.Logger.Debug("Starting code {0} (prioritized)", code);
                 }
                 else if (code.Flags.HasFlag(CodeFlags.IsFromMacro))
                 {
-                    Pipeline.Logger.Debug("Starting code {0} (macro code)", code);
+                    Processor.Logger.Debug("Starting code {0} (macro code)", code);
                 }
                 else if (SPI.Interface.IsWaitingForAcknowledgment(code.Channel))
                 {
-                    Pipeline.Logger.Debug("Starting code {0} (acknowledgment)", code);
+                    Processor.Logger.Debug("Starting code {0} (acknowledgment)", code);
                 }
                 else
                 {
-                    Pipeline.Logger.Debug("Starting code {0}", code);
+                    Processor.Logger.Debug("Starting code {0}", code);
                 }
 
                 // Code execution may begin, send it to the Pre stage
-                await Pipeline.WriteCodeAsync(code, Codes.PipelineStage.Pre);
+                await Processor.WriteCodeAsync(code, PipelineStage.Pre);
             }
             catch (Exception e)
             {
-                Processor.CancelCode(code, e);
+                Codes.Processor.CancelCode(code, e);
             }
         }
     }

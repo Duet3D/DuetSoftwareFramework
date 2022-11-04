@@ -3,21 +3,21 @@ using DuetAPI.Connection;
 using System;
 using System.Threading.Tasks;
 
-namespace DuetControlServer.Codes.PipelineStages
+namespace DuetControlServer.Codes.Pipelines
 {
     /// <summary>
     /// Code stage where codes are processed internally (if possible)
     /// </summary>
-    public class ProcessInternally : PipelineStage
+    public class ProcessInternally : PipelineBase
     {
         /// <summary>
         /// Constructor of this class
         /// </summary>
-        /// <param name="pipeline">Corresponding pipeline</param>
-        public ProcessInternally(PipelineChannel pipeline) : base(Codes.PipelineStage.ProcessInternally, pipeline) { }
+        /// <param name="processor">Chnanel processor</param>
+        public ProcessInternally(ChannelProcessor processor) : base(PipelineStage.ProcessInternally, processor) { }
 
         /// <summary>
-        /// Process an incoming code
+        /// Try to process an incoming code
         /// </summary>
         /// <param name="code">Code to process</param>
         /// <returns>Asynchronous task</returns>
@@ -29,21 +29,21 @@ namespace DuetControlServer.Codes.PipelineStages
                 {
                     bool resolved = await code.ProcessInternally();
                     code.Flags |= CodeFlags.IsInternallyProcessed;
-                    await Pipeline.WriteCodeAsync(code, resolved ? Codes.PipelineStage.Executed : Codes.PipelineStage.Post);
+                    await Processor.WriteCodeAsync(code, resolved ? PipelineStage.Executed : PipelineStage.Post);
                 }
                 catch (Exception e)
                 {
                     if (e is not OperationCanceledException)
                     {
-                        Pipeline.Logger.Error(e, "Failed to execute code {0} on internal processing stage", code);
+                        Processor.Logger.Error(e, "Failed to execute code {0} on internal processing stage", code);
                     }
-                    Processor.CancelCode(code, e);
+                    Codes.Processor.CancelCode(code, e);
                 }
             }
             else
             {
                 IPC.Processors.CodeInterception.GetCodeBeingIntercepted(code.Connection, out InterceptionMode mode);
-                await Pipeline.WriteCodeAsync(code, (mode != InterceptionMode.Post) ? Codes.PipelineStage.Post : Codes.PipelineStage.Firmware);
+                await Processor.WriteCodeAsync(code, (mode != InterceptionMode.Post) ? PipelineStage.Post : PipelineStage.Firmware);
             }
         }
     }

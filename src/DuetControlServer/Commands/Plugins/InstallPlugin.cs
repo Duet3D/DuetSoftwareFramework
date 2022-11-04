@@ -58,13 +58,11 @@ namespace DuetControlServer.Commands
             // Validate the current DSF/RRF versions
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-#pragma warning disable CS0618 // Type or member is obsolete
                 // Check the required DSF version
                 if (!PluginManifest.CheckVersion(Model.Provider.Get.State.DsfVersion, plugin.SbcDsfVersion))
                 {
                     throw new ArgumentException($"Incompatible DSF version (requires {plugin.SbcDsfVersion}, got {Model.Provider.Get.State.DsfVersion})");
                 }
-#pragma warning restore CS0618 // Type or member is obsolete
 
                 // Check the required RRF version
                 if (!string.IsNullOrEmpty(plugin.RrfVersion))

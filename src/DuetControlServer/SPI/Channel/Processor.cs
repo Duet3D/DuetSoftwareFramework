@@ -83,8 +83,7 @@ namespace DuetControlServer.SPI.Channel
         /// <returns>New state</returns>
         public State Push(Macro macro = null)
         {
-            Codes.PipelineStages.Pipeline pipelineState = Codes.Processor.Push(Channel, macro);
-            State state = new(pipelineState);
+            State state = new(Codes.Processor.Push(Channel, macro));
 
             // Dequeue already suspended codes first so the correct order is maintained
             Queue<Code> alreadySuspendedCodes = new(CurrentState.SuspendedCodes.Count);

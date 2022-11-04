@@ -74,12 +74,12 @@
         /// <summary>
         /// Time for which a temperature anomaly must persist on this heater before raising a heater fault (in s)
         /// </summary>
-        public int MaxHeatingFaultTime
+        public float MaxHeatingFaultTime
         {
             get => _maxHeatingFaultTime;
             set => SetPropertyValue(ref _maxHeatingFaultTime, value);
         }
-        private int _maxHeatingFaultTime = 5;
+        private float _maxHeatingFaultTime = 5F;
 
         /// <summary>
         /// Permitted temperature excursion from the setpoint for this heater (in K)

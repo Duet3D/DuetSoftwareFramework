@@ -174,7 +174,7 @@ namespace DuetControlServer.Commands
         /// </summary>
         /// <returns>Whether the code could be processed internally</returns>
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
-        internal async Task<bool> ProcessInternally()
+        internal async ValueTask<bool> ProcessInternally()
         {
             if (Keyword != KeywordType.None &&
                 Keyword != KeywordType.Echo &&

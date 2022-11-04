@@ -8,9 +8,11 @@ using System.Threading.Tasks;
 namespace DuetControlServer.Codes
 {
     /// <summary>
-    /// Class maintaining individual pipelines per code channel to deal with concurrent execution of G/M/T-codes
+    /// Class delegating parallel G/M/T-code execution for a single code channel.
+    /// Every instance holds the code pipeline elements through which incoming G/M/T-codes are sent.
+    /// Note that code files and events disrupting the code flow require their own stack level to maintain the correct order of code execution.
     /// </summary>
-    public class PipelineChannel
+    public class ChannelProcessor
     {
         /// <summary>
         /// Pipeline stages that support push/pop
@@ -35,32 +37,32 @@ namespace DuetControlServer.Codes
         /// <summary>
         /// Pipelines for code flow
         /// </summary>
-        private readonly PipelineStages.PipelineStage[] _stages = new PipelineStages.PipelineStage[NumPipelineStages];
+        private readonly Pipelines.PipelineBase[] _pipelines = new Pipelines.PipelineBase[NumPipelineStages];
 
         /// <summary>
         /// Retrieve the firmware state
         /// </summary>
-        internal PipelineStages.Pipeline FirmwareState => _stages[(int)PipelineStage.Firmware].State;
+        internal Pipelines.PipelineStackItem FirmwareState => _pipelines[(int)PipelineStage.Firmware].State;
 
         /// <summary>
         /// Constructor of this class
         /// </summary>
         /// <param name="channel"></param>
-        public PipelineChannel(CodeChannel channel)
+        public ChannelProcessor(CodeChannel channel)
         {
             Channel = channel;
             Logger = NLog.LogManager.GetLogger(Channel.ToString());
 
             foreach (PipelineStage stage in Enum.GetValues(typeof(PipelineStage)))
             {
-                _stages[(int)stage] = stage switch
+                _pipelines[(int)stage] = stage switch
                 {
-                    PipelineStage.Start => new PipelineStages.Start(this),
-                    PipelineStage.Pre => new PipelineStages.Pre(this),
-                    PipelineStage.ProcessInternally => new PipelineStages.ProcessInternally(this),
-                    PipelineStage.Post => new PipelineStages.Post(this),
-                    PipelineStage.Firmware => new PipelineStages.Firmware(this),
-                    PipelineStage.Executed => new PipelineStages.Executed(this),
+                    PipelineStage.Start => new Pipelines.Start(this),
+                    PipelineStage.Pre => new Pipelines.Pre(this),
+                    PipelineStage.ProcessInternally => new Pipelines.ProcessInternally(this),
+                    PipelineStage.Post => new Pipelines.Post(this),
+                    PipelineStage.Firmware => new Pipelines.Firmware(this),
+                    PipelineStage.Executed => new Pipelines.Executed(this),
                     _ => throw new ArgumentException($"Unsupported pipeline stage {stage}"),
                 };
             }
@@ -70,7 +72,7 @@ namespace DuetControlServer.Codes
         /// Lifecycle of this pipeline
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public Task Run() => Task.WhenAll(_stages.Select(stage => stage.WaitForCompletionAsync()));
+        public Task Run() => Task.WhenAll(_pipelines.Select(stage => stage.WaitForCompletionAsync()));
 
         /// <summary>
         /// Get diagnostics from this pipeline
@@ -78,9 +80,12 @@ namespace DuetControlServer.Codes
         /// <param name="builder">String builder to write to</param>
         public void Diagnostics(StringBuilder builder)
         {
-            foreach (PipelineStages.PipelineStage stage in _stages)
+            foreach (Pipelines.PipelineBase pipeline in _pipelines)
             {
-                stage.Diagnostics(builder);
+                if (pipeline.Stage != PipelineStage.Firmware)
+                {
+                    pipeline.Diagnostics(builder);
+                }
             }
         }
 
@@ -88,18 +93,18 @@ namespace DuetControlServer.Codes
         /// Push a new state on the stack
         /// </summary>
         /// <returns>New pipeline state of the firmware for the SPI connector</returns>
-        public PipelineStages.Pipeline Push(Macro macro)
+        public Pipelines.PipelineStackItem Push(Macro macro)
         {
-            PipelineStages.Pipeline newState = null;
+            Pipelines.PipelineStackItem newState = null;
             foreach (PipelineStage stage in StagesWithStack)
             {
                 if (stage == PipelineStage.Firmware)
                 {
-                    newState = _stages[(int)stage].Push(macro);
+                    newState = _pipelines[(int)stage].Push(macro);
                 }
                 else
                 {
-                    _stages[(int)stage].Push(macro);
+                    _pipelines[(int)stage].Push(macro);
                 }
             }
             return newState;
@@ -112,7 +117,7 @@ namespace DuetControlServer.Codes
         {
             foreach (PipelineStage stage in StagesWithStack)
             {
-                _stages[(int)stage].Pop();
+                _pipelines[(int)stage].Pop();
             }
         }
 
@@ -126,7 +131,7 @@ namespace DuetControlServer.Codes
         {
             foreach (PipelineStage stage in StagesWithStack)
             {
-                if (!_stages[(int)stage].IsIdle(code))
+                if (!_pipelines[(int)stage].IsIdle(code))
                 {
                     return false;
                 }
@@ -141,15 +146,15 @@ namespace DuetControlServer.Codes
         /// <returns>Whether the codes have been flushed successfully</returns>
         public async Task<bool> FlushAsync()
         {
-            foreach (PipelineStages.PipelineStage stage in _stages)
+            foreach (Pipelines.PipelineBase pipeline in _pipelines)
             {
-                Logger.Debug("Flushing codes on stage {0}", stage);
-                if (!await stage.FlushAsync(null))
+                Logger.Debug("Flushing codes on stage {0}", pipeline.Stage);
+                if (!await pipeline.FlushAsync(null))
                 {
-                    Logger.Debug("Failed to flush codes on stage {0}", stage);
+                    Logger.Debug("Failed to flush codes on stage {0}", pipeline.Stage);
                     return false;
                 }
-                Logger.Debug("Flushed codes on stage {0}", stage);
+                Logger.Debug("Flushed codes on stage {0}", pipeline.Stage);
             }
             return true;
         }
@@ -169,7 +174,7 @@ namespace DuetControlServer.Codes
                 if (code.Stage == PipelineStage.Executed || stage > code.Stage)
                 {
                     Logger.Debug("Flushing codes on stage {0} for {1}", stage, code);
-                    if (!await _stages[(int)stage].FlushAsync(code, evaluateExpressions, evaluateAll))
+                    if (!await _pipelines[(int)stage].FlushAsync(code, evaluateExpressions, evaluateAll))
                     {
                         Logger.Debug("Failed to flush codes on stage {0} for {1}", stage, code);
                         return false;
@@ -188,7 +193,7 @@ namespace DuetControlServer.Codes
         public void WriteCode(Commands.Code code, PipelineStage stage)
         {
             //Logger.Debug("Sending code {0} to stage {1}", code, stage);
-            _stages[(int)stage].WriteCode(code);
+            _pipelines[(int)stage].WriteCode(code);
             //Logger.Debug("Sent code {0} to stage {1}", code, stage);
         }
 
@@ -200,7 +205,7 @@ namespace DuetControlServer.Codes
         public async ValueTask WriteCodeAsync(Commands.Code code, PipelineStage stage)
         {
             //Logger.Debug("Sending code {0} to stage {1}", code, stage);
-            await _stages[(int)stage].WriteCodeAsync(code);
+            await _pipelines[(int)stage].WriteCodeAsync(code);
             //Logger.Debug("Sent code {0} to stage {1}", code, stage);
         }
     }

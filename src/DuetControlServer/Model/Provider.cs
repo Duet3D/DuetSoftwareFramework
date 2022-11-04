@@ -185,11 +185,9 @@ namespace DuetControlServer.Model
         public static void Init()
         {
             ObjectModel.OnDeserializationFailed += OnDeserializationFailed;
-#pragma warning disable CS0618 // Type or member is obsolete
             Get.State.DsfVersion = Program.Version;
             Get.State.DsfPluginSupport = Settings.PluginSupport;
             Get.State.DsfRootPluginSupport = Settings.PluginSupport && Settings.RootPluginSupport;
-#pragma warning restore CS0618 // Type or member is obsolete
             Get.Network.Hostname = Environment.MachineName;
             Get.Network.Name = Environment.MachineName;
         }

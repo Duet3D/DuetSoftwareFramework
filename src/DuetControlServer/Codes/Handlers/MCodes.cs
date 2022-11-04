@@ -79,9 +79,9 @@ namespace DuetControlServer.Codes.Handlers
                         string virtualDirectory = code.Parameter('P');
                         if (virtualDirectory == null)
                         {
-                            using (await Model.Provider.AccessReadOnlyAsync())
+                            using (await Provider.AccessReadOnlyAsync())
                             {
-                                virtualDirectory = Model.Provider.Get.Directories.GCodes;
+                                virtualDirectory = Provider.Get.Directories.GCodes;
                             }
                         }
                         string physicalDirectory = await FilePath.ToPhysicalAsync(virtualDirectory);
@@ -109,9 +109,9 @@ namespace DuetControlServer.Codes.Handlers
 
                         // Print standard G-code response
                         Compatibility compatibility;
-                        using (await Model.Provider.AccessReadOnlyAsync())
+                        using (await Provider.AccessReadOnlyAsync())
                         {
-                            compatibility = Model.Provider.Get.Inputs[code.Channel].Compatibility;
+                            compatibility = Provider.Get.Inputs[code.Channel].Compatibility;
                         }
 
                         StringBuilder result = new();
@@ -478,17 +478,17 @@ namespace DuetControlServer.Codes.Handlers
                 case 39:
                     if (await Processor.FlushAsync(code))
                     {
-                        using (await Model.Provider.AccessReadOnlyAsync())
+                        using (await Provider.AccessReadOnlyAsync())
                         {
                             int index = code.Parameter('P', 0);
                             if (code.Parameter('S', 0) == 2)
                             {
-                                if (index < 0 || index >= Model.Provider.Get.Volumes.Count)
+                                if (index < 0 || index >= Provider.Get.Volumes.Count)
                                 {
                                     return new Message(MessageType.Success, $"{{\"SDinfo\":{{\"slot\":{index},present:0}}}}");
                                 }
 
-                                Volume storage = Model.Provider.Get.Volumes[index];
+                                Volume storage = Provider.Get.Volumes[index];
                                 var output = new
                                 {
                                     SDinfo = new
@@ -505,12 +505,12 @@ namespace DuetControlServer.Codes.Handlers
                             }
                             else
                             {
-                                if (index < 0 || index >= Model.Provider.Get.Volumes.Count)
+                                if (index < 0 || index >= Provider.Get.Volumes.Count)
                                 {
                                     return new Message(MessageType.Error, $"Bad SD slot number: {index}");
                                 }
 
-                                Volume storage = Model.Provider.Get.Volumes[index];
+                                Volume storage = Provider.Get.Volumes[index];
                                 return new Message(MessageType.Success, $"SD card in slot {index}: capacity {storage.Capacity / (1000 * 1000 * 1000):F2}Gb, partition size {storage.PartitionSize / (1000 * 1000 * 1000):F2}Gb,free space {storage.FreeSpace / (1000 * 1000 * 1000):F2}Gb, speed {storage.Speed / (1000 * 1000):F2}MBytes/sec");
                             }
                         }
@@ -550,9 +550,9 @@ namespace DuetControlServer.Codes.Handlers
                         }
 
                         // RRF halted
-                        using (await Model.Provider.AccessReadWriteAsync())
+                        using (await Provider.AccessReadWriteAsync())
                         {
-                            Model.Provider.Get.State.Status = MachineStatus.Halted;
+                            Provider.Get.State.Status = MachineStatus.Halted;
                         }
                         return new Message();
                     }
@@ -664,9 +664,9 @@ namespace DuetControlServer.Codes.Handlers
                                 if (Directory.Exists(physicalDirectory))
                                 {
                                     string virtualDirectory = await FilePath.ToVirtualAsync(physicalDirectory);
-                                    using (await Model.Provider.AccessReadWriteAsync())
+                                    using (await Provider.AccessReadWriteAsync())
                                     {
-                                        Model.Provider.Get.Directories.System = virtualDirectory;
+                                        Provider.Get.Directories.System = virtualDirectory;
                                     }
                                     return new Message();
                                 }
@@ -674,9 +674,9 @@ namespace DuetControlServer.Codes.Handlers
                             return new Message(MessageType.Error, "Directory not found");
                         }
 
-                        using (await Model.Provider.AccessReadOnlyAsync())
+                        using (await Provider.AccessReadOnlyAsync())
                         {
-                            return new Message(MessageType.Success, $"Sys file path is {Model.Provider.Get.Directories.System}");
+                            return new Message(MessageType.Success, $"Sys file path is {Provider.Get.Directories.System}");
                         }
                     }
                     throw new OperationCanceledException();
@@ -733,9 +733,9 @@ namespace DuetControlServer.Codes.Handlers
                         string password = code.Parameter('P');
                         if (password != null)
                         {
-                            using (await Model.Provider.AccessReadWriteAsync())
+                            using (await Provider.AccessReadWriteAsync())
                             {
-                                Model.Provider.Password = password;
+                                Provider.Password = password;
                             }
                         }
                         break;
@@ -749,20 +749,20 @@ namespace DuetControlServer.Codes.Handlers
                         string corsSite = code.Parameter('C');
                         if (corsSite != null)
                         {
-                            using (await Model.Provider.AccessReadWriteAsync())
+                            using (await Provider.AccessReadWriteAsync())
                             {
-                                Model.Provider.Get.Network.CorsSite = string.IsNullOrWhiteSpace(corsSite) ? null : corsSite;
+                                Provider.Get.Network.CorsSite = string.IsNullOrWhiteSpace(corsSite) ? null : corsSite;
                             }
                             return new Message();
                         }
 
-                        using (await Model.Provider.AccessReadOnlyAsync())
+                        using (await Provider.AccessReadOnlyAsync())
                         {
-                            if (string.IsNullOrEmpty(Model.Provider.Get.Network.CorsSite))
+                            if (string.IsNullOrEmpty(Provider.Get.Network.CorsSite))
                             {
                                 return new Message(MessageType.Success, "CORS disabled");
                             }
-                            return new Message(MessageType.Success, $"CORS enabled for site '{Model.Provider.Get.Network.CorsSite}'");
+                            return new Message(MessageType.Success, $"CORS enabled for site '{Provider.Get.Network.CorsSite}'");
                         }
                     }
                     throw new OperationCanceledException();
@@ -829,13 +829,13 @@ namespace DuetControlServer.Codes.Handlers
                         CodeParameter sParam = code.Parameter('S');
                         if (sParam == null)
                         {
-                            using (await Model.Provider.AccessReadOnlyAsync())
+                            using (await Provider.AccessReadOnlyAsync())
                             {
-                                if (Model.Provider.Get.State.LogLevel == LogLevel.Off)
+                                if (Provider.Get.State.LogLevel == LogLevel.Off)
                                 {
                                     return new Message(MessageType.Success, "Event logging is disabled");
                                 }
-                                return new Message(MessageType.Success, $"Event logging is enabled at log level {Model.Provider.Get.State.LogLevel.ToString().ToLowerInvariant()}");
+                                return new Message(MessageType.Success, $"Event logging is enabled at log level {Provider.Get.State.LogLevel.ToString().ToLowerInvariant()}");
                             }
                         }
 
@@ -850,11 +850,11 @@ namespace DuetControlServer.Codes.Handlers
                             };
 
                             string defaultLogFile = Utility.Logger.DefaultLogFile;
-                            using (await Model.Provider.AccessReadOnlyAsync())
+                            using (await Provider.AccessReadOnlyAsync())
                             {
-                                if (!string.IsNullOrEmpty(Model.Provider.Get.State.LogFile))
+                                if (!string.IsNullOrEmpty(Provider.Get.State.LogFile))
                                 {
-                                    defaultLogFile = Model.Provider.Get.State.LogFile;
+                                    defaultLogFile = Provider.Get.State.LogFile;
                                 }
                             }
                             string logFile = code.Parameter('P', defaultLogFile);
@@ -881,16 +881,16 @@ namespace DuetControlServer.Codes.Handlers
                         {
                             // Get the IAP and Firmware files
                             string iapFile, firmwareFile;
-                            using (await Model.Provider.AccessReadOnlyAsync())
+                            using (await Provider.AccessReadOnlyAsync())
                             {
-                                if (Model.Provider.Get.Boards.Count == 0)
+                                if (Provider.Get.Boards.Count == 0)
                                 {
                                     return new Message(MessageType.Error, "No boards have been detected");
                                 }
 
                                 // There are now two different IAP binaries, check which one to use
-                                iapFile = Model.Provider.Get.Boards[0].IapFileNameSBC;
-                                firmwareFile = code.Parameter('P') ?? Model.Provider.Get.Boards[0].FirmwareFileName;
+                                iapFile = Provider.Get.Boards[0].IapFileNameSBC;
+                                firmwareFile = code.Parameter('P') ?? Provider.Get.Boards[0].FirmwareFileName;
                             }
 
                             if (string.IsNullOrEmpty(iapFile) || string.IsNullOrEmpty(firmwareFile))
@@ -958,7 +958,7 @@ namespace DuetControlServer.Codes.Handlers
                             }
                             else
                             {
-                                await Model.Updater.WaitForFullUpdate();
+                                await Updater.WaitForFullUpdate();
 
                                 Commands.StartPlugins startCommand = new();
                                 await startCommand.Execute();
@@ -1068,10 +1068,10 @@ namespace DuetControlServer.Codes.Handlers
             builder.AppendLine("=== Duet Control Server ===");
             builder.AppendLine($"Duet Control Server v{Program.Version}");
 
-            Codes.Processor.Diagnostics(builder);
+            Processor.Diagnostics(builder);
             await FileExecution.Job.Diagnostics(builder);
             IPC.Processors.CodeInterception.Diagnostics(builder);
-            Model.Provider.Diagnostics(builder);
+            Provider.Diagnostics(builder);
             await SPI.Interface.Diagnostics(builder);
 
             result.Append(MessageType.Success, builder.ToString());

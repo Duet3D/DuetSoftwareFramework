@@ -11,19 +11,14 @@ using System.Threading.Tasks;
 namespace DuetControlServer.Codes
 {
     /// <summary>
-    /// Static class holding code pipelines per code channel
+    /// Main class delegating parallel G/M/T-code execution
     /// </summary>
     public static class Processor
     {
         /// <summary>
-        /// Logger instance
+        /// Processors per code channel
         /// </summary>
-        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
-        /// <summary>
-        /// Code pipeline per code channel
-        /// </summary>
-        private static readonly PipelineChannel[] _channels = new PipelineChannel[Inputs.Total];
+        private static readonly ChannelProcessor[] _processors = new ChannelProcessor[Inputs.Total];
 
         /// <summary>
         /// Initialize this class
@@ -32,25 +27,25 @@ namespace DuetControlServer.Codes
         {
             for (int input = 0; input < Inputs.Total; input++)
             {
-                _channels[input] = new PipelineChannel((CodeChannel)input);
+                _processors[input] = new ChannelProcessor((CodeChannel)input);
             }
         }
 
         /// <summary>
-        /// Lifecycle of this pipeline
+        /// Task representing the lifecycle of this class
         /// </summary>
         /// <returns></returns>
-        public static Task Run() => Task.WhenAll(_channels.Select(pipeline => pipeline.Run()));
+        public static Task Run() => Task.WhenAll(_processors.Select(processor => processor.Run()));
 
         /// <summary>
-        /// Get diagnostics from every pipeline
+        /// Get diagnostics from every channel processor
         /// </summary>
         /// <param name="builder">String builder to write to</param>
         public static void Diagnostics(StringBuilder builder)
         {
-            foreach (PipelineChannel pipeline in _channels)
+            foreach (ChannelProcessor processor in _processors)
             {
-                pipeline.Diagnostics(builder);
+                processor.Diagnostics(builder);
             }
         }
 
@@ -58,32 +53,30 @@ namespace DuetControlServer.Codes
         /// Get the pipeline state of the firmware stage from a given channel
         /// </summary>
         /// <param name="channel"></param>
-        internal static PipelineStages.Pipeline GetFirmwareState(CodeChannel channel) => _channels[(int)channel].FirmwareState;
+        internal static Pipelines.PipelineStackItem GetFirmwareState(CodeChannel channel) => _processors[(int)channel].FirmwareState;
 
         /// <summary>
-        /// Push a new state on the stack of a given pipeline.
-        /// Only to be used by the SPI channel processor!
+        /// Push a new state on the stack of a given channel procesor. Only to be used by the SPI channel processor!
         /// </summary>
         /// <param name="channel">Code channel</param>
         /// <param name="macro">Optional macro file</param>
         /// <returns>Pipeline state</returns>
-        public static PipelineStages.Pipeline Push(CodeChannel channel, Macro macro = null) => _channels[(int)channel].Push(macro);
+        internal static Pipelines.PipelineStackItem Push(CodeChannel channel, Macro macro = null) => _processors[(int)channel].Push(macro);
 
         /// <summary>
-        /// Push a new state on the stack of a given pipeline.
-        /// Only to be used by the SPI channel processor!
+        /// Push a new state on the stack of a given pipeline. Only to be used by the SPI channel processor!
         /// </summary>
         /// <param name="channel">Code channel</param>
         /// <param name="macro">Optional macro file</param>
         /// <returns>Pipeline state</returns>
-        public static void Pop(CodeChannel channel) => _channels[(int)channel].Pop();
+        internal static void Pop(CodeChannel channel) => _processors[(int)channel].Pop();
 
         /// <summary>
         /// Wait for all pending codes to finish
         /// </summary>
         /// <param name="channel">Code channel to wait for</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static Task<bool> FlushAsync(CodeChannel channel) => _channels[(int)channel].FlushAsync();
+        public static Task<bool> FlushAsync(CodeChannel channel) => _processors[(int)channel].FlushAsync();
 
         /// <summary>
         /// Wait for all pending codes on the same stack level as the given code to finish.
@@ -99,7 +92,7 @@ namespace DuetControlServer.Codes
             {
                 throw new ArgumentNullException(nameof(code));
             }
-            return _channels[(int)code.Channel].FlushAsync(code, evaluateExpressions, evaluateAll);
+            return _processors[(int)code.Channel].FlushAsync(code, evaluateExpressions, evaluateAll);
         }
 
         /// <summary>
@@ -108,16 +101,16 @@ namespace DuetControlServer.Codes
         /// <param name="code">Code to enqueue</param>
         public static ValueTask StartCodeAsync(Commands.Code code)
         {
-            PipelineChannel pipeline = _channels[(int)code.Channel];
+            ChannelProcessor processor = _processors[(int)code.Channel];
             PipelineStage stage = PipelineStage.Start;
 
             // Deal with priority codes
             if (code.Flags.HasFlag(CodeFlags.IsPrioritized))
             {
                 // Check if the code has to be moved to another channel first
-                if (pipeline.IsIdle(code))
+                if (processor.IsIdle(code))
                 {
-                    return pipeline.WriteCodeAsync(code, stage);
+                    return processor.WriteCodeAsync(code, stage);
                 }
 
                 // Move priority codes to an empty code channel (if possible)
@@ -125,7 +118,7 @@ namespace DuetControlServer.Codes
                 {
                     if (channel != code.Channel)
                     {
-                        PipelineChannel next = _channels[(int)channel];
+                        ChannelProcessor next = _processors[(int)channel];
                         if (next.IsIdle(code))
                         {
                             code.Channel = channel;
@@ -135,7 +128,7 @@ namespace DuetControlServer.Codes
                 }
 
                 // Log a warning if that failed
-                pipeline.Logger.Warn("Failed to move priority code {0} to an empty code channel because all of them are occupied", code);
+                processor.Logger.Warn("Failed to move priority code {0} to an empty code channel because all of them are occupied", code);
             }
 
             // Deal with codes from code interceptors
@@ -159,7 +152,7 @@ namespace DuetControlServer.Codes
 
             // Forward the code to the requested pipeline
             code.Stage = stage;
-            return pipeline.WriteCodeAsync(code, stage);
+            return processor.WriteCodeAsync(code, stage);
         }
 
         /// <summary>
@@ -170,7 +163,7 @@ namespace DuetControlServer.Codes
         public static void CancelCode(Commands.Code code, Exception e = null)
         {
             code.Result = null;
-            if (e != null && e is not OperationCanceledException)
+            if (e is not null and not OperationCanceledException)
             {
                 code.SetException(e);
             }
@@ -182,6 +175,6 @@ namespace DuetControlServer.Codes
         /// </summary>
         /// <param name="code">Code to enqueue</param>
         /// <param name="stage">Stage level to enqueue it at</param>
-        public static void CodeCompleted(Commands.Code code) => _channels[(int)code.Channel].WriteCode(code, PipelineStage.Executed);
+        public static void CodeCompleted(Commands.Code code) => _processors[(int)code.Channel].WriteCode(code, PipelineStage.Executed);
     }
 }
