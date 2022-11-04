@@ -46,6 +46,36 @@
         private int _frequency;
 
         /// <summary>
+        /// Idle PWM value (0..1)
+        /// </summary>
+        public float IdlePwm
+        {
+            get => _idlePwm;
+            set => SetPropertyValue(ref _idlePwm, value);
+        }
+        private float _idlePwm;
+
+        /// <summary>
+        /// Maximum RPM
+        /// </summary>
+        public int Max
+        {
+            get => _max;
+            set => SetPropertyValue(ref _max, value);
+        }
+        private int _max = 10000;
+
+        /// <summary>
+        /// Maximum PWM value when turned on (0..1)
+        /// </summary>
+        public float MaxPwm
+        {
+            get => _maxPwm;
+            set => SetPropertyValue(ref _maxPwm, value);
+        }
+        private float _maxPwm = 1F;
+
+        /// <summary>
         /// Minimum RPM when turned on
         /// </summary>
         public int Min
@@ -56,14 +86,14 @@
         private int _min = 60;
 
         /// <summary>
-        /// Maximum RPM
+        /// Minimum PWM value when turned on (0..1)
         /// </summary>
-        public int Max
+        public float MinPwm
         {
-            get => _max;
-			set => SetPropertyValue(ref _max, value);
+            get => _minPwm;
+            set => SetPropertyValue(ref _minPwm, value);
         }
-        private int _max = 10000;
+        private float _minPwm;
 
         /// <summary>
         /// Current state
