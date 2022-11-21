@@ -104,12 +104,12 @@ namespace DuetAPI.ObjectModel
         /// <returns>RepRapFirmware-style message</returns>
         public override string ToString()
         {
-            return Type switch
+            switch (Type)
             {
-                MessageType.Error => "Error: " + Content,
-                MessageType.Warning => "Warning: " + Content,
-                _ => Content,
-            };
+                case MessageType.Error: return "Error: " + Content;
+                case MessageType.Warning: return "Warning: " + Content;
+                default: return Content;
+            }
         }
     }
 }

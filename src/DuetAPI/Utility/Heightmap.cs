@@ -72,7 +72,7 @@ namespace DuetAPI.Utility
         /// <exception cref="IOException">Invalid file</exception>
         public async Task Load(string filename)
         {
-            await using (FileStream stream = new FileStream(filename, FileMode.Open, FileAccess.Read))
+            using (FileStream stream = new FileStream(filename, FileMode.Open, FileAccess.Read))
             {
                 using (StreamReader reader = new StreamReader(stream))
                 {
@@ -154,9 +154,9 @@ namespace DuetAPI.Utility
         /// <returns>Asynchronous task</returns>
         public async Task Save(string filename)
         {
-            await using (FileStream stream = new FileStream(filename, FileMode.Create, FileAccess.Write))
+            using (FileStream stream = new FileStream(filename, FileMode.Create, FileAccess.Write))
             {
-                await using (StreamWriter writer = new StreamWriter(stream))
+                using (StreamWriter writer = new StreamWriter(stream))
                 {
                     await writer.WriteLineAsync($"RepRapFirmware height map file v2 generated at {DateTime.Now:yyyy-MM-dd HH:mm}");
                     await writer.WriteLineAsync("xmin,xmax,ymin,ymax,radius,xspacing,yspacing,xnum,ynum");

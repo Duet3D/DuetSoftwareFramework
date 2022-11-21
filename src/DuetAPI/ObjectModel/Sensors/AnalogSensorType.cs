@@ -102,23 +102,23 @@ namespace DuetAPI.ObjectModel
         {
             if (reader.TokenType == JsonTokenType.String)
             {
-                return reader.GetString().ToLowerInvariant() switch
+                switch (reader.GetString().ToLowerInvariant())
                 {
-                    "thermistor" => AnalogSensorType.Thermistor,
-                    "pt1000" => AnalogSensorType.PT1000,
-                    "rtdmax31865" => AnalogSensorType.MAX31865,
-                    "thermocouplemax31855" => AnalogSensorType.MAX31855,
-                    "thermocouplemax31856" => AnalogSensorType.MAX31856,
-                    "linearanalog" => AnalogSensorType.LinearAnalaog,
-                    "dht11" => AnalogSensorType.DHT11,
-                    "dht21" => AnalogSensorType.DHT21,
-                    "dht22" => AnalogSensorType.DHT22,
-                    "dhthumidity" => AnalogSensorType.DHTHumidity,
-                    "currentloooppyro" => AnalogSensorType.CurrentLoop,
-                    "mcutemp" => AnalogSensorType.McuTemp,
-                    "drivers" => AnalogSensorType.Drivers,
-                    "driversduex" => AnalogSensorType.DriversDuex,
-                    _ => AnalogSensorType.Unknown
+                    case "thermistor": return AnalogSensorType.Thermistor;
+                    case "pt1000": return AnalogSensorType.PT1000;
+                    case "rtdmax31865": return AnalogSensorType.MAX31865;
+                    case "thermocouplemax31855": return AnalogSensorType.MAX31855;
+                    case "thermocouplemax31856": return AnalogSensorType.MAX31856;
+                    case "linearanalog": return AnalogSensorType.LinearAnalaog;
+                    case "dht11": return AnalogSensorType.DHT11;
+                    case "dht21": return AnalogSensorType.DHT21;
+                    case "dht22": return AnalogSensorType.DHT22;
+                    case "dhthumidity": return AnalogSensorType.DHTHumidity;
+                    case "currentloooppyro": return AnalogSensorType.CurrentLoop;
+                    case "mcutemp": return AnalogSensorType.McuTemp;
+                    case "drivers": return AnalogSensorType.Drivers;
+                    case "driversduex": return AnalogSensorType.DriversDuex;
+                    default: return AnalogSensorType.Unknown;
                 };
             }
             throw new JsonException($"Invalid type for {nameof(AnalogSensorType)}");

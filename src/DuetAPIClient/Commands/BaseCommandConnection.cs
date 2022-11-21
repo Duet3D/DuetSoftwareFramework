@@ -60,10 +60,7 @@ namespace DuetAPIClient
         /// <seealso cref="SbcPermissions.ManageUserSessions"/>
         public Task<int> AddUserSession(AccessLevel access, SessionType type, string origin = null, CancellationToken cancellationToken = default)
         {
-            if (origin == null)
-            {
-                origin = Process.GetCurrentProcess().Id.ToString();
-            }
+            origin ??= Process.GetCurrentProcess().Id.ToString();
             return PerformCommand<int>(new AddUserSession { AccessLevel = access, SessionType = type, Origin = origin }, cancellationToken);
         }
 

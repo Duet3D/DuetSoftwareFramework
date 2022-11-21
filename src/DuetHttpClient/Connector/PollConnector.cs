@@ -57,33 +57,35 @@ namespace DuetHttpClient.Connector
         /// <exception cref="InvalidVersionException">Unsupported DSF version</exception>
         public static async Task<PollConnector> ConnectAsync(Uri baseUri, DuetHttpOptions options, CancellationToken cancellationToken)
         {
-            using HttpClient client = new HttpClient()
+            using (HttpClient client = new HttpClient() { Timeout = options.Timeout })
             {
-                Timeout = options.Timeout
-            };
+                using (HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, "rr_connect?password={HttpUtility.UrlPathEncode(password)}&time={DateTime.Now:s}"), cancellationToken))
+                {
+                    response.EnsureSuccessStatusCode();
 
-            using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, "rr_connect?password={HttpUtility.UrlPathEncode(password)}&time={DateTime.Now:s}"), cancellationToken);
-            response.EnsureSuccessStatusCode();
+                    using (Stream responseStream = await response.Content.ReadAsStreamAsync())
+                    {
+                        ConnectResponse connectResponse = await JsonSerializer.DeserializeAsync<ConnectResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
+                        switch (connectResponse.Err)
+                        {
+                            case 0: break;
+                            case 1: throw new InvalidPasswordException();
+                            case 2: throw new NoFreeSessionException();
+                            default: throw new LoginException($"rr_connect returned unknown err {connectResponse.Err}");
+                        }
 
-            await using Stream responseStream = await response.Content.ReadAsStreamAsync();
-            ConnectResponse connectResponse = await JsonSerializer.DeserializeAsync<ConnectResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
-            switch (connectResponse.Err)
-            {
-                case 0: break;
-                case 1: throw new InvalidPasswordException();
-                case 2: throw new NoFreeSessionException();
-                default: throw new LoginException($"rr_connect returned unknown err {connectResponse.Err}");
-            }
+                        if (connectResponse.IsEmulated)
+                        {
+                            // Don't attempt to use emulated endpoints since the remote server provides support for RESTful calls too
+                            throw new HttpRequestException("HTTP backend is emulated");
+                        }
 
-            if (connectResponse.IsEmulated)
-            {
-                // Don't attempt to use emulated endpoints since the remote server provides support for RESTful calls too
-                throw new HttpRequestException("HTTP backend is emulated");
-            }
-
-            if (connectResponse.ApiLevel < MinApiLevel)
-            {
-                throw new InvalidVersionException("Incompatible API level");
+                        if (connectResponse.ApiLevel < MinApiLevel)
+                        {
+                            throw new InvalidVersionException("Incompatible API level");
+                        }
+                    }
+                }
             }
 
             return new PollConnector(baseUri, options);
@@ -129,29 +131,35 @@ namespace DuetHttpClient.Connector
                 _runningCodes.Clear();
             }
 
-            using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_connect?password={HttpUtility.UrlPathEncode(Options.Password)}&time={DateTime.Now:s}");
-            using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
-            response.EnsureSuccessStatusCode();
-
-            using JsonDocument document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(), cancellationToken: cancellationToken);
-            if (document.RootElement.TryGetProperty("err", out JsonElement errProperty) && errProperty.TryGetInt32(out int errValue))
+            using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_connect?password={HttpUtility.UrlPathEncode(Options.Password)}&time={DateTime.Now:s}"))
             {
-                switch (errValue)
+                using (HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken))
                 {
-                    case 0: break;
-                    case 1: throw new InvalidPasswordException();
-                    case 2: throw new NoFreeSessionException();
-                    default: throw new LoginException($"Received unknown err value {errValue}");
+                    response.EnsureSuccessStatusCode();
+
+                    using (JsonDocument document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(), cancellationToken: cancellationToken))
+                    {
+                        if (document.RootElement.TryGetProperty("err", out JsonElement errProperty) && errProperty.TryGetInt32(out int errValue))
+                        {
+                            switch (errValue)
+                            {
+                                case 0: break;
+                                case 1: throw new InvalidPasswordException();
+                                case 2: throw new NoFreeSessionException();
+                                default: throw new LoginException($"Received unknown err value {errValue}");
+                            }
+                        }
+                        if (document.RootElement.TryGetProperty("isEmulated", out JsonElement isEmulatedProperty) && isEmulatedProperty.GetBoolean())
+                        {
+                            // Don't attempt to use emulated endpoints since the remote server provides support for RESTful calls too
+                            throw new OperationCanceledException("HTTP backend is emulated");
+                        }
+                        if (!document.RootElement.TryGetProperty("apiLevel", out JsonElement apiLevelProperty) || !apiLevelProperty.TryGetInt32(out int apiLevel) || apiLevel < MinApiLevel)
+                        {
+                            throw new InvalidVersionException("Incompatible API level");
+                        }
+                    }
                 }
-            }
-            if (document.RootElement.TryGetProperty("isEmulated", out JsonElement isEmulatedProperty) && isEmulatedProperty.GetBoolean())
-            {
-                // Don't attempt to use emulated endpoints since the remote server provides support for RESTful calls too
-                throw new OperationCanceledException("HTTP backend is emulated");
-            }
-            if (!document.RootElement.TryGetProperty("apiLevel", out JsonElement apiLevelProperty) || !apiLevelProperty.TryGetInt32(out int apiLevel) || apiLevel < MinApiLevel)
-            {
-                throw new InvalidVersionException("Incompatible API level");
             }
         }
 
@@ -192,18 +200,24 @@ namespace DuetHttpClient.Connector
                 try
                 {
                     string query = string.IsNullOrEmpty(key) ? $"rr_model?flags={flags}" : $"rr_model?key={key}&flags={flags}";
-                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, query);
-                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, _terminateSession.Token);
-                    if (response.IsSuccessStatusCode)
+                    using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, query))
                     {
-                        await using Stream stream = await response.Content.ReadAsStreamAsync();
-                        return await JsonDocument.ParseAsync(stream, cancellationToken: _terminateSession.Token);
-                    }
+                        using (HttpResponseMessage response = await SendRequest(request, Options.Timeout, _terminateSession.Token))
+                        {
+                            if (response.IsSuccessStatusCode)
+                            {
+                                using (Stream stream = await response.Content.ReadAsStreamAsync())
+                                {
+                                    return await JsonDocument.ParseAsync(stream, cancellationToken: _terminateSession.Token);
+                                }
+                            }
 
-                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                    if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                    {
-                        break;
+                            errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                            if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                            {
+                                break;
+                            }
+                        }
                     }
                 }
                 catch (OperationCanceledException oce)
@@ -288,128 +302,136 @@ namespace DuetHttpClient.Connector
 
                             if (isSeqsEmpty)
                             {
-                                using JsonDocument limitsDocument = await GetObjectModel("limits", "d99vn");
-                                if (limitsDocument.RootElement.TryGetProperty("key", out JsonElement limitsKey) && limitsKey.GetString().Equals("limits", StringComparison.InvariantCultureIgnoreCase) &&
-                                    limitsDocument.RootElement.TryGetProperty("result", out JsonElement limitsResult))
+                                using (JsonDocument limitsDocument = await GetObjectModel("limits", "d99vn"))
                                 {
-                                    lock (Model)
+                                    if (limitsDocument.RootElement.TryGetProperty("key", out JsonElement limitsKey) && limitsKey.GetString().Equals("limits", StringComparison.InvariantCultureIgnoreCase) &&
+                                        limitsDocument.RootElement.TryGetProperty("result", out JsonElement limitsResult))
                                     {
-                                        Model.UpdateFromFirmwareJson("limits", limitsResult);
+                                        lock (Model)
+                                        {
+                                            Model.UpdateFromFirmwareJson("limits", limitsResult);
+                                        }
                                     }
                                 }
                             }
 
                             // Request the next status update
-                            using JsonDocument statusDocument = await GetObjectModel(string.Empty, "d99fn");
-                            if (statusDocument.RootElement.TryGetProperty("key", out JsonElement statusKey) && string.IsNullOrEmpty(statusKey.GetString()) &&
-                                statusDocument.RootElement.TryGetProperty("result", out JsonElement statusResult))
+                            using (JsonDocument statusDocument = await GetObjectModel(string.Empty, "d99fn"))
                             {
-                                // Update frequently changing properties
-                                lock (Model)
+                                if (statusDocument.RootElement.TryGetProperty("key", out JsonElement statusKey) && string.IsNullOrEmpty(statusKey.GetString()) &&
+                                    statusDocument.RootElement.TryGetProperty("result", out JsonElement statusResult))
                                 {
-                                    Model.UpdateFromFirmwareJson(string.Empty, statusResult);
-                                    UpdateLayers();
-                                }
-
-                                // Update object model keys depending on the sequence numbers
-                                foreach (JsonProperty seqProperty in statusResult.GetProperty("seqs").EnumerateObject())
-                                {
-                                    if (seqProperty.Value.ValueKind == JsonValueKind.Number)
+                                    // Update frequently changing properties
+                                    lock (Model)
                                     {
-                                        int seq, newSeq = seqProperty.Value.GetInt32();
-                                        lock (_seqs)
-                                        {
-                                            _seqs.TryGetValue(seqProperty.Name, out seq);
-                                        }
+                                        Model.UpdateFromFirmwareJson(string.Empty, statusResult);
+                                        UpdateLayers();
+                                    }
 
-                                        if (newSeq > seq)
+                                    // Update object model keys depending on the sequence numbers
+                                    foreach (JsonProperty seqProperty in statusResult.GetProperty("seqs").EnumerateObject())
+                                    {
+                                        if (seqProperty.Value.ValueKind == JsonValueKind.Number)
                                         {
-                                            if (seqProperty.Name == "reply")
+                                            int seq, newSeq = seqProperty.Value.GetInt32();
+                                            lock (_seqs)
+                                            {
+                                                _seqs.TryGetValue(seqProperty.Name, out seq);
+                                            }
+
+                                            if (newSeq > seq)
+                                            {
+                                                if (seqProperty.Name == "reply")
+                                                {
+                                                    await GetGCodeReply(newSeq);
+                                                }
+                                                else
+                                                {
+                                                    int next = 0, offset = 0;
+                                                    do
+                                                    {
+                                                        // Request the next model chunk
+                                                        using (JsonDocument keyDocument = await GetObjectModel(seqProperty.Name, (next == 0) ? "d99vn" : $"d99vna{next}"))
+                                                        {
+                                                            offset = next;
+                                                            next = keyDocument.RootElement.TryGetProperty("next", out JsonElement nextValue) ? nextValue.GetInt32() : 0;
+
+                                                            if (keyDocument.RootElement.TryGetProperty("key", out JsonElement keyName) &&
+                                                                keyDocument.RootElement.TryGetProperty("result", out JsonElement keyResult))
+                                                            {
+                                                                lock (_seqs)
+                                                                {
+                                                                    _seqs[seqProperty.Name] = newSeq;
+                                                                }
+
+                                                                GCodeFileInfo fileInfoToUpdate = null;
+                                                                lock (Model)
+                                                                {
+                                                                    if (Model.UpdateFromFirmwareJson(keyName.GetString(), keyResult, offset, next == 0))
+                                                                    {
+                                                                        if (keyName.GetString() == "job" &&
+                                                                            Model.Job.File.Thumbnails.Count != 0 && _thumbnailFile != Model.Job.File.FileName)
+                                                                        {
+                                                                            _thumbnailFile = Model.Job.File.FileName;
+                                                                            fileInfoToUpdate = (GCodeFileInfo)Model.Job.File.Clone();
+                                                                        }
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        // Invalid key
+                                                                        break;
+                                                                    }
+                                                                }
+
+                                                                if (fileInfoToUpdate != null)
+                                                                {
+                                                                    await GetThumbnails(fileInfoToUpdate, _terminateSession.Token);
+                                                                    lock (Model)
+                                                                    {
+                                                                        Model.Job.File.Thumbnails.Assign(fileInfoToUpdate.Thumbnails);
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            // Check the index of the next element
+                                                            offset = next;
+                                                        }
+                                                    }
+                                                    while (next != 0);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Object model is now up-to-date
+                                    lock (_modelUpdateTcs)
+                                    {
+                                        foreach (TaskCompletionSource<object> tcs in _modelUpdateTcs)
+                                        {
+                                            tcs.TrySetResult(null);
+                                        }
+                                        _modelUpdateTcs.Clear();
+                                    }
+                                }
+                                else
+                                {
+                                    // Request only seqs.reply to know when to query rr_reply
+                                    using (JsonDocument replySeqDocument = await GetObjectModel("seqs.reply", string.Empty))
+                                    {
+                                        if (replySeqDocument.RootElement.TryGetProperty("result", out JsonElement replySeqElement) &&
+                                            replySeqElement.ValueKind == JsonValueKind.Number)
+                                        {
+                                            int seq, newSeq = replySeqElement.GetInt32();
+                                            lock (_seqs)
+                                            {
+                                                _seqs.TryGetValue("reply", out seq);
+                                            }
+
+                                            if (newSeq > seq)
                                             {
                                                 await GetGCodeReply(newSeq);
                                             }
-                                            else
-                                            {
-                                                int next = 0, offset = 0;
-                                                do
-                                                {
-                                                    // Request the next model chunk
-                                                    using JsonDocument keyDocument = await GetObjectModel(seqProperty.Name, (next == 0) ? "d99vn" : $"d99vna{next}");
-                                                    offset = next;
-                                                    next = keyDocument.RootElement.TryGetProperty("next", out JsonElement nextValue) ? nextValue.GetInt32() : 0;
-
-                                                    if (keyDocument.RootElement.TryGetProperty("key", out JsonElement keyName) &&
-                                                        keyDocument.RootElement.TryGetProperty("result", out JsonElement keyResult))
-                                                    {
-                                                        lock (_seqs)
-                                                        {
-                                                            _seqs[seqProperty.Name] = newSeq;
-                                                        }
-
-                                                        GCodeFileInfo fileInfoToUpdate = null;
-                                                        lock (Model)
-                                                        {
-                                                            if (Model.UpdateFromFirmwareJson(keyName.GetString(), keyResult, offset, next == 0))
-                                                            {
-                                                                if (keyName.GetString() == "job" &&
-                                                                    Model.Job.File.Thumbnails.Count != 0 && _thumbnailFile != Model.Job.File.FileName)
-                                                                {
-                                                                    _thumbnailFile = Model.Job.File.FileName;
-                                                                    fileInfoToUpdate = (GCodeFileInfo)Model.Job.File.Clone();
-                                                                }
-                                                            }
-                                                            else
-                                                            {
-                                                                // Invalid key
-                                                                break;
-                                                            }
-                                                        }
-
-                                                        if (fileInfoToUpdate != null)
-                                                        {
-                                                            await GetThumbnails(fileInfoToUpdate, _terminateSession.Token);
-                                                            lock (Model)
-                                                            {
-                                                                Model.Job.File.Thumbnails.Assign(fileInfoToUpdate.Thumbnails);
-                                                            }
-                                                        }
-                                                    }
-
-                                                    // Check the index of the next element
-                                                    offset = next;
-                                                }
-                                                while (next != 0);
-                                            }
                                         }
-                                    }
-                                }
-
-                                // Object model is now up-to-date
-                                lock (_modelUpdateTcs)
-                                {
-                                    foreach (TaskCompletionSource<object> tcs in _modelUpdateTcs)
-                                    {
-                                        tcs.TrySetResult(null);
-                                    }
-                                    _modelUpdateTcs.Clear();
-                                }
-                            }
-                            else
-                            {
-                                // Request only seqs.reply to know when to query rr_reply
-                                using JsonDocument replySeqDocument = await GetObjectModel("seqs.reply", string.Empty);
-                                if (replySeqDocument.RootElement.TryGetProperty("result", out JsonElement replySeqElement) &&
-                                    replySeqElement.ValueKind == JsonValueKind.Number)
-                                {
-                                    int seq, newSeq = replySeqElement.GetInt32();
-                                    lock (_seqs)
-                                    {
-                                        _seqs.TryGetValue("reply", out seq);
-                                    }
-
-                                    if (newSeq > seq)
-                                    {
-                                        await GetGCodeReply(newSeq);
                                     }
                                 }
                             }
@@ -609,8 +631,10 @@ namespace DuetHttpClient.Connector
             // Disconnect if possible
             try
             {
-                using CancellationTokenSource cts = new CancellationTokenSource(Options.Timeout);
-                await HttpClient.GetAsync("rr_disconnect", cts.Token);
+                using (CancellationTokenSource cts = new CancellationTokenSource(Options.Timeout))
+                {
+                    await HttpClient.GetAsync("rr_disconnect", cts.Token);
+                }
             }
             catch
             {
@@ -676,12 +700,14 @@ namespace DuetHttpClient.Connector
             // Make sure we know when to resolve the requested code
             if (replySeq == -1 && canAwaitCode)
             {
-                using JsonDocument replySeqDocument = await GetObjectModel("seqs.reply", string.Empty);
-                if (replySeqDocument.RootElement.TryGetProperty("result", out JsonElement replySeqElement) &&
-                    replySeqElement.ValueKind == JsonValueKind.Number)
+                using (JsonDocument replySeqDocument = await GetObjectModel("seqs.reply", string.Empty))
                 {
-                    replySeq = replySeqElement.GetInt32();
-                    await GetGCodeReply(replySeq);
+                    if (replySeqDocument.RootElement.TryGetProperty("result", out JsonElement replySeqElement) &&
+                        replySeqElement.ValueKind == JsonValueKind.Number)
+                    {
+                        replySeq = replySeqElement.GetInt32();
+                        await GetGCodeReply(replySeq);
+                    }
                 }
             }
 
@@ -692,43 +718,48 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_gcode?gcode={HttpUtility.UrlPathEncode(code)}");
-                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
-
-                    if (response.IsSuccessStatusCode)
+                    using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_gcode?gcode={HttpUtility.UrlPathEncode(code)}"))
                     {
-                        // Make sure the full G-code could be stored
-                        await using Stream responseStream = await response.Content.ReadAsStreamAsync();
-                        GcodeReply responseObj = await JsonSerializer.DeserializeAsync<GcodeReply>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
-                        if (responseObj.Buff == 0)
+                        using (HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken))
                         {
-                            throw new ArgumentException("G-code buffer is full");
-                        }
+                            if (response.IsSuccessStatusCode)
+                            {
+                                // Make sure the full G-code could be stored
+                                using (Stream responseStream = await response.Content.ReadAsStreamAsync())
+                                {
+                                    GcodeReply responseObj = await JsonSerializer.DeserializeAsync<GcodeReply>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
+                                    if (responseObj.Buff == 0)
+                                    {
+                                        throw new ArgumentException("G-code buffer is full");
+                                    }
+                                }
 
-                        // Stop here if no reply can be expected
-                        if (!canAwaitCode)
-                        {
-                            return string.Empty;
-                        }
+                                // Stop here if no reply can be expected
+                                if (!canAwaitCode)
+                                {
+                                    return string.Empty;
+                                }
 
-                        // Enqueue this code request
-                        TaskCompletionSource<string> codeRequest = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-                        lock (_runningCodes)
-                        {
-                            _runningCodes.Add(codeRequest, replySeq);
-                        }
-                        codeTask = codeRequest.Task;
-                        break;
-                    }
+                                // Enqueue this code request
+                                TaskCompletionSource<string> codeRequest = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+                                lock (_runningCodes)
+                                {
+                                    _runningCodes.Add(codeRequest, replySeq);
+                                }
+                                codeTask = codeRequest.Task;
+                                break;
+                            }
 
-                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                    if (response.StatusCode == HttpStatusCode.ServiceUnavailable)
-                    {
-                        await Task.Delay(2000, cancellationToken);
-                    }
-                    else if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                    {
-                        break;
+                            errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                            if (response.StatusCode == HttpStatusCode.ServiceUnavailable)
+                            {
+                                await Task.Delay(2000, cancellationToken);
+                            }
+                            else if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                            {
+                                break;
+                            }
+                        }
                     }
                 }
                 catch (OperationCanceledException oce)
@@ -760,65 +791,69 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "rr_reply");
-                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, _terminateSession.Token);
-                    if (response.IsSuccessStatusCode)
+                    using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "rr_reply"))
                     {
-                        // Get the reply and update the sequence number
-                        string gcodeReply = await response.Content.ReadAsStringAsync();
-                        lock (_seqs)
+                        using (HttpResponseMessage response = await SendRequest(request, Options.Timeout, _terminateSession.Token))
                         {
-                            _seqs["reply"] = seq;
-                        }
-
-                        // Check if a code is waiting to be resolved
-                        bool codeHandled = false;
-                        lock (_runningCodes)
-                        {
-                            foreach (var kv in _runningCodes)
+                            if (response.IsSuccessStatusCode)
                             {
-                                if (seq > kv.Value)
+                                // Get the reply and update the sequence number
+                                string gcodeReply = await response.Content.ReadAsStringAsync();
+                                lock (_seqs)
                                 {
-                                    kv.Key.SetResult(gcodeReply);
-                                    codeHandled = true;
+                                    _seqs["reply"] = seq;
                                 }
+
+                                // Check if a code is waiting to be resolved
+                                bool codeHandled = false;
+                                lock (_runningCodes)
+                                {
+                                    foreach (var kv in _runningCodes)
+                                    {
+                                        if (seq > kv.Value)
+                                        {
+                                            kv.Key.SetResult(gcodeReply);
+                                            codeHandled = true;
+                                        }
+                                    }
+
+                                    foreach (TaskCompletionSource<string> codeTask in _runningCodes.Keys.ToList())
+                                    {
+                                        if (codeTask.Task.IsCompleted)
+                                        {
+                                            _runningCodes.Remove(codeTask);
+                                        }
+                                    }
+                                }
+
+                                // If not, check if the message can be stored
+                                if (!codeHandled && Options.ObserveMessages)
+                                {
+                                    lock (Model)
+                                    {
+                                        if (gcodeReply.StartsWith("Error: "))
+                                        {
+                                            Model.Messages.Add(new Message(MessageType.Error, gcodeReply.Substring("Error: ".Length)));
+                                        }
+                                        else if (gcodeReply.StartsWith("Warning: "))
+                                        {
+                                            Model.Messages.Add(new Message(MessageType.Warning, gcodeReply.Substring("Warning: ".Length)));
+                                        }
+                                        else
+                                        {
+                                            Model.Messages.Add(new Message(MessageType.Success, gcodeReply));
+                                        }
+                                    }
+                                }
+                                return;
                             }
 
-                            foreach (TaskCompletionSource<string> codeTask in _runningCodes.Keys.ToList())
+                            errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                            if (response.StatusCode >= HttpStatusCode.InternalServerError)
                             {
-                                if (codeTask.Task.IsCompleted)
-                                {
-                                    _runningCodes.Remove(codeTask);
-                                }
+                                break;
                             }
                         }
-
-                        // If not, check if the message can be stored
-                        if (!codeHandled && Options.ObserveMessages)
-                        {
-                            lock (Model)
-                            {
-                                if (gcodeReply.StartsWith("Error: "))
-                                {
-                                    Model.Messages.Add(new Message(MessageType.Error, gcodeReply["Error: ".Length..]));
-                                }
-                                else if (gcodeReply.StartsWith("Warning: "))
-                                {
-                                    Model.Messages.Add(new Message(MessageType.Warning, gcodeReply["Warning: ".Length..]));
-                                }
-                                else
-                                {
-                                    Model.Messages.Add(new Message(MessageType.Success, gcodeReply));
-                                }
-                            }
-                        }
-                        return;
-                    }
-
-                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                    if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                    {
-                        break;
                     }
                 }
                 catch (OperationCanceledException oce)
@@ -854,18 +889,24 @@ namespace DuetHttpClient.Connector
 
             // Try to upload it
             string query = (lastModified != null) ? $"rr_upload?name={HttpUtility.UrlPathEncode(filename)}&time={lastModified:s}&crc32={checksum}" : $"rr_upload?name={HttpUtility.UrlPathEncode(filename)}&crc32={checksum}";
-            using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, query);
-            request.Content = new StreamContent(content);
-
-            // Check if that worked
-            using HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
-            response.EnsureSuccessStatusCode();
-
-            await using Stream responseStream = await response.Content.ReadAsStreamAsync();
-            ErrResponse responseObj = await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
-            if (responseObj.Err != 0)
+            using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, query))
             {
-                throw new HttpRequestException($"rr_upload returned err {responseObj.Err}");
+                request.Content = new StreamContent(content);
+
+                // Check if that worked
+                using (HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken))
+                {
+                    response.EnsureSuccessStatusCode();
+
+                    using (Stream responseStream = await response.Content.ReadAsStreamAsync())
+                    {
+                        ErrResponse responseObj = await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
+                        if (responseObj.Err != 0)
+                        {
+                            throw new HttpRequestException($"rr_upload returned err {responseObj.Err}");
+                        }
+                    }
+                }
             }
         }
 
@@ -882,31 +923,36 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_delete?name={HttpUtility.UrlPathEncode(filename)}");
-                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
-
-                    if (response.IsSuccessStatusCode)
+                    using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_delete?name={HttpUtility.UrlPathEncode(filename)}"))
                     {
-                        await using Stream responseStream = await response.Content.ReadAsStreamAsync();
-                        ErrResponse responseObj = await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
-                        if (responseObj.Err == 0)
+                        using (HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken))
                         {
-                            return;
-                        }
-                        else if (responseObj.Err == 1)
-                        {
-                            throw new FileNotFoundException();
-                        }
-                        else
-                        {
-                            throw new HttpRequestException($"rr_delete returned err {responseObj.Err}");
-                        }
-                    }
+                            if (response.IsSuccessStatusCode)
+                            {
+                                using (Stream responseStream = await response.Content.ReadAsStreamAsync())
+                                {
+                                    ErrResponse responseObj = await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
+                                    if (responseObj.Err == 0)
+                                    {
+                                        return;
+                                    }
+                                    else if (responseObj.Err == 1)
+                                    {
+                                        throw new FileNotFoundException();
+                                    }
+                                    else
+                                    {
+                                        throw new HttpRequestException($"rr_delete returned err {responseObj.Err}");
+                                    }
+                                }
+                            }
 
-                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                    if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                    {
-                        break;
+                            errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                            if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                            {
+                                break;
+                            }
+                        }
                     }
                 }
                 catch (OperationCanceledException oce)
@@ -936,31 +982,36 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_move?old={HttpUtility.UrlPathEncode(from)}&new={HttpUtility.UrlPathEncode(to)}&deleteexisting={(force ? "yes" : "no")}");
-                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
-
-                    if (response.IsSuccessStatusCode)
+                    using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_move?old={HttpUtility.UrlPathEncode(from)}&new={HttpUtility.UrlPathEncode(to)}&deleteexisting={(force ? "yes" : "no")}"))
                     {
-                        await using Stream responseStream = await response.Content.ReadAsStreamAsync();
-                        ErrResponse responseObj = await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
-                        if (responseObj.Err == 0)
+                        using (HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken))
                         {
-                            return;
-                        }
-                        else if (responseObj.Err == 1)
-                        {
-                            throw new FileNotFoundException();
-                        }
-                        else
-                        {
-                            throw new HttpRequestException($"rr_move returned err {responseObj.Err}");
-                        }
-                    }
+                            if (response.IsSuccessStatusCode)
+                            {
+                                using (Stream responseStream = await response.Content.ReadAsStreamAsync())
+                                {
+                                    ErrResponse responseObj = await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
+                                    if (responseObj.Err == 0)
+                                    {
+                                        return;
+                                    }
+                                    else if (responseObj.Err == 1)
+                                    {
+                                        throw new FileNotFoundException();
+                                    }
+                                    else
+                                    {
+                                        throw new HttpRequestException($"rr_move returned err {responseObj.Err}");
+                                    }
+                                }
+                            }
 
-                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                    if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                    {
-                        break;
+                            errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                            if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                            {
+                                break;
+                            }
+                        }
                     }
                 }
                 catch (OperationCanceledException oce)
@@ -988,27 +1039,32 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_mkdir?dir={HttpUtility.UrlPathEncode(directory)}");
-                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
-
-                    if (response.IsSuccessStatusCode)
+                    using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_mkdir?dir={HttpUtility.UrlPathEncode(directory)}"))
                     {
-                        await using Stream responseStream = await response.Content.ReadAsStreamAsync();
-                        ErrResponse responseObj = await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
-                        if (responseObj.Err == 0)
+                        using (HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken))
                         {
-                            return;
-                        }
-                        else
-                        {
-                            throw new HttpRequestException($"rr_mkdir returned err {responseObj.Err}");
-                        }
-                    }
+                            if (response.IsSuccessStatusCode)
+                            {
+                                using (Stream responseStream = await response.Content.ReadAsStreamAsync())
+                                {
+                                    ErrResponse responseObj = await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
+                                    if (responseObj.Err == 0)
+                                    {
+                                        return;
+                                    }
+                                    else
+                                    {
+                                        throw new HttpRequestException($"rr_mkdir returned err {responseObj.Err}");
+                                    }
+                                }
+                            }
 
-                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                    if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                    {
-                        break;
+                            errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                            if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                            {
+                                break;
+                            }
+                        }
                     }
                 }
                 catch (OperationCanceledException oce)
@@ -1031,16 +1087,17 @@ namespace DuetHttpClient.Connector
         /// <returns>Disposable download response</returns>
         public override async Task<HttpResponseMessage> Download(string filename, CancellationToken cancellationToken = default)
         {
-            using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_download?name={HttpUtility.UrlPathEncode(filename)}");
-
-            HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
-            if (response.StatusCode == HttpStatusCode.NotFound)
+            using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_download?name={HttpUtility.UrlPathEncode(filename)}"))
             {
-                throw new FileNotFoundException();
-            }
+                HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    throw new FileNotFoundException();
+                }
 
-            response.EnsureSuccessStatusCode();
-            return response;
+                response.EnsureSuccessStatusCode();
+                return response;
+            }
         }
 
         /// <summary>
@@ -1083,42 +1140,48 @@ namespace DuetHttpClient.Connector
                 {
                     try
                     {
-                        using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_filelist?dir={HttpUtility.UrlPathEncode(directory)}&first={nextIndex}");
-                        using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
-
-                        if (response.IsSuccessStatusCode)
+                        using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_filelist?dir={HttpUtility.UrlPathEncode(directory)}&first={nextIndex}"))
                         {
-                            await using Stream responseStream = await response.Content.ReadAsStreamAsync();
-                            FileListResponse responseObj = await JsonSerializer.DeserializeAsync<FileListResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
-                            if (responseObj.Err == 0)
+                            using (HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken))
                             {
-                                foreach (FileItem item in responseObj.Files)
+
+                                if (response.IsSuccessStatusCode)
                                 {
-                                    result.Add(new FileListItem()
+                                    using (Stream responseStream = await response.Content.ReadAsStreamAsync())
                                     {
-                                        Filename = item.Name,
-                                        IsDirectory = item.Type == 'd',
-                                        LastModified = item.Date,
-                                        Size = item.Size
-                                    });
+                                        FileListResponse responseObj = await JsonSerializer.DeserializeAsync<FileListResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
+                                        if (responseObj.Err == 0)
+                                        {
+                                            foreach (FileItem item in responseObj.Files)
+                                            {
+                                                result.Add(new FileListItem()
+                                                {
+                                                    Filename = item.Name,
+                                                    IsDirectory = item.Type == 'd',
+                                                    LastModified = item.Date,
+                                                    Size = item.Size
+                                                });
+                                            }
+                                            nextIndex = responseObj.Next;
+                                        }
+                                        else if (responseObj.Err == 2)
+                                        {
+                                            throw new DirectoryNotFoundException();
+                                        }
+                                        else
+                                        {
+                                            throw new HttpRequestException($"rr_filelist returned err {responseObj.Err}");
+                                        }
+                                        break;
+                                    }
                                 }
-                                nextIndex = responseObj.Next;
-                            }
-                            else if (responseObj.Err == 2)
-                            {
-                                throw new DirectoryNotFoundException();
-                            }
-                            else
-                            {
-                                throw new HttpRequestException($"rr_filelist returned err {responseObj.Err}");
-                            }
-                            break;
-                        }
 
-                        errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                        if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                        {
-                            break;
+                                errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                                if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                                {
+                                    break;
+                                }
+                            }
                         }
                     }
                     catch (OperationCanceledException oce)
@@ -1156,47 +1219,54 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_fileinfo?name={encodedFilename}");
-                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
-
-                    if (response.IsSuccessStatusCode)
+                    using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_fileinfo?name={encodedFilename}"))
                     {
-                        await using Stream responseStream = await response.Content.ReadAsStreamAsync();
-                        using JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
-                        if (responseJson.RootElement.TryGetProperty("err", out JsonElement errValue) && errValue.ValueKind == JsonValueKind.Number)
+                        using (HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken))
                         {
-                            int err = errValue.GetInt32();
-                            if (err == 0)
+                            if (response.IsSuccessStatusCode)
                             {
-                                GCodeFileInfo result = new GCodeFileInfo();
-                                result.UpdateFromJson(responseJson.RootElement, false);
-
-                                if (readThumbnailContent)
+                                using (Stream responseStream = await response.Content.ReadAsStreamAsync())
                                 {
-                                    await GetThumbnails(result, cancellationToken);
+                                    using (JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken))
+                                    {
+                                        if (responseJson.RootElement.TryGetProperty("err", out JsonElement errValue) && errValue.ValueKind == JsonValueKind.Number)
+                                        {
+                                            int err = errValue.GetInt32();
+                                            if (err == 0)
+                                            {
+                                                GCodeFileInfo result = new GCodeFileInfo();
+                                                result.UpdateFromJson(responseJson.RootElement, false);
+
+                                                if (readThumbnailContent)
+                                                {
+                                                    await GetThumbnails(result, cancellationToken);
+                                                }
+
+                                                return result;
+                                            }
+                                            else if (err == 1)
+                                            {
+                                                throw new FileNotFoundException();
+                                            }
+                                            else
+                                            {
+                                                throw new HttpRequestException($"rr_mkdir returned err {err}");
+                                            }
+                                        }
+                                        else
+                                        {
+                                            throw new HttpRequestException("rr_fileinfo did not return an err value");
+                                        }
+                                    }
                                 }
+                            }
 
-                                return result;
-                            }
-                            else if (err == 1)
+                            errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                            if (response.StatusCode >= HttpStatusCode.InternalServerError)
                             {
-                                throw new FileNotFoundException();
-                            }
-                            else
-                            {
-                                throw new HttpRequestException($"rr_mkdir returned err {err}");
+                                break;
                             }
                         }
-                        else
-                        {
-                            throw new HttpRequestException("rr_fileinfo did not return an err value");
-                        }
-                    }
-
-                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                    if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                    {
-                        break;
                     }
                 }
                 catch (OperationCanceledException oce)
@@ -1226,23 +1296,30 @@ namespace DuetHttpClient.Connector
 
                             do
                             {
-                                using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_thumbnail?name={fileinfo.FileName}&offset={offset}");
-                                using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
-
-                                if (response.IsSuccessStatusCode)
+                                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"rr_thumbnail?name={fileinfo.FileName}&offset={offset}"))
                                 {
-                                    await using Stream responseStream = await response.Content.ReadAsStreamAsync();
-                                    using JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
-                                    if (responseJson.RootElement.TryGetProperty("err", out JsonElement errValue) && errValue.ValueKind == JsonValueKind.Number)
+                                    using (HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken))
                                     {
-                                        int err = errValue.GetInt32();
-                                        if (err != 0)
+                                        if (response.IsSuccessStatusCode)
                                         {
-                                            throw new ArgumentException($"err {err}");
-                                        }
+                                            using (Stream responseStream = await response.Content.ReadAsStreamAsync())
+                                            {
+                                                using (JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken))
+                                                {
+                                                    if (responseJson.RootElement.TryGetProperty("err", out JsonElement errValue) && errValue.ValueKind == JsonValueKind.Number)
+                                                    {
+                                                        int err = errValue.GetInt32();
+                                                        if (err != 0)
+                                                        {
+                                                            throw new ArgumentException($"err {err}");
+                                                        }
 
-                                        offset = responseJson.RootElement.GetProperty("next").GetInt32();
-                                        thumbnailData.Append(responseJson.RootElement.GetProperty("data").GetString());
+                                                        offset = responseJson.RootElement.GetProperty("next").GetInt32();
+                                                        thumbnailData.Append(responseJson.RootElement.GetProperty("data").GetString());
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             } while (offset != 0);

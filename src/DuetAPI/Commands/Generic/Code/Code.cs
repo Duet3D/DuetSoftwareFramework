@@ -26,9 +26,13 @@ namespace DuetAPI.Commands
         /// <param name="code">UTF8-encoded G/M/T-Code</param>
         public Code(string code)
         {
-            using MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(code));
-            using StreamReader reader = new StreamReader(stream);
-            Parse(reader, this);
+            using (MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(code)))
+            {
+                using (StreamReader reader = new StreamReader(stream))
+                {
+                    Parse(reader, this);
+                }
+            }
         }
 
         /// <summary>
@@ -82,7 +86,7 @@ namespace DuetAPI.Commands
         /// Major code number (e.g. 28 in G28)
         /// </summary>
         public int? MajorNumber { get; set; }
-        
+
         /// <summary>
         /// Minor code number (e.g. 3 in G54.3)
         /// </summary>
@@ -92,7 +96,7 @@ namespace DuetAPI.Commands
         /// Flags of this code
         /// </summary>
         public CodeFlags Flags { get; set; } = CodeFlags.None;
-        
+
         /// <summary>
         /// Comment of the G/M/T-code. May be null if no comment is present
         /// </summary>
@@ -219,7 +223,7 @@ namespace DuetAPI.Commands
             builder.Append(ToShortString());
 
             // After this append each parameter and encapsulate it in double quotes
-            foreach(CodeParameter parameter in Parameters)
+            foreach (CodeParameter parameter in Parameters)
             {
                 if (builder.Length > 0)
                 {
@@ -309,20 +313,23 @@ namespace DuetAPI.Commands
         /// Convert the keyword to a string
         /// </summary>
         /// <returns></returns>
-        private string KeywordToString() => Keyword switch
+        private string KeywordToString()
         {
-            KeywordType.If => "if",
-            KeywordType.ElseIf => "elif",
-            KeywordType.Else => "else",
-            KeywordType.While => "while",
-            KeywordType.Break => "break",
-            KeywordType.Continue => "continue",
-            KeywordType.Abort => "abort",
-            KeywordType.Var => "var",
-            KeywordType.Set => "set",
-            KeywordType.Echo => "echo",
-            KeywordType.Global => "global",
-            _ => throw new NotImplementedException()
-        };
+            switch (Keyword)
+            {
+                case KeywordType.If: return "if";
+                case KeywordType.ElseIf: return "elif";
+                case KeywordType.Else: return "else";
+                case KeywordType.While: return "while";
+                case KeywordType.Break: return "break";
+                case KeywordType.Continue: return "continue";
+                case KeywordType.Abort: return "abort";
+                case KeywordType.Var: return "var";
+                case KeywordType.Set: return "set";
+                case KeywordType.Echo: return "echo";
+                case KeywordType.Global: return "global";
+                default: throw new NotImplementedException();
+            }
+        }
     }
 }

@@ -43,13 +43,16 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="type">Filament monitor type</param>
         /// <returns>Required type</returns>
-        private static Type GetFilamentMonitorType(FilamentMonitorType type) => type switch
+        private static Type GetFilamentMonitorType(FilamentMonitorType type)
         {
-            FilamentMonitorType.Laser => typeof(LaserFilamentMonitor),
-            FilamentMonitorType.Pulsed => typeof(PulsedFilamentMonitor),
-            FilamentMonitorType.RotatingMagnet => typeof(RotatingMagnetFilamentMonitor),
-            _ => typeof(FilamentMonitor),
-        };
+            switch (type)
+            {
+                case FilamentMonitorType.Laser: return typeof(LaserFilamentMonitor);
+                case FilamentMonitorType.Pulsed: return typeof(PulsedFilamentMonitor);
+                case FilamentMonitorType.RotatingMagnet: return typeof(RotatingMagnetFilamentMonitor);
+                default: return typeof(FilamentMonitor);
+            }
+        }
 
         /// <summary>
         /// Update this instance from a given JSON element

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DuetAPIClient;
+using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -111,7 +112,7 @@ namespace DuetWebServer.Middleware
         private async Task<T> Receive<T>(CancellationToken cancellationToken)
         {
             await using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
-            return await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions);
+            return await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions, cancellationToken);
         }
 
         /// <summary>

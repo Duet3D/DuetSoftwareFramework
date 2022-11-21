@@ -96,22 +96,22 @@ namespace DuetAPI.ObjectModel
             }
             if (reader.TokenType == JsonTokenType.String)
             {
-                return reader.GetString().ToLowerInvariant() switch
+                switch( reader.GetString().ToLowerInvariant())
                 {
-                    "cartesian" => KinematicsName.Cartesian,
-                    "corexy" => KinematicsName.CoreXY,
-                    "corexyu" => KinematicsName.CoreXYU,
-                    "corexyuv" => KinematicsName.CoreXYUV,
-                    "corexz" => KinematicsName.CoreXZ,
-                    "markforged" => KinematicsName.MarkForged,
-                    "fivebarscara" => KinematicsName.FiveBarScara,
-                    "hangprinter" => KinematicsName.Hangprinter,
-                    "delta" => KinematicsName.Delta,
-                    "polar" => KinematicsName.Polar,
-                    "rotary delta" => KinematicsName.RotaryDelta,
-                    "scara" => KinematicsName.Scara,
-                    _ => KinematicsName.Unknown,
-                };
+                    case "cartesian": return KinematicsName.Cartesian;
+                    case "corexy": return KinematicsName.CoreXY;
+                    case "corexyu": return KinematicsName.CoreXYU;
+                    case "corexyuv": return KinematicsName.CoreXYUV;
+                    case "corexz": return KinematicsName.CoreXZ;
+                    case "markforged": return KinematicsName.MarkForged;
+                    case "fivebarscara": return KinematicsName.FiveBarScara;
+                    case "hangprinter": return KinematicsName.Hangprinter;
+                    case "delta": return KinematicsName.Delta;
+                    case "polar": return KinematicsName.Polar;
+                    case "rotary delta": return KinematicsName.RotaryDelta;
+                    case "scara": return KinematicsName.Scara;
+                    default: return KinematicsName.Unknown;
+                }
             }
             throw new JsonException($"Invalid type for {nameof(KinematicsName)}");
         }
