@@ -129,15 +129,17 @@ namespace DuetAPI.ObjectModel
         /// <returns>Parsed file info object</returns>
         public override GCodeFileInfo Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            using JsonDocument jsonDocument = JsonDocument.ParseValue(ref reader);
-            if (jsonDocument.RootElement.ValueKind == JsonValueKind.Null)
+            using (JsonDocument jsonDocument = JsonDocument.ParseValue(ref reader))
             {
-                return null;
-            }
+                if (jsonDocument.RootElement.ValueKind == JsonValueKind.Null)
+                {
+                    return null;
+                }
 
-            GCodeFileInfo parsedFileInfo = new GCodeFileInfo();
-            parsedFileInfo.UpdateFromJson(jsonDocument.RootElement, false);
-            return parsedFileInfo;
+                GCodeFileInfo parsedFileInfo = new GCodeFileInfo();
+                parsedFileInfo.UpdateFromJson(jsonDocument.RootElement, false);
+                return parsedFileInfo;
+            }
         }
 
         /// <summary>

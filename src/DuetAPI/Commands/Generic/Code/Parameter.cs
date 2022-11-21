@@ -187,19 +187,19 @@ namespace DuetAPI.Commands
             }
             else if (value is int[] intArray)
             {
-                StringValue = string.Join(':', intArray.Select(intValue => intValue.ToString("G", CultureInfo.InvariantCulture)));
+                StringValue = string.Join(":", intArray.Select(intVal => intVal.ToString("G", CultureInfo.InvariantCulture)));
             }
             else if (value is uint[] uintArray)
             {
-                StringValue = string.Join(':', uintArray.Select(uintValue => uintValue.ToString("G", CultureInfo.InvariantCulture)));
+                StringValue = string.Join(":", uintArray.Select(uintVal => uintVal.ToString("G", CultureInfo.InvariantCulture)));
             }
             else if (value is float[] floatArray)
             {
-                StringValue = string.Join(':', floatArray.Select(floatValue => floatValue.ToString("G", CultureInfo.InvariantCulture)));
+                StringValue = string.Join(":", floatArray.Select(floatVal => floatVal.ToString("G", CultureInfo.InvariantCulture)));
             }
             else if (value is long[] longArray)
             {
-                StringValue = string.Join(':', longArray.Select(longValue => longValue.ToString("G", CultureInfo.InvariantCulture)));
+                StringValue = string.Join(":", longArray.Select(longVal => longVal.ToString("G", CultureInfo.InvariantCulture)));
             }
             else
             {

@@ -299,15 +299,17 @@ namespace DuetAPI.ObjectModel
         /// <returns>Machine model</returns>
         public override ObjectModel Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            using JsonDocument jsonDocument = JsonDocument.ParseValue(ref reader);
-            if (jsonDocument.RootElement.ValueKind == JsonValueKind.Null)
+            using (JsonDocument jsonDocument = JsonDocument.ParseValue(ref reader))
             {
-                return null;
-            }
+                if (jsonDocument.RootElement.ValueKind == JsonValueKind.Null)
+                {
+                    return null;
+                }
 
-            ObjectModel machineModel = new ObjectModel();
-            machineModel.UpdateFromJson(jsonDocument.RootElement, false);
-            return machineModel;
+                ObjectModel machineModel = new ObjectModel();
+                machineModel.UpdateFromJson(jsonDocument.RootElement, false);
+                return machineModel;
+            }
         }
 
         /// <summary>
