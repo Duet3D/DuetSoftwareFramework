@@ -601,7 +601,10 @@ namespace DuetControlServer.Codes
                                 }
                                 Directory.Move(source, destination);
                             }
-                            throw new FileNotFoundException();
+                            else
+                            {
+                                throw new FileNotFoundException();
+                            }
                         }
                         catch (Exception e)
                         {
