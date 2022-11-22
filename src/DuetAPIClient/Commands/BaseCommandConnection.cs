@@ -77,6 +77,7 @@ namespace DuetAPIClient
         {
             return PerformCommand<bool>(new CheckPassword { Password = password }, cancellationToken);
         }
+
         /// <summary>
         /// Evaluate an arbitrary expression
         /// </summary>
