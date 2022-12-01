@@ -387,7 +387,7 @@ DuetSoftwareFramework.deb: DuetWebControl.deb
 	$(CMD_PREFIX)sed -i "s/SDVER/$(DuetSD-version)/g" $(PKGSRCDIR)/DEBIAN/changelog
 	$(CMD_PREFIX)sed -i "s/DWCVER/$(DuetWebControl-version)/g" $(PKGSRCDIR)/DEBIAN/control 2>/dev/null || :
 	$(CMD_PREFIX)sed -i "s/DWCVER/$(DuetWebControl-version)/g" $(PKGSRCDIR)/DEBIAN/changelog 2>/dev/null || :
-	$(CMD_PREFIX)dpkg-deb --build $(PKGSRCDIR) $(PKGDIR) >/dev/null
+	$(CMD_PREFIX)dpkg-deb --build -Zxz $(PKGSRCDIR) $(PKGDIR) >/dev/null
 	$(CMD_PREFIX)rm -rf $(PKGSRCDIR)
 ifneq ($(KEY_ID),)
 	$(CMD_PREFIX)dpkg-sig -k $(KEY_ID) -s builder $(PKGDIR)/$(PKGNAME).deb  >/dev/null
