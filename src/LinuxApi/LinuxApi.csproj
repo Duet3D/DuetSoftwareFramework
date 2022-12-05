@@ -3,7 +3,7 @@
       <TargetFramework>net6.0</TargetFramework>
       <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
       <PackageLicenseExpression>LGPL-3.0</PackageLicenseExpression>
-      <Version>3.4.4</Version>
+      <Version>3.4.5</Version>
   </PropertyGroup>
 
   <PropertyGroup>

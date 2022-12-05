@@ -47,19 +47,21 @@ namespace DuetHttpClient.Connector
         /// <returns>HTTP response</returns>
         protected virtual async ValueTask<HttpResponseMessage> SendRequest(HttpRequestMessage request, TimeSpan timeout, CancellationToken cancellationToken = default)
         {
-            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _terminateSession.Token);
-            if (timeout != Timeout.InfiniteTimeSpan)
+            using (CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _terminateSession.Token))
             {
-                cts.CancelAfter(timeout);
-            }
+                if (timeout != Timeout.InfiniteTimeSpan)
+                {
+                    cts.CancelAfter(timeout);
+                }
 
-            HttpResponseMessage response = await HttpClient.SendAsync(request, cts.Token);
-            if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
-            {
-                // Session is no longer valid, attempt to connect again
-                await Reconnect(cancellationToken);
+                HttpResponseMessage response = await HttpClient.SendAsync(request, cts.Token);
+                if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
+                {
+                    // Session is no longer valid, attempt to connect again
+                    await Reconnect(cancellationToken);
+                }
+                return response;
             }
-            return response;
         }
 
         /// <summary>

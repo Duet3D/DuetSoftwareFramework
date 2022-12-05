@@ -17,29 +17,29 @@ pkg_progs() {
 	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetcontrolserver_$dcsver/DEBIAN/control
 	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetcontrolserver_$dcsver/DEBIAN/control
 	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetcontrolserver_$dcsver/DEBIAN/changelog
-	dpkg-deb --build $DEST_DIR/duetcontrolserver_$dcsver $DEST_DIR
+	dpkg-deb --build -Zxz $DEST_DIR/duetcontrolserver_$dcsver $DEST_DIR
 
 	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetwebserver_$dwsver/DEBIAN/control
 	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetwebserver_$dwsver/DEBIAN/control
 	sed -i "s/DWSVER/$(echo $dwsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetwebserver_$dwsver/DEBIAN/control
 	sed -i "s/DWSVER/$(echo $dwsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetwebserver_$dwsver/DEBIAN/changelog
-	dpkg-deb --build $DEST_DIR/duetwebserver_$dwsver $DEST_DIR
+	dpkg-deb --build -Zxz $DEST_DIR/duetwebserver_$dwsver $DEST_DIR
 
 	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetpluginservice_$dpsver/DEBIAN/control
 	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpluginservice_$dpsver/DEBIAN/control
 	sed -i "s/DPSVER/$(echo $dpsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpluginservice_$dpsver/DEBIAN/control
 	sed -i "s/DPSVER/$(echo $dpsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpluginservice_$dpsver/DEBIAN/changelog
-	dpkg-deb --build $DEST_DIR/duetpluginservice_$dpsver $DEST_DIR
+	dpkg-deb --build -Zxz $DEST_DIR/duetpluginservice_$dpsver $DEST_DIR
 
 	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duettools_$dcsver/DEBIAN/control
 	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duettools_$dcsver/DEBIAN/control
 	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duettools_$dcsver/DEBIAN/changelog
-	dpkg-deb --build $DEST_DIR/duettools_$dcsver $DEST_DIR
+	dpkg-deb --build -Zxz $DEST_DIR/duettools_$dcsver $DEST_DIR
 
 	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetruntime_$dcsver/DEBIAN/control
 	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetruntime_$dcsver/DEBIAN/control
 	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetruntime_$dcsver/DEBIAN/changelog
-	dpkg-deb --build $DEST_DIR/duetruntime_$dcsver $DEST_DIR
+	dpkg-deb --build -Zxz $DEST_DIR/duetruntime_$dcsver $DEST_DIR
 }
 
 pkg_plugins() {
@@ -50,7 +50,7 @@ pkg_plugins() {
 	sed -i "s/DMPVER/$(echo $dmpver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpimanagementplugin_$dmpver/DEBIAN/control
 	sed -i "s/DPSVER/$(echo $dpsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpimanagementplugin_$dmpver/DEBIAN/control
 	sed -i "s/DMPVER/$(echo $dmpver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpimanagementplugin_$dmpver/DEBIAN/changelog
-	dpkg-deb --build $DEST_DIR/duetpimanagementplugin_$dmpver $DEST_DIR
+	dpkg-deb --build -Zxz $DEST_DIR/duetpimanagementplugin_$dmpver $DEST_DIR
 }
 
 pkg_sd() {
@@ -58,7 +58,7 @@ pkg_sd() {
 
 	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetsd_$sdver/DEBIAN/control
 	sed -i "s/SDVER/$sdver/g" $DEST_DIR/duetsd_$sdver/DEBIAN/control
-	dpkg-deb --build $DEST_DIR/duetsd_$sdver $DEST_DIR
+	dpkg-deb --build -Zxz $DEST_DIR/duetsd_$sdver $DEST_DIR
 }
 
 pkg_dwc() {
@@ -66,7 +66,7 @@ pkg_dwc() {
 
 	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetwebcontrol_$dwcver/DEBIAN/control
 	sed -i "s/DWCVER/$(echo $dwcver | sed -e 's/-/~/g')/g" $DEST_DIR/duetwebcontrol_$dwcver/DEBIAN/control
-	dpkg-deb --build $DEST_DIR/duetwebcontrol_$dwcver $DEST_DIR
+	dpkg-deb --build -Zxz $DEST_DIR/duetwebcontrol_$dwcver $DEST_DIR
 }
 
 pkg_meta() {
@@ -79,7 +79,7 @@ pkg_meta() {
 	sed -i "s/SDVER/$(echo $sdver | sed -e 's/-/~/g')/g" $DEST_DIR/duetsoftwareframework_$dcsver/DEBIAN/control
 	sed -i "s/DWCVER/$(echo $dwcver | sed -e 's/-/~/g')/g" $DEST_DIR/duetsoftwareframework_$dcsver/DEBIAN/control
 	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetsoftwareframework_$dcsver/DEBIAN/changelog
-	dpkg-deb --build $DEST_DIR/duetsoftwareframework_$dcsver $DEST_DIR/
+	dpkg-deb --build -Zxz $DEST_DIR/duetsoftwareframework_$dcsver $DEST_DIR/
 }
 
 [ $BUILD_PROGS -eq 1 ] && { [ $BUILD -eq 1 ] && build_progs || : ; } && [ $PKGS -eq 1 ] && pkg_progs

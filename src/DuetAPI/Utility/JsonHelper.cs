@@ -119,6 +119,7 @@ namespace DuetAPI.Utility
             PropertyNameCaseInsensitive = true
         };
 
+#if NETSTANDARD2_1_OR_GREATER || NET6_0_OR_GREATER
         /// <summary>
         /// Receive a serialized JSON object from a socket in UTF-8 format
         /// </summary>
@@ -182,6 +183,7 @@ namespace DuetAPI.Utility
             jsonStream.Seek(0, SeekOrigin.Begin);
             return jsonStream;
         }
+#endif
 
         /// <summary>
         /// Convert a <see cref="JsonElement"/> to an object
