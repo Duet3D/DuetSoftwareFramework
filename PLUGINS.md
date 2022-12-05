@@ -134,6 +134,8 @@ corresponding command in DCS:
 
 \* Only needed to modify other data of other plugins
 
+**Note**: When the corresponding permissions are serialized, their first letter is converted to lower-case. For example `CommandExecution` will be converted to `commandExecution`. This has to be adjusted in the plugin manifest to pass the manifest check that is performed when a plugin ZIP is opened in DWC.
+
 ### Shared Data
 
 Every plugin is listed in the DSF object model in the `plugins` namespace.
