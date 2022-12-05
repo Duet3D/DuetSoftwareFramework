@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Class MachineController
    ">
-    <meta name="generator" content="docfx 2.59.2.0">
+    <meta name="generator" content="docfx 2.59.4.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -376,6 +376,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.DistanceUnit.html" title="DistanceUnit" class="">DistanceUnit</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.DistanceUnitConverter.html" title="DistanceUnitConverter" class="">DistanceUnitConverter</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Driver.html" title="Driver" class="">Driver</a>
@@ -2804,8 +2807,8 @@ public async Task&lt;IActionResult&gt; UninstallSystemPackage([FromServices] ISe
     </tbody>
   </table>
   <a id="DuetWebServer_Controllers_MachineController_UploadFile_" data-uid="DuetWebServer.Controllers.MachineController.UploadFile*"></a>
-  <h4 id="DuetWebServer_Controllers_MachineController_UploadFile_System_String_DuetWebServer_Singletons_ISessionStorage_" data-uid="DuetWebServer.Controllers.MachineController.UploadFile(System.String,DuetWebServer.Singletons.ISessionStorage)">UploadFile(String, ISessionStorage)</h4>
-  <div class="markdown level1 summary"><p>PUT /machine/file/{filename}
+  <h4 id="DuetWebServer_Controllers_MachineController_UploadFile_System_String_System_Nullable_System_DateTime__DuetWebServer_Singletons_ISessionStorage_" data-uid="DuetWebServer.Controllers.MachineController.UploadFile(System.String,System.Nullable{System.DateTime},DuetWebServer.Singletons.ISessionStorage)">UploadFile(String, Nullable&lt;DateTime&gt;, ISessionStorage)</h4>
+  <div class="markdown level1 summary"><p>PUT /machine/file/{filename}?timeModified={timeModified}
 Upload a file from the HTTP body and create the subdirectories if necessary</p>
 </div>
   <div class="markdown level1 conceptual"></div>
@@ -2814,7 +2817,7 @@ Upload a file from the HTTP body and create the subdirectories if necessary</p>
     <pre><code class="lang-csharp hljs">[Authorize(Policy = &quot;readWrite&quot;)]
 [DisableRequestSizeLimit]
 [HttpPut(&quot;file/{*filename}&quot;)]
-public async Task&lt;IActionResult&gt; UploadFile(string filename, [FromServices] ISessionStorage sessionStorage)</code></pre>
+public async Task&lt;IActionResult&gt; UploadFile(string filename, DateTime? timeModified, [FromServices] ISessionStorage sessionStorage)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-striped table-condensed">
@@ -2831,6 +2834,11 @@ public async Task&lt;IActionResult&gt; UploadFile(string filename, [FromServices
         <td><span class="parametername">filename</span></td>
         <td><p>Destination of the file to upload</p>
 </td>
+      </tr>
+      <tr>
+        <td><span class="xref">System.Nullable</span>&lt;<span class="xref">System.DateTime</span>&gt;</td>
+        <td><span class="parametername">timeModified</span></td>
+        <td></td>
       </tr>
       <tr>
         <td><a class="xref" href="DuetWebServer.Singletons.ISessionStorage.html">ISessionStorage</a></td>
