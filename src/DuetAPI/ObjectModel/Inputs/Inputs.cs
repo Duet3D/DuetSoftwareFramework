@@ -14,16 +14,21 @@ namespace DuetAPI.ObjectModel
     public sealed class Inputs : ModelCollection<InputChannel>
     {
         /// <summary>
-        /// Total number of supported input channels
+        /// Enumeration of valid code channels
         /// </summary>
-        public static readonly int Total = Enum.GetValues(typeof(CodeChannel)).Length;
+        public static readonly CodeChannel[] ValidChannels = Enum.GetValues(typeof(CodeChannel)).Cast<CodeChannel>().Where(channel => channel != CodeChannel.Unknown).ToArray();
+
+        /// <summary>
+        /// Total number of supported input channel
+        /// </summary>
+        public static readonly int Total = ValidChannels.Length;
 
         /// <summary>
         /// Constructor of this class
         /// </summary>
         public Inputs() : base()
         {
-            foreach (CodeChannel name in Enum.GetValues(typeof(CodeChannel)))
+            foreach (CodeChannel name in ValidChannels)
             {
                 Add(new InputChannel() { Name = name });
             }

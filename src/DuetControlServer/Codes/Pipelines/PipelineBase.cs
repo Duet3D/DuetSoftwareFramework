@@ -33,13 +33,18 @@ namespace DuetControlServer.Codes.Pipelines
             Processor = processor;
 
             // Make sure there is at least one item on the stack...
-            Push(null);
+            _baseState = Push(null);
         }
 
         /// <summary>
         /// Stacks holding state information per input channel
         /// </summary>
         protected readonly Stack<PipelineStackItem> _stack = new();
+
+        /// <summary>
+        /// Base state of this pipeline
+        /// </summary>
+        protected readonly PipelineStackItem _baseState;
 
         /// <summary>
         /// Get the current state. Should be used only on initialization
@@ -122,6 +127,14 @@ namespace DuetControlServer.Codes.Pipelines
                 PipelineStackItem topState = _stack.Peek();
                 return !topState.Busy && (code == null || code.Macro == topState.Macro);
             }
+        }
+
+        /// <summary>
+        /// Wait for the pipeline stage to become idle
+        /// </summary>
+        public virtual Task<bool> FlushAsync()
+        {
+            return _baseState.FlushAsync();
         }
 
         /// <summary>

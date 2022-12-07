@@ -65,7 +65,7 @@ namespace DuetAPIClient
         {
             Mode = mode;
             Channels.Clear();
-            Channels.AddRange(Enum.GetValues(typeof(CodeChannel)).Cast<CodeChannel>());
+            Channels.AddRange(Inputs.ValidChannels);
             Filters.Clear();
             PriortyCodes = false;
 
@@ -91,14 +91,7 @@ namespace DuetAPIClient
         {
             Mode = mode;
             Channels.Clear();
-            if (channels == null)
-            {
-                Channels.AddRange(Enum.GetValues(typeof(CodeChannel)).Cast<CodeChannel>());
-            }
-            else
-            {
-                Channels.AddRange(channels);
-            }
+            Channels.AddRange(channels ?? Inputs.ValidChannels);
             Filters.Clear();
             if (filters != null)
             {

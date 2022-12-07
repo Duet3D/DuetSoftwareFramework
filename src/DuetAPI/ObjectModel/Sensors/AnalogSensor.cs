@@ -26,6 +26,16 @@
         private string _name;
 
         /// <summary>
+        /// State of this sensor
+        /// </summary>
+        public TemperatureError State
+        {
+            get => _state;
+            set => SetPropertyValue(ref _state, value);
+        }
+        private TemperatureError _state = TemperatureError.Ok;
+
+        /// <summary>
         /// Type of this sensor
         /// </summary>
         public AnalogSensorType Type

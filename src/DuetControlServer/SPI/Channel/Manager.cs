@@ -1,4 +1,5 @@
 ﻿using DuetAPI;
+using DuetAPI.ObjectModel;
 using DuetControlServer.SPI.Communication.Shared;
 using System;
 using System.Collections;
@@ -14,14 +15,9 @@ namespace DuetControlServer.SPI.Channel
     public class Manager : IEnumerable<Processor>
     {
         /// <summary>
-        /// Logger instance
-        /// </summary>
-        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
-        /// <summary>
         /// List of different channels
         /// </summary>
-        private readonly Processor[] _channels;
+        private readonly Processor[] _channels = new Processor[Inputs.Total];
 
         /// <summary>
         /// Last channel that started processing stuff
@@ -33,12 +29,9 @@ namespace DuetControlServer.SPI.Channel
         /// </summary>
         public Manager()
         {
-            CodeChannel[] channels = (CodeChannel[])Enum.GetValues(typeof(CodeChannel));
-
-            _channels = new Processor[channels.Length];
-            foreach (CodeChannel channel in channels)
+            for (int input = 0; input < Inputs.Total; input++)
             {
-                this[channel] = new Processor(channel);
+                _channels[input] = new Processor((CodeChannel)input);
             }
         }
 

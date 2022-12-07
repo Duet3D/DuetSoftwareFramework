@@ -23,6 +23,18 @@ namespace DuetControlServer.Codes.Pipelines
         /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
         /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
+        public override Task<bool> FlushAsync()
+        {
+            return SPI.Interface.FlushAsync(Processor.Channel);
+        }
+
+        /// <summary>
+        /// Wait for the pipeline stage to become idle
+        /// </summary>
+        /// <param name="code">Code waiting for the flush</param>
+        /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
+        /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
+        /// <returns>Whether the codes have been flushed successfully</returns>
         public override Task<bool> FlushAsync(Code code, bool evaluateExpressions = true, bool evaluateAll = true)
         {
             return SPI.Interface.FlushAsync(code, evaluateExpressions, evaluateAll);

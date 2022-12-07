@@ -118,7 +118,7 @@ namespace DuetWebServer.Controllers
             {
                 _logger.LogError(e, "Failed to handle rr_connect request");
             }
-            return Content("{\"err\":1}", "application/json");
+            return Content("{\"err\":1,\"isEmulated\":true}", "application/json");
         }
 
         /// <summary>

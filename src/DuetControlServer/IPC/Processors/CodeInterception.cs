@@ -61,7 +61,7 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// List of input channels where codes may be intercepted
         /// </summary>
-        private readonly List<CodeChannel> _channels;
+        private readonly CodeChannel[] _channels;
 
         /// <summary>
         /// List of codes that may be intercepted
@@ -97,7 +97,7 @@ namespace DuetControlServer.IPC.Processors
         {
             InterceptInitMessage interceptInitMessage = (InterceptInitMessage)initMessage;
             _mode = interceptInitMessage.InterceptionMode;
-            _channels = (interceptInitMessage.Channels != null) ? interceptInitMessage.Channels.ToList() : new List<CodeChannel>(Enum.GetValues(typeof(CodeChannel)).Cast<CodeChannel>());
+            _channels = (interceptInitMessage.Channels != null) ? interceptInitMessage.Channels.ToArray() : Inputs.ValidChannels;
             _filters = interceptInitMessage.Filters ?? new List<string>();
             _priorityCodes = interceptInitMessage.PriortyCodes;
         }

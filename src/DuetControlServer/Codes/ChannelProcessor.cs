@@ -149,7 +149,7 @@ namespace DuetControlServer.Codes
             foreach (Pipelines.PipelineBase pipeline in _pipelines)
             {
                 Logger.Debug("Flushing codes on stage {0}", pipeline.Stage);
-                if (!await pipeline.FlushAsync(null))
+                if (!await pipeline.FlushAsync())
                 {
                     Logger.Debug("Failed to flush codes on stage {0}", pipeline.Stage);
                     return false;

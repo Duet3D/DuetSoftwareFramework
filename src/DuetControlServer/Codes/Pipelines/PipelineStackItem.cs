@@ -128,11 +128,29 @@ namespace DuetControlServer.Codes.Pipelines
         /// </summary>
         /// <param name="code">Code waiting for the flush</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
+        public async Task<bool> FlushAsync()
+        {
+            try
+            {
+                await _idleEvent.WaitAsync(Program.CancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Wait for the pipeline state to finish processing codes
+        /// </summary>
+        /// <param name="code">Code waiting for the flush</param>
+        /// <returns>Whether the codes have been flushed successfully</returns>
         public async Task<bool> FlushAsync(Code code)
         {
             try
             {
-                await _idleEvent.WaitAsync((code != null) ? code.CancellationToken : Program.CancellationToken);
+                await _idleEvent.WaitAsync(code.CancellationToken);
             }
             catch (OperationCanceledException)
             {

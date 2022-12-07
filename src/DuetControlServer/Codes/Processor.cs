@@ -114,14 +114,14 @@ namespace DuetControlServer.Codes
                 }
 
                 // Move priority codes to an empty code channel (if possible)
-                foreach (CodeChannel channel in Enum.GetValues(typeof(CodeChannel)))
+                for (int input = 0; input < Inputs.Total; input++)
                 {
-                    if (channel != code.Channel)
+                    if ((CodeChannel)input != code.Channel)
                     {
-                        ChannelProcessor next = _processors[(int)channel];
+                        ChannelProcessor next = _processors[input];
                         if (next.IsIdle(code))
                         {
-                            code.Channel = channel;
+                            code.Channel = (CodeChannel)input;
                             return next.WriteCodeAsync(code, stage);
                         }
                     }

@@ -18,8 +18,8 @@ namespace LinuxApi
         /// <param name="gid">Group ID</param>
         public static void GetPeerCredentials(this Socket socket, out int pid, out int uid, out int gid)
         {
-            ucred cred = new();
-            int credSize = Marshal.SizeOf<ucred>();
+            Ucred cred = new();
+            int credSize = Marshal.SizeOf<Ucred>();
 
             int error = Interop.getsockopt(socket.Handle.ToInt32(), Interop.SOL_SOCKET, Interop.SO_PEERCRED, ref cred, ref credSize);
             if (error < 0)
