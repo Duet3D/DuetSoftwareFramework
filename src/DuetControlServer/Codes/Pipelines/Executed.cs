@@ -63,7 +63,7 @@ namespace DuetControlServer.Codes.Pipelines
 
                     // Messages from RRF and replies to file print codes are logged somewhere else,
                     // so we only need to log internal code replies that are not part of file prints
-                    if (code.File == null || code.Channel != CodeChannel.File)
+                    if (code.File == null || !code.IsFromFileChannel)
                     {
                         await Utility.Logger.LogAsync(code.Result);
                     }
@@ -124,7 +124,7 @@ namespace DuetControlServer.Codes.Pipelines
                     Processor.Logger.Debug("Finished code {0}", code);
                     if (code.Flags.HasFlag(CodeFlags.Asynchronous))
                     {
-                        if (code.Channel == CodeChannel.File)
+                        if (code.IsFromFileChannel)
                         {
                             await Utility.Logger.LogOutputAsync(code.Result);
                         }

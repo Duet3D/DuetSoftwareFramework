@@ -1152,10 +1152,15 @@ namespace DuetControlServer.SPI
                 FileExecution.Job.Pause(filePositionValid ? filePosition : null, pauseReason);
             }
 
-            // Resolve pending and buffered codes on the file channel
+            // Resolve pending and buffered codes on the file channels
             using (_channels[CodeChannel.File].Lock())
             {
                 _channels[CodeChannel.File].PrintPaused();
+            }
+
+            using (_channels[CodeChannel.File2].Lock())
+            {
+                _channels[CodeChannel.File2].PrintPaused();
             }
         }
 

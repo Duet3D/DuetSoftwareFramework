@@ -31,7 +31,7 @@ namespace DuetControlServer.Codes.Handlers
         /// <returns>Result of the code if the code completed, else null</returns>
         public static async Task<Message> Process(Commands.Code code)
         {
-            if (code.Channel == CodeChannel.File && FileExecution.Job.IsSimulating)
+            if (code.IsFromFileChannel && FileExecution.Job.IsSimulating)
             {
                 // Ignore M-codes from files in simulation mode...
                 return null;
@@ -52,13 +52,13 @@ namespace DuetControlServer.Codes.Handlers
                             if (FileExecution.Job.IsFileSelected)
                             {
                                 // M0/M1/M2 may be used in a print file to terminate it
-                                if (code.Channel != CodeChannel.File && !FileExecution.Job.IsPaused)
+                                if (!code.IsFromFileChannel && !FileExecution.Job.IsPaused)
                                 {
                                     return new Message(MessageType.Error, "Pause the print before attempting to cancel it");
                                 }
 
                                 // Reassign the code's cancellation token to ensure M0/M1 is forwarded to RRF
-                                if (code.Channel == CodeChannel.File)
+                                if (code.IsFromFileChannel)
                                 {
                                     code.ResetCancellationToken();
                                 }
@@ -196,7 +196,7 @@ namespace DuetControlServer.Codes.Handlers
 
                         using (await FileExecution.Job.LockAsync())
                         {
-                            if (code.Channel != CodeChannel.File && FileExecution.Job.IsProcessing)
+                            if (!code.IsFromFileChannel && FileExecution.Job.IsProcessing)
                             {
                                 return new Message(MessageType.Error, "Cannot set file to print, because a file is already being printed");
                             }
@@ -431,7 +431,7 @@ namespace DuetControlServer.Codes.Handlers
 
                             using (await FileExecution.Job.LockAsync())
                             {
-                                if (code.Channel != CodeChannel.File && FileExecution.Job.IsProcessing)
+                                if (!code.IsFromFileChannel && FileExecution.Job.IsProcessing)
                                 {
                                     return new Message(MessageType.Error, "Cannot set file to simulate, because a file is already being printed");
                                 }

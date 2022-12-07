@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
@@ -61,6 +62,12 @@ namespace DuetAPI.Commands
         /// Code channel to send this code to
         /// </summary>
         public CodeChannel Channel { get; set; } = Defaults.InputChannel;
+
+        /// <summary>
+        /// Check if this code is from a file channel
+        /// </summary>
+        [JsonIgnore]
+        public bool IsFromFileChannel { get => Channel == CodeChannel.File || Channel == CodeChannel.File2; }
 
         /// <summary>
         /// Line number of this code

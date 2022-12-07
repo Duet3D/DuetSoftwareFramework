@@ -541,7 +541,7 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // Abort the file print if necessary
-            if (Channel == CodeChannel.File && (abortAll || !macroAborted))
+            if ((Channel == CodeChannel.File || Channel == CodeChannel.File2) && (abortAll || !macroAborted))
             {
                 using (FileExecution.Job.Lock())
                 {
@@ -634,7 +634,7 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // Abort the file print if necessary
-            if (Channel == CodeChannel.File && (abortAll || !macroAborted))
+            if ((Channel == CodeChannel.File || Channel == CodeChannel.File2) && (abortAll || !macroAborted))
             {
                 using (await FileExecution.Job.LockAsync())
                 {

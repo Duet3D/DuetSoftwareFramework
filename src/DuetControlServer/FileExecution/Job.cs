@@ -427,6 +427,7 @@ namespace DuetControlServer.FileExecution
                             {
                                 // Flush one last time in case plugins inserted codes at the end of a print file
                                 await SPI.Interface.FlushAsync(CodeChannel.File);
+                                await SPI.Interface.FlushAsync(CodeChannel.File2);
                             }
                             catch (OperationCanceledException)
                             {
