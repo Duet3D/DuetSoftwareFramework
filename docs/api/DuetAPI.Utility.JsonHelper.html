@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Class JsonHelper
    ">
-    <meta name="generator" content="docfx 2.59.2.0">
+    <meta name="generator" content="docfx 2.59.4.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -376,6 +376,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.DistanceUnit.html" title="DistanceUnit" class="">DistanceUnit</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.DistanceUnitConverter.html" title="DistanceUnitConverter" class="">DistanceUnitConverter</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Driver.html" title="Driver" class="">Driver</a>
@@ -1430,76 +1433,6 @@
   </table>
   <h3 id="methods">Methods
   </h3>
-  <a id="DuetAPI_Utility_JsonHelper_ReceiveUtf8Json_" data-uid="DuetAPI.Utility.JsonHelper.ReceiveUtf8Json*"></a>
-  <h4 id="DuetAPI_Utility_JsonHelper_ReceiveUtf8Json_System_Net_Sockets_Socket_System_Threading_CancellationToken_" data-uid="DuetAPI.Utility.JsonHelper.ReceiveUtf8Json(System.Net.Sockets.Socket,System.Threading.CancellationToken)">ReceiveUtf8Json(Socket, CancellationToken)</h4>
-  <div class="markdown level1 summary"><p>Receive a serialized JSON object from a socket in UTF-8 format</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static async ValueTask&lt;MemoryStream&gt; ReceiveUtf8Json(Socket socket, CancellationToken cancellationToken = default(CancellationToken))</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Net.Sockets.Socket</span></td>
-        <td><span class="parametername">socket</span></td>
-        <td><p>Socket to read from</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.Threading.CancellationToken</span></td>
-        <td><span class="parametername">cancellationToken</span></td>
-        <td><p>Cancellation token</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Threading.Tasks.ValueTask</span>&lt;<span class="xref">System.IO.MemoryStream</span>&gt;</td>
-        <td><p>Plain JSON</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.OperationCanceledException</span></td>
-        <td><p>Operation has been cancelled</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.Net.Sockets.SocketException</span></td>
-        <td><p>Connection has been closed</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
   <a id="DuetAPI_Utility_JsonHelper_ToObject_" data-uid="DuetAPI.Utility.JsonHelper.ToObject*"></a>
   <h4 id="DuetAPI_Utility_JsonHelper_ToObject_System_Text_Json_JsonElement_System_Type_System_Text_Json_JsonSerializerOptions_" data-uid="DuetAPI.Utility.JsonHelper.ToObject(System.Text.Json.JsonElement,System.Type,System.Text.Json.JsonSerializerOptions)">ToObject(JsonElement, Type, JsonSerializerOptions)</h4>
   <div class="markdown level1 summary"><p>Convert a <span class="xref">System.Text.Json.JsonElement</span> to an object</p>

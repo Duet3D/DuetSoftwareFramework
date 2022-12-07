@@ -4320,6 +4320,41 @@ references:
   commentId: F:DuetAPI.ObjectModel.DistanceUnit.MM
   fullName: DuetAPI.ObjectModel.DistanceUnit.MM
   nameWithType: DistanceUnit.MM
+- uid: DuetAPI.ObjectModel.DistanceUnitConverter
+  name: DistanceUnitConverter
+  href: api/DuetAPI.ObjectModel.DistanceUnitConverter.html
+  commentId: T:DuetAPI.ObjectModel.DistanceUnitConverter
+  fullName: DuetAPI.ObjectModel.DistanceUnitConverter
+  nameWithType: DistanceUnitConverter
+- uid: DuetAPI.ObjectModel.DistanceUnitConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)
+  name: Read(ref Utf8JsonReader, Type, JsonSerializerOptions)
+  href: api/DuetAPI.ObjectModel.DistanceUnitConverter.html#DuetAPI_ObjectModel_DistanceUnitConverter_Read_System_Text_Json_Utf8JsonReader__System_Type_System_Text_Json_JsonSerializerOptions_
+  commentId: M:DuetAPI.ObjectModel.DistanceUnitConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)
+  name.vb: Read(ByRef Utf8JsonReader, Type, JsonSerializerOptions)
+  fullName: DuetAPI.ObjectModel.DistanceUnitConverter.Read(ref System.Text.Json.Utf8JsonReader, System.Type, System.Text.Json.JsonSerializerOptions)
+  fullName.vb: DuetAPI.ObjectModel.DistanceUnitConverter.Read(ByRef System.Text.Json.Utf8JsonReader, System.Type, System.Text.Json.JsonSerializerOptions)
+  nameWithType: DistanceUnitConverter.Read(ref Utf8JsonReader, Type, JsonSerializerOptions)
+  nameWithType.vb: DistanceUnitConverter.Read(ByRef Utf8JsonReader, Type, JsonSerializerOptions)
+- uid: DuetAPI.ObjectModel.DistanceUnitConverter.Read*
+  name: Read
+  href: api/DuetAPI.ObjectModel.DistanceUnitConverter.html#DuetAPI_ObjectModel_DistanceUnitConverter_Read_
+  commentId: Overload:DuetAPI.ObjectModel.DistanceUnitConverter.Read
+  isSpec: "True"
+  fullName: DuetAPI.ObjectModel.DistanceUnitConverter.Read
+  nameWithType: DistanceUnitConverter.Read
+- uid: DuetAPI.ObjectModel.DistanceUnitConverter.Write(System.Text.Json.Utf8JsonWriter,DuetAPI.ObjectModel.DistanceUnit,System.Text.Json.JsonSerializerOptions)
+  name: Write(Utf8JsonWriter, DistanceUnit, JsonSerializerOptions)
+  href: api/DuetAPI.ObjectModel.DistanceUnitConverter.html#DuetAPI_ObjectModel_DistanceUnitConverter_Write_System_Text_Json_Utf8JsonWriter_DuetAPI_ObjectModel_DistanceUnit_System_Text_Json_JsonSerializerOptions_
+  commentId: M:DuetAPI.ObjectModel.DistanceUnitConverter.Write(System.Text.Json.Utf8JsonWriter,DuetAPI.ObjectModel.DistanceUnit,System.Text.Json.JsonSerializerOptions)
+  fullName: DuetAPI.ObjectModel.DistanceUnitConverter.Write(System.Text.Json.Utf8JsonWriter, DuetAPI.ObjectModel.DistanceUnit, System.Text.Json.JsonSerializerOptions)
+  nameWithType: DistanceUnitConverter.Write(Utf8JsonWriter, DistanceUnit, JsonSerializerOptions)
+- uid: DuetAPI.ObjectModel.DistanceUnitConverter.Write*
+  name: Write
+  href: api/DuetAPI.ObjectModel.DistanceUnitConverter.html#DuetAPI_ObjectModel_DistanceUnitConverter_Write_
+  commentId: Overload:DuetAPI.ObjectModel.DistanceUnitConverter.Write
+  isSpec: "True"
+  fullName: DuetAPI.ObjectModel.DistanceUnitConverter.Write
+  nameWithType: DistanceUnitConverter.Write
 - uid: DuetAPI.ObjectModel.Driver
   name: Driver
   href: api/DuetAPI.ObjectModel.Driver.html
@@ -10587,6 +10622,19 @@ references:
   isSpec: "True"
   fullName: DuetAPI.ObjectModel.PluginManifest.SbcRequired
   nameWithType: PluginManifest.SbcRequired
+- uid: DuetAPI.ObjectModel.PluginManifest.Tags
+  name: Tags
+  href: api/DuetAPI.ObjectModel.PluginManifest.html#DuetAPI_ObjectModel_PluginManifest_Tags
+  commentId: P:DuetAPI.ObjectModel.PluginManifest.Tags
+  fullName: DuetAPI.ObjectModel.PluginManifest.Tags
+  nameWithType: PluginManifest.Tags
+- uid: DuetAPI.ObjectModel.PluginManifest.Tags*
+  name: Tags
+  href: api/DuetAPI.ObjectModel.PluginManifest.html#DuetAPI_ObjectModel_PluginManifest_Tags_
+  commentId: Overload:DuetAPI.ObjectModel.PluginManifest.Tags
+  isSpec: "True"
+  fullName: DuetAPI.ObjectModel.PluginManifest.Tags
+  nameWithType: PluginManifest.Tags
 - uid: DuetAPI.ObjectModel.PluginManifest.Version
   name: Version
   href: api/DuetAPI.ObjectModel.PluginManifest.html#DuetAPI_ObjectModel_PluginManifest_Version
@@ -13558,19 +13606,6 @@ references:
   commentId: F:DuetAPI.Utility.JsonHelper.DefaultJsonOptions
   fullName: DuetAPI.Utility.JsonHelper.DefaultJsonOptions
   nameWithType: JsonHelper.DefaultJsonOptions
-- uid: DuetAPI.Utility.JsonHelper.ReceiveUtf8Json(System.Net.Sockets.Socket,System.Threading.CancellationToken)
-  name: ReceiveUtf8Json(Socket, CancellationToken)
-  href: api/DuetAPI.Utility.JsonHelper.html#DuetAPI_Utility_JsonHelper_ReceiveUtf8Json_System_Net_Sockets_Socket_System_Threading_CancellationToken_
-  commentId: M:DuetAPI.Utility.JsonHelper.ReceiveUtf8Json(System.Net.Sockets.Socket,System.Threading.CancellationToken)
-  fullName: DuetAPI.Utility.JsonHelper.ReceiveUtf8Json(System.Net.Sockets.Socket, System.Threading.CancellationToken)
-  nameWithType: JsonHelper.ReceiveUtf8Json(Socket, CancellationToken)
-- uid: DuetAPI.Utility.JsonHelper.ReceiveUtf8Json*
-  name: ReceiveUtf8Json
-  href: api/DuetAPI.Utility.JsonHelper.html#DuetAPI_Utility_JsonHelper_ReceiveUtf8Json_
-  commentId: Overload:DuetAPI.Utility.JsonHelper.ReceiveUtf8Json
-  isSpec: "True"
-  fullName: DuetAPI.Utility.JsonHelper.ReceiveUtf8Json
-  nameWithType: JsonHelper.ReceiveUtf8Json
 - uid: DuetAPI.Utility.JsonHelper.ToObject(System.Text.Json.JsonElement,System.Type,System.Text.Json.JsonSerializerOptions)
   name: ToObject(JsonElement, Type, JsonSerializerOptions)
   href: api/DuetAPI.Utility.JsonHelper.html#DuetAPI_Utility_JsonHelper_ToObject_System_Text_Json_JsonElement_System_Type_System_Text_Json_JsonSerializerOptions_
@@ -24769,12 +24804,15 @@ references:
   isSpec: "True"
   fullName: DuetWebServer.Controllers.MachineController.UninstallSystemPackage
   nameWithType: MachineController.UninstallSystemPackage
-- uid: DuetWebServer.Controllers.MachineController.UploadFile(System.String,DuetWebServer.Singletons.ISessionStorage)
-  name: UploadFile(String, ISessionStorage)
-  href: api/DuetWebServer.Controllers.MachineController.html#DuetWebServer_Controllers_MachineController_UploadFile_System_String_DuetWebServer_Singletons_ISessionStorage_
-  commentId: M:DuetWebServer.Controllers.MachineController.UploadFile(System.String,DuetWebServer.Singletons.ISessionStorage)
-  fullName: DuetWebServer.Controllers.MachineController.UploadFile(System.String, DuetWebServer.Singletons.ISessionStorage)
-  nameWithType: MachineController.UploadFile(String, ISessionStorage)
+- uid: DuetWebServer.Controllers.MachineController.UploadFile(System.String,System.Nullable{System.DateTime},DuetWebServer.Singletons.ISessionStorage)
+  name: UploadFile(String, Nullable<DateTime>, ISessionStorage)
+  href: api/DuetWebServer.Controllers.MachineController.html#DuetWebServer_Controllers_MachineController_UploadFile_System_String_System_Nullable_System_DateTime__DuetWebServer_Singletons_ISessionStorage_
+  commentId: M:DuetWebServer.Controllers.MachineController.UploadFile(System.String,System.Nullable{System.DateTime},DuetWebServer.Singletons.ISessionStorage)
+  name.vb: UploadFile(String, Nullable(Of DateTime), ISessionStorage)
+  fullName: DuetWebServer.Controllers.MachineController.UploadFile(System.String, System.Nullable<System.DateTime>, DuetWebServer.Singletons.ISessionStorage)
+  fullName.vb: DuetWebServer.Controllers.MachineController.UploadFile(System.String, System.Nullable(Of System.DateTime), DuetWebServer.Singletons.ISessionStorage)
+  nameWithType: MachineController.UploadFile(String, Nullable<DateTime>, ISessionStorage)
+  nameWithType.vb: MachineController.UploadFile(String, Nullable(Of DateTime), ISessionStorage)
 - uid: DuetWebServer.Controllers.MachineController.UploadFile*
   name: UploadFile
   href: api/DuetWebServer.Controllers.MachineController.html#DuetWebServer_Controllers_MachineController_UploadFile_
