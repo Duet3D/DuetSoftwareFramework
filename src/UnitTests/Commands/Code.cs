@@ -744,6 +744,22 @@ namespace UnitTests.Commands
         }
 
         [Test]
+        public async Task ParseEchoWithQuote()
+        {
+            DuetControlServer.Commands.SimpleCode simpleCode = new() { Code = "echo \"M98 P\"\"revo/define-tool.g\"\" S\"" };
+            List<DuetControlServer.Commands.Code> codes = new();
+            await foreach (DuetControlServer.Commands.Code code in simpleCode.ParseAsync())
+            {
+                codes.Add(code);
+            }
+
+            Assert.AreEqual(1, codes.Count);
+
+            Assert.AreEqual(CodeType.Keyword, codes[0].Type);
+            Assert.AreEqual("\"M98 P\"\"revo/define-tool.g\"\" S\"", codes[0].KeywordArgument);
+        }
+
+        [Test]
         public void ParseDynamicT()
         {
             foreach (DuetAPI.Commands.Code code in Parse("T{my.expression} P0"))

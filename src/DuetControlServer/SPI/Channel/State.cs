@@ -1,6 +1,7 @@
 ﻿using DuetControlServer.Codes.Pipelines;
 using DuetControlServer.Commands;
 using DuetControlServer.FileExecution;
+using System;
 using System.Collections.Generic;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -60,6 +61,17 @@ namespace DuetControlServer.SPI.Channel
         /// Pending codes ready to be sent over to the firmware
         /// </summary>
         public Channel<Code> PendingCodes { get => _pipelineStackItem.PendingCodes; }
+
+        /// <summary>
+        /// Called to flag if the pipeline is busy or not
+        /// </summary>
+        public void SetBusy(bool isBusy)
+        {
+            lock (_pipelineStackItem)
+            {
+                _pipelineStackItem.Busy = isBusy;
+            }
+        }
 
         /// <summary>
         /// Queue of pending flush requests

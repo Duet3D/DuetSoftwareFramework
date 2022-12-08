@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Web;
@@ -112,13 +113,36 @@ namespace DuetWebServer.Controllers
                 else
                 {
                     _logger.LogWarning("Invalid password");
+                    return Content("{\"err\":1,\"isEmulated\":true}", "application/json");
                 }
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Failed to handle rr_connect request");
+                if (e is AggregateException ae)
+                {
+                    e = ae.InnerException;
+                }
+                if (e is IncompatibleVersionException)
+                {
+                    _logger.LogError($"[{nameof(Connect)}] Incompatible DCS version");
+                    return StatusCode(502, "Incompatible DCS version");
+                }
+                if (e is SocketException)
+                {
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    if (System.IO.File.Exists(startErrorFile))
+                    {
+                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        _logger.LogError($"[{nameof(Connect)}] {startError}");
+                        return StatusCode(503, startError);
+                    }
+
+                    _logger.LogError($"[{nameof(Connect)}] DCS is not started");
+                    return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
+                }
+                _logger.LogWarning(e, $"[{nameof(Connect)}] Failed to handle connect request");
+                return StatusCode(500, e.Message);
             }
-            return Content("{\"err\":1,\"isEmulated\":true}", "application/json");
         }
 
         /// <summary>

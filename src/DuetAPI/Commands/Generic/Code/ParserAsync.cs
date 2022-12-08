@@ -117,11 +117,18 @@ namespace DuetAPI.Commands
 
                         if (c == '"')
                         {
-                            if (reader.Peek() == '"')
+                            if (buffer.BufferPointer >= buffer.BufferSize)
+                            {
+                                buffer.BufferSize = await reader.ReadAsync(buffer.Buffer, 0, buffer.Buffer.Length);
+                                buffer.BufferPointer = 0;
+                            }
+
+                            char nextC = (buffer.BufferPointer < buffer.BufferSize) ? buffer.Buffer[buffer.BufferPointer] : '\0';
+                            if (nextC == '"')
                             {
                                 // Subsequent double quotes are treated as a single quote char
-                                reader.Read();
                                 result.KeywordArgument += c;
+                                buffer.BufferPointer++;
                                 result.Length++;
                             }
                             else

@@ -401,10 +401,18 @@ namespace DuetControlServer.Model
                     char c = expression[i++];
                     builder.Append(c);
 
-                    if ((c == '"') && (i >= expression.Length || expression[i] != '"'))
+                    if (c == '"')
                     {
-                        // end of string
-                        return;
+                        if (i >= expression.Length || expression[i] != '"')
+                        {
+                            // end of string
+                            return;
+                        }
+
+                        // dealing with a double-quote
+                        builder.Append('"');
+                        i++;
+                        continue;
                     }
                 }
                 throw new CodeParserException("Unterminated quotes", code);

@@ -30,7 +30,7 @@ namespace DuetControlServer.Commands
             }
 
             // Wait for all codes and files to be invalidated
-            await SPI.Interface.AbortAll(Channel);
+            await SPI.Interface.AbortAllAsync(Channel);
         }
     }
 }

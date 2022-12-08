@@ -111,7 +111,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 if (code.Keyword == KeywordType.Abort)
                 {
-                    await SPI.Interface.AbortAll(code.Channel);
+                    await SPI.Interface.AbortAllAsync(code.Channel);
                 }
                 return new Message(MessageType.Success, result);
             }

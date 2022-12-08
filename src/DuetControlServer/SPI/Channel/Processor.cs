@@ -19,6 +19,9 @@ namespace DuetControlServer.SPI.Channel
     /// <summary>
     /// Class used to process data on a single code channel
     /// </summary>
+    /// <remarks>
+    /// This class should be merged with Codes.Pipelines.Firmware at some point
+    /// </remarks>
     public sealed class Processor
     {
         /// <summary>
@@ -187,6 +190,7 @@ namespace DuetControlServer.SPI.Channel
             {
                 source.SetResult(false);
             }
+            oldState.SetBusy(false);
         }
 
         /// <summary>
@@ -263,6 +267,7 @@ namespace DuetControlServer.SPI.Channel
             {
                 source.SetResult(false);
             }
+            oldState.SetBusy(false);
         }
 
         /// <summary>
@@ -382,6 +387,7 @@ namespace DuetControlServer.SPI.Channel
                 // Need to wait for the SPI connector to finish other operations first
                 TaskCompletionSource<bool> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
                 state.FlushRequests.Enqueue(tcs);
+                state.SetBusy(true);
                 return tcs.Task;
             }
 
@@ -459,11 +465,11 @@ namespace DuetControlServer.SPI.Channel
         }
 
         /// <summary>
-        /// Abort the last or all files
+        /// Called when the last or all files have been aborted
         /// </summary>
         /// <param name="abortAll">Whether to abort all files</param>
         /// <param name="fromFirmware">Whether the request came from the firmware</param>
-        public void AbortFiles(bool abortAll, bool fromFirmware)
+        public void FilesAborted(bool abortAll, bool fromFirmware)
         {
             bool macroAborted = false;
 
@@ -793,8 +799,15 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // 6. Pending codes
+            bool busyStateUpdated = false;
             while (CurrentState.PendingCodes.Reader.TryPeek(out Code pendingCode))
             {
+                if (!busyStateUpdated)
+                {
+                    CurrentState.SetBusy(true);
+                    busyStateUpdated = true;
+                }
+
                 if (BufferCode(pendingCode))
                 {
                     CurrentState.PendingCodes.Reader.TryRead(out _);
@@ -806,10 +819,14 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // 7. Flush requests
-            if (BufferedCodes.Count == 0 && CurrentState.FlushRequests.TryDequeue(out TaskCompletionSource<bool> flushRequest))
+            if (BufferedCodes.Count == 0)
             {
-                flushRequest.SetResult(true);
-                return;
+                if (CurrentState.FlushRequests.TryDequeue(out TaskCompletionSource<bool> flushRequest))
+                {
+                    flushRequest.SetResult(true);
+                    return;
+                }
+                CurrentState.SetBusy(false);
             }
 
             // Log untracked code replies
@@ -1238,6 +1255,7 @@ namespace DuetControlServer.SPI.Channel
                     {
                         source.SetResult(false);
                     }
+                    state.SetBusy(false);
                 }
             }
 
@@ -1273,6 +1291,7 @@ namespace DuetControlServer.SPI.Channel
                 {
                     source.SetResult(false);
                 }
+                CurrentState.SetBusy(false);
 
                 if (Stack.Count == 1)
                 {
