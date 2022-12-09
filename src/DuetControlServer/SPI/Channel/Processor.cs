@@ -367,7 +367,8 @@ namespace DuetControlServer.SPI.Channel
         private volatile bool _isWaitingForAcknowledgment;
 
         /// <summary>
-        /// Flush pending codes and return true on success or false on failure
+        /// Flush pending codes and return true on success or false on failure.
+        /// This method may be deprecated; in theory it should suffice to flush the pipeline only (with stricter Busy conditions)
         /// </summary>
         /// <param name="code">Optional code for the flush target</param>
         /// <returns>Whether the codes could be flushed</returns>

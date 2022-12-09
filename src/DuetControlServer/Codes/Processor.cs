@@ -53,7 +53,7 @@ namespace DuetControlServer.Codes
         /// Get the pipeline state of the firmware stage from a given channel
         /// </summary>
         /// <param name="channel"></param>
-        internal static Pipelines.PipelineStackItem GetFirmwareState(CodeChannel channel) => _processors[(int)channel].FirmwareState;
+        internal static Pipelines.PipelineStackItem GetFirmwareState(CodeChannel channel) => _processors[(int)channel].FirmwareStackItem;
 
         /// <summary>
         /// Push a new state on the stack of a given channel procesor. Only to be used by the SPI channel processor!
@@ -99,7 +99,8 @@ namespace DuetControlServer.Codes
         /// Start the execution of a given code
         /// </summary>
         /// <param name="code">Code to enqueue</param>
-        public static ValueTask StartCodeAsync(Commands.Code code)
+        /// <returns>Asynchronous task</returns>
+        public static async ValueTask StartCodeAsync(Commands.Code code)
         {
             ChannelProcessor processor = _processors[(int)code.Channel];
             PipelineStage stage = PipelineStage.Start;
@@ -110,7 +111,8 @@ namespace DuetControlServer.Codes
                 // Check if the code has to be moved to another channel first
                 if (processor.IsIdle(code))
                 {
-                    return processor.WriteCodeAsync(code, stage);
+                    await processor.WriteCodeAsync(code, stage);
+                    return;
                 }
 
                 // Move priority codes to an empty code channel (if possible)
@@ -122,7 +124,8 @@ namespace DuetControlServer.Codes
                         if (next.IsIdle(code))
                         {
                             code.Channel = (CodeChannel)input;
-                            return next.WriteCodeAsync(code, stage);
+                            await next.WriteCodeAsync(code, stage);
+                            return;
                         }
                     }
                 }
@@ -152,7 +155,7 @@ namespace DuetControlServer.Codes
 
             // Forward the code to the requested pipeline
             code.Stage = stage;
-            return processor.WriteCodeAsync(code, stage);
+            await processor.WriteCodeAsync(code, stage);
         }
 
         /// <summary>

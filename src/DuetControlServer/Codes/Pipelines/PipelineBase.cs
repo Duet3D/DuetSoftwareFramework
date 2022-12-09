@@ -33,7 +33,7 @@ namespace DuetControlServer.Codes.Pipelines
             Processor = processor;
 
             // Make sure there is at least one item on the stack...
-            _baseState = Push(null);
+            _baseItem = Push(null);
         }
 
         /// <summary>
@@ -44,12 +44,12 @@ namespace DuetControlServer.Codes.Pipelines
         /// <summary>
         /// Base state of this pipeline
         /// </summary>
-        protected readonly PipelineStackItem _baseState;
+        protected readonly PipelineStackItem _baseItem;
 
         /// <summary>
-        /// Get the current state. Should be used only on initialization
+        /// Current item on the stack
         /// </summary>
-        internal PipelineStackItem State => _stack.Peek();
+        internal PipelineStackItem CurrentStackItem => _stack.Peek();
 
         /// <summary>
         /// Get the diagnostics from this pipeline stage
@@ -62,16 +62,16 @@ namespace DuetControlServer.Codes.Pipelines
             int numIdleLevels = 0;
             lock (_stack)
             {
-                foreach (PipelineStackItem state in _stack)
+                foreach (PipelineStackItem stackItem in _stack)
                 {
-                    lock (state)
+                    lock (stackItem)
                     {
-                        if (!state.Busy)
+                        if (!stackItem.Busy)
                         {
                             numIdleLevels++;
                         }
 
-                        if (state.Busy || writingDiagnostics)
+                        if (stackItem.Busy || writingDiagnostics)
                         {
                             if (!writingDiagnostics)
                             {
@@ -85,19 +85,19 @@ namespace DuetControlServer.Codes.Pipelines
                             }
                             numIdleLevels = 0;
 
-                            if (state.CodeBeingExecuted != null)
+                            if (stackItem.CodeBeingExecuted != null)
                             {
-                                builder.Append($"> Doing {((state.CodeBeingExecuted.Type == DuetAPI.Commands.CodeType.MCode && state.CodeBeingExecuted.MajorNumber == 122) ? "M122" : state.CodeBeingExecuted)}");
+                                builder.Append($"> Doing {((stackItem.CodeBeingExecuted.Type == DuetAPI.Commands.CodeType.MCode && stackItem.CodeBeingExecuted.MajorNumber == 122) ? "M122" : stackItem.CodeBeingExecuted)}");
                             }
-                            if (state.Macro != null)
+                            if (stackItem.Macro != null)
                             {
-                                builder.Append($" from macro {Path.GetFileName(state.Macro.FileName)}");
+                                builder.Append($" from macro {Path.GetFileName(stackItem.Macro.FileName)}");
                             }
-                            if (state.PendingCodes.Reader.TryPeek(out _))
+                            if (stackItem.PendingCodes.Reader.TryPeek(out _))
                             {
-                                if (state.PendingCodes.Reader.CanCount)
+                                if (stackItem.PendingCodes.Reader.CanCount)
                                 {
-                                    builder.Append($", {state.PendingCodes.Reader.Count} more codes pending");
+                                    builder.Append($", {stackItem.PendingCodes.Reader.Count} more codes pending");
                                 }
                                 else
                                 {
@@ -130,12 +130,9 @@ namespace DuetControlServer.Codes.Pipelines
         }
 
         /// <summary>
-        /// Wait for the pipeline stage to become idle
+        /// Wait for the current pipeline stack item to become idle
         /// </summary>
-        public virtual Task<bool> FlushAsync()
-        {
-            return _baseState.FlushAsync();
-        }
+        public virtual Task<bool> FlushAsync() => CurrentStackItem.FlushAsync();
 
         /// <summary>
         /// Wait for the pipeline stage to become idle
@@ -148,15 +145,15 @@ namespace DuetControlServer.Codes.Pipelines
         {
             lock (_stack)
             {
-                foreach (PipelineStackItem state in _stack)
+                foreach (PipelineStackItem stackItem in _stack)
                 {
-                    if (state.Macro == code.Macro)
+                    if (stackItem.Macro == code.Macro)
                     {
-                        return state.FlushAsync(code);
+                        return stackItem.FlushAsync(code);
                     }
                 }
 
-                Processor.Logger.Warn("Failed to find corresponding state for flush request, falling back to top state");
+                Processor.Logger.Warn("Failed to find corresponding state for code flush request, falling back to top state");
                 return _stack.Peek().FlushAsync(code);
             }
         }
@@ -184,11 +181,11 @@ namespace DuetControlServer.Codes.Pipelines
         {
             lock (_stack)
             {
-                foreach (PipelineStackItem state in _stack)
+                foreach (PipelineStackItem stackItem in _stack)
                 {
-                    if (state.Macro == code.Macro)
+                    if (stackItem.Macro == code.Macro)
                     {
-                        return state.WriteCodeAsync(code);
+                        return stackItem.WriteCodeAsync(code);
                     }
                 }
             }
@@ -242,9 +239,9 @@ namespace DuetControlServer.Codes.Pipelines
             List<Task> tasks = new();
             lock (_stack)
             {
-                foreach (PipelineStackItem state in _stack)
+                foreach (PipelineStackItem stackItem in _stack)
                 {
-                    tasks.Add(state.ProcessorTask);
+                    tasks.Add(stackItem.ProcessorTask);
                 }
             }
             await Task.WhenAll(tasks);

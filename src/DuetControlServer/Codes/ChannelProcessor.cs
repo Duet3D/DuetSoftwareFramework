@@ -42,7 +42,7 @@ namespace DuetControlServer.Codes
         /// <summary>
         /// Retrieve the firmware state
         /// </summary>
-        internal Pipelines.PipelineStackItem FirmwareState => _pipelines[(int)PipelineStage.Firmware].State;
+        internal Pipelines.PipelineStackItem FirmwareStackItem => _pipelines[(int)PipelineStage.Firmware].CurrentStackItem;
 
         /// <summary>
         /// Constructor of this class
@@ -148,13 +148,13 @@ namespace DuetControlServer.Codes
         {
             foreach (Pipelines.PipelineBase pipeline in _pipelines)
             {
-                Logger.Debug("Flushing codes on stage {0}", pipeline.Stage);
+                //Logger.Debug("Flushing codes on stage {0}", pipeline.Stage);
                 if (!await pipeline.FlushAsync())
                 {
                     Logger.Debug("Failed to flush codes on stage {0}", pipeline.Stage);
                     return false;
                 }
-                Logger.Debug("Flushed codes on stage {0}", pipeline.Stage);
+                //Logger.Debug("Flushed codes on stage {0}", pipeline.Stage);
             }
             return true;
         }
@@ -173,13 +173,13 @@ namespace DuetControlServer.Codes
             {
                 if (code.Stage == PipelineStage.Executed || stage > code.Stage)
                 {
-                    Logger.Debug("Flushing codes on stage {0} for {1}", stage, code);
+                    //Logger.Debug("Flushing codes on stage {0} for {1}", stage, code);
                     if (!await _pipelines[(int)stage].FlushAsync(code, evaluateExpressions, evaluateAll))
                     {
                         Logger.Debug("Failed to flush codes on stage {0} for {1}", stage, code);
                         return false;
                     }
-                    Logger.Debug("Flushed codes on stage {0} for {1}", stage, code);
+                    //Logger.Debug("Flushed codes on stage {0} for {1}", stage, code);
                 }
             }
             return true;
