@@ -77,6 +77,7 @@ namespace DuetAPIClient
         {
             return PerformCommand<bool>(new CheckPassword { Password = password }, cancellationToken);
         }
+
         /// <summary>
         /// Evaluate an arbitrary expression
         /// </summary>
@@ -228,6 +229,22 @@ namespace DuetAPIClient
         public Task InstallSystemPackage(string packageFile, CancellationToken cancellationToken = default)
         {
             return PerformCommand(new InstallSystemPackage { PackageFile = packageFile }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Invalidate all pending codes and files on the given channel
+        /// </summary>
+        /// <remarks>
+        /// This does NOT cancel the current code being executed by RRF!
+        /// </remarks>
+        /// <param name="channel">Code channel where everything is supposed to be invalidated</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="SbcPermissions.SuperUser"/>
+        public Task InvalidateChannel(CodeChannel channel, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new InvalidateChannel { Channel = channel }, cancellationToken);
         }
 
         /// <summary>
