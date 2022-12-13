@@ -408,6 +408,17 @@ namespace DuetControlServer.FileExecution
                     Task secondFileTask = DoFilePrint(_file2);
                     await Task.WhenAll(firstFileTask, secondFileTask);
 
+                    // Flush one last time in case plugins inserted codes at the end of a print file
+                    try
+                    {
+                        await SPI.Interface.FlushAsync(CodeChannel.File);
+                        await SPI.Interface.FlushAsync(CodeChannel.File2);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // ignored
+                    }
+
                     // Deal with the print result
                     using (await LockAsync())
                     {
@@ -423,17 +434,6 @@ namespace DuetControlServer.FileExecution
                         }
                         else
                         {
-                            try
-                            {
-                                // Flush one last time in case plugins inserted codes at the end of a print file
-                                await SPI.Interface.FlushAsync(CodeChannel.File);
-                                await SPI.Interface.FlushAsync(CodeChannel.File2);
-                            }
-                            catch (OperationCanceledException)
-                            {
-                                // ignored
-                            }
-
                             await SPI.Interface.StopPrint(PrintStoppedReason.NormalCompletion);
                             _logger.Info("Finished job file");
                         }
