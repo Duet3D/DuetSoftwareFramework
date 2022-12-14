@@ -464,7 +464,7 @@ namespace DuetControlServer
         private static void LoadFromFile(string fileName)
         {
             byte[] content;
-            using (FileStream fileStream = new(fileName, FileMode.Open, FileAccess.Read))
+            using (FileStream fileStream = new(fileName, FileMode.Open, FileAccess.Read, FileShare.Read, FileBufferSize))
             {
                 content = new byte[fileStream.Length];
                 _ = fileStream.Read(content, 0, (int)fileStream.Length);
@@ -582,7 +582,7 @@ namespace DuetControlServer
         /// <param name="fileName">File to save the settings to</param>
         private static void SaveToFile(string fileName)
         {
-            using FileStream fileStream = new(fileName, FileMode.Create, FileAccess.Write);
+            using FileStream fileStream = new(fileName, FileMode.Create, FileAccess.Write, FileShare.None, Settings.FileBufferSize);
             using Utf8JsonWriter writer = new(fileStream, new JsonWriterOptions()
             {
                 Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,

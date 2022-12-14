@@ -84,12 +84,12 @@ namespace DuetControlServer.Codes.Pipelines
         }
 
         /// <summary>
-        /// Pending codes per channel
+        /// Pending codes to be executed
         /// </summary>
         public readonly Channel<Code> PendingCodes;
 
         /// <summary>
-        /// Macro of the corresponding 
+        /// Macro corresponding to this stack item
         /// </summary>
         public readonly Macro Macro;
 

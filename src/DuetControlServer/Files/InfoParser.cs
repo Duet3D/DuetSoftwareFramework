@@ -30,7 +30,7 @@ namespace DuetControlServer.Files
         /// <returns>Information about the file</returns>
         public static async Task<GCodeFileInfo> Parse(string fileName, bool readThumbnailContent)
         {
-            await using FileStream fileStream = new(fileName, FileMode.Open);
+            await using FileStream fileStream = new(fileName, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
             using StreamReader reader = new(fileStream, null, true, Settings.FileBufferSize);
             GCodeFileInfo result = new()
             {
@@ -123,7 +123,7 @@ namespace DuetControlServer.Files
         private static async Task ParseFooter(StreamReader reader, GCodeFileInfo partialFileInfo)
         {
             reader.BaseStream.Seek(0, SeekOrigin.End);
-            ReadLineFromEndData readData = new ReadLineFromEndData(reader.BaseStream.Position);
+            ReadLineFromEndData readData = new(reader.BaseStream.Position);
             char[] buffer = new char[Settings.FileBufferSize];
 
             Code code = new();
@@ -584,10 +584,10 @@ namespace DuetControlServer.Files
 
             try
             {
-                await using FileStream fs = new(filename, FileMode.Open, FileAccess.Read);
+                await using FileStream fs = new(filename, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
                 fs.Seek(offset, SeekOrigin.Begin);
 
-                byte[] data = new byte[4096];
+                byte[] data = new byte[Settings.FileBufferSize];
                 int bytesRead = await fs.ReadAsync(data);
                 if (bytesRead < 2)
                 {
@@ -676,7 +676,7 @@ namespace DuetControlServer.Files
             DateTime lastWriteTime = File.GetLastWriteTime(filename);
 
             // Update the simulated time in the file
-            await using (FileStream fileStream = new(filename, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+            await using (FileStream fileStream = new(filename, FileMode.Open, FileAccess.ReadWrite, FileShare.Read, Settings.FileBufferSize))
             {
                 // Check if we need to truncate the file before the last simulated time
                 bool truncate = false;
@@ -699,7 +699,7 @@ namespace DuetControlServer.Files
                 }
 
                 // Write the simulated time
-                await using (StreamWriter writer = new(fileStream, leaveOpen: true))
+                await using (StreamWriter writer = new(fileStream, Encoding.UTF8, Settings.FileBufferSize, true))
                 {
                     await writer.WriteLineAsync(SimulatedTimeString + ": " + totalSeconds.ToString());
                 }

@@ -3,6 +3,7 @@ using DuetControlServer.Files;
 using Nito.AsyncEx;
 using System;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Utility
@@ -57,8 +58,8 @@ namespace DuetControlServer.Utility
 
                 // Initialize access to the log file
                 string physicalFile = FilePath.ToPhysical(filename, FileDirectory.System);
-                _fileStream = new FileStream(physicalFile, FileMode.Append, FileAccess.Write);
-                _writer = new StreamWriter(_fileStream) { AutoFlush = true };
+                _fileStream = new FileStream(physicalFile, FileMode.Append, FileAccess.Write, FileShare.Read, Settings.FileBufferSize);
+                _writer = new StreamWriter(_fileStream, Encoding.UTF8, Settings.FileBufferSize) { AutoFlush = true };
                 _logCloseEvent = Program.CancellationToken.Register(Stop);
 
                 // Write the first line
@@ -91,8 +92,8 @@ namespace DuetControlServer.Utility
 
                 // Initialize access to the log file
                 string physicalFile = await FilePath.ToPhysicalAsync(filename, FileDirectory.System);
-                _fileStream = new FileStream(physicalFile, FileMode.Append, FileAccess.Write);
-                _writer = new StreamWriter(_fileStream) { AutoFlush = true };
+                _fileStream = new FileStream(physicalFile, FileMode.Append, FileAccess.Write, FileShare.Read, Settings.FileBufferSize);
+                _writer = new StreamWriter(_fileStream, Encoding.UTF8, Settings.FileBufferSize) { AutoFlush = true };
                 _logCloseEvent = Program.CancellationToken.Register(Stop);
 
                 // Write the first line

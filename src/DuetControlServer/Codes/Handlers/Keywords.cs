@@ -4,6 +4,7 @@ using DuetControlServer.Files;
 using DuetControlServer.Model;
 using System;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
@@ -97,9 +98,9 @@ namespace DuetControlServer.Codes.Handlers
 
                         // Write it to the SD card
                         _logger.Debug("{0} '{1}' to {2}", append ? "Appending" : "Writing", result, filename);
-                        await using (FileStream fs = new(physicalFilename, append ? FileMode.Append : FileMode.Create, FileAccess.Write))
+                        await using (FileStream fs = new(physicalFilename, append ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.Read, Settings.FileBufferSize))
                         {
-                            await using StreamWriter writer = new(fs);
+                            await using StreamWriter writer = new(fs, Encoding.UTF8, Settings.FileBufferSize);
                             await writer.WriteLineAsync(result);
                         }
 

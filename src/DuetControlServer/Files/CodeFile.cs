@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
@@ -140,8 +141,8 @@ namespace DuetControlServer.Files
             FileName = fileName;
             Channel = channel;
 
-            _fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read);
-            _reader = new StreamReader(_fileStream, leaveOpen: true);
+            _fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
+            _reader = new StreamReader(_fileStream, Encoding.UTF8, false, Settings.FileBufferSize, true);
         }
 
         /// <summary>

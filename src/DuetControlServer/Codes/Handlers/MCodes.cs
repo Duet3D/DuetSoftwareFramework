@@ -307,8 +307,8 @@ namespace DuetControlServer.Codes.Handlers
                             string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
                             try
                             {
-                                FileStream fileStream = new(physicalFile, FileMode.Create, FileAccess.Write);
-                                StreamWriter writer = new(fileStream);
+                                FileStream fileStream = new(physicalFile, FileMode.Create, FileAccess.Write, FileShare.Read, Settings.FileBufferSize);
+                                StreamWriter writer = new(fileStream, Encoding.UTF8, Settings.FileBufferSize);
                                 Commands.Code.FilesBeingWritten[numChannel] = writer;
                                 return new Message(MessageType.Success, prefix + $"Writing to file: {file}");
                             }
@@ -455,7 +455,7 @@ namespace DuetControlServer.Codes.Handlers
 
                         try
                         {
-                            await using FileStream stream = new(physicalFile, FileMode.Open, FileAccess.Read);
+                            await using FileStream stream = new(physicalFile, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
 
                             using System.Security.Cryptography.SHA1 sha1 = System.Security.Cryptography.SHA1.Create();
                             byte[] hash = await Task.Run(() => sha1.ComputeHash(stream), code.CancellationToken);
@@ -938,8 +938,8 @@ namespace DuetControlServer.Codes.Handlers
                             await stopCommand.Execute();
 
                             // Flash the firmware
-                            await using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read);
-                            await using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read);
+                            await using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
+                            await using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
                             if (Path.GetExtension(firmwareFile) == ".uf2")
                             {
                                 await using MemoryStream unpackedFirmwareStream = await Utility.Firmware.UnpackUF2(firmwareStream);

@@ -4,6 +4,7 @@ using DuetControlServer.Files;
 using Nito.AsyncEx;
 using System;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -48,8 +49,8 @@ namespace DuetControlServer.Commands
                 // Start all plugins
                 if (File.Exists(Settings.PluginsFilename))
                 {
-                    await using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Open, FileAccess.Read);
-                    using StreamReader reader = new(fileStream);
+                    await using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
+                    using StreamReader reader = new(fileStream, Encoding.UTF8, false, Settings.FileBufferSize);
                     while (!reader.EndOfStream)
                     {
                         string pluginName = await reader.ReadLineAsync();

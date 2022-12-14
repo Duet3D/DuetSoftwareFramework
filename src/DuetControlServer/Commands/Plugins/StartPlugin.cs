@@ -4,6 +4,7 @@ using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -39,8 +40,8 @@ namespace DuetControlServer.Commands
             // Save the execution state if requested
             if (SaveState)
             {
-                await using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write);
-                await using StreamWriter writer = new(fileStream);
+                await using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write, FileShare.None, Settings.FileBufferSize);
+                await using StreamWriter writer = new(fileStream, Encoding.UTF8, Settings.FileBufferSize);
                 using (await Model.Provider.AccessReadOnlyAsync())
                 {
                     foreach (Plugin item in Model.Provider.Get.Plugins.Values)

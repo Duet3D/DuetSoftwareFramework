@@ -1204,7 +1204,7 @@ namespace DuetControlServer.SPI
                     filePath = FilePath.ToPhysical(filename, FileDirectory.System);
                 }
 
-                using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read)
+                using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize)
                 {
                     Position = offset
                 };
@@ -1407,7 +1407,8 @@ namespace DuetControlServer.SPI
 
                 // Try to open the file as requested
                 FileMode fsMode = forWriting ? (append ? FileMode.Append : FileMode.Create) : FileMode.Open;
-                FileStream fs = new(physicalFile, fsMode);
+                FileAccess faMode = forWriting ? FileAccess.Write : FileAccess.Read;
+                FileStream fs = new(physicalFile, fsMode, faMode, FileShare.Read, Settings.FileBufferSize);
                 if (forWriting && !append && preAllocSize > 0)
                 {
                     fs.SetLength(preAllocSize);

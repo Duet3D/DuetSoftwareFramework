@@ -122,12 +122,12 @@ namespace DuetControlServer.Utility
                 // Get a stream containing the binary content
                 if (Path.GetExtension(filename) == ".uf2")
                 {
-                    await using FileStream fs = new(filename, FileMode.Open, FileAccess.Read);
+                    await using FileStream fs = new(filename, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
                     firmwareFile = await UnpackUF2(fs);
                 }
                 else
                 {
-                    firmwareFile = new FileStream(filename, FileMode.Open, FileAccess.Read);
+                    firmwareFile = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
                 }
 
                 // Check if we can read the version and load addresses

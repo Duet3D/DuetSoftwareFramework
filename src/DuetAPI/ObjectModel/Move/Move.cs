@@ -30,17 +30,6 @@ namespace DuetAPI.ObjectModel
         public CurrentMove CurrentMove { get; } = new CurrentMove();
 
         /// <summary>
-        /// Current Z hop value (in mm)
-        /// This only changes during firmware retraction with configured Z hop.
-        /// </summary>
-        public float CurrentZHop
-        {
-            get => _currentZHop;
-            set => SetPropertyValue(ref _currentZHop, value);
-        }
-        private float _currentZHop;
-
-        /// <summary>
         /// List of configured extruders
         /// </summary>
         /// <seealso cref="Extruder"/>

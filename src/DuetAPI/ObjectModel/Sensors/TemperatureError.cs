@@ -28,7 +28,7 @@ namespace DuetAPI.ObjectModel
         /// Short to GND detected
         /// </summary>
         ShortToGround,
-        
+
         /// <summary>
         /// Sensor circuit is open
         /// </summary>
@@ -83,7 +83,7 @@ namespace DuetAPI.ObjectModel
         /// Unknown sensor
         /// </summary>
         UnknownSensor,
-        
+
         /// <summary>
         /// Sensor exceeded min/max voltage
         /// </summary>

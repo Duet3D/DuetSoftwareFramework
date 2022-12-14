@@ -24,7 +24,7 @@ namespace DuetControlServer.Codes.Pipelines
         }
 
         /// <summary>
-        /// The only state for this 
+        /// The only state for this
         /// </summary>
         private readonly PipelineStackItem _stackItem;
 
