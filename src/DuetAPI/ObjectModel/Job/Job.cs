@@ -98,6 +98,16 @@ namespace DuetAPI.ObjectModel
         private bool _lastFileSimulated;
 
         /// <summary>
+        /// Warm-up duration of the last print or null if not available (in s)
+        /// </summary>
+        public int? LastWarmUpDuration
+        {
+            get => _lastWarmUpDuration;
+            set => SetPropertyValue(ref _lastWarmUpDuration, value);
+        }
+        private int? _lastWarmUpDuration;
+
+        /// <summary>
         /// Number of the current layer or null not available
         /// </summary>
         public int? Layer
