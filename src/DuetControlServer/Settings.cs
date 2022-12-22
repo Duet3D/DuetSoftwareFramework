@@ -245,17 +245,17 @@ namespace DuetControlServer
         /// <summary>
         /// Size of the read buffer used when reading from files (in bytes)
         /// </summary>
-        public static int FileBufferSize { get; set; } = 8192;
+        public static int FileBufferSize { get; set; } = 32768;
 
         /// <summary>
-        /// How many bytes to parse max at the beginning of a file to retrieve G-code file information (12KiB)
+        /// How many bytes to parse max at the beginning of a file to retrieve G-code file information (in bytes)
         /// </summary>
-        public static uint FileInfoReadLimitHeader { get; set; } = 12288;
+        public static int FileInfoReadLimitHeader { get; set; } = 16384;
 
         /// <summary>
-        /// How many bytes to parse max at the end of a file to retrieve G-code file information (256KiB)
+        /// How many bytes to parse max at the end of a file to retrieve G-code file information (in bytes)
         /// </summary>
-        public static uint FileInfoReadLimitFooter { get; set; } = 262144;
+        public static int FileInfoReadLimitFooter { get; set; } = 262144;
 
         /// <summary>
         /// Maximum allowed layer height. Used by the file info parser

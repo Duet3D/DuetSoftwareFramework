@@ -43,8 +43,8 @@
   ],
   "ModelUpdateInterval": 250,
   "MaxMachineModelLockTime": -1,
-  "FileBufferSize": 8192,
-  "FileInfoReadLimitHeader": 12288,
+  "FileBufferSize": 32768,
+  "FileInfoReadLimitHeader": 16384,
   "FileInfoReadLimitFooter": 262144,
   "MaxLayerHeight": 0.9,
   "LayerHeightFilters": [
