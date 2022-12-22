@@ -4,6 +4,7 @@ using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Files;
 using DuetControlServer.Model;
+using DuetControlServer.Utility;
 using System;
 using System.Globalization;
 using System.IO;
@@ -1067,9 +1068,10 @@ namespace DuetControlServer.Codes.Handlers
         /// <returns>Asynchronous task</returns>
         private static async Task Diagnostics(Message result)
         {
+            BuildDateTimeAttribute buildAttribute = (BuildDateTimeAttribute)Attribute.GetCustomAttribute(System.Reflection.Assembly.GetExecutingAssembly(), typeof(BuildDateTimeAttribute));
             StringBuilder builder = new();
             builder.AppendLine("=== Duet Control Server ===");
-            builder.AppendLine($"Duet Control Server v{Program.Version}");
+            builder.AppendLine($"Duet Control Server version {Program.Version} ({buildAttribute.Date ?? "unknown build time"})");
 
             Processor.Diagnostics(builder);
             await FileExecution.Job.Diagnostics(builder);

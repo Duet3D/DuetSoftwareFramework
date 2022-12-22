@@ -13,10 +13,17 @@
     <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>https://github.com/Duet3D/DuetSoftwareFramework</PackageProjectUrl>
     <Copyright>Duet3D Ltd</Copyright>
+    <BuildTime>$([System.DateTime]::Now)</BuildTime>
   </PropertyGroup>
 
   <ItemGroup>
     <RuntimeHostConfigurationOption Include="System.Globalization.Invariant" Value="true" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="DuetControlServer.Utility.BuildDateTime">
+      <_Parameter1>$([System.DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
