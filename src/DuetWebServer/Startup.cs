@@ -79,6 +79,9 @@ namespace DuetWebServer
                 KeepAliveInterval = TimeSpan.FromSeconds(_configuration.GetValue("KeepAliveInterval", 30)),
             });
 
+            // Use middleware to fix content types
+            app.UseMiddleware(typeof(Middleware.FixContentTypeMiddleware));
+
             // Define endpoints
             app.UseEndpoints(endpoints =>
             {

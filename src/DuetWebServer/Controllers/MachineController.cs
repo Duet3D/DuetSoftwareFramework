@@ -262,12 +262,6 @@ namespace DuetWebServer.Controllers
         public async Task<IActionResult> DoCode([FromServices] ISessionStorage sessionStorage, bool async = false)
         {
             string code;
-            if (Request.HasFormContentType)
-            {
-                // PrusaSlicer sends code requests as application/x-www-form-urlencoded whereas it should be text/plain
-                code = string.Join('\n', Request.Form.Keys);
-            }
-            else
             {
                 using StreamReader reader = new(Request.Body, Encoding.UTF8);
                 code = await reader.ReadToEndAsync();
