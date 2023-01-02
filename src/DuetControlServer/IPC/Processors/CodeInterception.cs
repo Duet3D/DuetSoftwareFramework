@@ -246,32 +246,41 @@ namespace DuetControlServer.IPC.Processors
         {
             using (await _codeMonitor.EnterAsync(Program.CancellationToken))
             {
-                // Send it to the IPC client and wait for a result
-                _codeBeingIntercepted = code;
-                _codeMonitor.Pulse();
-                await _codeMonitor.WaitAsync(Program.CancellationToken);
-                //_codeBeingIntercepted = null;     // TODO check this when the code pipeline is reworked; with this line something goes wrong in the interceptors
-
                 try
                 {
-                    // Code is cancelled. This invokes an OperationCanceledException on the code's task.
-                    if (_interceptionResult is Cancel)
-                    {
-                        throw new OperationCanceledException();
-                    }
+                    // Send the code being intercepted to the IPC client
+                    _codeBeingIntercepted = code;
+                    _codeMonitor.Pulse();
 
-                    // Code is resolved with a given result and the request is acknowledged
-                    if (_interceptionResult is Resolve resolveCommand)
+                    try
                     {
-                        code.Result = new Message(resolveCommand.Type, resolveCommand.Content);
-                        return true;
-                    }
+                        // Wait for the IPC client to send back a result
+                        await _codeMonitor.WaitAsync(Program.CancellationToken);
 
-                    // Code is ignored. Don't do anything
+                        // Code is cancelled. This invokes an OperationCanceledException on the code's task
+                        if (_interceptionResult is Cancel)
+                        {
+                            throw new OperationCanceledException();
+                        }
+
+                        // Code is resolved with a given result and the request is acknowledged
+                        if (_interceptionResult is Resolve resolveCommand)
+                        {
+                            code.Result = new Message(resolveCommand.Type, resolveCommand.Content);
+                            return true;
+                        }
+
+                        // Code is ignored. Don't do anything
+                    }
+                    catch (Exception e) when (e is not OperationCanceledException)
+                    {
+                        _logger.Error(e, "Interception processor for IPC#{0} caught an exception", Connection.Id);
+                    }
                 }
-                catch (Exception e) when (e is not OperationCanceledException)
+                finally
                 {
-                    _logger.Error(e, "Interception processor for IPC#{0} caught an exception", Connection.Id);
+                    // No longer intercepting a code...
+                    _codeBeingIntercepted = null;
                 }
             }
             return false;

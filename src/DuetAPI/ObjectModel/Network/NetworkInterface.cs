@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace DuetAPI.ObjectModel
+﻿namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about a network interface

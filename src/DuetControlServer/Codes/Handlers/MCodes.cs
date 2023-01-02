@@ -5,6 +5,7 @@ using DuetAPI.Utility;
 using DuetControlServer.Files;
 using DuetControlServer.Model;
 using DuetControlServer.Utility;
+using Nito.AsyncEx;
 using System;
 using System.Globalization;
 using System.IO;
@@ -24,6 +25,11 @@ namespace DuetControlServer.Codes.Handlers
         /// Logger instance
         /// </summary>
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
+        /// Async monitor to ensure correct order of M0/M1/M2 when cancelling a job file from the File/File2 channels
+        /// </summary>
+        private static readonly AsyncMonitor _stopPrintMonitor = new();
 
         /// <summary>
         /// Process an M-code that should be interpreted by the control server
@@ -48,24 +54,41 @@ namespace DuetControlServer.Codes.Handlers
                 case 2:
                     if (await Processor.FlushAsync(code))
                     {
+                        // File2 must wait for File to cancel the print first, else the cancellation token may be invalidated
+                        if (code.Channel == CodeChannel.File2)
+                        {
+                            using (await _stopPrintMonitor.EnterAsync(Program.CancellationToken))
+                            {
+                                await _stopPrintMonitor.WaitAsync(Program.CancellationToken);
+                            }
+                        }
+
+                        // Attempt to cancel the print
                         using (await FileExecution.Job.LockAsync())
                         {
-                            if (FileExecution.Job.IsFileSelected)
+                            if (code.Channel != CodeChannel.File2 && FileExecution.Job.IsFileSelected)
                             {
-                                // M0/M1/M2 may be used in a print file to terminate it
+                                // M0/M1/M2 is permitted from inside a job file, but only permitted from elsewhere if the job is already paused
                                 if (!code.IsFromFileChannel && !FileExecution.Job.IsPaused)
                                 {
                                     return new Message(MessageType.Error, "Pause the print before attempting to cancel it");
                                 }
 
-                                // Reassign the code's cancellation token to ensure M0/M1 is forwarded to RRF
-                                if (code.IsFromFileChannel)
-                                {
-                                    code.ResetCancellationToken();
-                                }
-
                                 // Invalidate the print file and make sure no more codes are read from it
                                 await FileExecution.Job.CancelAsync();
+                            }
+                        }
+
+                        // Reassign the code's cancellation token to ensure M0/M1/M2 is forwarded to RRF
+                        if (code.IsFromFileChannel)
+                        {
+                            code.ResetCancellationToken();
+                            if (code.Channel == CodeChannel.File)
+                            {
+                                using (await _stopPrintMonitor.EnterAsync(Program.CancellationToken))
+                                {
+                                    _stopPrintMonitor.Pulse();
+                                }
                             }
                         }
                         break;

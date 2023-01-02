@@ -1,13 +1,11 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
-using DuetControlServer.Commands;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
-using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;

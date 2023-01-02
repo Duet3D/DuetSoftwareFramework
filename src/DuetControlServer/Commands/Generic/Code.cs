@@ -122,7 +122,7 @@ namespace DuetControlServer.Commands
         /// <returns>True if Marlin is being emulated</returns>
         public async Task<bool> EmulatingMarlin()
         {
-            using (await Provider.AccessReadOnlyAsync(CancellationToken))
+            using (await Provider.AccessReadOnlyAsync(Program.CancellationToken))
             {
                 Compatibility compatibility = Provider.Get.Inputs[Channel].Compatibility;
                 return compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP;

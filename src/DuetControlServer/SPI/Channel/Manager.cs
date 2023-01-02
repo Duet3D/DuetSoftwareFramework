@@ -1,7 +1,6 @@
 ﻿using DuetAPI;
 using DuetAPI.ObjectModel;
 using DuetControlServer.SPI.Communication.Shared;
-using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;

@@ -9,6 +9,7 @@ using DuetControlServer.Utility;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -151,6 +152,44 @@ namespace DuetControlServer.FileExecution
         }
 
         /// <summary>
+        /// Dictionary of codes vs. synchronization tasks
+        /// </summary>
+        private static readonly Dictionary<Code, TaskCompletionSource<bool>> _syncRequests = new();
+
+        /// <summary>
+        /// Synchronize the File and File2 code streams, may only be called when a job is live
+        /// </summary>
+        /// <param name="code">Code to synchronize at</param>
+        /// <returns>True if the sync request was successful, false otherwise</returns>
+        /// <remarks>
+        /// This must be called while the Job class is NOT locked!
+        /// </remarks>
+        public static Task<bool> DoSync(Code code)
+        {
+            if (code.FilePosition == null)
+            {
+                throw new ArgumentException("Code has no file position and cannot be used for sync requests", nameof(code));
+            }
+
+            lock (_syncRequests)
+            {
+                foreach (Code item in _syncRequests.Keys)
+                {
+                    if (code.FilePosition == item.FilePosition)
+                    {
+                        _syncRequests[item].TrySetResult(true);
+                        return Task.FromResult(true);
+                    }
+
+                }
+
+                TaskCompletionSource<bool> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                _syncRequests.Add(code, tcs);
+                return tcs.Task;
+            }
+        }
+
+        /// <summary>
         /// Set the current file position
         /// </summary>
         /// <param name="motionSystem">Motion system</param>
@@ -171,6 +210,18 @@ namespace DuetControlServer.FileExecution
                 using (await _file2.LockAsync())
                 {
                     _file2.Position = filePosition;
+                }
+            }
+
+            lock (_syncRequests)
+            {
+                foreach (Code code in _syncRequests.Keys.ToList())
+                {
+                    if (code.FilePosition >= filePosition)
+                    {
+                        _syncRequests[code].TrySetResult(false);
+                        _syncRequests.Remove(code);
+                    }
                 }
             }
         }
@@ -484,6 +535,16 @@ namespace DuetControlServer.FileExecution
                     // We are no longer printing a file...
                     _finished.NotifyAll();
 
+                    // Clean up pending sync requests
+                    lock (_syncRequests)
+                    {
+                        foreach (Code code in _syncRequests.Keys)
+                        {
+                            _syncRequests[code].TrySetResult(false);
+                        }
+                        _syncRequests.Clear();
+                    }
+
                     // Dispose the file
                     _file.Dispose();
                     _file2.Dispose();
@@ -553,7 +614,7 @@ namespace DuetControlServer.FileExecution
         }
 
         /// <summary>
-        /// Cancel the current print (e.g. when M0/M1 is called)
+        /// Cancel the current print (e.g. when M0/M1/M2 is called)
         /// </summary>
         /// <returns>Asynchronous task</returns>
         public static async Task CancelAsync()

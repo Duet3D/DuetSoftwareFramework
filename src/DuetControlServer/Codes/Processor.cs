@@ -85,14 +85,30 @@ namespace DuetControlServer.Codes
         /// <param name="code">Code waiting for the flush</param>
         /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
         /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
+        /// <param name="syncFileStreams">Whether the file streams are supposed to be synchronized (if applicable)</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true)
+        public static async Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true, bool syncFileStreams = true)
         {
             if (code == null)
             {
                 throw new ArgumentNullException(nameof(code));
             }
-            return _processors[(int)code.Channel].FlushAsync(code, evaluateExpressions, evaluateAll);
+
+            // Wait for the pending codes on this channel to go
+            if (!await _processors[(int)code.Channel].FlushAsync(code, evaluateExpressions, evaluateAll))
+            {
+                return false;
+            }
+
+            // If this request is coming from a File channel, make sure we get both streams in sync.
+            // For now, skip this check if the code is indented (i.e. in a conditional code block that may be never reached)
+            if (code.IsFromFileChannel && code.Indent == 0 && syncFileStreams)
+            {
+                return await FileExecution.Job.DoSync(code);
+            }
+
+            // Done
+            return true;
         }
 
         /// <summary>

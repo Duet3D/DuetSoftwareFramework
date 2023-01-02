@@ -1,7 +1,6 @@
 ﻿using DuetControlServer.Codes.Pipelines;
 using DuetControlServer.Commands;
 using DuetControlServer.FileExecution;
-using System;
 using System.Collections.Generic;
 using System.Threading.Channels;
 using System.Threading.Tasks;

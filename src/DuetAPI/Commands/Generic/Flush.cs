@@ -17,5 +17,10 @@ namespace DuetAPI.Commands
         /// This value is ignored if this request is processed while a code is being intercepted
         /// </remarks>
         public CodeChannel Channel { get; set; }
+
+        /// <summary>
+        /// Whether the File and File2 streams are supposed to synchronize at the same code if a code is being intercepted (recommended)
+        /// </summary>
+        public bool SyncFileStreams { get; set; } = true;
     }
 }
