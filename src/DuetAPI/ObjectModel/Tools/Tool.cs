@@ -36,7 +36,7 @@
         /// <summary>
         /// Feedforward coefficients to apply to the mapped heaters during extrusions
         /// </summary>
-        public ModelCollection<int> FeedForward { get; } = new ModelCollection<int>();
+        public ModelCollection<float> FeedForward { get; } = new ModelCollection<float>();
 
         /// <summary>
         /// Extruder drive index for resolving the tool filament (index or -1)
