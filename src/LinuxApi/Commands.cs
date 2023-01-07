@@ -106,10 +106,10 @@ namespace LinuxApi
         /// <param name="gid">Group ID</param>
         public static void GetOwner(string pathname, out int uid, out int gid)
         {
-            statbuf buffer = new();
-            if (Interop.stat(Interop.STATVER, pathname, ref buffer) < 0)
+            statxbuf buffer = new();
+            if (Interop.statx(Interop.AT_FDCWD, pathname, Interop.AT_STATX_SYNC_AS_STAT, Interop.STATX_BASIC_STATS, ref buffer) < 0)
             {
-                throw new ArgumentException($"Failed to get file info (error {Marshal.GetLastWin32Error()})");
+                throw new ArgumentException($"Failed to get file info for {pathname} (error {Marshal.GetLastWin32Error()})");
             }
             uid = (int)buffer.UserID;
             gid = (int)buffer.GroupID;
@@ -124,12 +124,11 @@ namespace LinuxApi
         /// <param name="any">Any permissions</param>
         public static void GetPermissions(string pathname, out UnixPermissions user, out UnixPermissions group, out UnixPermissions any)
         {
-            statbuf buffer = new();
-            if (Interop.stat(Interop.STATVER, pathname, ref buffer) < 0)
+            statxbuf buffer = new();
+            if (Interop.statx(Interop.AT_FDCWD, pathname, Interop.AT_STATX_SYNC_AS_STAT, Interop.STATX_BASIC_STATS, ref buffer) < 0)
             {
-                throw new ArgumentException($"Failed to get file info (error {Marshal.GetLastWin32Error()})");
+                throw new ArgumentException($"Failed to get file info for {pathname} : (error {Marshal.GetLastWin32Error()})");
             }
-
             user = (UnixPermissions)((buffer.Mode >> 6) & 0xF);
             group = (UnixPermissions)((buffer.Mode >> 3) & 0xF);
             any = (UnixPermissions)(buffer.Mode & 0xF);
