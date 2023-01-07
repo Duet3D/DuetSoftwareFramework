@@ -85,11 +85,11 @@ namespace DuetControlServer.Codes.Pipelines
                             }
                             numIdleLevels = 0;
 
-                            if (stackItem.CodeBeingExecuted != null)
+                            if (stackItem.CodeBeingExecuted is not null)
                             {
                                 builder.Append($"> Doing {((stackItem.CodeBeingExecuted.Type == DuetAPI.Commands.CodeType.MCode && stackItem.CodeBeingExecuted.MajorNumber == 122) ? "M122" : stackItem.CodeBeingExecuted)}");
                             }
-                            if (stackItem.Macro != null)
+                            if (stackItem.Macro is not null)
                             {
                                 builder.Append($" from macro {Path.GetFileName(stackItem.Macro.FileName)}");
                             }
@@ -120,12 +120,12 @@ namespace DuetControlServer.Codes.Pipelines
         /// </summary>
         /// <param name="code">Optional code requesting the check</param>
         /// <returns>Whether the corresponding state is empty</returns>
-        public bool IsIdle(Commands.Code code)
+        public bool IsIdle(Commands.Code? code)
         {
             lock (_stack)
             {
                 PipelineStackItem topState = _stack.Peek();
-                return !topState.Busy && (code == null || code.Macro == topState.Macro);
+                return !topState.Busy && (code is null || code.Macro == topState.Macro);
             }
         }
 
@@ -199,7 +199,7 @@ namespace DuetControlServer.Codes.Pipelines
         /// Push a new element onto the stack
         /// </summary>
         /// <param name="macro">Macro file or null if waiting for acknowledgment</param>
-        internal virtual PipelineStackItem Push(Macro macro)
+        internal virtual PipelineStackItem Push(Macro? macro)
         {
             PipelineStackItem newState = new(this, macro);
             lock (_stack)

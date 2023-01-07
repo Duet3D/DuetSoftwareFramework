@@ -36,7 +36,7 @@ namespace DuetAPI.Connection.InitMessages
         /// <summary>
         /// List of channel where codes may be intercepted. If the list is empty, all available channels are used
         /// </summary>
-        public List<CodeChannel> Channels { get; set; }
+        public List<CodeChannel> Channels { get; set; } = new List<CodeChannel>();
 
         /// <summary>
         /// List of G/M/T-codes to filter or Q for comments
@@ -46,7 +46,7 @@ namespace DuetAPI.Connection.InitMessages
         /// Alternatively keyword types may be specified (e.g. if or elif).
         /// Asterisks are supported, too (e.g. T*)
         /// </remarks>
-        public List<string> Filters { get; set; }
+        public List<string> Filters { get; set; } = new List<string>();
 
         /// <summary>
         /// Defines if either regular or priority codes are supposed to be intercepted

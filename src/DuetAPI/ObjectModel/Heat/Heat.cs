@@ -47,6 +47,6 @@
         /// List of configured heaters
         /// </summary>
         /// <seealso cref="Heater"/>
-        public ModelCollection<Heater> Heaters { get; } = new ModelCollection<Heater>();
+        public ModelCollection<Heater?> Heaters { get; } = new ModelCollection<Heater?>();
     }
 }

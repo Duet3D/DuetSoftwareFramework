@@ -16,11 +16,11 @@ namespace UnitTests.File
             string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes/config.g");
             CodeFile macro = new(filePath, DuetAPI.CodeChannel.Trigger);
 
-            Code code;
+            Code? code;
             do
             {
                 code = await macro.ReadCodeAsync();
-                if (code == null)
+                if (code is null)
                 {
                     break;
                 }

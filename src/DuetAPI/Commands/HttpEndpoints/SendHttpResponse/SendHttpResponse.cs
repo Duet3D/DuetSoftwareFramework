@@ -14,7 +14,7 @@
         /// <summary>
         /// Content to return. If this is null or empty and a WebSocket is connected, the connection is closed
         /// </summary>
-        public string Response { get; set; }
+        public string Response { get; set; } = string.Empty;
 
         /// <summary>
         /// Type of the content to return. Ignored if a WebSocket is connected

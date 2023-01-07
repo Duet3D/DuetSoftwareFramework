@@ -81,12 +81,12 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// Current code being intercepted
         /// </summary>
-        private volatile Code _codeBeingIntercepted;
+        private volatile Code? _codeBeingIntercepted;
 
         /// <summary>
         /// Interception command to resolve the code being intercepted
         /// </summary>
-        private BaseCommand _interceptionResult;
+        private BaseCommand? _interceptionResult;
 
         /// <summary>
         /// Constructor of the interception processor
@@ -97,7 +97,7 @@ namespace DuetControlServer.IPC.Processors
         {
             InterceptInitMessage interceptInitMessage = (InterceptInitMessage)initMessage;
             _mode = interceptInitMessage.InterceptionMode;
-            _channels = (interceptInitMessage.Channels != null) ? interceptInitMessage.Channels.ToArray() : Inputs.ValidChannels;
+            _channels = (interceptInitMessage.Channels is not null) ? interceptInitMessage.Channels.ToArray() : Inputs.ValidChannels;
             _filters = interceptInitMessage.Filters ?? new List<string>();
             _priorityCodes = interceptInitMessage.PriortyCodes;
         }
@@ -146,7 +146,7 @@ namespace DuetControlServer.IPC.Processors
                         try
                         {
                             // Send it to the client
-                            await Connection.Send<DuetAPI.Commands.Code>(_codeBeingIntercepted);
+                            await Connection.Send<DuetAPI.Commands.Code>(_codeBeingIntercepted!);
 
                             // Keep processing incoming commands until a final action for the code has been received
                             do
@@ -160,7 +160,7 @@ namespace DuetControlServer.IPC.Processors
                                     Connection.CheckPermissions(commandType);
 
                                     // Execute regular commands here
-                                    object result = await command.Invoke();
+                                    object? result = await command.Invoke();
                                     await Connection.SendResponse(result);
                                 }
                                 else if (SupportedCommands.Contains(commandType))
@@ -337,7 +337,7 @@ namespace DuetControlServer.IPC.Processors
         /// </summary>
         /// <param name="connection">Connection ID to check</param>
         /// <returns>True if the connection is intercepting a code</returns>
-        public static bool IsInterceptingConnection(Connection connection)
+        public static bool IsInterceptingConnection(Connection? connection)
         {
             foreach (List<CodeInterception> processorList in _connections.Values)
             {
@@ -350,7 +350,7 @@ namespace DuetControlServer.IPC.Processors
                             continue;
                         }
 
-                        return (processor._codeBeingIntercepted != null);
+                        return processor._codeBeingIntercepted is not null;
                     }
                 }
             }
@@ -363,9 +363,9 @@ namespace DuetControlServer.IPC.Processors
         /// <param name="connection">Connection to look up</param>
         /// <param name="mode">Mode of the corresponding interceptor</param>
         /// <returns>Code being intercepted</returns>
-        public static Code GetCodeBeingIntercepted(Connection connection, out InterceptionMode mode)
+        public static Code? GetCodeBeingIntercepted(Connection? connection, out InterceptionMode mode)
         {
-            if (connection != null)
+            if (connection is not null)
             {
                 foreach (List<CodeInterception> processorList in _connections.Values)
                 {
@@ -400,7 +400,7 @@ namespace DuetControlServer.IPC.Processors
                 {
                     foreach (CodeInterception processor in processorList)
                     {
-                        if (processor._codeBeingIntercepted != null)
+                        if (processor._codeBeingIntercepted is not null)
                         {
                             builder.AppendLine($"IPC connection #{processor.Connection.Id} is intercepting {processor._codeBeingIntercepted} ({processor._mode})");
                         }

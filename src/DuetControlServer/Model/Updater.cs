@@ -156,7 +156,7 @@ namespace DuetControlServer.Model
                         {
                             jsonData = await SPI.Interface.RequestObjectModel("limits", "d99vn");
                             using JsonDocument limitsDocument = JsonDocument.Parse(jsonData);
-                            if (limitsDocument.RootElement.TryGetProperty("key", out JsonElement limitsKey) && limitsKey.GetString().Equals("limits", StringComparison.InvariantCultureIgnoreCase) &&
+                            if (limitsDocument.RootElement.TryGetProperty("key", out JsonElement limitsKey) && limitsKey.GetString()!.Equals("limits", StringComparison.InvariantCultureIgnoreCase) &&
                                 limitsDocument.RootElement.TryGetProperty("result", out JsonElement limitsResult))
                             {
                                 using (await Provider.AccessReadWriteAsync())
@@ -312,7 +312,7 @@ namespace DuetControlServer.Model
         private static void UpdateLayers()
         {
             // Are we printing?
-            if (Provider.Get.Job.Duration == null)
+            if (Provider.Get.Job.Duration is null)
             {
                 if (_lastLayer != -1)
                 {
@@ -333,7 +333,7 @@ namespace DuetControlServer.Model
             }
 
             // Don't continue from here unless the layer number is known and valid
-            if (Provider.Get.Job.Layer == null || Provider.Get.Job.Layer.Value < 0)
+            if (Provider.Get.Job.Layer is null || Provider.Get.Job.Layer.Value < 0)
             {
                 return;
             }
@@ -342,14 +342,14 @@ namespace DuetControlServer.Model
             {
                 // Compute layer usage stats first
                 int numChangedLayers = (Provider.Get.Job.Layer.Value > _lastLayer) ? Math.Abs(Provider.Get.Job.Layer.Value - _lastLayer) : 1;
-                int printDuration = Provider.Get.Job.Duration.Value - (Provider.Get.Job.WarmUpDuration != null ? Provider.Get.Job.WarmUpDuration.Value : 0);
+                int printDuration = Provider.Get.Job.Duration.Value - (Provider.Get.Job.WarmUpDuration is not null ? Provider.Get.Job.WarmUpDuration.Value : 0);
                 float avgLayerDuration = (printDuration - _lastDuration) / numChangedLayers;
                 List<float> totalFilamentUsage = new(), avgFilamentUsage = new();
-                long bytesPrinted = (Provider.Get.Job.FilePosition != null) ? (Provider.Get.Job.FilePosition.Value - _lastFilePosition) : 0L;
+                long bytesPrinted = (Provider.Get.Job.FilePosition is not null) ? (Provider.Get.Job.FilePosition.Value - _lastFilePosition) : 0L;
                 float avgFractionPrinted = (Provider.Get.Job.File.Size > 0) ? (float)bytesPrinted / (Provider.Get.Job.File.Size * numChangedLayers) : 0F;
                 for (int i = 0; i < Provider.Get.Move.Extruders.Count; i++)
                 {
-                    if (Provider.Get.Move.Extruders[i] != null)
+                    if (Provider.Get.Move.Extruders[i] is not null)
                     {
                         float lastFilamentUsage = (i < _lastFilamentUsage.Count) ? _lastFilamentUsage[i] : 0F;
                         totalFilamentUsage.Add(Provider.Get.Move.Extruders[i].RawPosition);
@@ -384,9 +384,9 @@ namespace DuetControlServer.Model
                         }
                         newLayer.FractionPrinted = avgFractionPrinted;
                         newLayer.Height = avgLayerHeight;
-                        foreach (AnalogSensor sensor in Provider.Get.Sensors.Analog)
+                        foreach (AnalogSensor? sensor in Provider.Get.Sensors.Analog)
                         {
-                            if (sensor != null)
+                            if (sensor is not null)
                             {
                                 newLayer.Temperatures.Add(sensor.LastReading);
                             }
@@ -404,9 +404,9 @@ namespace DuetControlServer.Model
                         {
                             Height = avgLayerHeight
                         };
-                        foreach (AnalogSensor sensor in Provider.Get.Sensors.Analog)
+                        foreach (AnalogSensor? sensor in Provider.Get.Sensors.Analog)
                         {
-                            if (sensor != null)
+                            if (sensor is not null)
                             {
                                 lastLayer.Temperatures.Add(sensor.LastReading);
                             }

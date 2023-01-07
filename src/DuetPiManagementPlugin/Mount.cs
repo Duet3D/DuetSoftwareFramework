@@ -17,7 +17,7 @@ namespace DuetPiManagementPlugin
         /// <param name="directory">Directory to mount to</param>
         /// <param name="options">Mount options</param>
         /// <returns>Mount result</returns>
-        public static async Task<Message> MountShare(string device, string physicalDirectory, string type, string options)
+        public static async Task<Message> MountShare(string device, string? physicalDirectory, string? type, string? options)
         {
             if (device.Replace(@"\\", string.Empty).ToCharArray().Any(c => c != '.' && c != ':' && c != '/' && c != '-' && c != '_' && c != '#' && !char.IsLetterOrDigit(c)))
             {

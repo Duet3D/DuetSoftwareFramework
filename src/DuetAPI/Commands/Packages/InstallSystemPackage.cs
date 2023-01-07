@@ -11,6 +11,6 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Absolute file path to the package file
         /// </summary>
-        public string PackageFile { get; set; }
+        public string PackageFile { get; set; } = string.Empty;
     }
 }

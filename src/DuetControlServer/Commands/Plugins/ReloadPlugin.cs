@@ -35,7 +35,7 @@ namespace DuetControlServer.Commands
                 string file = Path.Combine(Settings.PluginDirectory, Plugin + ".json");
                 if (File.Exists(file))
                 {
-                    if (plugin == null)
+                    if (plugin is null)
                     {
                         plugin = new();
                         Model.Provider.Get.Plugins.Add(Plugin, plugin);
@@ -48,7 +48,7 @@ namespace DuetControlServer.Commands
                 }
                 else
                 {
-                    if (plugin == null)
+                    if (plugin is null)
                     {
                         // Don't attempt to remove a non-existent plugin
                         return;

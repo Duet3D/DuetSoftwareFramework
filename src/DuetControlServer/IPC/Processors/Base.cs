@@ -22,14 +22,14 @@ namespace DuetControlServer.IPC.Processors
         /// Add a list of supported commands
         /// </summary>
         /// <param name="supportedCommands">List of supported commands</param>
-        protected static void AddSupportedCommands(IEnumerable<Type> supportedCommands) => SupportedCommands.AddRange(supportedCommands.Where(item => item != null && !SupportedCommands.Contains(item)));
+        protected static void AddSupportedCommands(IEnumerable<Type> supportedCommands) => SupportedCommands.AddRange(supportedCommands.Where(item => item is not null && !SupportedCommands.Contains(item)));
 
         /// <summary>
         /// Get the corresponding command type
         /// </summary>
         /// <param name="name">Name of the command</param>
         /// <returns>Command type or null if not found</returns>
-        public static Type GetCommandType(string name) => SupportedCommands.FirstOrDefault(item => item.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
+        public static Type? GetCommandType(string name) => SupportedCommands.FirstOrDefault(item => item.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
 
         /// <summary>
         /// Connection to the IPC client served by this processor

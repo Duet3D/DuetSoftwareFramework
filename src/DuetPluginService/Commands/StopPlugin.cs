@@ -22,7 +22,7 @@ namespace DuetPluginService.Commands
             using (await Plugins.LockAsync())
             {
                 // Try to find the plugin first
-                Plugin plugin = null;
+                Plugin? plugin = null;
                 foreach (Plugin item in Plugins.List)
                 {
                     if (item.Id == Plugin)
@@ -31,7 +31,8 @@ namespace DuetPluginService.Commands
                         break;
                     }
                 }
-                if (plugin == null)
+
+                if (plugin is null)
                 {
                     throw new ArgumentException($"Plugin {Plugin} not found by {(Program.IsRoot ? "root service" : "service")}");
                 }
@@ -43,7 +44,7 @@ namespace DuetPluginService.Commands
                 }
 
                 // Try to stop the process
-                if (Plugins.Processes.TryGetValue(plugin.Id, out Process process) && !process.HasExited)
+                if (Plugins.Processes.TryGetValue(plugin.Id, out Process? process) && !process.HasExited)
                 {
                     try
                     {

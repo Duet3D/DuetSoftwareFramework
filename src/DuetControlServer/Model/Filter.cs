@@ -159,7 +159,7 @@ namespace DuetControlServer.Model
         /// <returns>Dictionary holding the results or null if nothing could be found</returns>
         /// <remarks>Make sure the model provider is locked in read-only mode before using this class</remarks>
         /// <seealso cref="DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filter"/>
-        public static Dictionary<string, object> GetFiltered(object[] filter) => (Dictionary<string, object>)InternalGetFiltered(Provider.Get, filter);
+        public static Dictionary<string, object?> GetFiltered(object[] filter) => (Dictionary<string, object?>?)InternalGetFiltered(Provider.Get, filter) ?? new Dictionary<string, object?>();
 
         /// <summary>
         /// Internal function to find a specific object in the object model
@@ -167,10 +167,10 @@ namespace DuetControlServer.Model
         /// <param name="partialModel">Partial object model</param>
         /// <param name="partialFilter">Array consisting of item indices or case-insensitive property names</param>
         /// <returns>Dictionary or list holding the result or null if nothing could be found</returns>
-        private static object InternalGetFiltered(object partialModel, object[] partialFilter)
+        private static object? InternalGetFiltered(object? partialModel, object[] partialFilter)
         {
             // Cannot proceed if there is nothing more to do...
-            if (partialModel == null || partialFilter.Length == 0)
+            if (partialModel is null || partialFilter.Length == 0)
             {
                 return null;
             }
@@ -182,7 +182,7 @@ namespace DuetControlServer.Model
             {
                 if (partialModel is ModelObject model)
                 {
-                    Dictionary<string, object> result = new();
+                    Dictionary<string, object?> result = new();
                     foreach (KeyValuePair<string, PropertyInfo> property in model.JsonProperties)
                     {
                         if (propertyName == "*" || property.Key == propertyName)
@@ -199,9 +199,9 @@ namespace DuetControlServer.Model
                                 typeof(IList).IsAssignableFrom(property.Value.PropertyType))
                             {
                                 // Property is somewhere deeper
-                                object propertyValue = property.Value.GetValue(model);
-                                object subResult = InternalGetFiltered(propertyValue, partialFilter);
-                                if (subResult != null)
+                                object propertyValue = property.Value.GetValue(model)!;
+                                object? subResult = InternalGetFiltered(propertyValue, partialFilter);
+                                if (subResult is not null)
                                 {
                                     result.Add(property.Key, subResult);
                                 }
@@ -230,10 +230,10 @@ namespace DuetControlServer.Model
                     }
 
                     // This is an object list, return either the filter results or dummy objects
-                    List<object> results = new(new object[list.Count]);
+                    List<object?> results = new(new object[list.Count]);
                     for (int i = 0; i < list.Count; i++)
                     {
-                        object item = list[i];
+                        object? item = list[i];
                         if (itemIndex == -1 || i == itemIndex)
                         {
                             if (partialFilter.Length == 0)
@@ -241,11 +241,11 @@ namespace DuetControlServer.Model
                                 // This is one of the items we've been looking for
                                 results[i] = item;
                             }
-                            else if (item != null)
+                            else if (item is not null)
                             {
                                 // Property is somewhere deeper
-                                object subResult = InternalGetFiltered(item, partialFilter);
-                                if (subResult != null)
+                                object? subResult = InternalGetFiltered(item, partialFilter);
+                                if (subResult is not null)
                                 {
                                     // Got a result
                                     results[i] = subResult;
@@ -253,14 +253,14 @@ namespace DuetControlServer.Model
                                 else
                                 {
                                     // Set placeholder
-                                    results[i] = isModelObjectList ? new Dictionary<string, object>() : new List<object>();
+                                    results[i] = isModelObjectList ? new Dictionary<string, object?>() : new List<object?>();
                                 }
                             }
                         }
-                        else if (item != null)
+                        else if (item is not null)
                         {
                             // Set placeholder
-                            results[i] = isModelObjectList ? new Dictionary<string, object>() : new List<object>();
+                            results[i] = isModelObjectList ? new Dictionary<string, object?>() : new List<object?>();
                         }
                     }
                     return results;
@@ -276,21 +276,21 @@ namespace DuetControlServer.Model
         /// </summary>
         /// <param name="a">First partial object model</param>
         /// <param name="b">Second partial object model</param>
-        public static void MergeFiltered(Dictionary<string, object> a, Dictionary<string, object> b)
+        public static void MergeFiltered(Dictionary<string, object?> a, Dictionary<string, object?> b)
         {
-            if (b == null)
+            if (b is null)
             {
                 return;
             }
 
-            foreach (KeyValuePair<string, object> item in b)
+            foreach (KeyValuePair<string, object?> item in b)
             {
-                if (a.TryGetValue(item.Key, out object aItem))
+                if (a.TryGetValue(item.Key, out object? aItem))
                 {
                     // Item already exists, try to merge it
-                    if (aItem is Dictionary<string, object> aDictionary)
+                    if (aItem is Dictionary<string, object?> aDictionary)
                     {
-                        if (item.Value is Dictionary<string, object> bDictionary)
+                        if (item.Value is Dictionary<string, object?> bDictionary)
                         {
                             MergeFiltered(aDictionary, bDictionary);
                         }
@@ -326,16 +326,16 @@ namespace DuetControlServer.Model
         /// <param name="b">Second list</param>
         private static void MergeFilteredLists(IList a, IList b)
         {
-            if (b == null || a.Count != b.Count)
+            if (b is null || a.Count != b.Count)
             {
                 return;
             }
 
             for (int i = 0; i < b.Count; i++)
             {
-                if (a[i] is Dictionary<string, object> aDictionary)
+                if (a[i] is Dictionary<string, object?> aDictionary)
                 {
-                    if (b[i] is Dictionary<string, object> bDictionary)
+                    if (b[i] is Dictionary<string, object?> bDictionary)
                     {
                         MergeFiltered(aDictionary, bDictionary);
                     }
@@ -365,7 +365,7 @@ namespace DuetControlServer.Model
         /// <param name="findSbcProperty">Whether the object may be an SBC property</param>
         /// <param name="result">Partial object model or null</param>
         /// <returns>Whether the object could be found</returns>
-        public static bool GetSpecific(string filter, bool findSbcProperty, out object result)
+        public static bool GetSpecific(string filter, bool findSbcProperty, out object? result)
         {
             return InternalGetSpecific(Provider.Get, ConvertFilter(filter, false), findSbcProperty, false, out result);
         }
@@ -379,10 +379,10 @@ namespace DuetControlServer.Model
         /// <param name="hadSbcProperty">Whether an SBC property is part of the current node path</param>
         /// <param name="result">Partial object model or null</param>
         /// <returns>Whether the object could be found</returns>
-        private static bool InternalGetSpecific(object partialModel, object[] partialFilter, bool findSbcProperty, bool hadSbcProperty, out object result)
+        private static bool InternalGetSpecific(object partialModel, object[] partialFilter, bool findSbcProperty, bool hadSbcProperty, out object? result)
         {
             // Cannot proceed if there is nothing more to do...
-            if (partialModel == null || partialFilter.Length == 0)
+            if (partialModel is null || partialFilter.Length == 0)
             {
                 result = null;
                 return false;
@@ -394,7 +394,7 @@ namespace DuetControlServer.Model
                 partialFilter = partialFilter.Skip(1).ToArray();
                 if (partialModel is ModelObject model)
                 {
-                    if (model.JsonProperties.TryGetValue(propertyName, out PropertyInfo property))
+                    if (model.JsonProperties.TryGetValue(propertyName, out PropertyInfo? property))
                     {
                         if (findSbcProperty && Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
                         {
@@ -413,7 +413,7 @@ namespace DuetControlServer.Model
                         else if (property.PropertyType.IsSubclassOf(typeof(ModelObject)) || typeof(IList).IsAssignableFrom(property.PropertyType))
                         {
                             // Property is somewhere deeper
-                            object propertyValue = property.GetValue(model);
+                            object propertyValue = property.GetValue(model)!;
                             return InternalGetSpecific(propertyValue, partialFilter, findSbcProperty, hadSbcProperty, out result);
                         }
                     }
@@ -426,7 +426,7 @@ namespace DuetControlServer.Model
                 {
                     if (itemIndex >= 0 && itemIndex < list.Count)
                     {
-                        object item = list[itemIndex];
+                        object? item = list[itemIndex];
                         if (partialFilter.Length == 0)
                         {
                             // This is the item we've been looking for

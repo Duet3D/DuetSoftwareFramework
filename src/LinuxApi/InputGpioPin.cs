@@ -231,7 +231,7 @@ namespace LinuxApi
         /// <summary>
         /// Event to call when a pin change has occurreed
         /// </summary>
-        public event PinChangeDelegate PinChanged;
+        public event PinChangeDelegate? PinChanged;
 
         /// <summary>
         /// Start polling for pin events

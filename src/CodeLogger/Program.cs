@@ -14,11 +14,11 @@ namespace CodeLogger
         public static async Task<int> Main(string[] args)
         {
             bool quiet = false, priorityCodes = false;
-            CodeChannel[] channels = null;
-            string[] filters = null, types = new string[] { "pre", "post", "executed" };
+            CodeChannel[]? channels = null;
+            string[]? filters = null, types = new string[] { "pre", "post", "executed" };
 
             // Parse the command line arguments
-            string lastArg = null, socketPath = Defaults.FullSocketPath;
+            string? lastArg = null, socketPath = Defaults.FullSocketPath;
             foreach (string arg in args)
             {
                 if (lastArg == "-t" || lastArg == "--types")
@@ -60,7 +60,7 @@ namespace CodeLogger
                 lastArg = arg;
             }
 
-            InterceptConnection preConnection = null, postConnection = null, executedConnection = null;
+            InterceptConnection? preConnection = null, postConnection = null, executedConnection = null;
             try
             {
                 // Connect to DCS
@@ -99,9 +99,9 @@ namespace CodeLogger
                 // Start waiting for incoming codes
                 Task[] tasks = new Task[]
                 {
-                    (preConnection != null) ? PrintIncomingCodes(preConnection) : Task.CompletedTask,
-                    (postConnection != null) ? PrintIncomingCodes(postConnection) : Task.CompletedTask,
-                    (executedConnection != null) ? PrintIncomingCodes(executedConnection) : Task.CompletedTask
+                    (preConnection is not null) ? PrintIncomingCodes(preConnection) : Task.CompletedTask,
+                    (postConnection is not null) ? PrintIncomingCodes(postConnection) : Task.CompletedTask,
+                    (executedConnection is not null) ? PrintIncomingCodes(executedConnection) : Task.CompletedTask
                 };
 
                 // Wait for all tasks to finish

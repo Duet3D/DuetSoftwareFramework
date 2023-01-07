@@ -28,22 +28,22 @@
         /// <summary>
         /// List of possible choices (only for mode 4)
         /// </summary>
-        public ModelCollection<string> Choices
+        public ModelCollection<string>? Choices
         {
             get => _choices;
             set => SetPropertyValue(ref _choices, value);
         }
-        private ModelCollection<string> _choices;
+        private ModelCollection<string>? _choices;
 
         /// <summary>
         /// Default value (only for modes >= 4)
         /// </summary>
-        public object Default
+        public object? Default
         {
             get => _default;
             set => SetPropertyValue(ref _default, value);
         }
-        private object _default;
+        private object? _default;
 
         /// <summary>
         /// Maximum input value (only for modes >= 5)

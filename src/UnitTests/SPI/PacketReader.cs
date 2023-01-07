@@ -196,11 +196,11 @@ namespace UnitTests.SPI
         {
             Span<byte> blob = GetBlob("evaluationResult.bin");
 
-            int bytesRead = Reader.ReadEvaluationResult(blob, out string expression, out object result);
+            int bytesRead = Reader.ReadEvaluationResult(blob, out string expression, out object? result);
             Assert.AreEqual(32, bytesRead);
 
             // Header
-            Assert.AreEqual(300, (int)result);
+            Assert.AreEqual(300, (int)result!);
 
             // Expression
             Assert.AreEqual("move.axes[0].position", expression);

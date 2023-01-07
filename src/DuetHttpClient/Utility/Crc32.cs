@@ -23,7 +23,7 @@ namespace DuetHttpClient.Utility
         public const uint DefaultPolynomial = 0xedb88320u;
         public const uint DefaultSeed = 0xffffffffu;
 
-        static uint[] defaultTable;
+        static uint[]? defaultTable;
 
         readonly uint seed;
         readonly uint[] table;
@@ -79,7 +79,7 @@ namespace DuetHttpClient.Utility
 
         static uint[] InitializeTable(uint polynomial)
         {
-            if (polynomial == DefaultPolynomial && defaultTable != null)
+            if (polynomial == DefaultPolynomial && defaultTable is not null)
                 return defaultTable;
 
             var createTable = new uint[256];

@@ -12,7 +12,7 @@ namespace CodeStream
         public static async Task<int> Main(string[] args)
         {
             // Parse the command line arguments
-            string lastArg = null, socketPath = Defaults.FullSocketPath;
+            string? lastArg = null, socketPath = Defaults.FullSocketPath;
             bool quiet = false;
             int bufferSize = Defaults.CodeBufferSize;
             foreach (string arg in args)
@@ -92,8 +92,8 @@ namespace CodeStream
             {
                 try
                 {
-                    string line = Console.ReadLine();
-                    if (line == "exit" || line == "quit")
+                    string? line = Console.ReadLine();
+                    if (line is null || line == "exit" || line == "quit")
                     {
                         break;
                     }
@@ -120,7 +120,7 @@ namespace CodeStream
             {
                 try
                 {
-                    string line = await reader.ReadLineAsync();
+                    string? line = await reader.ReadLineAsync();
                     Console.WriteLine(line);
                 }
                 catch (SocketException)

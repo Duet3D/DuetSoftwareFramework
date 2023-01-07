@@ -93,9 +93,9 @@ namespace DuetControlServer.Codes
         /// Push a new state on the stack
         /// </summary>
         /// <returns>New pipeline state of the firmware for the SPI connector</returns>
-        public Pipelines.PipelineStackItem Push(Macro macro)
+        public Pipelines.PipelineStackItem Push(Macro? macro)
         {
-            Pipelines.PipelineStackItem newState = null;
+            Pipelines.PipelineStackItem? newState = null;
             foreach (PipelineStage stage in StagesWithStack)
             {
                 if (stage == PipelineStage.Firmware)
@@ -107,7 +107,7 @@ namespace DuetControlServer.Codes
                     _pipelines[(int)stage].Push(macro);
                 }
             }
-            return newState;
+            return newState!;
         }
 
         /// <summary>
@@ -127,7 +127,7 @@ namespace DuetControlServer.Codes
         /// <param name="firstStage">First stage to check</param>
         /// <param name="code">Optional code requesting the check</param>
         /// <returns>True if the pipeline is empty</returns>
-        public bool IsIdle(Commands.Code code = null)
+        public bool IsIdle(Commands.Code? code = null)
         {
             foreach (PipelineStage stage in StagesWithStack)
             {

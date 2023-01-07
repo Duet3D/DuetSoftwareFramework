@@ -13,6 +13,6 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Absolute file path to the plugin ZIP bundle
         /// </summary>
-        public string PluginFile { get; set; }
+        public string PluginFile { get; set; } = string.Empty;
     }
 }

@@ -17,7 +17,7 @@ namespace DuetPluginService.Commands
         /// <summary>
         /// Logger instance
         /// </summary>
-        private NLog.Logger _logger;
+        private NLog.Logger? _logger;
 
         /// <summary>
         /// Start a plugin
@@ -29,7 +29,7 @@ namespace DuetPluginService.Commands
             _logger = NLog.LogManager.GetLogger($"Plugin {Plugin}");
 
             // Get the plugin
-            Plugin plugin = null;
+            Plugin? plugin = null;
             using (await Plugins.LockAsync())
             {
                 foreach (Plugin item in Plugins.List)
@@ -41,7 +41,7 @@ namespace DuetPluginService.Commands
                     }
                 }
             }
-            if (plugin == null)
+            if (plugin is null)
             {
                 throw new ArgumentException($"Plugin {Plugin} not found by {(Program.IsRoot ? "root service" : "service")}");
             }
@@ -62,10 +62,10 @@ namespace DuetPluginService.Commands
                 _ => "unknown"
             };
 
-            string sbcExecutable = Path.Combine(Settings.PluginDirectory, plugin.Id, "dsf", architecture, plugin.SbcExecutable);
+            string sbcExecutable = Path.Combine(Settings.PluginDirectory, plugin.Id, "dsf", architecture, plugin.SbcExecutable!);
             if (!File.Exists(sbcExecutable))
             {
-                sbcExecutable = Path.Combine(Settings.PluginDirectory, plugin.Id, "dsf", plugin.SbcExecutable);
+                sbcExecutable = Path.Combine(Settings.PluginDirectory, plugin.Id, "dsf", plugin.SbcExecutable!);
                 if (!File.Exists(sbcExecutable))
                 {
                     throw new ArgumentException($"Cannot find executable {sbcExecutable}");
@@ -90,7 +90,12 @@ namespace DuetPluginService.Commands
                     RedirectStandardOutput = true
                 };
 
-                Process process = Process.Start(startInfo);
+                Process? process = Process.Start(startInfo);
+                if (process is null)
+                {
+                    throw new IOException($"Failed to create process {sbcExecutable}");
+                }
+
                 DataReceivedEventHandler outputHandler = MakeOutputHandler(Plugin, MessageType.Success, plugin.SbcOutputRedirected);
                 DataReceivedEventHandler errorHandler = MakeOutputHandler(Plugin, MessageType.Error, plugin.SbcOutputRedirected);
                 process.OutputDataReceived += outputHandler;
@@ -179,18 +184,18 @@ namespace DuetPluginService.Commands
                         }
                         catch
                         {
-                            _logger.Warn("Failed to send console message to DCS");
+                            _logger!.Warn("Failed to send console message to DCS");
                         }
                     }
 
                     // Fall back to normal logging output via this service
                     if (messageType == MessageType.Error)
                     {
-                        _logger.Error(e.Data);
+                        _logger!.Error(e.Data);
                     }
                     else
                     {
-                        _logger.Info(e.Data);
+                        _logger!.Info(e.Data);
                     }
                 }
             };

@@ -31,17 +31,17 @@ namespace DuetControlServer.Utility
         /// <summary>
         /// File stream of the log file
         /// </summary>
-        private static FileStream _fileStream;
+        private static FileStream? _fileStream;
 
         /// <summary>
         /// Writer for logging data
         /// </summary>
-        private static StreamWriter _writer;
+        private static StreamWriter? _writer;
 
         /// <summary>
         /// Registration that is triggered when the log is supposed to be closed
         /// </summary>
-        private static IDisposable _logCloseEvent;
+        private static IDisposable? _logCloseEvent;
 
         /// <summary>
         /// Start logging to a file
@@ -141,7 +141,7 @@ namespace DuetControlServer.Utility
         /// <returns>Asynchronous task</returns>
         private static void StopInternal()
         {
-            if (_writer != null)
+            if (_writer is not null)
             {
                 _writer.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging stopped");
                 _writer.Close();
@@ -150,7 +150,7 @@ namespace DuetControlServer.Utility
                 _logger.Info("Event logging stopped");
             }
 
-            if (_fileStream != null)
+            if (_fileStream is not null)
             {
                 _fileStream.Close();
                 _fileStream = null;
@@ -158,7 +158,7 @@ namespace DuetControlServer.Utility
 
             if (!Program.CancellationToken.IsCancellationRequested)
             {
-                if (_logCloseEvent != null)
+                if (_logCloseEvent is not null)
                 {
                     _logCloseEvent.Dispose();
                     _logCloseEvent = null;
@@ -178,7 +178,7 @@ namespace DuetControlServer.Utility
         /// <returns>Asynchronous task</returns>
         private static async Task StopInternalAsync()
         {
-            if (_writer != null)
+            if (_writer is not null)
             {
                 await _writer.WriteLineAsync($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging stopped");
                 _writer.Close();
@@ -187,7 +187,7 @@ namespace DuetControlServer.Utility
                 _logger.Info("Event logging stopped");
             }
 
-            if (_fileStream != null)
+            if (_fileStream is not null)
             {
                 _fileStream.Close();
                 _fileStream = null;
@@ -195,7 +195,7 @@ namespace DuetControlServer.Utility
 
             if (!Program.CancellationToken.IsCancellationRequested)
             {
-                if (_logCloseEvent != null)
+                if (_logCloseEvent is not null)
                 {
                     _logCloseEvent.Dispose();
                     _logCloseEvent = null;
@@ -218,7 +218,7 @@ namespace DuetControlServer.Utility
         {
             using (_lock.Lock(Program.CancellationToken))
             {
-                if (level != LogLevel.Off && _writer != null && !string.IsNullOrWhiteSpace(message?.Content))
+                if (level != LogLevel.Off && _writer is not null && !string.IsNullOrWhiteSpace(message?.Content))
                 {
                     using (Model.Provider.AccessReadOnly())
                     {
@@ -252,7 +252,7 @@ namespace DuetControlServer.Utility
         {
             using (await _lock.LockAsync(Program.CancellationToken))
             {
-                if (level != LogLevel.Off && _writer != null && !string.IsNullOrWhiteSpace(message?.Content))
+                if (level != LogLevel.Off && _writer is not null && !string.IsNullOrWhiteSpace(message?.Content))
                 {
                     using (await Model.Provider.AccessReadOnlyAsync())
                     {
@@ -322,7 +322,7 @@ namespace DuetControlServer.Utility
         /// <param name="message">Message to log</param>
         public static void Log(Message message)
         {
-            if (message != null && !string.IsNullOrEmpty(message.Content))
+            if (message is not null && !string.IsNullOrEmpty(message.Content))
             {
                 LogLevel level = (message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
                 Log(level, message);
@@ -336,7 +336,7 @@ namespace DuetControlServer.Utility
         /// <returns>Asynchronous task</returns>
         public static async Task LogAsync(Message message)
         {
-            if (message != null && !string.IsNullOrEmpty(message.Content))
+            if (message is not null && !string.IsNullOrEmpty(message.Content))
             {
                 LogLevel level = (message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
                 await LogAsync(level, message);
@@ -349,7 +349,7 @@ namespace DuetControlServer.Utility
         /// <param name="message">Message to log and output</param>
         public static void LogOutput(Message message)
         {
-            if (message != null && !string.IsNullOrEmpty(message.Content))
+            if (message is not null && !string.IsNullOrEmpty(message.Content))
             {
                 Model.Provider.Output(message);
                 Log((message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn, message);
@@ -363,7 +363,7 @@ namespace DuetControlServer.Utility
         /// <returns>Asynchronous task</returns>
         public static async Task LogOutputAsync(Message message)
         {
-            if (message != null && !string.IsNullOrEmpty(message.Content))
+            if (message is not null && !string.IsNullOrEmpty(message.Content))
             {
                 await Model.Provider.OutputAsync(message);
                 await LogAsync((message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn, message);

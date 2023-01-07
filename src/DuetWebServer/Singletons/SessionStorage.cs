@@ -53,14 +53,14 @@ namespace DuetWebServer.Singletons
         /// </summary>
         /// <param name="key">Key to query</param>
         /// <returns>Authentication ticket or null</returns>
-        public AuthenticationTicket GetTicketFromKey(string key);
+        public AuthenticationTicket? GetTicketFromKey(string key);
 
         /// <summary>
         /// Get a ticket from the given IP address
         /// </summary>
         /// <param name="ipAddress">IP address to query</param>
         /// <returns>Authentication ticket or null</returns>
-        public AuthenticationTicket GetTicketFromIpAddress(string ipAddress);
+        public AuthenticationTicket? GetTicketFromIpAddress(string ipAddress);
 
         /// <summary>
         /// Remove a session ticket returning the corresponding session ID
@@ -128,11 +128,11 @@ namespace DuetWebServer.Singletons
         {
             public AuthenticationTicket Ticket { get; }
 
-            public string Key => Ticket.Principal.FindFirst("key").Value;
+            public string Key => Ticket.Principal.FindFirst("key")!.Value;
 
-            public int SessionId => Convert.ToInt32(Ticket.Principal.FindFirst("sessionId").Value);
+            public int SessionId => Convert.ToInt32(Ticket.Principal.FindFirst("sessionId")!.Value);
 
-            public string IpAddress => Ticket.Principal.FindFirst("ipAddress").Value;
+            public string IpAddress => Ticket.Principal.FindFirst("ipAddress")!.Value;
 
             public DateTime LastQueryTime { get; set; } = DateTime.Now;
 
@@ -284,7 +284,7 @@ namespace DuetWebServer.Singletons
         /// </summary>
         /// <param name="key">Key to query</param>
         /// <returns>Authentication ticket or null</returns>
-        public AuthenticationTicket GetTicketFromKey(string key)
+        public AuthenticationTicket? GetTicketFromKey(string key)
         {
             lock (_sessions)
             {
@@ -305,7 +305,7 @@ namespace DuetWebServer.Singletons
         /// </summary>
         /// <param name="ipAddress">IP address to query</param>
         /// <returns>Authentication ticket or null</returns>
-        public AuthenticationTicket GetTicketFromIpAddress(string ipAddress)
+        public AuthenticationTicket? GetTicketFromIpAddress(string ipAddress)
         {
             lock (_sessions)
             {

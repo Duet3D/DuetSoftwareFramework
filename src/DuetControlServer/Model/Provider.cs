@@ -41,7 +41,7 @@ namespace DuetControlServer.Model
             /// <summary>
             /// CTS to trigger when the lock is being released
             /// </summary>
-            private readonly CancellationTokenSource _releaseCts;
+            private readonly CancellationTokenSource? _releaseCts;
 
             /// <summary>
             /// Constructor of the lock wrapper

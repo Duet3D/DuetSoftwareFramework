@@ -18,7 +18,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         protected override void ClearItems()
         {
-            List<T> removed = new List<T>(this);
+            List<T> removed = new(this);
             base.ClearItems();
             base.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed));
         }
@@ -45,10 +45,10 @@ namespace DuetAPI.ObjectModel
         /// This is required to update model properties which do not have a setter
         /// </summary>
         /// <param name="from">Other instance</param>
-        public void Assign(object from)
+        public void Assign(object? from)
         {
             // Assigning null values is not supported
-            if (from == null)
+            if (from is null)
             {
                 throw new ArgumentNullException(nameof(from));
             }
@@ -85,7 +85,7 @@ namespace DuetAPI.ObjectModel
         /// <returns>Cloned list</returns>
         public object Clone()
         {
-            ModelGrowingCollection<T> clone = new ModelGrowingCollection<T>();
+            ModelGrowingCollection<T> clone = new();
             foreach (T item in this)
             {
                 if (item is ICloneable cloneableItem)
@@ -107,10 +107,10 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="other">Other instance</param>
         /// <returns>Object differences or null if both instances are equal</returns>
-        public object FindDifferences(IModelObject other)
+        public object? FindDifferences(IModelObject? other)
         {
             // Check the types
-            Type myType = GetType(), otherType = other?.GetType();
+            Type? myType = GetType(), otherType = other?.GetType();
             if (myType != otherType)
             {
                 // Types differ, return the entire instance
@@ -119,7 +119,7 @@ namespace DuetAPI.ObjectModel
 
             // Get the other instance
             Type itemType = typeof(T);
-            ModelGrowingCollection<T> otherList = (ModelGrowingCollection<T>)other;
+            ModelGrowingCollection<T> otherList = (ModelGrowingCollection<T>)other!;
 
             bool hadDiffs = (Count != otherList.Count);
             IList diffs = new object[Count];
@@ -129,23 +129,23 @@ namespace DuetAPI.ObjectModel
                 {
                     if (i < otherList.Count)
                     {
-                        IModelObject myItem = (IModelObject)this[i], otherItem = (IModelObject)otherList[i];
-                        if (otherItem == null || myItem == null || otherItem.GetType() != myItem.GetType())
+                        IModelObject? myItem = (IModelObject?)this[i], otherItem = (IModelObject?)otherList[i];
+                        if (otherItem is null || myItem is null || otherItem.GetType() != myItem.GetType())
                         {
                             hadDiffs = myItem != otherItem;
                             diffs[i] = myItem;
                         }
                         else
                         {
-                            object diff = myItem.FindDifferences(otherItem);
-                            if (diff != null)
+                            object? diff = myItem.FindDifferences(otherItem);
+                            if (diff is not null)
                             {
                                 hadDiffs = true;
                                 diffs[i] = diff;
                             }
                             else
                             {
-                                diffs[i] = new Dictionary<string, object>();
+                                diffs[i] = new Dictionary<string, object?>();
                             }
                         }
                     }
@@ -162,7 +162,16 @@ namespace DuetAPI.ObjectModel
                 {
                     for (int i = 0; i < Count; i++)
                     {
-                        if (!this[i].Equals(otherList[i]))
+                        T item = this[i], otherItem = otherList[i];
+                        if (item is null)
+                        {
+                            if (otherItem is not null)
+                            {
+                                hadDiffs = true;
+                                break;
+                            }
+                        }
+                        else if (!item.Equals(otherItem))
                         {
                             hadDiffs = true;
                             break;
@@ -181,7 +190,7 @@ namespace DuetAPI.ObjectModel
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         /// <remarks>Accepts null as the JSON value to clear existing items</remarks>
-        public IModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public IModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {
@@ -193,7 +202,7 @@ namespace DuetAPI.ObjectModel
                 {
                     try
                     {
-                        T itemValue = JsonSerializer.Deserialize<T>(jsonItem.GetRawText(), Utility.JsonHelper.DefaultJsonOptions);
+                        T itemValue = JsonSerializer.Deserialize<T>(jsonItem.GetRawText(), Utility.JsonHelper.DefaultJsonOptions)!;
                         Add(itemValue);
                     }
                     catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), jsonItem.Clone(), e))

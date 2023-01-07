@@ -31,7 +31,7 @@ namespace DuetPluginService.IPC
         /// <returns>Asynchronous task</returns>
         public static async Task Run()
         {
-            DuetAPI.Commands.BaseCommand command = null;
+            DuetAPI.Commands.BaseCommand? command = null;
             Type commandType;
             do
             {
@@ -42,7 +42,7 @@ namespace DuetPluginService.IPC
                     commandType = command.GetType();
 
                     // Execute it and send back the result
-                    object result = await command.Invoke();
+                    object? result = await command.Invoke();
                     await _connection.SendResponse(result);
 
                     // Shut down the socket if this was the last command
@@ -61,13 +61,16 @@ namespace DuetPluginService.IPC
                     // Send errors back to the client
                     if (e is not OperationCanceledException)
                     {
-                        if (e is UnauthorizedAccessException)
+                        if (command is not null)
                         {
-                            _logger.Error("Insufficient permissions to execute {0}", command.Command);
-                        }
-                        else if (command != null)
-                        {
-                            _logger.Error(e, "Failed to execute {0}", command.Command);
+                            if (e is UnauthorizedAccessException)
+                            {
+                                _logger.Error("Insufficient permissions to execute {0}", command!.Command);
+                            }
+                            else
+                            {
+                                _logger.Error(e, "Failed to execute {0}", command.Command);
+                            }
                         }
                         else
                         {

@@ -12,7 +12,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// The filename to extract information from
         /// </summary>
-        public string FileName { get; set; }
+        public string FileName { get; set; } = string.Empty;
 
         /// <summary>
         /// Whether thumbnail content shall be returned

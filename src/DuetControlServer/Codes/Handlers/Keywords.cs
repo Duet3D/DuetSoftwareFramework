@@ -27,6 +27,12 @@ namespace DuetControlServer.Codes.Handlers
         /// <returns>Result of the code if the code completed, else null</returns>
         public static async Task<Message> Process(Code code)
         {
+            if (code.KeywordArgument is null)
+            {
+                throw new ArgumentException("KeywordArgument must not be empty");
+
+            }
+
             if (!await Processor.FlushAsync(code, false))
             {
                 throw new OperationCanceledException();
@@ -34,8 +40,8 @@ namespace DuetControlServer.Codes.Handlers
 
             if (code.Keyword == KeywordType.Echo || code.Keyword == KeywordType.Abort)
             {
-                string result;
-                if (code.Keyword == KeywordType.Echo && !string.IsNullOrEmpty(code.KeywordArgument))
+                string? result;
+                if (code.Keyword == KeywordType.Echo)
                 {
                     string keywordArgument = code.KeywordArgument.TrimStart();
                     if (keywordArgument.StartsWith('>'))
@@ -114,7 +120,7 @@ namespace DuetControlServer.Codes.Handlers
                 {
                     await SPI.Interface.AbortAllAsync(code.Channel);
                 }
-                return new Message(MessageType.Success, result);
+                return new Message(MessageType.Success, result ?? string.Empty);
             }
 
             if (code.Keyword == KeywordType.Global ||
@@ -159,7 +165,7 @@ namespace DuetControlServer.Codes.Handlers
                 }
 
                 // Replace SBC fields and assign the variable
-                expression = await Expressions.Evaluate(code, false);
+                expression = await Expressions.Evaluate(code, false) ?? string.Empty;
 
                 // Assign the variable
                 string fullVarName = varName;
@@ -167,11 +173,11 @@ namespace DuetControlServer.Codes.Handlers
                 {
                     fullVarName = (code.Keyword == KeywordType.Global ? "global." : "var.") + varName;
                 }
-                object varContent = await SPI.Interface.SetVariable(code.Channel, code.Keyword != KeywordType.Set, fullVarName, expression);
+                object? varContent = await SPI.Interface.SetVariable(code.Channel, code.Keyword != KeywordType.Set, fullVarName, expression);
                 _logger.Debug("Set variable {0} to {1}", fullVarName, varContent);
 
                 // Keep track of it
-                if (code.Keyword == KeywordType.Var && code.File != null)
+                if (code.Keyword == KeywordType.Var && code.File is not null)
                 {
                     using (await code.File.LockAsync())
                     {

@@ -45,6 +45,6 @@ namespace DuetControlServer.Codes.Pipelines
         /// </summary>
         /// <param name="code">Code to process</param>
         /// <returns>Asynchronous task</returns>
-        public override Task ProcessCodeAsync(Code code) => null;
+        public override Task ProcessCodeAsync(Code code) => Task.CompletedTask;
     }
 }

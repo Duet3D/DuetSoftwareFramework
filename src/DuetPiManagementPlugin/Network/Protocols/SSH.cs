@@ -60,7 +60,11 @@ namespace DuetPiManagementPlugin.Network.Protocols
                 using StreamReader reader = new(sshdConfig);
                 while (!reader.EndOfStream)
                 {
-                    string line = await reader.ReadLineAsync();
+                    string? line = await reader.ReadLineAsync();
+                    if (line == null)
+                    {
+                        break;
+                    }
 
                     Match match = _portRegex.Match(line);
                     if (match.Success)
@@ -120,12 +124,12 @@ namespace DuetPiManagementPlugin.Network.Protocols
             // Check SSH/SFTP
             bool serviceWasDisabled = !Manager.IsEnabled(NetworkProtocol.SSH) && !Manager.IsEnabled(NetworkProtocol.SFTP);
             bool servicesChanged = false;
-            if (enableSSH != null && enableSSH != Manager.IsEnabled(NetworkProtocol.SSH))
+            if (enableSSH is not null && enableSSH != Manager.IsEnabled(NetworkProtocol.SSH))
             {
                 await Manager.SetProtocol(NetworkProtocol.SSH, enableSSH.Value);
                 servicesChanged = true;
             }
-            if (enableSFTP != null && enableSFTP != Manager.IsEnabled(NetworkProtocol.SFTP))
+            if (enableSFTP is not null && enableSFTP != Manager.IsEnabled(NetworkProtocol.SFTP))
             {
                 await Manager.SetProtocol(NetworkProtocol.SFTP, enableSFTP.Value);
                 servicesChanged = true;
@@ -158,7 +162,12 @@ namespace DuetPiManagementPlugin.Network.Protocols
                     bool portWritten = false, sshDisabled = false, sftpEnabled = false;
                     while (!reader.EndOfStream)
                     {
-                        string line = await reader.ReadLineAsync();
+                        string? line = await reader.ReadLineAsync();
+                        if (line is null)
+                        {
+                            break;
+                        }
+
                         if (_genericPortRegex.IsMatch(line))
                         {
                             if (portChanged)

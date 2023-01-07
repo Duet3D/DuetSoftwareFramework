@@ -35,7 +35,12 @@ namespace DuetAPI.ObjectModel
         /// <returns>Distance unit value</returns>
         public override DistanceUnit Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            string jsonValue = reader.GetString();
+            if (reader.TokenType != JsonTokenType.String)
+            {
+                throw new JsonException();
+            }
+
+            string jsonValue = reader.GetString()!;
             return jsonValue.Equals("in", StringComparison.InvariantCultureIgnoreCase) ? DistanceUnit.Inch : DistanceUnit.MM;
         }
 

@@ -33,7 +33,7 @@ namespace DuetAPI.Utility
         /// <param name="options">Write options</param>
         public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
         {
-            if (value == null)
+            if (value is null)
             {
                 writer.WriteNullValue();
             }

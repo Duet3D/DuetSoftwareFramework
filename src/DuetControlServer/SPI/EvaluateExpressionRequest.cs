@@ -38,18 +38,18 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Internal TCS for the task
         /// </summary>
-        private readonly TaskCompletionSource<object> _tcs = new();
+        private readonly TaskCompletionSource<object?> _tcs = new();
 
         /// <summary>
         /// Task that completes when the request has been fulfilled
         /// </summary>
-        public Task<object> Task => _tcs.Task;
+        public Task<object?> Task => _tcs.Task;
 
         /// <summary>
         /// Set the result of the evaluated expression
         /// </summary>
         /// <param name="result">Result to set</param>
-        public void SetResult(object result) => _tcs.TrySetResult(result);
+        public void SetResult(object? result) => _tcs.TrySetResult(result);
 
         /// <summary>
         /// Set the task to canceled

@@ -14,6 +14,7 @@ using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.Model;
 using DuetControlServer.Utility;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace DuetControlServer.SPI
 {
@@ -28,9 +29,9 @@ namespace DuetControlServer.SPI
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
         // General transfer variables
-        private static InputGpioPin _transferReadyPin;
+        private static InputGpioPin _transferReadyPin = null!;
         private static bool _expectedTfrRdyPinValue;
-        private static SpiDevice _spiDevice;
+        private static SpiDevice _spiDevice = null!;
         private static bool _waitingForFirstTransfer = true, _connected, _hadTimeout, _resetting, _updating;
         private static ushort _lastTransferNumber;
 
@@ -50,7 +51,7 @@ namespace DuetControlServer.SPI
         private const int NumTxBuffers = 3;
         private static readonly Memory<byte> _rxBuffer = new byte[bufferSize];
         private static readonly LinkedList<Memory<byte>> _txBuffers = new();
-        private static LinkedListNode<Memory<byte>> _txBuffer;
+        private static LinkedListNode<Memory<byte>> _txBuffer = null!;
         private static int _rxPointer, _txPointer;
         private static PacketHeader _lastPacket;
         private static ReadOnlyMemory<byte> _packetData;
@@ -74,7 +75,7 @@ namespace DuetControlServer.SPI
             {
                 _txBuffers.AddLast(new byte[bufferSize]);
             }
-            _txBuffer = _txBuffers.First;
+            _txBuffer = _txBuffers.First!;
 
             // Initialize transfer ready pin and SPI device
             _transferReadyPin = new InputGpioPin(Settings.GpioChipDevice, Settings.TransferReadyPin, $"dcs-trp-{Settings.TransferReadyPin}");
@@ -264,7 +265,7 @@ namespace DuetControlServer.SPI
                     {
                         _maxTxSize = _txHeader.DataLength;
                     }
-                    _txBuffer = _txBuffer.Next ?? _txBuffers.First;
+                    _txBuffer = _txBuffer.Next ?? _txBuffers.First!;
                     _rxPointer = _txPointer = 0;
                     _packetId = 0;
 
@@ -428,7 +429,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="expression">Evaluated expression</param>
         /// <param name="result">Result</param>
-        public static void ReadEvaluationResult(out string expression, out object result)
+        public static void ReadEvaluationResult(out string expression, out object? result)
         {
             Serialization.Reader.ReadEvaluationResult(_packetData.Span, out expression, out result);
         }
@@ -596,7 +597,7 @@ namespace DuetControlServer.SPI
         /// <param name="sbcRequest">Content of the packet to resend</param>
         public static void ResendPacket(PacketHeader packet, out Communication.SbcRequests.Request sbcRequest)
         {
-            Span<byte> buffer = (_txBuffer.Next ?? _txBuffers.First).Value.Span;
+            Span<byte> buffer = (_txBuffer.Next ?? _txBuffers.First!).Value.Span;
 
             PacketHeader header;
             int headerSize = Marshal.SizeOf<PacketHeader>();

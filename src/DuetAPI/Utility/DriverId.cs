@@ -41,7 +41,7 @@ namespace DuetAPI.Utility
         /// </summary>
         /// <param name="value">String value</param>
         /// <exception cref="ArgumentException">Driver ID could not be parsed</exception>
-        public DriverId(string value)
+        public DriverId(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -49,7 +49,7 @@ namespace DuetAPI.Utility
                 return;
             }
 
-            string[] segments = value.Split('.');
+            string[] segments = value!.Split('.');
             if (segments.Length == 1)
             {
                 if (ushort.TryParse(segments[0], out ushort port))
@@ -122,7 +122,7 @@ namespace DuetAPI.Utility
         /// </summary>
         /// <param name="obj">Other instance</param>
         /// <returns>Whether this and the other instance are equal</returns>
-        public override bool Equals(object obj) => obj is DriverId other && Board == other.Board && Port == other.Port;
+        public override bool Equals(object? obj) => obj is DriverId other && Board == other.Board && Port == other.Port;
     }
 
     /// <summary>
@@ -137,13 +137,13 @@ namespace DuetAPI.Utility
         /// <param name="typeToConvert">Target type</param>
         /// <param name="options">JSON options</param>
         /// <returns></returns>
-        public override DriverId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override DriverId? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            switch (reader.TokenType)
+            return reader.TokenType switch
             {
-                case JsonTokenType.Null: return null;
-                case JsonTokenType.String: return new DriverId(reader.GetString());
-                default: throw new JsonException("Invalid token type for DriverId");
+                JsonTokenType.Null => null,
+                JsonTokenType.String => new DriverId(reader.GetString()),
+                _ => throw new JsonException("Invalid token type for DriverId"),
             };
         }
 
@@ -153,9 +153,9 @@ namespace DuetAPI.Utility
         /// <param name="writer">JSON writer</param>
         /// <param name="value">Value to write</param>
         /// <param name="options">JSON options</param>
-        public override void Write(Utf8JsonWriter writer, DriverId value, JsonSerializerOptions options)
+        public override void Write(Utf8JsonWriter writer, DriverId? value, JsonSerializerOptions options)
         {
-            if (value == null)
+            if (value is null)
             {
                 writer.WriteNullValue();
             }

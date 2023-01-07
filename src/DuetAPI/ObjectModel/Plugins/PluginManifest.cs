@@ -36,7 +36,7 @@ namespace DuetAPI.ObjectModel
                 SetPropertyValue(ref _id, value);
             }
         }
-        private string _id;
+        private string _id = string.Empty;
 
         /// <summary>
         /// Name of the plugin. May consist of letters, digits, dashes, and underscores only (max length 64 chars)
@@ -62,7 +62,7 @@ namespace DuetAPI.ObjectModel
                 SetPropertyValue(ref _name, value);
             }
         }
-        private string _name;
+        private string _name = string.Empty;
 
         /// <summary>
         /// Author of the plugin
@@ -72,7 +72,7 @@ namespace DuetAPI.ObjectModel
             get => _author;
             set => SetPropertyValue(ref _author, value);
         }
-        private string _author;
+        private string _author = string.Empty;
 
         /// <summary>
         /// Version of the plugin
@@ -97,12 +97,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Link to the plugin homepage or source code repository
         /// </summary>
-        public string Homepage
+        public string? Homepage
         {
             get => _homepage;
             set => SetPropertyValue(ref _homepage, value);
         }
-        private string _homepage;
+        private string? _homepage;
 
         /// <summary>
         /// List of general tags for search
@@ -112,12 +112,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Major/minor compatible DWC version
         /// </summary>
-        public string DwcVersion
+        public string? DwcVersion
         {
             get => _dwcVersion;
             set => SetPropertyValue(ref _dwcVersion, value);
         }
-        private string _dwcVersion;
+        private string? _dwcVersion;
 
         /// <summary>
         /// List of DWC plugins this plugin depends on. Circular dependencies are not supported
@@ -137,12 +137,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Required DSF version for the plugin running on the SBC (ignored if there is no SBC executable)
         /// </summary>
-        public string SbcDsfVersion
+        public string? SbcDsfVersion
         {
             get => _sbcDsfVersion;
             set => SetPropertyValue(ref _sbcDsfVersion, value);
         }
-        private string _sbcDsfVersion;
+        private string? _sbcDsfVersion;
 
         /// <summary>
         /// Filename in the dsf directory used to start the plugin
@@ -151,29 +151,29 @@ namespace DuetAPI.ObjectModel
         /// A plugin may provide different binaries in subdirectories per architecture.
         /// Supported architectures are: arm, arm64, x86, x86_64
         /// </remarks>
-        public string SbcExecutable
+        public string? SbcExecutable
         {
             get => _sbcExecutable;
             set
             {
-                if (value != null && value.Contains(".."))
+                if (value is not null && value.Contains(".."))
                 {
                     throw new ArgumentException("Executable must not contain relative file paths");
                 }
                 SetPropertyValue(ref _sbcExecutable, value);
             }
         }
-        private string _sbcExecutable;
+        private string? _sbcExecutable;
 
         /// <summary>
         /// Command-line arguments for the executable
         /// </summary>
-        public string SbcExecutableArguments
+        public string? SbcExecutableArguments
         {
             get => _sbcExecutableArguments;
             set => SetPropertyValue(ref _sbcExecutableArguments, value);
         }
-        private string _sbcExecutableArguments;
+        private string? _sbcExecutableArguments;
 
         /// <summary>
         /// List of other filenames in the dsf directory that should be executable
@@ -218,12 +218,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Major/minor supported RRF version (optional)
         /// </summary>
-        public string RrfVersion
+        public string? RrfVersion
         {
             get => _rrfVersion;
             set => SetPropertyValue(ref _rrfVersion, value);
         }
-        private string _rrfVersion;
+        private string? _rrfVersion;
 
         /// <summary>
         /// Custom plugin data to be populated in the object model (DSF/DWC in SBC mode - or - DWC in standalone mode).

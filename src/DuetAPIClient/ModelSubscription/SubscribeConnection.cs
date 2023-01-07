@@ -43,7 +43,7 @@ namespace DuetAPIClient
         /// </summary>
         /// <seealso cref="Filters"/>
         [Obsolete("Use Filters instead")]
-        public string Filter { get; private set; }
+        public string? Filter { get; private set; }
 
         /// <summary>
         /// Filter expressions
@@ -70,7 +70,7 @@ namespace DuetAPIClient
             Filter = filter;
             Filters.Clear();
 
-            SubscribeInitMessage initMessage = new SubscribeInitMessage() { SubscriptionMode = mode, Filter = Filter };
+            SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Filter = Filter };
             return Connect(initMessage, socketPath, cancellationToken);
         }
 
@@ -86,16 +86,16 @@ namespace DuetAPIClient
         /// <exception cref="IOException">Connection mode is unavailable</exception>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Init message could not be processed</exception>
-        public Task Connect(SubscriptionMode mode, IEnumerable<string> filters = null, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+        public Task Connect(SubscriptionMode mode, IEnumerable<string>? filters = null, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
         {
             Mode = mode;
             Filters.Clear();
-            if (filters != null)
+            if (filters is not null)
             {
                 Filters.AddRange(filters);
             }
 
-            SubscribeInitMessage initMessage = new SubscribeInitMessage() { SubscriptionMode = mode, Filters = Filters };
+            SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Filters = Filters };
             return Connect(initMessage, socketPath, cancellationToken);
         }
 
@@ -112,17 +112,17 @@ namespace DuetAPIClient
         /// <exception cref="IOException">Connection mode is unavailable</exception>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Init message could not be processed</exception>
-        public Task Connect(SubscriptionMode mode, CodeChannel? channel, IEnumerable<string> filters = null, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+        public Task Connect(SubscriptionMode mode, CodeChannel? channel, IEnumerable<string>? filters = null, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
         {
             Mode = mode;
             Channel = channel;
             Filters.Clear();
-            if (filters != null)
+            if (filters is not null)
             {
                 Filters.AddRange(filters);
             }
 
-            SubscribeInitMessage initMessage = new SubscribeInitMessage() { SubscriptionMode = mode, Channel = Channel, Filters = Filters };
+            SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Channel = Channel, Filters = Filters };
             return Connect(initMessage, socketPath, cancellationToken);
         }
 

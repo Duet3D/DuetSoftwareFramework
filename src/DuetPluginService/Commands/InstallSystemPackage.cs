@@ -1,6 +1,5 @@
 ﻿using DuetAPIClient;
 using System;
-using System.Collections;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -17,7 +16,7 @@ namespace DuetPluginService.Commands
         /// <summary>
         /// Logger instance
         /// </summary>
-        private NLog.Logger _logger;
+        private NLog.Logger? _logger;
 
         /// <summary>
         /// Magic value every ZIP file starts with
@@ -54,7 +53,7 @@ namespace DuetPluginService.Commands
             }
             _logger = NLog.LogManager.GetLogger(Path.GetFileName(PackageFile));
 
-            string packageDirectory = null, args;
+            string? packageDirectory = null, args;
             if (await IsZipFile(PackageFile))
             {
                 // Go into update mode, this may take longer
@@ -104,7 +103,7 @@ namespace DuetPluginService.Commands
                     }
                 }
 
-                if (packageDirectory != null)
+                if (packageDirectory is not null)
                 {
                     // Run update script if it exists
                     string updateScript = Path.Combine(packageDirectory, "update.sh");
@@ -144,7 +143,7 @@ namespace DuetPluginService.Commands
             finally
             {
                 // Restore the previous update state if applicable
-                if (packageDirectory != null)
+                if (packageDirectory is not null)
                 {
                     _logger.Info("End of combined ZIP package installation");
                     using CommandConnection commandConnection = new();

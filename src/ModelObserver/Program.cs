@@ -13,35 +13,39 @@ namespace ModelObserver
         private static async Task<int> Main(string[] args)
         {
             // Parse the command line arguments
-            string lastArg = null, socketPath = Defaults.FullSocketPath, filter = null;
+            string? lastArg = null, socketPath = Defaults.FullSocketPath, filter = null;
             bool confirm = false, quiet = false;
             foreach (string arg in args)
             {
-                if (lastArg == "-s" || lastArg == "--socket")
+                switch (lastArg)
                 {
-                    socketPath = arg;
-                }
-                else if (lastArg == "-f" || lastArg == "--filter")
-                {
-                    filter = arg;
-                }
-                else if (arg == "-c" || arg == "--confirm")
-                {
-                    confirm = true;
-                }
-                else if (arg == "-q" || arg == "--quiet")
-                {
-                    quiet = true;
-                }
-                else if (arg == "-h" || arg == "--help")
-                {
-                    Console.WriteLine("Available command line arguments:");
-                    Console.WriteLine("-s, --socket <socket>: UNIX socket to connect to");
-                    Console.WriteLine("-f, --filter <filter>: UNIX socket to connect to");
-                    Console.WriteLine("-c, --confirm: Confirm every JSON receipt manually");
-                    Console.WriteLine("-q, --quiet: Do not display when a connection has been established");
-                    Console.WriteLine("-h, --help: Display this help text");
-                    return 0;
+                    case "-s" or "--socket":
+                        socketPath = arg;
+                        break;
+                    case "-f" or "--filter":
+                        filter = arg;
+                        break;
+                    default:
+                        if (arg is "-c" or "--confirm")
+                        {
+                            confirm = true;
+                        }
+                        else if (arg is "-q" or "--quiet")
+                        {
+                            quiet = true;
+                        }
+                        else if (arg is "-h" or "--help")
+                        {
+                            Console.WriteLine("Available command line arguments:");
+                            Console.WriteLine("-s, --socket <socket>: UNIX socket to connect to");
+                            Console.WriteLine("-f, --filter <filter>: UNIX socket to connect to");
+                            Console.WriteLine("-c, --confirm: Confirm every JSON receipt manually");
+                            Console.WriteLine("-q, --quiet: Do not display when a connection has been established");
+                            Console.WriteLine("-h, --help: Display this help text");
+                            return 0;
+                        }
+
+                        break;
                 }
                 lastArg = arg;
             }
@@ -50,7 +54,12 @@ namespace ModelObserver
             if (string.IsNullOrWhiteSpace(filter))
             {
                 Console.WriteLine("Please enter a filter expression or press RETURN to receive partial model updates:");
-                filter = Console.ReadLine().Trim();
+                filter = Console.ReadLine()?.Trim();
+                if (filter is null)
+                {
+                    Console.Error.WriteLine("Invalid filter string!");
+                    return 1;
+                }
             }
 
             // Connect to DCS

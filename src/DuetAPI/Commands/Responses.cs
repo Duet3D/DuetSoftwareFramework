@@ -30,16 +30,13 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Default constructor for a response
         /// </summary>
-        public Response() { }
+        public Response() => Result = default!;
 
         /// <summary>
         /// Creates a new Response instance from the given result
         /// </summary>
         /// <param name="result">Response result</param>
-        public Response(T result)
-        {
-            Result = result;
-        }
+        public Response(T result) => Result = result;
     }
 
     /// <summary>
@@ -64,6 +61,7 @@ namespace DuetAPI.Commands
         public ErrorResponse()
         {
             Success = false;
+            ErrorType = ErrorMessage = string.Empty;
         }
 
         /// <summary>

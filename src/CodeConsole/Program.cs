@@ -12,7 +12,7 @@ namespace CodeConsole
         public static async Task<int> Main(string[] args)
         {
             // Parse the command line arguments
-            string lastArg = null, codeToExecute = null, socketPath = Defaults.FullSocketPath;
+            string? lastArg = null, codeToExecute = null, socketPath = Defaults.FullSocketPath;
             bool quiet = false;
             foreach (string arg in args)
             {
@@ -56,7 +56,7 @@ namespace CodeConsole
             }
 
             // Check if this is an interactive session
-            if (codeToExecute == null)
+            if (codeToExecute is null)
             {
                 if (!quiet)
                 {
@@ -69,8 +69,8 @@ namespace CodeConsole
 
                 // Start reading lines from stdin and send them to DCS as simple codes.
                 // When the code has finished, the result is printed to stdout
-                string input = Console.ReadLine();
-                while (input != null && input != "exit" && input != "quit")
+                string? input = Console.ReadLine();
+                while (input is not null && input != "exit" && input != "quit")
                 {
                     try
                     {
@@ -111,7 +111,7 @@ namespace CodeConsole
                     {
                         if (e is AggregateException ae)
                         {
-                            e = ae.InnerException;
+                            e = ae.InnerException!;
                         }
                         Console.WriteLine(e.Message);
                     }

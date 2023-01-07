@@ -169,18 +169,18 @@ namespace DuetControlServer.Model
                     index++;
 
                     // Update IPv4 configuration
-                    IPAddress ipAddress = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
-                                           where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
-                                           select unicastAddress.Address).FirstOrDefault();
-                    IPAddress netMask = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
-                                         where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
-                                         select unicastAddress.IPv4Mask).FirstOrDefault();
-                    IPAddress gateway = (from gatewayAddress in iface.GetIPProperties().GatewayAddresses
-                                         where gatewayAddress.Address.AddressFamily == AddressFamily.InterNetwork
-                                         select gatewayAddress.Address).FirstOrDefault();
-                    IPAddress dnsServer = (from item in iface.GetIPProperties().DnsAddresses
-                                           where item.AddressFamily == AddressFamily.InterNetwork
-                                           select item).FirstOrDefault();
+                    IPAddress? ipAddress = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
+                                            where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                                            select unicastAddress.Address).FirstOrDefault();
+                    IPAddress? netMask = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
+                                          where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                                          select unicastAddress.IPv4Mask).FirstOrDefault();
+                    IPAddress? gateway = (from gatewayAddress in iface.GetIPProperties().GatewayAddresses
+                                          where gatewayAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                                          select gatewayAddress.Address).FirstOrDefault();
+                    IPAddress? dnsServer = (from item in iface.GetIPProperties().DnsAddresses
+                                            where item.AddressFamily == AddressFamily.InterNetwork
+                                            select item).FirstOrDefault();
                     // In theory we could use ipInfo.DhcpLeaseLifetime to check if DHCP is configured but it isn't supported on Unix (.NET 5)
                     networkInterface.ActualIP = networkInterface.ConfiguredIP = ipAddress?.ToString();
                     networkInterface.Subnet = netMask?.ToString();

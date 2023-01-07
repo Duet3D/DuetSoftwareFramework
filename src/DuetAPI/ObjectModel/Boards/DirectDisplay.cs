@@ -33,6 +33,6 @@
             get => _typeName;
             set => SetPropertyValue(ref _typeName, value);
         }
-        private string _typeName;
+        private string _typeName = string.Empty;
     }
 }

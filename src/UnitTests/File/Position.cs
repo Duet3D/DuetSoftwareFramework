@@ -17,17 +17,17 @@ namespace UnitTests.File
             Code code;
 
             // Line 1
-            code = await file.ReadCodeAsync();
+            code = (await file.ReadCodeAsync())!;
             Assert.AreEqual(0, code.FilePosition);
             Assert.AreEqual(15, code.Length);
 
             // Line 2
-            code = await file.ReadCodeAsync();
+            code = (await file.ReadCodeAsync())!;
             Assert.AreEqual(15, code.FilePosition);
             Assert.AreEqual(11, code.Length);
 
             // Line 3
-            code = await file.ReadCodeAsync();
+            code = (await file.ReadCodeAsync())!;
             Assert.AreEqual(26, code.FilePosition);
             Assert.AreEqual(26, code.Length);
 
@@ -35,7 +35,7 @@ namespace UnitTests.File
             file.Position = 15;
 
             // Read it again
-            code = await file.ReadCodeAsync();
+            code = (await file.ReadCodeAsync())!;
             Assert.AreEqual(15, code.FilePosition);
             Assert.AreEqual(11, code.Length);
         }

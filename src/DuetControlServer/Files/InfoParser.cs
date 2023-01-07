@@ -31,7 +31,7 @@ namespace DuetControlServer.Files
         public static async Task<GCodeFileInfo> Parse(string fileName, bool readThumbnailContent)
         {
             await using FileStream fileStream = new(fileName, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
-            using StreamReader reader = new(fileStream, null, true, Settings.FileBufferSize);
+            using StreamReader reader = new(fileStream, Encoding.UTF8, true, Settings.FileBufferSize);
             GCodeFileInfo result = new()
             {
                 FileName = await FilePath.ToVirtualAsync(fileName),
@@ -95,8 +95,8 @@ namespace DuetControlServer.Files
 
                 if (!string.IsNullOrWhiteSpace(code.Comment))
                 {
-                    gotNewInfo |= (partialFileInfo.SimulatedTime == null) && FindSimulatedTime(code.Comment, ref partialFileInfo);
-                    gotNewInfo |= !gotNewInfo && (partialFileInfo.PrintTime == null) && FindPrintTime(code.Comment, ref partialFileInfo);
+                    gotNewInfo |= (partialFileInfo.SimulatedTime is null) && FindSimulatedTime(code.Comment, ref partialFileInfo);
+                    gotNewInfo |= !gotNewInfo && (partialFileInfo.PrintTime is null) && FindPrintTime(code.Comment, ref partialFileInfo);
                     gotNewInfo |= (partialFileInfo.LayerHeight == 0) && FindLayerHeight(code.Comment, ref partialFileInfo);
                     gotNewInfo |= (partialFileInfo.NumLayers == 0) && FindNumLayers(code.Comment, ref partialFileInfo);
                     gotNewInfo |= FindFilamentUsed(code.Comment, ref partialFileInfo);
@@ -161,9 +161,9 @@ namespace DuetControlServer.Files
                             else if (code.MajorNumber == 0 || code.MajorNumber == 1)
                             {
                                 // G0/G1 is an absolute move, see if there is a Z parameter present
-                                CodeParameter zParam = code.Parameter('Z');
-                                if (zParam != null && (zParam.Type == typeof(int) || zParam.Type == typeof(float)) &&
-                                    (code.Comment == null || !code.Comment.TrimStart().StartsWith("E", StringComparison.InvariantCultureIgnoreCase)))
+                                CodeParameter? zParam = code.Parameter('Z');
+                                if (zParam is not null && (zParam.Type == typeof(int) || zParam.Type == typeof(float)) &&
+                                    (code.Comment is null || !code.Comment.TrimStart().StartsWith("E", StringComparison.InvariantCultureIgnoreCase)))
                                 {
                                     gotNewInfo = true;
                                     partialFileInfo.Height = zParam;
@@ -172,8 +172,8 @@ namespace DuetControlServer.Files
                         }
                         else if (!string.IsNullOrWhiteSpace(code.Comment))
                         {
-                            gotNewInfo |= (partialFileInfo.SimulatedTime == null) && FindSimulatedTime(code.Comment, ref partialFileInfo);
-                            gotNewInfo |= !gotNewInfo && (partialFileInfo.PrintTime == null) && FindPrintTime(code.Comment, ref partialFileInfo);
+                            gotNewInfo |= (partialFileInfo.SimulatedTime is null) && FindSimulatedTime(code.Comment, ref partialFileInfo);
+                            gotNewInfo |= !gotNewInfo && (partialFileInfo.PrintTime is null) && FindPrintTime(code.Comment, ref partialFileInfo);
                             gotNewInfo |= (partialFileInfo.LayerHeight == 0) && FindLayerHeight(code.Comment, ref partialFileInfo);
                             gotNewInfo |= (partialFileInfo.NumLayers == 0) && FindNumLayers(code.Comment, ref partialFileInfo);
                             gotNewInfo |= !hadFilament && FindFilamentUsed(code.Comment, ref partialFileInfo);
@@ -198,17 +198,17 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Result for wrapping the buffer pointer because ref parameters are not supported for async functions
         /// </summary>
-        private class ReadLineFromEndData
+        private struct ReadLineFromEndData
         {
             /// <summary>
             /// Read line
             /// </summary>
-            public string Line;
+            public string Line = string.Empty;
 
             /// <summary>
             /// New pointer in the buffer
             /// </summary>
-            public int BufferPointer;
+            public int BufferPointer = 0;
 
             /// <summary>
             /// Last file position
@@ -352,12 +352,12 @@ namespace DuetControlServer.Files
                 Match match = item.Match(line);
                 if (match.Success)
                 {
-                    if (match.Groups.TryGetValue("mm", out Group mmGroup))
+                    if (match.Groups.TryGetValue("mm", out Group? mmGroup))
                     {
                         if (float.TryParse(mmGroup.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out float filamentUsage) &&
                             float.IsFinite(filamentUsage))
                         {
-                            if (match.Groups.TryGetValue("index", out Group indexGroup) && int.TryParse(indexGroup.Value, out int index))
+                            if (match.Groups.TryGetValue("index", out Group? indexGroup) && int.TryParse(indexGroup.Value, out int index))
                             {
                                 for (int i = fileInfo.Filament.Count; i <= index; i++)
                                 {
@@ -380,12 +380,12 @@ namespace DuetControlServer.Files
                         return true;
                     }
 
-                    if (match.Groups.TryGetValue("m", out Group mGroup))
+                    if (match.Groups.TryGetValue("m", out Group? mGroup))
                     {
                         if (float.TryParse(mGroup.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out float filamentUsage) &&
                             float.IsFinite(filamentUsage))
                         {
-                            if (match.Groups.TryGetValue("index", out Group indexGroup) && int.TryParse(indexGroup.Value, out int index))
+                            if (match.Groups.TryGetValue("index", out Group? indexGroup) && int.TryParse(indexGroup.Value, out int index))
                             {
                                 for (int i = fileInfo.Filament.Count; i <= index; i++)
                                 {
@@ -528,6 +528,12 @@ namespace DuetControlServer.Files
         /// <returns>True if the code contains thumbnail data</returns>
         private static async ValueTask<bool> ParseThumbnails(StreamReader reader, Code code, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, bool readThumbnailContent)
         {
+            if (code.Comment is null)
+            {
+                // Need a comment to start parsing thumbnails...
+                return false;
+            }
+
             // This is the start of an embedded thumbnail image
             string trimmedComment = code.Comment.TrimStart();
             if (trimmedComment.StartsWith("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))

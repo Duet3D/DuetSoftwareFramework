@@ -43,7 +43,7 @@
             get => _name;
 			set => SetPropertyValue(ref _name, value);
         }
-        private string _name;
+        private string _name = string.Empty;
 
         /// <summary>
         /// Number of currently open files or null if unknown
@@ -74,7 +74,7 @@
             get => _path;
 			set => SetPropertyValue(ref _path, value);
         }
-        private string _path;
+        private string _path = string.Empty;
 
         /// <summary>
         /// Speed of the storage device (in bytes/s or null if unknown)

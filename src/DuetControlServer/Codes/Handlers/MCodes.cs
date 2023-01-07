@@ -36,7 +36,7 @@ namespace DuetControlServer.Codes.Handlers
         /// </summary>
         /// <param name="code">Code to process</param>
         /// <returns>Result of the code if the code completed, else null</returns>
-        public static async Task<Message> Process(Commands.Code code)
+        public static async Task<Message?> Process(Commands.Code code)
         {
             if (code.IsFromFileChannel && FileExecution.Job.IsSimulating)
             {
@@ -100,8 +100,8 @@ namespace DuetControlServer.Codes.Handlers
                     if (await Processor.FlushAsync(code))
                     {
                         // Resolve the directory
-                        string virtualDirectory = code.Parameter('P');
-                        if (virtualDirectory == null)
+                        string? virtualDirectory = code.Parameter('P');
+                        if (virtualDirectory is null)
                         {
                             using (await Provider.AccessReadOnlyAsync())
                             {
@@ -135,7 +135,7 @@ namespace DuetControlServer.Codes.Handlers
                         Compatibility compatibility;
                         using (await Provider.AccessReadOnlyAsync())
                         {
-                            compatibility = Provider.Get.Inputs[code.Channel].Compatibility;
+                            compatibility = Provider.Get.Inputs[code.Channel]?.Compatibility ?? Compatibility.RepRapFirmware;
                         }
 
                         StringBuilder result = new();
@@ -258,7 +258,7 @@ namespace DuetControlServer.Codes.Handlers
                         int motionSystem;
                         using (await Provider.AccessReadOnlyAsync())
                         {
-                            motionSystem = Provider.Get.Inputs[code.Channel].MotionSystem;
+                            motionSystem = Provider.Get.Inputs[code.Channel]?.MotionSystem ?? 0;
                         }
 
                         using (await FileExecution.Job.LockAsync())
@@ -268,8 +268,8 @@ namespace DuetControlServer.Codes.Handlers
                                 return new Message(MessageType.Error, "Not printing a file");
                             }
 
-                            CodeParameter sParam = code.Parameter('S');
-                            if (sParam != null)
+                            CodeParameter? sParam = code.Parameter('S');
+                            if (sParam is not null)
                             {
                                 if (sParam < 0L || sParam > FileExecution.Job.FileLength)
                                 {
@@ -294,7 +294,7 @@ namespace DuetControlServer.Codes.Handlers
                         int motionSystem;
                         using (await Provider.AccessReadOnlyAsync())
                         {
-                            motionSystem = Provider.Get.Inputs[code.Channel].MotionSystem;
+                            motionSystem = Provider.Get.Inputs[code.Channel]?.MotionSystem ?? 0;
                         }
 
                         using (await FileExecution.Job.LockAsync())
@@ -316,7 +316,7 @@ namespace DuetControlServer.Codes.Handlers
                         int numChannel = (int)code.Channel;
                         using (await Commands.Code.FileLocks[numChannel].LockAsync(Program.CancellationToken))
                         {
-                            if (Commands.Code.FilesBeingWritten[numChannel] != null)
+                            if (Commands.Code.FilesBeingWritten[numChannel] is not null)
                             {
                                 return new Message(MessageType.Error, "Another file is already being written to");
                             }
@@ -352,10 +352,11 @@ namespace DuetControlServer.Codes.Handlers
                         int numChannel = (int)code.Channel;
                         using (await Commands.Code.FileLocks[numChannel].LockAsync(Program.CancellationToken))
                         {
-                            if (Commands.Code.FilesBeingWritten[numChannel] != null)
+                            StreamWriter? writer = Commands.Code.FilesBeingWritten[numChannel];
+                            if (writer is not null)
                             {
-                                Stream stream = Commands.Code.FilesBeingWritten[numChannel].BaseStream;
-                                await Commands.Code.FilesBeingWritten[numChannel].DisposeAsync();
+                                Stream stream = writer.BaseStream;
+                                await writer.DisposeAsync();
                                 Commands.Code.FilesBeingWritten[numChannel] = null;
                                 await stream.DisposeAsync();
 
@@ -410,18 +411,19 @@ namespace DuetControlServer.Codes.Handlers
                                 }
 
                                 // Get thumbnail
-                                string pParam = code.Parameter('P');
-                                if (pParam == null)
+                                string? pParam = code.Parameter('P');
+                                CodeParameter? sParam = code.Parameter('S');
+                                if (pParam is null)
                                 {
                                     return new Message(MessageType.Error, "Missing parameter 'P'");
                                 }
-                                if (code.Parameter('S') == null)
+                                if (sParam is null)
                                 {
                                     return new Message(MessageType.Error, "Missing parameter 'S'");
                                 }
 
                                 string filename = await FilePath.ToPhysicalAsync(pParam, FileDirectory.GCodes);
-                                string thumbnailJson = await InfoParser.ParseThumbnail(filename, code.Parameter('S'));
+                                string thumbnailJson = await InfoParser.ParseThumbnail(filename, sParam);
                                 return new Message(MessageType.Success, thumbnailJson);
                             }
                             catch (Exception e)
@@ -438,31 +440,27 @@ namespace DuetControlServer.Codes.Handlers
                 case 37:
                     if (await Processor.FlushAsync(code))
                     {
-                        CodeParameter pParam = code.Parameter('P');
-                        if (pParam != null)
+                        string? file = code.Parameter('P', string.Empty);
+                        if (string.IsNullOrWhiteSpace(file))
                         {
-                            string file = pParam;
-                            if (string.IsNullOrWhiteSpace(file))
+                            return new Message(MessageType.Error, "Filename expected");
+                        }
+
+                        string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
+                        if (!File.Exists(physicalFile))
+                        {
+                            return new Message(MessageType.Error, $"GCode file \"{file}\" not found");
+                        }
+
+                        using (await FileExecution.Job.LockAsync())
+                        {
+                            if (!code.IsFromFileChannel && FileExecution.Job.IsProcessing)
                             {
-                                return new Message(MessageType.Error, "Filename expected");
+                                return new Message(MessageType.Error, "Cannot set file to simulate, because a file is already being printed");
                             }
 
-                            string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
-                            if (!File.Exists(physicalFile))
-                            {
-                                return new Message(MessageType.Error, $"GCode file \"{file}\" not found");
-                            }
-
-                            using (await FileExecution.Job.LockAsync())
-                            {
-                                if (!code.IsFromFileChannel && FileExecution.Job.IsProcessing)
-                                {
-                                    return new Message(MessageType.Error, "Cannot set file to simulate, because a file is already being printed");
-                                }
-
-                                await FileExecution.Job.SelectFile(physicalFile, true);
-                                // Simulation is started when M37 has been processed by the firmware
-                            }
+                            await FileExecution.Job.SelectFile(physicalFile, true);
+                            // Simulation is started when M37 has been processed by the firmware
                         }
 
                         // Let RRF do everything else
@@ -491,7 +489,7 @@ namespace DuetControlServer.Codes.Handlers
                             _logger.Debug(e, "Failed to compute SHA1 checksum");
                             if (e is AggregateException ae)
                             {
-                                e = ae.InnerException;
+                                e = ae.InnerException!;
                             }
                             return new Message(MessageType.Error, $"Could not compute SHA1 checksum for file {file}: {e.Message}");
                         }
@@ -543,7 +541,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Flag current macro file as (not) pausable
                 case 98:
-                    if (code.Parameter('R') != null)
+                    if (code.Parameter('R') is not null)
                     {
                         if (await Processor.FlushAsync(code))
                         {
@@ -596,8 +594,8 @@ namespace DuetControlServer.Codes.Handlers
                 case 470:
                     if (await Processor.FlushAsync(code))
                     {
-                        string path = code.Parameter('P');
-                        if (path == null)
+                        string? path = code.Parameter('P');
+                        if (path is null)
                         {
                             return new Message(MessageType.Error, "Missing directory name");
                         }
@@ -619,8 +617,17 @@ namespace DuetControlServer.Codes.Handlers
                 case 471:
                     if (await Processor.FlushAsync(code))
                     {
-                        string from = code.Parameter('S');
-                        string to = code.Parameter('T');
+                        string? from = code.Parameter('S');
+                        if (from is null)
+                        {
+                            return new Message(MessageType.Error, "Missing S parameter");
+                        }
+
+                        string? to = code.Parameter('T');
+                        if (to is null)
+                        {
+                            return new Message(MessageType.Error, "Missing T parameter");
+                        }
 
                         try
                         {
@@ -682,7 +689,7 @@ namespace DuetControlServer.Codes.Handlers
                 case 505:
                     if (await Processor.FlushAsync(code))
                     {
-                        string directory = code.Parameter('P');
+                        string? directory = code.Parameter('P');
                         if (!string.IsNullOrEmpty(directory))
                         {
                             await using (await SPI.Interface.LockAllMovementSystemsAndWaitForStandstill(code.Channel))
@@ -713,7 +720,7 @@ namespace DuetControlServer.Codes.Handlers
                     if (await Processor.FlushAsync(code))
                     {
                         // Verify the P parameter
-                        string pParam = code.Parameter('P');
+                        string? pParam = code.Parameter('P');
                         if (!string.IsNullOrEmpty(pParam))
                         {
                             if (pParam.Length > 40)
@@ -757,8 +764,8 @@ namespace DuetControlServer.Codes.Handlers
                 case 551:
                     if (await Processor.FlushAsync(code))
                     {
-                        string password = code.Parameter('P');
-                        if (password != null)
+                        string? password = code.Parameter('P');
+                        if (password is not null)
                         {
                             using (await Provider.AccessReadWriteAsync())
                             {
@@ -773,8 +780,8 @@ namespace DuetControlServer.Codes.Handlers
                 case 586:
                     if (await Processor.FlushAsync(code))
                     {
-                        string corsSite = code.Parameter('C');
-                        if (corsSite != null)
+                        string? corsSite = code.Parameter('C');
+                        if (corsSite is not null)
                         {
                             using (await Provider.AccessReadWriteAsync())
                             {
@@ -800,8 +807,8 @@ namespace DuetControlServer.Codes.Handlers
                     {
                         bool seen = false;
 
-                        CodeParameter pParam = code.Parameter('P');
-                        if (pParam != null)
+                        CodeParameter? pParam = code.Parameter('P');
+                        if (pParam is not null)
                         {
                             if (DateTime.TryParseExact(pParam, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date))
                             {
@@ -814,8 +821,8 @@ namespace DuetControlServer.Codes.Handlers
                             }
                         }
 
-                        CodeParameter sParam = code.Parameter('S');
-                        if (sParam != null)
+                        CodeParameter? sParam = code.Parameter('S');
+                        if (sParam is not null)
                         {
                             if (DateTime.TryParseExact(sParam, "HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime time))
                             {
@@ -828,8 +835,8 @@ namespace DuetControlServer.Codes.Handlers
                             }
                         }
 
-                        CodeParameter tParam = code.Parameter('T');
-                        if (tParam != null)
+                        CodeParameter? tParam = code.Parameter('T');
+                        if (tParam is not null)
                         {
                             if (File.Exists($"/usr/share/zoneinfo/{tParam}"))
                             {
@@ -853,8 +860,8 @@ namespace DuetControlServer.Codes.Handlers
                 case 929:
                     if (await Processor.FlushAsync(code))
                     {
-                        CodeParameter sParam = code.Parameter('S');
-                        if (sParam == null)
+                        CodeParameter? sParam = code.Parameter('S');
+                        if (sParam is null)
                         {
                             using (await Provider.AccessReadOnlyAsync())
                             {
@@ -876,7 +883,7 @@ namespace DuetControlServer.Codes.Handlers
                                 _ => LogLevel.Off
                             };
 
-                            string defaultLogFile = Utility.Logger.DefaultLogFile;
+                            string defaultLogFile = Logger.DefaultLogFile;
                             using (await Provider.AccessReadOnlyAsync())
                             {
                                 if (!string.IsNullOrEmpty(Provider.Get.State.LogFile))
@@ -884,17 +891,17 @@ namespace DuetControlServer.Codes.Handlers
                                     defaultLogFile = Provider.Get.State.LogFile;
                                 }
                             }
-                            string logFile = code.Parameter('P', defaultLogFile);
+                            string? logFile = code.Parameter('P', defaultLogFile);
                             if (string.IsNullOrWhiteSpace(logFile))
                             {
                                 return new Message(MessageType.Error, "Missing filename in M929 command");
                             }
 
-                            await Utility.Logger.StartAsync(logFile, logLevel);
+                            await Logger.StartAsync(logFile, logLevel);
                         }
                         else
                         {
-                            await Utility.Logger.StopAsync();
+                            await Logger.StopAsync();
                         }
                         return new Message();
                     }
@@ -907,7 +914,7 @@ namespace DuetControlServer.Codes.Handlers
                         if (await Processor.FlushAsync(code))
                         {
                             // Get the IAP and Firmware files
-                            string iapFile, firmwareFile;
+                            string? iapFile, firmwareFile;
                             using (await Provider.AccessReadOnlyAsync())
                             {
                                 if (Provider.Get.Boards.Count == 0)
@@ -966,7 +973,7 @@ namespace DuetControlServer.Codes.Handlers
                             await using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
                             if (Path.GetExtension(firmwareFile) == ".uf2")
                             {
-                                await using MemoryStream unpackedFirmwareStream = await Utility.Firmware.UnpackUF2(firmwareStream);
+                                await using MemoryStream unpackedFirmwareStream = await Firmware.UnpackUF2(firmwareStream);
                                 await SPI.Interface.UpdateFirmware(iapStream, unpackedFirmwareStream);
                             }
                             else
@@ -1037,7 +1044,7 @@ namespace DuetControlServer.Codes.Handlers
         /// <remarks>This method shall be used only to update values that are time-critical. Others are supposed to be updated via the object model</remarks>
         public static async Task CodeExecuted(Commands.Code code)
         {
-            if (code.Result == null || code.Result.Type != MessageType.Success)
+            if (code.Result is null || code.Result.Type != MessageType.Success)
             {
                 return;
             }
@@ -1091,7 +1098,7 @@ namespace DuetControlServer.Codes.Handlers
         /// <returns>Asynchronous task</returns>
         private static async Task Diagnostics(Message result)
         {
-            BuildDateTimeAttribute buildAttribute = (BuildDateTimeAttribute)Attribute.GetCustomAttribute(System.Reflection.Assembly.GetExecutingAssembly(), typeof(BuildDateTimeAttribute));
+            BuildDateTimeAttribute buildAttribute = (BuildDateTimeAttribute)Attribute.GetCustomAttribute(System.Reflection.Assembly.GetExecutingAssembly(), typeof(BuildDateTimeAttribute))!;
             StringBuilder builder = new();
             builder.AppendLine("=== Duet Control Server ===");
             builder.AppendLine($"Duet Control Server version {Program.Version} ({buildAttribute.Date ?? "unknown build time"})");

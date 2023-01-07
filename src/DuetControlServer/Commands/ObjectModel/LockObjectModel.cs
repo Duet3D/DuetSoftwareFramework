@@ -11,12 +11,12 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Source connection of this command
         /// </summary>
-        public Connection Connection { get; set; }
+        public Connection? Connection { get; set; }
 
         /// <summary>
         /// Lock the machine model for write access
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public override Task Execute() => LockManager.LockMachineModel(Connection);
+        public override Task Execute() => LockManager.LockMachineModel(Connection!);
     }
 }

@@ -34,7 +34,12 @@ namespace DuetPiManagementPlugin.Network.Protocols
 
                 while (!reader.EndOfStream)
                 {
-                    string line = await reader.ReadLineAsync();
+                    string? line = await reader.ReadLineAsync();
+                    if (line is null)
+                    {
+                        break;
+                    }
+
                     Match match = _portRegex.Match(line);
                     if (match.Success)
                     {
@@ -76,7 +81,12 @@ namespace DuetPiManagementPlugin.Network.Protocols
                     bool portWritten = false;
                     while (!reader.EndOfStream)
                     {
-                        string line = await reader.ReadLineAsync();
+                        string? line = await reader.ReadLineAsync();
+                        if (line is null)
+                        {
+                            break;
+                        }
+
                         if (!portWritten && _portRegex.IsMatch(line))
                         {
                             // Replace Port line with the new Port argument
@@ -109,7 +119,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
             }
 
             // Enable FTP
-            if (enabled != null && enabled.Value && !Manager.IsEnabled(NetworkProtocol.FTP))
+            if (enabled is not null && enabled.Value && !Manager.IsEnabled(NetworkProtocol.FTP))
             {
                 string startOutput = await Command.Execute("systemctl", "start proftpd.service");
                 string enableOutput = await Command.Execute("systemctl", "enable -q proftpd.service");
@@ -118,7 +128,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
             }
 
             // Disable FTP
-            if (enabled != null && !enabled.Value && Manager.IsEnabled(NetworkProtocol.FTP))
+            if (enabled is not null && !enabled.Value && Manager.IsEnabled(NetworkProtocol.FTP))
             {
                 string stopOutput = await Command.Execute("systemctl", "stop proftpd.service");
                 string disableOutput = await Command.Execute("systemctl", "disable -q proftpd.service");

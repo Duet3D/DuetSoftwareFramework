@@ -17,7 +17,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Key to update
         /// </summary>
-        public string Key { get; set; }
+        public string Key { get; set; } = string.Empty;
 
         /// <summary>
         /// JSON patch to apply

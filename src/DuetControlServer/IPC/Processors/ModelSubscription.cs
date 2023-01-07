@@ -58,7 +58,7 @@ namespace DuetControlServer.IPC.Processors
                 {
                     foreach (ModelSubscription subscription in _subscriptions)
                     {
-                        if (subscription._mode == SubscriptionMode.Full || subscription._channel == null)
+                        if (subscription._mode == SubscriptionMode.Full || subscription._channel is null)
                         {
                             return true;
                         }
@@ -92,7 +92,7 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// Dictionary of updated fields (in Patch mode)
         /// </summary>
-        private readonly Dictionary<string, object> _patch = new();
+        private readonly Dictionary<string, object?> _patch = new();
 
         /// <summary>
         /// Memory stream holding the JSON patch in UTF-8 format
@@ -109,7 +109,7 @@ namespace DuetControlServer.IPC.Processors
             SubscribeInitMessage subscribeInitMessage = (SubscribeInitMessage)initMessage;
             _mode = subscribeInitMessage.SubscriptionMode;
             _channel = subscribeInitMessage.Channel;
-            if (subscribeInitMessage.Filters != null)
+            if (subscribeInitMessage.Filters is not null)
             {
                 _filters = Filter.ConvertFilters(subscribeInitMessage.Filters);
             }
@@ -146,7 +146,7 @@ namespace DuetControlServer.IPC.Processors
                 }
 
                 // Get the requested machine model
-                byte[] jsonData;
+                byte[]? jsonData;
                 using (await Provider.AccessReadOnlyAsync())
                 {
                     if (_mode == SubscriptionMode.Full || _filters.Length == 0)
@@ -155,10 +155,10 @@ namespace DuetControlServer.IPC.Processors
                     }
                     else
                     {
-                        Dictionary<string, object> patchModel = new();
+                        Dictionary<string, object?> patchModel = new();
                         foreach (object[] filter in _filters)
                         {
-                            Dictionary<string, object> partialModel = Filter.GetFiltered(filter);
+                            Dictionary<string, object?> partialModel = Filter.GetFiltered(filter);
                             Filter.MergeFiltered(patchModel, partialModel);
                         }
 
@@ -170,7 +170,7 @@ namespace DuetControlServer.IPC.Processors
 
                 do
                 {
-                    if (jsonData != null)
+                    if (jsonData is not null)
                     {
                         // Send new JSON data
                         await Connection.Send(jsonData);
@@ -294,10 +294,10 @@ namespace DuetControlServer.IPC.Processors
         /// <param name="root">Root dictionary</param>
         /// <param name="path">Path node</param>
         /// <returns>Item at the given path</returns>
-        public static object GetPathNode(Dictionary<string, object> root, object[] path)
+        public static object? GetPathNode(Dictionary<string, object?> root, object[] path)
         {
-            Dictionary<string, object> currentDictionary = root;
-            List<object> currentList = null;
+            Dictionary<string, object?> currentDictionary = root;
+            List<object?>? currentList = null;
 
             for (int i = 0; i < path.Length - 1; i++)
             {
@@ -305,9 +305,9 @@ namespace DuetControlServer.IPC.Processors
                 if (pathItem is string pathString)
                 {
                     // Get the requested dictionary
-                    if (currentDictionary.TryGetValue(pathString, out object child))
+                    if (currentDictionary.TryGetValue(pathString, out object? child))
                     {
-                        if (child is Dictionary<string, object> childDictionary)
+                        if (child is Dictionary<string, object?> childDictionary)
                         {
                             currentDictionary = childDictionary;
                         }
@@ -319,7 +319,7 @@ namespace DuetControlServer.IPC.Processors
                     }
                     else
                     {
-                        Dictionary<string, object> newNode = new();
+                        Dictionary<string, object?> newNode = new();
                         currentDictionary.Add(pathString, newNode);
                         currentDictionary = newNode;
                     }
@@ -328,9 +328,9 @@ namespace DuetControlServer.IPC.Processors
                 else if (pathItem is ItemPathNode pathNode)
                 {
                     // Get the requested list
-                    if (currentDictionary.TryGetValue(pathNode.Name, out object nodeObject))
+                    if (currentDictionary.TryGetValue(pathNode.Name, out object? nodeObject))
                     {
-                        if (nodeObject is List<object> nodeList)
+                        if (nodeObject is List<object?> nodeList)
                         {
                             for (int k = nodeList.Count; k > pathNode.List.Count; k--)
                             {
@@ -346,24 +346,24 @@ namespace DuetControlServer.IPC.Processors
                     }
                     else
                     {
-                        currentList = new List<object>(pathNode.List.Count);
+                        currentList = new List<object?>(pathNode.List.Count);
                         currentDictionary.Add(pathNode.Name, currentList);
                     }
 
                     // Add missing items to the current list
                     for (int k = currentList.Count; k < pathNode.List.Count; k++)
                     {
-                        if (pathNode.List[k] == null)
+                        if (pathNode.List[k] is null)
                         {
                             currentList.Add(null);
                         }
                         else if (pathNode.List[k] is IModelObject)
                         {
-                            currentList.Add(new Dictionary<string, object>());
+                            currentList.Add(new Dictionary<string, object?>());
                         }
                         else if (pathNode.List[k] is IModelCollection)
                         {
-                            currentList.Add(new List<object>());
+                            currentList.Add(new List<object?>());
                         }
                         else
                         {
@@ -373,7 +373,7 @@ namespace DuetControlServer.IPC.Processors
 
                     // Try to move on to the next node
                     nodeObject = currentList[pathNode.Index];
-                    if (nodeObject is Dictionary<string, object> nextDictionary)
+                    if (nodeObject is Dictionary<string, object?> nextDictionary)
                     {
                         currentDictionary = nextDictionary;
                         currentList = null;
@@ -386,7 +386,7 @@ namespace DuetControlServer.IPC.Processors
                 }
             }
 
-            if (currentDictionary != null)
+            if (currentDictionary is not null)
             {
                 return currentDictionary;
             }
@@ -399,7 +399,7 @@ namespace DuetControlServer.IPC.Processors
         /// <param name="path">Path to the property</param>
         /// <param name="changeType">Type of the change</param>
         /// <param name="value">New value</param>
-        private void MachineModelPropertyChanged(object[] path, PropertyChangeType changeType, object value)
+        private void MachineModelPropertyChanged(object[] path, PropertyChangeType changeType, object? value)
         {
             if (!CheckFilters(path))
             {
@@ -410,8 +410,8 @@ namespace DuetControlServer.IPC.Processors
             {
                 try
                 {
-                    object node = GetPathNode(_patch, path);
-                    if (node == null)
+                    object? node = GetPathNode(_patch, path);
+                    if (node is null)
                     {
                         // Skip this update if the underlying object is about to be fully transferred anyway
                         return;
@@ -421,7 +421,7 @@ namespace DuetControlServer.IPC.Processors
                     {
                         case PropertyChangeType.Property:
                             // Set new property value
-                            if (node is Dictionary<string, object> propertyNode)
+                            if (node is Dictionary<string, object?> propertyNode)
                             {
                                 string propertyName = (string)path[^1];
                                 propertyNode[propertyName] = value;
@@ -431,7 +431,7 @@ namespace DuetControlServer.IPC.Processors
                         case PropertyChangeType.Collection:
                             // Update a collection
                             ItemPathNode pathNode = (ItemPathNode)path[^1];
-                            if (node is not List<object> collection)
+                            if (node is not List<object?> collection)
                             {
                                 if (pathNode.Name.Equals(nameof(ObjectModel.Job.Layers)) && Connection.ApiVersion < 11)
                                 {
@@ -439,10 +439,10 @@ namespace DuetControlServer.IPC.Processors
                                     break;
                                 }
 
-                                Dictionary<string, object> objectCollectionNode = (Dictionary<string, object>)node;
-                                if (objectCollectionNode.TryGetValue(pathNode.Name, out object objectCollection))
+                                Dictionary<string, object?> objectCollectionNode = (Dictionary<string, object?>)node;
+                                if (objectCollectionNode.TryGetValue(pathNode.Name, out object? objectCollection))
                                 {
-                                    collection = (List<object>)objectCollection;
+                                    collection = (List<object?>)objectCollection!;
 
                                     for (int k = collection.Count; k > pathNode.List.Count; k--)
                                     {
@@ -451,24 +451,24 @@ namespace DuetControlServer.IPC.Processors
                                 }
                                 else
                                 {
-                                    collection = new List<object>(pathNode.List.Count);
+                                    collection = new List<object?>(pathNode.List.Count);
                                     objectCollectionNode.Add(pathNode.Name, collection);
                                 }
                             }
 
                             for (int k = collection.Count; k < pathNode.List.Count; k++)
                             {
-                                if (pathNode.List[k] == null)
+                                if (pathNode.List[k] is null)
                                 {
                                     collection.Add(null);
                                 }
                                 else if (pathNode.List[k] is IModelObject)
                                 {
-                                    collection.Add(new Dictionary<string, object>());
+                                    collection.Add(new Dictionary<string, object?>());
                                 }
                                 else if (pathNode.List[k] is IModelCollection)
                                 {
-                                    collection.Add(new List<object>());
+                                    collection.Add(new List<object?>());
                                 }
                                 else
                                 {
@@ -484,18 +484,18 @@ namespace DuetControlServer.IPC.Processors
 
                         case PropertyChangeType.GrowingCollection:
                             // Add new items or clear list
-                            if (node is Dictionary<string, object> parent)
+                            if (node is Dictionary<string, object?> parent)
                             {
                                 string collectionName = (string)path[^1];
                                 if (collectionName.Equals(nameof(ObjectModel.Messages), StringComparison.InvariantCultureIgnoreCase))
                                 {
-                                    if (value == null)
+                                    if (value is null)
                                     {
                                         // Don't clear messages - they are volatile anyway
                                         break;
                                     }
 
-                                    if (_channel != null)
+                                    if (_channel is not null)
                                     {
                                         MessageTypeFlags channelFlag = (MessageTypeFlags)(1 << (int)_channel);
                                         if (!MessageTypeFlags.GenericMessage.HasFlag(channelFlag))
@@ -507,17 +507,17 @@ namespace DuetControlServer.IPC.Processors
                                 }
 
                                 IList growingCollection;
-                                if (parent.TryGetValue(collectionName, out object obj))
+                                if (parent.TryGetValue(collectionName, out object? obj))
                                 {
-                                    growingCollection = (IList)obj;
+                                    growingCollection = (IList)obj!;
                                 }
                                 else
                                 {
-                                    growingCollection = new List<object>();
+                                    growingCollection = new List<object?>();
                                     parent.Add(collectionName, growingCollection);
                                 }
 
-                                if (value != null)
+                                if (value is not null)
                                 {
                                     foreach (object newItem in (IList)value)
                                     {
@@ -554,7 +554,7 @@ namespace DuetControlServer.IPC.Processors
             {
                 foreach (ModelSubscription subscription in _subscriptions)
                 {
-                    if (subscription._mode == SubscriptionMode.Patch && subscription._channel != null)
+                    if (subscription._mode == SubscriptionMode.Patch && subscription._channel is not null)
                     {
                         MessageTypeFlags channelFlag = (MessageTypeFlags)(1 << (int)subscription._channel);
                         if (flags.HasFlag(channelFlag))
@@ -580,16 +580,16 @@ namespace DuetControlServer.IPC.Processors
         /// </summary>
         /// <param name="changes">Changes to write</param>
         /// <returns></returns>
-        private void SerializeJsonChanges(Dictionary<string, object> changes)
+        private void SerializeJsonChanges(Dictionary<string, object?> changes)
         {
             using Utf8JsonWriter writer = new(_patchStream);
-            void WriteData(Dictionary<string, object> data)
+            void WriteData(Dictionary<string, object?> data)
             {
                 writer.WriteStartObject();
                 foreach (var kv in data)
                 {
                     writer.WritePropertyName(kv.Key);
-                    if (kv.Value is Dictionary<string, object> childNode)
+                    if (kv.Value is Dictionary<string, object?> childNode)
                     {
                         WriteData(childNode);
                     }

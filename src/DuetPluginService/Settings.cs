@@ -136,14 +136,14 @@ namespace DuetPluginService
         public static bool Init(string[] args)
         {
             // Check if a custom config is supposed to be loaded
-            string lastArg = null;
+            string? lastArg = null;
             foreach (string arg in args)
             {
-                if (lastArg == "-c" || lastArg == "--config")
+                if (lastArg is "-c" or "--config")
                 {
                     ConfigFilename = arg;
                 }
-                else if (arg == "-h" || arg == "--help")
+                else if (arg is "-h" or "--help")
                 {
                     Console.WriteLine("Available command line arguments:");
                     Console.WriteLine("-l, --log-level [trace,debug,info,warn,error,fatal,off]: Set minimum log level");
@@ -205,14 +205,14 @@ namespace DuetPluginService
         /// <param name="args">Command-line arguments</param>
         private static void ParseParameters(string[] args)
         {
-            string lastArg = null;
+            string? lastArg = null;
             foreach (string arg in args)
             {
-                if (lastArg == "-l" || lastArg == "--log-level")
+                if (lastArg is "-l" or "--log-level")
                 {
                     LogLevel = LogLevel.FromString(arg);
                 }
-                else if (lastArg == "-s" || lastArg == "--socket")
+                else if (lastArg is "-s" or "--socket")
                 {
                     SocketPath = arg;
                 }
@@ -234,15 +234,15 @@ namespace DuetPluginService
             }
 
             Utf8JsonReader reader = new(content);
-            PropertyInfo property = null;
+            PropertyInfo? property = null;
             while (reader.Read())
             {
                 switch (reader.TokenType)
                 {
                     case JsonTokenType.PropertyName:
-                        string propertyName = reader.GetString();
+                        string propertyName = reader.GetString()!;
                         property = typeof(Settings).GetProperty(propertyName, BindingFlags.Static | BindingFlags.Public | BindingFlags.IgnoreCase);
-                        if (property == null || Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
+                        if (property is null || Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
                         {
                             // Skip non-existent and ignored properties
                             if (reader.Read())
@@ -261,7 +261,7 @@ namespace DuetPluginService
 
                     case JsonTokenType.True:
                     case JsonTokenType.False:
-                        if (property.PropertyType == typeof(bool))
+                        if (property!.PropertyType == typeof(bool))
                         {
                             property.SetValue(null, reader.GetBoolean());
                         }
@@ -272,7 +272,7 @@ namespace DuetPluginService
                         break;
 
                     case JsonTokenType.Number:
-                        if (property.PropertyType == typeof(int))
+                        if (property!.PropertyType == typeof(int))
                         {
                             property.SetValue(null, reader.GetInt32());
                         }
@@ -295,7 +295,7 @@ namespace DuetPluginService
                         break;
 
                     case JsonTokenType.String:
-                        if (property.PropertyType == typeof(string))
+                        if (property!.PropertyType == typeof(string))
                         {
                             property.SetValue(null, reader.GetString());
                         }
@@ -310,12 +310,12 @@ namespace DuetPluginService
                         break;
 
                     case JsonTokenType.StartArray:
-                        if (property.PropertyType == typeof(List<string>))
+                        if (property!.PropertyType == typeof(List<string>))
                         {
                             List<string> list = new();
                             while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
                             {
-                                list.Add(reader.GetString());
+                                list.Add(reader.GetString()!);
                             }
                             property.SetValue(null, list);
                         }
@@ -326,14 +326,14 @@ namespace DuetPluginService
                         break;
 
                     case JsonTokenType.StartObject:
-                        if (property != null)
+                        if (property is not null)
                         {
                             if (property.PropertyType == typeof(Dictionary<string, string>))
                             {
                                 Dictionary<string, string> dict = new();
                                 while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
                                 {
-                                    dict.Add(reader.GetString(), reader.GetString());
+                                    dict.Add(reader.GetString()!, reader.GetString()!);
                                 }
                                 property.SetValue(null, dict);
                             }
@@ -365,7 +365,7 @@ namespace DuetPluginService
             {
                 if (!Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
                 {
-                    object value = property.GetValue(null);
+                    object? value = property.GetValue(null);
                     if (value is string stringValue)
                     {
                         writer.WriteString(property.Name, stringValue);

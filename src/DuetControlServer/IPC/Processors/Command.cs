@@ -74,7 +74,7 @@ namespace DuetControlServer.IPC.Processors
         {
             do
             {
-                DuetAPI.Commands.BaseCommand command = null;
+                DuetAPI.Commands.BaseCommand? command = null;
                 try
                 {
                     // Read another command from the IPC connection
@@ -89,7 +89,7 @@ namespace DuetControlServer.IPC.Processors
                     Connection.CheckPermissions(commandType);
 
                     // Execute it and send back the result
-                    object result = await command.Invoke();
+                    object? result = await command.Invoke();
                     await Connection.SendResponse(result);
 
                     // Shut down the socket if this was the last command
@@ -108,7 +108,7 @@ namespace DuetControlServer.IPC.Processors
                     // Send errors back to the client
                     if (e is not OperationCanceledException)
                     {
-                        if (command != null)
+                        if (command is not null)
                         {
                             if (e is UnauthorizedAccessException)
                             {

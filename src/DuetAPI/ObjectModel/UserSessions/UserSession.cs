@@ -33,7 +33,7 @@
             get => _origin;
 			set => SetPropertyValue(ref _origin, value);
         }
-        private string _origin;
+        private string _origin = string.Empty;
 
         /// <summary>
         /// Corresponding identifier of the origin.

@@ -190,7 +190,11 @@ namespace DuetAPI.Utility
             {
                 while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
                 {
-                    SbcPermissions readValue = (SbcPermissions)Enum.Parse(typeof(SbcPermissions), reader.GetString(), true);
+                    if (reader.TokenType != JsonTokenType.String)
+                    {
+                        throw new JsonException();
+                    }
+                    SbcPermissions readValue = (SbcPermissions)Enum.Parse(typeof(SbcPermissions), reader.GetString()!, true);
                     result |= readValue;
                 }
             }

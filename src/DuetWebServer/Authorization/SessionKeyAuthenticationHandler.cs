@@ -63,8 +63,8 @@ namespace DuetWebServer.Authorization
             {
                 foreach (string sessionKey in sessionKeys)
                 {
-                    AuthenticationTicket ticket = _sessionStorage.GetTicketFromKey(sessionKey);
-                    if (ticket != null)
+                    AuthenticationTicket? ticket = _sessionStorage.GetTicketFromKey(sessionKey);
+                    if (ticket is not null)
                     {
                         // Got a ticket, success!
                         return AuthenticateResult.Success(ticket);
@@ -74,11 +74,11 @@ namespace DuetWebServer.Authorization
             else
             {
                 // Check for IP address authorization
-                string ipAddress = Context.Connection.RemoteIpAddress.ToString();
-                AuthenticationTicket ticket = _sessionStorage.GetTicketFromIpAddress(ipAddress);
+                string ipAddress = Context.Connection.RemoteIpAddress!.ToString();
+                AuthenticationTicket? ticket = _sessionStorage.GetTicketFromIpAddress(ipAddress);
 
                 // Make a new session if no ticket could be found and no password is set
-                if (ticket == null)
+                if (ticket is null)
                 {
                     try
                     {
@@ -98,7 +98,7 @@ namespace DuetWebServer.Authorization
                 }
 
                 // Deal with the result
-                return (ticket != null) ? AuthenticateResult.Success(ticket) : AuthenticateResult.NoResult();
+                return (ticket is not null) ? AuthenticateResult.Success(ticket) : AuthenticateResult.NoResult();
             }
             return AuthenticateResult.Fail("Missing X-Session-Key header");
         }

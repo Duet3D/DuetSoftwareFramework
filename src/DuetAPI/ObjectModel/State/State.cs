@@ -20,22 +20,22 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Port of the ATX power pin or null if not assigned
         /// </summary>
-        public string AtxPowerPort
+        public string? AtxPowerPort
         {
             get => _atxPowerPort;
             set => SetPropertyValue(ref _atxPowerPort, value);
         }
-        private string _atxPowerPort;
+        private string? _atxPowerPort;
 
         /// <summary>
         /// Information about a requested beep or null if none is requested
         /// </summary>
-        public BeepRequest Beep
+        public BeepRequest? Beep
         {
             get => _beep;
             set => SetPropertyValue(ref _beep, value);
         }
-        private BeepRequest _beep;
+        private BeepRequest? _beep;
 
         /// <summary>
         /// Number of the currently selected tool or -1 if none is selected
@@ -75,12 +75,12 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         [Obsolete("This field will be removed in favour of a new dsf main key in v3.5")]
         [SbcProperty(false)]
-        public string DsfVersion
+        public string? DsfVersion
         {
             get => _dsfVersion;
             set => SetPropertyValue(ref _dsfVersion, value);
         }
-        private string _dsfVersion;
+        private string? _dsfVersion;
 
         /// <summary>
         /// Indicates if DSF allows the installation and usage of third-party plugins
@@ -110,7 +110,7 @@ namespace DuetAPI.ObjectModel
         /// List of general-purpose output ports
         /// </summary>
         /// <seealso cref="GpOutputPort"/>
-        public ModelCollection<GpOutputPort> GpOut { get; } = new ModelCollection<GpOutputPort>();
+        public ModelCollection<GpOutputPort?> GpOut { get; } = new ModelCollection<GpOutputPort?>();
 
         /// <summary>
         /// Laser PWM of the next commanded move (0..1) or null if not applicable
@@ -126,12 +126,12 @@ namespace DuetAPI.ObjectModel
         /// Log file being written to or null if logging is disabled
         /// </summary>
         [SbcProperty(true)]
-        public string LogFile
+        public string? LogFile
         {
             get => _logFile;
             set => SetPropertyValue(ref _logFile, value);
         }
-        private string _logFile;
+        private string? _logFile;
 
         /// <summary>
         /// Current log level
@@ -147,12 +147,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Details about a requested message box or null if none is requested
         /// </summary>
-        public MessageBox MessageBox
+        public MessageBox? MessageBox
         {
             get => _messageBox;
             set => SetPropertyValue(ref _messageBox, value);
         }
-        private MessageBox _messageBox;
+        private MessageBox? _messageBox;
 
         /// <summary>
         /// Current mode of operation

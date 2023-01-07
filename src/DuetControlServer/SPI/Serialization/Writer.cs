@@ -77,15 +77,15 @@ namespace DuetControlServer.SPI.Serialization
                 NumParameters = (byte)((code.Type == CodeType.Comment) ? 1 : code.Parameters.Count)
             };
 
-            if (code.Type == CodeType.Comment || code.MajorNumber != null)
+            if (code.Type == CodeType.Comment || code.MajorNumber is not null)
             {
                 header.Flags |= CodeFlags.HasMajorCommandNumber;
             }
-            if (code.MinorNumber != null)
+            if (code.MinorNumber is not null)
             {
                 header.Flags |= CodeFlags.HasMinorCommandNumber;
             }
-            if (code.FilePosition != null)
+            if (code.FilePosition is not null)
             {
                 header.Flags |= CodeFlags.HasFilePosition;
             }
@@ -185,7 +185,7 @@ namespace DuetControlServer.SPI.Serialization
                     }
                     else if (parameter.Type == typeof(string))
                     {
-                        string value = parameter;
+                        string value = parameter!;
                         binaryParam.Type = parameter.IsExpression ? DataType.Expression : DataType.String;
                         binaryParam.IntValue = Encoding.UTF8.GetByteCount(value);
                         extraParameters.Add(value);
@@ -193,7 +193,7 @@ namespace DuetControlServer.SPI.Serialization
                     // Boolean values are not supported for codes. Use integers instead
                     else
                     {
-                        throw new ArgumentException("Unsupported type", parameter.Type.Name);
+                        throw new ArgumentException("Unsupported type", parameter.Type?.Name);
                     }
 
                     MemoryMarshal.Write(to[bytesWritten..], ref binaryParam);
@@ -423,7 +423,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <exception cref="ArgumentException">One of the supplied values is too big</exception>
         public static int WritePrintFileInfo(Span<byte> to, GCodeFileInfo info)
         {
-            Span<byte> unicodeFilename = Encoding.UTF8.GetBytes(info.FileName);
+            Span<byte> unicodeFilename = Encoding.UTF8.GetBytes(info.FileName ?? string.Empty);
             if (unicodeFilename.Length > 254)
             {
                 throw new ArgumentException("Filename is too long", nameof(info));
@@ -442,7 +442,7 @@ namespace DuetControlServer.SPI.Serialization
                 GeneratedByLength = (byte)unicodeGeneratedBy.Length,
                 NumFilaments = (ushort)info.Filament.Count,
                 FileSize = (uint)info.Size,
-                LastModifiedTime = (info.LastModified != null) ? (ulong)(info.LastModified.Value - new DateTime(1970, 1, 1)).TotalSeconds : 0,
+                LastModifiedTime = (info.LastModified is not null) ? (ulong)(info.LastModified.Value - new DateTime(1970, 1, 1)).TotalSeconds : 0,
                 NumLayers = (uint)info.NumLayers,
                 LayerHeight = info.LayerHeight,
                 ObjectHeight = info.Height,
@@ -562,14 +562,14 @@ namespace DuetControlServer.SPI.Serialization
             // Write header
             FileChunkHeader header = new()
             {
-                DataLength = (data != null) ? data.Length : -1,
+                DataLength = data.Length,
                 FileLength = (uint)fileLength
             };
             MemoryMarshal.Write(to, ref header);
             int bytesWritten = Marshal.SizeOf<FileChunkHeader>();
 
             // Write chunk
-            if (data != null)
+            if (data.Length > 0)
             {
                 data.CopyTo(to[bytesWritten..]);
                 bytesWritten += data.Length;

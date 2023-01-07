@@ -18,12 +18,12 @@
         /// <summary>
         /// Name of this sensor or null if not configured
         /// </summary>
-        public string Name
+        public string? Name
         {
             get => _name;
 			set => SetPropertyValue(ref _name, value);
         }
-        private string _name;
+        private string? _name;
 
         /// <summary>
         /// State of this sensor

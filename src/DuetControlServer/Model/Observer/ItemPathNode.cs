@@ -44,7 +44,7 @@ namespace DuetControlServer.Model
         /// </summary>
         /// <param name="obj">Other instance</param>
         /// <returns>If this instance equals obj</returns>
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             return obj is ItemPathNode other && other.Name == Name && other.Index == Index && other.List.Count == List.Count;
         }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -35,7 +36,7 @@ namespace DocGen
             {
                 if (xmlReader.NodeType == XmlNodeType.Element && xmlReader.Name == "member")
                 {
-                    string rawName = xmlReader["name"];
+                    string rawName = xmlReader["name"]!;
                     _loadedXmlDocumentation[rawName] = await xmlReader.ReadOuterXmlAsync();
                 }
             }
@@ -47,10 +48,10 @@ namespace DocGen
         /// <param name="typeFullNameString">Full type name</param>
         /// <param name="memberNameString">Name of the member</param>
         /// <returns>XML key</returns>
-        private static string XmlDocumentationKeyHelper(string typeFullNameString, string memberNameString)
+        private static string XmlDocumentationKeyHelper(string typeFullNameString, string? memberNameString)
         {
             string key = Regex.Replace(typeFullNameString, @"\[.*\]", string.Empty).Replace('+', '.');
-            if (memberNameString != null)
+            if (memberNameString is not null)
             {
                 key += "." + memberNameString;
             }
@@ -62,9 +63,10 @@ namespace DocGen
         /// </summary>
         /// <param name="text">Text to trim</param>
         /// <returns>Trimmed text</returns>
-        private static string TrimLines(this string text)
+        [return: NotNullIfNotNull(nameof(text))]
+        private static string? TrimLines(this string text)
         {
-            if (text == null)
+            if (text is null)
             {
                 return null;
             }
@@ -82,12 +84,12 @@ namespace DocGen
         /// </summary>
         /// <param name="xmlContent">XML node content</param>
         /// <returns>Content formatted in markup language</returns>
-        private static string GenerateDocFromXml(string xmlContent)
+        private static string? GenerateDocFromXml(string xmlContent)
         {
-            string summary = null, remarks = null;
+            string? summary = null, remarks = null;
             XmlDocument xmlDocument = new();
             xmlDocument.LoadXml(xmlContent);
-            foreach (XmlNode node in xmlDocument.FirstChild)
+            foreach (XmlNode node in xmlDocument.FirstChild!)
             {
                 if (node.NodeType == XmlNodeType.Element)
                 {
@@ -102,11 +104,11 @@ namespace DocGen
                 }
             }
 
-            if (summary == null)
+            if (summary is null)
             {
                 return null;
             }
-            if (remarks == null)
+            if (remarks is null)
             {
                 return summary;
             }
@@ -124,10 +126,10 @@ namespace DocGen
         /// </summary>
         /// <param name="type">Instance type</param>
         /// <returns>Documentation string</returns>
-        public static string GetDocumentation(this Type type)
+        public static string? GetDocumentation(this Type type)
         {
-            string key = "T:" + XmlDocumentationKeyHelper(type.FullName, null);
-            if (_loadedXmlDocumentation.TryGetValue(key, out string documentation))
+            string key = "T:" + XmlDocumentationKeyHelper(type.FullName!, null);
+            if (_loadedXmlDocumentation.TryGetValue(key, out string? documentation))
             {
                 return GenerateDocFromXml(documentation);
             }
@@ -139,20 +141,20 @@ namespace DocGen
         /// </summary>
         /// <param name="propertyInfo">Property info</param>
         /// <returns>XML documentation</returns>
-        public static string GetDocumentation(this PropertyInfo propertyInfo)
+        public static string? GetDocumentation(this PropertyInfo propertyInfo)
         {
-            string key = "P:" + XmlDocumentationKeyHelper(propertyInfo.DeclaringType.FullName, propertyInfo.Name);
-            if (_loadedXmlDocumentation.TryGetValue(key, out string documentation))
+            string key = "P:" + XmlDocumentationKeyHelper(propertyInfo.DeclaringType!.FullName!, propertyInfo.Name);
+            if (_loadedXmlDocumentation.TryGetValue(key, out string? documentation))
             {
                 return GenerateDocFromXml(documentation);
             }
             return null;
         }
 
-        public static string GetEnumDocumentation(Type enumType, object value)
+        public static string? GetEnumDocumentation(Type enumType, object value)
         {
-            string key = "F:" + XmlDocumentationKeyHelper(enumType.FullName, Enum.GetName(enumType, value));
-            if (_loadedXmlDocumentation.TryGetValue(key, out string documentation))
+            string key = "F:" + XmlDocumentationKeyHelper(enumType.FullName!, Enum.GetName(enumType, value));
+            if (_loadedXmlDocumentation.TryGetValue(key, out string? documentation))
             {
                 return GenerateDocFromXml(documentation);
             }

@@ -18,11 +18,11 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Namespace of the endpoint
         /// </summary>
-        public string Namespace { get; set; }
+        public string Namespace { get; set; } = string.Empty;
 
         /// <summary>
         /// Endpoint path to unregister
         /// </summary>
-        public string Path { get; set; }
+        public string Path { get; set; } = string.Empty;
     }
 }

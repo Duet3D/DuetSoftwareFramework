@@ -19,7 +19,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Code to parse and execute
         /// </summary>
-        public string Code { get; set; }
+        public string Code { get; set; } = string.Empty;
 
         /// <summary>
         /// Destination channel

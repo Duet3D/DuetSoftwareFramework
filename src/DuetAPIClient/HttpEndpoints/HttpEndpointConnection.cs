@@ -93,7 +93,7 @@ namespace DuetAPIClient
         {
             try
             {
-                SendHttpResponse httpResponse = new SendHttpResponse()
+                SendHttpResponse httpResponse = new()
                 {
                     StatusCode = statusCode,
                     Response = response,
@@ -122,7 +122,7 @@ namespace DuetAPIClient
         private async Task<T> Receive<T>(CancellationToken cancellationToken)
         {
             await using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_socket, cancellationToken);
-            return await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions, cancellationToken);
+            return (await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions, cancellationToken))!;
         }
 
         /// <summary>

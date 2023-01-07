@@ -43,15 +43,15 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="type">Filament monitor type</param>
         /// <returns>Required type</returns>
-        private static Type GetFilamentMonitorType(FilamentMonitorType type)
+        private static Type GetFilamentMonitorType(FilamentMonitorType? type)
         {
-            switch (type)
+            return type switch
             {
-                case FilamentMonitorType.Laser: return typeof(LaserFilamentMonitor);
-                case FilamentMonitorType.Pulsed: return typeof(PulsedFilamentMonitor);
-                case FilamentMonitorType.RotatingMagnet: return typeof(RotatingMagnetFilamentMonitor);
-                default: return typeof(FilamentMonitor);
-            }
+                FilamentMonitorType.Laser => typeof(LaserFilamentMonitor),
+                FilamentMonitorType.Pulsed => typeof(PulsedFilamentMonitor),
+                FilamentMonitorType.RotatingMagnet => typeof(RotatingMagnetFilamentMonitor),
+                _ => typeof(FilamentMonitor),
+            };
         }
 
         /// <summary>
@@ -61,7 +61,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
-        public override IModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public override IModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {
@@ -70,11 +70,11 @@ namespace DuetAPI.ObjectModel
 
             if (jsonElement.TryGetProperty("type", out JsonElement nameProperty))
             {
-                FilamentMonitorType filamentMonitorType = (FilamentMonitorType)JsonSerializer.Deserialize(nameProperty.GetRawText(), typeof(FilamentMonitorType));
+                FilamentMonitorType? filamentMonitorType = (FilamentMonitorType?)JsonSerializer.Deserialize(nameProperty.GetRawText()!, typeof(FilamentMonitorType));
                 Type requiredType = GetFilamentMonitorType(filamentMonitorType);
                 if (GetType() != requiredType)
                 {
-                    FilamentMonitor newInstance = (FilamentMonitor)Activator.CreateInstance(requiredType);
+                    FilamentMonitor newInstance = (FilamentMonitor)Activator.CreateInstance(requiredType)!;
                     return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
                 }
             }

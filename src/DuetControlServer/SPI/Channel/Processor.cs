@@ -84,13 +84,13 @@ namespace DuetControlServer.SPI.Channel
         /// </summary>
         /// <param name="macro">Optional macro</param>
         /// <returns>New state</returns>
-        public State Push(Macro macro = null)
+        public State Push(Macro? macro = null)
         {
             State state = new(Codes.Processor.Push(Channel, macro));
 
             // Dequeue already suspended codes first so the correct order is maintained
             Queue<Code> alreadySuspendedCodes = new(CurrentState.SuspendedCodes.Count);
-            while (CurrentState.SuspendedCodes.TryDequeue(out Code suspendedCode))
+            while (CurrentState.SuspendedCodes.TryDequeue(out Code? suspendedCode))
             {
                 alreadySuspendedCodes.Enqueue(suspendedCode);
             }
@@ -105,7 +105,7 @@ namespace DuetControlServer.SPI.Channel
             BufferedCodes.Clear();
 
             // Add back any codes that were previously suspended
-            while (alreadySuspendedCodes.TryDequeue(out Code suspendedCode))
+            while (alreadySuspendedCodes.TryDequeue(out Code? suspendedCode))
             {
                 CurrentState.SuspendedCodes.Enqueue(suspendedCode);
             }
@@ -135,18 +135,18 @@ namespace DuetControlServer.SPI.Channel
             _isWaitingForAcknowledgment = CurrentState.WaitingForAcknowledgement;
 
             // Invalidate obsolete lock requests and supended codes
-            while (oldState.LockRequests.TryDequeue(out LockRequest lockRequest))
+            while (oldState.LockRequests.TryDequeue(out LockRequest? lockRequest))
             {
                 lockRequest.Resolve(false);
             }
 
-            while (oldState.SuspendedCodes.TryDequeue(out Code suspendedCode))
+            while (oldState.SuspendedCodes.TryDequeue(out Code? suspendedCode))
             {
                 Codes.Processor.CancelCode(suspendedCode);
             }
 
             // Deal with macro files
-            if (oldState.Macro != null)
+            if (oldState.Macro is not null)
             {
                 using (oldState.Macro.Lock())
                 {
@@ -174,19 +174,19 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // Invalidate macro start codes, pending codes, and flush requests
-            if (oldState.StartCode != null)
+            if (oldState.StartCode is not null)
             {
                 _logger.Warn("==> Cancelling unfinished starting code: {0}", oldState.StartCode);
                 Codes.Processor.CancelCode(oldState.StartCode);
             }
 
-            while (oldState.PendingCodes.Reader.TryRead(out Code pendingCode))
+            while (oldState.PendingCodes.Reader.TryRead(out Code? pendingCode))
             {
                 pendingCode.Stage = Codes.PipelineStage.Firmware;
                 Codes.Processor.CancelCode(pendingCode);
             }
 
-            while (oldState.FlushRequests.TryDequeue(out TaskCompletionSource<bool> source))
+            while (oldState.FlushRequests.TryDequeue(out TaskCompletionSource<bool>? source))
             {
                 source.SetResult(false);
             }
@@ -212,18 +212,18 @@ namespace DuetControlServer.SPI.Channel
             _isWaitingForAcknowledgment = CurrentState.WaitingForAcknowledgement;
 
             // Invalidate obsolete lock requests and supended codes
-            while (oldState.LockRequests.TryDequeue(out LockRequest lockRequest))
+            while (oldState.LockRequests.TryDequeue(out LockRequest? lockRequest))
             {
                 lockRequest.Resolve(false);
             }
 
-            while (oldState.SuspendedCodes.TryDequeue(out Code suspendedCode))
+            while (oldState.SuspendedCodes.TryDequeue(out Code? suspendedCode))
             {
                 Codes.Processor.CancelCode(suspendedCode);
             }
 
             // Deal with macro files
-            if (oldState.Macro != null)
+            if (oldState.Macro is not null)
             {
                 using (await oldState.Macro.LockAsync())
                 {
@@ -251,19 +251,19 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // Invalidate macro start codes, pending codes, and flush requests
-            if (oldState.StartCode != null)
+            if (oldState.StartCode is not null)
             {
                 _logger.Warn("==> Cancelling unfinished starting code: {0}", oldState.StartCode);
                 Codes.Processor.CancelCode(oldState.StartCode);
             }
 
-            while (oldState.PendingCodes.Reader.TryRead(out Code pendingCode))
+            while (oldState.PendingCodes.Reader.TryRead(out Code? pendingCode))
             {
                 pendingCode.Stage = Codes.PipelineStage.Firmware;
                 Codes.Processor.CancelCode(pendingCode);
             }
 
-            while (oldState.FlushRequests.TryDequeue(out TaskCompletionSource<bool> source))
+            while (oldState.FlushRequests.TryDequeue(out TaskCompletionSource<bool>? source))
             {
                 source.SetResult(false);
             }
@@ -295,7 +295,7 @@ namespace DuetControlServer.SPI.Channel
             StringBuilder channelDiagostics = new();
 
             using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-            IDisposable lockObject = null;
+            IDisposable? lockObject = null;
             try
             {
                 cts.CancelAfter(2000);
@@ -329,15 +329,15 @@ namespace DuetControlServer.SPI.Channel
 
                 if (state.WaitingForAcknowledgement)
                 {
-                    channelDiagostics.AppendLine($"Waiting for acknowledgement, requested by {((state.StartCode == null) ? "system" : state.StartCode.ToString())}");
+                    channelDiagostics.AppendLine($"Waiting for acknowledgement, requested by {((state.StartCode is null) ? "system" : state.StartCode.ToString())}");
                 }
                 if (state.LockRequests.Count > 0)
                 {
                     channelDiagostics.AppendLine($"Number of lock/unlock requests: {state.LockRequests.Count(item => item.IsLockRequest)}/{state.LockRequests.Count(item => !item.IsLockRequest)}");
                 }
-                if (state.Macro != null)
+                if (state.Macro is not null)
                 {
-                    channelDiagostics.AppendLine($"{(state.Macro.IsExecuting ? "Executing" : "Finishing")} macro {state.Macro.FileName}, started by {((state.StartCode == null) ? "system" : state.StartCode.ToString())}");
+                    channelDiagostics.AppendLine($"{(state.Macro.IsExecuting ? "Executing" : "Finishing")} macro {state.Macro.FileName}, started by {((state.StartCode is null) ? "system" : state.StartCode.ToString())}");
                 }
                 foreach (Code suspendedCode in state.SuspendedCodes)
                 {
@@ -372,14 +372,14 @@ namespace DuetControlServer.SPI.Channel
         /// </summary>
         /// <param name="code">Optional code for the flush target</param>
         /// <returns>Whether the codes could be flushed</returns>
-        public Task<bool> FlushAsync(Code code = null)
+        public Task<bool> FlushAsync(Code? code = null)
         {
             Task<bool> GetFlushTask(State state)
             {
                 // Check if we can resolve the flush request immediately if nothing is being done
                 if (state == CurrentState &&
                     BufferedCodes.Count == 0 && state.LockRequests.Count == 0 && !_allFilesAborted && 
-                    (state.Macro == null || (!state.Macro.JustStarted && state.Macro.IsExecuting)) && !state.MacroCompleted &&
+                    (state.Macro is null || (!state.Macro.JustStarted && state.Macro.IsExecuting)) && !state.MacroCompleted &&
                     state.SuspendedCodes.Count == 0 && !state.PendingCodes.Reader.TryPeek(out _))
                 {
                     return Task.FromResult(true);
@@ -392,19 +392,19 @@ namespace DuetControlServer.SPI.Channel
                 return tcs.Task;
             }
 
-            if (code != null)
+            if (code is not null)
             {
                 // Need to find the correct state for a flush request first
                 foreach (State state in Stack)
                 {
-                    if (code.Macro != null)
+                    if (code.Macro is not null)
                     {
                         if (code.Macro == state.Macro)
                         {
                             return GetFlushTask(state);
                         }
                     }
-                    else if (state.Macro == null)
+                    else if (state.Macro is null)
                     {
                         return GetFlushTask(state);
                     }
@@ -415,7 +415,7 @@ namespace DuetControlServer.SPI.Channel
                 // Flush requests are not meant for temporary macro states
                 foreach (State state in Stack)
                 {
-                    if ((state.Macro == null || state.Macro.IsExecuting) && !state.MacroCompleted)
+                    if ((state.Macro is null || state.Macro.IsExecuting) && !state.MacroCompleted)
                     {
                         return GetFlushTask(state);
                     }
@@ -456,7 +456,7 @@ namespace DuetControlServer.SPI.Channel
         /// <returns>Asynchronous task</returns>
         public async Task SetMacroPausable(bool isPausable)
         {
-            if (CurrentState.Macro != null)
+            if (CurrentState.Macro is not null)
             {
                 using (await CurrentState.Macro.LockAsync())
                 {
@@ -475,21 +475,21 @@ namespace DuetControlServer.SPI.Channel
             bool macroAborted = false;
 
             // Clean up the stack
-            Code startCode = null;
-            while (CurrentState.WaitingForAcknowledgement || CurrentState.Macro != null)
+            Code? startCode = null;
+            while (CurrentState.WaitingForAcknowledgement || CurrentState.Macro is not null)
             {
-                if (CurrentState.StartCode != null)
+                if (CurrentState.StartCode is not null)
                 {
                     startCode = CurrentState.StartCode;
                     CurrentState.StartCode = null;
                 }
 
-                if (CurrentState.Macro != null)
+                if (CurrentState.Macro is not null)
                 {
                     using (CurrentState.Macro.Lock())
                     {
                         // Resolve potential start codes when the macro file finishes
-                        if (startCode != null)
+                        if (startCode is not null)
                         {
                             _ = CurrentState.Macro.WaitForFinishAsync().ContinueWith(async task =>
                             {
@@ -509,7 +509,7 @@ namespace DuetControlServer.SPI.Channel
                     }
                     macroAborted = true;
                 }
-                else if (startCode != null)
+                else if (startCode is not null)
                 {
                     // Cancel the code that started the blocking message prompt
                     Codes.Processor.CancelCode(startCode);
@@ -518,7 +518,7 @@ namespace DuetControlServer.SPI.Channel
 
                 // Pop the stack
                 Pop();
-                if (startCode != null)
+                if (startCode is not null)
                 {
                     _logger.Debug("==> Unfinished starting code: {0}", startCode);
                 }
@@ -568,21 +568,21 @@ namespace DuetControlServer.SPI.Channel
             bool macroAborted = false;
 
             // Clean up the stack
-            Code startCode = null;
-            while (CurrentState.WaitingForAcknowledgement || CurrentState.Macro != null)
+            Code? startCode = null;
+            while (CurrentState.WaitingForAcknowledgement || CurrentState.Macro is not null)
             {
-                if (CurrentState.StartCode != null)
+                if (CurrentState.StartCode is not null)
                 {
                     startCode = CurrentState.StartCode;
                     CurrentState.StartCode = null;
                 }
 
-                if (CurrentState.Macro != null)
+                if (CurrentState.Macro is not null)
                 {
                     using (await CurrentState.Macro.LockAsync())
                     {
                         // Resolve potential start codes when the macro file finishes
-                        if (startCode != null)
+                        if (startCode is not null)
                         {
                             _ = CurrentState.Macro.WaitForFinishAsync().ContinueWith(async task =>
                             {
@@ -602,7 +602,7 @@ namespace DuetControlServer.SPI.Channel
                     }
                     macroAborted = true;
                 }
-                else if (startCode != null)
+                else if (startCode is not null)
                 {
                     // Cancel the code that started the blocking message prompt
                     Codes.Processor.CancelCode(startCode);
@@ -611,7 +611,7 @@ namespace DuetControlServer.SPI.Channel
 
                 // Pop the stack
                 await PopAsync();
-                if (startCode != null)
+                if (startCode is not null)
                 {
                     _logger.Debug("==> Unfinished starting code: {0}", startCode);
                 }
@@ -657,7 +657,7 @@ namespace DuetControlServer.SPI.Channel
         {
             foreach (State state in Stack)
             {
-                if (state.LockRequests.TryDequeue(out LockRequest item))
+                if (state.LockRequests.TryDequeue(out LockRequest? item))
                 {
                     item.Resolve(true);
                     return;
@@ -687,7 +687,7 @@ namespace DuetControlServer.SPI.Channel
         /// </summary>
         private void ResolvePendingReplies()
         {
-            while (BufferedCodes.Count > 0 && PendingReplies.TryPop(out Tuple<MessageTypeFlags, string> reply))
+            while (BufferedCodes.Count > 0 && PendingReplies.TryPop(out Tuple<MessageTypeFlags, string>? reply))
             {
                 HandleReply(reply.Item1, reply.Item2);
             }
@@ -703,7 +703,7 @@ namespace DuetControlServer.SPI.Channel
             ResolvePendingReplies();
 
             // 2. Lock/Unlock requests
-            if (CurrentState.LockRequests.TryPeek(out LockRequest lockRequest))
+            if (CurrentState.LockRequests.TryPeek(out LockRequest? lockRequest))
             {
                 if (lockRequest.IsLockRequest)
                 {
@@ -734,7 +734,7 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // 4. Macro files (must come before any other code)
-            if (CurrentState.Macro != null)
+            if (CurrentState.Macro is not null)
             {
                 // Tell RRF as quickly as possible about the new macro being started
                 if (CurrentState.Macro.JustStarted)
@@ -754,8 +754,8 @@ namespace DuetControlServer.SPI.Channel
                             if (!CurrentState.Macro.FileOpened)
                             {
                                 // In newer protocol versions we don't expect a response because RRF will be waiting in a semaphore
-                                Code startCode = CurrentState.StartCode;
-                                if (startCode != null)
+                                Code? startCode = CurrentState.StartCode;
+                                if (startCode is not null)
                                 {
                                     BytesBuffered += startCode.BinarySize;
                                     BufferedCodes.Insert(0, startCode);
@@ -765,7 +765,7 @@ namespace DuetControlServer.SPI.Channel
 
                                 // Macro has finished, pop the stack
                                 Pop();
-                                if (startCode != null)
+                                if (startCode is not null)
                                 {
                                     _logger.Debug("==> Unfinished starting code: {0}", startCode);
                                 }
@@ -786,7 +786,7 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // 5. Suspended codes being resumed (may include priority and macro codes)
-            while (CurrentState.SuspendedCodes.TryPeek(out Code suspendedCode))
+            while (CurrentState.SuspendedCodes.TryPeek(out Code? suspendedCode))
             {
                 if (BufferCode(suspendedCode))
                 {
@@ -801,7 +801,7 @@ namespace DuetControlServer.SPI.Channel
 
             // 6. Pending codes
             bool busyStateUpdated = false;
-            while (CurrentState.PendingCodes.Reader.TryPeek(out Code pendingCode))
+            while (CurrentState.PendingCodes.Reader.TryPeek(out Code? pendingCode))
             {
                 if (!busyStateUpdated)
                 {
@@ -822,7 +822,7 @@ namespace DuetControlServer.SPI.Channel
             // 7. Flush requests
             if (BufferedCodes.Count == 0)
             {
-                if (CurrentState.FlushRequests.TryDequeue(out TaskCompletionSource<bool> flushRequest))
+                if (CurrentState.FlushRequests.TryDequeue(out TaskCompletionSource<bool>? flushRequest))
                 {
                     flushRequest.SetResult(true);
                     return;
@@ -831,7 +831,7 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // Log untracked code replies
-            while (PendingReplies.TryPop(out Tuple<MessageTypeFlags, string> reply))
+            while (PendingReplies.TryPop(out Tuple<MessageTypeFlags, string>? reply))
             {
                 _logger.Warn("Pending out-of-order reply: '{0}'", reply.Item2);
             }
@@ -851,7 +851,11 @@ namespace DuetControlServer.SPI.Channel
                 {
                     try
                     {
-                        Message result = await task;
+                        Message? result = await task;
+                        if (result is null)
+                        {
+                            return;
+                        }
 
                         // Check what kind of message this is
                         MessageTypeFlags flags = (MessageTypeFlags)(1 << (int)Channel);
@@ -882,7 +886,7 @@ namespace DuetControlServer.SPI.Channel
                     }
                     catch (AggregateException ae)
                     {
-                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to execute {code} from firmware: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to execute {code} from firmware: [{ae.InnerException!.GetType().Name}] {ae.InnerException.Message}");
                         _logger.Warn(ae);
                     }
                     catch (Exception e)
@@ -1022,7 +1026,7 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Holds the last incomplete code reply
         /// </summary>
-        private string _lastPartialMessage;
+        private string? _lastPartialMessage;
 
         /// <summary>
         /// Process a firmware code reply
@@ -1050,13 +1054,13 @@ namespace DuetControlServer.SPI.Channel
                 return false;
             }
 
-            if (code != null)
+            if (code is not null)
             {
                 // Code reply is complete, resolve the code
                 MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
                             : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                             : MessageType.Success;
-                if (code.Result == null)
+                if (code.Result is null)
                 {
                     code.Result = new Message(type, reply);
                 }
@@ -1090,7 +1094,7 @@ namespace DuetControlServer.SPI.Channel
             {
                 _logger.Debug("Waiting for acknowledgement");
 
-                Code startCode = null;
+                Code? startCode = null;
                 if (BufferedCodes.Count > 0)
                 {
                     startCode = BufferedCodes[0];
@@ -1110,8 +1114,8 @@ namespace DuetControlServer.SPI.Channel
         /// </summary>
         public void MacroFileClosed()
         {
-            Code startCode = CurrentState.StartCode;
-            if (startCode != null)
+            Code? startCode = CurrentState.StartCode;
+            if (startCode is not null)
             {
                 _logger.Debug("==> Unfinished starting code: {0}", startCode);
 
@@ -1134,17 +1138,17 @@ namespace DuetControlServer.SPI.Channel
             {
                 _logger.Debug("Message acknowledged");
 
-                Code startCode = CurrentState.StartCode;
-                if (startCode != null)
+                Code? startCode = CurrentState.StartCode;
+                if (startCode is not null)
                 {
-                    BytesBuffered += CurrentState.StartCode.BinarySize;
+                    BytesBuffered += CurrentState.StartCode!.BinarySize;
                     BufferedCodes.Insert(0, CurrentState.StartCode);
                     CurrentState.StartCode = null;
                     ResolvePendingReplies();
                 }
 
                 Pop();
-                if (startCode != null)
+                if (startCode is not null)
                 {
                     _logger.Debug("==> Unfinished starting code: {0}", startCode);
                 }
@@ -1166,12 +1170,12 @@ namespace DuetControlServer.SPI.Channel
             ResolveCommentCodes();
 
             // Figure out which code started the macro file
-            Code startCode = null;
+            Code? startCode = null;
             if (fromCode)
             {
                 if (CurrentState.MacroCompleted)
                 {
-                    _logger.Info("Finished intermediate macro file {0}", CurrentState.Macro.FileName);
+                    _logger.Info("Finished intermediate macro file {0}", CurrentState.Macro!.FileName);
                     startCode = CurrentState.StartCode;
                     CurrentState.StartCode = null;     // don't add it back to the buffered codes because it's about to be pushed on the stack again
                     Pop();
@@ -1192,10 +1196,10 @@ namespace DuetControlServer.SPI.Channel
 
             // Try to locate the macro file and start it
             string physicalFile = FilePath.ToPhysical(fileName, FileDirectory.System);
-            Macro macro = new(fileName, physicalFile, Channel, startCode != null, startCode?.SourceConnection ?? 0);
+            Macro macro = new(fileName, physicalFile, Channel, startCode is not null, startCode?.SourceConnection ?? 0);
             State newState = Push(macro);
             newState.StartCode = startCode;
-            if (startCode != null)
+            if (startCode is not null)
             {
                 _logger.Debug("==> Starting code {0}", startCode);
             }
@@ -1234,25 +1238,25 @@ namespace DuetControlServer.SPI.Channel
 
             foreach (State state in Stack)
             {
-                if (!state.WaitingForAcknowledgement && (state.Macro == null || state.Macro.IsPausable))
+                if (!state.WaitingForAcknowledgement && (state.Macro is null || state.Macro.IsPausable))
                 {
-                    while (state.LockRequests.TryDequeue(out LockRequest lockRequest))
+                    while (state.LockRequests.TryDequeue(out LockRequest? lockRequest))
                     {
                         lockRequest.Resolve(false);
                     }
 
-                    while (state.SuspendedCodes.TryDequeue(out Code suspendedCode))
+                    while (state.SuspendedCodes.TryDequeue(out Code? suspendedCode))
                     {
                         Codes.Processor.CancelCode(suspendedCode);
                     }
 
-                    while (state.PendingCodes.Reader.TryRead(out Code pendingCode))
+                    while (state.PendingCodes.Reader.TryRead(out Code? pendingCode))
                     {
                         pendingCode.Stage = Codes.PipelineStage.Firmware;
                         Codes.Processor.CancelCode(pendingCode);
                     }
 
-                    while (state.FlushRequests.TryDequeue(out TaskCompletionSource<bool> source))
+                    while (state.FlushRequests.TryDequeue(out TaskCompletionSource<bool>? source))
                     {
                         source.SetResult(false);
                     }
@@ -1272,23 +1276,23 @@ namespace DuetControlServer.SPI.Channel
             // Invalidate the stack
             do
             {
-                while (CurrentState.LockRequests.TryDequeue(out LockRequest lockRequest))
+                while (CurrentState.LockRequests.TryDequeue(out LockRequest? lockRequest))
                 {
                     lockRequest.Resolve(false);
                 }
 
-                while (CurrentState.SuspendedCodes.TryDequeue(out Code suspendedCode))
+                while (CurrentState.SuspendedCodes.TryDequeue(out Code? suspendedCode))
                 {
                     Codes.Processor.CancelCode(suspendedCode);
                 }
 
-                while (CurrentState.PendingCodes.Reader.TryRead(out Code pendingCode))
+                while (CurrentState.PendingCodes.Reader.TryRead(out Code? pendingCode))
                 {
                     pendingCode.Stage = Codes.PipelineStage.Firmware;
                     Codes.Processor.CancelCode(pendingCode);
                 }
 
-                while (CurrentState.FlushRequests.TryDequeue(out TaskCompletionSource<bool> source))
+                while (CurrentState.FlushRequests.TryDequeue(out TaskCompletionSource<bool>? source))
                 {
                     source.SetResult(false);
                 }

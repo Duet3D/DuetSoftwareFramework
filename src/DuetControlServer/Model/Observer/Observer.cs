@@ -13,12 +13,12 @@ namespace DuetControlServer.Model
         /// <param name="path">Path to the value that changed</param>
         /// <param name="changeType">Type of the modification</param>
         /// <param name="value">New value</param>
-        public delegate void PropertyPathChanged(object[] path, PropertyChangeType changeType, object value);
+        public delegate void PropertyPathChanged(object[] path, PropertyChangeType changeType, object? value);
 
         /// <summary>
         /// Event to call when an object model value has been changed
         /// </summary>
-        public static event PropertyPathChanged OnPropertyPathChanged;
+        public static event PropertyPathChanged? OnPropertyPathChanged;
 
         /// <summary>
         /// Initializes the observer to keep track of deep changes in the object model

@@ -16,7 +16,7 @@ namespace DuetControlServer.SPI
         /// <param name="createVariable">Whether the variable is supposed to be created</param>
         /// <param name="varName">Name of the variable</param>
         /// <param name="expression">Expression to evaluate</param>
-        public VariableRequest(CodeChannel channel, bool createVariable, string varName, string expression)
+        public VariableRequest(CodeChannel channel, bool createVariable, string varName, string? expression)
         {
             Channel = channel;
             CreateVariable = createVariable;
@@ -42,7 +42,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Expression to set or null if the variable is supposed to be deleted
         /// </summary>
-        public string Expression { get; }
+        public string? Expression { get; }
 
         /// <summary>
         /// Whether the request has been sent to the firmware
@@ -52,18 +52,18 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Internal TCS for the task
         /// </summary>
-        private readonly TaskCompletionSource<object> _tcs = new();
+        private readonly TaskCompletionSource<object?> _tcs = new();
 
         /// <summary>
         /// Task that completes when the request has been fulfilled
         /// </summary>
-        public Task<object> Task => _tcs.Task;
+        public Task<object?> Task => _tcs.Task;
 
         /// <summary>
         /// Set the result of the evaluated expression
         /// </summary>
         /// <param name="result">Result to set</param>
-        public void SetResult(object result) => _tcs.SetResult(result);
+        public void SetResult(object? result) => _tcs.SetResult(result);
 
         /// <summary>
         /// Set the task to canceled

@@ -34,7 +34,7 @@ namespace DuetControlServer.Codes.Pipelines
         /// <returns>Asynchronous task</returns>
         public override async Task ProcessCodeAsync(Commands.Code code)
         {
-            if (code.Result != null)
+            if (code.Result is not null)
             {
                 // Process the code result
                 switch (code.Type)
@@ -62,7 +62,7 @@ namespace DuetControlServer.Codes.Pipelines
 
                     // Messages from RRF and replies to file print codes are logged somewhere else,
                     // so we only need to log internal code replies that are not part of file prints
-                    if (code.File == null || !code.IsFromFileChannel)
+                    if (code.File is null || !code.IsFromFileChannel)
                     {
                         await Utility.Logger.LogAsync(code.Result);
                     }
@@ -75,7 +75,7 @@ namespace DuetControlServer.Codes.Pipelines
                     {
                         if (code.Flags.HasFlag(CodeFlags.IsLastCode))
                         {
-                            if (code.Result == null || string.IsNullOrEmpty(code.Result.Content))
+                            if (code.Result is null || string.IsNullOrEmpty(code.Result.Content))
                             {
                                 code.Result = new Message(MessageType.Success, "ok\n");
                             }
@@ -89,7 +89,7 @@ namespace DuetControlServer.Codes.Pipelines
                             }
                         }
                     }
-                    else if (code.Result == null || string.IsNullOrEmpty(code.Result.Content))
+                    else if (code.Result is null || string.IsNullOrEmpty(code.Result.Content))
                     {
                         code.Result = new Message(MessageType.Success, "\n");
                     }
@@ -100,7 +100,7 @@ namespace DuetControlServer.Codes.Pipelines
                 }
 
                 // Update the last code result
-                if (code.File != null)
+                if (code.File is not null)
                 {
                     code.File.LastResult = (int)code.Result.Type;
                 }
@@ -118,7 +118,7 @@ namespace DuetControlServer.Codes.Pipelines
             }
             finally
             {
-                if (code.Result != null)
+                if (code.Result is not null)
                 {
                     Processor.Logger.Debug("Finished code {0}", code);
                     if (code.Flags.HasFlag(CodeFlags.Asynchronous))

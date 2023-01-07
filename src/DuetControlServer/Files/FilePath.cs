@@ -176,7 +176,7 @@ namespace DuetControlServer.Files
         /// <param name="filePath">File path to resolve</param>
         /// <param name="directory">Directory containing filePath if it is not absolute is specified</param>
         /// <returns>Resolved file path</returns>
-        public static string ToPhysical(string filePath, string directory = null)
+        public static string ToPhysical(string filePath, string? directory = null)
         {
             filePath = filePath.Replace('\\', '/');
 
@@ -199,7 +199,7 @@ namespace DuetControlServer.Files
                 throw new ArgumentException("Invalid drive index");
             }
 
-            if (directory != null && !filePath.StartsWith('/'))
+            if (directory is not null && !filePath.StartsWith('/'))
             {
                 match = Regex.Match(directory, @"^(\d+):/*(.*)");
                 if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
@@ -230,7 +230,7 @@ namespace DuetControlServer.Files
         /// <param name="filePath">File path to resolve</param>
         /// <param name="directory">Directory containing filePath if it is not absolute is specified</param>
         /// <returns>Resolved file path</returns>
-        public static async Task<string> ToPhysicalAsync(string filePath, string directory = null)
+        public static async Task<string> ToPhysicalAsync(string filePath, string? directory = null)
         {
             filePath = filePath.Replace('\\', '/');
 
@@ -253,7 +253,7 @@ namespace DuetControlServer.Files
                 throw new ArgumentException("Invalid drive index");
             }
 
-            if (directory != null && !filePath.StartsWith('/'))
+            if (directory is not null && !filePath.StartsWith('/'))
             {
                 match = Regex.Match(directory, @"^(\d+):/*(.*)");
                 if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))

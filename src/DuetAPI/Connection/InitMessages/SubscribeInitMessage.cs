@@ -31,7 +31,7 @@ namespace DuetAPI.Connection.InitMessages
         /// </remarks>
         /// <seealso cref="Filters"/>
         [Obsolete("Use Filters instead")]
-        public string Filter { get; set; }
+        public string? Filter { get; set; }
 
         /// <summary>
         /// Optional list of filter paths for <see cref="SubscriptionMode.Patch"/> mode
@@ -42,6 +42,6 @@ namespace DuetAPI.Connection.InitMessages
         /// To get updates for an entire namespace, the ** wildcard can be used (for example heat/** for everything heat-related),
         /// however it can be only used at the end of a filter expression
         /// </remarks>
-        public List<string> Filters { get; set; }
+        public List<string> Filters { get; set; } = new List<string>();
     }
 }

@@ -16,9 +16,9 @@ namespace DuetControlServer.Model
         /// </summary>
         /// <param name="sender">Parent object</param>
         /// <param name="e">Event arguments</param>
-        private static void ModelDictionaryChanging(object sender, PropertyChangingEventArgs e)
+        private static void ModelDictionaryChanging(object? sender, PropertyChangingEventArgs e)
         {
-            if (sender is IDictionary dictionary && dictionary.Contains(e.PropertyName) && dictionary[e.PropertyName] is ModelObject modelItem)
+            if (sender is IDictionary dictionary && dictionary.Contains(e.PropertyName!) && dictionary[e.PropertyName!] is ModelObject modelItem)
             {
                 // Prevent memory leaks in case variable model objects are replaced
                 UnsubscribeFromModelObject(modelItem);
@@ -41,12 +41,12 @@ namespace DuetControlServer.Model
             {
                 if (sender is IDictionary dictionary)
                 {
-                    object value = dictionary[e.PropertyName];
-                    OnPropertyPathChanged?.Invoke(AddToPath(path, e.PropertyName), PropertyChangeType.Property, value);
+                    object? value = dictionary[e.PropertyName!];
+                    OnPropertyPathChanged?.Invoke(AddToPath(path, e.PropertyName!), PropertyChangeType.Property, value);
 
                     if (value is ModelObject modelValue)
                     {
-                        SubscribeToModelObject(modelValue, AddToPath(path, e.PropertyName));
+                        SubscribeToModelObject(modelValue, AddToPath(path, e.PropertyName!));
                     }
                 }
             };
@@ -85,7 +85,7 @@ namespace DuetControlServer.Model
             modelDictionary.DictionaryCleared += clearedHandler;
             _dictionaryClearedHandlers[modelDictionary] = clearedHandler;
 
-            if (GetItemType(modelDictionary.GetType()).IsSubclassOf(typeof(ModelObject)))
+            if (GetItemType(modelDictionary.GetType())!.IsSubclassOf(typeof(ModelObject)))
             {
                 foreach (object key in modelDictionary)
                 {
@@ -104,19 +104,19 @@ namespace DuetControlServer.Model
         /// <param name="modelDictionary">Model dictionary to unsubscribe from</param>
         private static void UnsubscribeFromModelDictionary(IModelDictionary modelDictionary)
         {
-            if (_dictionaryChangedHandlers.TryGetValue(modelDictionary, out PropertyChangedEventHandler changeHandler))
+            if (_dictionaryChangedHandlers.TryGetValue(modelDictionary, out PropertyChangedEventHandler? changeHandler))
             {
                 modelDictionary.PropertyChanged -= changeHandler;
                 _dictionaryChangedHandlers.Remove(modelDictionary);
             }
 
-            if (_dictionaryClearedHandlers.TryGetValue(modelDictionary, out EventHandler clearedHandler))
+            if (_dictionaryClearedHandlers.TryGetValue(modelDictionary, out EventHandler? clearedHandler))
             {
                 modelDictionary.DictionaryCleared -= clearedHandler;
                 _dictionaryClearedHandlers.Remove(modelDictionary);
             }
 
-            if (GetItemType(modelDictionary.GetType()).IsSubclassOf(typeof(ModelObject)))
+            if (GetItemType(modelDictionary.GetType())!.IsSubclassOf(typeof(ModelObject)))
             {
                 foreach (object key in modelDictionary)
                 {

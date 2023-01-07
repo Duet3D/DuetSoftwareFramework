@@ -26,13 +26,10 @@ namespace DuetHttpClient
         /// <exception cref="InvalidPasswordException">Invalid password specified</exception>
         /// <exception cref="NoFreeSessionException">No free session available</exception>
         /// <exception cref="InvalidVersionException">Unsupported DSF version</exception>
-        public static async Task<DuetHttpSession> ConnectAsync(Uri baseUri, DuetHttpOptions options = null, CancellationToken cancellationToken = default)
+        public static async Task<DuetHttpSession> ConnectAsync(Uri baseUri, DuetHttpOptions? options = null, CancellationToken cancellationToken = default)
         {
-            if (options == null)
-            {
-                // Use default settings if none are passed
-                options = new DuetHttpOptions();
-            }
+            // Use default settings if none are passed
+            options ??= new DuetHttpOptions();
 
             try
             {

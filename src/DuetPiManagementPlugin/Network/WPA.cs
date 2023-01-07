@@ -1,4 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
+using DuetPiManagementPlugin.Network.Protocols;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -60,23 +61,29 @@ namespace DuetPiManagementPlugin.Network
                 using StreamReader reader = new(configStream);
 
                 bool inNetworkSection = false;
-                string ssid = null;
+                string? ssid = null;
                 while (!reader.EndOfStream)
                 {
-                    string line = (await reader.ReadLineAsync()).TrimStart();
+                    string? line = await reader.ReadLineAsync();
+                    if (line == null)
+                    {
+                        break;
+                    }
+
+                    string trimmedLine = line.Trim();
                     if (inNetworkSection)
                     {
-                        if (ssid == null)
+                        if (ssid is null)
                         {
-                            if (line.StartsWith("ssid="))
+                            if (trimmedLine.StartsWith("ssid="))
                             {
                                 // Parse next SSID
-                                ssid = line["ssid=".Length..].Trim(' ', '\t', '"');
+                                ssid = trimmedLine["ssid=".Length..].Trim(' ', '\t', '"');
                             }
                         }
-                        else if (line.StartsWith('}'))
+                        else if (trimmedLine.StartsWith('}'))
                         {
-                            if (ssid != null)
+                            if (ssid is not null)
                             {
                                 ssids.Add(ssid);
                                 ssid = null;
@@ -84,13 +91,13 @@ namespace DuetPiManagementPlugin.Network
                             inNetworkSection = false;
                         }
                     }
-                    else if (line.StartsWith("network={"))
+                    else if (trimmedLine.StartsWith("network={"))
                     {
                         inNetworkSection = true;
                     }
                 }
 
-                if (ssid != null)
+                if (ssid is not null)
                 {
                     ssids.Add(ssid);
                 }
@@ -150,7 +157,7 @@ namespace DuetPiManagementPlugin.Network
         /// Try to read the country code from the wpa_supplicant config file
         /// </summary>
         /// <returns>Country code or null if not found</returns>
-        public static async Task<string> GetCountryCode()
+        public static async Task<string?> GetCountryCode()
         {
             if (File.Exists("/etc/wpa_supplicant/wpa_supplicant.conf"))
             {
@@ -159,11 +166,17 @@ namespace DuetPiManagementPlugin.Network
 
                 while (!reader.EndOfStream)
                 {
-                    string line = (await reader.ReadLineAsync()).TrimStart();
-                    if (line.StartsWith("country="))
+                    string? line = await reader.ReadLineAsync();
+                    if (line == null)
+                    {
+                        break;
+                    }
+
+                    string trimmedLine = line.Trim();
+                    if (trimmedLine.StartsWith("country="))
                     {
                         // Country code found
-                        return line["country=".Length..].Trim(' ', '\t');
+                        return trimmedLine["country=".Length..].Trim(' ', '\t');
                     }
                 }
             }
@@ -177,7 +190,7 @@ namespace DuetPiManagementPlugin.Network
         /// <param name="psk">Password of the new network or null to delete it</param>
         /// <param name="countryCode">Optional country code, must be set if no country code is present yet</param>
         /// <returns></returns>
-        public static async Task<Message> UpdateSSID(string ssid, string psk, string countryCode = null)
+        public static async Task<Message> UpdateSSID(string? ssid, string? psk, string? countryCode = null)
         {
             // Create template if it doesn't already exist or if the 
             if (!File.Exists("/etc/wpa_supplicant/wpa_supplicant.conf"))
@@ -204,20 +217,26 @@ namespace DuetPiManagementPlugin.Network
                     using StreamReader reader = new(configStream, leaveOpen: true);
                     await using StreamWriter writer = new(newConfigStream, leaveOpen: true);
 
-                    StringBuilder networkSection = null;
-                    string parsedSsid = null;
+                    StringBuilder? networkSection = null;
+                    string? parsedSsid = null;
                     bool networkUpdated = false;
 
                     while (!reader.EndOfStream)
                     {
-                        string line = await reader.ReadLineAsync(), trimmedLine = line.TrimStart();
+                        string? line = await reader.ReadLineAsync();
+                        if (line == null)
+                        {
+                            break;
+                        }
+
+                        string trimmedLine = line.TrimStart();
                         if (trimmedLine.StartsWith("country=") && !countrySeen)
                         {
                             // Read country code, replace it if requested
                             await writer.WriteLineAsync(string.IsNullOrWhiteSpace(countryCode) ? line : $"country={countryCode}");
                             countrySeen = true;
                         }
-                        else if (networkSection != null)
+                        else if (networkSection is not null)
                         {
                             // Dealing with the content of a network section
                             if (trimmedLine.StartsWith("ssid="))
@@ -226,7 +245,7 @@ namespace DuetPiManagementPlugin.Network
                                 parsedSsid = trimmedLine["ssid=".Length..].Trim(' ', '\t', '"');
                                 networkSection.AppendLine(line);
                             }
-                            else if (parsedSsid == ssid && trimmedLine.StartsWith("psk=") && psk != null)
+                            else if (parsedSsid == ssid && trimmedLine.StartsWith("psk=") && psk is not null)
                             {
                                 // Replace PSK
                                 networkSection.AppendLine($"psk=\"{psk}\"");
@@ -236,7 +255,7 @@ namespace DuetPiManagementPlugin.Network
                             {
                                 // End of network section
                                 networkSection.AppendLine(line);
-                                if ((ssid != "*" && ssid != parsedSsid) || psk != null)
+                                if ((ssid != "*" && ssid != parsedSsid) || psk is not null)
                                 {
                                     await writer.WriteAsync(networkSection);
                                 }
@@ -263,7 +282,7 @@ namespace DuetPiManagementPlugin.Network
                     }
 
                     // Add missing network if required
-                    if (!networkUpdated && ssid != null && psk != null)
+                    if (!networkUpdated && ssid is not null && psk is not null)
                     {
                         await writer.WriteLineAsync("network={");
                         await writer.WriteLineAsync($"    ssid=\"{ssid}\"");
@@ -315,7 +334,7 @@ namespace DuetPiManagementPlugin.Network
         /// <param name="netmask">Subnet mask or null if unchanged</param>
         /// <param name="dnsServer">Set IP address for AP mode</param>
         /// <returns>Asynchronous task</returns>
-        public static Task<string> SetIPAddress(IPAddress ip, IPAddress netmask, IPAddress gateway, IPAddress dnsServer, bool forAP = false)
+        public static Task<string> SetIPAddress(IPAddress? ip, IPAddress? netmask, IPAddress? gateway, IPAddress? dnsServer, bool forAP = false)
         {
             return DHCP.SetIPAddress("wlan0", ip, netmask, gateway, dnsServer, forAP);
         }

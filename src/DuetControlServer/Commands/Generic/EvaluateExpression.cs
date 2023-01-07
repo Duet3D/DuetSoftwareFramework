@@ -12,12 +12,12 @@ namespace DuetControlServer.Commands
         /// Evaluate an arbitrary expression
         /// </summary>
         /// <returns>Evaluation result</returns>
-        public override async Task<object> Execute()
+        public override async Task<object?> Execute()
         {
             // Check if the corresponding code channel has been disabled
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                if (Model.Provider.Get.Inputs[Channel] == null)
+                if (Model.Provider.Get.Inputs[Channel] is null)
                 {
                     throw new InvalidOperationException("Requested code channel has been disabled");
                 }

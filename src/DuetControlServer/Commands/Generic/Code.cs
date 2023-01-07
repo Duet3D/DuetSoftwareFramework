@@ -90,7 +90,7 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Current stream writer of the files being written to (M28/M29)
         /// </summary>
-        public static readonly StreamWriter[] FilesBeingWritten = new StreamWriter[Inputs.Total];
+        public static readonly StreamWriter?[] FilesBeingWritten = new StreamWriter[Inputs.Total];
 
         /// <summary>
         /// Constructor of a new code
@@ -105,7 +105,7 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Source connection of this command
         /// </summary>
-        public Connection Connection
+        public Connection? Connection
         {
             get => _connection;
             set
@@ -114,7 +114,7 @@ namespace DuetControlServer.Commands
                 _connection = value;
             }
         }
-        private Connection _connection;
+        private Connection? _connection;
 
         /// <summary>
         /// Check if Marlin is being emulated
@@ -124,8 +124,8 @@ namespace DuetControlServer.Commands
         {
             using (await Provider.AccessReadOnlyAsync(Program.CancellationToken))
             {
-                Compatibility compatibility = Provider.Get.Inputs[Channel].Compatibility;
-                return compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP;
+                Compatibility compatibility = Provider.Get.Inputs[Channel]?.Compatibility ?? Compatibility.RepRapFirmware;
+                return compatibility is Compatibility.Marlin or Compatibility.NanoDLP;
             }
         }
 
@@ -134,7 +134,7 @@ namespace DuetControlServer.Commands
         /// </summary>
         /// <returns>Result of the code</returns>
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
-        public override async Task<Message> Execute()
+        public override async Task<Message?> Execute()
         {
             // Assign a cancellation token when the execution starts
             if (CancellationToken == default)
@@ -157,17 +157,17 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Current stage of this code on the code pipeline
         /// </summary>
-        internal Codes.PipelineStage Stage { get; set; }
+        internal Codes.PipelineStage? Stage { get; set; }
 
         /// <summary>
         /// File that started this code
         /// </summary>
-        internal Files.CodeFile File { get; set; }
+        internal Files.CodeFile? File { get; set; }
 
         /// <summary>
         /// Macro that started this code or null
         /// </summary>
-        internal Macro Macro { get; set; }
+        internal Macro? Macro { get; set; }
 
         /// <summary>
         /// Attempt to process this code internally
@@ -191,10 +191,11 @@ namespace DuetControlServer.Commands
             int numChannel = (int)Channel;
             using (await FileLocks[numChannel].LockAsync(Program.CancellationToken))
             {
-                if (FilesBeingWritten[numChannel] != null && (Type != CodeType.MCode || MajorNumber != 29))
+                TextWriter? fileWriter = FilesBeingWritten[numChannel];
+                if (fileWriter is not null && (Type != CodeType.MCode || MajorNumber != 29))
                 {
                     _logger.Debug("Writing {0}", this);
-                    FilesBeingWritten[numChannel].WriteLine(this);
+                    fileWriter.WriteLine(this);
                     Result = new();
                     return true;
                 }
@@ -226,7 +227,7 @@ namespace DuetControlServer.Commands
                     break;
             }
 
-            if (Result != null)
+            if (Result is not null)
             {
                 return true;
             }

@@ -46,7 +46,7 @@ namespace DuetAPI.Commands
                 result.Length += reader.CurrentEncoding.GetByteCount(buffer.Buffer, buffer.BufferPointer, 1);
                 buffer.BufferPointer++;
 
-                if (c == '\n' && !hadLineNumber && buffer.LineNumber != null)
+                if (c == '\n' && !hadLineNumber && buffer.LineNumber is not null)
                 {
                     // Keep track of the line number (if possible)
                     buffer.LineNumber++;
@@ -79,7 +79,7 @@ namespace DuetAPI.Commands
                         // Add next character to the comment unless it is the "artificial" 0-character termination
                         result.Comment += c;
                     }
-                    else if (result.Comment == null)
+                    else if (result.Comment is null)
                     {
                         // Something started a comment, so the comment cannot be null any more
                         result.Comment = string.Empty;
@@ -98,7 +98,7 @@ namespace DuetAPI.Commands
                     else
                     {
                         // End of encapsulated comment
-                        if (result.Comment == null)
+                        if (result.Comment is null)
                         {
                             // Something started a comment, so the comment cannot be null any more
                             result.Comment = string.Empty;
@@ -408,7 +408,7 @@ namespace DuetAPI.Commands
                             hadLineNumber = true;
                         }
                         else if (((letter == 'G' && value != "lobal") || letter == 'M' || letter == 'T') &&
-                                 (result.MajorNumber == null || (result.Type == CodeType.GCode && result.MajorNumber == 53)))
+                                 (result.MajorNumber is null || (result.Type == CodeType.GCode && result.MajorNumber == 53)))
                         {
                             // Process G/M/T identifier(s)
                             if (result.Type == CodeType.GCode && result.MajorNumber == 53)
@@ -461,7 +461,7 @@ namespace DuetAPI.Commands
                                 throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({value})", result);
                             }
                         }
-                        else if (result.Type == CodeType.None && result.MajorNumber == null && !wasQuoted && !wasExpression)
+                        else if (result.Type == CodeType.None && result.MajorNumber is null && !wasQuoted && !wasExpression)
                         {
                             // Check for conditional G-code
                             string keyword = char.ToLowerInvariant(letter) + value;
@@ -537,7 +537,7 @@ namespace DuetAPI.Commands
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
-                            else if (result.Parameter(letter) == null)
+                            else if (result.Parameter(letter) is null)
                             {
                                 AddParameter(result, letter, value, false, buffer.MayRepeatCode);
                             }
@@ -555,7 +555,7 @@ namespace DuetAPI.Commands
                                 letter = '@';
                             }
 
-                            if (result.Parameter(letter) == null)
+                            if (result.Parameter(letter) is null)
                             {
                                 if (wasExpression && (!value.StartsWith("{") || !value.EndsWith("}")))
                                 {
@@ -627,7 +627,7 @@ namespace DuetAPI.Commands
             // Deal with Fanuc and LaserWeb G-code styles
             if (buffer.MayRepeatCode)
             {
-                if (result.Type == CodeType.GCode && result.MajorNumber != null)
+                if (result.Type == CodeType.GCode && result.MajorNumber is not null)
                 {
                     buffer.LastGCode = result.MajorNumber.Value;
                 }
@@ -645,7 +645,7 @@ namespace DuetAPI.Commands
             }
 
             // Check if this is a whole-line comment
-            if (result.Type == CodeType.None && result.Parameters.Count == 0 && result.Comment != null)
+            if (result.Type == CodeType.None && result.Parameters.Count == 0 && result.Comment is not null)
             {
                 result.Type = CodeType.Comment;
             }
@@ -667,7 +667,7 @@ namespace DuetAPI.Commands
             {
                 throw new CodeParserException("Too many closing curly braces", result);
             }
-            if (result.KeywordArgument != null)
+            if (result.KeywordArgument is not null)
             {
                 result.KeywordArgument = result.KeywordArgument.Trim();
                 if (result.KeywordArgument.Length > 255)

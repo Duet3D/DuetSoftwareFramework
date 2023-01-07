@@ -24,7 +24,7 @@ namespace DuetControlServer
         /// <summary>
         /// Version of this application
         /// </summary>
-        public static readonly string Version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion;
+        public static readonly string Version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
 
         /// <summary>
         /// Logger instance
@@ -202,7 +202,7 @@ namespace DuetControlServer
             };
 
             // Notify the service manager that we're up and running
-            string notifySocket = Environment.GetEnvironmentVariable("NOTIFY_SOCKET");
+            string? notifySocket = Environment.GetEnvironmentVariable("NOTIFY_SOCKET");
             if (!string.IsNullOrEmpty(notifySocket))
             {
                 try
@@ -318,7 +318,7 @@ namespace DuetControlServer
                 string taskName = mainTasks[terminatedTask];
                 if (terminatedTask.IsFaulted && !terminatedTask.IsCanceled)
                 {
-                    foreach (Exception ie in terminatedTask.Exception.InnerExceptions)
+                    foreach (Exception ie in terminatedTask.Exception!.InnerExceptions)
                     {
                         _logger.Fatal(ie, "{0} task faulted", taskName);
                     }

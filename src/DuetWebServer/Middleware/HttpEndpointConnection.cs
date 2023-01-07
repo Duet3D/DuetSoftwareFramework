@@ -111,7 +111,7 @@ namespace DuetWebServer.Middleware
         private async Task<T> Receive<T>(CancellationToken cancellationToken)
         {
             await using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
-            return await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions, cancellationToken);
+            return (await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions, cancellationToken))!;
         }
 
         /// <summary>

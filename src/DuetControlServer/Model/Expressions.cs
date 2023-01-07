@@ -3,6 +3,7 @@ using DuetAPI.ObjectModel;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
@@ -23,7 +24,7 @@ namespace DuetControlServer.Model
         /// <param name="functionName">Name of the function</param>
         /// <param name="arguments">Function arguments</param>
         /// <returns>Result value</returns>
-        public delegate Task<object> CustomAsyncFunctionResolver(string functionName, object[] arguments);
+        public delegate Task<object?> CustomAsyncFunctionResolver(string functionName, object?[] arguments);
 
         /// <summary>
         /// Dictionary of custom meta G-code functions vs. async resolvers
@@ -38,7 +39,7 @@ namespace DuetControlServer.Model
         /// <param name="wantsCount">If the function name is prefixed with a #</param>
         /// <param name="fn">Asynchronous function handler if applicable</param>
         /// <returns>If any handler could be found</returns>
-        private static bool TryGetCustomFunction(string lastExpression, out string lastFunction, out bool wantsCount, out CustomAsyncFunctionResolver fn)
+        private static bool TryGetCustomFunction(string lastExpression, out string lastFunction, out bool wantsCount, [NotNullWhen(true)] out CustomAsyncFunctionResolver? fn)
         {
             // Read the last valid function
             lastFunction = string.Empty;
@@ -133,29 +134,32 @@ namespace DuetControlServer.Model
         /// <exception cref="CodeParserException">Failed to parse expression</exception>
         public static bool ContainsSbcFields(Code code)
         {
-            // echo command
-            if (code.Keyword == KeywordType.Echo)
+            if (code.KeywordArgument is not null)
             {
-                foreach (string expression in SplitExpression(code.KeywordArgument))
+                // echo command
+                if (code.Keyword == KeywordType.Echo)
                 {
-                    if (ContainsSbcFields(expression))
+                    foreach (string expression in SplitExpression(code.KeywordArgument))
                     {
-                        return true;
+                        if (ContainsSbcFields(expression))
+                        {
+                            return true;
+                        }
                     }
+                    return false;
                 }
-                return false;
-            }
 
-            // Conditional code
-            if (code.Keyword != KeywordType.None && code.KeywordArgument != null)
-            {
-                return ContainsSbcFields(code.KeywordArgument);
+                // Conditional code
+                if (code.Keyword != KeywordType.None)
+                {
+                    return ContainsSbcFields(code.KeywordArgument);
+                }
             }
 
             // Regular G/M/T-code
             foreach (CodeParameter parameter in code.Parameters)
             {
-                if (parameter.IsExpression && ContainsSbcFields(parameter))
+                if (parameter.IsExpression && ContainsSbcFields(parameter!))
                 {
                     return true;
                 }
@@ -237,7 +241,7 @@ namespace DuetControlServer.Model
 
             foreach (string pathItem in expression.Split('.', '['))
             {
-                if (model.JsonProperties.TryGetValue(pathItem, out PropertyInfo property))
+                if (model.JsonProperties.TryGetValue(pathItem, out PropertyInfo? property))
                 {
                     if (Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
                     {
@@ -246,14 +250,14 @@ namespace DuetControlServer.Model
 
                     if (property.PropertyType.IsSubclassOf(typeof(ModelObject)))
                     {
-                        model = (ModelObject)Activator.CreateInstance(property.PropertyType);
+                        model = (ModelObject)Activator.CreateInstance(property.PropertyType)!;
                     }
                     else if (property.PropertyType.IsGenericType)
                     {
                         Type itemType = property.PropertyType.GetGenericArguments()[0];
                         if (itemType.IsSubclassOf(typeof(ModelObject)))
                         {
-                            model = (ModelObject)Activator.CreateInstance(itemType);
+                            model = (ModelObject)Activator.CreateInstance(itemType)!;
                         }
                         else
                         {
@@ -271,9 +275,9 @@ namespace DuetControlServer.Model
         /// <param name="code">Code holding expressions</param>
         /// <param name="evaluateAll">Whether all or only SBC fields are supposed to be evaluated</param>
         /// <returns>Evaluation result or null</returns>
-        public static async Task<string> Evaluate(Code code, bool evaluateAll)
+        public static async Task<string?> Evaluate(Code code, bool evaluateAll)
         {
-            if (code.KeywordArgument != null)
+            if (code.KeywordArgument is not null)
             {
                 if (code.Keyword == KeywordType.Echo)
                 {
@@ -351,7 +355,7 @@ namespace DuetControlServer.Model
             {
                 if (code.Parameters[i].IsExpression)
                 {
-                    string trimmedExpression = ((string)code.Parameters[i]).Trim();
+                    string trimmedExpression = ((string)code.Parameters[i]!).Trim();
                     try
                     {
                         string parameterValue = await EvaluateExpression(code, trimmedExpression, !evaluateAll, !evaluateAll);
@@ -423,9 +427,9 @@ namespace DuetControlServer.Model
             }
 
             // Convert an object to a string value
-            string objectToString(object obj, bool wantsCount, bool encodeStrings)
+            string objectToString(object? obj, bool wantsCount, bool encodeStrings)
             {
-                if (obj == null)
+                if (obj is null)
                 {
                     return "null";
                 }
@@ -493,7 +497,7 @@ namespace DuetControlServer.Model
                 {
                     return "{object}";
                 }
-                return obj.ToString();
+                return obj.ToString() ?? "null";
             }
 
             // Finish a token before appending it to the resulting expression
@@ -505,7 +509,7 @@ namespace DuetControlServer.Model
                 switch (lastTokenValue.Trim())
                 {
                     case "iterations":
-                        if (code.File == null)
+                        if (code.File is null)
                         {
                             throw new CodeParserException("not executing a file", code);
                         }
@@ -520,7 +524,7 @@ namespace DuetControlServer.Model
                         break;
 
                     case "result":
-                        if (code.File == null)
+                        if (code.File is null)
                         {
                             throw new CodeParserException("not executing a file", code);
                         }
@@ -537,7 +541,7 @@ namespace DuetControlServer.Model
                         {
                             using (await Provider.AccessReadOnlyAsync())
                             {
-                                if (Filter.GetSpecific(filterString, true, out object sbcField))
+                                if (Filter.GetSpecific(filterString, true, out object? sbcField))
                                 {
                                     string subResult = objectToString(sbcField, wantsCount, true);
                                     result.Append(subResult);
@@ -557,11 +561,11 @@ namespace DuetControlServer.Model
             }
 
             // Evaluate a given expression to its final value. This function attempts to look up well-known values before asking RRF
-            async Task<object> getExpressionValue(string subExpression)
+            async Task<object?> getExpressionValue(string subExpression)
             {
                 // Attempt to evaluate an atomic value and return the parsed result, returns null if that failed
                 // Note that it returns _nullResult instead of null in case value is "null"
-                async Task<object> attemptToEvaluate(string value)
+                async Task<object?> attemptToEvaluate(string value)
                 {
                     string trimmedValue = value.Trim();
 
@@ -577,7 +581,7 @@ namespace DuetControlServer.Model
                             return false;
 
                         case "iterations":
-                            if (code.File == null)
+                            if (code.File is null)
                             {
                                 throw new CodeParserException("not executing a file", code);
                             }
@@ -586,9 +590,13 @@ namespace DuetControlServer.Model
                                 return code.File.GetIterations(code);
                             }
                         case "line":
+                            if (code.LineNumber is null)
+                            {
+                                throw new CodeParserException("not executing a file", code);
+                            }
                             return code.LineNumber;
                         case "result":
-                            if (code.File == null)
+                            if (code.File is null)
                             {
                                 throw new CodeParserException("not executing a file", code);
                             }
@@ -664,8 +672,8 @@ namespace DuetControlServer.Model
                 }
 
                 // Perform final expression evalution here
-                object evaluatedSubExpression = await attemptToEvaluate(subExpression);
-                if (evaluatedSubExpression != null)
+                object? evaluatedSubExpression = await attemptToEvaluate(subExpression);
+                if (evaluatedSubExpression is not null)
                 {
                     return (evaluatedSubExpression != _nullResult) ? evaluatedSubExpression : null;
                 }
@@ -688,15 +696,15 @@ namespace DuetControlServer.Model
                     else if (c == '(')
                     {
                         string subExpression = await eatExpression(c);
-                        if (TryGetCustomFunction(lastToken.ToString(), out string functionName, out bool wantsCount, out CustomAsyncFunctionResolver fn))
+                        if (TryGetCustomFunction(lastToken.ToString(), out string functionName, out bool wantsCount, out CustomAsyncFunctionResolver? fn))
                         {
-                            List<object> arguments = new();
+                            List<object?> arguments = new();
                             foreach (string arg in SplitExpression(subExpression))
                             {
-                                object argValue = await getExpressionValue(arg);
+                                object? argValue = await getExpressionValue(arg);
                                 arguments.Add(argValue);
                             }
-                            object fnResult = await fn(functionName, arguments.ToArray());
+                            object? fnResult = await fn(functionName, arguments.ToArray());
                             result.Append(objectToString(fnResult, wantsCount, true));
                         }
                         else
@@ -715,7 +723,7 @@ namespace DuetControlServer.Model
                         string subExpression = await eatExpression(c);
                         if (IsSbcExpression(lastToken.ToString().Trim(), false))
                         {
-                            object evaluatedSubExpression = await getExpressionValue(subExpression);
+                            object? evaluatedSubExpression = await getExpressionValue(subExpression);
                             if (evaluatedSubExpression is int intValue)
                             {
                                 lastToken.Append(intValue);
@@ -791,7 +799,7 @@ namespace DuetControlServer.Model
             {
                 return expressionContent;
             }
-            object expressionValue = await SPI.Interface.EvaluateExpression(code.Channel, expressionContent);
+            object? expressionValue = await SPI.Interface.EvaluateExpression(code.Channel, expressionContent);
             return objectToString(expressionValue, false, encodeResult);
         }
     }

@@ -6,7 +6,7 @@ namespace DuetAPI.Commands
     /// Evaluate an arbitrary expression on the given channel
     /// </summary>
     [RequiredPermissions(SbcPermissions.CommandExecution)]
-    public class EvaluateExpression : Command<object>
+    public class EvaluateExpression : Command<object?>
     {
         /// <summary>
         /// Code channel where the expression is evaluated
@@ -16,6 +16,6 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Expression to evaluate
         /// </summary>
-        public string Expression { get; set; }
+        public string Expression { get; set; } = string.Empty;
     }
 }

@@ -20,10 +20,10 @@ namespace UnitTests.Machine
         public void ObserveProperty()
         {
             int numEvents = 0;
-            object[] recordedPath = null;
+            object[]? recordedPath = null;
             PropertyChangeType recordedChangeType = PropertyChangeType.Property;
-            object recordedValue = null;
-            void onPropertyChanged(object[] path, PropertyChangeType changeType, object value)
+            object? recordedValue = null;
+            void onPropertyChanged(object[] path, PropertyChangeType changeType, object? value)
             {
                 numEvents++;
                 recordedChangeType = changeType;
@@ -70,7 +70,7 @@ namespace UnitTests.Machine
 
             // Nested item propery 2
             TestContext.Out.WriteLine("Nested item property 2");
-            Provider.Get.Inputs.HTTP.State = InputChannelState.AwaitingAcknowledgement;
+            Provider.Get.Inputs.HTTP!.State = InputChannelState.AwaitingAcknowledgement;
 
             Assert.AreEqual(1, numEvents);
             Assert.AreEqual(new object[] { new ItemPathNode("inputs", (int)DuetAPI.CodeChannel.HTTP, new object[Inputs.Total]), "state" }, recordedPath);
@@ -132,10 +132,10 @@ namespace UnitTests.Machine
         public void ObserveModelProperty()
         {
             int numEvents = 0;
-            object[] recordedPath = null;
+            object[]? recordedPath = null;
             PropertyChangeType recordedChangeType = PropertyChangeType.Property;
-            object recordedValue = null;
-            void onPropertyChanged(object[] path, PropertyChangeType changeType, object value)
+            object? recordedValue = null;
+            void onPropertyChanged(object[] path, PropertyChangeType changeType, object? value)
             {
                 numEvents++;
                 recordedChangeType = changeType;
@@ -163,10 +163,10 @@ namespace UnitTests.Machine
         public void ObserveModelDictionary()
         {
             int numEvents = 0;
-            object[] recordedPath = null;
+            object[]? recordedPath = null;
             PropertyChangeType recordedChangeType = PropertyChangeType.Property;
-            object recordedValue = null;
-            void onPropertyChanged(object[] path, PropertyChangeType changeType, object value)
+            object? recordedValue = null;
+            void onPropertyChanged(object[] path, PropertyChangeType changeType, object? value)
             {
                 numEvents++;
                 recordedChangeType = changeType;
@@ -221,10 +221,10 @@ namespace UnitTests.Machine
         public void ObserveModelObjectDictionary()
         {
             int numEvents = 0;
-            object[] recordedPath = null;
+            object[]? recordedPath = null;
             PropertyChangeType recordedChangeType = PropertyChangeType.Property;
-            object recordedValue = null;
-            void onPropertyChanged(object[] path, PropertyChangeType changeType, object value)
+            object? recordedValue = null;
+            void onPropertyChanged(object[] path, PropertyChangeType changeType, object? value)
             {
                 numEvents++;
                 recordedChangeType = changeType;
@@ -270,9 +270,9 @@ namespace UnitTests.Machine
         {
             int numEvents = 0;
             PropertyChangeType recordedChangeType = PropertyChangeType.Property;
-            object[] recordedPath = null;
-            object recordedValue = null;
-            void onPropertyChanged(object[] path, PropertyChangeType changeType, object value)
+            object[]? recordedPath = null;
+            object? recordedValue = null;
+            void onPropertyChanged(object[] path, PropertyChangeType changeType, object? value)
             {
                 numEvents++;
                 recordedChangeType = changeType;
@@ -317,7 +317,7 @@ namespace UnitTests.Machine
 
             // Modify first item
             TestContext.Out.WriteLine("Modify first item");
-            Provider.Get.Heat.Heaters[0].Active = 123F;
+            Provider.Get.Heat.Heaters[0]!.Active = 123F;
 
             Assert.AreEqual(1, numEvents);
             Assert.AreEqual(PropertyChangeType.Property, recordedChangeType);
@@ -409,10 +409,10 @@ namespace UnitTests.Machine
         public void ObserveModelGrowingCollectiion()
         {
             int numEvents = 0;
-            object[] recordedPath = null;
+            object[]? recordedPath = null;
             PropertyChangeType recordedChangeType = PropertyChangeType.Property;
-            object recordedValue = null;
-            void onPropertyChanged(object[] path, PropertyChangeType changeType, object value)
+            object? recordedValue = null;
+            void onPropertyChanged(object[] path, PropertyChangeType changeType, object? value)
             {
                 numEvents++;
                 recordedChangeType = changeType;

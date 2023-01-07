@@ -20,7 +20,7 @@ namespace DuetPluginService.Commands
         /// <summary>
         /// Logger instance
         /// </summary>
-        private NLog.Logger _logger;
+        private NLog.Logger? _logger;
 
         /// <summary>
         /// Internal flag to indicate that custom plugin files should not be purged
@@ -146,7 +146,7 @@ namespace DuetPluginService.Commands
                     }
 
                     // Make sure the parent directory exists
-                    string parentDirectory = Path.GetDirectoryName(fileName);
+                    string parentDirectory = Path.GetDirectoryName(fileName)!;
                     if (!Directory.Exists(parentDirectory))
                     {
                         _logger.Debug("Creating new directory {0}", parentDirectory);
@@ -194,7 +194,7 @@ namespace DuetPluginService.Commands
                     string installWwwPath = Path.Combine(Settings.BaseDirectory, "www", dwcFile);
 
                     // Create parent directory first
-                    string directory = Path.GetDirectoryName(installWwwPath);
+                    string directory = Path.GetDirectoryName(installWwwPath)!;
                     if (!Directory.Exists(directory))
                     {
                         Directory.CreateDirectory(directory);
@@ -250,8 +250,8 @@ namespace DuetPluginService.Commands
         private static async Task<Plugin> ExtractManifest(ZipArchive zipArchive)
         {
             // Extract the plugin manifest
-            ZipArchiveEntry manifestFile = zipArchive.GetEntry("plugin.json");
-            if (manifestFile == null)
+            ZipArchiveEntry? manifestFile = zipArchive.GetEntry("plugin.json");
+            if (manifestFile is null)
             {
                 throw new ArgumentException("plugin.json not found in the ZIP file");
             }
@@ -302,11 +302,14 @@ namespace DuetPluginService.Commands
                     startInfo.EnvironmentVariables.Add(kv.Key, kv.Value);
                 }
 
-                using Process process = Process.Start(startInfo);
-                await process.WaitForExitAsync(Program.CancellationToken);
-                if (process.ExitCode != 0)
+                using Process? process = Process.Start(startInfo);
+                if (process is not null)
                 {
-                    throw new ArgumentException($"Failed to install package {package}, package manager exited with code {process.ExitCode}");
+                    await process.WaitForExitAsync(Program.CancellationToken);
+                    if (process.ExitCode != 0)
+                    {
+                        throw new ArgumentException($"Failed to install package {package}, package manager exited with code {process.ExitCode}");
+                    }
                 }
             }
         }
@@ -334,11 +337,14 @@ namespace DuetPluginService.Commands
                     startInfo.EnvironmentVariables.Add(kv.Key, kv.Value);
                 }
 
-                using Process process = Process.Start(startInfo);
-                await process.WaitForExitAsync(Program.CancellationToken);
-                if (process.ExitCode != 0)
+                using Process? process = Process.Start(startInfo);
+                if (process is not null)
                 {
-                    throw new ArgumentException($"Failed to install package {package}, package manager exited with code {process.ExitCode}");
+                    await process.WaitForExitAsync(Program.CancellationToken);
+                    if (process.ExitCode != 0)
+                    {
+                        throw new ArgumentException($"Failed to install package {package}, package manager exited with code {process.ExitCode}");
+                    }
                 }
             }
         }

@@ -105,7 +105,7 @@ namespace UnitTests.Commands
                 Assert.AreEqual(1, code.Parameters.Count);
 
                 int[] steps = { 810, 810, 407, 407 };
-                Assert.AreEqual(steps, (int[])code.Parameter('E'));
+                Assert.AreEqual(steps, (int[])code.Parameter('E')!);
             }
         }
 
@@ -119,7 +119,7 @@ namespace UnitTests.Commands
                 Assert.IsNull(code.MinorNumber);
                 Assert.AreEqual(1, code.Parameters.Count);
                 Assert.AreEqual('P', code.Parameters[0].Letter);
-                Assert.AreEqual("config.g", (string)code.Parameters[0]);
+                Assert.AreEqual("config.g", (string?)code.Parameters[0]);
             }
         }
 
@@ -135,7 +135,7 @@ namespace UnitTests.Commands
                 Assert.AreEqual('P', code.Parameters[0].Letter);
                 Assert.AreEqual(1, (int)code.Parameters[0]);
                 Assert.AreEqual('C', code.Parameters[1].Letter);
-                Assert.AreEqual("Fancy \" Fan", (string)code.Parameters[1]);
+                Assert.AreEqual("Fancy \" Fan", (string?)code.Parameters[1]);
                 Assert.AreEqual('H', code.Parameters[2].Letter);
                 Assert.AreEqual(-1, (int)code.Parameters[2]);
                 Assert.AreEqual('S', code.Parameters[3].Letter);
@@ -155,7 +155,7 @@ namespace UnitTests.Commands
                 Assert.IsNull(code.MinorNumber);
                 Assert.AreEqual(1, code.Parameters.Count);
                 Assert.AreEqual('@', code.Parameters[0].Letter);
-                Assert.AreEqual(string.Empty, (string)code.Parameters[0]);
+                Assert.AreEqual(string.Empty, (string?)code.Parameters[0]);
             }
         }
 
@@ -169,7 +169,7 @@ namespace UnitTests.Commands
                 Assert.IsNull(code.MinorNumber);
                 Assert.AreEqual(1, code.Parameters.Count);
                 Assert.AreEqual('@', code.Parameters[0].Letter);
-                Assert.AreEqual("DSF", (string)code.Parameters[0]);
+                Assert.AreEqual("DSF", (string?)code.Parameters[0]);
             }
         }
 
@@ -210,7 +210,7 @@ namespace UnitTests.Commands
                 Assert.AreEqual(302, code.MajorNumber);
                 Assert.AreEqual(2, code.Parameters.Count);
                 Assert.AreEqual('D', code.Parameters[0].Letter);
-                Assert.AreEqual("dummy", (string)code.Parameters[0]);
+                Assert.AreEqual("dummy", (string?)code.Parameters[0]);
                 Assert.AreEqual('P', code.Parameters[1].Letter);
                 Assert.AreEqual(1, (int)code.Parameters[1]);
             }
@@ -288,7 +288,7 @@ namespace UnitTests.Commands
                 Assert.AreEqual('S', code.Parameters[1].Letter);
                 Assert.AreEqual(1, (int)code.Parameters[1]);
                 Assert.AreEqual('P', code.Parameters[2].Letter);
-                Assert.AreEqual("io1.in", (string)code.Parameters[2]);
+                Assert.AreEqual("io1.in", (string?)code.Parameters[2]);
                 Assert.AreEqual("comment", code.Comment);
             }
         }
@@ -304,15 +304,15 @@ namespace UnitTests.Commands
                 Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
                 Assert.AreEqual(5, code.Parameters.Count);
                 Assert.AreEqual('S', code.Parameters[0].Letter);
-                Assert.AreEqual("TestAp", (string)code.Parameters[0]);
+                Assert.AreEqual("TestAp", (string?)code.Parameters[0]);
                 Assert.AreEqual('P', code.Parameters[1].Letter);
-                Assert.AreEqual("Some pass", (string)code.Parameters[1]);
+                Assert.AreEqual("Some pass", (string?)code.Parameters[1]);
                 Assert.AreEqual('I', code.Parameters[2].Letter);
-                Assert.AreEqual(IPAddress.Parse("192.168.1.123"), (IPAddress)code.Parameters[2]);
+                Assert.AreEqual(IPAddress.Parse("192.168.1.123"), (IPAddress?)code.Parameters[2]);
                 Assert.AreEqual('J', code.Parameters[3].Letter);
-                Assert.AreEqual(IPAddress.Parse("192.168.1.254"), (IPAddress)code.Parameters[3]);
+                Assert.AreEqual(IPAddress.Parse("192.168.1.254"), (IPAddress?)code.Parameters[3]);
                 Assert.AreEqual('K', code.Parameters[4].Letter);
-                Assert.AreEqual(IPAddress.Parse("255.255.255.0"), (IPAddress)code.Parameters[4]);
+                Assert.AreEqual(IPAddress.Parse("255.255.255.0"), (IPAddress?)code.Parameters[4]);
             }
         }
 
@@ -347,7 +347,7 @@ namespace UnitTests.Commands
                 Assert.AreEqual('P', code.Parameters[0].Letter);
                 Assert.AreEqual(4, (int)code.Parameters[0]);
                 Assert.AreEqual('S', code.Parameters[1].Letter);
-                Assert.AreEqual("foo", (string)code.Parameters[1]);
+                Assert.AreEqual("foo", (string?)code.Parameters[1]);
                 Assert.AreEqual("T3 P4 S\"foo\"", code.ToString());
             }
         }
@@ -397,7 +397,7 @@ namespace UnitTests.Commands
                 Assert.AreEqual(1, code.Parameters.Count);
                 Assert.AreEqual('E', code.Parameters[0].Letter);
                 Assert.IsTrue(code.Parameters[0].IsExpression);
-                Assert.AreEqual("{123:{456}}", (string)code.Parameters[0]);
+                Assert.AreEqual("{123:{456}}", (string?)code.Parameters[0]);
             }
 
             foreach (DuetAPI.Commands.Code code in Parse("M584 E{123}:{456}:789"))
@@ -408,7 +408,7 @@ namespace UnitTests.Commands
                 Assert.AreEqual(1, code.Parameters.Count);
                 Assert.AreEqual('E', code.Parameters[0].Letter);
                 Assert.IsTrue(code.Parameters[0].IsExpression);
-                Assert.AreEqual("{{123}:{456}:789}", (string)code.Parameters[0]);
+                Assert.AreEqual("{{123}:{456}:789}", (string?)code.Parameters[0]);
             }
 
             foreach (DuetAPI.Commands.Code code in Parse("M584 E{123}:{456}:{789}"))
@@ -419,7 +419,7 @@ namespace UnitTests.Commands
                 Assert.AreEqual(1, code.Parameters.Count);
                 Assert.AreEqual('E', code.Parameters[0].Letter);
                 Assert.IsTrue(code.Parameters[0].IsExpression);
-                Assert.AreEqual("{123}:{456}:{789}", (string)code.Parameters[0]);
+                Assert.AreEqual("{123}:{456}:{789}", (string?)code.Parameters[0]);
             }
 
             foreach (DuetAPI.Commands.Code code in Parse("M92 E{123,456}"))
@@ -430,7 +430,7 @@ namespace UnitTests.Commands
                 Assert.AreEqual(1, code.Parameters.Count);
                 Assert.AreEqual('E', code.Parameters[0].Letter);
                 Assert.IsTrue(code.Parameters[0].IsExpression);
-                Assert.AreEqual("{123,456}", (string)code.Parameters[0]);
+                Assert.AreEqual("{123,456}", (string?)code.Parameters[0]);
             }
 
         }
@@ -486,10 +486,10 @@ namespace UnitTests.Commands
                 Assert.AreEqual(2, code.Parameters.Count);
                 Assert.IsTrue(code.Parameters[0].IsExpression);
                 Assert.AreEqual('X', code.Parameters[0].Letter);
-                Assert.AreEqual("{machine.axes[0].maximum - 10}", (string)code.Parameters[0]);
+                Assert.AreEqual("{machine.axes[0].maximum - 10}", (string?)code.Parameters[0]);
                 Assert.IsTrue(code.Parameters[1].IsExpression);
                 Assert.AreEqual('Y', code.Parameters[1].Letter);
-                Assert.AreEqual("{machine.axes[1].maximum - 10}", (string)code.Parameters[1]);
+                Assert.AreEqual("{machine.axes[1].maximum - 10}", (string?)code.Parameters[1]);
             }
         }
 
@@ -504,7 +504,7 @@ namespace UnitTests.Commands
                 Assert.AreEqual(1, code.Parameters.Count);
                 Assert.AreEqual('@', code.Parameters[0].Letter);
                 Assert.AreEqual(true, code.Parameters[0].IsExpression);
-                Assert.AreEqual("{my.test.value}", (string)code.Parameters[0]);
+                Assert.AreEqual("{my.test.value}", (string?)code.Parameters[0]);
             }
         }
 
@@ -519,7 +519,7 @@ namespace UnitTests.Commands
                 Assert.AreEqual(1, code.Parameters.Count);
                 Assert.AreEqual('@', code.Parameters[0].Letter);
                 Assert.IsFalse(code.Parameters[0].IsExpression);
-                Assert.AreEqual("Hello world!", (string)code.Parameters[0]);
+                Assert.AreEqual("Hello world!", (string?)code.Parameters[0]);
                 Assert.AreEqual("comment", code.Comment);
             }
         }
@@ -535,7 +535,7 @@ namespace UnitTests.Commands
                 Assert.AreEqual(1, code.Parameters.Count);
                 Assert.AreEqual('@', code.Parameters[0].Letter);
                 Assert.IsTrue(code.Parameters[0].IsExpression);
-                Assert.AreEqual("{ \"Axis \" ^ ( move.axes[0].letter ) ^ \" not homed. Please wait while all axes are homed\" }", (string)code.Parameters[0]);
+                Assert.AreEqual("{ \"Axis \" ^ ( move.axes[0].letter ) ^ \" not homed. Please wait while all axes are homed\" }", (string?)code.Parameters[0]);
             }
         }
 
@@ -770,7 +770,7 @@ namespace UnitTests.Commands
                 Assert.IsNull(code.MinorNumber);
                 Assert.AreEqual(2, code.Parameters.Count);
                 Assert.AreEqual('T', code.Parameters[0].Letter);
-                Assert.AreEqual("{my.expression}", (string)code.Parameters[0]);
+                Assert.AreEqual("{my.expression}", (string?)code.Parameters[0]);
                 Assert.AreEqual('P', code.Parameters[1].Letter);
                 Assert.AreEqual(0, (int)code.Parameters[1]);
             }
@@ -1061,8 +1061,8 @@ namespace UnitTests.Commands
                 await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
                 Assert.AreEqual(CodeType.MCode, code.Type);
                 Assert.AreEqual(291, code.MajorNumber);
-                Assert.AreEqual("Please go to <a href=\"https://www.duet3d.com/StartHere\" target=\"_blank\">this</a> page for further instructions on how to set it up.", (string)code.Parameter('P'));
-                Assert.AreEqual("Welcome to your new Duet 3!", (string)code.Parameter('R'));
+                Assert.AreEqual("Please go to <a href=\"https://www.duet3d.com/StartHere\" target=\"_blank\">this</a> page for further instructions on how to set it up.", (string?)code.Parameter('P'));
+                Assert.AreEqual("Welcome to your new Duet 3!", (string?)code.Parameter('R'));
                 Assert.AreEqual(1, (int)code.Parameter('S'));
                 Assert.AreEqual(0, (int)code.Parameter('T'));
             }

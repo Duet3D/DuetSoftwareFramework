@@ -14,7 +14,7 @@ namespace DuetAPI.Commands
     /// A parsed representation of a generic G/M/T-code
     /// </summary>
     [RequiredPermissions(SbcPermissions.CommandExecution)]
-    public partial class Code : Command<Message>
+    public partial class Code : Command<Message?>
     {
         /// <summary>
         /// Create an empty Code representation
@@ -27,13 +27,9 @@ namespace DuetAPI.Commands
         /// <param name="code">UTF8-encoded G/M/T-Code</param>
         public Code(string code)
         {
-            using (MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(code)))
-            {
-                using (StreamReader reader = new StreamReader(stream))
-                {
-                    Parse(reader, this);
-                }
-            }
+            using MemoryStream stream = new(Encoding.UTF8.GetBytes(code));
+            using StreamReader reader = new(stream);
+            Parse(reader, this);
         }
 
         /// <summary>
@@ -51,7 +47,7 @@ namespace DuetAPI.Commands
         /// <remarks>
         /// This used to be of type CodeResult but since v3.2 CodeResult can read Message JSON so it should remain compatible
         /// </remarks>
-        public Message Result { get; set; }
+        public Message? Result { get; set; }
 
         /// <summary>
         /// Type of the code
@@ -87,7 +83,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Argument of the conditional G-code (if any)
         /// </summary>
-        public string KeywordArgument { get; set; }
+        public string? KeywordArgument { get; set; }
 
         /// <summary>
         /// Major code number (e.g. 28 in G28)
@@ -111,7 +107,7 @@ namespace DuetAPI.Commands
         /// The parser combines different comment segments and concatenates them as a single value.
         /// So for example a code like 'G28 (Do homing) ; via G28' causes the Comment field to be filled with 'Do homing via G28'
         /// </remarks>
-        public string Comment { get; set; }
+        public string? Comment { get; set; }
 
         /// <summary>
         /// File position of this code in bytes (optional)
@@ -155,7 +151,7 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <param name="c">Letter of the parameter to find</param>
         /// <returns>The parsed parameter instance or null if none could be found</returns>
-        public CodeParameter Parameter(char c) => Parameters.FirstOrDefault(p => p.Letter == c);
+        public CodeParameter? Parameter(char c) => Parameters.FirstOrDefault(p => p.Letter == c);
 
         /// <summary>
         /// Retrieve the parameter whose letter equals c or generate a default parameter
@@ -177,11 +173,11 @@ namespace DuetAPI.Commands
             {
                 if (p.Letter == '@')
                 {
-                    return p;
+                    return (string?)p ?? string.Empty;
                 }
             }
 
-            StringBuilder builder = new StringBuilder();
+            StringBuilder builder = new();
             foreach (CodeParameter p in Parameters)
             {
                 if (builder.Length != 0)
@@ -193,7 +189,7 @@ namespace DuetAPI.Commands
                 {
                     builder.Append('"');
                 }
-                builder.Append((string)p);
+                builder.Append((string?)p);
                 if (quoteStrings && p.Type == typeof(string))
                 {
                     builder.Append('"');
@@ -210,8 +206,8 @@ namespace DuetAPI.Commands
         {
             if (Keyword != KeywordType.None)
             {
-                string asString = KeywordToString() + ((KeywordArgument == null) ? string.Empty : " " + KeywordArgument);
-                if (Result != null && !string.IsNullOrEmpty(Result.Content))
+                string asString = KeywordToString() + ((KeywordArgument is null) ? string.Empty : " " + KeywordArgument);
+                if (Result is not null && !string.IsNullOrEmpty(Result.Content))
                 {
                     asString += " => ";
                     asString += Result.ToString().TrimEnd();
@@ -226,7 +222,7 @@ namespace DuetAPI.Commands
 
             // Because it is neither always feasible nor reasonable to keep track of the original code,
             // attempt to rebuild it here. First, assemble the code letter, then the major+minor numbers (e.g. G53.4)
-            StringBuilder builder = new StringBuilder();
+            StringBuilder builder = new();
             builder.Append(ToShortString());
 
             // After this append each parameter and encapsulate it in double quotes
@@ -239,25 +235,18 @@ namespace DuetAPI.Commands
 
                 if (parameter.Letter != '@')
                 {
-                    if (parameter.Type == typeof(string) && !parameter.IsExpression)
-                    {
-                        builder.Append($"{parameter.Letter}\"{((string)parameter).Replace("\"", "\"\"")}\"");
-                    }
-                    else
-                    {
-                        builder.Append($"{parameter.Letter}{(string)parameter}");
-                    }
+                    builder.Append(parameter.Letter);
+                }
+
+                if (parameter.Type == typeof(string) && !parameter.IsExpression)
+                {
+                    builder.Append('"');
+                    builder.Append(((string?)parameter)!.Replace("\"", "\"\""));
+                    builder.Append('"');
                 }
                 else
                 {
-                    if (parameter.Type == typeof(string) && !parameter.IsExpression)
-                    {
-                        builder.Append($"\"{((string)parameter).Replace("\"", "\"\"")}\"");
-                    }
-                    else
-                    {
-                        builder.Append((string)parameter);
-                    }
+                    builder.Append((string?)parameter);
                 }
             }
 
@@ -274,7 +263,7 @@ namespace DuetAPI.Commands
             }
 
             // If this code has finished, append the code result
-            if (Result != null && !string.IsNullOrEmpty(Result.Content))
+            if (Result is not null && !string.IsNullOrEmpty(Result.Content))
             {
                 builder.Append(" => ");
                 builder.Append(Result.ToString().TrimEnd());
@@ -305,9 +294,9 @@ namespace DuetAPI.Commands
             }
 
             string prefix = Flags.HasFlag(CodeFlags.EnforceAbsolutePosition) ? "G53 " : string.Empty;
-            if (MajorNumber != null)
+            if (MajorNumber is not null)
             {
-                if (MinorNumber != null)
+                if (MinorNumber is not null)
                 {
                     return prefix + $"{(char)Type}{MajorNumber}.{MinorNumber}";
                 }
@@ -322,21 +311,21 @@ namespace DuetAPI.Commands
         /// <returns></returns>
         private string KeywordToString()
         {
-            switch (Keyword)
+            return Keyword switch
             {
-                case KeywordType.If: return "if";
-                case KeywordType.ElseIf: return "elif";
-                case KeywordType.Else: return "else";
-                case KeywordType.While: return "while";
-                case KeywordType.Break: return "break";
-                case KeywordType.Continue: return "continue";
-                case KeywordType.Abort: return "abort";
-                case KeywordType.Var: return "var";
-                case KeywordType.Set: return "set";
-                case KeywordType.Echo: return "echo";
-                case KeywordType.Global: return "global";
-                default: throw new NotImplementedException();
-            }
+                KeywordType.If => "if",
+                KeywordType.ElseIf => "elif",
+                KeywordType.Else => "else",
+                KeywordType.While => "while",
+                KeywordType.Break => "break",
+                KeywordType.Continue => "continue",
+                KeywordType.Abort => "abort",
+                KeywordType.Var => "var",
+                KeywordType.Set => "set",
+                KeywordType.Echo => "echo",
+                KeywordType.Global => "global",
+                _ => throw new NotImplementedException(),
+            };
         }
     }
 }

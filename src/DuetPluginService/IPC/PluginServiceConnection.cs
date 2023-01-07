@@ -73,15 +73,15 @@ namespace DuetPluginService
                     }
 
                     // Check if the received command is valid
-                    string commandName = item.Value.GetString();
-                    Type commandType = SupportedCommands.FirstOrDefault(item => item.Name.Equals(commandName, StringComparison.InvariantCultureIgnoreCase));
+                    string? commandName = item.Value.GetString();
+                    Type? commandType = SupportedCommands.FirstOrDefault(item => item.Name.Equals(commandName, StringComparison.InvariantCultureIgnoreCase));
                     if (!typeof(BaseCommand).IsAssignableFrom(commandType))
                     {
                         throw new ArgumentException($"Unsupported command {commandName}");
                     }
 
                     // Perform final deserialization and assign source identifier to this command
-                    return (BaseCommand)jsonDocument.RootElement.ToObject(commandType, JsonHelper.DefaultJsonOptions);
+                    return (BaseCommand)jsonDocument.RootElement.ToObject(commandType, JsonHelper.DefaultJsonOptions)!;
                 }
             }
             throw new ArgumentException("Command type not found");
@@ -93,9 +93,9 @@ namespace DuetPluginService
         /// <param name="obj">Object to send</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="SocketException">Message could not be sent</exception>
-        public Task SendResponse(object obj = null)
+        public Task SendResponse(object? obj = null)
         {
-            if (obj == null)
+            if (obj is null)
             {
                 return Send(new BaseResponse());
             }
@@ -104,7 +104,7 @@ namespace DuetPluginService
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 ErrorResponse errorResponse = new(e);
                 return Send(errorResponse);

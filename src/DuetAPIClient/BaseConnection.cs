@@ -24,7 +24,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Socket used for inter-process communication
         /// </summary>
-        protected readonly Socket _unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        protected readonly Socket _unixSocket = new(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
 
         /// <summary>
         /// Create a new connection instance
@@ -90,11 +90,11 @@ namespace DuetAPIClient
         protected async Task Connect(ClientInitMessage initMessage, string socketPath, CancellationToken cancellationToken)
         {
             // Create a new connection
-            UnixDomainSocketEndPoint endPoint = new UnixDomainSocketEndPoint(socketPath);
+            UnixDomainSocketEndPoint endPoint = new(socketPath);
             _unixSocket.Connect(endPoint);
 
             // Read the server init message
-            ServerInitMessage ownMessage = new ServerInitMessage();
+            ServerInitMessage ownMessage = new();
             ServerInitMessage serverMessage = await Receive<ServerInitMessage>(cancellationToken);
             Id = serverMessage.Id;
 
@@ -144,8 +144,8 @@ namespace DuetAPIClient
         {
             await Send(command, cancellationToken);
 
-            BaseResponse response = await ReceiveResponse(cancellationToken);
-            if (!response.Success)
+            BaseResponse? response = await ReceiveResponse(cancellationToken);
+            if (response is not null && !response.Success)
             {
                 ErrorResponse errorResponse = (ErrorResponse)response;
                 if (errorResponse.ErrorType == nameof(TaskCanceledException))
@@ -170,7 +170,12 @@ namespace DuetAPIClient
         {
             await Send(command, cancellationToken);
             
-            BaseResponse response = await ReceiveResponse<T>(cancellationToken);
+            BaseResponse? response = await ReceiveResponse<T>(cancellationToken);
+            if (response is null)
+            {
+                throw new InvalidCastException("Cannot convert null to expected response type");
+            }
+
             if (response.Success)
             {
                 return ((Response<T>)response).Result;
@@ -195,7 +200,7 @@ namespace DuetAPIClient
         protected async ValueTask<T> Receive<T>(CancellationToken cancellationToken)
         {
             await using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
-            return await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions, cancellationToken);
+            return (await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions, cancellationToken))!;
         }
 
         /// <summary>
@@ -208,18 +213,18 @@ namespace DuetAPIClient
         private async ValueTask<BaseResponse> ReceiveResponse(CancellationToken cancellationToken)
         {
             using JsonDocument jsonDocument = await ReceiveJson(cancellationToken);
-            foreach (var item in jsonDocument.RootElement.EnumerateObject())
+            foreach (JsonProperty property in jsonDocument.RootElement.EnumerateObject())
             {
-                if (item.Name.Equals(nameof(BaseResponse.Success), StringComparison.InvariantCultureIgnoreCase) &&
-                    item.Value.ValueKind == JsonValueKind.True)
+                if (property.Name.Equals(nameof(BaseResponse.Success), StringComparison.InvariantCultureIgnoreCase) &&
+                    property.Value.ValueKind == JsonValueKind.True)
                 {
                     // Response OK
-                    return jsonDocument.ToObject<BaseResponse>(JsonHelper.DefaultJsonOptions);
+                    return jsonDocument.ToObject<BaseResponse>(JsonHelper.DefaultJsonOptions)!;
                 }
             }
 
             // Error
-            return jsonDocument.ToObject<ErrorResponse>(JsonHelper.DefaultJsonOptions);
+            return jsonDocument.ToObject<ErrorResponse>(JsonHelper.DefaultJsonOptions)!;
         }
 
         /// <summary>
@@ -230,7 +235,7 @@ namespace DuetAPIClient
         /// <returns>Deserialized response</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Connection has been closed</exception>
-        private async ValueTask<BaseResponse> ReceiveResponse<T>(CancellationToken cancellationToken)
+        private async ValueTask<BaseResponse?> ReceiveResponse<T>(CancellationToken cancellationToken)
         {
             using JsonDocument jsonDocument = await ReceiveJson(cancellationToken);
             foreach (JsonProperty property in jsonDocument.RootElement.EnumerateObject())

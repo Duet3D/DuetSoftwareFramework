@@ -18,7 +18,7 @@ namespace DuetControlServer.Codes.Pipelines
         /// </summary>
         /// <param name="pipeline">Pipeline holding this stack item</param>
         /// <param name="macro">Current macro file or null if not present</param>
-        public PipelineStackItem(PipelineBase pipeline, Macro macro)
+        public PipelineStackItem(PipelineBase pipeline, Macro? macro)
         {
             if (pipeline.Stage != PipelineStage.Executed)
             {
@@ -91,7 +91,7 @@ namespace DuetControlServer.Codes.Pipelines
         /// <summary>
         /// Macro corresponding to this stack item
         /// </summary>
-        public readonly Macro Macro;
+        public readonly Macro? Macro;
 
         /// <summary>
         /// Internal task processing incoming codes
@@ -122,7 +122,7 @@ namespace DuetControlServer.Codes.Pipelines
         /// Current code being executed.
         /// This is not applicable on the Firmware stage because we buffer multiple codes there
         /// </summary>
-        public Code CodeBeingExecuted;
+        public Code? CodeBeingExecuted;
 
         /// <summary>
         /// Wait for the pipeline state to finish processing codes

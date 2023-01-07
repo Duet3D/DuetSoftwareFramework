@@ -15,11 +15,11 @@ namespace DuetAPI.Commands
         /// Path to the property in the machine model
         /// </summary>
         /// <seealso cref="Connection.InitMessages.SubscribeInitMessage.Filter"/>
-        public string PropertyPath { get; set; }
+        public string PropertyPath { get; set; } = string.Empty;
 
         /// <summary>
         /// String representation of the value to set
         /// </summary>
-        public string Value { get; set; }
+        public string Value { get; set; } = string.Empty;
     }
 }

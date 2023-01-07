@@ -25,7 +25,7 @@ namespace DuetAPI.Utility
         public override JsonConverter CreateConverter(Type type, JsonSerializerOptions options)
         {
             Type converterType = typeof(JsonCharEnumConverterInner<>).MakeGenericType(type);
-            return (JsonConverter)Activator.CreateInstance(converterType);
+            return (JsonConverter)Activator.CreateInstance(converterType)!;
         }
 
         /// <summary>
@@ -53,7 +53,11 @@ namespace DuetAPI.Utility
             /// <returns>Read value</returns>
             public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             {
-                return (T)(object)Convert.ToInt32(Convert.ToChar(reader.GetString()));
+                if (reader.TokenType != JsonTokenType.String)
+                {
+                    throw new JsonException();
+                }
+                return (T)(object)Convert.ToInt32(Convert.ToChar(reader.GetString()!));
             }
 
             /// <summary>

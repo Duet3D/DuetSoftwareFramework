@@ -61,7 +61,7 @@ namespace DuetControlServer.Codes
         /// <param name="channel">Code channel</param>
         /// <param name="macro">Optional macro file</param>
         /// <returns>Pipeline state</returns>
-        internal static Pipelines.PipelineStackItem Push(CodeChannel channel, Macro macro = null) => _processors[(int)channel].Push(macro);
+        internal static Pipelines.PipelineStackItem Push(CodeChannel channel, Macro? macro = null) => _processors[(int)channel].Push(macro);
 
         /// <summary>
         /// Push a new state on the stack of a given pipeline. Only to be used by the SPI channel processor!
@@ -89,7 +89,7 @@ namespace DuetControlServer.Codes
         /// <returns>Whether the codes have been flushed successfully</returns>
         public static async Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true, bool syncFileStreams = true)
         {
-            if (code == null)
+            if (code is null)
             {
                 throw new ArgumentNullException(nameof(code));
             }
@@ -151,8 +151,8 @@ namespace DuetControlServer.Codes
             }
 
             // Deal with codes from code interceptors
-            Commands.Code codeBeingIntercepted = IPC.Processors.CodeInterception.GetCodeBeingIntercepted(code.Connection, out InterceptionMode mode);
-            if (codeBeingIntercepted != null)
+            Commands.Code? codeBeingIntercepted = IPC.Processors.CodeInterception.GetCodeBeingIntercepted(code.Connection, out InterceptionMode mode);
+            if (codeBeingIntercepted is not null)
             {
                 // Make sure new codes from macros go the same route as regular macro codes
                 if (codeBeingIntercepted.Flags.HasFlag(CodeFlags.IsFromMacro))
@@ -179,7 +179,7 @@ namespace DuetControlServer.Codes
         /// </summary>
         /// <param name="code">Code to cancel</param>
         /// <param name="e">Optional exception causing the cancellation</param>
-        public static void CancelCode(Commands.Code code, Exception e = null)
+        public static void CancelCode(Commands.Code code, Exception? e = null)
         {
             code.Result = null;
             if (e is not null and not OperationCanceledException)

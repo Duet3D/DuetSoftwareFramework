@@ -1,6 +1,7 @@
 ﻿using DuetAPI.Utility;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Net;
@@ -37,13 +38,13 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Unparsed string representation of the code parameter or an empty string if none present
         /// </summary>
-        internal readonly string StringValue;
+        internal readonly string? StringValue;
 
         /// <summary>
         /// Internal parsed representation of the string value (one of string, int, uint, float, int[], uint[] or float[])
         /// </summary>
-        internal object ParsedValue;
-        
+        internal object? ParsedValue;
+
         /// <summary>
         /// Creates a new CodeParameter instance and parses value to a native data type if applicable
         /// </summary>
@@ -52,24 +53,24 @@ namespace DuetAPI.Commands
         /// <param name="isString">Whether this is a string. This is set to true if the parameter was inside quotation marks</param>
         /// <param name="isDriverId">Whether this is a driver ID</param>
         /// <remarks>This constructor does not parsed long (aka int64) values because RRF cannot handle them</remarks>
-        public CodeParameter(char letter, string value, bool isString, bool isDriverId)
+        public CodeParameter(char letter, string? value, bool isString, bool isDriverId)
         {
             Letter = letter;
             StringValue = value;
 
-            if (isString)
+            if (value is null || isString)
             {
-                // Value is definitely a string because it is encapsulated in quotation marks
+                // Value is null or definitely a string because it is encapsulated in quotation marks
                 ParsedValue = value;
             }
             else if (isDriverId)
             {
                 // Value is a (list of) driver identifier(s)
-                List<DriverId> driverIds = new List<DriverId>();
+                List<DriverId> driverIds = new();
 
                 foreach (string item in value.Split(':'))
                 {
-                    DriverId driverId = new DriverId(item);
+                    DriverId driverId = new(item);
                     driverIds.Add(driverId);
                 }
 
@@ -157,7 +158,7 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <param name="letter">Letter of the code parameter (automatically converted to upper-case)</param>
         /// <param name="value">Value of this parameter</param>
-        public CodeParameter(char letter, object value)
+        public CodeParameter(char letter, object? value)
         {
             Letter = letter;
             ParsedValue = value;
@@ -201,7 +202,7 @@ namespace DuetAPI.Commands
             {
                 StringValue = string.Join(":", longArray.Select(longVal => longVal.ToString("G", CultureInfo.InvariantCulture)));
             }
-            else
+            else  if (value is not null)
             {
                 StringValue = value.ToString();
             }
@@ -211,7 +212,7 @@ namespace DuetAPI.Commands
         /// Data type of the internally parsed value
         /// </summary>
         [JsonIgnore]
-        public Type Type => ParsedValue.GetType();
+        public Type? Type => ParsedValue?.GetType();
 
         /// <summary>
         /// Implicit conversion operator to float
@@ -219,7 +220,7 @@ namespace DuetAPI.Commands
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator float(CodeParameter codeParameter)
+        public static implicit operator float(CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
@@ -247,7 +248,7 @@ namespace DuetAPI.Commands
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator int(CodeParameter codeParameter)
+        public static implicit operator int(CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
@@ -271,7 +272,7 @@ namespace DuetAPI.Commands
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator uint(CodeParameter codeParameter)
+        public static implicit operator uint(CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
@@ -303,7 +304,7 @@ namespace DuetAPI.Commands
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator DriverId(CodeParameter codeParameter)
+        public static implicit operator DriverId(CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
@@ -326,7 +327,7 @@ namespace DuetAPI.Commands
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator long(CodeParameter codeParameter)
+        public static implicit operator long(CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
@@ -357,21 +358,24 @@ namespace DuetAPI.Commands
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator bool(CodeParameter codeParameter) => codeParameter > 0;
+        public static implicit operator bool(CodeParameter? codeParameter) => codeParameter > 0;
 
         /// <summary>
         /// Implicit conversion operator to string
         /// </summary>
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
-        public static implicit operator string(CodeParameter codeParameter) => codeParameter?.StringValue;
+        public static implicit operator string?(CodeParameter? codeParameter) => codeParameter?.StringValue;
 
         /// <summary>
         /// Implicit conversion operator to an IP address
         /// </summary>
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
-        public static implicit operator IPAddress(CodeParameter codeParameter) => (codeParameter != null) ? IPAddress.Parse(codeParameter.StringValue) : null;
+        public static implicit operator IPAddress?(CodeParameter? codeParameter)
+        {
+            return (codeParameter is null || codeParameter.StringValue is null) ? null : IPAddress.Parse(codeParameter.StringValue);
+        }
 
         /// <summary>
         /// Implicit conversion operator to float array
@@ -379,11 +383,11 @@ namespace DuetAPI.Commands
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator float[](CodeParameter codeParameter)
+        public static implicit operator float[](CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
-                return null;
+                throw new ArgumentNullException(nameof(codeParameter));
             }
             if (codeParameter.ParsedValue is float[] floatArray)
             {
@@ -419,11 +423,11 @@ namespace DuetAPI.Commands
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator int[] (CodeParameter codeParameter)
+        public static implicit operator int[](CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
-                return null;
+                throw new ArgumentNullException(nameof(codeParameter));
             }
             if (codeParameter.ParsedValue is int[] intArray)
             {
@@ -451,11 +455,11 @@ namespace DuetAPI.Commands
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator uint[] (CodeParameter codeParameter)
+        public static implicit operator uint[](CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
-                return null;
+                throw new ArgumentNullException(nameof(codeParameter));
             }
             if (codeParameter.ParsedValue is uint[] uintArray)
             {
@@ -499,7 +503,7 @@ namespace DuetAPI.Commands
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator DriverId[](CodeParameter codeParameter)
+        public static implicit operator DriverId[](CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
@@ -530,11 +534,11 @@ namespace DuetAPI.Commands
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
         /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator long[] (CodeParameter codeParameter)
+        public static implicit operator long[](CodeParameter codeParameter)
         {
             if (codeParameter is null)
             {
-                return null;
+                throw new ArgumentNullException(nameof(codeParameter));
             }
             if (codeParameter.ParsedValue is long[] longArray)
             {
@@ -577,11 +581,11 @@ namespace DuetAPI.Commands
         /// <param name="a">Code parameter</param>
         /// <param name="b">Other object</param>
         /// <returns>True if both objects are equal</returns>
-        public static bool operator ==(CodeParameter a, object b)
+        public static bool operator ==(CodeParameter? a, object? b)
         {
-            if (a is null)
+            if (a is null || a.ParsedValue is null)
             {
-                return (b is null);
+                return b is null;
             }
             if (b is CodeParameter other)
             {
@@ -596,20 +600,20 @@ namespace DuetAPI.Commands
         /// <param name="a">Code parameter</param>
         /// <param name="b">Other object</param>
         /// <returns>True if both objects are not equal</returns>
-        public static bool operator !=(CodeParameter a, object b) => !(a == b);
+        public static bool operator !=(CodeParameter? a, object? b) => !(a == b);
 
         /// <summary>
         /// Checks if the other obj equals this instance
         /// </summary>
         /// <param name="obj">Other object</param>
         /// <returns>True if both objects are not equal</returns>
-        public override bool Equals(object obj) => this == obj;
+        public override bool Equals(object? obj) => this == obj;
 
         /// <summary>
         /// Returns the hash code of this instance
         /// </summary>
         /// <returns>Computed hash code</returns>
-        public override int GetHashCode() => Letter.GetHashCode() ^ ParsedValue.GetHashCode();
+        public override int GetHashCode() => Letter.GetHashCode() ^ (ParsedValue?.GetHashCode() ?? 0);
 
         /// <summary>
         /// Converts this parameter to a string
@@ -635,7 +639,9 @@ namespace DuetAPI.Commands
             if (reader.TokenType == JsonTokenType.StartObject)
             {
                 char letter = '@';
-                string propertyName = string.Empty, value = string.Empty;
+                string propertyName = string.Empty;
+                string? value = null;
+
                 bool isString = false, isDriverId = false;
 
                 while (reader.Read())
@@ -643,17 +649,17 @@ namespace DuetAPI.Commands
                     switch (reader.TokenType)
                     {
                         case JsonTokenType.PropertyName:
-                            propertyName = reader.GetString();
+                            propertyName = reader.GetString()!;
                             break;
 
                         case JsonTokenType.String:
                             if (propertyName.Equals("letter", StringComparison.InvariantCultureIgnoreCase))
                             {
-                                letter = Convert.ToChar(reader.GetString());
+                                letter = Convert.ToChar(reader.GetString()!);
                             }
                             else if (propertyName.Equals("value", StringComparison.InvariantCultureIgnoreCase))
                             {
-                                value = reader.GetString();
+                                value = reader.GetString()!;
                             }
                             break;
 

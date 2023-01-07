@@ -16,9 +16,9 @@ namespace DuetControlServer.Model
         /// </summary>
         /// <param name="sender">Parent object</param>
         /// <param name="e">Event arguments</param>
-        private static void VariableModelObjectChanging(object sender, PropertyChangingEventArgs e)
+        private static void VariableModelObjectChanging(object? sender, PropertyChangingEventArgs e)
         {
-            if (sender.GetType().GetProperty(e.PropertyName).GetValue(sender) is ModelObject modelMember)
+            if (sender?.GetType().GetProperty(e.PropertyName!)?.GetValue(sender) is ModelObject modelMember)
             {
                 // Prevent memory leaks in case variable model objects are replaced
                 UnsubscribeFromModelObject(modelMember);
@@ -40,8 +40,8 @@ namespace DuetControlServer.Model
         {
             return (sender, e) =>
             {
-                string propertyName = JsonNamingPolicy.CamelCase.ConvertName(e.PropertyName);
-                object value = sender.GetType().GetProperty(e.PropertyName).GetValue(sender);
+                string propertyName = JsonNamingPolicy.CamelCase.ConvertName(e.PropertyName!);
+                object? value = sender?.GetType().GetProperty(e.PropertyName!)!.GetValue(sender);
                 OnPropertyPathChanged?.Invoke(AddToPath(path, propertyName), PropertyChangeType.Property, value);
 
                 if (hasVariableModelObjects && value is ModelObject modelMember)
@@ -62,12 +62,12 @@ namespace DuetControlServer.Model
             bool hasVariableModelObjects = false;
             foreach (PropertyInfo property in modelObject.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
             {
-                if (property.GetMethod.GetParameters().Length != 0)
+                if (property.GetMethod!.GetParameters().Length != 0)
                 {
                     continue;
                 }
                 string propertyName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
-                object value = property.GetValue(modelObject);
+                object? value = property.GetValue(modelObject);
 
                 if (value is ModelObject objectValue)
                 {
@@ -82,7 +82,7 @@ namespace DuetControlServer.Model
                     SubscribeToModelDictionary(dictionaryValue, AddToPath(path, propertyName));
                 }
 
-                hasVariableModelObjects |= property.PropertyType.IsAssignableTo(typeof(ModelObject)) && (property.SetMethod != null);
+                hasVariableModelObjects |= property.PropertyType.IsAssignableTo(typeof(ModelObject)) && (property.SetMethod is not null);
             }
 
             if (modelObject is INotifyPropertyChanged propChangeModel)
@@ -106,7 +106,7 @@ namespace DuetControlServer.Model
         /// <param name="modelObject">Model object to unsubscribe from</param>
         private static void UnsubscribeFromModelObject(ModelObject modelObject)
         {
-            if (_propertyChangedHandlers.TryGetValue(modelObject, out PropertyChangedEventHandler changeHandler))
+            if (_propertyChangedHandlers.TryGetValue(modelObject, out PropertyChangedEventHandler? changeHandler))
             {
                 modelObject.PropertyChanged -= changeHandler;
                 _propertyChangedHandlers.Remove(modelObject);
@@ -115,12 +115,12 @@ namespace DuetControlServer.Model
             bool hasVariableModelObjects = false;
             foreach (PropertyInfo property in modelObject.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
             {
-                if (property.GetMethod.GetParameters().Length != 0)
+                if (property.GetMethod!.GetParameters().Length != 0)
                 {
                     continue;
                 }
-                object value = property.GetValue(modelObject);
 
+                object? value = property.GetValue(modelObject);
                 if (value is ModelObject objectValue)
                 {
                     UnsubscribeFromModelObject(objectValue);
@@ -134,7 +134,7 @@ namespace DuetControlServer.Model
                     UnsubscribeFromModelDictionary(dictionaryValue);
                 }
 
-                hasVariableModelObjects |= property.PropertyType.IsAssignableTo(typeof(ModelObject)) && (property.SetMethod != null);
+                hasVariableModelObjects |= property.PropertyType.IsAssignableTo(typeof(ModelObject)) && (property.SetMethod is not null);
             }
 
             if (hasVariableModelObjects)

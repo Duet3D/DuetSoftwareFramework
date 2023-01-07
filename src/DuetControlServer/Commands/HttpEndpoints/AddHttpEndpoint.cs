@@ -46,7 +46,7 @@ namespace DuetControlServer.Commands
 
             // Create a UNIX socket file like /run/dsf/mynamespace/myaction-GET.sock
             string socketPath = System.IO.Path.Combine(Settings.SocketDirectory, Namespace, $"{Path}-{EndpointType}.sock");
-            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(socketPath));
+            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(socketPath)!);
 
             using (await Model.Provider.AccessReadWriteAsync())
             {

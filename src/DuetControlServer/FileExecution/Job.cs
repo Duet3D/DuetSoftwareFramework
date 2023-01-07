@@ -60,17 +60,17 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Name of the job file
         /// </summary>
-        private static string _filename;
+        private static string? _filename;
 
         /// <summary>
         /// First job file being read from
         /// </summary>
-        private static CodeFile _file;
+        private static CodeFile? _file;
 
         /// <summary>
         /// Second job file being read from
         /// </summary>
-        private static CodeFile _file2;
+        private static CodeFile? _file2;
 
         /// <summary>
         /// Internal cancellation token source used to cancel pending codes when necessary
@@ -80,7 +80,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Indicates if a file has been selected for printing
         /// </summary>
-        public static bool IsFileSelected => _file != null;
+        public static bool IsFileSelected => _file is not null;
 
         /// <summary>
         /// Indicates if a print is live
@@ -132,7 +132,7 @@ namespace DuetControlServer.FileExecution
         /// <returns>File position</returns>
         public static async Task<long> GetFilePosition(int motionSystem)
         {
-            if (_file != null && motionSystem == 0)
+            if (_file is not null && motionSystem == 0)
             {
                 using (await _file.LockAsync())
                 {
@@ -140,7 +140,7 @@ namespace DuetControlServer.FileExecution
                 }
             }
 
-            if (_file2 != null && motionSystem == 1)
+            if (_file2 is not null && motionSystem == 1)
             {
                 using (await _file2.LockAsync())
                 {
@@ -166,7 +166,7 @@ namespace DuetControlServer.FileExecution
         /// </remarks>
         public static Task<bool> DoSync(Code code)
         {
-            if (code.FilePosition == null)
+            if (code.FilePosition is null)
             {
                 throw new ArgumentException("Code has no file position and cannot be used for sync requests", nameof(code));
             }
@@ -197,7 +197,7 @@ namespace DuetControlServer.FileExecution
         /// <returns>File position</returns>
         public static async Task SetFilePosition(int motionSystem, long filePosition)
         {
-            if (_file != null && motionSystem == 0)
+            if (_file is not null && motionSystem == 0)
             {
                 using (await _file.LockAsync())
                 {
@@ -205,7 +205,7 @@ namespace DuetControlServer.FileExecution
                 }
             }
 
-            if (_file2 != null && motionSystem == 1)
+            if (_file2 is not null && motionSystem == 1)
             {
                 using (await _file2.LockAsync())
                 {
@@ -229,7 +229,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Returns the length of the file being printed in bytes
         /// </summary>
-        public static long FileLength => _file.Length;
+        public static long FileLength => (_file is not null) ? _file.Length : 0;
 
         /// <summary>
         /// Start a new file print
@@ -265,7 +265,9 @@ namespace DuetControlServer.FileExecution
             // Update the object model
             using (await Provider.AccessReadWriteAsync())
             {
-                Provider.Get.Inputs.File.Volumetric = false;
+#warning check the following two lines
+                Provider.Get.Inputs.File!.Volumetric = false;
+                Provider.Get.Inputs.File2!.Volumetric = false;
                 Provider.Get.Job.File.Assign(info);
             }
 
@@ -302,7 +304,7 @@ namespace DuetControlServer.FileExecution
             do
             {
                 // Fill up the code buffer
-                while (codePool.TryDequeue(out Code sharedCode))
+                while (codePool.TryDequeue(out Code? sharedCode))
                 {
                     sharedCode.Reset();
 
@@ -320,11 +322,11 @@ namespace DuetControlServer.FileExecution
                     // Try to read the next code
                     try
                     {
-                        Code readCode;
+                        Code? readCode;
                         try
                         {
                             readCode = await file.ReadCodeAsync(sharedCode);
-                            if (readCode == null)
+                            if (readCode is null)
                             {
                                 codePool.Enqueue(sharedCode);
                                 break;
@@ -355,7 +357,7 @@ namespace DuetControlServer.FileExecution
                             file.Close();
                         }
 
-                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from job file (channel {file.Channel}): {ae.InnerException.Message}");
+                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from job file (channel {file.Channel}): {ae.InnerException!.Message}");
                         _logger.Error(ae.InnerException);
                     }
                     catch (Exception e)
@@ -371,7 +373,7 @@ namespace DuetControlServer.FileExecution
                 }
 
                 // Is there anything more to do?
-                if (codes.TryDequeue(out Code code))
+                if (codes.TryDequeue(out Code? code))
                 {
                     try
                     {
@@ -379,7 +381,7 @@ namespace DuetControlServer.FileExecution
                         {
                             // Logging of regular messages is done by the code itself, no need to take care of it here
                             await code.Task;
-                            nextFilePosition = code.FilePosition.Value + code.Length.Value;
+                            nextFilePosition = code.FilePosition ?? 0 + code.Length ?? 0;
                         }
                         catch (OperationCanceledException)
                         {
@@ -392,7 +394,7 @@ namespace DuetControlServer.FileExecution
                         }
                         catch (AggregateException ae)
                         {
-                            await Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception (channel {file.Channel}): [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                            await Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception (channel {file.Channel}): [{ae.InnerException!.GetType().Name}] {ae.InnerException.Message}");
                             _logger.Error(ae.InnerException);
                         }
                         catch (Exception e)
@@ -445,7 +447,7 @@ namespace DuetControlServer.FileExecution
                 using (await LockAsync())
                 {
                     await _resume.WaitAsync(Program.CancellationToken);
-                    startingNewPrint = !_file.IsClosed;
+                    startingNewPrint = !_file!.IsClosed && !_file2!.IsClosed;
                     IsProcessing = startingNewPrint;
                 }
 
@@ -455,8 +457,8 @@ namespace DuetControlServer.FileExecution
                     _logger.Info("Starting file print");
 
                     // Run the same file print on two distinct channels
-                    Task firstFileTask = DoFilePrint(_file);
-                    Task secondFileTask = DoFilePrint(_file2);
+                    Task firstFileTask = DoFilePrint(_file!);
+                    Task secondFileTask = DoFilePrint(_file2!);
                     await Task.WhenAll(firstFileTask, secondFileTask);
 
                     // Flush one last time in case plugins inserted codes at the end of a print file
@@ -508,7 +510,7 @@ namespace DuetControlServer.FileExecution
                                 await Updater.WaitForFullUpdate();
                                 using (await Provider.AccessReadOnlyAsync())
                                 {
-                                    if (Provider.Get.State.UpTime < upTime || Provider.Get.Job.LastDuration != null)
+                                    if (Provider.Get.State.UpTime < upTime || Provider.Get.Job.LastDuration is not null)
                                     {
                                         lastDuration = Provider.Get.Job.LastDuration;
                                         break;
@@ -520,7 +522,7 @@ namespace DuetControlServer.FileExecution
                             // Try to update the last simulated time
                             if (lastDuration > 0)
                             {
-                                await InfoParser.UpdateSimulatedTime(_filename, lastDuration.Value);
+                                await InfoParser.UpdateSimulatedTime(_filename!, lastDuration.Value);
                             }
                             else
                             {
@@ -546,8 +548,8 @@ namespace DuetControlServer.FileExecution
                     }
 
                     // Dispose the file
-                    _file.Dispose();
-                    _file2.Dispose();
+                    _file!.Dispose();
+                    _file2!.Dispose();
                     _file = _file2 = null;
                     _filename = null;
 
@@ -600,11 +602,11 @@ namespace DuetControlServer.FileExecution
                 _cancellationTokenSource.Dispose();
                 _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
 
-                using (_file.Lock())
+                using (_file!.Lock())
                 {
                     _file.Close();
                 }
-                using (_file2.Lock())
+                using (_file2!.Lock())
                 {
                     _file2.Close();
                 }
@@ -625,11 +627,11 @@ namespace DuetControlServer.FileExecution
                 _cancellationTokenSource.Dispose();
                 _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
 
-                using (await _file.LockAsync())
+                using (await _file!.LockAsync())
                 {
                     _file.Close();
                 }
-                using (await _file2.LockAsync())
+                using (await _file2!.LockAsync())
                 {
                     _file2.Close();
                 }
@@ -650,11 +652,11 @@ namespace DuetControlServer.FileExecution
                 _cancellationTokenSource.Dispose();
                 _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
 
-                using (_file.Lock())
+                using (_file!.Lock())
                 {
                     _file.Close();
                 }
-                using (_file2.Lock())
+                using (_file2!.Lock())
                 {
                     _file2.Close();
                 }
@@ -675,11 +677,11 @@ namespace DuetControlServer.FileExecution
                 _cancellationTokenSource.Dispose();
                 _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
 
-                using (await _file.LockAsync())
+                using (await _file!.LockAsync())
                 {
                     _file.Close();
                 }
-                using (await _file2.LockAsync())
+                using (await _file2!.LockAsync())
                 {
                     _file2.Close();
                 }
@@ -696,7 +698,7 @@ namespace DuetControlServer.FileExecution
         public static async Task Diagnostics(StringBuilder builder)
         {
             using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-            IDisposable lockObject = null;
+            IDisposable? lockObject = null;
             try
             {
                 cts.CancelAfter(2000);
@@ -709,7 +711,7 @@ namespace DuetControlServer.FileExecution
 
             if (IsFileSelected)
             {
-                builder.Append($"File {_file.FileName} is selected");
+                builder.Append($"File {_file!.FileName} is selected");
                 if (IsProcessing)
                 {
                     builder.Append(", processing");

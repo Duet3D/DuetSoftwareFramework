@@ -17,12 +17,12 @@ namespace DocGen
         /// <summary>
         /// Version of this application
         /// </summary>
-        public static readonly string Version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion;
+        public static readonly string Version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
 
         /// <summary>
         /// List of available types from the DuetAPI library
         /// </summary>
-        private static readonly Type[] apiTypes = Assembly.GetAssembly(typeof(ObjectModel)).GetTypes();
+        private static readonly Type[] apiTypes = Assembly.GetAssembly(typeof(ObjectModel))!.GetTypes();
 
         /// <summary>
         /// Minimum markup indentation level
@@ -113,14 +113,14 @@ namespace DocGen
         /// <param name="classDescription">Description of the class or null if not applicable</param>
         /// <param name="depth">Current indentation depth</param>
         /// <returns>Asynchronous task</returns>
-        private static async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property, string path, string classDescription, int depth)
+        private static async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property, string? path, string? classDescription, int depth)
         {
             if (depth > MaxDepth)
             {
                 depth = MaxDepth;
             }
 
-            string documentation = property.GetDocumentation();
+            string? documentation = property.GetDocumentation();
             if (!string.IsNullOrEmpty(documentation))
             {
                 string indentation = string.Empty;
@@ -130,7 +130,7 @@ namespace DocGen
                 }
 
                 // Write title
-                string propertyName = (path != null) ? $"{path}." : string.Empty;
+                string propertyName = (path is not null) ? $"{path}." : string.Empty;
                 propertyName += JsonNamingPolicy.CamelCase.ConvertName(property.Name);
                 if (typeof(IEnumerable).IsAssignableFrom(property.PropertyType) &&
                     property.PropertyType != typeof(string) &&
@@ -139,7 +139,7 @@ namespace DocGen
                     propertyName += "[]";
                 }
 
-                if (classDescription == null)
+                if (classDescription is null)
                 {
                     await writer.WriteLineAsync($"{indentation} {propertyName}");
                 }
@@ -152,7 +152,7 @@ namespace DocGen
                 bool writeNL = false;
                 if (Attribute.IsDefined(property, typeof(ObsoleteAttribute)))
                 {
-                    ObsoleteAttribute attribute = (ObsoleteAttribute)Attribute.GetCustomAttribute(property, typeof(ObsoleteAttribute));
+                    ObsoleteAttribute attribute = (ObsoleteAttribute)Attribute.GetCustomAttribute(property, typeof(ObsoleteAttribute))!;
                     if (string.IsNullOrWhiteSpace(attribute.Message))
                     {
                         await writer.WriteLineAsync("*This field is obsolete and will be removed from the object model in the future*");
@@ -165,7 +165,7 @@ namespace DocGen
                 }
                 if (Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
                 {
-                    SbcPropertyAttribute attribute = (SbcPropertyAttribute)Attribute.GetCustomAttribute(property, typeof(SbcPropertyAttribute));
+                    SbcPropertyAttribute attribute = (SbcPropertyAttribute)Attribute.GetCustomAttribute(property, typeof(SbcPropertyAttribute))!;
                     if (attribute.AvailableInStandaloneMode)
                     {
                         await writer.WriteLineAsync("*This field is maintained by DSF in SBC mode*");
@@ -202,7 +202,7 @@ namespace DocGen
                         string jsonValue = JsonSerializer.Serialize(value, baseType).Trim('"', '[', ']');
                         if (!string.IsNullOrEmpty(jsonValue))
                         {
-                            string memberDocs = XMLHelper.GetEnumDocumentation(baseType, value);
+                            string? memberDocs = XMLHelper.GetEnumDocumentation(baseType, value);
                             await writer.WriteLineAsync($"- {jsonValue}: {memberDocs}");
                         }
                     }
@@ -248,7 +248,7 @@ namespace DocGen
                         foreach (Type type in relatedTypes)
                         {
                             // Only write plain type documentation if this property type does not directly inherit from ModelObject
-                            classDescription = (type.BaseType != typeof(ModelObject)) ? $"{type.Name} : {type.BaseType.Name}" : type.Name;
+                            classDescription = (type.BaseType != typeof(ModelObject)) ? $"{type.Name} : {type.BaseType!.Name}" : type.Name;
                             await WriteTypeDocumentation(writer, type, propertyName, classDescription, depth + 1, type.BaseType != typeof(ModelObject));
                         }
                     }
@@ -266,7 +266,7 @@ namespace DocGen
         /// <param name="depth">Current indentation depth</param>
         /// <param name="writeTypeDocs">Whether the type should be documented too</param>
         /// <returns>Asynchronous task</returns>
-        private static async Task WriteTypeDocumentation(StreamWriter writer, Type type, string path, string classDescription, int depth, bool writeTypeDocs)
+        private static async Task WriteTypeDocumentation(StreamWriter writer, Type type, string path, string? classDescription, int depth, bool writeTypeDocs)
         {
             if (depth > MaxDepth)
             {
@@ -276,7 +276,7 @@ namespace DocGen
             // Write type documentation only if needed
             if (writeTypeDocs)
             {
-                string documentation = type.GetDocumentation();
+                string? documentation = type.GetDocumentation();
                 if (!string.IsNullOrEmpty(documentation))
                 {
                     string indentation = string.Empty;
@@ -285,7 +285,7 @@ namespace DocGen
                         indentation += '#';
                     }
 
-                    if (classDescription == null)
+                    if (classDescription is null)
                     {
                         await writer.WriteLineAsync($"{indentation} {path}");
                     }

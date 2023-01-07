@@ -14,65 +14,65 @@
         /// <summary>
         /// Actual IPv4 address of the network adapter
         /// </summary>
-        public string ActualIP
+        public string? ActualIP
         {
             get => _actualIP;
 			set => SetPropertyValue(ref _actualIP, value);
         }
-        private string _actualIP;
+        private string? _actualIP;
 
         /// <summary>
         /// Configured IPv4 address of the network adapter
         /// </summary>
         [SbcProperty(false)]
-        public string ConfiguredIP
+        public string? ConfiguredIP
         {
             get => _configuredIP;
 			set => SetPropertyValue(ref _configuredIP, value);
         }
-        private string _configuredIP;
+        private string? _configuredIP;
 
         /// <summary>
         /// Configured IPv4 DNS server fo the network adapter
         /// </summary>
         [SbcProperty(false)]
-        public string DnsServer
+        public string? DnsServer
         {
             get => _dnsServer;
             set => SetPropertyValue(ref _dnsServer, value);
         }
-        private string _dnsServer;
+        private string? _dnsServer;
 
         /// <summary>
         /// Version of the network interface or null if unknown.
         /// This is only reported by ESP-based boards in standalone mode
         /// </summary>
-        public string FirmwareVersion
+        public string? FirmwareVersion
         {
             get => _firmwareVersion;
 			set => SetPropertyValue(ref _firmwareVersion, value);
         }
-        private string _firmwareVersion;
+        private string? _firmwareVersion;
 
         /// <summary>
         /// IPv4 gateway of the network adapter
         /// </summary>
-        public string Gateway
+        public string? Gateway
         {
             get => _gateway;
 			set => SetPropertyValue(ref _gateway, value);
         }
-        private string _gateway;
+        private string? _gateway;
 
         /// <summary>
         /// Physical address of the network adapter
         /// </summary>
-        public string Mac
+        public string? Mac
         {
             get => _mac;
 			set => SetPropertyValue(ref _mac, value);
         }
-        private string _mac;
+        private string? _mac;
 
         /// <summary>
         /// Number of reconnect attempts or null if unknown.
@@ -120,12 +120,12 @@
         /// <summary>
         /// Subnet of the network adapter
         /// </summary>
-        public string Subnet
+        public string? Subnet
         {
             get => _subnet;
 			set => SetPropertyValue(ref _subnet, value);
         }
-        private string _subnet;
+        private string? _subnet;
 
         /// <summary>
         /// Type of this network interface

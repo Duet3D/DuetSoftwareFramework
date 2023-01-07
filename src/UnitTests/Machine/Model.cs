@@ -20,9 +20,9 @@ namespace UnitTests.Machine
             model.UpdateFromJson(parsedJson.RootElement, false);
 
             Assert.IsNotNull(model.State.MessageBox);
-            Assert.AreEqual(MessageBoxMode.OkOnly, model.State.MessageBox.Mode);
-            Assert.AreEqual("message", model.State.MessageBox.Message);
-            Assert.AreEqual("title", model.State.MessageBox.Title);
+            Assert.AreEqual(MessageBoxMode.OkOnly, model.State.MessageBox?.Mode);
+            Assert.AreEqual("message", model.State.MessageBox?.Message);
+            Assert.AreEqual("title", model.State.MessageBox?.Title);
 
             string serializedModel = model.ToString();
             Assert.AreEqual(jsonText, serializedModel);
@@ -81,12 +81,12 @@ namespace UnitTests.Machine
 
             Assert.AreEqual("Yum", modelToUpdate.Boards[0].FirmwareName);
             Assert.AreEqual(2, modelToUpdate.Heat.BedHeaters.Count);
-            Assert.AreEqual(90F, modelToUpdate.Heat.Heaters[0].Active);
-            Assert.AreEqual(21F, modelToUpdate.Heat.Heaters[0].Standby);
-            Assert.AreEqual(20F, modelToUpdate.Heat.Heaters[1].Standby);
+            Assert.AreEqual(90F, modelToUpdate.Heat.Heaters[0]?.Active);
+            Assert.AreEqual(21F, modelToUpdate.Heat.Heaters[0]?.Standby);
+            Assert.AreEqual(20F, modelToUpdate.Heat.Heaters[1]?.Standby);
             Assert.AreEqual(1, modelToUpdate.Fans.Count);
-            Assert.AreEqual(0.5F, modelToUpdate.Fans[0].ActualValue);
-            Assert.AreEqual(0.75F, modelToUpdate.Fans[0].RequestedValue);
+            Assert.AreEqual(0.5F, modelToUpdate.Fans[0]?.ActualValue);
+            Assert.AreEqual(0.75F, modelToUpdate.Fans[0]?.RequestedValue);
             Assert.AreEqual(MachineStatus.Pausing, modelToUpdate.State.Status);
         }
 

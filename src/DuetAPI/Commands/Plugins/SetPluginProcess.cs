@@ -12,7 +12,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Identifier of the plugin to update
         /// </summary>
-        public string Plugin { get; set; }
+        public string Plugin { get; set; } = string.Empty;
 
         /// <summary>
         /// New process identifier of the plugin

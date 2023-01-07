@@ -81,7 +81,7 @@ namespace DuetWebServer.Controllers
                 using CommandConnection connection = await BuildConnection();
                 if (await connection.CheckPassword(password))
                 {
-                    int sessionId = await connection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, HttpContext.Connection.RemoteIpAddress.ToString());
+                    int sessionId = await connection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, HttpContext.Connection.RemoteIpAddress!.ToString());
                     string sessionKey = sessionStorage.MakeSessionKey(sessionId, string.Empty, true);
 
                     string jsonResponse = JsonSerializer.Serialize(new
@@ -96,7 +96,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -150,7 +150,7 @@ namespace DuetWebServer.Controllers
         {
             try
             {
-                if (HttpContext.User != null)
+                if (HttpContext.User is not null)
                 {
                     // Remove the internal session
                     int sessionId = sessionStorage.RemoveTicket(HttpContext.User);
@@ -168,7 +168,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -219,7 +219,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -292,7 +292,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -354,7 +354,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -408,7 +408,7 @@ namespace DuetWebServer.Controllers
                     resolvedPath = await ResolvePath(filename);
 
                     // Create directory if necessary
-                    string directory = Path.GetDirectoryName(resolvedPath);
+                    string directory = Path.GetDirectoryName(resolvedPath)!;
                     if (!Directory.Exists(directory))
                     {
                         Directory.CreateDirectory(directory);
@@ -421,7 +421,7 @@ namespace DuetWebServer.Controllers
                     }
 
                     // Change the datetime of the file if possible
-                    if (timeModified != null)
+                    if (timeModified is not null)
                     {
                         System.IO.File.SetLastWriteTime(resolvedPath, timeModified.Value);
                     }
@@ -437,7 +437,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -501,7 +501,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -571,7 +571,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -664,7 +664,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -724,7 +724,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -778,7 +778,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -844,7 +844,7 @@ namespace DuetWebServer.Controllers
                 {
                     if (e is AggregateException ae)
                     {
-                        e = ae.InnerException;
+                        e = ae.InnerException!;
                     }
                     if (e is IncompatibleVersionException)
                     {
@@ -918,7 +918,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -952,12 +952,12 @@ namespace DuetWebServer.Controllers
             /// <summary>
             /// Plugin to change
             /// </summary>
-            public string plugin { get; set; }
+            public string plugin { get; set; } = string.Empty;
 
             /// <summary>
             /// Key to change
             /// </summary>
-            public string key { get; set; }
+            public string key { get; set; } = string.Empty;
 
             /// <summary>
             /// Target value
@@ -984,7 +984,7 @@ namespace DuetWebServer.Controllers
         {
             try
             {
-                PluginPatchInstruction instruction = await JsonSerializer.DeserializeAsync<PluginPatchInstruction>(HttpContext.Request.Body);
+                PluginPatchInstruction instruction = (await JsonSerializer.DeserializeAsync<PluginPatchInstruction>(HttpContext.Request.Body))!;
 
                 using CommandConnection connection = await BuildConnection();
                 ObjectModel model = await connection.GetObjectModel();
@@ -1005,7 +1005,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -1064,7 +1064,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -1123,7 +1123,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -1195,7 +1195,7 @@ namespace DuetWebServer.Controllers
                 {
                     if (e is AggregateException ae)
                     {
-                        e = ae.InnerException;
+                        e = ae.InnerException!;
                     }
                     if (e is IncompatibleVersionException)
                     {
@@ -1269,7 +1269,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {

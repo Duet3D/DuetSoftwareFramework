@@ -76,11 +76,11 @@ namespace DuetWebServer.Middleware
         public async Task InvokeAsync(HttpContext context)
         {
             // Check if this endpoint is reserved for any route
-            HttpEndpoint httpEndpoint = null;
+            HttpEndpoint? httpEndpoint = null;
             lock (_modelProvider.Endpoints)
             {
                 string method = context.WebSockets.IsWebSocketRequest ? "WebSocket" : context.Request.Method.ToString();
-                if (_modelProvider.Endpoints.TryGetValue($"{method}{context.Request.Path.Value}", out HttpEndpoint ep))
+                if (_modelProvider.Endpoints.TryGetValue($"{method}{context.Request.Path.Value}", out HttpEndpoint? ep))
                 {
                     httpEndpoint = ep;
                 }
@@ -90,7 +90,7 @@ namespace DuetWebServer.Middleware
                 }
             }
 
-            if (httpEndpoint != null)
+            if (httpEndpoint is not null)
             {
                 // Connect to the given UNIX socket endpoint
                 using HttpEndpointConnection endpointConnection = new();
@@ -270,7 +270,7 @@ namespace DuetWebServer.Middleware
             ReceivedHttpRequest receivedHttpRequest = new()
             {
                 Body = body,
-                ContentType = context.Request.ContentType,
+                ContentType = context.Request.ContentType!,
                 SessionId = sessionId
             };
 
@@ -302,7 +302,7 @@ namespace DuetWebServer.Middleware
                 switch (httpResponse.ResponseType)
                 {
                     case HttpResponseType.StatusCode:
-                        context.Response.ContentType = null;
+                        context.Response.ContentType = string.Empty;
                         break;
                     case HttpResponseType.PlainText:
                         context.Response.ContentType = "text/plain;charset=utf-8";
@@ -311,7 +311,6 @@ namespace DuetWebServer.Middleware
                         context.Response.ContentType = "application/json";
                         break;
                 }
-
                 await context.Response.BodyWriter.WriteAsync(Encoding.UTF8.GetBytes(httpResponse.Response));
             }
         }

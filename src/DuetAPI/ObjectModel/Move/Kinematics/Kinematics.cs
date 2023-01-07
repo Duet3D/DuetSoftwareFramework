@@ -21,42 +21,29 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Segmentation parameters or null if not configured
         /// </summary>
-        public MoveSegmentation Segmentation
+        public MoveSegmentation? Segmentation
         {
             get => _segmentation;
             set => SetPropertyValue(ref _segmentation, value);
         }
-        private MoveSegmentation _segmentation;
+        private MoveSegmentation? _segmentation;
 
         /// <summary>
         /// Figure out the required type for the given kinematics name
         /// </summary>
         /// <param name="name">Kinematics name</param>
         /// <returns>Required type</returns>
-        private static Type GetKinematicsType(KinematicsName name)
+        private static Type GetKinematicsType(KinematicsName? name)
         {
-            switch (name)
+            return name switch
             {
-                case KinematicsName.Cartesian:
-                case KinematicsName.CoreXY:
-                case KinematicsName.CoreXYU:
-                case KinematicsName.CoreXYUV:
-                case KinematicsName.CoreXZ:
-                case KinematicsName.MarkForged:
-                    return typeof(CoreKinematics);
-                case KinematicsName.Delta:
-                    return typeof(DeltaKinematics);
-                case KinematicsName.Hangprinter:
-                    return typeof(HangprinterKinematics);
-                case KinematicsName.FiveBarScara:
-                case KinematicsName.Scara:
-                    return typeof(ScaraKinematics);
-                case KinematicsName.Polar:
-                    return typeof(PolarKinematics);
-                case KinematicsName.RotaryDelta:
-                default:
-                    return typeof(Kinematics);
-            }
+                KinematicsName.Cartesian or KinematicsName.CoreXY or KinematicsName.CoreXYU or KinematicsName.CoreXYUV or KinematicsName.CoreXZ or KinematicsName.MarkForged => typeof(CoreKinematics),
+                KinematicsName.Delta => typeof(DeltaKinematics),
+                KinematicsName.Hangprinter => typeof(HangprinterKinematics),
+                KinematicsName.FiveBarScara or KinematicsName.Scara => typeof(ScaraKinematics),
+                KinematicsName.Polar => typeof(PolarKinematics),
+                _ => typeof(Kinematics),
+            };
         }
 
         /// <summary>
@@ -66,7 +53,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
-        public override IModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public override IModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {
@@ -75,11 +62,11 @@ namespace DuetAPI.ObjectModel
 
             if (jsonElement.TryGetProperty("name", out JsonElement nameProperty))
             {
-                KinematicsName kinematicsName = (KinematicsName)Enum.Parse(typeof(KinematicsName), nameProperty.GetString(), true);
+                KinematicsName? kinematicsName = (KinematicsName?)JsonSerializer.Deserialize(nameProperty.GetRawText(), typeof(KinematicsName));
                 Type requiredType = GetKinematicsType(kinematicsName);
                 if (GetType() != requiredType)
                 {
-                    Kinematics newInstance = (Kinematics)Activator.CreateInstance(requiredType);
+                    Kinematics newInstance = (Kinematics)Activator.CreateInstance(requiredType)!;
                     return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
                 }
             }

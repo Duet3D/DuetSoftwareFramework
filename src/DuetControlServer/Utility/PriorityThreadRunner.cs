@@ -35,7 +35,7 @@ namespace DuetControlServer.Utility
                         }
                         else
                         {
-                            tcs.SetException(ae.InnerException);
+                            tcs.SetException(ae.InnerException!);
                         }
                     }
                     else if (e is OperationCanceledException)
@@ -47,9 +47,11 @@ namespace DuetControlServer.Utility
                         tcs.SetException(e);
                     }
                 }
-            });
-            wrapper.Priority = priority;
-            wrapper.IsBackground = true;
+            })
+            {
+                Priority = priority,
+                IsBackground = true
+            };
             wrapper.Start();
             return tcs.Task;
         }

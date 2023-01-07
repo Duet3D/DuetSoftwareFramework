@@ -14,7 +14,7 @@ namespace DuetControlServer.Codes.Handlers
         /// </summary>
         /// <param name="code">Code to process</param>
         /// <returns>Result of the code if the code completed, else null</returns>
-        public static Task<Message> Process(Code code) => Task.FromResult<Message>(null);
+        public static Task<Message?> Process(Code code) => Task.FromResult<Message?>(null);
 
         /// <summary>
         /// React to an executed G-code before its result is returned

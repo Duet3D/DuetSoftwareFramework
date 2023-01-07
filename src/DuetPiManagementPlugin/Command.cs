@@ -34,15 +34,18 @@ namespace DuetPiManagementPlugin
             startInfo.RedirectStandardError = true;
             startInfo.RedirectStandardOutput = true;
 
-            using Process process = Process.Start(startInfo);
-            process.OutputDataReceived += OutputReceived;
-            process.ErrorDataReceived += OutputReceived;
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            await process.WaitForExitAsync(Program.CancellationToken);
+            using Process? process = Process.Start(startInfo);
+            if (process is not null)
+            {
+                process.OutputDataReceived += OutputReceived;
+                process.ErrorDataReceived += OutputReceived;
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+                await process.WaitForExitAsync(Program.CancellationToken);
 
-            process.OutputDataReceived -= OutputReceived;
-            process.ErrorDataReceived -= OutputReceived;
+                process.OutputDataReceived -= OutputReceived;
+                process.ErrorDataReceived -= OutputReceived;
+            }
             return output.ToString();
         }
 

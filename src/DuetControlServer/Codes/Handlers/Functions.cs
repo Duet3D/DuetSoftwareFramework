@@ -23,7 +23,7 @@ namespace DuetControlServer.Codes.Handlers
         /// <param name="functionName">Function name</param>
         /// <param name="argument">Function argument</param>
         /// <returns>Whether the file exists</returns>
-        public static async Task<object> FileExists(string functionName, object[] arguments)
+        public static async Task<object?> FileExists(string functionName, object?[] arguments)
         {
             if (arguments.Length == 1 && arguments[0] is string stringArgument)
             {

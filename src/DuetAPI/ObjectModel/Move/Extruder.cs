@@ -30,12 +30,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Assigned driver
         /// </summary>
-        public DriverId Driver
+        public DriverId? Driver
         {
             get => _driver;
 			set => SetPropertyValue(ref _driver, value);
         }
-        private DriverId _driver;
+        private DriverId? _driver;
 
         /// <summary>
         /// Name of the currently loaded filament

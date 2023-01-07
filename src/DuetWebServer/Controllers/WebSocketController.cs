@@ -115,7 +115,7 @@ namespace DuetWebServer.Controllers
                 {
                     if (e is AggregateException ae)
                     {
-                        e = ae.InnerException;
+                        e = ae.InnerException!;
                     }
                     if (e is IncompatibleVersionException)
                     {
@@ -178,7 +178,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -207,7 +207,7 @@ namespace DuetWebServer.Controllers
             }
 
             // Log this event
-            string ipAddress = HttpContext.Connection.RemoteIpAddress.ToString();
+            string? ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
             int port = HttpContext.Connection.RemotePort;
             _logger.LogInformation("WebSocket connected from {0}:{1}", ipAddress, port);
 
@@ -230,14 +230,14 @@ namespace DuetWebServer.Controllers
                 Task terminatedTask = await Task.WhenAny(rxTask, txTask);
                 if (terminatedTask.IsFaulted)
                 {
-                    throw terminatedTask.Exception;
+                    throw terminatedTask.Exception!;
                 }
             }
             catch (Exception e)
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is SocketException)
                 {

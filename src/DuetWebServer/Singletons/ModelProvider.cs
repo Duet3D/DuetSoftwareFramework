@@ -25,7 +25,7 @@ namespace DuetWebServer.Singletons
         /// <summary>
         /// Path to the web directory
         /// </summary>
-        public string WebDirectory { get; set; }
+        public string? WebDirectory { get; set; }
 
         /// <summary>
         /// Delegate for an event that is triggered when the path of the web directory changes
@@ -36,7 +36,7 @@ namespace DuetWebServer.Singletons
         /// <summary>
         /// Event that is triggered whenever the web directory path changes
         /// </summary>
-        public event WebDirectoryChanged OnWebDirectoryChanged;
+        public event WebDirectoryChanged? OnWebDirectoryChanged;
     }
 
     /// <summary>
@@ -60,7 +60,7 @@ namespace DuetWebServer.Singletons
         /// <summary>
         /// Path to the web directory
         /// </summary>
-        public string WebDirectory
+        public string? WebDirectory
         {
             get => _webDirectory;
             set
@@ -68,17 +68,17 @@ namespace DuetWebServer.Singletons
                 if (value != _webDirectory)
                 {
                     _webDirectory = value;
-                    OnWebDirectoryChanged?.Invoke(value);
+                    OnWebDirectoryChanged?.Invoke(value!);
                 }
             }
 
         }
-        private string _webDirectory;
+        private string? _webDirectory;
 
         /// <summary>
         /// Event that is triggered whenever the web directory path changes
         /// </summary>
-        public event IModelProvider.WebDirectoryChanged OnWebDirectoryChanged;
+        public event IModelProvider.WebDirectoryChanged? OnWebDirectoryChanged;
 
         /// <summary>
         /// Constructor of this singleton

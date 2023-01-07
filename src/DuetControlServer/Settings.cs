@@ -342,7 +342,7 @@ namespace DuetControlServer
         public static bool Init(string[] args)
         {
             // Check if a custom config is supposed to be loaded
-            string lastArg = null;
+            string? lastArg = null;
             foreach (string arg in args)
             {
                 if (lastArg == "-c" || lastArg == "--config")
@@ -422,7 +422,7 @@ namespace DuetControlServer
         /// <param name="args">Command-line arguments</param>
         private static void ParseParameters(string[] args)
         {
-            string lastArg = null;
+            string? lastArg = null;
             foreach (string arg in args)
             {
                 if (lastArg == "-l" || lastArg == "--log-level")
@@ -471,15 +471,15 @@ namespace DuetControlServer
             }
 
             Utf8JsonReader reader = new(content);
-            PropertyInfo property = null;
+            PropertyInfo? property = null;
             while (reader.Read())
             {
                 switch (reader.TokenType)
                 {
                     case JsonTokenType.PropertyName:
-                        string propertyName = reader.GetString();
+                        string propertyName = reader.GetString()!;
                         property = typeof(Settings).GetProperty(propertyName, BindingFlags.Static | BindingFlags.Public | BindingFlags.IgnoreCase);
-                        if (property == null || Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
+                        if (property is null || Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
                         {
                             // Skip non-existent and ignored properties
                             if (reader.Read())
@@ -498,72 +498,72 @@ namespace DuetControlServer
 
                     case JsonTokenType.True:
                     case JsonTokenType.False:
-                        if (property.PropertyType == typeof(bool))
+                        if (property?.PropertyType == typeof(bool))
                         {
                             property.SetValue(null, reader.GetBoolean());
                         }
                         else
                         {
-                            throw new JsonException($"Bad boolean type: {property.PropertyType.Name}");
+                            throw new JsonException($"Bad boolean type: {property?.PropertyType.Name}");
                         }
                         break;
 
                     case JsonTokenType.Number:
-                        if (property.PropertyType == typeof(int))
+                        if (property?.PropertyType == typeof(int))
                         {
                             property.SetValue(null, reader.GetInt32());
                         }
-                        else if (property.PropertyType == typeof(uint))
+                        else if (property?.PropertyType == typeof(uint))
                         {
                             property.SetValue(null, reader.GetUInt32());
                         }
-                        else if (property.PropertyType == typeof(float))
+                        else if (property?.PropertyType == typeof(float))
                         {
                             property.SetValue(null, reader.GetSingle());
                         }
-                        else if (property.PropertyType == typeof(double))
+                        else if (property?.PropertyType == typeof(double))
                         {
                             property.SetValue(null, reader.GetDouble());
                         }
                         else
                         {
-                            throw new JsonException($"Bad number type: {property.PropertyType.Name}");
+                            throw new JsonException($"Bad number type: {property?.PropertyType.Name}");
                         }
                         break;
 
                     case JsonTokenType.String:
-                        if (property.PropertyType == typeof(string))
+                        if (property?.PropertyType == typeof(string))
                         {
                             property.SetValue(null, reader.GetString());
                         }
-                        else if (property.PropertyType == typeof(LogLevel))
+                        else if (property?.PropertyType == typeof(LogLevel))
                         {
                             property.SetValue(null, LogLevel.FromString(reader.GetString()));
                         }
                         else
                         {
-                            throw new JsonException($"Bad string type: {property.PropertyType.Name}");
+                            throw new JsonException($"Bad string type: {property?.PropertyType.Name}");
                         }
                         break;
 
                     case JsonTokenType.StartArray:
-                        if (property.PropertyType == typeof(List<Regex>))
+                        if (property?.PropertyType == typeof(List<Regex>))
                         {
                             JsonRegexListConverter regexListConverter = new();
                             property.SetValue(null, regexListConverter.Read(ref reader, typeof(List<Regex>), null));
                         }
-                        else if (property.PropertyType == typeof(List<string>))
+                        else if (property?.PropertyType == typeof(List<string>))
                         {
                             List<string> list = new();
                             while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
                             {
-                                list.Add(reader.GetString());
+                                list.Add(reader.GetString()!);
                             }
                             property.SetValue(null, list);
                         }
                         else
                         {
-                            throw new JsonException($"Bad list type: {property.PropertyType.Name}");
+                            throw new JsonException($"Bad list type: {property?.PropertyType.Name}");
                         }
                         break;
                 }
@@ -582,7 +582,7 @@ namespace DuetControlServer
         /// <param name="fileName">File to save the settings to</param>
         private static void SaveToFile(string fileName)
         {
-            using FileStream fileStream = new(fileName, FileMode.Create, FileAccess.Write, FileShare.None, Settings.FileBufferSize);
+            using FileStream fileStream = new(fileName, FileMode.Create, FileAccess.Write, FileShare.None, FileBufferSize);
             using Utf8JsonWriter writer = new(fileStream, new JsonWriterOptions()
             {
                 Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
@@ -594,7 +594,7 @@ namespace DuetControlServer
             {
                 if (!Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
                 {
-                    object value = property.GetValue(null);
+                    object? value = property.GetValue(null);
                     if (value is string stringValue)
                     {
                         writer.WriteString(property.Name, stringValue);

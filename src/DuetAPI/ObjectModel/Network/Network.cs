@@ -24,12 +24,12 @@
         /// If this is set, the web server will allow cross-origin requests via the Access-Control-Allow-Origin header
         /// </summary>
         [SbcProperty(true)]
-        public string CorsSite
+        public string? CorsSite
         {
             get =>_corsSite;
             set => SetPropertyValue(ref _corsSite, value);
         }
-        private string _corsSite;
+        private string? _corsSite;
 
         /// <summary>
         /// Hostname of the machine

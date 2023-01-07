@@ -24,7 +24,7 @@ namespace DuetAPI.Commands
         /// <param name="message">Exception message</param>
         /// <param name="code">Code being parsed</param>
         public CodeParserException(string message, Code code)
-            : base(message + ((code?.LineNumber != null) ? $" in line {code.LineNumber}" : string.Empty)) { }
+            : base(message + ((code?.LineNumber is not null) ? $" in line {code.LineNumber}" : string.Empty)) { }
 
         /// <summary>
         /// Creates a new CodeParserException

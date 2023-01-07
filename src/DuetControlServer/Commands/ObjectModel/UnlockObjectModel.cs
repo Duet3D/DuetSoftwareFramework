@@ -11,7 +11,7 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Source connection of this command. Needed to register the owner of the lock
         /// </summary>
-        public Connection Connection { get; set; }
+        public Connection? Connection { get; set; }
 
         /// <summary>
         /// Unlock the machine model again
@@ -19,7 +19,7 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         public override async Task Execute()
         {
-            await LockManager.UnlockMachineModel(Connection);
+            await LockManager.UnlockMachineModel(Connection!);
         }
     }
 }

@@ -11,6 +11,6 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Identifier of the package
         /// </summary>
-        public string Package { get; set; }
+        public string Package { get; set; } = string.Empty;
     }
 }

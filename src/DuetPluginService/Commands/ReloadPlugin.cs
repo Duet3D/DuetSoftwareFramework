@@ -21,7 +21,7 @@ namespace DuetPluginService.Commands
             using (await Plugins.LockAsync())
             {
                 // Try to find the plugin first
-                Plugin plugin = null;
+                Plugin? plugin = null;
                 foreach (Plugin item in Plugins.List)
                 {
                     if (item.Id == Plugin)
@@ -35,7 +35,7 @@ namespace DuetPluginService.Commands
                 string file = Path.Combine(Settings.PluginDirectory, Plugin + ".json");
                 if (File.Exists(file))
                 {
-                    if (plugin == null)
+                    if (plugin is null)
                     {
                         plugin = new();
                         Plugins.List.Add(plugin);
@@ -48,7 +48,7 @@ namespace DuetPluginService.Commands
                 }
                 else
                 {
-                    if (plugin == null)
+                    if (plugin is null)
                     {
                         // Don't attempt to remove a non-existent plugin
                         return;

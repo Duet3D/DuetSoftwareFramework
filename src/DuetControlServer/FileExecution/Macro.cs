@@ -73,7 +73,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// File to read from
         /// </summary>
-        private readonly CodeFile _file;
+        private CodeFile? _file;
 
         /// <summary>
         /// Name of the file being executed
@@ -128,7 +128,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Indicates if the macro file could be opened
         /// </summary>
-        public bool FileOpened => _file != null;
+        public bool FileOpened => _file is not null;
 
         /// <summary>
         /// Constructor of a macro
@@ -185,7 +185,7 @@ namespace DuetControlServer.FileExecution
         public void Start()
         {
             string name = Path.GetFileName(FileName);
-            if (_file != null || (name == FilePath.ConfigFile && _file != null) || name == FilePath.ConfigFileFallback)
+            if (_file is not null || (name == FilePath.ConfigFile && _file is not null) || name == FilePath.ConfigFileFallback)
             {
                 IsExecuting = JustStarted = true;
                 _ = Task.Run(Run);
@@ -205,12 +205,13 @@ namespace DuetControlServer.FileExecution
             IsAborted = true;
             _cts.Cancel();
 
-            if (_file != null)
+            if (_file is not null)
             {
                 using (_file.Lock())
                 {
                     _file.Close();
                 }
+                _file = null;
             }
 
             _logger.Info("Aborted macro file {0}", FileName);
@@ -229,12 +230,13 @@ namespace DuetControlServer.FileExecution
             IsAborted = true;
             _cts.Cancel();
 
-            if (_file != null)
+            if (_file is not null)
             {
                 using (await _file.LockAsync())
                 {
                     _file.Close();
                 }
+                _file = null;
             }
 
             _logger.Info("Aborted macro file {0}", FileName);
@@ -243,7 +245,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Internal TCS to resolve when the macro has finished
         /// </summary>
-        private TaskCompletionSource _finishTcs;
+        private TaskCompletionSource? _finishTcs;
 
         /// <summary>
         /// Wait for this macro to finish asynchronously
@@ -259,7 +261,7 @@ namespace DuetControlServer.FileExecution
                 return Task.CompletedTask;
             }
 
-            if (_finishTcs != null)
+            if (_finishTcs is not null)
             {
                 return _finishTcs.Task;
             }
@@ -282,8 +284,8 @@ namespace DuetControlServer.FileExecution
                 {
                     try
                     {
-                        Code readCode = await ReadCodeAsync();
-                        if (readCode == null)
+                        Code? readCode = await ReadCodeAsync();
+                        if (readCode is null)
                         {
                             // No more codes available
                             break;
@@ -305,17 +307,17 @@ namespace DuetControlServer.FileExecution
                     }
                     catch (AggregateException ae)
                     {
-                        using (await _file.LockAsync())
+                        using (await _file!.LockAsync())
                         {
                             _file.Close();
                         }
 
-                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from macro {Path.GetFileName(FileName)}: {ae.InnerException.Message}");
+                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from macro {Path.GetFileName(FileName)}: {ae.InnerException!.Message}");
                         _logger.Error(ae.InnerException, "Failed to read code from macro {0}", FileName);
                     }
                     catch (Exception e)
                     {
-                        using (await _file.LockAsync())
+                        using (await _file!.LockAsync())
                         {
                             _file.Close();
                         }
@@ -326,7 +328,7 @@ namespace DuetControlServer.FileExecution
                 }
 
                 // Wait for the next code to finish
-                if (codes.TryDequeue(out Code code))
+                if (codes.TryDequeue(out Code? code))
                 {
                     try
                     {
@@ -344,7 +346,7 @@ namespace DuetControlServer.FileExecution
                     }
                     catch (AggregateException ae)
                     {
-                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{ae.InnerException.GetType().Name}] {ae.InnerException.Message}");
+                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{ae.InnerException!.GetType().Name}] {ae.InnerException.Message}");
                         _logger.Warn(ae);
                     }
                     catch (Exception e)
@@ -370,7 +372,7 @@ namespace DuetControlServer.FileExecution
                 {
                     _logger.Info("Finished macro file {0}", FileName);
                 }
-                if (_finishTcs != null)
+                if (_finishTcs is not null)
                 {
                     _finishTcs.SetResult();
                     _finishTcs = null;
@@ -385,9 +387,9 @@ namespace DuetControlServer.FileExecution
         /// Read the next available code asynchronously
         /// </summary>
         /// <returns>Read code</returns>
-        private async Task<Code> ReadCodeAsync()
+        private async Task<Code?> ReadCodeAsync()
         {
-            Code result;
+            Code? result;
 
             // When executing config.g, perform some extra steps...
             if (IsConfig)
@@ -420,17 +422,17 @@ namespace DuetControlServer.FileExecution
                         break;
 
                     default:
-                        result = (_file != null) ? await _file.ReadCodeAsync() : null;
+                        result = (_file is not null) ? await _file.ReadCodeAsync() : null;
                         break;
                 }
             }
             else
             {
-                result = (_file != null) ? await _file.ReadCodeAsync() : null;
+                result = (_file is not null) ? await _file.ReadCodeAsync() : null;
             }
 
             // Update code information
-            if (result != null)
+            if (result is not null)
             {
                 result.CancellationToken = CancellationToken;
                 result.FilePosition = null;
@@ -466,7 +468,9 @@ namespace DuetControlServer.FileExecution
             // Dispose the used resources
             _cts.Dispose();
             _file?.Dispose();
+            _file = null;
             _finishTcs?.SetCanceled();
+            _finishTcs = null;
             _disposed = true;
         }
     }

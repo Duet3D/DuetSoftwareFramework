@@ -15,7 +15,7 @@ namespace DuetHttpClient.Utility
         /// <summary>
         /// Name of the file or directory
         /// </summary>
-        public string Filename { get; set; }
+        public string Filename { get; set; } = string.Empty;
 
         /// <summary>
         /// Size of the file
@@ -38,7 +38,7 @@ namespace DuetHttpClient.Utility
         /// </summary>
         /// <param name="obj">Other instance</param>
         /// <returns>Whether both instances are equal</returns>
-        public override bool Equals(object obj) => obj is FileListItem other && IsDirectory == other.IsDirectory && Filename == other.Filename && Size == other.Size && LastModified == other.LastModified;
+        public override bool Equals(object? obj) => obj is FileListItem other && IsDirectory == other.IsDirectory && Filename == other.Filename && Size == other.Size && LastModified == other.LastModified;
 
         /// <summary>
         /// Convert this instance to a string

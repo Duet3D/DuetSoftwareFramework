@@ -31,9 +31,9 @@ namespace DuetWebServer.Services
             .Build();
 
         /// <summary>
-        /// Conenction to resolve file paths
+        /// Connection to resolve file paths
         /// </summary>
-        private static CommandConnection _commandConnection;
+        private static CommandConnection? _commandConnection;
 
         /// <summary>
         /// Configuration of this application
@@ -65,7 +65,7 @@ namespace DuetWebServer.Services
             if (httpContext.Request.Headers.ContainsKey(CorsConstants.Origin))
             {
                 if (httpContext.Request.Headers.ContainsKey(HeaderNames.Host) &&
-                    Uri.TryCreate(httpContext.Request.Headers[CorsConstants.Origin], UriKind.Absolute, out Uri uri) &&
+                    Uri.TryCreate(httpContext.Request.Headers[CorsConstants.Origin], UriKind.Absolute, out Uri? uri) &&
                     (string.Equals(uri.Host, httpContext.Request.Headers[HeaderNames.Host], StringComparison.InvariantCultureIgnoreCase) ||
                      string.Equals($"{uri.Host}:{uri.Port}", httpContext.Request.Headers[HeaderNames.Host], StringComparison.InvariantCultureIgnoreCase)))
                 {
@@ -90,7 +90,7 @@ namespace DuetWebServer.Services
         /// <summary>
         /// Task representing the lifecycle of this service
         /// </summary>
-        private Task _task;
+        private Task? _task;
 
         /// <summary>
         /// Cancellation token source that is triggered when the service is supposed to shut down
@@ -138,7 +138,7 @@ namespace DuetWebServer.Services
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             _stopRequest.Cancel();
-            await _task;
+            await _task!;
         }
 
         /// <summary>
@@ -278,12 +278,12 @@ namespace DuetWebServer.Services
         /// </summary>
         /// <param name="sender">Sender object</param>
         /// <param name="e">Information about the changed property</param>
-        private async void Directories_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        private async void Directories_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(Directories.Web))
             {
-                Directories directories = (Directories)sender;
-                _modelProvider.WebDirectory = await _commandConnection.ResolvePath(directories.Web);
+                Directories directories = (Directories)sender!;
+                _modelProvider.WebDirectory = await _commandConnection!.ResolvePath(directories.Web);
             }
         }
     }

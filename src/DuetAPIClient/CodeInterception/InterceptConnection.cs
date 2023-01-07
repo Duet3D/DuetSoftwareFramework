@@ -68,7 +68,7 @@ namespace DuetAPIClient
             Filters.Clear();
             PriortyCodes = false;
 
-            InterceptInitMessage initMessage = new InterceptInitMessage() { InterceptionMode = mode };
+            InterceptInitMessage initMessage = new() { InterceptionMode = mode };
             return Connect(initMessage, socketPath, cancellationToken);
         }
 
@@ -86,19 +86,19 @@ namespace DuetAPIClient
         /// <exception cref="IOException">Connection mode is unavailable</exception>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Init message could not be processed</exception>
-        public Task Connect(InterceptionMode mode, IEnumerable<CodeChannel> channels = null, IEnumerable<string> filters = null, bool priortyCodes = false, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+        public Task Connect(InterceptionMode mode, IEnumerable<CodeChannel>? channels = null, IEnumerable<string>? filters = null, bool priortyCodes = false, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
         {
             Mode = mode;
             Channels.Clear();
             Channels.AddRange(channels ?? Inputs.ValidChannels);
             Filters.Clear();
-            if (filters != null)
+            if (filters is not null)
             {
                 Filters.AddRange(filters);
             }
             PriortyCodes = priortyCodes;
 
-            InterceptInitMessage initMessage = new InterceptInitMessage() {
+            InterceptInitMessage initMessage = new() {
                 InterceptionMode = mode,
                 Channels = Channels,
                 Filters = Filters,

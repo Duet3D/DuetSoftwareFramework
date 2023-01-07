@@ -48,7 +48,7 @@ namespace DuetAPI.ObjectModel
             get => _kinematics;
 			set => SetPropertyValue(ref _kinematics, value);
         }
-        private Kinematics _kinematics = new Kinematics();
+        private Kinematics _kinematics = new();
 
         /// <summary>
         /// Limit axis positions by their minima and maxima

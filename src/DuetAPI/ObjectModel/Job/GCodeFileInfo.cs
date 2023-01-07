@@ -25,17 +25,17 @@ namespace DuetAPI.ObjectModel
             get => _fileName;
 			set => SetPropertyValue(ref _fileName, value);
         }
-        private string _fileName;
+        private string _fileName = string.Empty;
 
         /// <summary>
         /// Name of the application that generated this file
         /// </summary>
-        public string GeneratedBy
+        public string? GeneratedBy
         {
             get => _generatedBy;
 			set => SetPropertyValue(ref _generatedBy, value);
         }
-        private string _generatedBy;
+        private string? _generatedBy;
 
         /// <summary>
         /// Build height of the G-code job or 0 if not found (in mm)
@@ -127,19 +127,17 @@ namespace DuetAPI.ObjectModel
         /// <param name="typeToConvert">Target type</param>
         /// <param name="options">JSON options</param>
         /// <returns>Parsed file info object</returns>
-        public override GCodeFileInfo Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override GCodeFileInfo? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            using (JsonDocument jsonDocument = JsonDocument.ParseValue(ref reader))
+            using JsonDocument jsonDocument = JsonDocument.ParseValue(ref reader);
+            if (jsonDocument.RootElement.ValueKind == JsonValueKind.Null)
             {
-                if (jsonDocument.RootElement.ValueKind == JsonValueKind.Null)
-                {
-                    return null;
-                }
-
-                GCodeFileInfo parsedFileInfo = new GCodeFileInfo();
-                parsedFileInfo.UpdateFromJson(jsonDocument.RootElement, false);
-                return parsedFileInfo;
+                return null;
             }
+
+            GCodeFileInfo parsedFileInfo = new();
+            parsedFileInfo.UpdateFromJson(jsonDocument.RootElement, false);
+            return parsedFileInfo;
         }
 
         /// <summary>
@@ -150,7 +148,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="options">JSON options</param>
         public override void Write(Utf8JsonWriter writer, GCodeFileInfo value, JsonSerializerOptions options)
         {
-            if (value == null)
+            if (value is null)
             {
                 writer.WriteNullValue();
             }

@@ -44,7 +44,7 @@ namespace UnitTests.Machine
             DuetControlServer.Model.Provider.Get.Volumes.Add(new DuetAPI.ObjectModel.Volume { FreeSpace = 12345 });
 
             DuetControlServer.Commands.Code code = new("echo volumes[0].freeSpace");
-            object result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
+            object? result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
             Assert.AreEqual("12345", result);
 
             code = new DuetControlServer.Commands.Code("echo move.axes[0].userPosition");
@@ -78,7 +78,7 @@ namespace UnitTests.Machine
             result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
             Assert.AreEqual("{\"hello\" ^ (\"there\" +12345)}", result);
 
-            DuetControlServer.Model.Expressions.CustomFunctions.Add("fileexists", async (string functionName, object[] vals) =>
+            DuetControlServer.Model.Expressions.CustomFunctions.Add("fileexists", async (string functionName, object?[] vals) =>
             {
                 Assert.AreEqual(functionName, "fileexists");
                 Assert.AreEqual(vals.Length, 1);

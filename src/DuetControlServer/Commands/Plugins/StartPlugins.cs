@@ -53,8 +53,8 @@ namespace DuetControlServer.Commands
                     using StreamReader reader = new(fileStream, Encoding.UTF8, false, Settings.FileBufferSize);
                     while (!reader.EndOfStream)
                     {
-                        string pluginName = await reader.ReadLineAsync();
-                        if (pluginName == null)
+                        string? pluginName = await reader.ReadLineAsync();
+                        if (pluginName is null)
                         {
                             break;
                         }

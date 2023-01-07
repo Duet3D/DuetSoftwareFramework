@@ -10,6 +10,6 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Source connection of the command
         /// </summary>
-        public Connection Connection { get; set; }
+        public Connection? Connection { get; set; }
     }
 }

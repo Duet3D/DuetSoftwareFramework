@@ -70,18 +70,18 @@ namespace UnitTests.Machine
             Provider.Get.Sensors.Analog.Add(null);
             Provider.Get.Sensors.Analog.Add(new DuetAPI.ObjectModel.AnalogSensor { LastReading = 456F });
 
-            Dictionary<string, object> partialModel = DuetControlServer.Model.Filter.GetFiltered(parsedFilter);
+            Dictionary<string, object?> partialModel = DuetControlServer.Model.Filter.GetFiltered(parsedFilter);
 
-            Dictionary<string, object> sensorsKey = (Dictionary<string, object>)partialModel["sensors"];
+            Dictionary<string, object?> sensorsKey = (Dictionary<string, object?>)partialModel["sensors"]!;
             Assert.AreEqual(1, sensorsKey.Count);
-            List<object> analogKey = (List<object>)sensorsKey["analog"];
+            List<object?> analogKey = (List<object?>)sensorsKey["analog"]!;
             Assert.AreEqual(3, analogKey.Count);
-            Dictionary<string, object> firstSensor = (Dictionary<string, object>)analogKey[0];
+            Dictionary<string, object?> firstSensor = (Dictionary<string, object?>)analogKey[0]!;
             Assert.AreEqual(1, firstSensor.Count);
             Assert.AreEqual(123F, firstSensor["lastReading"]);
-            Dictionary<string, object> secondSensor = (Dictionary<string, object>)analogKey[1];
+            Dictionary<string, object?> secondSensor = (Dictionary<string, object?>)analogKey[1]!;
             Assert.IsNull(secondSensor);
-            Dictionary<string, object> thirdSensor = (Dictionary<string, object>)analogKey[2];
+            Dictionary<string, object?> thirdSensor = (Dictionary<string, object?>)analogKey[2]!;
             Assert.AreEqual(1, thirdSensor.Count);
             Assert.AreEqual(456F, thirdSensor["lastReading"]);
         }
@@ -109,49 +109,49 @@ namespace UnitTests.Machine
             Provider.Get.Tools.Add(toolB);
 
             // Query filter A
-            Dictionary<string, object> partialModelA = DuetControlServer.Model.Filter.GetFiltered(parsedFilterA);
-            List<object> toolsKeyA = (List<object>)partialModelA["tools"];
-            Dictionary<string, object> toolOneA = (Dictionary<string, object>)toolsKeyA[0];
+            Dictionary<string, object?> partialModelA = DuetControlServer.Model.Filter.GetFiltered(parsedFilterA);
+            List<object?> toolsKeyA = (List<object?>)partialModelA["tools"]!;
+            Dictionary<string, object?> toolOneA = (Dictionary<string, object?>)toolsKeyA[0]!;
             Assert.AreEqual(1, toolOneA.Count);
-            Assert.AreEqual(new List<object> { 123F }, toolOneA["active"]);
-            Dictionary<string, object> toolTwoA = (Dictionary<string, object>)toolsKeyA[1];
+            Assert.AreEqual(new List<object?> { 123F }, toolOneA["active"]);
+            Dictionary<string, object?> toolTwoA = (Dictionary<string, object?>)toolsKeyA[1]!;
             Assert.AreEqual(1, toolTwoA.Count);
-            Assert.AreEqual(new List<object> { 10F }, toolTwoA["active"]);
+            Assert.AreEqual(new List<object?> { 10F }, toolTwoA["active"]);
 
             // Query filter B
-            Dictionary<string, object> partialModelB = DuetControlServer.Model.Filter.GetFiltered(parsedFilterB);
-            List<object> toolsKeyB = (List<object>)partialModelB["tools"];
-            Dictionary<string, object> toolOneB = (Dictionary<string, object>)toolsKeyB[0];
+            Dictionary<string, object?> partialModelB = DuetControlServer.Model.Filter.GetFiltered(parsedFilterB);
+            List<object?> toolsKeyB = (List<object?>)partialModelB["tools"]!;
+            Dictionary<string, object?> toolOneB = (Dictionary<string, object?>)toolsKeyB[0]!;
             Assert.AreEqual(1, toolOneB.Count);
             Assert.AreEqual(new List<object> { 456F }, toolOneB["standby"]);
-            Dictionary<string, object> toolTwoB = (Dictionary<string, object>)toolsKeyB[1];
+            Dictionary<string, object?> toolTwoB = (Dictionary<string, object?>)toolsKeyB[1]!;
             Assert.AreEqual(1, toolTwoB.Count);
             Assert.AreEqual(new List<object> { 20F }, toolTwoB["standby"]);
 
             // Query filter C
-            Dictionary<string, object> partialModelC = DuetControlServer.Model.Filter.GetFiltered(parsedFilterC);
-            IList toolsKeyC = (IList)partialModelC["tools"];
+            Dictionary<string, object?> partialModelC = DuetControlServer.Model.Filter.GetFiltered(parsedFilterC);
+            IList toolsKeyC = (IList)partialModelC["tools"]!;
             Assert.AreEqual(2, toolsKeyC.Count);
             Assert.IsTrue(toolsKeyC[0] is DuetAPI.ObjectModel.Tool);
             Assert.IsTrue(toolsKeyC[1] is DuetAPI.ObjectModel.Tool);
 
             // Merge A+B
-            Dictionary<string, object> merged = new();
+            Dictionary<string, object?> merged = new();
             DuetControlServer.Model.Filter.MergeFiltered(merged, partialModelA);
             DuetControlServer.Model.Filter.MergeFiltered(merged, partialModelB);
-            List<object> mergedTools = (List<object>)merged["tools"];
-            Dictionary<string, object> mergedToolA = (Dictionary<string, object>)mergedTools[0];
+            List<object?> mergedTools = (List<object?>)merged["tools"]!;
+            Dictionary<string, object?> mergedToolA = (Dictionary<string, object?>)mergedTools[0]!;
             Assert.AreEqual(2, mergedToolA.Count);
-            Assert.AreEqual(new List<object> { 123F }, mergedToolA["active"]);
-            Assert.AreEqual(new List<object> { 456F }, mergedToolA["standby"]);
-            Dictionary<string, object> mergedToolB = (Dictionary<string, object>)mergedTools[1];
+            Assert.AreEqual(new List<object?> { 123F }, mergedToolA["active"]);
+            Assert.AreEqual(new List<object?> { 456F }, mergedToolA["standby"]);
+            Dictionary<string, object?> mergedToolB = (Dictionary<string, object?>)mergedTools[1]!;
             Assert.AreEqual(2, mergedToolB.Count);
-            Assert.AreEqual(new List<object> { 10F }, mergedToolB["active"]);
-            Assert.AreEqual(new List<object> { 20F }, mergedToolB["standby"]);
+            Assert.AreEqual(new List<object?> { 10F }, mergedToolB["active"]);
+            Assert.AreEqual(new List<object?> { 20F }, mergedToolB["standby"]);
 
             // Merge A+C
             DuetControlServer.Model.Filter.MergeFiltered(merged, partialModelC);
-            mergedTools = (List<object>)merged["tools"];
+            mergedTools = (List<object?>)merged["tools"]!;
             Assert.IsTrue(mergedTools[0] is DuetAPI.ObjectModel.Tool);
             Assert.IsTrue(mergedTools[1] is DuetAPI.ObjectModel.Tool);
         }
@@ -160,11 +160,11 @@ namespace UnitTests.Machine
         public void GetSpecific()
         {
             Provider.Get.State.Status = DuetAPI.ObjectModel.MachineStatus.Processing;
-            Assert.IsTrue(DuetControlServer.Model.Filter.GetSpecific("state.status", false, out object status));
+            Assert.IsTrue(DuetControlServer.Model.Filter.GetSpecific("state.status", false, out object? status));
             Assert.AreEqual(DuetAPI.ObjectModel.MachineStatus.Processing, status);
 
             Provider.Get.Fans.Add(new DuetAPI.ObjectModel.Fan() { ActualValue = 0.53F });
-            Assert.IsTrue(DuetControlServer.Model.Filter.GetSpecific("fans[0].actualValue", false, out object actualValue));
+            Assert.IsTrue(DuetControlServer.Model.Filter.GetSpecific("fans[0].actualValue", false, out object? actualValue));
             Assert.AreEqual(0.53F, actualValue);
         }
     }

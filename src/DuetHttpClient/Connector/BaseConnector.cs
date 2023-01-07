@@ -47,32 +47,30 @@ namespace DuetHttpClient.Connector
         /// <returns>HTTP response</returns>
         protected virtual async ValueTask<HttpResponseMessage> SendRequest(HttpRequestMessage request, TimeSpan timeout, CancellationToken cancellationToken = default)
         {
-            using (CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _terminateSession.Token))
+            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _terminateSession.Token);
+            if (timeout != Timeout.InfiniteTimeSpan)
             {
-                if (timeout != Timeout.InfiniteTimeSpan)
-                {
-                    cts.CancelAfter(timeout);
-                }
-
-                HttpResponseMessage response = await HttpClient.SendAsync(request, cts.Token);
-                if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
-                {
-                    // Session is no longer valid, attempt to connect again
-                    await Reconnect(cancellationToken);
-                }
-                return response;
+                cts.CancelAfter(timeout);
             }
+
+            HttpResponseMessage response = await HttpClient.SendAsync(request, cts.Token);
+            if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                // Session is no longer valid, attempt to connect again
+                await Reconnect(cancellationToken);
+            }
+            return response;
         }
 
         /// <summary>
         /// Cancellation token to terminate the session on demand
         /// </summary>
-        protected readonly CancellationTokenSource _terminateSession = new CancellationTokenSource();
+        protected readonly CancellationTokenSource _terminateSession = new();
 
         /// <summary>
         /// TCS to complete when the session task has been termianted
         /// </summary>
-        protected readonly TaskCompletionSource<object> _sessionTaskTerminated = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+        protected readonly TaskCompletionSource<object?> _sessionTaskTerminated = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         /// <summary>
         /// Options used for communication

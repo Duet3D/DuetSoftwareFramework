@@ -28,13 +28,13 @@ namespace DuetAPI.Utility
         /// <param name="typeToConvert">Type to convert</param>
         /// <param name="options">Reader options</param>
         /// <returns>Read value</returns>
-        public override List<Regex> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override List<Regex> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions? options)
         {
             if (reader.TokenType == JsonTokenType.StartArray)
             {
-                List<Regex> regexList = new List<Regex>();
+                List<Regex> regexList = new();
 
-                string pattern = null;
+                string? pattern = null;
                 int optionsValue = 0;
                 string propertyName = string.Empty;
 
@@ -49,7 +49,7 @@ namespace DuetAPI.Utility
                             break;
 
                         case JsonTokenType.PropertyName:
-                            propertyName = reader.GetString();
+                            propertyName = reader.GetString()!;
                             break;
 
                         case JsonTokenType.String:
@@ -67,7 +67,10 @@ namespace DuetAPI.Utility
                             break;
 
                         case JsonTokenType.EndObject:
-                            regexList.Add(new Regex(pattern, (RegexOptions)optionsValue));
+                            if (pattern is not null)
+                            {
+                                regexList.Add(new Regex(pattern, (RegexOptions)optionsValue));
+                            }
                             break;
 
                         case JsonTokenType.EndArray:
@@ -85,7 +88,7 @@ namespace DuetAPI.Utility
         /// <param name="writer">JSON writer</param>
         /// <param name="value">Value to serialize</param>
         /// <param name="options">Write options</param>
-        public override void Write(Utf8JsonWriter writer, List<Regex> value, JsonSerializerOptions options)
+        public override void Write(Utf8JsonWriter writer, List<Regex> value, JsonSerializerOptions? options)
         {
             writer.WriteStartArray();
             foreach (Regex regex in value)
@@ -107,7 +110,7 @@ namespace DuetAPI.Utility
         /// <summary>
         /// Default JSON (de-)serialization options
         /// </summary>
-        public static readonly JsonSerializerOptions DefaultJsonOptions = new JsonSerializerOptions()
+        public static readonly JsonSerializerOptions DefaultJsonOptions = new()
         {
             Converters = {
                 new JsonPolymorphicWriteOnlyConverter<Kinematics>(),
@@ -130,7 +133,7 @@ namespace DuetAPI.Utility
         /// <exception cref="SocketException">Connection has been closed</exception>
         public static async ValueTask<MemoryStream> ReceiveUtf8Json(Socket socket, CancellationToken cancellationToken = default)
         {
-            MemoryStream jsonStream = new MemoryStream();
+            MemoryStream jsonStream = new();
             bool inJson = false, inQuotes = false, isEscaped = false;
             int numBraces = 0;
 
@@ -194,19 +197,16 @@ namespace DuetAPI.Utility
         /// <returns>Deserialized object</returns>
         /// <remarks>
         /// The original code is from https://stackoverflow.com/questions/58138793/system-text-json-jsonelement-toobject-workaround
-        /// and it will become obsolete when DSF is migrated to .NET Core 5.
         /// </remarks>
-        public static T ToObject<T>(this JsonElement element, JsonSerializerOptions options = null)
+        public static T? ToObject<T>(this JsonElement element, JsonSerializerOptions? options = null)
         {
-            using (MemoryStream stream = new MemoryStream())
+            using MemoryStream stream = new();
+            using (Utf8JsonWriter writer = new(stream))
             {
-                using (Utf8JsonWriter writer = new Utf8JsonWriter(stream))
-                {
-                    element.WriteTo(writer);
-                }
-                stream.Seek(0, SeekOrigin.Begin);
-                return JsonSerializer.Deserialize<T>(stream, options);
+                element.WriteTo(writer);
             }
+            stream.Seek(0, SeekOrigin.Begin);
+            return JsonSerializer.Deserialize<T>(stream, options);
         }
 
         /// <summary>
@@ -220,17 +220,15 @@ namespace DuetAPI.Utility
         /// The original code is from https://stackoverflow.com/questions/58138793/system-text-json-jsonelement-toobject-workaround
         /// and it will become obsolete when DSF is migrated to .NET Core 5.
         /// </remarks>
-        public static object ToObject(this JsonElement element, Type type, JsonSerializerOptions options = null)
+        public static object? ToObject(this JsonElement element, Type type, JsonSerializerOptions? options = null)
         {
-            using (MemoryStream stream = new MemoryStream())
+            using MemoryStream stream = new();
+            using (Utf8JsonWriter writer = new(stream))
             {
-                using (Utf8JsonWriter writer = new Utf8JsonWriter(stream))
-                {
-                    element.WriteTo(writer);
-                }
-                stream.Seek(0, SeekOrigin.Begin);
-                return JsonSerializer.Deserialize(stream, type, options);
+                element.WriteTo(writer);
             }
+            stream.Seek(0, SeekOrigin.Begin);
+            return JsonSerializer.Deserialize(stream, type, options);
         }
 
         /// <summary>
@@ -242,11 +240,10 @@ namespace DuetAPI.Utility
         /// <returns>Deserialized object</returns>
         /// <remarks>
         /// The original code is from https://stackoverflow.com/questions/58138793/system-text-json-jsonelement-toobject-workaround
-        /// and it will become obsolete when DSF is migrated to .NET Core 5.
         /// </remarks>
-        public static T ToObject<T>(this JsonDocument document, JsonSerializerOptions options = null)
+        public static T? ToObject<T>(this JsonDocument document, JsonSerializerOptions? options = null)
         {
-            if (document == null)
+            if (document is null)
             {
                 throw new ArgumentNullException(nameof(document));
             }

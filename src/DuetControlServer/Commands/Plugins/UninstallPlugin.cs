@@ -22,7 +22,7 @@ namespace DuetControlServer.Commands
         /// Client connection
         /// </summary>
         [JsonIgnore]
-        public Connection Connection { get; set; }
+        public Connection? Connection { get; set; }
 
         /// <summary>
         /// Uninstall a plugin
@@ -37,7 +37,7 @@ namespace DuetControlServer.Commands
             }
 
             // Make sure the upgrade switch is only used by the plugin service
-            if (ForUpgrade && (Connection != null && !Connection.Permissions.HasFlag(SbcPermissions.ServicePlugins)))
+            if (ForUpgrade && (Connection is not null && !Connection.Permissions.HasFlag(SbcPermissions.ServicePlugins)))
             {
                 throw new ArgumentException($"{nameof(ForUpgrade)} switch must not be used by third-party applications");
             }

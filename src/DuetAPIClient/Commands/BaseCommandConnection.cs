@@ -58,7 +58,7 @@ namespace DuetAPIClient
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.ManageUserSessions"/>
-        public Task<int> AddUserSession(AccessLevel access, SessionType type, string origin = null, CancellationToken cancellationToken = default)
+        public Task<int> AddUserSession(AccessLevel access, SessionType type, string? origin = null, CancellationToken cancellationToken = default)
         {
             origin ??= Process.GetCurrentProcess().Id.ToString();
             return PerformCommand<int>(new AddUserSession { AccessLevel = access, SessionType = type, Origin = origin }, cancellationToken);
@@ -496,7 +496,7 @@ namespace DuetAPIClient
         /// <exception cref="UnauthorizedAccessException">Insufficient permissions to modify other plugin data</exception>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
         /// <seealso cref="SbcPermissions.ManagePlugins"/>
-        public Task SetPluginData(string key, object value, string plugin = null, CancellationToken cancellationToken = default)
+        public Task SetPluginData(string key, object value, string? plugin = null, CancellationToken cancellationToken = default)
         {
             byte[] jsonData = JsonSerializer.SerializeToUtf8Bytes(value);
             using JsonDocument jsonDocument = JsonDocument.Parse(jsonData);

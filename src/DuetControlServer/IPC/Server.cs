@@ -128,8 +128,8 @@ namespace DuetControlServer.IPC
                     await connection.Send(new ServerInitMessage { Id = connection.Id });
 
                     // Read client-side init message and switch mode
-                    Base processor = await GetConnectionProcessor(connection);
-                    if (processor != null)
+                    Base? processor = await GetConnectionProcessor(connection);
+                    if (processor is not null)
                     {
                         // Send success message
                         await connection.SendResponse();
@@ -170,13 +170,13 @@ namespace DuetControlServer.IPC
         /// </summary>
         /// <param name="conn">Connection to get a processor for</param>
         /// <returns>Instance of a base processor</returns>
-        private static async Task<Base> GetConnectionProcessor(Connection conn)
+        private static async Task<Base?> GetConnectionProcessor(Connection conn)
         {
             try
             {
                 // Read the init message from the client
                 string response = await conn.ReceivePlainJson();
-                ClientInitMessage initMessage = JsonSerializer.Deserialize<ClientInitMessage>(response, JsonHelper.DefaultJsonOptions);
+                ClientInitMessage initMessage = JsonSerializer.Deserialize<ClientInitMessage>(response, JsonHelper.DefaultJsonOptions)!;
                 conn.ApiVersion = initMessage.Version;
 
                 // Check the version number
@@ -200,7 +200,7 @@ namespace DuetControlServer.IPC
                         {
                             throw new UnauthorizedAccessException("Insufficient permissions");
                         }
-                        initMessage = JsonSerializer.Deserialize<CommandInitMessage>(response, JsonHelper.DefaultJsonOptions);
+                        initMessage = JsonSerializer.Deserialize<CommandInitMessage>(response, JsonHelper.DefaultJsonOptions)!;
                         return new Command(conn);
 
                     case ConnectionMode.Intercept:
@@ -208,7 +208,7 @@ namespace DuetControlServer.IPC
                         {
                             throw new UnauthorizedAccessException("Insufficient permissions");
                         }
-                        initMessage = JsonSerializer.Deserialize<InterceptInitMessage>(response, JsonHelper.DefaultJsonOptions);
+                        initMessage = JsonSerializer.Deserialize<InterceptInitMessage>(response, JsonHelper.DefaultJsonOptions)!;
                         return new CodeInterception(conn, initMessage);
 
                     case ConnectionMode.Subscribe:
@@ -216,7 +216,7 @@ namespace DuetControlServer.IPC
                         {
                             throw new UnauthorizedAccessException("Insufficient permissions");
                         }
-                        initMessage = JsonSerializer.Deserialize<SubscribeInitMessage>(response, JsonHelper.DefaultJsonOptions);
+                        initMessage = JsonSerializer.Deserialize<SubscribeInitMessage>(response, JsonHelper.DefaultJsonOptions)!;
                         return new ModelSubscription(conn, initMessage);
 
                     case ConnectionMode.CodeStream:
@@ -224,18 +224,18 @@ namespace DuetControlServer.IPC
                         {
                             throw new UnauthorizedAccessException("Insufficient permissions");
                         }
-                        initMessage = JsonSerializer.Deserialize<CodeStreamInitMessage>(response, JsonHelper.DefaultJsonOptions);
+                        initMessage = JsonSerializer.Deserialize<CodeStreamInitMessage>(response, JsonHelper.DefaultJsonOptions)!;
                         return new CodeStream(conn, initMessage);
 
                     case ConnectionMode.PluginService:
-                        initMessage = JsonSerializer.Deserialize<PluginServiceInitMessage>(response, JsonHelper.DefaultJsonOptions);
+                        initMessage = JsonSerializer.Deserialize<PluginServiceInitMessage>(response, JsonHelper.DefaultJsonOptions)!;
                         return new PluginService(conn);
 
                     default:
                         throw new ArgumentException("Invalid connection mode");
                 }
             }
-            catch (Exception e) when (e is not OperationCanceledException && e is not SocketException)
+            catch (Exception e) when (e is not OperationCanceledException and not SocketException)
             {
                 _logger.Error(e, "IPC#{0}: Failed to assign connection processor", conn.Id);
                 await conn.SendResponse(e);

@@ -47,7 +47,7 @@ namespace DuetControlServer.Files.ImageProcessing
                 }
 
                 // Icon data goes until the first line of executable code.
-                if (code.Type == CodeType.Comment)
+                if (code.Type == CodeType.Comment && code.Comment is not null)
                 {
                     if (!offsetAdjusted)
                     {
@@ -102,13 +102,13 @@ namespace DuetControlServer.Files.ImageProcessing
             try
             {
                 using Image image = BinaryToImage(ms, out int width, out int height);
-                string data = null;
+                string? data = null;
                 if (readThumbnailContent)
                 {
                     using MemoryStream memoryStream = new();
                     image.Save(memoryStream, PngFormat.Instance);
                     memoryStream.TryGetBuffer(out ArraySegment<byte> buffer);
-                    data = Convert.ToBase64String(buffer.Array, 0, (int)memoryStream.Length);
+                    data = Convert.ToBase64String(buffer.Array!, 0, (int)memoryStream.Length);
                 }
                 _logger.Debug(data);
 

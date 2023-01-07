@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -16,12 +17,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Event that is triggered when a property is being changed
         /// </summary>
-        public event PropertyChangingEventHandler PropertyChanging;
+        public event PropertyChangingEventHandler? PropertyChanging;
 
         /// <summary>
         /// Event that is triggered when a property has been changed
         /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>
         /// Method to update a property value internally
@@ -42,7 +43,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Cached dictionary of derived types vs JSON property names vs property descriptors
         /// </summary>
-        private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _propertyInfos = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
+        private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _propertyInfos = new();
 
         /// <summary>
         /// Static constructor that caches the JSON properties of each derived type
@@ -65,14 +66,14 @@ namespace DuetAPI.ObjectModel
         /// <param name="type">Type to register</param>
         static protected void RegisterJsonType(Type type)
         {
-            Dictionary<string, PropertyInfo> jsonProperties = new Dictionary<string, PropertyInfo>();
+            Dictionary<string, PropertyInfo> jsonProperties = new();
             foreach (PropertyInfo property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
             {
                 if (!Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
                 {
                     if (Attribute.IsDefined(property, typeof(JsonPropertyNameAttribute)))
                     {
-                        JsonPropertyNameAttribute attribute = (JsonPropertyNameAttribute)Attribute.GetCustomAttribute(property, typeof(JsonPropertyNameAttribute));
+                        JsonPropertyNameAttribute attribute = (JsonPropertyNameAttribute)Attribute.GetCustomAttribute(property, typeof(JsonPropertyNameAttribute))!;
                         jsonProperties.Add(attribute.Name, property);
                     }
                     else
@@ -99,7 +100,7 @@ namespace DuetAPI.ObjectModel
         public void Assign(object from)
         {
             // Assigning null values is not supported
-            if (from == null)
+            if (from is null)
             {
                 throw new ArgumentNullException(nameof(from));
             }
@@ -117,18 +118,17 @@ namespace DuetAPI.ObjectModel
             {
                 if (typeof(IModelObject).IsAssignableFrom(property.PropertyType))
                 {
-                    IModelObject myValue = (IModelObject)property.GetValue(this);
-                    IModelObject otherValue = (IModelObject)property.GetValue(from);
-                    if (property.SetMethod != null)
+                    IModelObject? myValue = (IModelObject?)property.GetValue(this), otherValue = (IModelObject?)property.GetValue(from);
+                    if (property.SetMethod is not null)
                     {
                         property.SetValue(this, otherValue?.Clone());
                     }
-                    else if (myValue != null && otherValue != null)
+                    else if (myValue is not null && otherValue is not null)
                     {
                         myValue.Assign(otherValue);
                     }
                 }
-                else if (property.SetMethod != null)
+                else if (property.SetMethod is not null)
                 {
                     property.SetValue(this, property.GetValue(from));
                 }
@@ -143,7 +143,7 @@ namespace DuetAPI.ObjectModel
         {
             // Make a new clone
             Type myType = GetType();
-            ModelObject clone = (ModelObject)Activator.CreateInstance(myType);
+            ModelObject clone = (ModelObject)Activator.CreateInstance(myType)!;
 
             // Assign cloned property values
             IEnumerable<PropertyInfo> properties = _propertyInfos[myType].Values;
@@ -151,25 +151,25 @@ namespace DuetAPI.ObjectModel
             {
                 if (typeof(IModelObject).IsAssignableFrom(property.PropertyType))
                 {
-                    IModelObject myValue = (IModelObject)property.GetValue(this);
-                    if (property.SetMethod != null)
+                    IModelObject? myValue = (IModelObject?)property.GetValue(this);
+                    if (property.SetMethod is not null)
                     {
                         property.SetValue(clone, myValue?.Clone());
                     }
                     else
                     {
-                        IModelObject clonedValue = (IModelObject)property.GetValue(clone);
-                        if (myValue != null && clonedValue != null)
+                        IModelObject? clonedValue = (IModelObject?)property.GetValue(clone);
+                        if (myValue is not null && clonedValue is not null)
                         {
                             clonedValue.Assign(myValue);
                         }
                     }
                 }
-                else if (property.SetMethod != null)
+                else if (property.SetMethod is not null)
                 {
                     if (typeof(ICloneable).IsAssignableFrom(property.PropertyType))
                     {
-                        ICloneable myValue = (ICloneable)property.GetValue(this);
+                        ICloneable? myValue = (ICloneable?)property.GetValue(this);
                         property.SetValue(clone, myValue?.Clone());
                     }
                     else
@@ -187,10 +187,15 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="other">Other instance</param>
         /// <returns>Object differences or null if both instances are equal</returns>
-        public object FindDifferences(IModelObject other)
+        public object? FindDifferences(IModelObject? other)
         {
             // Check the types
-            Type myType = GetType(), otherType = other?.GetType();
+            if (other is null)
+            {
+                return this;
+            }
+
+            Type myType = GetType(), otherType = other.GetType();
             if (myType != otherType)
             {
                 // Types differ, return the entire instance
@@ -198,41 +203,32 @@ namespace DuetAPI.ObjectModel
             }
 
             // Look for differences
-            Dictionary<string, object> diffs = null;
+            Dictionary<string, object?>? diffs = null;
             var properties = _propertyInfos[myType];
             foreach (var jsonProperty in properties)
             {
-                object myValue = jsonProperty.Value.GetValue(this);
-                object otherValue = jsonProperty.Value.GetValue(other);
-                if (otherValue == null || myValue == null || otherValue.GetType() != myValue.GetType())
+                object? myValue = jsonProperty.Value.GetValue(this);
+                object? otherValue = jsonProperty.Value.GetValue(other);
+                if (otherValue is null || myValue is null || otherValue.GetType() != myValue.GetType())
                 {
                     if (otherValue != myValue)
                     {
-                        if (diffs == null)
-                        {
-                            diffs = new Dictionary<string, object>();
-                        }
+                        diffs ??= new Dictionary<string, object?>();
                         diffs.Add(jsonProperty.Key, myValue);
                     }
                 }
                 else if (typeof(IModelObject).IsAssignableFrom(jsonProperty.Value.PropertyType))
                 {
-                    object diff = ((IModelObject)myValue).FindDifferences((IModelObject)otherValue);
-                    if (diff != null)
+                    object? diff = ((IModelObject)myValue).FindDifferences((IModelObject)otherValue);
+                    if (diff is not null)
                     {
-                        if (diffs == null)
-                        {
-                            diffs = new Dictionary<string, object>();
-                        }
+                        diffs ??= new Dictionary<string, object?>();
                         diffs.Add(jsonProperty.Key, diff);
                     }
                 }
                 else if (!myValue.Equals(otherValue))
                 {
-                    if (diffs == null)
-                    {
-                        diffs = new Dictionary<string, object>();
-                    }
+                    diffs ??= new Dictionary<string, object?>();
                     diffs.Add(jsonProperty.Key, myValue);
                 }
             }
@@ -246,7 +242,7 @@ namespace DuetAPI.ObjectModel
         /// <returns>JSON patch</returns>
         public byte[] MakeUtf8Patch(ModelObject old)
         {
-            object diffs = FindDifferences(old);
+            object? diffs = FindDifferences(old);
             return JsonSerializer.SerializeToUtf8Bytes(diffs, Utility.JsonHelper.DefaultJsonOptions);
         }
 
@@ -257,7 +253,7 @@ namespace DuetAPI.ObjectModel
         /// <returns>JSON patch</returns>
         public string MakeStringPatch(ModelObject old)
         {
-            object diffs = FindDifferences(old);
+            object? diffs = FindDifferences(old);
             return JsonSerializer.Serialize(diffs, Utility.JsonHelper.DefaultJsonOptions);
         }
 
@@ -268,12 +264,12 @@ namespace DuetAPI.ObjectModel
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
-        public virtual IModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public virtual IModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             Dictionary<string, PropertyInfo> properties = JsonProperties;
             foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
             {
-                if (properties.TryGetValue(jsonProperty.Name, out PropertyInfo property))
+                if (properties.TryGetValue(jsonProperty.Name, out PropertyInfo? property))
                 {
                     if (ignoreSbcProperties && Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
                     {
@@ -283,13 +279,13 @@ namespace DuetAPI.ObjectModel
 
                     if (jsonProperty.Value.ValueKind == JsonValueKind.Null)
                     {
-                        if (property.SetMethod != null)
+                        if (property.SetMethod is not null)
                         {
                             property.SetValue(this, null);
                         }
                         else if (typeof(IModelObject).IsAssignableFrom(property.PropertyType))
                         {
-                            IModelObject propertyValue = (IModelObject)property.GetValue(this);
+                            IModelObject propertyValue = (IModelObject)property.GetValue(this)!;
                             propertyValue.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
                         }
 #if VERIFY_OBJECT_MODEL
@@ -301,15 +297,15 @@ namespace DuetAPI.ObjectModel
                     }
                     else if (typeof(IModelObject).IsAssignableFrom(property.PropertyType))
                     {
-                        object propertyValue = property.GetValue(this), newPropertyValue = propertyValue;
-                        if (propertyValue == null)
+                        IModelObject? propertyValue = (IModelObject?)property.GetValue(this), newPropertyValue = propertyValue;
+                        if (propertyValue is null)
                         {
-                            newPropertyValue = Activator.CreateInstance(property.PropertyType);
+                            newPropertyValue = (IModelObject?)Activator.CreateInstance(property.PropertyType);
                         }
-                        newPropertyValue = (newPropertyValue as IModelObject).UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                        newPropertyValue = newPropertyValue!.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
                         if (propertyValue != newPropertyValue)
                         {
-                            if (property.SetMethod != null)
+                            if (property.SetMethod is not null)
                             {
                                 property.SetValue(this, newPropertyValue);
                             }
@@ -325,8 +321,8 @@ namespace DuetAPI.ObjectModel
                     {
                         try
                         {
-                            object deserializedValue = JsonSerializer.Deserialize(jsonProperty.Value.GetRawText(), property.PropertyType);
-                            if (property.SetMethod != null)
+                            object? deserializedValue = JsonSerializer.Deserialize(jsonProperty.Value.GetRawText(), property.PropertyType);
+                            if (property.SetMethod is not null)
                             {
                                 property.SetValue(this, deserializedValue);
 

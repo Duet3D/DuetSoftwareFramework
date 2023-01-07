@@ -183,7 +183,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <param name="expression">Expression</param>
         /// <param name="result">Evaluation result</param>
         /// <returns>Number of bytes read</returns>
-        public static int ReadEvaluationResult(ReadOnlySpan<byte> from, out string expression, out object result)
+        public static int ReadEvaluationResult(ReadOnlySpan<byte> from, out string expression, out object? result)
         {
             EvaluationResultHeader header = MemoryMarshal.Read<EvaluationResultHeader>(from);
             int bytesRead = Marshal.SizeOf<EvaluationResultHeader>();

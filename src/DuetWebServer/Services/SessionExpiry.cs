@@ -26,7 +26,7 @@ namespace DuetWebServer.Services
         /// <summary>
         /// Task representing the lifecycle of this service
         /// </summary>
-        private Task _task;
+        private Task? _task;
 
         /// <summary>
         /// Cancellation token source that is triggered when the service is supposed to shut down
@@ -72,7 +72,7 @@ namespace DuetWebServer.Services
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             _stopRequest.Cancel();
-            await _task;
+            await _task!;
         }
 
         /// <summary>

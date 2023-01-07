@@ -27,7 +27,7 @@ namespace DuetControlServer.Model
             return (sender, e) =>
             {
                 // Notify clients that something has been changed in this collection
-                IList senderList = (IList)sender;
+                IList senderList = (IList)sender!;
 
                 // Unsubscribe from old items, subscribe to new items, and figure out which items need to be patched
                 bool[] itemNeedsPatch = new bool[senderList.Count];
@@ -48,7 +48,7 @@ namespace DuetControlServer.Model
                                 itemNeedsPatch[i] = true;
                             }
                         }
-                        if (e.NewItems[0] is ModelObject newObjectItem)
+                        if (e.NewItems![0] is ModelObject newObjectItem)
                         {
                             nodePath = AddToPath(path, new ItemPathNode(collectionName, e.NewStartingIndex, senderList));
                             SubscribeToModelObject(newObjectItem, nodePath);
@@ -62,12 +62,12 @@ namespace DuetControlServer.Model
                         break;
                     case NotifyCollectionChangedAction.Replace:
                         itemNeedsPatch[e.NewStartingIndex] = true;
-                        if (e.OldItems[0] is ModelObject oldObjectItem)
+                        if (e.OldItems![0] is ModelObject oldObjectItem)
                         {
                             UnsubscribeFromModelObject(oldObjectItem);
                         }
                         nodePath = AddToPath(path, new ItemPathNode(collectionName, e.NewStartingIndex, senderList));
-                        if (e.NewItems[0] is ModelObject replaceObjectItem)
+                        if (e.NewItems![0] is ModelObject replaceObjectItem)
                         {
                             SubscribeToModelObject(replaceObjectItem, nodePath);
                         }
@@ -77,7 +77,7 @@ namespace DuetControlServer.Model
                         {
                             itemNeedsPatch[i] = true;
                         }
-                        foreach (object item in e.OldItems)
+                        foreach (object item in e.OldItems!)
                         {
                             if (item is ModelObject objectItem)
                             {
@@ -136,8 +136,8 @@ namespace DuetControlServer.Model
             modelCollection.CollectionChanged += changeHandler;
             _collectionChangeHandlers[modelCollection] = changeHandler;
 
-            Type itemType = GetItemType(modelCollection.GetType());
-            if (itemType != null && itemType.IsAssignableTo(typeof(ModelObject)))
+            Type? itemType = GetItemType(modelCollection.GetType());
+            if (itemType is not null && itemType.IsAssignableTo(typeof(ModelObject)))
             {
                 IList list = (IList)modelCollection;
                 for (int i = 0; i < list.Count; i++)
@@ -156,14 +156,14 @@ namespace DuetControlServer.Model
         /// <param name="modelCollection">Collection to unsubscribe from</param>
         private static void UnsubscribeFromModelCollection(IModelCollection modelCollection)
         {
-            if (_collectionChangeHandlers.TryGetValue(modelCollection, out NotifyCollectionChangedEventHandler changeHandler))
+            if (_collectionChangeHandlers.TryGetValue(modelCollection, out NotifyCollectionChangedEventHandler? changeHandler))
             {
                 modelCollection.CollectionChanged -= changeHandler;
                 _collectionChangeHandlers.Remove(modelCollection);
             }
 
-            Type itemType = GetItemType(modelCollection.GetType());
-            if (itemType != null && itemType.IsAssignableTo(typeof(IModelObject)))
+            Type? itemType = GetItemType(modelCollection.GetType());
+            if (itemType is not null && itemType.IsAssignableTo(typeof(IModelObject)))
             {
                 IList list = (IList)modelCollection;
                 foreach (object listItem in list)

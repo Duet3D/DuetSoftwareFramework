@@ -11,6 +11,6 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Path that is RepRapFirmware-compatible
         /// </summary>
-        public string Path { get; set; }
+        public string Path { get; set; } = string.Empty;
     }
 }

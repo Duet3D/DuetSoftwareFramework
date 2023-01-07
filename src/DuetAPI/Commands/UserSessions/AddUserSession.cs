@@ -23,6 +23,6 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Origin of this session. For remote sessions, this equals the remote IP address
         /// </summary>
-        public string Origin { get; set; }
+        public string Origin { get; set; } = string.Empty;
     }
 }

@@ -25,7 +25,7 @@ namespace DuetAPI.Utility
         public override JsonConverter CreateConverter(Type type, JsonSerializerOptions options)
         {
             Type converterType = typeof(JsonLowerCaseStringEnumConverterInner<>).MakeGenericType(type);
-            return (JsonConverter)Activator.CreateInstance(converterType);
+            return (JsonConverter)Activator.CreateInstance(converterType)!;
         }
 
         /// <summary>
@@ -58,7 +58,7 @@ namespace DuetAPI.Utility
                 {
                     try
                     {
-                        return (T)Enum.Parse(typeToConvert, reader.GetString(), true);
+                        return (T)Enum.Parse(typeToConvert, reader.GetString()!, true);
                     }
                     catch (ArgumentException ae)
                     {
@@ -76,7 +76,7 @@ namespace DuetAPI.Utility
             /// <param name="options">Write options</param>
             public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
             {
-                writer.WriteStringValue(Enum.GetName(value.GetType(), value).ToLowerInvariant());
+                writer.WriteStringValue(Enum.GetName(value.GetType(), value)?.ToLowerInvariant());
             }
         }
     }

@@ -15,7 +15,7 @@ namespace UnitTests.HttpClient
     [TestFixture]
     public class Session
     {
-        private DuetHttpSession session;
+        private DuetHttpSession? session;
 
         [OneTimeSetUp]
         public async Task Connect()
@@ -32,7 +32,7 @@ namespace UnitTests.HttpClient
         public async Task ObjectModel()
         {
             // Wait for the object model to be up-to-date
-            await session.WaitForModelUpdate();
+            await session!.WaitForModelUpdate();
             Assert.AreNotEqual(MachineStatus.Starting, session.Model.State.Status);
 
             // Save the current uptime
@@ -57,7 +57,7 @@ namespace UnitTests.HttpClient
         public async Task Codes()
         {
             // Make sure there are no timeouts
-            await session.SendCode("G4 S6");
+            await session!.SendCode("G4 S6");
 
             // Check generic G-code reply
             string response = await session.SendCode("M115");
@@ -75,7 +75,7 @@ namespace UnitTests.HttpClient
                 uploadStream.Write(Encoding.UTF8.GetBytes(uploadContent));
                 uploadStream.Seek(0, SeekOrigin.Begin);
 
-                await session.Upload("0:/sys/unitTest.txt", uploadStream);
+                await session!.Upload("0:/sys/unitTest.txt", uploadStream);
             }
 
             // Download it again
@@ -86,31 +86,31 @@ namespace UnitTests.HttpClient
             }
 
             // Move it
-            await session.Move("0:/sys/unitTest.txt", "0:/sys/unitTest2.txt", true);
+            await session!.Move("0:/sys/unitTest.txt", "0:/sys/unitTest2.txt", true);
 
             // Delete it again
-            await session.Delete("0:/sys/unitTest2.txt");
+            await session!.Delete("0:/sys/unitTest2.txt");
         }
 
         [Test]
         public async Task Directories()
         {
             // Create a new directory
-            await session.MakeDirectory("0:/sys/unitTest");
+            await session!.MakeDirectory("0:/sys/unitTest");
 
             // Delete it again
-            await session.Delete("0:/sys/unitTest");
+            await session!.Delete("0:/sys/unitTest");
         }
 
         [Test]
         public async Task FileList()
         {
             // List files in 0:/sys and check for valid config.g
-            IEnumerable<FileListItem> fileList = await session.GetFileList("0:/sys");
+            IEnumerable<FileListItem> fileList = await session!.GetFileList("0:/sys");
             Assert.IsTrue(fileList.Any(item => !item.IsDirectory && item.Filename == "config.g" && item.Size > 0 && item.Size < 192_000));
 
             // List root directories and check for sys directory
-            fileList = await session.GetFileList("0:/");
+            fileList = await session!.GetFileList("0:/");
             Assert.IsTrue(fileList.Any(item => item.IsDirectory && item.Filename == "sys"));
         }
 
@@ -118,7 +118,7 @@ namespace UnitTests.HttpClient
         public async Task FileInfo()
         {
             // Get fileinfo for 0:/sys/config.g
-            GCodeFileInfo info = await session.GetFileInfo("0:/sys/config.g");
+            GCodeFileInfo info = await session!.GetFileInfo("0:/sys/config.g");
             Assert.Greater(info.Size, 0);
             Assert.Less(info.Size, 192_000);
         }
@@ -126,7 +126,7 @@ namespace UnitTests.HttpClient
         [OneTimeTearDown]
         public async Task Disconnect()
         {
-            await session.DisposeAsync();
+            await session!.DisposeAsync();
         }
     }
 }

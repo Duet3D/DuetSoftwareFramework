@@ -11,6 +11,6 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Identifier of the plugin
         /// </summary>
-        public string Plugin { get; set; }
+        public string Plugin { get; set; } = string.Empty;
     }
 }

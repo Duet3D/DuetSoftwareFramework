@@ -12,9 +12,9 @@ namespace DuetControlServer.Model
         /// </summary>
         /// <param name="collectionType">Type of the collection</param>
         /// <returns>Item type or null if not found</returns>
-        private static Type GetItemType(Type collectionType)
+        private static Type? GetItemType(Type collectionType)
         {
-            for (Type type = collectionType; type != null; type = type.BaseType)
+            for (Type? type = collectionType; type is not null; type = type.BaseType)
             {
                 if (type.IsGenericType)
                 {

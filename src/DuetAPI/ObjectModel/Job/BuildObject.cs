@@ -18,12 +18,12 @@
         /// <summary>
         /// Name of the build object (if any)
         /// </summary>
-        public string Name
+        public string? Name
         {
             get => _name;
             set => SetPropertyValue(ref _name, value);
         }
-        private string _name;
+        private string? _name;
 
         /// <summary>
         /// X coordinates of the build object (in mm or null if not found)

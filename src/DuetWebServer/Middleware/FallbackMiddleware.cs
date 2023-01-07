@@ -39,7 +39,7 @@ namespace DuetWebServer.Middleware
         public async Task InvokeAsync(HttpContext context)
         {
             if (context.Request.Method == HttpMethods.Get &&
-                !context.Request.Path.Value.Equals("/") &&
+                !context.Request.Path.Value!.Equals("/") &&
                 !context.Request.Path.Value.StartsWith("/rr_") && !context.Request.Path.Value.StartsWith("/machine/") &&
                 !context.Request.Path.Value.Contains('.'))
             {

@@ -71,7 +71,7 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Last code block
         /// </summary>
-        private CodeBlock _lastCodeBlock;
+        private CodeBlock? _lastCodeBlock;
 
         /// <summary>
         /// Gets or sets the current file position in bytes
@@ -195,7 +195,7 @@ namespace DuetControlServer.Files
         /// <remarks>
         /// This instance must NOT be locked when this is called
         /// </remarks>
-        public async Task<Code> ReadCodeAsync(Code sharedCode = null)
+        public async Task<Code?> ReadCodeAsync(Code? sharedCode = null)
         {
             while (true)
             {
@@ -226,7 +226,7 @@ namespace DuetControlServer.Files
 
                         // Get the next code
                         codeRead = await DuetAPI.Commands.Code.ParseAsync(_reader, code, _parserBuffer);
-                        _position += code.Length.Value;
+                        _position += code.Length ?? 0;
                         LineNumber = code.LineNumber;
                     }
                     while (!codeRead && _parserBuffer.GetPosition(_reader) < _fileStream.Length);
@@ -239,7 +239,7 @@ namespace DuetControlServer.Files
 
                 // Check if this is the end of the last block(s)
                 bool readAgain = false;
-                while (_codeBlocks.TryPeek(out CodeBlock state))
+                while (_codeBlocks.TryPeek(out CodeBlock? state))
                 {
                     if (!codeRead || (code.Type != CodeType.Comment && state.IsFinished(code.Indent)))
                     {
@@ -269,7 +269,7 @@ namespace DuetControlServer.Files
 
                                     using (await _lock.LockAsync(Program.CancellationToken))
                                     {
-                                        Position = state.StartingCode.FilePosition.Value;
+                                        Position = state.StartingCode.FilePosition ?? 0;
                                         _parserBuffer.LineNumber = LineNumber = state.StartingCode.LineNumber;
                                         state.ProcessBlock = true;
                                         state.ContinueLoop = false;
@@ -314,10 +314,10 @@ namespace DuetControlServer.Files
                 }
 
                 // Process only codes where the corresponding condition is met
-                if (!_codeBlocks.TryPeek(out CodeBlock codeBlock) || codeBlock.ProcessBlock)
+                if (!_codeBlocks.TryPeek(out CodeBlock? codeBlock) || codeBlock.ProcessBlock)
                 {
                     // FIXME If/ElseIf/Else/While are not sent to the interceptors
-                    if (codeBlock != null && (code.Keyword != KeywordType.While || code.FilePosition != codeBlock.StartingCode.FilePosition))
+                    if (codeBlock is not null && (code.Keyword != KeywordType.While || code.FilePosition != codeBlock.StartingCode.FilePosition))
                     {
                         codeBlock.SeenCodes = true;
                     }
@@ -330,7 +330,7 @@ namespace DuetControlServer.Files
                             // Check elif condition
                             if (code.Keyword == KeywordType.ElseIf)
                             {
-                                if (_lastCodeBlock == null || _lastCodeBlock.StartingCode.Indent != code.Indent ||
+                                if (_lastCodeBlock is null || _lastCodeBlock.StartingCode.Indent != code.Indent ||
                                     (_lastCodeBlock.StartingCode.Keyword != KeywordType.If && _lastCodeBlock.StartingCode.Keyword != KeywordType.ElseIf))
                                 {
                                     throw new CodeParserException("unexpected elif condition", code);
@@ -351,7 +351,7 @@ namespace DuetControlServer.Files
                             // Start a new conditional block if necessary
                             await Codes.Processor.FlushAsync(Channel);
                             _logger.Debug("Evaluating {0} block", code.Keyword);
-                            if (code.Keyword != KeywordType.While || codeBlock == null || codeBlock.StartingCode.FilePosition != code.FilePosition)
+                            if (code.Keyword != KeywordType.While || codeBlock is null || codeBlock.StartingCode.FilePosition != code.FilePosition)
                             {
                                 using (await _lock.LockAsync(Program.CancellationToken))
                                 {
@@ -361,7 +361,7 @@ namespace DuetControlServer.Files
                             }
 
                             // Evaluate the condition
-                            string stringEvaluationResult = await Model.Expressions.Evaluate(code, true);
+                            string? stringEvaluationResult = await Model.Expressions.Evaluate(code, true);
                             if (bool.TryParse(stringEvaluationResult, out bool evaluationResult))
                             {
                                 _logger.Debug("Evaluation result: ({0}) = {1}", code.KeywordArgument, evaluationResult);
@@ -375,7 +375,7 @@ namespace DuetControlServer.Files
                             break;
 
                         case KeywordType.Else:
-                            if (_lastCodeBlock == null || _lastCodeBlock.StartingCode.Indent != code.Indent ||
+                            if (_lastCodeBlock is null || _lastCodeBlock.StartingCode.Indent != code.Indent ||
                                 (_lastCodeBlock.StartingCode.Keyword != KeywordType.If && _lastCodeBlock.StartingCode.Keyword != KeywordType.ElseIf))
                             {
                                 throw new CodeParserException("unexpected else", code);
@@ -419,7 +419,7 @@ namespace DuetControlServer.Files
                             return code;
 
                         case KeywordType.Var:
-                            if (codeBlock == null || code.Indent > codeBlock.StartingCode.Indent)
+                            if (codeBlock is null || code.Indent > codeBlock.StartingCode.Indent)
                             {
                                 using (await _lock.LockAsync(Program.CancellationToken))
                                 {
@@ -448,7 +448,7 @@ namespace DuetControlServer.Files
                 }
 
                 // Make a new shared code so it isn't reused in code blocks
-                if (sharedCode != null)
+                if (sharedCode is not null)
                 {
                     sharedCode = new Code();
                 }
@@ -461,7 +461,7 @@ namespace DuetControlServer.Files
         /// <param name="varName">Name of the variable</param>
         public void AddLocalVariable(string varName)
         {
-            if (_codeBlocks.TryPeek(out CodeBlock codeBlock))
+            if (_codeBlocks.TryPeek(out CodeBlock? codeBlock))
             {
                 if (!codeBlock.LocalVariables.Contains(varName))
                 {
@@ -498,7 +498,7 @@ namespace DuetControlServer.Files
         {
             using (await _lock.LockAsync(Program.CancellationToken))
             {
-                if (_codeBlocks.TryPop(out CodeBlock codeBlock))
+                if (_codeBlocks.TryPop(out CodeBlock? codeBlock))
                 {
                     // Log the end of this block
                     if (codeBlock.StartingCode.Keyword == KeywordType.If ||

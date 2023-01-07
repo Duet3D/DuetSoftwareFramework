@@ -27,11 +27,11 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Type of the body content
         /// </summary>
-        public string ContentType { get; set; }
+        public string ContentType { get; set; } = string.Empty;
 
         /// <summary>
         /// Body content as plain text or the filename where the body payload was saved if <see cref="HttpEndpoint.IsUploadRequest"/> is true
         /// </summary>
-        public string Body { get; set; }
+        public string Body { get; set; } = string.Empty;
     }
 }

@@ -18,7 +18,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Identifier of the plugin to update (only mandatory if running as root)
         /// </summary>
-        public string Plugin { get; set; }
+        public string? Plugin { get; set; }
 
         /// <summary>
         /// Key to set
@@ -26,7 +26,7 @@ namespace DuetAPI.Commands
         /// <remarks>
         /// This key must already exist in the <see cref="ObjectModel.PluginManifest.Data"/> object!
         /// </remarks>
-        public string Key { get; set; }
+        public string Key { get; set; } = string.Empty;
 
         /// <summary>
         /// Custom value to set

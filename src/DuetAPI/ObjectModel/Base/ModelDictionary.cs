@@ -2,6 +2,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Data.SqlTypes;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -26,22 +28,22 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Internal storage for key/value pairs
         /// </summary>
-        private readonly Dictionary<string, TValue> _dictionary = new Dictionary<string, TValue>();
+        private readonly Dictionary<string, TValue> _dictionary = new();
 
         /// <summary>
         /// Event that is called when the entire directory is cleared. Only used if <see cref="NullRemovesItems"/> is false
         /// </summary>
-        public event EventHandler DictionaryCleared;
+        public event EventHandler? DictionaryCleared;
 
         /// <summary>
         /// Event that is called when a key has been changed
         /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>
         /// Event that is called when a key is being changed
         /// </summary>
-        public event PropertyChangingEventHandler PropertyChanging;
+        public event PropertyChangingEventHandler? PropertyChanging;
 
         /// <summary>
         /// Constructor of this class
@@ -50,32 +52,41 @@ namespace DuetAPI.ObjectModel
         public ModelDictionary(bool nullRemovesItems) => NullRemovesItems = nullRemovesItems;
 
         /// <summary>
+        /// Get an element from the dictionary
+        /// </summary>
+        /// <param name="key">Key</param>
+        /// <returns>Value</returns>
+        [return: MaybeNull]
+        private TValue GetValue(string key)
+        {
+            if (NullRemovesItems)
+            {
+                return _dictionary.TryGetValue(key, out TValue? result) ? result! : default;
+            }
+            return _dictionary[key];
+        }
+
+        /// <summary>
         /// Index operator
         /// </summary>
         /// <param name="key">Key</param>
         /// <returns>Value</returns>
+        [AllowNull]
         public TValue this[string key]
         {
-            get
-            {
-                if (NullRemovesItems)
-                {
-                    return _dictionary.TryGetValue(key, out TValue result) ? result : default;
-                }
-                return _dictionary[key];
-            }
+            get => GetValue(key)!;
             set
             {
-                PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(key));
-                if (NullRemovesItems && value == null)
+                PropertyChanging?.Invoke(this, new(key));
+                if (NullRemovesItems && value is null)
                 {
                     _dictionary.Remove(key);
                 }
                 else
                 {
-                    _dictionary[key] = value;
+                    _dictionary[key] = value!;
                 }
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(key));
+                PropertyChanged?.Invoke(this, new(key));
             }
         }
 
@@ -84,10 +95,12 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="key">Key object</param>
         /// <returns>Value if found</returns>
+        [AllowNull]
+        [MaybeNull]
         public object this[object key]
         {
             get => this[(string)key];
-            set => this[(string)key] = (TValue)value;
+            set => this[(string)key] = (TValue?)value;
         }
 
         /// <summary>
@@ -148,14 +161,14 @@ namespace DuetAPI.ObjectModel
         /// <param name="value">Value to add</param>
         public void Add(string key, TValue value)
         {
-            if (NullRemovesItems && value == null)
+            if (NullRemovesItems && value is null)
             {
                 throw new ArgumentNullException(nameof(value));
             }
 
-            PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(key));
+            PropertyChanging?.Invoke(this, new(key));
             _dictionary.Add(key, value);
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(key));
+            PropertyChanged?.Invoke(this, new(key));
         }
 
         /// <summary>
@@ -163,7 +176,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="key">Key to add</param>
         /// <param name="value">Value to add</param>
-        public void Add(object key, object value) => Add((string)key, (TValue)value);
+        public void Add(object key, object? value) => Add((string)key, (TValue)value!);
 
         /// <summary>
         /// Add a new item
@@ -175,16 +188,16 @@ namespace DuetAPI.ObjectModel
         /// Assign the properties from another instance
         /// </summary>
         /// <param name="from">Other instance</param>
-        public void Assign(object from)
+        public void Assign(object? from)
         {
             // Assigning null values is not supported
-            if (from == null)
+            if (from is null)
             {
                 throw new ArgumentNullException(nameof(from));
             }
 
             // Validate the types
-            if (!(from is ModelDictionary<TValue> other))
+            if (from is not ModelDictionary<TValue> other)
             {
                 throw new ArgumentException("Types do not match", nameof(from));
             }
@@ -206,9 +219,16 @@ namespace DuetAPI.ObjectModel
             // Update items
             foreach (var kv in other)
             {
-                if (TryGetValue(kv.Key, out TValue existingItem))
+                if (TryGetValue(kv.Key, out TValue? existingItem))
                 {
-                    if (!existingItem.Equals(kv.Value))
+                    if (existingItem is null)
+                    {
+                        if (kv.Value is not null)
+                        {
+                            this[kv.Key] = kv.Value;
+                        }
+                    }
+                    else if (!existingItem.Equals(kv.Value))
                     {
                         if (kv.Value is ICloneable cloneableItem)
                         {
@@ -235,7 +255,7 @@ namespace DuetAPI.ObjectModel
         {
             if (NullRemovesItems)
             {
-                List<string> keys = new List<string>(_dictionary.Keys);
+                List<string> keys = new(_dictionary.Keys);
                 foreach (string key in keys)
                 {
                     Remove(key);
@@ -254,7 +274,7 @@ namespace DuetAPI.ObjectModel
         /// <returns></returns>
         public object Clone()
         {
-            ModelDictionary<TValue> clone = new ModelDictionary<TValue>(NullRemovesItems);
+            ModelDictionary<TValue> clone = new(NullRemovesItems);
             foreach (KeyValuePair<string, TValue> kv in _dictionary)
             {
                 if (kv.Value is ICloneable cloneableItem)
@@ -290,7 +310,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="index">Start index</param>
         public void CopyTo(Array array, int index)
         {
-            List<string> keys = new List<string>(_dictionary.Keys);
+            List<string> keys = new(_dictionary.Keys);
             for (int i = 0; i < Count; i++)
             {
                 string key = keys[i];
@@ -310,7 +330,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="item">Item to check</param>
         /// <returns>If the item exists in the dictionary</returns>
-        public bool Contains(KeyValuePair<string, TValue> item) => _dictionary.TryGetValue(item.Key, out TValue value) && Equals(value, item.Value);
+        public bool Contains(KeyValuePair<string, TValue> item) => _dictionary.TryGetValue(item.Key, out TValue? value) && Equals(value, item.Value);
 
         /// <summary>
         /// Create a dictionary or list of all the differences between this instance and another.
@@ -318,25 +338,22 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="other">Other instance</param>
         /// <returns>Object differences or null if both instances are equal</returns>
-        public object FindDifferences(IModelObject other)
+        public object? FindDifferences(IModelObject? other)
         {
             // Check the types
-            if (!(other is ModelDictionary<TValue> otherDictionary))
+            if (other is not ModelDictionary<TValue> otherDictionary)
             {
                 // Types differ, return the entire instance
                 return this;
             }
 
             // Find the differences
-            Dictionary<string, TValue> diffs = null;
+            Dictionary<string, TValue>? diffs = null;
             foreach (var kv in this)
             {
-                if (!otherDictionary.TryGetValue(kv.Key, out TValue otherItem) || !kv.Value.Equals(otherItem))
+                if (!otherDictionary.TryGetValue(kv.Key, out TValue? otherItem) || !kv.Value!.Equals(otherItem))
                 {
-                    if (diffs == null)
-                    {
-                        diffs = new Dictionary<string, TValue>();
-                    }
+                    diffs ??= new Dictionary<string, TValue>();
                     diffs.Add(kv.Key, kv.Value);
                 }
             }
@@ -348,11 +365,8 @@ namespace DuetAPI.ObjectModel
                 {
                     if (!_dictionary.ContainsKey(key))
                     {
-                        if (diffs == null)
-                        {
-                            diffs = new Dictionary<string, TValue>();
-                        }
-                        diffs.Add(key, default);
+                        diffs ??= new Dictionary<string, TValue>();
+                        diffs.Add(key, default!);
                     }
                 }
             }
@@ -381,11 +395,11 @@ namespace DuetAPI.ObjectModel
         {
             if (NullRemovesItems)
             {
-                if (_dictionary.TryGetValue(key, out TValue itemToRemove))
+                if (_dictionary.TryGetValue(key, out _))
                 {
-                    PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(key));
+                    PropertyChanging?.Invoke(this, new(key));
                     _dictionary.Remove(key);
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(key));
+                    PropertyChanged?.Invoke(this, new(key));
                     return true;
                 }
                 return false;
@@ -413,7 +427,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="key">Key to look up</param>
         /// <param name="value">Retrieved value</param>
         /// <returns>Whether the key could be found</returns>
-        public bool TryGetValue(string key, out TValue value) => _dictionary.TryGetValue(key, out value);
+        public bool TryGetValue(string key, out TValue value) => _dictionary.TryGetValue(key, out value!);
 
         /// <summary>
         /// Update this instance from a given JSON element
@@ -439,7 +453,7 @@ namespace DuetAPI.ObjectModel
                     }
                     else if (typeof(TValue) == typeof(JsonElement))
                     {
-                        if (!TryGetValue(jsonProperty.Name, out TValue value) || !value.Equals(jsonProperty.Value))
+                        if (!TryGetValue(jsonProperty.Name, out TValue? value) || !value!.Equals(jsonProperty.Value))
                         {
                             this[jsonProperty.Name] = (TValue)(object)jsonProperty.Value.Clone();
                         }
@@ -448,8 +462,8 @@ namespace DuetAPI.ObjectModel
                     {
                         try
                         {
-                            TValue newValue = JsonSerializer.Deserialize<TValue>(jsonProperty.Value.GetRawText(), Utility.JsonHelper.DefaultJsonOptions);
-                            if (!TryGetValue(jsonProperty.Name, out TValue value) || !value.Equals(newValue))
+                            TValue newValue = JsonSerializer.Deserialize<TValue>(jsonProperty.Value.GetRawText(), Utility.JsonHelper.DefaultJsonOptions)!;
+                            if (!TryGetValue(jsonProperty.Name, out TValue? value) || !value!.Equals(newValue))
                             {
                                 this[jsonProperty.Name] = newValue;
                             }
@@ -490,7 +504,7 @@ namespace DuetAPI.ObjectModel
         {
             Type itemType = type.GetGenericArguments().First();
             Type converterType = typeof(ModelDictionaryConverterInner<,>).MakeGenericType(type, itemType);
-            return (JsonConverter)Activator.CreateInstance(converterType);
+            return (JsonConverter)Activator.CreateInstance(converterType)!;
         }
 
         /// <summary>

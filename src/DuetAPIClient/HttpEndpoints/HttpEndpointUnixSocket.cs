@@ -18,29 +18,6 @@ namespace DuetAPIClient
         private static extern int chmod(string pathname, ushort mode);
 
         const uint GroupRwMode = 0x30;   // 000110000, mode 060
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct statbuf
-        {
-            public uint DeviceID;
-            public uint InodeNumber;
-            public uint Mode;
-            public uint HardLinks;
-            public uint UserID;
-            public uint GroupID;
-            public uint SpecialDeviceID;
-            public ulong Size;
-            public ulong BlockSize;
-            public uint Blocks;
-            public long TimeLastAccess;
-            public long TimeLastModification;
-            public long TimeLastStatusChange;
-        }
-
-        private const int STATVER = 1;
-
-        [DllImport(LibcLibrary, EntryPoint = "__xstat", SetLastError = true, CharSet = CharSet.Ansi)]
-        private static extern int stat(int vers, string pathname, ref statbuf statbuf);
         #endregion
 
         /// <summary>
@@ -71,7 +48,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Actual UNIX socket instance
         /// </summary>
-        private readonly Socket _unixSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        private readonly Socket _unixSocket = new(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
 
         /// <summary>
         /// Open a new UNIX socket on the given file path
@@ -97,15 +74,15 @@ namespace DuetAPIClient
             try
             {
                 // Create a new UNIX socket
-                UnixDomainSocketEndPoint endPoint = new UnixDomainSocketEndPoint(socketPath);
+                UnixDomainSocketEndPoint endPoint = new(socketPath);
                 _unixSocket.Bind(endPoint);
                 _unixSocket.Listen(backlog);
 
                 // Allow the group to write to it
-                statbuf buf = new statbuf();
-                if (stat(STATVER, socketPath, ref buf) == 0)
+                statxbuf buffer = new();
+                if (Interop.statx(Interop.AT_FDCWD, socketPath, Interop.AT_STATX_SYNC_AS_STAT, Interop.STATX_BASIC_STATS, ref buffer) == 0)
                 {
-                    chmod(socketPath, (ushort)(buf.Mode | GroupRwMode));
+                    chmod(socketPath, (ushort)(buffer.Mode | GroupRwMode));
                 }
 
                 // Start listening
@@ -150,7 +127,7 @@ namespace DuetAPIClient
         /// <summary>
         /// Event that is triggered whenever a new HTTP request is received
         /// </summary>
-        public event EndpointRequestReceived OnEndpointRequestReceived;
+        public event EndpointRequestReceived? OnEndpointRequestReceived;
 
         /// <summary>
         /// Accept incoming UNIX socket connections (HTTP/WebSocket requests)
@@ -162,9 +139,9 @@ namespace DuetAPIClient
                 do
                 {
                     Socket socket = await _unixSocket.AcceptAsync();
-                    HttpEndpointConnection connection = new HttpEndpointConnection(socket, EndpointType == HttpEndpointType.WebSocket);
+                    HttpEndpointConnection connection = new(socket, EndpointType == HttpEndpointType.WebSocket);
 
-                    if (OnEndpointRequestReceived != null)
+                    if (OnEndpointRequestReceived is not null)
                     {
                         // Invoke the event handler and forward the wrapped connection for dealing with a single endpoint connection
                         // Note that the event delegate is responsible for disposing the connection!

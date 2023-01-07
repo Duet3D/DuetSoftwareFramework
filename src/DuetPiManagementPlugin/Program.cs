@@ -21,7 +21,7 @@ namespace DuetPiManagementPlugin
         /// <summary>
         /// Version of this application
         /// </summary>
-        public static readonly string Version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion;
+        public static readonly string Version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
 
         /// <summary>
         /// List of codes to intercept
@@ -66,7 +66,7 @@ namespace DuetPiManagementPlugin
             string socketPath = Defaults.FullSocketPath;
 
             // Parse command line parameters
-            string lastArg = null;
+            string? lastArg = null;
             foreach (string arg in args)
             {
                 if (lastArg == "-s" || lastArg == "--socket")
@@ -129,12 +129,18 @@ namespace DuetPiManagementPlugin
                 {
                     // Initialize SD card
                     case 21:
-                        if (code.Parameter('P').Type == typeof(string))
+                        if (code.Parameter('P')?.Type == typeof(string))
                         {
                             if (await Connection.Flush(CancellationToken))
                             {
-                                string device = code.Parameter('P'), directory = code.Parameter('S');
-                                string type = code.Parameter('T'), options = code.Parameter('O');
+                                string? device = code.Parameter('P');
+                                if (device is null)
+                                {
+                                    await Connection.ResolveCode(MessageType.Error, "Missing P parameter");
+                                    break;
+                                }
+
+                                string? directory = code.Parameter('S'), type = code.Parameter('T'), options = code.Parameter('O');
                                 try
                                 {
                                     if (!string.IsNullOrEmpty(directory))
@@ -163,11 +169,17 @@ namespace DuetPiManagementPlugin
 
                     // Release SD card
                     case 22:
-                        if (code.Parameter('P').Type == typeof(string))
+                        if (code.Parameter('P')?.Type == typeof(string))
                         {
                             if (await Connection.Flush(CancellationToken))
                             {
-                                string node = code.Parameter('P');
+                                string? node = code.Parameter('P');
+                                if (node is null)
+                                {
+                                    await Connection.ResolveCode(MessageType.Error, "Missing P parameter");
+                                    break;
+                                }
+
                                 try
                                 {
                                     string directory = await Connection.ResolvePath(node, CancellationToken);
@@ -203,9 +215,10 @@ namespace DuetPiManagementPlugin
                             int index = code.Parameter('I', 0);
                             try
                             {
-                                if (code.Parameter('P') != null)
+                                CodeParameter? pParam = code.Parameter('P');
+                                if (pParam is not null)
                                 {
-                                    Message setResult = await Network.Interface.SetMACAddress(index, code.Parameter('P'));
+                                    Message setResult = await Network.Interface.SetMACAddress(index, pParam!);
                                     await Connection.ResolveCode(setResult, CancellationToken);
                                 }
                                 else
@@ -230,7 +243,7 @@ namespace DuetPiManagementPlugin
                     case 550:
                         if (await Connection.Flush(CancellationToken))
                         {
-                            string newHostname = code.Parameter('P', string.Empty);
+                            string? newHostname = code.Parameter('P', string.Empty);
                             if (!string.IsNullOrWhiteSpace(newHostname))
                             {
                                 if (newHostname.Length > 40)
@@ -272,9 +285,8 @@ namespace DuetPiManagementPlugin
                     case 552:
                         if (await Connection.Flush(CancellationToken))
                         {
-                            CodeParameter pParam = code.Parameter('P');
-                            CodeParameter sParam = code.Parameter('S');
-                            if (pParam == null && sParam == null)
+                            CodeParameter? pParam = code.Parameter('P'), sParam = code.Parameter('S');
+                            if (pParam is null && sParam is null)
                             {
                                 StringBuilder builder = new();
                                 await Network.Interface.Report(builder, null, code.Parameter('I', -1));
@@ -343,12 +355,12 @@ namespace DuetPiManagementPlugin
                         {
                             try
                             {
-                                if (code.Parameter('P') != null)
+                                if (code.Parameter('P') is not null)
                                 {
                                     int protocol = code.Parameter('P', 0), tls = code.Parameter('T', 0), port = code.Parameter('R', 0);
-                                    CodeParameter enabled = code.Parameter('S');
-                                    Message result = await Network.Protocols.Manager.ConfigureProtocols(protocol, (enabled != null) ? (enabled > 0) : null, tls > 0, port);
-                                    if (string.IsNullOrWhiteSpace(result.Content) && code.Parameter('C') != null)
+                                    CodeParameter? enabled = code.Parameter('S');
+                                    Message result = await Network.Protocols.Manager.ConfigureProtocols(protocol, (enabled is not null) ? (enabled > 0) : null, tls > 0, port);
+                                    if (string.IsNullOrWhiteSpace(result.Content) && code.Parameter('C') is not null)
                                     {
                                         // Let DSF/RRF process the combined C parameter
                                         await Connection.IgnoreCode(CancellationToken);
@@ -359,7 +371,7 @@ namespace DuetPiManagementPlugin
                                         await Connection.ResolveCode(result, CancellationToken);
                                     }
                                 }
-                                else if (code.Parameter('C') != null)
+                                else if (code.Parameter('C') is not null)
                                 {
                                     // Let DSF/RRF process the standalone C parameter
                                     await Connection.IgnoreCode(CancellationToken);
@@ -389,11 +401,10 @@ namespace DuetPiManagementPlugin
                         {
                             try
                             {
-                                string ssid = code.Parameter('S');
-                                string psk = code.Parameter('P');
-                                if (psk != null)
+                                string? ssid = code.Parameter('S'), psk = code.Parameter('P');
+                                if (psk is not null)
                                 {
-                                    if (ssid == null)
+                                    if (ssid is null)
                                     {
                                         await Connection.ResolveCode(MessageType.Error, "Missing S parameter");
                                         break;
@@ -404,13 +415,13 @@ namespace DuetPiManagementPlugin
                                         break;
                                     }
                                 }
-                                string countryCode = code.Parameter('C');
-                                IPAddress ip = code.Parameter('I');
-                                IPAddress gateway = code.Parameter('J');
-                                IPAddress netmask = code.Parameter('K');
-                                IPAddress dnsServer = code.Parameter('L');
+                                string? countryCode = code.Parameter('C');
+                                IPAddress? ip = code.Parameter('I');
+                                IPAddress? gateway = code.Parameter('J');
+                                IPAddress? netmask = code.Parameter('K');
+                                IPAddress? dnsServer = code.Parameter('L');
 
-                                if ((ssid == null || psk == null) && countryCode == null)
+                                if ((ssid is null || psk is null) && countryCode is null)
                                 {
                                     // Output currently configured SSIDs
                                     Message ssidReport = await Network.WPA.Report();
@@ -445,19 +456,18 @@ namespace DuetPiManagementPlugin
                     case 588:
                         if (await Connection.Flush(CancellationToken))
                         {
+                            string? ssid = code.Parameter('S');
+                            if (ssid is null)
+                            {
+                                await Connection.ResolveCode(MessageType.Error, "Missing S parameter", CancellationToken);
+                                break;
+                            }
+
                             try
                             {
-                                string ssid = code.Parameter('S');
-                                if (ssid == null)
-                                {
-                                    await Connection.ResolveCode(MessageType.Error, "Missing S parameter", CancellationToken);
-                                }
-                                else
-                                {
-                                    // Remove SSID(s) if possible
-                                    Message configResult = await Network.WPA.UpdateSSID(ssid, null);
-                                    await Connection.ResolveCode(configResult, CancellationToken);
-                                }
+                                // Remove SSID(s) if possible
+                                Message configResult = await Network.WPA.UpdateSSID(ssid, null);
+                                await Connection.ResolveCode(configResult, CancellationToken);
                             }
                             catch (Exception e)
                             {
@@ -477,22 +487,23 @@ namespace DuetPiManagementPlugin
                         {
                             try
                             {
-                                string ssid = code.Parameter('S');
+                                string? ssid = code.Parameter('S');
                                 if (string.IsNullOrWhiteSpace(ssid))
                                 {
                                     await Connection.ResolveCode(MessageType.Error, "Missing S parameter");
                                     break;
                                 }
-                                string password = code.Parameter('P');
+                                string? password = code.Parameter('P');
                                 if (string.IsNullOrWhiteSpace(password))
                                 {
                                     await Connection.ResolveCode(MessageType.Error, "Missing P parameter");
                                     break;
                                 }
-                                IPAddress ipAddress = code.Parameter('I');
-                                if (ipAddress == null)
+                                IPAddress? ipAddress = code.Parameter('I');
+                                if (ipAddress is null)
                                 {
                                     await Connection.ResolveCode(MessageType.Error, "Missing I parameter");
+                                    break;
                                 }
                                 int channel = code.Parameter('C', 6);
 

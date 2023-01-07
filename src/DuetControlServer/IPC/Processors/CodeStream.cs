@@ -78,7 +78,7 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// Stream for writing to a client
         /// </summary>
-        private StreamWriter _streamWriter;
+        private StreamWriter? _streamWriter;
 
         /// <summary>
         /// Constructor of the code stream interpreter
@@ -137,8 +137,8 @@ namespace DuetControlServer.IPC.Processors
                     try
                     {
                         // Read the next line from the client
-                        string line = await streamReader.ReadLineAsync();
-                        if (line == null)
+                        string? line = await streamReader.ReadLineAsync();
+                        if (line is null)
                         {
                             break;
                         }
@@ -150,7 +150,7 @@ namespace DuetControlServer.IPC.Processors
                         do
                         {
                             // Get another code instance
-                            Code code;
+                            Code? code;
                             using (await codeLock.EnterAsync(Program.CancellationToken))
                             {
                                 if (!codes.TryDequeue(out code))
@@ -175,11 +175,14 @@ namespace DuetControlServer.IPC.Processors
                                         {
                                             try
                                             {
-                                                Message result = await task;
-                                                using (await _outputLock.LockAsync(Program.CancellationToken))
+                                                Message? result = await task;
+                                                if (result is not null)
                                                 {
-                                                    await streamWriter.WriteAsync(result.ToString());
-                                                    await streamWriter.FlushAsync();
+                                                    using (await _outputLock.LockAsync(Program.CancellationToken))
+                                                    {
+                                                        await streamWriter.WriteAsync(result.ToString());
+                                                        await streamWriter.FlushAsync();
+                                                    }
                                                 }
                                             }
                                             catch (SocketException)
@@ -295,8 +298,8 @@ namespace DuetControlServer.IPC.Processors
                 {
                     using (await task)
                     {
-                        await _streamWriter?.WriteAsync(message.ToString());
-                        await _streamWriter?.FlushAsync();
+                        await _streamWriter!.WriteAsync(message.ToString());
+                        await _streamWriter!.FlushAsync();
                     }
                 }, TaskContinuationOptions.RunContinuationsAsynchronously);
         }

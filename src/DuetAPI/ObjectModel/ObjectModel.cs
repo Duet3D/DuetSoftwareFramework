@@ -33,7 +33,7 @@ namespace DuetAPI.ObjectModel
         /// List of configured fans
         /// </summary>
         /// <seealso cref="Fan"/>
-        public ModelCollection<Fan> Fans { get; } = new ModelCollection<Fan>();
+        public ModelCollection<Fan?> Fans { get; } = new ModelCollection<Fan?>();
 
         /// <summary>
         /// Dictionary of global variables vs JSON values
@@ -106,7 +106,7 @@ namespace DuetAPI.ObjectModel
         /// List of configured CNC spindles
         /// </summary>
         /// <seealso cref="Spindle"/>
-        public ModelCollection<Spindle> Spindles { get; } = new ModelCollection<Spindle>();
+        public ModelCollection<Spindle?> Spindles { get; } = new ModelCollection<Spindle?>();
         
         /// <summary>
         /// Information about the machine state
@@ -117,7 +117,7 @@ namespace DuetAPI.ObjectModel
         /// List of configured tools
         /// </summary>
         /// <seealso cref="Tool"/>
-        public ModelCollection<Tool> Tools { get; } = new ModelCollection<Tool>();
+        public ModelCollection<Tool?> Tools { get; } = new ModelCollection<Tool?>();
 
         /// <summary>
         /// List of user sessions
@@ -140,7 +140,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="offset">Index offset</param>
         /// <param name="last">Whether this is the last update</param>
         /// <returns>Whether the key could be updated</returns>
-        public bool UpdateFromFirmwareJson(string key, JsonElement jsonElement, int offset = 0, bool last = true) => InternalUpdateFromJson(key, jsonElement, true, offset, last);
+        public bool UpdateFromFirmwareJson(string? key, JsonElement jsonElement, int offset = 0, bool last = true) => InternalUpdateFromJson(key, jsonElement, true, offset, last);
 
         /// <summary>
         /// Update this instance from a given JSON element
@@ -166,7 +166,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="offset">Index offset (collection keys only)</param>
         /// <param name="last">Whether this is the last update (collection keys only)</param>
         /// <returns>Whether the key could be updated</returns>
-        private bool InternalUpdateFromJson(string key, JsonElement jsonElement, bool ignoreSbcProperties, int offset = 0, bool last = true)
+        private bool InternalUpdateFromJson(string? key, JsonElement jsonElement, bool ignoreSbcProperties, int offset = 0, bool last = true)
         {
             if (string.IsNullOrEmpty(key))
             {
@@ -174,7 +174,7 @@ namespace DuetAPI.ObjectModel
                 return true;
             }
 
-            if (JsonProperties.TryGetValue(key, out PropertyInfo property))
+            if (JsonProperties.TryGetValue(key!, out PropertyInfo? property))
             {
                 if (ignoreSbcProperties && Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
                 {
@@ -182,7 +182,7 @@ namespace DuetAPI.ObjectModel
                     return true;
                 }
 
-                object propertyValue = property.GetValue(this);
+                object? propertyValue = property.GetValue(this);
                 if (propertyValue is IModelCollection modelCollection)
                 {
                     modelCollection.UpdateFromJson(jsonElement, ignoreSbcProperties, offset, last);
@@ -223,7 +223,7 @@ namespace DuetAPI.ObjectModel
         /// Static event to be called when the deserialization of a property failed.
         /// If an event handler is assigned, potential JsonExceptions are suppressed and the event is called instead
         /// </summary>
-        public static event DeserializationFailedEventHandler OnDeserializationFailed;
+        public static event DeserializationFailedEventHandler? OnDeserializationFailed;
 
         /// <summary>
         /// Internal function to be called when the deserialization of a sub-property failed
@@ -235,7 +235,7 @@ namespace DuetAPI.ObjectModel
         /// <returns>True if the exception can be suppressed</returns>
         internal static bool DeserializationFailed(object sender, Type type, JsonElement jsonValue, JsonException e)
         {
-            if (OnDeserializationFailed == null)
+            if (OnDeserializationFailed is null)
             {
                 return false;
             }
@@ -297,19 +297,17 @@ namespace DuetAPI.ObjectModel
         /// <param name="typeToConvert">Target type</param>
         /// <param name="options">JSON options</param>
         /// <returns>Machine model</returns>
-        public override ObjectModel Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override ObjectModel? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            using (JsonDocument jsonDocument = JsonDocument.ParseValue(ref reader))
+            using JsonDocument jsonDocument = JsonDocument.ParseValue(ref reader);
+            if (jsonDocument.RootElement.ValueKind == JsonValueKind.Null)
             {
-                if (jsonDocument.RootElement.ValueKind == JsonValueKind.Null)
-                {
-                    return null;
-                }
-
-                ObjectModel machineModel = new ObjectModel();
-                machineModel.UpdateFromJson(jsonDocument.RootElement, false);
-                return machineModel;
+                return null;
             }
+
+            ObjectModel machineModel = new();
+            machineModel.UpdateFromJson(jsonDocument.RootElement, false);
+            return machineModel;
         }
 
         /// <summary>
@@ -320,7 +318,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="options">JSON options</param>
         public override void Write(Utf8JsonWriter writer, ObjectModel value, JsonSerializerOptions options)
         {
-            if (value == null)
+            if (value is null)
             {
                 writer.WriteNullValue();
             }

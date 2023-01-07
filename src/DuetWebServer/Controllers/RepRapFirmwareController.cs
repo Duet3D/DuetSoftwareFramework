@@ -82,7 +82,7 @@ namespace DuetWebServer.Controllers
                 using CommandConnection connection = await BuildConnection();
                 if (await connection.CheckPassword(password))
                 {
-                    int sessionId = await connection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, HttpContext.Connection.RemoteIpAddress.ToString());
+                    int sessionId = await connection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, HttpContext.Connection.RemoteIpAddress!.ToString());
                     _ = sessionStorage.MakeSessionKey(sessionId, HttpContext.Connection.RemoteIpAddress.ToString(), true);
 
                     // See RepRapFirmware/src/Platform/Platform.cpp -> Platform::GetBoardString()
@@ -120,7 +120,7 @@ namespace DuetWebServer.Controllers
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 if (e is IncompatibleVersionException)
                 {
@@ -160,7 +160,7 @@ namespace DuetWebServer.Controllers
         {
             try
             {
-                if (HttpContext.User != null)
+                if (HttpContext.User is not null)
                 {
                     // Remove the internal session
                     int sessionId = sessionStorage.RemoveTicket(HttpContext.User);
@@ -273,7 +273,7 @@ namespace DuetWebServer.Controllers
                     string resolvedPath = await ResolvePath(name);
 
                     // Create directory if necessary
-                    string directory = Path.GetDirectoryName(resolvedPath);
+                    string directory = Path.GetDirectoryName(resolvedPath)!;
                     if (!Directory.Exists(directory))
                     {
                         Directory.CreateDirectory(directory);
@@ -488,9 +488,9 @@ namespace DuetWebServer.Controllers
                     using JsonDocument jsonDoc = JsonDocument.Parse(response);
                     if (jsonDoc.RootElement.TryGetProperty("result", out JsonElement resultElement) && resultElement.TryGetProperty("seqs", out JsonElement seqsElement))
                     {
-                        Dictionary<string, object> result = JsonSerializer.Deserialize<Dictionary<string, object>>(resultElement.GetRawText());
+                        Dictionary<string, object> result = JsonSerializer.Deserialize<Dictionary<string, object>>(resultElement.GetRawText())!;
                         {
-                            Dictionary<string, object> seqs = JsonSerializer.Deserialize<Dictionary<string, object>>(seqsElement.GetRawText());
+                            Dictionary<string, object> seqs = JsonSerializer.Deserialize<Dictionary<string, object>>(seqsElement.GetRawText())!;
                             lock (_modelProvider)
                             {
                                 if (seqs.ContainsKey("reply"))
@@ -655,7 +655,7 @@ namespace DuetWebServer.Controllers
         /// <summary>
         /// Last queried file info
         /// </summary>
-        private GCodeFileInfo _lastFileInfo;
+        private GCodeFileInfo? _lastFileInfo;
 
         /// <summary>
         /// GET /rr_fileinfo?name={filename}
@@ -702,24 +702,24 @@ namespace DuetWebServer.Controllers
                 }
 
                 // Return it in RRF format
-                Dictionary<string, object> result = new()
+                Dictionary<string, object?> result = new()
                 {
                     { "err", 0 },
                     { "fileName", name },
                     { "size", info.Size }
                 };
-                if (info.LastModified != null)
+                if (info.LastModified is not null)
                 {
                     result.Add("lastModified", info.LastModified.Value.ToString("s"));
                 }
                 result.Add("height", Math.Round(info.Height, 2));
                 result.Add("layerHeight", Math.Round(info.LayerHeight, 2));
                 result.Add("numLayers", info.NumLayers);
-                if (info.PrintTime != null)
+                if (info.PrintTime is not null)
                 {
                     result.Add("printTime", info.PrintTime.Value);
                 }
-                if (info.SimulatedTime != null)
+                if (info.SimulatedTime is not null)
                 {
                     result.Add("simulatedTime", info.SimulatedTime.Value);
                 }
@@ -727,7 +727,7 @@ namespace DuetWebServer.Controllers
                 {
                     result.Add("filament", info.Filament.Select(val => Math.Round(val, 1)).ToArray());
                 }
-                if (printDuration != null)
+                if (printDuration is not null)
                 {
                     result.Add("printDuration", printDuration.Value);
                 }
@@ -795,15 +795,15 @@ namespace DuetWebServer.Controllers
                 }
 
                 // Get fileinfo and cache it
-                GCodeFileInfo info = null;
+                GCodeFileInfo? info = null;
                 lock (this)
                 {
-                    if (_lastFileInfo != null && _lastFileInfo.FileName == resolvedPath)
+                    if (_lastFileInfo is not null && _lastFileInfo.FileName == resolvedPath)
                     {
                         info = _lastFileInfo;
                     }
                 }
-                if (info == null)
+                if (info is null)
                 {
                     info = await connection.GetFileInfo(resolvedPath, true);
                     lock (this)
@@ -814,7 +814,7 @@ namespace DuetWebServer.Controllers
                 }
 
                 // Get corresponding thumbnail
-                string data = null;
+                string? data = null;
                 foreach (ThumbnailInfo item in info.Thumbnails)
                 {
                     if (item.Offset >= offset && offset < item.Offset + item.Size)
@@ -826,7 +826,7 @@ namespace DuetWebServer.Controllers
                 }
 
                 // Return result
-                if (data == null)
+                if (data is null)
                 {
                     _logger.LogWarning("Failed to find corresponding thumbnail in rr_thumbnail");
                     return Content("{\"err\":1}", "application/json");

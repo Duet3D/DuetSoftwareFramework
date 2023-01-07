@@ -11,7 +11,7 @@ namespace DuetAPI.ObjectModel
     /// <remarks>
     /// During runtime some elements may be replaced with null if they are not available
     /// </remarks>
-    public sealed class Inputs : ModelCollection<InputChannel>
+    public sealed class Inputs : ModelCollection<InputChannel?>
     {
         /// <summary>
         /// Enumeration of valid code channels
@@ -38,67 +38,67 @@ namespace DuetAPI.ObjectModel
         /// G/M/T-code channel for HTTP requests
         /// </summary>
         [JsonIgnore]
-        public InputChannel HTTP => this[CodeChannel.HTTP];
+        public InputChannel? HTTP => this[CodeChannel.HTTP];
 
         /// <summary>
         /// G/M/T-code channel for Telnet requests
         /// </summary>
         [JsonIgnore]
-        public InputChannel Telnet => this[CodeChannel.Telnet];
+        public InputChannel? Telnet => this[CodeChannel.Telnet];
 
         /// <summary>
         /// G/M/T-code channel for primary file prints
         /// </summary>
         [JsonIgnore]
-        public InputChannel File => this[CodeChannel.File];
+        public InputChannel? File => this[CodeChannel.File];
 
         /// <summary>
         /// G/M/T-code channel for USB
         /// </summary>
         [JsonIgnore]
-        public InputChannel USB => this[CodeChannel.USB];
+        public InputChannel? USB => this[CodeChannel.USB];
 
         /// <summary>
         /// G/M/T-code channel for AUX (UART/PanelDue)
         /// </summary>
         [JsonIgnore]
-        public InputChannel Aux => this[CodeChannel.Aux];
+        public InputChannel? Aux => this[CodeChannel.Aux];
 
         /// <summary>
         /// G/M/T-code channel for running triggers or config.g
         /// </summary>
         [JsonIgnore]
-        public InputChannel Trigger => this[CodeChannel.Trigger];
+        public InputChannel? Trigger => this[CodeChannel.Trigger];
 
         /// <summary>
         /// G/M/T-code channel for the primary code queue
         /// </summary>
         [JsonIgnore]
-        public InputChannel Queue => this[CodeChannel.Queue];
+        public InputChannel? Queue => this[CodeChannel.Queue];
 
         /// <summary>
         /// G/M/T-code channel for AUX (UART/PanelDue)
         /// </summary>
         [JsonIgnore]
-        public InputChannel LCD => this[CodeChannel.LCD];
+        public InputChannel? LCD => this[CodeChannel.LCD];
 
         /// <summary>
         /// Default G/M/T-code channel for generic codes
         /// </summary>
         [JsonIgnore]
-        public InputChannel SBC => this[CodeChannel.SBC];
+        public InputChannel? SBC => this[CodeChannel.SBC];
 
         /// <summary>
         /// Code channel that executes the daemon process
         /// </summary>
         [JsonIgnore]
-        public InputChannel Daemon => this[CodeChannel.Daemon];
+        public InputChannel? Daemon => this[CodeChannel.Daemon];
 
         /// <summary>
         /// G/M/T-code chanel for auto pause events
         /// </summary>
         [JsonIgnore]
-        public InputChannel Autopause => this[CodeChannel.Autopause];
+        public InputChannel? Autopause => this[CodeChannel.Autopause];
 
         /// <summary>
         /// G/M/T-code channel for secondary file prints
@@ -107,7 +107,7 @@ namespace DuetAPI.ObjectModel
         /// May not be available if async moves are not supported
         /// </remarks>
         [JsonIgnore]
-        public InputChannel File2 => this[CodeChannel.File2];
+        public InputChannel? File2 => this[CodeChannel.File2];
 
         /// <summary>
         /// G/M/T-code channel for the secondary code queue
@@ -116,13 +116,13 @@ namespace DuetAPI.ObjectModel
         /// May not be available if async moves are not supported
         /// </remarks>
         [JsonIgnore]
-        public InputChannel Queue2 => this[CodeChannel.Queue2];
+        public InputChannel? Queue2 => this[CodeChannel.Queue2];
 
         /// <summary>
         /// Index operator for easy access via an <see cref="CodeChannel"/> value
         /// </summary>
         /// <param name="channel">Channel to retrieve information about</param>
         /// <returns>Information about the code channel</returns>
-        public InputChannel this[CodeChannel channel] => this.FirstOrDefault(inputChannel => inputChannel != null && inputChannel.Name == channel);
+        public InputChannel? this[CodeChannel channel] => this.FirstOrDefault(inputChannel => inputChannel is not null && inputChannel.Name == channel);
     }
 }

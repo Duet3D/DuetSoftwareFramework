@@ -29,7 +29,7 @@ namespace DuetPluginService.Commands
             using (await Plugins.LockAsync())
             {
                 // Get the plugin first
-                Plugin plugin = null;
+                Plugin? plugin = null;
                 foreach (Plugin item in Plugins.List)
                 {
                     if (item.Id == Plugin)
@@ -38,7 +38,8 @@ namespace DuetPluginService.Commands
                         break;
                     }
                 }
-                if (plugin == null)
+
+                if (plugin is null)
                 {
                     throw new ArgumentException($"Plugin {Plugin} not found by {(Program.IsRoot ? "root service" : "service")}");
                 }
@@ -76,7 +77,7 @@ namespace DuetPluginService.Commands
                             logger.Debug("Removing {0}", installWwwPath);
                         }
 
-                        string directory = Path.GetDirectoryName(installWwwPath);
+                        string directory = Path.GetDirectoryName(installWwwPath)!;
                         if (!Directory.EnumerateFileSystemEntries(directory).Any())
                         {
                             logger.Debug("Removing {0}", directory);

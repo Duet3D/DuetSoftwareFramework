@@ -30,7 +30,7 @@ namespace DuetHttpClient.Connector
             /// <summary>
             /// Session key
             /// </summary>
-            public string SessionKey { get; set; }
+            public string SessionKey { get; set; } = string.Empty;
         }
 
         /// <summary>
@@ -46,29 +46,27 @@ namespace DuetHttpClient.Connector
         /// <exception cref="InvalidVersionException">Unsupported DSF version</exception>
         public static async Task<RestConnector> ConnectAsync(Uri baseUri, DuetHttpOptions options, CancellationToken cancellationToken)
         {
-            using (HttpClient client = new HttpClient() { Timeout = options.Timeout })
+            using HttpClient client = new() { Timeout = options.Timeout };
+            using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"machine/connect?password={HttpUtility.UrlPathEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken);
+            if (response.IsSuccessStatusCode)
             {
-                using (HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"machine/connect?password={HttpUtility.UrlPathEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken))
-                {
-                    if (response.IsSuccessStatusCode)
-                    {
-                        using (Stream responseStream = await response.Content.ReadAsStreamAsync())
-                        {
-                            ConnectResponse responseObj = await JsonSerializer.DeserializeAsync<ConnectResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
-                            return new RestConnector(baseUri, options, responseObj.SessionKey);
-                        }
-                    }
-
-                    if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
-                    {
-                        // Invalid password specified
-                        throw new InvalidPasswordException();
-                    }
-
-                    // Unknown response
-                    throw new HttpRequestException($"Server returned ${response.StatusCode} ${response.ReasonPhrase}");
-                }
+#if NET6_0_OR_GREATER
+                using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+#else
+                using Stream responseStream = await response.Content.ReadAsStreamAsync();
+#endif
+                ConnectResponse responseObj = (await JsonSerializer.DeserializeAsync<ConnectResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!;
+                return new RestConnector(baseUri, options, responseObj.SessionKey);
             }
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                // Invalid password specified
+                throw new InvalidPasswordException();
+            }
+
+            // Unknown response
+            throw new HttpRequestException($"Server returned ${response.StatusCode} ${response.ReasonPhrase}");
         }
 
         /// <summary>
@@ -97,7 +95,7 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// Session key of the underlying HTTP session
         /// </summary>
-        private string _sessionKey;
+        private string? _sessionKey;
 
         /// <summary>
         /// Reconnect to the board when the connection has been reset
@@ -107,33 +105,31 @@ namespace DuetHttpClient.Connector
             _sessionKey = null;
             HttpClient.DefaultRequestHeaders.Remove("X-Session-Key");
 
-            using (CancellationTokenSource connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _terminateSession.Token))
+            using CancellationTokenSource connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _terminateSession.Token);
+            connectCts.CancelAfter(Options.Timeout);
+
+            using HttpResponseMessage response = await HttpClient.GetAsync($"machine/connect?password=${Options.Password}", connectCts.Token);
+            if (response.IsSuccessStatusCode)
             {
-                connectCts.CancelAfter(Options.Timeout);
+#if NET6_0_OR_GREATER
+                using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+#else
+                using Stream responseStream = await response.Content.ReadAsStreamAsync();
+#endif
+                ConnectResponse responseObj = (await JsonSerializer.DeserializeAsync<ConnectResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!;
 
-                using (HttpResponseMessage response = await HttpClient.GetAsync($"machine/connect?password=${Options.Password}", connectCts.Token))
-                {
-                    if (response.IsSuccessStatusCode)
-                    {
-                        using (Stream responseStream = await response.Content.ReadAsStreamAsync())
-                        {
-                            ConnectResponse responseObj = await JsonSerializer.DeserializeAsync<ConnectResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
-
-                            _sessionKey = responseObj.SessionKey;
-                            HttpClient.DefaultRequestHeaders.Add("X-Session-Key", responseObj.SessionKey);
-                        }
-                    }
-                    else if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
-                    {
-                        // Invalid password specified
-                        throw new InvalidPasswordException();
-                    }
-                    else
-                    {
-                        // Unknown response
-                        throw new HttpRequestException($"Server returned ${response.StatusCode} ${response.ReasonPhrase}");
-                    }
-                }
+                _sessionKey = responseObj.SessionKey;
+                HttpClient.DefaultRequestHeaders.Add("X-Session-Key", responseObj.SessionKey);
+            }
+            else if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                // Invalid password specified
+                throw new InvalidPasswordException();
+            }
+            else
+            {
+                // Unknown response
+                throw new HttpRequestException($"Server returned ${response.StatusCode} ${response.ReasonPhrase}");
             }
         }
 
@@ -155,7 +151,7 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// TCS to complete when the object model is up-to-date
         /// </summary>
-        private readonly List<TaskCompletionSource<object>> _modelUpdateTCS = new List<TaskCompletionSource<object>>();
+        private readonly List<TaskCompletionSource<object?>> _modelUpdateTCS = new();
 
         /// <summary>
         /// Wait for the object model to be up-to-date
@@ -173,7 +169,7 @@ namespace DuetHttpClient.Connector
                 throw new InvalidOperationException("Cannot wait for object model, because the object model is not observed");
             }
 
-            TaskCompletionSource<object> tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            TaskCompletionSource<object?> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
             CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_terminateSession.Token, cancellationToken);
             CancellationTokenRegistration ctsRegistration = cts.Token.Register(() => tcs.TrySetCanceled());
             lock (_modelUpdateTCS)
@@ -204,148 +200,140 @@ namespace DuetHttpClient.Connector
             {
                 do
                 {
-                    using (ClientWebSocket webSocket = new ClientWebSocket())
+                    using ClientWebSocket webSocket = new();
+                    webSocket.Options.KeepAliveInterval = Options.KeepAliveInterval;
+
+                    string wsScheme = (HttpClient.BaseAddress?.Scheme == "https") ? "wss" : "ws";
+                    Uri wsUri = new($"{wsScheme}://{HttpClient.BaseAddress?.Host}:{HttpClient.BaseAddress?.Port}/machine?sessionKey={HttpUtility.UrlPathEncode(_sessionKey)}");
+
+                    try
                     {
-                        webSocket.Options.KeepAliveInterval = Options.KeepAliveInterval;
+                        await webSocket.ConnectAsync(wsUri, _terminateSession.Token);
 
-                        string wsScheme = (HttpClient.BaseAddress.Scheme == "https") ? "wss" : "ws";
-                        Uri wsUri = new Uri($"{wsScheme}://{HttpClient.BaseAddress.Host}:{HttpClient.BaseAddress.Port}/machine?sessionKey={HttpUtility.UrlPathEncode(_sessionKey)}");
-
-                        try
+                        // Read the full object model first
+                        using (MemoryStream modelStream = new())
                         {
-                            await webSocket.ConnectAsync(wsUri, _terminateSession.Token);
-
-                            // Read the full object model first
-                            using (MemoryStream modelStream = new MemoryStream())
-                            {
-                                byte[] modelChunk = new byte[8192];
-                                do
-                                {
-                                    WebSocketReceiveResult result = await webSocket.ReceiveAsync(new ArraySegment<byte>(modelChunk), _terminateSession.Token);
-                                    if (result.MessageType == WebSocketMessageType.Close)
-                                    {
-                                        // Server has closed the connection
-                                        break;
-                                    }
-
-                                    modelStream.Write(modelChunk, 0, result.Count);
-                                    if (result.EndOfMessage)
-                                    {
-                                        break;
-                                    }
-                                } while (true);
-
-                                modelStream.Seek(0, SeekOrigin.Begin);
-                                using (JsonDocument modelJson = await JsonDocument.ParseAsync(modelStream, cancellationToken: _terminateSession.Token))
-                                {
-                                    lock (Model)
-                                    {
-                                        Model.UpdateFromJson(modelJson.RootElement, false);
-                                        if (!Options.ObserveMessages && Model.Messages.Count > 0)
-                                        {
-                                            // Clear messages automatically if they are not cleared by a consumer
-                                            Model.Messages.Clear();
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Keep processing further patches
+                            byte[] modelChunk = new byte[8192];
                             do
                             {
-                                // Send back the OK response
-                                await webSocket.SendAsync(new ArraySegment<byte>(okResponse), WebSocketMessageType.Text, true, _terminateSession.Token);
-
-                                // Wait a moment
-                                await Task.Delay(Options.UpdateDelay, _terminateSession.Token);
-
-                                // Either read a JSON patch or keep the connection alive
-                                using (CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_terminateSession.Token))
+                                WebSocketReceiveResult result = await webSocket.ReceiveAsync(new ArraySegment<byte>(modelChunk), _terminateSession.Token);
+                                if (result.MessageType == WebSocketMessageType.Close)
                                 {
-                                    cts.CancelAfter(Options.PingInterval);
-
-                                    try
-                                    {
-                                        using (MemoryStream patchStream = new MemoryStream())
-                                        {
-                                            byte[] patchChunk = new byte[8192];
-
-                                            do
-                                            {
-                                                WebSocketReceiveResult result = await webSocket.ReceiveAsync(new ArraySegment<byte>(patchChunk), _terminateSession.Token);
-                                                if (result.MessageType == WebSocketMessageType.Close)
-                                                {
-                                                    // Server has closed the connection
-                                                    break;
-                                                }
-
-                                                if (result.Count == pongResponse.Length && patchChunk.SequenceEqual(pongResponse))
-                                                {
-                                                    // Got a PONG response back
-                                                    continue;
-                                                }
-
-                                                patchStream.Write(patchChunk, 0, result.Count);
-                                                if (result.EndOfMessage)
-                                                {
-                                                    // JSON patch is complete
-                                                    patchStream.Seek(0, SeekOrigin.Begin);
-                                                    using (JsonDocument modelJson = await JsonDocument.ParseAsync(patchStream, cancellationToken: _terminateSession.Token))
-                                                    {
-                                                        lock (Model)
-                                                        {
-                                                            Model.UpdateFromJson(modelJson.RootElement, false);
-                                                            if (!Options.ObserveMessages && Model.Messages.Count > 0)
-                                                            {
-                                                                // Clear messages automatically if they are not cleared by a consumer
-                                                                Model.Messages.Clear();
-                                                            }
-                                                        }
-                                                    }
-                                                    break;
-                                                }
-                                            } while (true);
-                                        }
-                                    }
-                                    catch (OperationCanceledException) when (!_terminateSession.IsCancellationRequested)
-                                    {
-                                        // Timeout while waiting for model update, send a PING request
-                                        await webSocket.SendAsync(new ArraySegment<byte>(pingRequest), WebSocketMessageType.Text, true, _terminateSession.Token);
-                                    }
+                                    // Server has closed the connection
+                                    break;
                                 }
 
-                                // Object model is up-to-date
-                                lock (_modelUpdateTCS)
+                                modelStream.Write(modelChunk, 0, result.Count);
+                                if (result.EndOfMessage)
                                 {
-                                    foreach (TaskCompletionSource<object> tcs in _modelUpdateTCS)
-                                    {
-                                        tcs.TrySetResult(null);
-                                    }
-                                    _modelUpdateTCS.Clear();
+                                    break;
                                 }
-                            }
-                            while (webSocket.State == WebSocketState.Open);
-                        }
-                        catch (Exception e) when (!(e is OperationCanceledException))
-                        {
-                            // Something went wrong, the remote end is offline or unavailable
+                            } while (true);
+
+                            modelStream.Seek(0, SeekOrigin.Begin);
+                            using JsonDocument modelJson = await JsonDocument.ParseAsync(modelStream, cancellationToken: _terminateSession.Token);
                             lock (Model)
                             {
-                                Model.State.Status = MachineStatus.Disconnected;
-                                Model.Global.Clear();
+                                Model.UpdateFromJson(modelJson.RootElement, false);
+                                if (!Options.ObserveMessages && Model.Messages.Count > 0)
+                                {
+                                    // Clear messages automatically if they are not cleared by a consumer
+                                    Model.Messages.Clear();
+                                }
                             }
                         }
 
-                        // Connection lost, check if we can reconnect after a short delay
-                        try
+                        // Keep processing further patches
+                        do
                         {
-                            await Task.Delay(2000, _terminateSession.Token);
-                            await Reconnect();
+                            // Send back the OK response
+                            await webSocket.SendAsync(new ArraySegment<byte>(okResponse), WebSocketMessageType.Text, true, _terminateSession.Token);
+
+                            // Wait a moment
+                            await Task.Delay(Options.UpdateDelay, _terminateSession.Token);
+
+                            // Either read a JSON patch or keep the connection alive
+                            using (CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_terminateSession.Token))
+                            {
+                                cts.CancelAfter(Options.PingInterval);
+
+                                try
+                                {
+                                    using MemoryStream patchStream = new();
+                                    byte[] patchChunk = new byte[8192];
+
+                                    do
+                                    {
+                                        WebSocketReceiveResult result = await webSocket.ReceiveAsync(new ArraySegment<byte>(patchChunk), _terminateSession.Token);
+                                        if (result.MessageType == WebSocketMessageType.Close)
+                                        {
+                                            // Server has closed the connection
+                                            break;
+                                        }
+
+                                        if (result.Count == pongResponse.Length && patchChunk.SequenceEqual(pongResponse))
+                                        {
+                                            // Got a PONG response back
+                                            continue;
+                                        }
+
+                                        patchStream.Write(patchChunk, 0, result.Count);
+                                        if (result.EndOfMessage)
+                                        {
+                                            // JSON patch is complete
+                                            patchStream.Seek(0, SeekOrigin.Begin);
+                                            using JsonDocument modelJson = await JsonDocument.ParseAsync(patchStream, cancellationToken: _terminateSession.Token);
+                                            lock (Model)
+                                            {
+                                                Model.UpdateFromJson(modelJson.RootElement, false);
+                                                if (!Options.ObserveMessages && Model.Messages.Count > 0)
+                                                {
+                                                    // Clear messages automatically if they are not cleared by a consumer
+                                                    Model.Messages.Clear();
+                                                }
+                                            }
+                                            break;
+                                        }
+                                    } while (true);
+                                }
+                                catch (OperationCanceledException) when (!_terminateSession.IsCancellationRequested)
+                                {
+                                    // Timeout while waiting for model update, send a PING request
+                                    await webSocket.SendAsync(new ArraySegment<byte>(pingRequest), WebSocketMessageType.Text, true, _terminateSession.Token);
+                                }
+                            }
+
+                            // Object model is up-to-date
+                            lock (_modelUpdateTCS)
+                            {
+                                foreach (TaskCompletionSource<object?> tcs in _modelUpdateTCS)
+                                {
+                                    tcs.TrySetResult(null);
+                                }
+                                _modelUpdateTCS.Clear();
+                            }
                         }
-                        catch (Exception e) when (e is OperationCanceledException || e is HttpRequestException)
+                        while (webSocket.State == WebSocketState.Open);
+                    }
+                    catch (Exception e) when (e is not OperationCanceledException)
+                    {
+                        // Something went wrong, the remote end is offline or unavailable
+                        lock (Model)
                         {
-                            // expected when the remote end is still offline or unavailable
+                            Model.State.Status = MachineStatus.Disconnected;
+                            Model.Global.Clear();
                         }
+                    }
+
+                    // Connection lost, check if we can reconnect after a short delay
+                    try
+                    {
+                        await Task.Delay(2000, _terminateSession.Token);
+                        await Reconnect();
+                    }
+                    catch (Exception e) when (e is OperationCanceledException || e is HttpRequestException)
+                    {
+                        // expected when the remote end is still offline or unavailable
                     }
                 }
                 while (!_terminateSession.IsCancellationRequested);
@@ -369,18 +357,16 @@ namespace DuetHttpClient.Connector
                     try
                     {
                         // Perform a NOOP request
-                        using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "machine/noop"))
+                        using (HttpRequestMessage request = new(HttpMethod.Get, "machine/noop"))
                         {
-                            using (HttpResponseMessage response = await SendRequest(request, Options.Timeout))
-                            {
-                                response.EnsureSuccessStatusCode();
-                            }
+                            using HttpResponseMessage response = await SendRequest(request, Options.Timeout);
+                            response.EnsureSuccessStatusCode();
                         }
 
                         // Wait a moment
                         await Task.Delay(Options.SessionKeepAliveInterval, _terminateSession.Token);
                     }
-                    catch (Exception e) when (!(e is OperationCanceledException))
+                    catch (Exception e) when (e is not OperationCanceledException)
                     {
                         // Something went wrong
                     }
@@ -424,14 +410,12 @@ namespace DuetHttpClient.Connector
             await _sessionTaskTerminated.Task;
 
             // Disconnect if possible
-            if (_sessionKey != null)
+            if (_sessionKey is not null)
             {
                 try
                 {
-                    using (CancellationTokenSource cts = new CancellationTokenSource(Options.Timeout))
-                    {
-                        await HttpClient.GetAsync("machine/disconnect", cts.Token);
-                    }
+                    using CancellationTokenSource cts = new(Options.Timeout);
+                    await HttpClient.GetAsync("machine/disconnect", cts.Token);
                 }
                 catch
                 {
@@ -463,24 +447,24 @@ namespace DuetHttpClient.Connector
             string errorMessage = "Invalid number of maximum retries configured";
             for (int i = 0; i <= Options.MaxRetries; i++)
             {
-                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, executeAsynchronously ? "machine/code?async=true" : "machine/code"))
+                using HttpRequestMessage request = new(HttpMethod.Post, executeAsynchronously ? "machine/code?async=true" : "machine/code");
+                request.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(code));
+
+                using HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
+                if (response.IsSuccessStatusCode)
                 {
-                    request.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(code));
+#if NET6_0_OR_GREATER
+                    byte[] responseData = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+#else
+                    byte[] responseData = await response.Content.ReadAsByteArrayAsync();
+#endif
+                    return Encoding.UTF8.GetString(responseData);
+                }
 
-                    using (HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken))
-                    {
-                        if (response.IsSuccessStatusCode)
-                        {
-                            byte[] responseData = await response.Content.ReadAsByteArrayAsync();
-                            return Encoding.UTF8.GetString(responseData);
-                        }
-
-                        errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                        if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                        {
-                            break;
-                        }
-                    }
+                errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                {
+                    break;
                 }
             }
             throw new HttpRequestException(errorMessage);
@@ -496,15 +480,11 @@ namespace DuetHttpClient.Connector
         /// <returns>Asynchronous task</returns>
         public override async Task Upload(string filename, Stream content, DateTime? lastModified = null, CancellationToken cancellationToken = default)
         {
-            using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Put, $"machine/file/{HttpUtility.UrlPathEncode(filename)}"))
-            {
-                request.Content = new StreamContent(content);
+            using HttpRequestMessage request = new(HttpMethod.Put, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
+            request.Content = new StreamContent(content);
 
-                using (HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken))
-                {
-                    response.EnsureSuccessStatusCode();
-                }
-            }
+            using HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
+            response.EnsureSuccessStatusCode();
         }
 
         /// <summary>
@@ -520,26 +500,22 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Delete, $"machine/file/{HttpUtility.UrlPathEncode(filename)}"))
+                    using HttpRequestMessage request = new(HttpMethod.Delete, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
+                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                    if (response.IsSuccessStatusCode)
                     {
-                        using (HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken))
-                        {
-                            if (response.IsSuccessStatusCode)
-                            {
-                                return;
-                            }
+                        return;
+                    }
 
-                            if (response.StatusCode == HttpStatusCode.NotFound)
-                            {
-                                throw new FileNotFoundException();
-                            }
+                    if (response.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        throw new FileNotFoundException();
+                    }
 
-                            errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                            if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                            {
-                                break;
-                            }
-                        }
+                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                    if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                    {
+                        break;
                     }
                 }
                 catch (OperationCanceledException oce)
@@ -569,36 +545,30 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, $"machine/file/move"))
-                    {
-                        using (MultipartFormDataContent formData = new MultipartFormDataContent
+                    using HttpRequestMessage request = new(HttpMethod.Post, $"machine/file/move");
+                    using MultipartFormDataContent formData = new()
                         {
                             { new StringContent(from), "from" },
                             { new StringContent(to), "to" },
                             { new StringContent(force ? "true" : "false"), "force" }
-                        })
-                        {
-                            request.Content = formData;
+                        };
+                    request.Content = formData;
 
-                            using (HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken))
-                            {
-                                if (response.IsSuccessStatusCode)
-                                {
-                                    return;
-                                }
+                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        return;
+                    }
 
-                                if (response.StatusCode == HttpStatusCode.NotFound)
-                                {
-                                    throw new FileNotFoundException();
-                                }
+                    if (response.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        throw new FileNotFoundException();
+                    }
 
-                                errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                                if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                                {
-                                    break;
-                                }
-                            }
-                        }
+                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                    if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                    {
+                        break;
                     }
                 }
                 catch (OperationCanceledException oce)
@@ -626,21 +596,17 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Put, $"machine/directory/{HttpUtility.UrlPathEncode(directory)}"))
+                    using HttpRequestMessage request = new(HttpMethod.Put, $"machine/directory/{HttpUtility.UrlPathEncode(directory)}");
+                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                    if (response.IsSuccessStatusCode)
                     {
-                        using (HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken))
-                        {
-                            if (response.IsSuccessStatusCode)
-                            {
-                                return;
-                            }
+                        return;
+                    }
 
-                            errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                            if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                            {
-                                break;
-                            }
-                        }
+                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                    if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                    {
+                        break;
                     }
                 }
                 catch (OperationCanceledException oce)
@@ -663,17 +629,15 @@ namespace DuetHttpClient.Connector
         /// <returns>Disposable download response</returns>
         public override async Task<HttpResponseMessage> Download(string filename, CancellationToken cancellationToken = default)
         {
-            using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"machine/file/{HttpUtility.UrlPathEncode(filename)}"))
+            using HttpRequestMessage request = new(HttpMethod.Get, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
+            HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
-                HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
-                if (response.StatusCode == HttpStatusCode.NotFound)
-                {
-                    throw new FileNotFoundException();
-                }
-
-                response.EnsureSuccessStatusCode();
-                return response;
+                throw new FileNotFoundException();
             }
+
+            response.EnsureSuccessStatusCode();
+            return response;
         }
 
         /// <summary>
@@ -682,7 +646,7 @@ namespace DuetHttpClient.Connector
         private class FileNode
         {
             public DateTime Date { get; set; }
-            public string Name { get; set; }
+            public string Name { get; set; } = string.Empty;
             public long Size { get; set; }
             public char Type { get; set; }
         }
@@ -700,37 +664,35 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"machine/directory/{HttpUtility.UrlPathEncode(directory)}"))
+                    using HttpRequestMessage request = new(HttpMethod.Get, $"machine/directory/{HttpUtility.UrlPathEncode(directory)}");
+                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                    if (response.IsSuccessStatusCode)
                     {
-                        using (HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken))
-                        {
-                            if (response.IsSuccessStatusCode)
+#if NET6_0_OR_GREATER
+                        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+#else
+                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
+#endif
+                        return (await JsonSerializer.DeserializeAsync<List<FileNode>>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!
+                            .Select(item => new FileListItem()
                             {
-                                using (Stream responseStream = await response.Content.ReadAsStreamAsync())
-                                {
-                                    return (await JsonSerializer.DeserializeAsync<List<FileNode>>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))
-                                        .Select(item => new FileListItem()
-                                        {
-                                            Filename = item.Name,
-                                            IsDirectory = item.Type == 'd',
-                                            LastModified = item.Date,
-                                            Size = item.Size
-                                        })
-                                        .ToList();
-                                }
-                            }
+                                Filename = item.Name,
+                                IsDirectory = item.Type == 'd',
+                                LastModified = item.Date,
+                                Size = item.Size
+                            })
+                            .ToList();
+                    }
 
-                            if (response.StatusCode == HttpStatusCode.NotFound)
-                            {
-                                throw new DirectoryNotFoundException();
-                            }
+                    if (response.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        throw new DirectoryNotFoundException();
+                    }
 
-                            errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                            if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                            {
-                                break;
-                            }
-                        }
+                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                    if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                    {
+                        break;
                     }
                 }
                 catch (OperationCanceledException oce)
@@ -759,27 +721,27 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"machine/fileinfo/{HttpUtility.UrlPathEncode(filename)}?readThumbnailContent={(readThumbnailContent ? "true" : "false")}"))
+                    using HttpRequestMessage request = new(HttpMethod.Get, $"machine/fileinfo/{HttpUtility.UrlPathEncode(filename)}?readThumbnailContent={(readThumbnailContent ? "true" : "false")}");
+                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                    if (response.IsSuccessStatusCode)
                     {
-                        using (HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken))
-                        {
-                            if (response.IsSuccessStatusCode)
-                            {
-                                Stream responseStream = await response.Content.ReadAsStreamAsync();
-                                return await JsonSerializer.DeserializeAsync<GCodeFileInfo>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken);
-                            }
+#if NET6_0_OR_GREATER
+                        Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+#else
+                        Stream responseStream = await response.Content.ReadAsStreamAsync();
+#endif
+                        return (await JsonSerializer.DeserializeAsync<GCodeFileInfo>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!;
+                    }
 
-                            if (response.StatusCode == HttpStatusCode.NotFound)
-                            {
-                                throw new FileNotFoundException();
-                            }
+                    if (response.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        throw new FileNotFoundException();
+                    }
 
-                            errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                            if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                            {
-                                break;
-                            }
-                        }
+                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                    if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                    {
+                        break;
                     }
                 }
                 catch (OperationCanceledException oce)

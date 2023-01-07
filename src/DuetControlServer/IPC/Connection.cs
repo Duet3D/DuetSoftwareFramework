@@ -44,7 +44,7 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Name of the connected plugin
         /// </summary>
-        public string PluginId { get; private set; }
+        public string? PluginId { get; private set; }
 
         /// <summary>
         /// Permissions of this connection
@@ -103,8 +103,8 @@ namespace DuetControlServer.IPC
             // If the remote process is running as dsf, reject it unless the process is in the same directory as DCS (like DWS or DPS)
             if (!IsRoot && (uid == LinuxApi.Commands.GetEffectiveUserID() || gid == LinuxApi.Commands.GetEffectiveGroupID()))
             {
-                string dcsDirectory = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-                string remoteDirectory = Path.GetDirectoryName(Process.GetProcessById(pid)?.MainModule?.FileName);
+                string dcsDirectory = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)!;
+                string remoteDirectory = Path.GetDirectoryName(Process.GetProcessById(pid)?.MainModule?.FileName)!;
                 if (dcsDirectory != remoteDirectory)
                 {
                     _logger.Error("IPC#{0}: Failed to find plugin permissions for pid #{1}", Id, pid);
@@ -226,12 +226,12 @@ namespace DuetControlServer.IPC
                     item.Value.ValueKind == JsonValueKind.True)
                 {
                     // Response OK
-                    return jsonDocument.ToObject<BaseResponse>(JsonHelper.DefaultJsonOptions);
+                    return jsonDocument.ToObject<BaseResponse>(JsonHelper.DefaultJsonOptions)!;
                 }
             }
 
             // Error
-            return jsonDocument.ToObject<ErrorResponse>(JsonHelper.DefaultJsonOptions);
+            return jsonDocument.ToObject<ErrorResponse>(JsonHelper.DefaultJsonOptions)!;
         }
 
         /// <summary>
@@ -293,14 +293,14 @@ namespace DuetControlServer.IPC
                     }
 
                     // Map it in case we need to retain backwards-compatibility
-                    string commandName = item.Value.GetString();
-                    if (ApiVersion <= 8 && _legacyCommandMapping.TryGetValue(commandName?.ToLowerInvariant() ?? string.Empty, out string newCommandName))
+                    string? commandName = item.Value.GetString();
+                    if (ApiVersion <= 8 && _legacyCommandMapping.TryGetValue(commandName?.ToLowerInvariant() ?? string.Empty, out string? newCommandName))
                     {
                         commandName = newCommandName;
                     }
 
                     // Check if the received command is valid
-                    Type commandType = Base.GetCommandType(commandName);
+                    Type? commandType = Base.GetCommandType(commandName!);
                     if (!typeof(BaseCommand).IsAssignableFrom(commandType))
                     {
                         throw new ArgumentException($"Unsupported command {commandName}");
@@ -317,7 +317,7 @@ namespace DuetControlServer.IPC
                     }
 
                     // Perform final deserialization and assign source identifier to this command
-                    BaseCommand command = (BaseCommand)jsonDocument.RootElement.ToObject(commandType, JsonHelper.DefaultJsonOptions);
+                    BaseCommand command = (BaseCommand)jsonDocument.RootElement.ToObject(commandType, JsonHelper.DefaultJsonOptions)!;
                     if (command is Commands.IConnectionCommand commandWithSourceConnection)
                     {
                         commandWithSourceConnection.Connection = this;
@@ -334,9 +334,9 @@ namespace DuetControlServer.IPC
         /// <param name="obj">Object to send</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="SocketException">Message could not be sent</exception>
-        public Task SendResponse(object obj = null)
+        public Task SendResponse(object? obj = null)
         {
-            if (obj == null)
+            if (obj is null)
             {
                 return Send(new BaseResponse());
             }
@@ -345,7 +345,7 @@ namespace DuetControlServer.IPC
             {
                 if (e is AggregateException ae)
                 {
-                    e = ae.InnerException;
+                    e = ae.InnerException!;
                 }
                 ErrorResponse errorResponse = new(e);
                 return Send(errorResponse);

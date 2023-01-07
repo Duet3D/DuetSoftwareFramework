@@ -32,27 +32,38 @@ namespace DuetControlServer.SPI
         private static int _bytesReserved, _bufferSpace;
 
         // Object model queries
-        private sealed class PendingModelQuery
+        private struct PendingModelQuery
         {
             /// <summary>
             /// Key to query
             /// </summary>
-            public string Key { get; init; }
+            public string Key;
 
             /// <summary>
             /// Flags to query
             /// </summary>
-            public string Flags { get; init; }
+            public string Flags;
 
             /// <summary>
             /// Whether the model query has been sent
             /// </summary>
-            public bool QuerySent { get; set; }
+            public bool QuerySent = false;
 
             /// <summary>
             /// Task to complete when the query has finished
             /// </summary>
-            public TaskCompletionSource<byte[]> Tcs { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public TaskCompletionSource<byte[]> Tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            /// <summary>
+            /// Constructor of this struct
+            /// </summary>
+            /// <param name="key">Query key</param>
+            /// <param name="flags">Query flags</param>
+            public PendingModelQuery(string key, string flags)
+            {
+                Key = key;
+                Flags = flags;
+            }
         }
         private static readonly Queue<PendingModelQuery> _pendingModelQueries = new();
         private static DateTime _lastQueryTime = DateTime.Now;
@@ -63,27 +74,24 @@ namespace DuetControlServer.SPI
 
         // Firmware updates
         private static readonly AsyncLock _firmwareUpdateLock = new();
-        private static Stream _iapStream, _firmwareStream;
-        private static TaskCompletionSource _firmwareUpdateRequest;
+        private static Stream? _iapStream, _firmwareStream;
+        private static TaskCompletionSource? _firmwareUpdateRequest;
 
         // Firmware halt/restart requests
         private static readonly AsyncLock _firmwareActionLock = new();
-        private static TaskCompletionSource _firmwareHaltRequest;
-        private static TaskCompletionSource _firmwareResetRequest;
+        private static TaskCompletionSource? _firmwareHaltRequest;
+        private static TaskCompletionSource? _firmwareResetRequest;
 
         // Print handling
         private static readonly AsyncLock _printStateLock = new();
-        private static TaskCompletionSource _setPrintInfoRequest;
+        private static TaskCompletionSource? _setPrintInfoRequest;
         private static PrintStoppedReason _stopPrintReason;
-        private static TaskCompletionSource _stopPrintRequest;
+        private static TaskCompletionSource? _stopPrintRequest;
 
         // Miscellaneous requests
         private static readonly Queue<Tuple<MessageTypeFlags, string>> _messagesToSend = new();
         private static readonly Dictionary<uint, FileStream> _openFiles = new();
         private static uint _openFileHandle = Consts.NoFileHandle;
-
-        // Partial incoming message (if any)
-        private static string _partialGenericMessage;
 
         /// <summary>
         /// Print diagnostics of this class
@@ -114,7 +122,7 @@ namespace DuetControlServer.SPI
                 throw new InvalidOperationException("Not connected over SPI");
             }
 
-            PendingModelQuery query = new() { Key = key, Flags = flags };
+            PendingModelQuery query = new(key, flags);
             lock (_pendingModelQueries)
             {
                 _pendingModelQueries.Enqueue(query);
@@ -132,11 +140,11 @@ namespace DuetControlServer.SPI
         /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
         /// <exception cref="NotSupportedException">Incompatible firmware version</exception>
         /// <exception cref="ArgumentException">Invalid parameter</exception>
-        public static Task<object> EvaluateExpression(CodeChannel channel, string expression)
+        public static Task<object?> EvaluateExpression(CodeChannel channel, string expression)
         {
             if (Program.CancellationToken.IsCancellationRequested)
             {
-                return Task.FromCanceled<object>(Program.CancellationToken);
+                return Task.FromCanceled<object?>(Program.CancellationToken);
             }
             if (Settings.NoSpi)
             {
@@ -181,11 +189,11 @@ namespace DuetControlServer.SPI
         /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
         /// <exception cref="NotSupportedException">Incompatible firmware version</exception>
         /// <exception cref="ArgumentException">Invalid parameter</exception>
-        public static Task<object> SetVariable(CodeChannel channel, bool createVariable, string varName, string expression)
+        public static Task<object?> SetVariable(CodeChannel channel, bool createVariable, string varName, string? expression)
         {
             if (Program.CancellationToken.IsCancellationRequested)
             {
-                return Task.FromCanceled<object>(Program.CancellationToken);
+                return Task.FromCanceled<object?>(Program.CancellationToken);
             }
             if (DataTransfer.ProtocolVersion < 5)
             {
@@ -195,7 +203,7 @@ namespace DuetControlServer.SPI
             {
                 throw new ArgumentException($"Variable too long (max {Consts.MaxVariableLength} chars)");
             }
-            if (expression != null && Encoding.UTF8.GetByteCount(expression) >= Consts.MaxExpressionLength)
+            if (expression is not null && Encoding.UTF8.GetByteCount(expression) >= Consts.MaxExpressionLength)
             {
                 throw new ArgumentException($"Expression too long (max {Consts.MaxExpressionLength} chars)");
             }
@@ -205,7 +213,7 @@ namespace DuetControlServer.SPI
             {
                 request = new(channel, createVariable, varName, expression);
                 _variableRequests.Add(request);
-                if (expression != null)
+                if (expression is not null)
                 {
                     _logger.Debug("Setting variable {0} to {1} on channel {2}", varName, expression, channel);
                 }
@@ -501,7 +509,7 @@ namespace DuetControlServer.SPI
             TaskCompletionSource tcs;
             using (await _firmwareUpdateLock.LockAsync(Program.CancellationToken))
             {
-                if (_firmwareUpdateRequest != null)
+                if (_firmwareUpdateRequest is not null)
                 {
                     throw new InvalidOperationException("Firmware is already being updated");
                 }
@@ -526,14 +534,14 @@ namespace DuetControlServer.SPI
             }
 
             // Get the CRC16 checksum of the firmware binary
-            ushort crc16 = CRC16.Calculate(_firmwareStream);
+            ushort crc16 = CRC16.Calculate(_firmwareStream!);
 
             // Send the IAP binary to the firmware
             _logger.Info("Flashing IAP binary");
             bool dataSent;
             do
             {
-                dataSent = DataTransfer.WriteIapSegment(_iapStream);
+                dataSent = DataTransfer.WriteIapSegment(_iapStream!);
                 if (_logger.IsDebugEnabled)
                 {
                     Console.Write('.');
@@ -558,7 +566,7 @@ namespace DuetControlServer.SPI
                 }
 
                 _logger.Info("Flashing RepRapFirmware");
-                _firmwareStream.Seek(0, SeekOrigin.Begin);
+                _firmwareStream!.Seek(0, SeekOrigin.Begin);
 
                 try
                 {
@@ -661,7 +669,7 @@ namespace DuetControlServer.SPI
                 using (_firmwareActionLock.Lock(Program.CancellationToken))
                 {
                     // Check if an emergency stop has been requested
-                    if (_firmwareHaltRequest != null)
+                    if (_firmwareHaltRequest is not null)
                     {
                         Invalidate();
                         if (DataTransfer.WriteEmergencyStop())
@@ -674,7 +682,7 @@ namespace DuetControlServer.SPI
                     }
 
                     // Check if a firmware reset has been requested
-                    if (_firmwareResetRequest != null)
+                    if (_firmwareResetRequest is not null)
                     {
                         Invalidate();
                         if (DataTransfer.WriteReset())
@@ -693,7 +701,7 @@ namespace DuetControlServer.SPI
                 // Check if a firmware update is supposed to be performed
                 using (_firmwareUpdateLock.Lock(Program.CancellationToken))
                 {
-                    if (_iapStream != null && _firmwareStream != null)
+                    if (_iapStream is not null && _firmwareStream is not null)
                     {
                         Invalidate();
 
@@ -735,7 +743,7 @@ namespace DuetControlServer.SPI
                 // Check for changes of the print status
                 using (_printStateLock.Lock(Program.CancellationToken))
                 {
-                    if (_setPrintInfoRequest != null && DataTransfer.WritePrintFileInfo(Model.Provider.Get.Job.File))
+                    if (_setPrintInfoRequest is not null && DataTransfer.WritePrintFileInfo(Model.Provider.Get.Job.File))
                     {
                         // The packet providing file info has be sent first because it includes a time_t value that must reside on a 64-bit boundary!
                         _setPrintInfoRequest.SetResult();
@@ -743,7 +751,7 @@ namespace DuetControlServer.SPI
                     }
                     else
                     {
-                        if (_stopPrintRequest != null && DataTransfer.WritePrintStopped(_stopPrintReason))
+                        if (_stopPrintRequest is not null && DataTransfer.WritePrintStopped(_stopPrintReason))
                         {
                             _stopPrintRequest.SetResult();
                             _stopPrintRequest = null;
@@ -757,7 +765,7 @@ namespace DuetControlServer.SPI
                     try
                     {
                         PacketHeader? packet = DataTransfer.ReadNextPacket();
-                        if (packet == null)
+                        if (packet is null)
                         {
                             _logger.Error("Read invalid packet");
                             break;
@@ -833,10 +841,10 @@ namespace DuetControlServer.SPI
                         {
                             if (!request.Written)
                             {
-                                if ((request.Expression != null && DataTransfer.WriteSetVariable(request.Channel, request.CreateVariable, request.VariableName, request.Expression)) ||
-                                    (request.Expression == null && DataTransfer.WriteDeleteLocalVariable(request.Channel, request.VariableName)))
+                                if ((request.Expression is not null && DataTransfer.WriteSetVariable(request.Channel, request.CreateVariable, request.VariableName, request.Expression)) ||
+                                    (request.Expression is null && DataTransfer.WriteDeleteLocalVariable(request.Channel, request.VariableName)))
                                 {
-                                    if (request.Expression == null)
+                                    if (request.Expression is null)
                                     {
                                         request.SetResult(null);
                                         _variableRequests.Remove(request);
@@ -860,7 +868,7 @@ namespace DuetControlServer.SPI
                 // Send pending messages
                 lock (_messagesToSend)
                 {
-                    while (_messagesToSend.TryPeek(out Tuple<MessageTypeFlags, string> message))
+                    while (_messagesToSend.TryPeek(out Tuple<MessageTypeFlags, string>? message))
                     {
                         if (DataTransfer.WriteMessage(message.Item1, message.Item2))
                         {
@@ -1024,7 +1032,7 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Buffer for truncated log messages
         /// </summary>
-        private static string _partialLogMessage;
+        private static string? _partialLogMessage;
 
         /// <summary>
         /// Process an incoming message
@@ -1079,6 +1087,12 @@ namespace DuetControlServer.SPI
                 IPC.Processors.ModelSubscription.RecordMessage(flags, new Message(type, reply));
             }
         }
+
+
+        /// <summary>
+        /// Partial incoming message (if any)
+        /// </summary>
+        private static string? _partialGenericMessage;
 
         /// <summary>
         /// Output a generic message
@@ -1225,7 +1239,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         private static void HandleEvaluationResult()
         {
-            DataTransfer.ReadEvaluationResult(out string expression, out object result);
+            DataTransfer.ReadEvaluationResult(out string expression, out object? result);
             _logger.Trace("Received evaluation result for expression {0} = {1}", expression, result);
 
             lock (_evaluateExpressionRequests)
@@ -1312,7 +1326,7 @@ namespace DuetControlServer.SPI
         /// </summary>
         private static void HandleVariableResult()
         {
-            DataTransfer.ReadEvaluationResult(out string varName, out object result);
+            DataTransfer.ReadEvaluationResult(out string varName, out object? result);
             _logger.Trace("Received variable assignment result for {0} = {1}", varName, result);
 
             lock (_evaluateExpressionRequests)
@@ -1399,7 +1413,7 @@ namespace DuetControlServer.SPI
             try
             {
                 // Resolve the path and create the parent directory if necessary
-                string physicalFile = FilePath.ToPhysical(filename), parentDirectory = Path.GetDirectoryName(physicalFile);
+                string physicalFile = FilePath.ToPhysical(filename), parentDirectory = Path.GetDirectoryName(physicalFile)!;
                 if (!Directory.Exists(parentDirectory))
                 {
                     Directory.CreateDirectory(parentDirectory);
@@ -1565,12 +1579,12 @@ namespace DuetControlServer.SPI
             // No longer starting or stopping a print. Must do this before aborting the print
             using (_printStateLock.Lock(Program.CancellationToken))
             {
-                if (_setPrintInfoRequest != null)
+                if (_setPrintInfoRequest is not null)
                 {
                     _setPrintInfoRequest.SetCanceled();
                     _setPrintInfoRequest = null;
                 }
-                if (_stopPrintRequest != null)
+                if (_stopPrintRequest is not null)
                 {
                     _stopPrintRequest.SetResult();      // called from the print task so this never throws an exception
                     _stopPrintRequest = null;
@@ -1648,12 +1662,12 @@ namespace DuetControlServer.SPI
             // No longer starting or stopping a print. Must do this before aborting the print
             using (await _printStateLock.LockAsync(Program.CancellationToken))
             {
-                if (_setPrintInfoRequest != null)
+                if (_setPrintInfoRequest is not null)
                 {
                     _setPrintInfoRequest.SetCanceled();
                     _setPrintInfoRequest = null;
                 }
-                if (_stopPrintRequest != null)
+                if (_stopPrintRequest is not null)
                 {
                     _stopPrintRequest.SetResult();      // called from the print task so this never throws an exception
                     _stopPrintRequest = null;

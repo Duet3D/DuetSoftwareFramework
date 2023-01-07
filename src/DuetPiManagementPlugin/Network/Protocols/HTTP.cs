@@ -34,7 +34,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
                 {
                     public sealed class HttpConfig
                     {
-                        public string Url { get; set; }
+                        public string? Url { get; set; }
                     }
 
                     public HttpConfig Http { get; set; } = new HttpConfig();
@@ -56,11 +56,11 @@ namespace DuetPiManagementPlugin.Network.Protocols
                 AspNetConfig config;
                 await using (FileStream configStream = new("/opt/dsf/conf/http.json", FileMode.Open, FileAccess.Read))
                 {
-                    config = await JsonSerializer.DeserializeAsync<AspNetConfig>(configStream, cancellationToken: Program.CancellationToken);
+                    config = (await JsonSerializer.DeserializeAsync<AspNetConfig>(configStream, cancellationToken: Program.CancellationToken))!;
                 }
 
                 bool dwsEnabled = await Command.ExecQuery("systemctl", "is-enabled -q duetwebserver.service");
-                if (config?.Kestrel?.Endpoints?.Http?.Url != null && Uri.TryCreate(config.Kestrel.Endpoints.Http.Url.Replace('*', 'x'), UriKind.Absolute, out Uri url))
+                if (config?.Kestrel?.Endpoints?.Http?.Url is not null && Uri.TryCreate(config.Kestrel.Endpoints.Http.Url.Replace('*', 'x'), UriKind.Absolute, out Uri? url))
                 {
                     _httpPort = url.Port;
                     if (dwsEnabled)
@@ -68,7 +68,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
                         await Manager.SetProtocol(NetworkProtocol.HTTP, true);
                     }
                 }
-                if (config?.Kestrel?.Endpoints?.Https?.Url != null && Uri.TryCreate(config.Kestrel.Endpoints.Https.Url.Replace('*', 'x'), UriKind.Absolute, out url))
+                if (config?.Kestrel?.Endpoints?.Https?.Url is not null && Uri.TryCreate(config.Kestrel.Endpoints.Https.Url.Replace('*', 'x'), UriKind.Absolute, out url))
                 {
                     _httpsPort = url.Port;
                     if (dwsEnabled)
@@ -101,7 +101,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
             bool enableService = false, disableService = false;
             if (secure)
             {
-                if (enabled != null && enabled != useHTTPS)
+                if (enabled is not null && enabled != useHTTPS)
                 {
                     enableService = !useHTTP && !useHTTPS && enabled.Value;
                     disableService = !useHTTP && useHTTPS && !enabled.Value;
@@ -116,7 +116,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
             }
             else
             {
-                if (enabled != null && enabled != useHTTP)
+                if (enabled is not null && enabled != useHTTP)
                 {
                     enableService = !useHTTP && !useHTTPS && enabled.Value;
                     disableService = useHTTP && !useHTTPS && !enabled.Value;
@@ -162,7 +162,12 @@ namespace DuetPiManagementPlugin.Network.Protocols
 
                 while (!reader.EndOfStream)
                 {
-                    string line = await reader.ReadLineAsync();
+                    string? line = await reader.ReadLineAsync();
+                    if (line is null)
+                    {
+                        break;
+                    }
+
                     line = line.Replace("{httpPort}", _httpPort.ToString());
                     line = line.Replace("{httpsPort}", _httpsPort.ToString());
                     await writer.WriteLineAsync(line);

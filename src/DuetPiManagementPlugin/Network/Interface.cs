@@ -44,7 +44,7 @@ namespace DuetPiManagementPlugin.Network
         /// <returns>Command result</returns>
         public static async Task<Message> SetMACAddress(int index, string macAddress)
         {
-            if (!PhysicalAddress.TryParse(macAddress.Replace(':', '-'), out PhysicalAddress parsedAddress))
+            if (!PhysicalAddress.TryParse(macAddress.Replace(':', '-'), out PhysicalAddress? parsedAddress))
             {
                 throw new ArgumentException("Invalid MAC address");
             }
@@ -81,14 +81,14 @@ namespace DuetPiManagementPlugin.Network
         /// <param name="pParam">P parameter</param>
         /// <param name="sParam">S parameter</param>
         /// <returns>Configuration result</returns>
-        public static async Task<Message> SetConfig(int index, CodeParameter pParam, CodeParameter sParam)
+        public static async Task<Message> SetConfig(int index, CodeParameter? pParam, CodeParameter? sParam)
         {
             NetworkInterface iface = Get(index);
             StringBuilder result = new();
             if (iface.Name.StartsWith('w'))
             {
                 // WiFi interface
-                if (sParam == null)
+                if (sParam is null)
                 {
                     // Report the status only if no valid S parameter is given
                     await Report(result, iface, index);
@@ -126,19 +126,19 @@ namespace DuetPiManagementPlugin.Network
                     result.AppendLine(enableResult);
 
                     // Connect to the given SSID (if applicable)
-                    if (pParam != null)
+                    if (pParam is not null)
                     {
                         // Find the network index
                         string networkList = await Command.Execute("wpa_cli", "list_networks");
-                        Regex ssidRegex = new($"^(\\d+)\\s+{Regex.Escape(sParam)}\\W", RegexOptions.IgnoreCase);
+                        Regex ssidRegex = new($"^(\\d+)\\s+{Regex.Escape(sParam!)}\\W", RegexOptions.IgnoreCase);
 
                         int networkIndex = -1;
                         using (StringReader reader = new(networkList))
                         {
                             do
                             {
-                                string line = await reader.ReadLineAsync();
-                                if (line == null)
+                                string? line = await reader.ReadLineAsync();
+                                if (line is null)
                                 {
                                     break;
                                 }
@@ -198,15 +198,15 @@ namespace DuetPiManagementPlugin.Network
             else
             {
                 // Ethernet interface
-                if (pParam != null)
+                if (pParam is not null)
                 {
                     // Set IP address
-                    IPAddress ip = IPAddress.Parse(pParam);
+                    IPAddress ip = IPAddress.Parse(pParam!);
                     string setResult = await DHCP.SetIPAddress(iface.Name, ip, null, null, null);
                     result.AppendLine(setResult);
                 }
 
-                if (sParam != null && (iface.OperationalStatus != OperationalStatus.Up) != sParam)
+                if (sParam is not null && (iface.OperationalStatus != OperationalStatus.Up) != sParam)
                 {
                     // Enable or disable the adapter if required
                     result.AppendLine(await Command.Execute("ip", $"link set {iface.Name} {(sParam ? "up" : "down")}"));
@@ -221,20 +221,20 @@ namespace DuetPiManagementPlugin.Network
         /// <param name="index">Index of the network interface</param>
         /// <param name="netmask">Subnet mask</param>
         /// <returns>Configuration result</returns>
-        public static async Task<string> ManageNetmask(int index, IPAddress netmask)
+        public static async Task<string> ManageNetmask(int index, IPAddress? netmask)
         {
             NetworkInterface iface = Get(index);
-            if (netmask != null)
+            if (netmask is not null)
             {
                 return await DHCP.SetIPAddress(iface.Name, null, netmask, null, null);
             }
 
             if (iface.OperationalStatus == OperationalStatus.Up)
             {
-                UnicastIPAddressInformation ipInfo = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
-                                                      where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
-                                                      select unicastAddress).FirstOrDefault();
-                netmask = (ipInfo != null) ? ipInfo.IPv4Mask : IPAddress.Any;
+                UnicastIPAddressInformation? ipInfo = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
+                                                       where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                                                       select unicastAddress).FirstOrDefault();
+                netmask = (ipInfo is not null) ? ipInfo.IPv4Mask : IPAddress.Any;
             }
             else
             {
@@ -249,10 +249,10 @@ namespace DuetPiManagementPlugin.Network
         /// <param name="index">Index of the network interface</param>
         /// <param name="netmask">Subnet mask</param>
         /// <returns>Configuration result</returns>
-        public static async Task<string> ManageGateway(int index, IPAddress gateway, IPAddress dnsServer)
+        public static async Task<string> ManageGateway(int index, IPAddress? gateway, IPAddress? dnsServer)
         {
             NetworkInterface iface = Get(index);
-            if (gateway != null || dnsServer != null)
+            if (gateway is not null || dnsServer is not null)
             {
                 return await DHCP.SetIPAddress(iface.Name, null, null, gateway, dnsServer);
             }
@@ -284,9 +284,9 @@ namespace DuetPiManagementPlugin.Network
         /// <param name="builder">String builder to write to</param>
         /// <param name="iface">Optional network interface</param>
         /// <param name="index">Index of the network interface</param>
-        public static async ValueTask Report(StringBuilder builder, NetworkInterface iface, int index)
+        public static async ValueTask Report(StringBuilder builder, NetworkInterface? iface, int index)
         {
-            if (iface == null)
+            if (iface is null)
             {
                 int i = 0;
                 foreach (NetworkInterface item in NetworkInterface.GetAllNetworkInterfaces())
@@ -310,10 +310,10 @@ namespace DuetPiManagementPlugin.Network
                     // WiFi interface
                     if (iface.OperationalStatus != OperationalStatus.Down)
                     {
-                        UnicastIPAddressInformation ipInfo = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
-                                                              where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
-                                                              select unicastAddress).FirstOrDefault();
-                        if (ipInfo != null)
+                        UnicastIPAddressInformation? ipInfo = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
+                                                               where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                                                               select unicastAddress).FirstOrDefault();
+                        if (ipInfo is not null)
                         {
                             bool isAccessPoint = await AccessPoint.IsEnabled();
                             builder.AppendLine($"WiFi module is {(isAccessPoint ? "providing access point" : "connected to access point")}, IP address {ipInfo.Address}");

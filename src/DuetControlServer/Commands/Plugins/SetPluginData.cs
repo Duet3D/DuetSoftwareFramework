@@ -12,6 +12,11 @@ namespace DuetControlServer.Commands
     public sealed class SetPluginData : DuetAPI.Commands.SetPluginData, IConnectionCommand
     {
         /// <summary>
+        /// Source connection of this command
+        /// </summary>
+        public Connection? Connection { get; set; }
+
+        /// <summary>
         /// Set custom plugin data in the object model
         /// </summary>
         /// <returns>Asynchronous task</returns>
@@ -25,11 +30,11 @@ namespace DuetControlServer.Commands
             // Fill in plugin name if required
             if (string.IsNullOrEmpty(Plugin))
             {
-                Plugin = Connection.PluginId;
+                Plugin = Connection!.PluginId ?? throw new UnauthorizedAccessException("Failed to determine plugin ID");
             }
 
             // Check permissions. Only the owner or plugins with the ManagePlugins permission may modify plugin data
-            if (Connection.PluginId != Plugin && !Connection.Permissions.HasFlag(SbcPermissions.ManagePlugins))
+            if (Connection!.PluginId != Plugin && !Connection!.Permissions.HasFlag(SbcPermissions.ManagePlugins))
             {
                 throw new UnauthorizedAccessException("Insufficient permissions");
             }
@@ -37,7 +42,7 @@ namespace DuetControlServer.Commands
             // Update the plugin data
             using (await Model.Provider.AccessReadWriteAsync())
             {
-                if (Model.Provider.Get.Plugins.TryGetValue(Plugin, out Plugin plugin))
+                if (Model.Provider.Get.Plugins.TryGetValue(Plugin, out Plugin? plugin))
                 {
                     if (!plugin.Data.ContainsKey(Key))
                     {
@@ -51,10 +56,5 @@ namespace DuetControlServer.Commands
                 }
             }
         }
-
-        /// <summary>
-        /// Source connection of this command
-        /// </summary>
-        public Connection Connection { get; set; }
     }
 }

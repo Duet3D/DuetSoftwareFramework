@@ -8,12 +8,12 @@
         /// <summary>
         /// Information about the current build or null if not available
         /// </summary>
-        public Build Build
+        public Build? Build
         {
             get => _build;
             set => SetPropertyValue(ref _build, value);
         }
-        private Build _build;
+        private Build? _build;
 
         /// <summary>
         /// Total active duration of the current job file (in s or null)
@@ -53,12 +53,12 @@
         /// <summary>
         /// Name of the last file processed or null if none
         /// </summary>
-        public string LastFileName
+        public string? LastFileName
         {
             get => _lastFileName;
 			set => SetPropertyValue(ref _lastFileName, value);
         }
-        private string _lastFileName;
+        private string? _lastFileName;
 
         /// <summary>
         /// Indicates if the last file was aborted (unexpected cancellation)

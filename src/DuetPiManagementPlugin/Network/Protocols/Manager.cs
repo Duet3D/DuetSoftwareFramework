@@ -76,7 +76,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
                 // HTTP/HTTPS
                 case 0:
                     // HTTP/HTTPS
-                    if (enabled != null || port > 0)
+                    if (enabled is not null || port > 0)
                     {
                         codeResult = await HTTP.Configure(enabled, port, secure);
                     }
@@ -93,7 +93,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
                     if (secure)
                     {
                         // SFTP
-                        if (enabled != null || port > 0)
+                        if (enabled is not null || port > 0)
                         {
                             codeResult = await SFTP.Configure(enabled, port);
                         }
@@ -107,7 +107,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
                     else
                     {
                         // FTP
-                        if (enabled != null || port > 0)
+                        if (enabled is not null || port > 0)
                         {
                             codeResult = await FTP.Configure(enabled, port);
                         }
@@ -125,7 +125,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
                     if (secure)
                     {
                         // SSH
-                        if (enabled != null || port > 0)
+                        if (enabled is not null || port > 0)
                         {
                             codeResult = await SSH.Configure(enabled, port);
                         }
@@ -139,7 +139,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
                     else
                     {
                         // Telnet
-                        if (enabled != null || port > 0)
+                        if (enabled is not null || port > 0)
                         {
                             codeResult = await Telnet.Configure(enabled, port);
                         }

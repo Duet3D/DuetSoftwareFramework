@@ -19,7 +19,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Content of the message to write
         /// </summary>
-        public string Content { get; set; }
+        public string Content { get; set; } = string.Empty;
 
         /// <summary>
         /// Output the message on the console and via the object model

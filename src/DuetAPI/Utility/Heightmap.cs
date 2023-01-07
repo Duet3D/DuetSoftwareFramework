@@ -62,7 +62,7 @@ namespace DuetAPI.Utility
         /// <summary>
         /// Z coordinate of each probe point
         /// </summary>
-        public float[] ZCoordinates { get; set; }
+        public float[] ZCoordinates { get; set; } = Array.Empty<float>();
 
         /// <summary>
         /// Load a new heightmap from the given CSV file
@@ -72,77 +72,94 @@ namespace DuetAPI.Utility
         /// <exception cref="IOException">Invalid file</exception>
         public async Task Load(string filename)
         {
-            using (FileStream stream = new FileStream(filename, FileMode.Open, FileAccess.Read))
+            using FileStream stream = new(filename, FileMode.Open, FileAccess.Read);
+            using StreamReader reader = new(stream);
+
+            // Read header
+            string? line = await reader.ReadLineAsync();
+            if (line is null || !line.StartsWith("RepRapFirmware height map file v2 generated at"))
             {
-                using (StreamReader reader = new StreamReader(stream))
+                throw new IOException("Invalid file format");
+            }
+
+            // Read data columns
+            line = await reader.ReadLineAsync();
+            if (line is null)
+            {
+                throw new IOException("Invalid file format");
+            }
+
+            string[] columns = line.Split(',');
+
+            // Read data values
+            line = await reader.ReadLineAsync();
+            if (line is null)
+            {
+                throw new IOException("Invalid file format");
+            }
+
+            string[] values = line.Split(',');
+            if (columns.Length != values.Length)
+            {
+                throw new IOException("Invalid number of columns and values");
+            }
+
+            // Read grid definition
+            for (int i = 0; i < columns.Length; i++)
+            {
+                string column = columns[i], value = values[i];
+                switch (column)
                 {
-                    string line = await reader.ReadLineAsync();
-                    if (!line.StartsWith("RepRapFirmware height map file v2 generated at"))
-                    {
-                        throw new IOException("Invalid file format");
-                    }
+                    case "xmin":
+                        XMin = float.Parse(value, NumberStyles.Any, CultureInfo.InvariantCulture);
+                        break;
+                    case "xmax":
+                        XMax = float.Parse(value, NumberStyles.Any, CultureInfo.InvariantCulture);
+                        break;
+                    case "ymin":
+                        YMin = float.Parse(value, NumberStyles.Any, CultureInfo.InvariantCulture);
+                        break;
+                    case "ymax":
+                        YMax = float.Parse(value, NumberStyles.Any, CultureInfo.InvariantCulture);
+                        break;
+                    case "radius":
+                        Radius = float.Parse(value, NumberStyles.Any, CultureInfo.InvariantCulture);
+                        break;
+                    case "xspacing":
+                        XSpacing = float.Parse(value, NumberStyles.Any, CultureInfo.InvariantCulture);
+                        break;
+                    case "yspacing":
+                        YSpacing = float.Parse(value, NumberStyles.Any, CultureInfo.InvariantCulture);
+                        break;
+                    case "xnum":
+                        NumX = int.Parse(value);
+                        break;
+                    case "ynum":
+                        NumY = int.Parse(value);
+                        break;
+                    default:
+                        throw new IOException($"Unknown heightmap field: {column}");
+                }
+            }
 
-                    string[] columns = (await reader.ReadLineAsync()).Split(',');
-                    string[] values = (await reader.ReadLineAsync()).Split(',');
-                    if (columns.Length != values.Length)
-                    {
-                        throw new IOException("Invalid number of columns and values");
-                    }
+            // Create array of points
+            ZCoordinates = new float[NumX * NumY];
 
-                    // Read grid definition
-                    for (int i = 0; i < columns.Length; i++)
-                    {
-                        string column = columns[i], value = values[i];
-                        switch (column)
-                        {
-                            case "xmin":
-                                XMin = float.Parse(value, NumberStyles.Any, CultureInfo.InvariantCulture);
-                                break;
-                            case "xmax":
-                                XMax = float.Parse(value, NumberStyles.Any, CultureInfo.InvariantCulture);
-                                break;
-                            case "ymin":
-                                YMin = float.Parse(value, NumberStyles.Any, CultureInfo.InvariantCulture);
-                                break;
-                            case "ymax":
-                                YMax = float.Parse(value, NumberStyles.Any, CultureInfo.InvariantCulture);
-                                break;
-                            case "radius":
-                                Radius = float.Parse(value, NumberStyles.Any, CultureInfo.InvariantCulture);
-                                break;
-                            case "xspacing":
-                                XSpacing = float.Parse(value, NumberStyles.Any, CultureInfo.InvariantCulture);
-                                break;
-                            case "yspacing":
-                                YSpacing = float.Parse(value, NumberStyles.Any, CultureInfo.InvariantCulture);
-                                break;
-                            case "xnum":
-                                NumX = int.Parse(value);
-                                break;
-                            case "ynum":
-                                NumY = int.Parse(value);
-                                break;
-                            default:
-                                throw new IOException($"Unknown heightmap field: {column}");
-                        }
-                    }
+            // Read values in Y direction
+            int index = 0;
+            for (int y = 0; y < NumY; y++)
+            {
+                line = await reader.ReadLineAsync();
+                if (line is null)
+                {
+                    throw new IOException("Unexpected end of file");
+                }
 
-                    // Create array of points
-                    ZCoordinates = new float[NumX * NumY];
-
-                    // Read values in Y direction
-                    int index = 0;
-                    for (int y = 0; y < NumY; y++)
-                    {
-                        line = await reader.ReadLineAsync();
-
-                        // Read values in X direction
-                        values = line.Split(',').Select(val => val.Trim()).ToArray();
-                        for (int x = 0; x < NumX; x++)
-                        {
-                            ZCoordinates[index++] = (values[x] == "0") ? float.NaN : float.Parse(values[x], NumberStyles.Any, CultureInfo.InvariantCulture);
-                        }
-                    }
+                // Read values in X direction
+                values = line.Split(',').Select(val => val.Trim()).ToArray();
+                for (int x = 0; x < NumX; x++)
+                {
+                    ZCoordinates[index++] = (values[x] == "0") ? float.NaN : float.Parse(values[x], NumberStyles.Any, CultureInfo.InvariantCulture);
                 }
             }
         }
@@ -154,26 +171,23 @@ namespace DuetAPI.Utility
         /// <returns>Asynchronous task</returns>
         public async Task Save(string filename)
         {
-            using (FileStream stream = new FileStream(filename, FileMode.Create, FileAccess.Write))
-            {
-                using (StreamWriter writer = new StreamWriter(stream))
-                {
-                    await writer.WriteLineAsync($"RepRapFirmware height map file v2 generated at {DateTime.Now:yyyy-MM-dd HH:mm}");
-                    await writer.WriteLineAsync("xmin,xmax,ymin,ymax,radius,xspacing,yspacing,xnum,ynum");
-                    await writer.WriteLineAsync(FormattableString.Invariant($"{XMin:F2},{XMax:F2},{YMin:F2},{YMax:F2},{Radius:F2},{XSpacing:F2},{YSpacing:F2},{NumX},{NumY}"));
+            using FileStream stream = new(filename, FileMode.Create, FileAccess.Write);
+            using StreamWriter writer = new(stream);
 
-                    string[] values = new string[NumX];
-                    int i = 0;
-                    for (int y = 0; y < NumY; y++)
-                    {
-                        for (int x = 0; x < NumX; x++)
-                        {
-                            values[x] = float.IsNaN(ZCoordinates[i]) ? FormattableString.Invariant($"{0,7}") : FormattableString.Invariant(($"{ZCoordinates[i],7:F3}"));
-                            i++;
-                        }
-                        await writer.WriteLineAsync(string.Join(",", values));
-                    }
+            await writer.WriteLineAsync($"RepRapFirmware height map file v2 generated at {DateTime.Now:yyyy-MM-dd HH:mm}");
+            await writer.WriteLineAsync("xmin,xmax,ymin,ymax,radius,xspacing,yspacing,xnum,ynum");
+            await writer.WriteLineAsync(FormattableString.Invariant($"{XMin:F2},{XMax:F2},{YMin:F2},{YMax:F2},{Radius:F2},{XSpacing:F2},{YSpacing:F2},{NumX},{NumY}"));
+
+            string[] values = new string[NumX];
+            int i = 0;
+            for (int y = 0; y < NumY; y++)
+            {
+                for (int x = 0; x < NumX; x++)
+                {
+                    values[x] = float.IsNaN(ZCoordinates[i]) ? FormattableString.Invariant($"{0,7}") : FormattableString.Invariant(($"{ZCoordinates[i],7:F3}"));
+                    i++;
                 }
+                await writer.WriteLineAsync(string.Join(",", values));
             }
         }
     }

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
 namespace DuetAPI.ObjectModel
@@ -18,7 +19,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         protected override void ClearItems()
         {
-            List<T> removed = new List<T>(this);
+            List<T> removed = new(this);
             base.ClearItems();
             base.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed));
         }
@@ -41,16 +42,16 @@ namespace DuetAPI.ObjectModel
         /// This is required to update model properties which do not have a setter
         /// </summary>
         /// <param name="from">Other instance</param>
-        public void Assign(object from)
+        public void Assign([DisallowNull] object? from)
         {
             // Assigning null values is not supported
-            if (from == null)
+            if (from is null)
             {
                 throw new ArgumentNullException(nameof(from));
             }
 
             // Validate the types
-            if (!(from is ModelCollection<T> other))
+            if (from is not ModelCollection<T> other)
             {
                 throw new ArgumentException("Types do not match", nameof(from));
             }
@@ -67,11 +68,11 @@ namespace DuetAPI.ObjectModel
             {
                 for (int i = 0; i < Math.Min(Count, other.Count); i++)
                 {
-                    IModelObject myItem = (IModelObject)this[i];
-                    IModelObject otherItem = (IModelObject)other[i];
-                    if (myItem == null || otherItem == null)
+                    IModelObject myItem = (IModelObject)this[i]!;
+                    IModelObject otherItem = (IModelObject)other[i]!;
+                    if (myItem is null || otherItem is null)
                     {
-                        this[i] = (T)otherItem;
+                        this[i] = (T)otherItem!;
                     }
                     else if (myItem.GetType() != otherItem.GetType())
                     {
@@ -87,13 +88,13 @@ namespace DuetAPI.ObjectModel
             {
                 for (int i = 0; i < Math.Min(Count, other.Count); i++)
                 {
-                    if (this[i] == null || other[i] == null)
+                    if (this[i] is null || other[i] is null)
                     {
                         this[i] = other[i];
                     }
                     else
                     {
-                        IList listItem = (IList)this[i], fromItem = (IList)other[i];
+                        IList listItem = (IList)this[i]!, fromItem = (IList)other[i]!;
                         if (listItem.Count != fromItem.Count)
                         {
                             this[i] = other[i];
@@ -136,7 +137,7 @@ namespace DuetAPI.ObjectModel
         /// <returns>Cloned list</returns>
         public object Clone()
         {
-            ModelCollection<T> clone = new ModelCollection<T>();
+            ModelCollection<T> clone = new();
             foreach (T item in this)
             {
                 if (item is ICloneable cloneableItem)
@@ -158,10 +159,10 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="other">Other instance</param>
         /// <returns>Object differences or null if both instances are equal</returns>
-        public object FindDifferences(IModelObject other)
+        public object? FindDifferences(IModelObject? other)
         {
             // Check the types
-            if (!(other is ModelCollection<T> otherList))
+            if (other is not ModelCollection<T> otherList)
             {
                 // Types differ, return the entire instance
                 return this;
@@ -177,23 +178,23 @@ namespace DuetAPI.ObjectModel
                 {
                     if (i < otherList.Count)
                     {
-                        IModelObject myItem = (IModelObject)this[i], otherItem = (IModelObject)otherList[i];
-                        if (otherItem == null || myItem == null || otherItem.GetType() != myItem.GetType())
+                        IModelObject myItem = (IModelObject)this[i]!, otherItem = (IModelObject)otherList[i]!;
+                        if (otherItem is null || myItem is null || otherItem.GetType() != myItem.GetType())
                         {
                             hadDiffs = myItem != otherItem;
                             diffs[i] = myItem;
                         }
                         else
                         {
-                            object diff = myItem.FindDifferences(otherItem);
-                            if (diff != null)
+                            object? diff = myItem.FindDifferences(otherItem);
+                            if (diff is not null)
                             {
                                 hadDiffs = true;
                                 diffs[i] = diff;
                             }
                             else
                             {
-                                diffs[i] = new Dictionary<string, object>();
+                                diffs[i] = new Dictionary<string, object?>();
                             }
                         }
                     }
@@ -210,7 +211,7 @@ namespace DuetAPI.ObjectModel
                 {
                     for (int i = 0; i < Count; i++)
                     {
-                        if (!this[i].Equals(otherList[i]))
+                        if (!this[i]!.Equals(otherList[i]))
                         {
                             hadDiffs = true;
                             break;
@@ -268,22 +269,19 @@ namespace DuetAPI.ObjectModel
                 // Update model items
                 for (int i = offset; i < Math.Min(Count, offset + arrayLength); i++)
                 {
-                    IModelObject item = (IModelObject)this[i];
+                    IModelObject item = (IModelObject)this[i]!;
                     JsonElement jsonItem = jsonElement[i - offset];
                     if (jsonItem.ValueKind == JsonValueKind.Null)
                     {
-                        if (this[i] != null)
+                        if (this[i] is not null)
                         {
-                            this[i] = default;
+                            this[i] = default!;
                         }
                     }
                     else
                     {
-                        if (item == null)
-                        {
-                            item = (IModelObject)Activator.CreateInstance(itemType);
-                        }
-                        T updatedItem = (T)item.UpdateFromJson(jsonItem, ignoreSbcProperties);
+                        item ??= (IModelObject)Activator.CreateInstance(itemType)!;
+                        T updatedItem = (T)item.UpdateFromJson(jsonItem, ignoreSbcProperties)!;
                         if (!ReferenceEquals(this[i], updatedItem))
                         {
                             this[i] = updatedItem;
@@ -297,13 +295,13 @@ namespace DuetAPI.ObjectModel
                     JsonElement jsonItem = jsonElement[i - offset];
                     if (jsonItem.ValueKind == JsonValueKind.Null)
                     {
-                        Add(default);
+                        Add(default!);
                     }
                     else
                     {
-                        IModelObject newItem = (IModelObject)Activator.CreateInstance(itemType);
-                        newItem = newItem.UpdateFromJson(jsonElement[i], ignoreSbcProperties);
-                        Add((T)newItem);
+                        IModelObject? newItem = (IModelObject)Activator.CreateInstance(itemType)!;
+                        newItem = newItem.UpdateFromJson(jsonElement[i]!, ignoreSbcProperties);
+                        Add((T)newItem!);
                     }
                 }
             }
@@ -315,9 +313,9 @@ namespace DuetAPI.ObjectModel
                     JsonElement jsonItem = jsonElement[i - offset];
                     if (jsonItem.ValueKind == JsonValueKind.Null)
                     {
-                        if (this[i] != null)
+                        if (this[i] is not null)
                         {
-                            this[i] = default;
+                            this[i] = default!;
                         }
                     }
                     else if (itemType == typeof(bool) && jsonItem.ValueKind == JsonValueKind.Number)
@@ -339,11 +337,11 @@ namespace DuetAPI.ObjectModel
                     {
                         try
                         {
-                            T itemValue = JsonSerializer.Deserialize<T>(jsonItem.GetRawText(), Utility.JsonHelper.DefaultJsonOptions);
+                            T itemValue = JsonSerializer.Deserialize<T>(jsonItem.GetRawText(), Utility.JsonHelper.DefaultJsonOptions)!;
                             if (itemType.IsArray)
                             {
-                                IList listItem = (IList)this[i], newItem = (IList)itemValue;
-                                if (listItem == null || listItem.Count != newItem.Count)
+                                IList listItem = (IList)this[i]!, newItem = (IList)itemValue;
+                                if (listItem is null || listItem.Count != newItem.Count)
                                 {
                                     this[i] = itemValue;
                                 }
@@ -390,7 +388,7 @@ namespace DuetAPI.ObjectModel
                     {
                         try
                         {
-                            T newItem = JsonSerializer.Deserialize<T>(jsonItem.GetRawText(), Utility.JsonHelper.DefaultJsonOptions);
+                            T newItem = JsonSerializer.Deserialize<T>(jsonItem.GetRawText(), Utility.JsonHelper.DefaultJsonOptions)!;
                             Add(newItem);
                         }
                         catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), jsonItem.Clone(), e))

@@ -30,6 +30,12 @@ namespace DuetControlServer.Files.ImageProcessing
         /// <returns>Asynchronous task</returns>
         public static async ValueTask ProcessAsync(StreamReader reader, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, Code code, bool readThumbnailContent, ThumbnailInfoFormat format)
         {
+            // Need a valid comment to start parsing...
+            if (code.Comment is null)
+            {
+                return;
+            }
+
             // Read the image header info that is currently in the code
             string[] thumbnailTokens = code.Comment.Trim().Split(' ');
             if (thumbnailTokens.Length != 4)
@@ -56,7 +62,7 @@ namespace DuetControlServer.Files.ImageProcessing
 
             // Keep reading the data from the file
             bool offsetAdjusted = false;
-            StringBuilder data = readThumbnailContent ? new(encodedLength) : null;
+            StringBuilder? data = readThumbnailContent ? new(encodedLength) : null;
             while (codeParserBuffer.GetPosition(reader) < reader.BaseStream.Length)
             {
                 Program.CancellationToken.ThrowIfCancellationRequested();
@@ -90,8 +96,8 @@ namespace DuetControlServer.Files.ImageProcessing
                 {
                     if (readThumbnailContent)
                     {
-                        string dataContent = data.ToString();
-                        thumbnail.Data = Base64Regex.IsMatch(dataContent) ? dataContent : null;
+                        string? dataContent = data?.ToString();
+                        thumbnail.Data = (dataContent is not null && Base64Regex.IsMatch(dataContent)) ? dataContent : null;
                     }
                     parsedFileInfo.Thumbnails.Add(thumbnail);
                     return;
@@ -117,7 +123,7 @@ namespace DuetControlServer.Files.ImageProcessing
 
                     if (readThumbnailContent)
                     {
-                        data.Append(trimmedComment);
+                        data?.Append(trimmedComment);
                     }
                 }
             }

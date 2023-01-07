@@ -21,12 +21,12 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Namespace of the plugin wanting to create a new third-party endpoint
         /// </summary>
-        public string Namespace { get; set; }
+        public string Namespace { get; set; } = string.Empty;
 
         /// <summary>
         /// Path to the endpoint to register
         /// </summary>
-        public string Path { get; set; }
+        public string Path { get; set; } = string.Empty;
 
         /// <summary>
         /// Whether this is an upload request

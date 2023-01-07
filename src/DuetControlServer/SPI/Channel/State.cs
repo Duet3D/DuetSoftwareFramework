@@ -44,7 +44,7 @@ namespace DuetControlServer.SPI.Channel
         /// <remarks>
         /// This is only assigned once after an instance has been created
         /// </remarks>
-        public Macro Macro { get => _pipelineStackItem.Macro; }
+        public Macro? Macro { get => _pipelineStackItem.Macro; }
 
         /// <summary>
         /// Indicates if the firmware has been notified about the macro completion
@@ -54,7 +54,7 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Code that started this state
         /// </summary>
-        public Code StartCode { get; set; }
+        public Code? StartCode { get; set; }
 
         /// <summary>
         /// Pending codes ready to be sent over to the firmware

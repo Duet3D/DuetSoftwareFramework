@@ -71,7 +71,7 @@ namespace DuetPiManagementPlugin.Network
         /// <returns></returns>
         public static async Task<Message> Configure(string ssid, string psk, IPAddress ipAddress, int channel)
         {
-            string countryCode = await WPA.GetCountryCode();
+            string? countryCode = await WPA.GetCountryCode();
             if (string.IsNullOrWhiteSpace(countryCode))
             {
                 return new Message(MessageType.Error, "Cannot configure access point because no country code has been set. Use M587 C to set it first");
@@ -110,7 +110,12 @@ namespace DuetPiManagementPlugin.Network
 
                     while (!reader.EndOfStream)
                     {
-                        string line = await reader.ReadLineAsync();
+                        string? line = await reader.ReadLineAsync();
+                        if (line is null)
+                        {
+                            break;
+                        }
+
                         line = line.Replace("{ssid}", ssid);
                         line = line.Replace("{psk}", psk);
                         line = line.Replace("{channel}", channel.ToString());
@@ -132,7 +137,12 @@ namespace DuetPiManagementPlugin.Network
 
                     while (!reader.EndOfStream)
                     {
-                        string line = await reader.ReadLineAsync();
+                        string? line = await reader.ReadLineAsync();
+                        if (line is null)
+                        {
+                            break;
+                        }
+
                         line = line.Replace("{ipRangeStart}", ipRangeStart);
                         line = line.Replace("{ipRangeEnd}", ipRangeEnd);
                         line = line.Replace("{ipAddress}", ipAddress.ToString());

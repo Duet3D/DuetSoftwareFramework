@@ -20,12 +20,12 @@ namespace CustomHttpEndpoint
         /// <summary>
         /// Command binary to start when an HTTP query is received
         /// </summary>
-        private static string _cmd = null;
+        private static string? _cmd = null;
 
         /// <summary>
         /// Command arguments for the binary to start
         /// </summary>
-        private static string _args = null;
+        private static string? _args = null;
 
         /// <summary>
         /// True if no info texts are printed
@@ -40,7 +40,7 @@ namespace CustomHttpEndpoint
         public static async Task<int> Main(string[] args)
         {
             // Parse the command line arguments
-            string lastArg = null, socketPath = Defaults.FullSocketPath, ns = "custom-http-endpoint", path = "demo";
+            string? lastArg = null, socketPath = Defaults.FullSocketPath, ns = "custom-http-endpoint", path = "demo";
             foreach (string arg in args)
             {
                 if (lastArg == "-s" || lastArg == "--socket")
@@ -337,7 +337,7 @@ namespace CustomHttpEndpoint
         {
             do
             {
-                string input = await Task.Run(() => Console.ReadLine(), cancellationToken);
+                string? input = await Task.Run(() => Console.ReadLine(), cancellationToken);
                 if (input == "close")
                 {
                     // Sending codes greater than or equal to 1000 closes the connection
@@ -346,7 +346,7 @@ namespace CustomHttpEndpoint
                 else
                 {
                     // Send input to the client
-                    await connection.SendResponse(200, input, HttpResponseType.PlainText, cancellationToken);
+                    await connection.SendResponse(200, input ?? string.Empty, HttpResponseType.PlainText, cancellationToken);
                 }
             }
             while (!cancellationToken.IsCancellationRequested);

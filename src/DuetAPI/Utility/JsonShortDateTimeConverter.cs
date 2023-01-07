@@ -18,12 +18,8 @@ namespace DuetAPI.Utility
         /// <returns>Deserialized DateTime or null</returns>
         public override DateTime? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            string value = reader.GetString();
-            if (string.IsNullOrEmpty(value))
-            {
-                return null;
-            }
-            return DateTime.Parse(value);
+            string? value = reader.GetString();
+            return string.IsNullOrEmpty(value) ? null : DateTime.Parse(value);
         }
 
         /// <summary>
@@ -34,7 +30,7 @@ namespace DuetAPI.Utility
         /// <param name="options">Serializer options</param>
         public override void Write(Utf8JsonWriter writer, DateTime? value, JsonSerializerOptions options)
         {
-            if (value == null)
+            if (value is null)
             {
                 writer.WriteNullValue();
             }

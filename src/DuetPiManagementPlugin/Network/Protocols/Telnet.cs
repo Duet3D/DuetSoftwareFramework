@@ -38,7 +38,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
             }
 
             // Enable Telnet
-            if (enabled.Value && !Manager.IsEnabled(NetworkProtocol.Telnet))
+            if (enabled == true && !Manager.IsEnabled(NetworkProtocol.Telnet))
             {
                 string startOutput = await Command.Execute("systemctl", "start inetd.service");
                 string enableOutput = await Command.Execute("systemctl", "enable -q inetd.service");
@@ -47,7 +47,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
             }
 
             // Disable Telnet
-            if (!enabled.Value && Manager.IsEnabled(NetworkProtocol.Telnet))
+            if (enabled == false && Manager.IsEnabled(NetworkProtocol.Telnet))
             {
                 string stopOutput = await Command.Execute("systemctl", "stop inetd.service");
                 string disableOutput = await Command.Execute("systemctl", "disable -q inetd.service");

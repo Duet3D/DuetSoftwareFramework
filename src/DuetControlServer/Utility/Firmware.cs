@@ -114,9 +114,9 @@ namespace DuetControlServer.Utility
         /// </summary>
         /// <param name="filename">Firmware file</param>
         /// <returns>Firmware version or null if not found</returns>
-        private static async Task<string> GetFirmwareVersion(string filename)
+        private static async Task<string?> GetFirmwareVersion(string filename)
         {
-            Stream firmwareFile = null;
+            Stream? firmwareFile = null;
             try
             {
                 // Get a stream containing the binary content
@@ -178,7 +178,7 @@ namespace DuetControlServer.Utility
             }
             finally
             {
-                if (firmwareFile != null)
+                if (firmwareFile is not null)
                 {
                     await firmwareFile.DisposeAsync();
                 }
@@ -198,7 +198,7 @@ namespace DuetControlServer.Utility
         public static async Task UpdateFirmware()
         {
             // Get the different firmware filenames
-            Dictionary<string, string> firmwareVersions = new();
+            Dictionary<string, string?> firmwareVersions = new();
             using (await Model.Provider.AccessReadOnlyAsync())
             {
                 foreach (Board board in Model.Provider.Get.Boards)
@@ -231,7 +231,7 @@ namespace DuetControlServer.Utility
             {
                 foreach (Board board in Model.Provider.Get.Boards)
                 {
-                    if (!string.IsNullOrEmpty(board.FirmwareFileName) && firmwareVersions.TryGetValue(board.FirmwareFileName, out string newVersion))
+                    if (!string.IsNullOrEmpty(board.FirmwareFileName) && firmwareVersions.TryGetValue(board.FirmwareFileName, out string? newVersion))
                     {
                         if (board.FirmwareVersion != newVersion)
                         {
@@ -256,7 +256,7 @@ namespace DuetControlServer.Utility
             Console.WriteLine((outdatedBoards.Count == 1) ? "There is {0} outdated board:" : "There are {0} outdated boards:", outdatedBoards.Count);
             foreach (Board board in outdatedBoards)
             {
-                string newVersion = firmwareVersions[board.FirmwareFileName] ?? "n/a";
+                string newVersion = firmwareVersions[board.FirmwareFileName!] ?? "n/a";
                 string boardName = string.IsNullOrEmpty(board.Name) ? $"Duet 3 Expansion {board.ShortName}" : board.Name;
                 Console.WriteLine("- {0} ({1} -> {2}){3}", boardName, board.FirmwareVersion, newVersion, (board.CanAddress ?? 0) > 0 ? $" @ CAN address {board.CanAddress}" : string.Empty);
             }
@@ -291,7 +291,7 @@ namespace DuetControlServer.Utility
                 {
                     foreach (Board board in outdatedBoards)
                     {
-                        string newVersion = firmwareVersions[board.FirmwareFileName] ?? "n/a";
+                        string newVersion = firmwareVersions[board.FirmwareFileName!] ?? "n/a";
                         string boardName = string.IsNullOrEmpty(board.Name) ? $"Duet 3 Expansion {board.ShortName}" : board.Name;
                         Console.Write("Would you like to update {0} ({1} -> {2}){3} (Y/n)? ", boardName, board.FirmwareVersion, newVersion, (board.CanAddress ?? 0) > 0 ? $" @ CAN address {board.CanAddress}" : string.Empty);
                         key = char.ToUpper(Console.ReadKey().KeyChar);
@@ -327,7 +327,7 @@ namespace DuetControlServer.Utility
                                 new('B', board.CanAddress)
                             }
                         };
-                        Message result = await updateCode.Execute();
+                        Message result = await updateCode.Execute() ?? new Message();
 
                         // Unlike with M997, we need to wait for RRF to complete the update process
                         while (true)
@@ -366,7 +366,7 @@ namespace DuetControlServer.Utility
                         Type = CodeType.MCode,
                         MajorNumber = 997
                     };
-                    Message result = await updateCode.Execute();
+                    Message result = await updateCode.Execute() ?? new Message();
                     Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
                 }
                 catch (Exception e)
@@ -386,7 +386,7 @@ namespace DuetControlServer.Utility
                         Type = CodeType.MCode,
                         MajorNumber = 999
                     };
-                    Message result = await updateCode.Execute();
+                    Message result = await updateCode.Execute() ?? new Message();
                     Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
                 }
                 catch (Exception e)
@@ -426,7 +426,7 @@ namespace DuetControlServer.Utility
             }
 
             // Get the different firmware filenames
-            Dictionary<string, string> firmwareVersions = new();
+            Dictionary<string, string?> firmwareVersions = new();
             foreach (Board board in objectModel.Boards)
             {
                 if (!string.IsNullOrEmpty(board.FirmwareFileName) && !firmwareVersions.ContainsKey(board.FirmwareFileName))
@@ -454,7 +454,7 @@ namespace DuetControlServer.Utility
             List<Board> outdatedBoards = new();
             foreach (Board board in objectModel.Boards)
             {
-                if (!string.IsNullOrEmpty(board.FirmwareFileName) && firmwareVersions.TryGetValue(board.FirmwareFileName, out string newVersion))
+                if (!string.IsNullOrEmpty(board.FirmwareFileName) && firmwareVersions.TryGetValue(board.FirmwareFileName, out string? newVersion))
                 {
                     if (board.FirmwareVersion != newVersion)
                     {
@@ -477,7 +477,7 @@ namespace DuetControlServer.Utility
             Console.WriteLine((outdatedBoards.Count == 1) ? "There is {0} outdated board:" : "There are {0} outdated boards:", outdatedBoards.Count);
             foreach (Board board in outdatedBoards)
             {
-                string newVersion = firmwareVersions[board.FirmwareFileName] ?? "n/a";
+                string newVersion = firmwareVersions[board.FirmwareFileName!] ?? "n/a";
                 string boardName = string.IsNullOrEmpty(board.Name) ? $"Duet 3 Expansion {board.ShortName}" : board.Name;
                 Console.WriteLine("- {0} ({1} -> {2}){3}", boardName, board.FirmwareVersion, newVersion, (board.CanAddress ?? 0) > 0 ? $" @ CAN address {board.CanAddress}" : string.Empty);
             }
@@ -507,7 +507,7 @@ namespace DuetControlServer.Utility
                 {
                     foreach (Board board in outdatedBoards)
                     {
-                        string newVersion = firmwareVersions[board.FirmwareFileName] ?? "n/a";
+                        string newVersion = firmwareVersions[board.FirmwareFileName!] ?? "n/a";
                         string boardName = string.IsNullOrEmpty(board.Name) ? $"Duet 3 Expansion {board.ShortName}" : board.Name;
                         Console.Write("Would you like to update {0} ({1} -> {2}){3} (Y/n)? ", boardName, board.FirmwareVersion, newVersion, (board.CanAddress ?? 0) > 0 ? $" @ CAN address {board.CanAddress}" : string.Empty);
                         key = char.ToUpper(Console.ReadKey().KeyChar);

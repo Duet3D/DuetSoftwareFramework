@@ -53,17 +53,17 @@ namespace DuetPiManagementPlugin.Network
             /// <summary>
             /// IP address
             /// </summary>
-            public IPAddress IP { get; set; }
+            public IPAddress? IP { get; set; }
 
             /// <summary>
             /// Gateway
             /// </summary>
-            public IPAddress Gateway { get; set; }
+            public IPAddress? Gateway { get; set; }
 
             /// <summary>
             /// Subnet mask
             /// </summary>
-            public IPAddress Subnet { get; set; }
+            public IPAddress? Subnet { get; set; }
 
             /// <summary>
             /// Get or set the subnet mask in CIDR notation
@@ -73,7 +73,7 @@ namespace DuetPiManagementPlugin.Network
                 get
                 {
                     int cidr = 0;
-                    uint subnetMask = BitConverter.ToUInt32(Subnet.GetAddressBytes());
+                    uint subnetMask = BitConverter.ToUInt32(Subnet?.GetAddressBytes());
                     for (int i = 0; i < 32; i++)
                     {
                         if ((subnetMask & (1u << i)) != 0)
@@ -107,12 +107,18 @@ namespace DuetPiManagementPlugin.Network
             /// <summary>
             /// DNS server
             /// </summary>
-            public IPAddress DNSServer { get; set; }
+            public IPAddress? DNSServer { get; set; }
 
             /// <summary>
             /// Set to true if the configuration is intended for AP mode
             /// </summary>
             public bool ForAP { get; set; }
+
+            /// <summary>
+            /// Constructor of this class
+            /// </summary>
+            /// <param name="iface">Interface name</param>
+            public IPConfig(string iface) => Interface = iface;
         }
 
         /// <summary>
@@ -128,22 +134,27 @@ namespace DuetPiManagementPlugin.Network
                 await using FileStream configStream = new("/etc/dhcpcd.conf", FileMode.Open, FileAccess.Read);
                 using StreamReader reader = new(configStream);
 
-                IPConfig item = null;
+                IPConfig? item = null;
                 while (!reader.EndOfStream)
                 {
-                    string line = await reader.ReadLineAsync();
+                    string? line = await reader.ReadLineAsync();
+                    if (line is null)
+                    {
+                        break;
+                    }
+
                     Match match = _ifaceRegex.Match(line);
                     if (match.Success)
                     {
-                        if (item != null)
+                        if (item is not null)
                         {
                             result.Add(item);
                         }
 
                         // Interface name
-                        item = new IPConfig() { Interface = match.Groups[1].Value };
+                        item = new IPConfig(match.Groups[1].Value);
                     }
-                    else if (item != null)
+                    else if (item is not null)
                     {
                         match = _ipRegex.Match(line);
                         if (match.Success)
@@ -184,7 +195,7 @@ namespace DuetPiManagementPlugin.Network
                         }
                     }
                 }
-                if (item != null)
+                if (item is not null)
                 {
                     result.Add(item);
                 }
@@ -204,9 +215,9 @@ namespace DuetPiManagementPlugin.Network
         /// <param name="dnsServer">DNS server or null if unset</param>
         /// <param name="forAP">Add extra option for AP mode</param>
         /// <returns>Asynchronous task</returns>
-        private static async Task UpdateProfile(string iface, IPAddress ip, IPAddress subnet, IPAddress gateway, IPAddress dnsServer, bool forAP)
+        private static async Task UpdateProfile(string iface, IPAddress? ip, IPAddress? subnet, IPAddress? gateway, IPAddress? dnsServer, bool forAP)
         {
-            if (iface == null)
+            if (iface is null)
             {
                 throw new ArgumentNullException(nameof(iface));
             }
@@ -219,7 +230,7 @@ namespace DuetPiManagementPlugin.Network
                 async Task WriteProfile(bool writeEmptyLine)
                 {
                     // Write the interface section only if it isn't meant to be configured by DHCP
-                    if (!IPAddress.Any.Equals(ip) && (ip != null || gateway != null || dnsServer != null))
+                    if (!IPAddress.Any.Equals(ip) && (ip is not null || gateway is not null || dnsServer is not null))
                     {
                         if (writeEmptyLine)
                         {
@@ -228,20 +239,17 @@ namespace DuetPiManagementPlugin.Network
                         }
 
                         await writer.WriteLineAsync($"interface {iface}");
-                        if (ip != null)
+                        if (ip is not null)
                         {
                             int? cidr = null;
-                            if (subnet != null)
+                            if (subnet is not null)
                             {
                                 uint subnetMask = BitConverter.ToUInt32(subnet.GetAddressBytes());
                                 for (int i = 0; i < 32; i++)
                                 {
                                     if ((subnetMask & (1u << i)) != 0)
                                     {
-                                        if (cidr == null)
-                                        {
-                                            cidr = 0;
-                                        }
+                                        cidr ??= 0;
                                         cidr++;
                                     }
                                     else
@@ -256,11 +264,11 @@ namespace DuetPiManagementPlugin.Network
                                 await writer.WriteLineAsync("nohook wpa_supplicant");
                             }
                         }
-                        if (gateway != null && !IPAddress.Any.Equals(gateway))
+                        if (gateway is not null && !IPAddress.Any.Equals(gateway))
                         {
                             await writer.WriteLineAsync($"static routers={gateway}");
                         }
-                        if (dnsServer != null && !IPAddress.Any.Equals(dnsServer))
+                        if (dnsServer is not null && !IPAddress.Any.Equals(dnsServer))
                         {
                             await writer.WriteLineAsync($"static domain_name_servers={dnsServer}");
                         }
@@ -269,10 +277,14 @@ namespace DuetPiManagementPlugin.Network
 
                 // Rewrite the config line by line
                 bool lastLineEmpty = true, profileWritten = false;
-                string line = null, currentInterface = null;
+                string? line = null, currentInterface = null;
                 while (!reader.EndOfStream)
                 {
                     line = await reader.ReadLineAsync();
+                    if (line is null)
+                    {
+                        break;
+                    }
 
                     // Is this the first line of a new profile?
                     Match match = _ifaceRegex.Match(line);
@@ -322,8 +334,8 @@ namespace DuetPiManagementPlugin.Network
         public static async Task<IPAddress> GetConfiguredIPAddress(string iface)
         {
             List<IPConfig> profiles = await ReadProfiles();
-            IPConfig ifaceProfile = profiles.FirstOrDefault(profile => profile.Interface == iface);
-            return (ifaceProfile == null) ? IPAddress.Any : ifaceProfile.IP;
+            IPConfig? ifaceProfile = profiles.FirstOrDefault(profile => profile.Interface == iface);
+            return (ifaceProfile is null || ifaceProfile.IP is null) ? IPAddress.Any : ifaceProfile.IP;
         }
 
         /// <summary>
@@ -336,20 +348,20 @@ namespace DuetPiManagementPlugin.Network
         /// <param name="netmask">Subnet mask or null if unchanged</param>
         /// <param name="dnsServer">Set IP address for AP mode</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task<string> SetIPAddress(string iface, IPAddress ip, IPAddress netmask, IPAddress gateway, IPAddress dnsServer, bool? forAP = null)
+        public static async Task<string> SetIPAddress(string iface, IPAddress? ip, IPAddress? netmask, IPAddress? gateway, IPAddress? dnsServer, bool? forAP = null)
         {
             // Check if the profile already exists and if anything is supposed to change
             List<IPConfig> profiles = await ReadProfiles();
-            IPConfig existingProfile = null;
+            IPConfig? existingProfile = null;
             foreach (IPConfig profile in profiles)
             {
                 if (profile.Interface == iface)
                 {
-                    if ((ip == null || ip == profile.IP) &&
-                        (netmask == null || netmask == profile.Subnet) &&
-                        (gateway == null || gateway == profile.Gateway) &&
-                        (dnsServer == null || dnsServer == profile.DNSServer) &&
-                        (forAP == null || forAP == profile.ForAP))
+                    if ((ip is null || ip == profile.IP) &&
+                        (netmask is null || netmask == profile.Subnet) &&
+                        (gateway is null || gateway == profile.Gateway) &&
+                        (dnsServer is null || dnsServer == profile.DNSServer) &&
+                        (forAP is null || forAP == profile.ForAP))
                     {
                         // Config remains unchanged; no need to rewrite the config
                         return string.Empty;
@@ -361,13 +373,13 @@ namespace DuetPiManagementPlugin.Network
             if (IPAddress.Any.Equals(ip))
             {
                 // DHCP config
-                if (existingProfile == null)
+                if (existingProfile is null)
                 {
                     // It is and will remain enabled; no need to rewrite the config
                     return string.Empty;
                 }
             }
-            else if (existingProfile != null && !existingProfile.ForAP && forAP != true)
+            else if (existingProfile is not null && !existingProfile.ForAP && forAP != true)
             {
                 // Static config - replace missing settings with parsed settings from the old config
                 ip ??= existingProfile.IP;
@@ -381,13 +393,13 @@ namespace DuetPiManagementPlugin.Network
 
             // Restart dhcpcd if the AP config may have changed
             StringBuilder builder = new();
-            if (forAP != null)
+            if (forAP is not null)
             {
                 builder.Append(await Command.Execute("systemctl", "restart dhcpcd.service"));
             }
 
             // Restart Ethernet adapter if it is up to apply the new configuration
-            if (NetworkInterface.GetAllNetworkInterfaces().Any(item => item.Name == iface && item.OperationalStatus == OperationalStatus.Up) && forAP == null)
+            if (NetworkInterface.GetAllNetworkInterfaces().Any(item => item.Name == iface && item.OperationalStatus == OperationalStatus.Up) && forAP is null)
             {
                 builder.AppendLine(await Command.Execute("ip", $"link set {iface} down"));
                 builder.AppendLine(await Command.Execute("ip", $"link set {iface} up"));
@@ -405,8 +417,8 @@ namespace DuetPiManagementPlugin.Network
         public static async Task<IPAddress> GetConfiguredNetmask(string iface)
         {
             List<IPConfig> profiles = await ReadProfiles();
-            IPConfig ifaceProfile = profiles.FirstOrDefault(profile => profile.Interface == iface);
-            return (ifaceProfile == null) ? IPAddress.Any : ifaceProfile.Subnet;
+            IPConfig? ifaceProfile = profiles.FirstOrDefault(profile => profile.Interface == iface);
+            return (ifaceProfile is null || ifaceProfile.Subnet is null) ? IPAddress.Any : ifaceProfile.Subnet;
         }
 
         /// <summary>
@@ -417,8 +429,8 @@ namespace DuetPiManagementPlugin.Network
         public static async Task<IPAddress> GetConfiguredGateway(string iface)
         {
             List<IPConfig> profiles = await ReadProfiles();
-            IPConfig ifaceProfile = profiles.FirstOrDefault(profile => profile.Interface == iface);
-            return (ifaceProfile == null) ? IPAddress.Any : ifaceProfile.Gateway;
+            IPConfig? ifaceProfile = profiles.FirstOrDefault(profile => profile.Interface == iface);
+            return (ifaceProfile is null || ifaceProfile.Gateway is null) ? IPAddress.Any : ifaceProfile.Gateway;
         }
 
         /// <summary>
@@ -429,8 +441,8 @@ namespace DuetPiManagementPlugin.Network
         public static async Task<IPAddress> GetConfiguredDNSServer(string iface)
         {
             List<IPConfig> profiles = await ReadProfiles();
-            IPConfig ifaceProfile = profiles.FirstOrDefault(profile => profile.Interface == iface);
-            return (ifaceProfile == null) ? IPAddress.Any : ifaceProfile.DNSServer;
+            IPConfig? ifaceProfile = profiles.FirstOrDefault(profile => profile.Interface == iface);
+            return (ifaceProfile is null || ifaceProfile.DNSServer is null) ? IPAddress.Any : ifaceProfile.DNSServer;
         }
 
         /// <summary>

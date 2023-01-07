@@ -61,7 +61,7 @@ namespace DuetControlServer.Commands
         /// <param name="id">Plugin identifier</param>
         /// <param name="requiredBy">Plugin that requires this plugin</param>
         /// <returns>Whether the plugin could be found</returns>
-        private async Task Start(string id, string requiredBy = null)
+        private async Task Start(string id, string? requiredBy = null)
         {
             bool rootPlugin;
             List<string> dependencies = new();
@@ -85,7 +85,7 @@ namespace DuetControlServer.Commands
                     }
 
                     // Check the required DSF version
-                    if (!PluginManifest.CheckVersion(Program.Version, plugin.SbcDsfVersion))
+                    if (!PluginManifest.CheckVersion(Program.Version, plugin.SbcDsfVersion!))
                     {
                         throw new ArgumentException($"Incompatible DSF version (requires {plugin.SbcDsfVersion}, got {Program.Version})");
                     }
@@ -112,7 +112,7 @@ namespace DuetControlServer.Commands
                 }
                 else
                 {
-                    if (requiredBy == null)
+                    if (requiredBy is null)
                     {
                         throw new ArgumentException($"Plugin {Plugin} not found");
                     }

@@ -146,7 +146,7 @@ namespace DuetControlServer.IPC.Processors
                 do
                 {
                     // Wait for the next request and read it
-                    Tuple<object, TaskCompletionSource> request;
+                    Tuple<object, TaskCompletionSource>? request;
                     try
                     {
                         using (await monitor.EnterAsync(Program.CancellationToken))
@@ -232,7 +232,7 @@ namespace DuetControlServer.IPC.Processors
                     }
 
                     // Invalidate pending requests
-                    while (pendingCommands.TryDequeue(out Tuple<object, TaskCompletionSource> request))
+                    while (pendingCommands.TryDequeue(out Tuple<object, TaskCompletionSource>? request))
                     {
                         request.Item2.SetCanceled();
                     }

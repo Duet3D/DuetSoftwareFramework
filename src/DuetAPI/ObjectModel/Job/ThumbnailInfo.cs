@@ -11,12 +11,12 @@
         /// <remarks>
         /// This property is not provided by RepRapFirmware fileinfo results and it may be null if no thumbnail content is requested
         /// </remarks>
-        public string Data
+        public string? Data
         {
             get => _data;
             set => SetPropertyValue(ref _data, value);
         }
-        private string _data;
+        private string? _data;
 
         /// <summary>
         /// Format of this thumbnail

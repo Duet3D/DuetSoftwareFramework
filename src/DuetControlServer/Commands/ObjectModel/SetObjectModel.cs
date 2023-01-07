@@ -32,7 +32,7 @@ namespace DuetControlServer.Commands
 
             // Try to find the object that the path references
             string lastPathItem = "<root>";
-            object obj = Model.Provider.Get;
+            object? obj = Model.Provider.Get;
             for (int i = 0; i < pathItems.Length - 2; i++)
             {
                 string pathItem = pathItems[i];
@@ -54,8 +54,8 @@ namespace DuetControlServer.Commands
                 }
                 else
                 {
-                    PropertyInfo property = obj.GetType().GetProperty(pathItem, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-                    if (property != null)
+                    PropertyInfo? property = obj?.GetType().GetProperty(pathItem, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                    if (property is not null)
                     {
                         obj = property.GetValue(obj);
                     }
@@ -66,10 +66,10 @@ namespace DuetControlServer.Commands
             // Try to update the property
             if (obj != Model.Provider.Get)
             {
-                PropertyInfo property = obj.GetType().GetProperty(pathItems[^1], BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-                if (property != null)
+                PropertyInfo? property = obj?.GetType().GetProperty(pathItems[^1], BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                if (property is not null)
                 {
-                    object newValue = JsonSerializer.Deserialize(Value, property.PropertyType, JsonHelper.DefaultJsonOptions);
+                    object? newValue = JsonSerializer.Deserialize(Value, property.PropertyType, JsonHelper.DefaultJsonOptions);
                     property.SetValue(obj, newValue);
                     return Task.FromResult(true);
                 }

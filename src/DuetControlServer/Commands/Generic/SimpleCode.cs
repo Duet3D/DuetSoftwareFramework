@@ -34,7 +34,7 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Source connection of this command
         /// </summary>
-        public Connection Connection { get; set; }
+        public Connection? Connection { get; set; }
 
         /// <summary>
         /// Parse codes from the given input string asynchronously
@@ -72,7 +72,7 @@ namespace DuetControlServer.Commands
             // Check if the corresponding code channel has been disabled
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                if (!Settings.NoSpi && Model.Provider.Get.Inputs[Channel] == null)
+                if (!Settings.NoSpi && Model.Provider.Get.Inputs[Channel] is null)
                 {
                     throw new InvalidOperationException("Requested code channel has been disabled");
                 }
@@ -120,10 +120,10 @@ namespace DuetControlServer.Commands
                 // Execute priority codes first
                 foreach (Code priorityCode in priorityCodes)
                 {
-                    Message codeResult = await priorityCode.Execute();
+                    Message? codeResult = await priorityCode.Execute();
                     try
                     {
-                        if (codeResult != null && !string.IsNullOrEmpty(codeResult.Content))
+                        if (codeResult is not null && !string.IsNullOrEmpty(codeResult.Content))
                         {
                             result.AppendLine(codeResult.ToString());
                         }
@@ -137,7 +137,7 @@ namespace DuetControlServer.Commands
                 // Execute normal codes next. Use a lock here because multiple codes may be queued for the same channel
                 if (codes.Count > 0)
                 {
-                    Task<Message>[] codeTasks = new Task<Message>[codes.Count];
+                    Task<Message?>[] codeTasks = new Task<Message?>[codes.Count];
                     using (await _channelLocks[(int)Channel].LockAsync(Program.CancellationToken))
                     {
                         for (int i = 0; i < codes.Count; i++)
@@ -146,12 +146,12 @@ namespace DuetControlServer.Commands
                         }
                     }
 
-                    foreach (Task<Message> codeTask in codeTasks)
+                    foreach (Task<Message?> codeTask in codeTasks)
                     {
                         try
                         {
-                            Message codeResult = await codeTask;
-                            if (codeResult != null)
+                            Message? codeResult = await codeTask;
+                            if (codeResult is not null)
                             {
                                 result.Append(codeResult);
                             }

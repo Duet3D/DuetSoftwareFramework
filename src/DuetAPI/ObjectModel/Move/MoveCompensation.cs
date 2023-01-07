@@ -18,32 +18,32 @@
 		/// <summary>
 		/// Full path to the currently used height map file or null if none is in use
 		/// </summary>
-		public string File
+		public string? File
 		{
 			get => _file;
 			set => SetPropertyValue(ref _file, value);
 		}
-		private string _file;
+		private string? _file;
 
 		/// <summary>
 		/// Grid settings of the loaded heightmap or null if no heightmap is loaded
 		/// </summary>
-		public ProbeGrid LiveGrid
+		public ProbeGrid? LiveGrid
         {
 			get => _liveGrid;
 			set => SetPropertyValue(ref _liveGrid, value);
         }
-		private ProbeGrid _liveGrid;
+		private ProbeGrid? _liveGrid;
 
 		/// <summary>
 		/// Deviations of the mesh grid or null if not applicable
 		/// </summary>
-		public MoveDeviations MeshDeviation
+		public MoveDeviations? MeshDeviation
 		{
 			get => _meshDeviation;
 			set => SetPropertyValue(ref _meshDeviation, value);
 		}
-		private MoveDeviations _meshDeviation;
+		private MoveDeviations? _meshDeviation;
 
 		/// <summary>
 		/// Probe grid settings as defined by M557

@@ -10,22 +10,22 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Accelerometer of this board or null if unknown
         /// </summary>
-        public Accelerometer Accelerometer
+        public Accelerometer? Accelerometer
         {
             get => _accelerometer;
             set => SetPropertyValue(ref _accelerometer, value);
         }
-        private Accelerometer _accelerometer;
+        private Accelerometer? _accelerometer;
 
         /// <summary>
         /// Filename of the bootloader binary or null if unknown
         /// </summary>
-        public string BootloaderFileName
+        public string? BootloaderFileName
         {
             get => _bootloaderFileName;
             set => SetPropertyValue(ref _bootloaderFileName, value);
         }
-        private string _bootloaderFileName;
+        private string? _bootloaderFileName;
 
         /// <summary>
         /// CAN address of this board or null if not applicable
@@ -40,22 +40,22 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Closed loop data of this board or null if unknown
         /// </summary>
-        public ClosedLoop ClosedLoop
+        public ClosedLoop? ClosedLoop
         {
             get => _closedLoop;
             set => SetPropertyValue(ref _closedLoop, value);
         }
-        private ClosedLoop _closedLoop;
+        private ClosedLoop? _closedLoop;
 
         /// <summary>
         /// Details about a connected display or null if none is connected
         /// </summary>
-        public DirectDisplay DirectDisplay
+        public DirectDisplay? DirectDisplay
         {
             get => _directDisplay;
             set => SetPropertyValue(ref _directDisplay, value);
         }
-        private DirectDisplay _directDisplay;
+        private DirectDisplay? _directDisplay;
 
         /// <summary>
         /// Date of the firmware build
@@ -68,14 +68,14 @@ namespace DuetAPI.ObjectModel
         private string _firmwareDate = string.Empty;
 
         /// <summary>
-        /// Filename of the firmware binary
+        /// Filename of the firmware binary or null if unknown
         /// </summary>
-        public string FirmwareFileName
+        public string? FirmwareFileName
         {
             get => _firmwareFileName;
             set => SetPropertyValue(ref _firmwareFileName, value);
         }
-        private string _firmwareFileName;
+        private string? _firmwareFileName;
 
         /// <summary>
         /// Name of the firmware build
@@ -103,12 +103,12 @@ namespace DuetAPI.ObjectModel
         /// <remarks>
         /// This is only available for the mainboard (first board item)
         /// </remarks>
-        public string IapFileNameSBC
+        public string? IapFileNameSBC
         {
             get => _iapFileNameSBC;
             set => SetPropertyValue(ref _iapFileNameSBC, value);
         }
-        private string _iapFileNameSBC;
+        private string? _iapFileNameSBC;
 
         /// <summary>
         /// Filename of the IAP binary that is used for updates from the SD card or null if unsupported
@@ -116,12 +116,12 @@ namespace DuetAPI.ObjectModel
         /// <remarks>
         /// This is only available for the mainboard (first board item)
         /// </remarks>
-        public string IapFileNameSD
+        public string? IapFileNameSD
         {
             get => _iapFileNameSD;
             set => SetPropertyValue(ref _iapFileNameSD, value);
         }
-        private string _iapFileNameSD;
+        private string? _iapFileNameSD;
 
         /// <summary>
         /// Maximum number of heaters this board can control
@@ -146,12 +146,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Minimum, maximum, and current temperatures of the MCU or null if unknown
         /// </summary>
-        public MinMaxCurrent<float> McuTemp
+        public MinMaxCurrent<float>? McuTemp
         {
             get => _mcuTemp;
             set => SetPropertyValue(ref _mcuTemp, value);
         }
-        private MinMaxCurrent<float> _mcuTemp;
+        private MinMaxCurrent<float>? _mcuTemp;
 
         /// <summary>
         /// Full name of the board
@@ -206,41 +206,41 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Unique identifier of the board or null if unknown
         /// </summary>
-        public string UniqueId
+        public string? UniqueId
         {
             get => _uniqueId;
             set => SetPropertyValue(ref _uniqueId, value);
         }
-        private string _uniqueId;
+        private string? _uniqueId;
 
         /// <summary>
         /// Minimum, maximum, and current voltages on the 12V rail or null if unknown
         /// </summary>
-        public MinMaxCurrent<float> V12
+        public MinMaxCurrent<float>? V12
         {
             get => _v12;
             set => SetPropertyValue(ref _v12, value);
         }
-        private MinMaxCurrent<float> _v12;
+        private MinMaxCurrent<float>? _v12;
 
         /// <summary>
         /// Minimum, maximum, and current voltages on the input rail or null if unknown
         /// </summary>
-        public MinMaxCurrent<float> VIn
+        public MinMaxCurrent<float>? VIn
         {
             get => _vIn;
             set => SetPropertyValue(ref _vIn, value);
         }
-        private MinMaxCurrent<float> _vIn;
+        private MinMaxCurrent<float>? _vIn;
 
         /// <summary>
         /// Filename of the on-board WiFi chip or null if not present
         /// </summary>
-        public string WifiFirmwareFileName
+        public string? WifiFirmwareFileName
         {
             get => _wifiFirmwareFileName;
             set => SetPropertyValue(ref _wifiFirmwareFileName, value);
         }
-        private string _wifiFirmwareFileName;
+        private string? _wifiFirmwareFileName;
     }
 }

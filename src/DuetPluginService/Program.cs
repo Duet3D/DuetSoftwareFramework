@@ -19,7 +19,7 @@ namespace DuetPluginService
         /// <summary>
         /// Version of this application
         /// </summary>
-        public static readonly string Version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion;
+        public static readonly string Version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
 
         /// <summary>
         /// Logger instance
@@ -130,7 +130,7 @@ namespace DuetPluginService
             }
 
             // Notify the service manager that we're up and running
-            string notifySocket = Environment.GetEnvironmentVariable("NOTIFY_SOCKET");
+            string? notifySocket = Environment.GetEnvironmentVariable("NOTIFY_SOCKET");
             if (!string.IsNullOrEmpty(notifySocket))
             {
                 try

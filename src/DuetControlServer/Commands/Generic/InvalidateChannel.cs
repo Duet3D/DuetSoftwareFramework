@@ -12,7 +12,7 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Source connection of this command
         /// </summary>
-        public Connection Connection { get; set; }
+        public Connection? Connection { get; set; }
 
         /// <summary>
         /// Wait for all pending codes of the given channel to finish
@@ -23,7 +23,7 @@ namespace DuetControlServer.Commands
             // Check if the corresponding code channel has been disabled
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                if (Model.Provider.Get.Inputs[Channel] == null)
+                if (Model.Provider.Get.Inputs[Channel] is null)
                 {
                     throw new InvalidOperationException("Requested code channel has been disabled");
                 }
