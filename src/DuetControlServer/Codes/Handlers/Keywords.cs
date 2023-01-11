@@ -47,8 +47,8 @@ namespace DuetControlServer.Codes.Handlers
                     if (keywordArgument.StartsWith('>'))
                     {
                         // File redirection requested
-                        bool append = keywordArgument.StartsWith(">>");
-                        keywordArgument = keywordArgument[(append ? 2 : 1)..].TrimStart();
+                        bool append = keywordArgument.StartsWith(">>"), appendNoNL = keywordArgument.StartsWith(">>>");
+                        keywordArgument = keywordArgument[(appendNoNL ? 3 : (append ? 2 : 1))..].TrimStart();
 
                         // Get the file string or expression to write to
                         bool inQuotes = false, isComplete = false;
@@ -102,12 +102,19 @@ namespace DuetControlServer.Codes.Handlers
                         string physicalFilename = await FilePath.ToPhysicalAsync(filename, FileDirectory.System);
                         result = await Expressions.Evaluate(code, true);
 
-                        // Write it to the SD card
+                        // Write it to the designated file
                         _logger.Debug("{0} '{1}' to {2}", append ? "Appending" : "Writing", result, filename);
                         await using (FileStream fs = new(physicalFilename, append ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.Read, Settings.FileBufferSize))
                         {
                             await using StreamWriter writer = new(fs, Encoding.UTF8, Settings.FileBufferSize);
-                            await writer.WriteLineAsync(result);
+                            if (appendNoNL)
+                            {
+                                await writer.WriteAsync(result);
+                            }
+                            else
+                            {
+                                await writer.WriteLineAsync(result);
+                            }
                         }
 
                         // Done

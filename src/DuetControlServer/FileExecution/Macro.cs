@@ -73,7 +73,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// File to read from
         /// </summary>
-        private CodeFile? _file;
+        private readonly CodeFile? _file;
 
         /// <summary>
         /// Name of the file being executed
@@ -211,7 +211,6 @@ namespace DuetControlServer.FileExecution
                 {
                     _file.Close();
                 }
-                _file = null;
             }
 
             _logger.Info("Aborted macro file {0}", FileName);
@@ -236,7 +235,6 @@ namespace DuetControlServer.FileExecution
                 {
                     _file.Close();
                 }
-                _file = null;
             }
 
             _logger.Info("Aborted macro file {0}", FileName);
