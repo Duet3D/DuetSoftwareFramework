@@ -32,7 +32,7 @@ namespace DuetControlServer.SPI
         private static int _bytesReserved, _bufferSpace;
 
         // Object model queries
-        private struct PendingModelQuery
+        private class PendingModelQuery
         {
             /// <summary>
             /// Key to query
@@ -805,7 +805,7 @@ namespace DuetControlServer.SPI
                 {
                     lock (_pendingModelQueries)
                     {
-                        if (_pendingModelQueries.TryPeek(out PendingModelQuery query) &&
+                        if (_pendingModelQueries.TryPeek(out PendingModelQuery? query) &&
                             !query.QuerySent && DataTransfer.WriteGetObjectModel(query.Key, query.Flags))
                         {
                             query.QuerySent = true;
@@ -1002,7 +1002,7 @@ namespace DuetControlServer.SPI
                 DataTransfer.ReadObjectModel(out ReadOnlySpan<byte> json);
                 lock (_pendingModelQueries)
                 {
-                    if (_pendingModelQueries.TryDequeue(out PendingModelQuery query))
+                    if (_pendingModelQueries.TryDequeue(out PendingModelQuery? query))
                     {
                         query.Tcs.SetResult(json.ToArray());
                     }

@@ -42,14 +42,8 @@ namespace DuetAPI.ObjectModel
         /// This is required to update model properties which do not have a setter
         /// </summary>
         /// <param name="from">Other instance</param>
-        public void Assign([DisallowNull] object? from)
+        public void Assign(object from)
         {
-            // Assigning null values is not supported
-            if (from is null)
-            {
-                throw new ArgumentNullException(nameof(from));
-            }
-
             // Validate the types
             if (from is not ModelCollection<T> other)
             {
@@ -159,7 +153,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="other">Other instance</param>
         /// <returns>Object differences or null if both instances are equal</returns>
-        public object? FindDifferences(IModelObject? other)
+        public object? FindDifferences(IModelObject other)
         {
             // Check the types
             if (other is not ModelCollection<T> otherList)
@@ -230,16 +224,14 @@ namespace DuetAPI.ObjectModel
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         /// <remarks>Accepts null as the JSON value to clear existing items</remarks>
-        public IModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public IModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {
-                ClearItems();
+                return null;
             }
-            else
-            {
-                UpdateFromJson(jsonElement, ignoreSbcProperties, 0, true);
-            }
+
+            UpdateFromJson(jsonElement, ignoreSbcProperties, 0, true);
             return this;
         }
 
@@ -281,7 +273,7 @@ namespace DuetAPI.ObjectModel
                     else
                     {
                         item ??= (IModelObject)Activator.CreateInstance(itemType)!;
-                        T updatedItem = (T)item.UpdateFromJson(jsonItem, ignoreSbcProperties)!;
+                        T? updatedItem = (T?)item.UpdateFromJson(jsonItem, ignoreSbcProperties)!;
                         if (!ReferenceEquals(this[i], updatedItem))
                         {
                             this[i] = updatedItem;
@@ -299,9 +291,8 @@ namespace DuetAPI.ObjectModel
                     }
                     else
                     {
-                        IModelObject? newItem = (IModelObject)Activator.CreateInstance(itemType)!;
-                        newItem = newItem.UpdateFromJson(jsonElement[i]!, ignoreSbcProperties);
-                        Add((T)newItem!);
+                        IModelObject? newItem = (IModelObject?)Activator.CreateInstance(itemType)!;
+                        Add((T?)newItem.UpdateFromJson(jsonElement[i]!, ignoreSbcProperties)!);
                     }
                 }
             }

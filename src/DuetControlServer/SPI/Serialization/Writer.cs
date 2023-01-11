@@ -190,6 +190,11 @@ namespace DuetControlServer.SPI.Serialization
                         binaryParam.IntValue = Encoding.UTF8.GetByteCount(value);
                         extraParameters.Add(value);
                     }
+                    else if (parameter.Type == null)
+                    {
+                        binaryParam.Type = DataType.Null;
+                        binaryParam.IntValue = 0;
+                    }
                     // Boolean values are not supported for codes. Use integers instead
                     else
                     {
@@ -423,7 +428,7 @@ namespace DuetControlServer.SPI.Serialization
         /// <exception cref="ArgumentException">One of the supplied values is too big</exception>
         public static int WritePrintFileInfo(Span<byte> to, GCodeFileInfo info)
         {
-            Span<byte> unicodeFilename = Encoding.UTF8.GetBytes(info.FileName ?? string.Empty);
+            Span<byte> unicodeFilename = Encoding.UTF8.GetBytes(info.FileName!);
             if (unicodeFilename.Length > 254)
             {
                 throw new ArgumentException("Filename is too long", nameof(info));

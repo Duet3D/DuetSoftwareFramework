@@ -1,6 +1,5 @@
 ﻿using System;
 using System.ComponentModel;
-using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
 namespace DuetAPI.ObjectModel
@@ -15,7 +14,7 @@ namespace DuetAPI.ObjectModel
         /// This is required to update model properties which do not have a setter
         /// </summary>
         /// <param name="from">Other instance</param>
-        void Assign([DisallowNull] object? from);
+        void Assign(object from);
 
         /// <summary>
         /// Create a dictionary or list of all the differences between this instance and another.
@@ -23,7 +22,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="other">Other instance</param>
         /// <returns>Object differences or null if both instances are equal</returns>
-        object? FindDifferences(IModelObject? other);
+        object? FindDifferences(IModelObject other);
 
         /// <summary>
         /// Update this instance from a given JSON element

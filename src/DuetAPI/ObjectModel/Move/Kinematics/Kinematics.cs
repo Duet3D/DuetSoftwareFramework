@@ -57,7 +57,7 @@ namespace DuetAPI.ObjectModel
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {
-                throw new ArgumentNullException(nameof(jsonElement));
+                return null;
             }
 
             if (jsonElement.TryGetProperty("name", out JsonElement nameProperty))

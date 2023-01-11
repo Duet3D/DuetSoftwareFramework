@@ -188,14 +188,8 @@ namespace DuetAPI.ObjectModel
         /// Assign the properties from another instance
         /// </summary>
         /// <param name="from">Other instance</param>
-        public void Assign(object? from)
+        public void Assign(object from)
         {
-            // Assigning null values is not supported
-            if (from is null)
-            {
-                throw new ArgumentNullException(nameof(from));
-            }
-
             // Validate the types
             if (from is not ModelDictionary<TValue> other)
             {
@@ -437,41 +431,39 @@ namespace DuetAPI.ObjectModel
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         /// <remarks>Accepts null as the JSON value to clear existing items</remarks>
-        public IModelObject UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public IModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {
-                Clear();
+                return null;
             }
-            else
+
+            foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
             {
-                foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
+                if (NullRemovesItems && jsonProperty.Value.ValueKind == JsonValueKind.Null)
                 {
-                    if (NullRemovesItems && jsonProperty.Value.ValueKind == JsonValueKind.Null)
+                    Remove(jsonProperty.Name);
+                }
+                else if (typeof(TValue) == typeof(JsonElement))
+                {
+                    if (!TryGetValue(jsonProperty.Name, out TValue? value) || !value!.Equals(jsonProperty.Value))
                     {
-                        Remove(jsonProperty.Name);
+                        this[jsonProperty.Name] = (TValue)(object)jsonProperty.Value.Clone();
                     }
-                    else if (typeof(TValue) == typeof(JsonElement))
+                }
+                else
+                {
+                    try
                     {
-                        if (!TryGetValue(jsonProperty.Name, out TValue? value) || !value!.Equals(jsonProperty.Value))
+                        TValue newValue = JsonSerializer.Deserialize<TValue>(jsonProperty.Value.GetRawText(), Utility.JsonHelper.DefaultJsonOptions)!;
+                        if (!TryGetValue(jsonProperty.Name, out TValue? value) || !value!.Equals(newValue))
                         {
-                            this[jsonProperty.Name] = (TValue)(object)jsonProperty.Value.Clone();
+                            this[jsonProperty.Name] = newValue;
                         }
                     }
-                    else
+                    catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
                     {
-                        try
-                        {
-                            TValue newValue = JsonSerializer.Deserialize<TValue>(jsonProperty.Value.GetRawText(), Utility.JsonHelper.DefaultJsonOptions)!;
-                            if (!TryGetValue(jsonProperty.Name, out TValue? value) || !value!.Equals(newValue))
-                            {
-                                this[jsonProperty.Name] = newValue;
-                            }
-                        }
-                        catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
-                        {
-                            // suppressed
-                        }
+                        // suppressed
                     }
                 }
             }

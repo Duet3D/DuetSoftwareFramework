@@ -198,7 +198,7 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Result for wrapping the buffer pointer because ref parameters are not supported for async functions
         /// </summary>
-        private struct ReadLineFromEndData
+        private class ReadLineFromEndData
         {
             /// <summary>
             /// Read line

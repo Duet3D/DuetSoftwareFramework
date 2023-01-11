@@ -19,25 +19,25 @@ namespace UnitTests.File
             // Line 1
             code = (await file.ReadCodeAsync())!;
             Assert.AreEqual(0, code.FilePosition);
-            Assert.AreEqual(15, code.Length);
+            Assert.AreEqual(16, code.Length);
 
             // Line 2
             code = (await file.ReadCodeAsync())!;
-            Assert.AreEqual(15, code.FilePosition);
-            Assert.AreEqual(11, code.Length);
+            Assert.AreEqual(16, code.FilePosition);
+            Assert.AreEqual(12, code.Length);
 
             // Line 3
             code = (await file.ReadCodeAsync())!;
-            Assert.AreEqual(26, code.FilePosition);
-            Assert.AreEqual(26, code.Length);
+            Assert.AreEqual(28, code.FilePosition);
+            Assert.AreEqual(27, code.Length);
 
-            // Go back to line 2
-            file.Position = 15;
+            // Go back to the first char of line 2. May be 15 if NL instead of CRNL is used
+            file.Position = 16;
 
             // Read it again
             code = (await file.ReadCodeAsync())!;
-            Assert.AreEqual(15, code.FilePosition);
-            Assert.AreEqual(11, code.Length);
+            Assert.AreEqual(16, code.FilePosition);
+            Assert.AreEqual(12, code.Length);
         }
     }
 }

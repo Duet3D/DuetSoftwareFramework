@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -99,15 +100,9 @@ namespace DuetAPI.ObjectModel
         /// <param name="from">Other instance</param>
         public void Assign(object from)
         {
-            // Assigning null values is not supported
-            if (from is null)
-            {
-                throw new ArgumentNullException(nameof(from));
-            }
-
             // Validate the types
             Type myType = GetType();
-            if (from.GetType() != myType)
+            if (from?.GetType() != myType)
             {
                 throw new ArgumentException("Types do not match", nameof(from));
             }
@@ -187,14 +182,9 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="other">Other instance</param>
         /// <returns>Object differences or null if both instances are equal</returns>
-        public object? FindDifferences(IModelObject? other)
+        public object? FindDifferences(IModelObject other)
         {
             // Check the types
-            if (other is null)
-            {
-                return this;
-            }
-
             Type myType = GetType(), otherType = other.GetType();
             if (myType != otherType)
             {
@@ -266,6 +256,11 @@ namespace DuetAPI.ObjectModel
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         public virtual IModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
+            if (jsonElement.ValueKind == JsonValueKind.Null)
+            {
+                return null;
+            }
+
             Dictionary<string, PropertyInfo> properties = JsonProperties;
             foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
             {

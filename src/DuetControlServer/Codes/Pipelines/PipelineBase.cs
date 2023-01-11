@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -59,18 +60,15 @@ namespace DuetControlServer.Codes.Pipelines
         public void Diagnostics(StringBuilder builder)
         {
             bool writingDiagnostics = false;
-            int numIdleLevels = 0;
+
+            string prefix = ">";
             lock (_stack)
             {
-                foreach (PipelineStackItem stackItem in _stack)
+                // Print diagnostics for stack from bottom to top
+                foreach (PipelineStackItem stackItem in _stack.Reverse())
                 {
                     lock (stackItem)
                     {
-                        if (!stackItem.Busy)
-                        {
-                            numIdleLevels++;
-                        }
-
                         if (stackItem.Busy || writingDiagnostics)
                         {
                             if (!writingDiagnostics)
@@ -79,38 +77,42 @@ namespace DuetControlServer.Codes.Pipelines
                                 writingDiagnostics = true;
                             }
 
-                            for (int i = 0; i < numIdleLevels; i++)
+                            builder.Append(prefix);
+                            builder.Append(' ');
+                            if (stackItem.Macro is not null)
                             {
-                                builder.AppendLine("> Doing nothing");
+                                builder.Append("Macro ");
+                                builder.Append(Path.GetFileName(stackItem.Macro.FileName));
+                                builder.Append(": ");
                             }
-                            numIdleLevels = 0;
 
                             if (stackItem.CodeBeingExecuted is not null)
                             {
-                                builder.Append($"> Doing {((stackItem.CodeBeingExecuted.Type == DuetAPI.Commands.CodeType.MCode && stackItem.CodeBeingExecuted.MajorNumber == 122) ? "M122" : stackItem.CodeBeingExecuted)}");
+                                builder.Append("Executing ");
+                                builder.Append((stackItem.CodeBeingExecuted.Type == DuetAPI.Commands.CodeType.MCode && stackItem.CodeBeingExecuted.MajorNumber == 122) ? "M122" : stackItem.CodeBeingExecuted);
                             }
-                            if (stackItem.Macro is not null)
+                            else if (stackItem.Busy)
                             {
-                                builder.Append($" from macro {Path.GetFileName(stackItem.Macro.FileName)}");
+                                builder.Append("Busy");
                             }
-                            if (stackItem.PendingCodes.Reader.TryPeek(out _))
+                            else
                             {
-                                if (stackItem.PendingCodes.Reader.CanCount)
-                                {
-                                    builder.Append($", {stackItem.PendingCodes.Reader.Count} more codes pending");
-                                }
-                                else
-                                {
-                                    builder.Append(", more codes pending");
-                                }
+                                builder.Append("Idle");
                             }
-                            builder.AppendLine();
-                        }
-                        else
-                        {
-                            numIdleLevels++;
+
+                            if (stackItem.PendingCodes.Reader.Count > 0)
+                            {
+                                builder.Append(" (");
+                                builder.Append(stackItem.PendingCodes.Reader.Count);
+                                builder.AppendLine(" more codes pending)");
+                            }
+                            else
+                            {
+                                builder.AppendLine();
+                            }
                         }
                     }
+                    prefix += '>';
                 }
             }
         }

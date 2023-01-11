@@ -6,6 +6,20 @@
     public sealed class InputChannel : ModelObject
     {
         /// <summary>
+        /// True if the input is is in active mode i.e. executing commands for its assigned motion system,
+        /// false if it is assigned to a motion system other than the current one
+        /// </summary>
+        /// <remarks>
+        /// This will always be true except for the File and File2 inputs
+        /// </remarks>
+        public bool Active
+        {
+            get => _active;
+            set => SetPropertyValue(ref _active, value);
+        }
+        private bool _active = true;
+
+        /// <summary>
         /// Whether relative positioning is being used
         /// </summary>
         public bool AxesRelative

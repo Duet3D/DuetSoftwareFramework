@@ -23,7 +23,9 @@ namespace UnitTests.Commands
                 Assert.IsNull(code.MinorNumber);
                 Assert.AreEqual(2, code.Parameters.Count);
                 Assert.AreEqual('X', code.Parameters[0].Letter);
+                Assert.IsTrue(code.Parameters[0].IsNull);
                 Assert.AreEqual('Y', code.Parameters[1].Letter);
+                Assert.IsTrue(code.Parameters[1].IsNull);
             }
         }
 
@@ -66,7 +68,7 @@ namespace UnitTests.Commands
         [Test]
         public void ParseG92()
         {
-            foreach (DuetAPI.Commands.Code code in Parse("G92 XYZ"))
+            foreach (DuetAPI.Commands.Code code in Parse("G92 X0 Y0 Z0"))
             {
                 Assert.AreEqual(CodeType.GCode, code.Type);
                 Assert.AreEqual(92, code.MajorNumber);
@@ -787,11 +789,11 @@ namespace UnitTests.Commands
                 Assert.IsNull(code.MinorNumber);
                 Assert.AreEqual(3, code.Parameters.Count);
                 Assert.AreEqual('X', code.Parameters[0].Letter);
-                Assert.AreEqual(0, (int)code.Parameters[0]);
+                Assert.IsTrue(code.Parameters[0].IsNull);
                 Assert.AreEqual('Y', code.Parameters[1].Letter);
-                Assert.AreEqual(0, (int)code.Parameters[1]);
+                Assert.IsTrue(code.Parameters[1].IsNull);
                 Assert.AreEqual('E', code.Parameters[2].Letter);
-                Assert.AreEqual(0, (int)code.Parameters[2]);
+                Assert.IsTrue(code.Parameters[2].IsNull);
                 Assert.AreEqual(" disable motors", code.Comment);
             }
         }

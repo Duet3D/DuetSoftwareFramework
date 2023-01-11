@@ -175,7 +175,7 @@ namespace DuetControlServer.Model
                     // Request the next status update
                     jsonData = await SPI.Interface.RequestObjectModel(string.Empty, "d99fn");
                     using JsonDocument statusDocument = JsonDocument.Parse(jsonData);
-                    if (statusDocument.RootElement.TryGetProperty("key", out JsonElement statusKey) && string.IsNullOrEmpty(statusKey.GetString()) &&
+                    if (statusDocument.RootElement.TryGetProperty("key", out JsonElement statusKey) &&
                         statusDocument.RootElement.TryGetProperty("result", out JsonElement statusResult))
                     {
                         // Update frequently changing properties

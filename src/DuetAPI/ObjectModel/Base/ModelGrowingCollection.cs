@@ -45,17 +45,11 @@ namespace DuetAPI.ObjectModel
         /// This is required to update model properties which do not have a setter
         /// </summary>
         /// <param name="from">Other instance</param>
-        public void Assign(object? from)
+        public void Assign(object from)
         {
-            // Assigning null values is not supported
-            if (from is null)
-            {
-                throw new ArgumentNullException(nameof(from));
-            }
-
             // Validate the types
             Type myType = GetType();
-            if (from.GetType() != myType)
+            if (from?.GetType() != myType)
             {
                 throw new ArgumentException("Types do not match", nameof(from));
             }
@@ -107,7 +101,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="other">Other instance</param>
         /// <returns>Object differences or null if both instances are equal</returns>
-        public object? FindDifferences(IModelObject? other)
+        public object? FindDifferences(IModelObject other)
         {
             // Check the types
             Type? myType = GetType(), otherType = other?.GetType();
@@ -194,21 +188,19 @@ namespace DuetAPI.ObjectModel
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {
-                ClearItems();
+                return null;
             }
-            else
+
+            foreach (JsonElement jsonItem in jsonElement.EnumerateArray())
             {
-                foreach (JsonElement jsonItem in jsonElement.EnumerateArray())
+                try
                 {
-                    try
-                    {
-                        T itemValue = JsonSerializer.Deserialize<T>(jsonItem.GetRawText(), Utility.JsonHelper.DefaultJsonOptions)!;
-                        Add(itemValue);
-                    }
-                    catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), jsonItem.Clone(), e))
-                    {
-                        // suppressed
-                    }
+                    T itemValue = JsonSerializer.Deserialize<T>(jsonItem.GetRawText(), Utility.JsonHelper.DefaultJsonOptions)!;
+                    Add(itemValue);
+                }
+                catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), jsonItem.Clone(), e))
+                {
+                    // suppressed
                 }
             }
             return this;

@@ -146,8 +146,9 @@ namespace DuetAPI.Commands
             Parameters.Clear();
         }
 
+#warning Refactor those two calls and replace implicit cast operators with explicit ones
         /// <summary>
-        /// Retrieve the parameter whose letter equals c. Note that this look-up is case-insensitive
+        /// Retrieve the parameter whose letter equals c
         /// </summary>
         /// <param name="c">Letter of the parameter to find</param>
         /// <returns>The parsed parameter instance or null if none could be found</returns>
@@ -238,15 +239,18 @@ namespace DuetAPI.Commands
                     builder.Append(parameter.Letter);
                 }
 
-                if (parameter.Type == typeof(string) && !parameter.IsExpression)
+                if (parameter.StringValue is not null)
                 {
-                    builder.Append('"');
-                    builder.Append(((string?)parameter)!.Replace("\"", "\"\""));
-                    builder.Append('"');
-                }
-                else
-                {
-                    builder.Append((string?)parameter);
+                    if (parameter.Type == typeof(string) && !parameter.IsExpression)
+                    {
+                        builder.Append('"');
+                        builder.Append(parameter.StringValue.Replace("\"", "\"\""));
+                        builder.Append('"');
+                    }
+                    else
+                    {
+                        builder.Append(parameter.StringValue);
+                    }
                 }
             }
 

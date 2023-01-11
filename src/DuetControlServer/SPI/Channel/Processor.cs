@@ -312,41 +312,33 @@ namespace DuetControlServer.SPI.Channel
             }
             if (BytesBuffered != 0)
             {
-                channelDiagostics.AppendLine($"==> {BytesBuffered} bytes");
+                channelDiagostics.AppendLine($"Buffered codes: {BytesBuffered} bytes total");
             }
 
-            bool topStackItem = true;
-            foreach (State state in Stack)
+            string prefix = ">";
+            foreach (State state in Stack.Reverse())
             {
-                if (topStackItem)
-                {
-                    topStackItem = false;
-                }
-                else
-                {
-                    channelDiagostics.AppendLine("> Next stack level");
-                }
-
                 if (state.WaitingForAcknowledgement)
                 {
-                    channelDiagostics.AppendLine($"Waiting for acknowledgement, requested by {((state.StartCode is null) ? "system" : state.StartCode.ToString())}");
+                    channelDiagostics.AppendLine($"{prefix} Waiting for acknowledgement, requested by {((state.StartCode is null) ? "system" : state.StartCode.ToString())}");
                 }
                 if (state.LockRequests.Count > 0)
                 {
-                    channelDiagostics.AppendLine($"Number of lock/unlock requests: {state.LockRequests.Count(item => item.IsLockRequest)}/{state.LockRequests.Count(item => !item.IsLockRequest)}");
+                    channelDiagostics.AppendLine($"{prefix} Number of lock/unlock requests: {state.LockRequests.Count(item => item.IsLockRequest)}/{state.LockRequests.Count(item => !item.IsLockRequest)}");
                 }
                 if (state.Macro is not null)
                 {
-                    channelDiagostics.AppendLine($"{(state.Macro.IsExecuting ? "Executing" : "Finishing")} macro {state.Macro.FileName}, started by {((state.StartCode is null) ? "system" : state.StartCode.ToString())}");
+                    channelDiagostics.AppendLine($"{prefix} {(state.Macro.IsExecuting ? "Doing" : "Finishing")} macro {state.Macro.FileName}, started by {((state.StartCode is null) ? "system" : state.StartCode.ToString())}");
                 }
                 foreach (Code suspendedCode in state.SuspendedCodes)
                 {
-                    channelDiagostics.AppendLine($"Suspended code: {suspendedCode}");
+                    channelDiagostics.AppendLine($"{prefix} Suspended code: {suspendedCode}");
                 }
                 if (state.FlushRequests.Count > 0)
                 {
-                    channelDiagostics.AppendLine($"Number of flush requests: {state.FlushRequests.Count}");
+                    channelDiagostics.AppendLine($"{prefix} Number of flush requests: {state.FlushRequests.Count}");
                 }
+                prefix += '>';
             }
 
             if (channelDiagostics.Length != 0)

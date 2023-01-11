@@ -468,9 +468,7 @@ namespace DuetControlServer.FileExecution
             // Dispose the used resources
             _cts.Dispose();
             _file?.Dispose();
-            _file = null;
             _finishTcs?.SetCanceled();
-            _finishTcs = null;
             _disposed = true;
         }
     }
