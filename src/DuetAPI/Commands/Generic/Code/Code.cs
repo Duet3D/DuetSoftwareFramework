@@ -153,8 +153,8 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <param name="letter">Letter of the parameter to find</param>
         /// <returns>The parsed parameter instance or null if none could be found</returns>
-        [Obsolete]
-        public CodeParameter? Parameter(char letter) => Parameters.FirstOrDefault(p => p.Letter == letter);
+        [Obsolete("Use GetParameter or one of the typed getter methods instead")]
+        public CodeParameter? Parameter(char letter) => GetParameter(letter);
 
         /// <summary>
         /// Retrieve the parameter whose letter equals c or generate a default parameter
@@ -162,8 +162,8 @@ namespace DuetAPI.Commands
         /// <param name="letter">Letter of the parameter to find</param>
         /// <param name="defaultValue">Default parameter value (no expression)</param>
         /// <returns>The parsed parameter instance or null if none could be found</returns>
-        [Obsolete]
-        public CodeParameter Parameter(char letter, object defaultValue) => Parameter(letter) ?? new CodeParameter(letter, defaultValue);
+        [Obsolete("Use GetParameter or one of the typed getter methods instead")]
+        public CodeParameter Parameter(char letter, object defaultValue) => GetParameter(letter, defaultValue);
 
         /// <summary>
         /// Check if a given parameter exists
@@ -171,6 +171,21 @@ namespace DuetAPI.Commands
         /// <param name="letter">Letter of the parameter to find</param>
         /// <returns>If the parameter is present</returns>
         public bool HasParameter(char letter) => Parameters.Any(p => p.Letter == letter);
+
+        /// <summary>
+        /// Retrieve the parameter whose letter equals c
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <returns>The parsed parameter instance or null if none could be found</returns>
+        public CodeParameter? GetParameter(char letter) => Parameters.FirstOrDefault(p => p.Letter == letter);
+
+        /// <summary>
+        /// Retrieve the parameter whose letter equals c or generate a default parameter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="defaultValue">Default parameter value (no expression)</param>
+        /// <returns>The parsed parameter instance or null if none could be found</returns>
+        public CodeParameter GetParameter(char letter, object defaultValue) => GetParameter(letter) ?? new CodeParameter(letter, defaultValue);
 
         /// <summary>
         /// Try to get a parameter by letter
@@ -192,7 +207,6 @@ namespace DuetAPI.Commands
             return false;
         }
 
-#pragma warning disable CS0612 // Type or member is obsolete
         /// <summary>
         /// Get a float parameter value
         /// </summary>
@@ -202,7 +216,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public float GetFloat(char letter)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (float)param : throw new MissingParameterException(letter);
         }
 
@@ -215,7 +229,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public float GetFloat(char letter, float defaultValue)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (float)param : defaultValue;
         }
 
@@ -270,7 +284,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public int GetInt(char letter)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (int)param : throw new MissingParameterException(letter);
         }
 
@@ -283,7 +297,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public int GetInt(char letter, int defaultValue)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (int)param : defaultValue;
         }
 
@@ -338,7 +352,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public uint GetUInt(char letter)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (uint)param : throw new MissingParameterException(letter);
         }
 
@@ -351,7 +365,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public uint GetUInt(char letter, uint defaultValue)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (uint)param : defaultValue;
         }
 
@@ -406,7 +420,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public long GetLong(char letter)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (long)param : throw new MissingParameterException(letter);
         }
 
@@ -419,7 +433,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public long GetLong(char letter, long defaultValue)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (long)param : defaultValue;
         }
 
@@ -474,7 +488,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public bool GetBool(char letter)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (bool)param : throw new MissingParameterException(letter);
         }
 
@@ -487,7 +501,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public bool GetBool(char letter, bool defaultValue)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (bool)param : defaultValue;
         }
 
@@ -542,7 +556,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public string GetString(char letter)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (string)param : throw new MissingParameterException(letter);
         }
 
@@ -553,7 +567,7 @@ namespace DuetAPI.Commands
         /// <returns>Parameter value or null</returns>
         public string? GetOptionalString(char letter)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (string)param : null;
         }
 
@@ -566,7 +580,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public string GetString(char letter, string defaultValue)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (string)param : defaultValue;
         }
 
@@ -600,7 +614,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public DriverId GetDriverId(char letter)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (DriverId)param : throw new MissingParameterException(letter);
         }
 
@@ -613,7 +627,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public DriverId GetDriverId(char letter, DriverId defaultValue)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (DriverId)param : defaultValue;
         }
 
@@ -647,7 +661,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public IPAddress GetIPAddress(char letter)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (IPAddress)param : throw new MissingParameterException(letter);
         }
 
@@ -660,7 +674,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public IPAddress GetIPAddress(char letter, IPAddress defaultValue)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (IPAddress)param : defaultValue;
         }
 
@@ -694,7 +708,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public float[] GetFloatArray(char letter)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (float[])param : throw new MissingParameterException(letter);
         }
 
@@ -707,7 +721,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public float[] GetFloatArray(char letter, float[] defaultValue)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (float[])param : defaultValue;
         }
 
@@ -741,7 +755,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public int[] GetIntArray(char letter)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (int[])param : throw new MissingParameterException(letter);
         }
 
@@ -754,7 +768,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public int[] GetIntArray(char letter, int[] defaultValue)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (int[])param : defaultValue;
         }
 
@@ -788,7 +802,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public uint[] GetUIntArray(char letter)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (uint[])param : throw new MissingParameterException(letter);
         }
 
@@ -801,7 +815,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public uint[] GetUIntArray(char letter, uint[] defaultValue)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (uint[])param : defaultValue;
         }
 
@@ -835,7 +849,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public long[] GetLongArray(char letter)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (long[])param : throw new MissingParameterException(letter);
         }
 
@@ -848,7 +862,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public long[] GetLongArray(char letter, long[] defaultValue)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (long[])param : defaultValue;
         }
 
@@ -882,7 +896,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public DriverId[] GetDriverIdArray(char letter)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (DriverId[])param : throw new MissingParameterException(letter);
         }
 
@@ -895,7 +909,7 @@ namespace DuetAPI.Commands
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
         public DriverId[] GetDriverIdArray(char letter, DriverId[] defaultValue)
         {
-            CodeParameter? param = Parameter(letter);
+            CodeParameter? param = GetParameter(letter);
             return (param != null) ? (DriverId[])param : defaultValue;
         }
 
@@ -919,7 +933,6 @@ namespace DuetAPI.Commands
             parameter = null;
             return false;
         }
-#pragma warning restore CS0612 // Type or member is obsolete
 
         /// <summary>
         /// Reconstruct an unprecedented string from the parameter list or
