@@ -109,7 +109,7 @@ namespace DuetControlServer.IPC.Processors
             SubscribeInitMessage subscribeInitMessage = (SubscribeInitMessage)initMessage;
             _mode = subscribeInitMessage.SubscriptionMode;
             _channel = subscribeInitMessage.Channel;
-            if (subscribeInitMessage.Filters is not null)
+            if (subscribeInitMessage.Filters is not null && subscribeInitMessage.Filters.Count > 0)
             {
                 _filters = Filter.ConvertFilters(subscribeInitMessage.Filters);
             }
