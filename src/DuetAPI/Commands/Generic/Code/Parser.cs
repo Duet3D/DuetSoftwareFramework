@@ -80,7 +80,7 @@ namespace DuetAPI.Commands
                     }
                     else
                     {
-                        // End of encapsulated comment, if the comment was empty, assign an empty string
+                        // End of encapsulated comment, it cannot be null any more
                         result.Comment ??= string.Empty;
                         inEncapsulatedComment = false;
                     }
@@ -501,7 +501,7 @@ namespace DuetAPI.Commands
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
-                            else if (result.Parameter(letter) is null)
+                            else if (!result.HasParameter(letter))
                             {
                                 AddParameter(result, letter, value, false, false);
                             }
@@ -519,7 +519,7 @@ namespace DuetAPI.Commands
                                 letter = '@';
                             }
 
-                            if (result.Parameter(letter) is null)
+                            if (!result.HasParameter(letter))
                             {
                                 if (wasExpression && (!value.StartsWith("{") || !value.EndsWith("}")))
                                 {

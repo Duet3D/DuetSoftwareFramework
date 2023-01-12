@@ -23,25 +23,25 @@ namespace DuetControlServer.Files.ImageProcessing
         /// <summary>
         /// Try to extract thumbnails from a given file
         /// </summary>
-        /// <param name="reader">Stream reader to read from</param>
+        /// <param name="stream">Stream to read from</param>
         /// <param name="codeParserBuffer">Read buffer</param>
         /// <param name="parsedFileInfo">File information</param>
         /// <param name="code">Code instance to reuse</param>
         /// <param name="readThumbnailContent">Whether thumbnail content shall be returned</param>
         /// <returns>Asynchronous task</returns>
-        public static async ValueTask ProcessAsync(StreamReader reader, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, Code code, bool readThumbnailContent)
+        public static async ValueTask ProcessAsync(Stream stream, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, Code code, bool readThumbnailContent)
         {
             _logger.Info($"Processing Image {parsedFileInfo.FileName}");
             bool offsetAdjusted = false;
-            long offset = codeParserBuffer.GetPosition(reader);
+            long offset = codeParserBuffer.GetPosition(stream);
             code.Reset();
 
             // Keep reading the data from the file
             StringBuilder imageBuffer = new();
-            while (codeParserBuffer.GetPosition(reader) < reader.BaseStream.Length)
+            while (codeParserBuffer.GetPosition(stream) < stream.Length)
             {
                 Program.CancellationToken.ThrowIfCancellationRequested();
-                if (!await Code.ParseAsync(reader, code, codeParserBuffer))
+                if (!await Code.ParseAsync(stream, code, codeParserBuffer))
                 {
                     continue;
                 }

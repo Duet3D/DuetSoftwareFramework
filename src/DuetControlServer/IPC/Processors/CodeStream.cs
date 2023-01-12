@@ -145,7 +145,6 @@ namespace DuetControlServer.IPC.Processors
 
                         // Attempt to parse it. Throw it away if a parse error occurs
                         await using MemoryStream lineStream = new(Encoding.UTF8.GetBytes(line));
-                        using StreamReader lineReader = new(lineStream);
 
                         do
                         {
@@ -164,7 +163,7 @@ namespace DuetControlServer.IPC.Processors
                             // Read the next code from the stream, execute it, and put the code instance back into the buffer
                             try
                             {
-                                if (await DuetAPI.Commands.Code.ParseAsync(lineReader, code, parserBuffer))
+                                if (await DuetAPI.Commands.Code.ParseAsync(lineStream, code, parserBuffer))
                                 {
                                     code.Channel = _channel;
                                     code.Connection = Connection;

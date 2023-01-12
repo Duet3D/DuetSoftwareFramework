@@ -1,4 +1,4 @@
-﻿using DuetAPI.Commands;
+﻿using DuetAPI;
 using NUnit.Framework;
 using System.Threading.Tasks;
 

@@ -202,7 +202,7 @@ namespace DuetAPI.Commands
             {
                 StringValue = string.Join(":", longArray.Select(longVal => longVal.ToString("G", CultureInfo.InvariantCulture)));
             }
-            else  if (value is not null)
+            else if (value is not null)
             {
                 StringValue = value.ToString();
             }
@@ -220,17 +220,45 @@ namespace DuetAPI.Commands
         [JsonIgnore]
         public bool IsNull { get => Type is null; }
 
+        #region Explicit cast operators
         /// <summary>
-        /// Implicit conversion operator to float
+        /// Explicit conversion operator to float
         /// </summary>
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
-        /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator float([NotNull] CodeParameter? codeParameter)
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public static explicit operator float([NotNull] CodeParameter? codeParameter)
+        {
+            if (codeParameter is not null)
+            {
+                if (codeParameter.ParsedValue is float floatValue)
+                {
+                    return floatValue;
+                }
+                if (codeParameter.ParsedValue is int intValue)
+                {
+                    return Convert.ToSingle(intValue);
+                }
+                if (codeParameter.ParsedValue is uint uintValue)
+                {
+                    return Convert.ToSingle(uintValue);
+                }
+                // long won't fit
+            }
+            throw new InvalidParameterTypeException(codeParameter, typeof(float));
+        }
+
+        /// <summary>
+        /// Explicit conversion operator to float?
+        /// </summary>
+        /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public static explicit operator float?(CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
-                throw new ArgumentNullException(nameof(codeParameter));
+                return null;
             }
             if (codeParameter.ParsedValue is float floatValue)
             {
@@ -245,20 +273,43 @@ namespace DuetAPI.Commands
                 return Convert.ToSingle(uintValue);
             }
             // long won't fit
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to float (value {codeParameter.StringValue})");
+            throw new InvalidParameterTypeException(codeParameter, typeof(float?));
         }
 
         /// <summary>
-        /// Implicit conversion operator to int
+        /// Explicit conversion operator to int
         /// </summary>
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
-        /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator int([NotNull] CodeParameter? codeParameter)
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public static explicit operator int([NotNull] CodeParameter? codeParameter)
+        {
+            if (codeParameter is not null)
+            {
+                if (codeParameter.ParsedValue is int intValue)
+                {
+                    return intValue;
+                }
+                if (codeParameter.ParsedValue is float floatValue)
+                {
+                    return Convert.ToInt32(floatValue);
+                }
+                // long and uint won't fit
+            }
+            throw new InvalidParameterTypeException(codeParameter, typeof(int));
+        }
+
+        /// <summary>
+        /// Explicit conversion operator to int?
+        /// </summary>
+        /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public static explicit operator int?(CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
-                throw new ArgumentNullException(nameof(codeParameter));
+                return null;
             }
             if (codeParameter.ParsedValue is int intValue)
             {
@@ -269,20 +320,51 @@ namespace DuetAPI.Commands
                 return Convert.ToInt32(floatValue);
             }
             // long and uint won't fit
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to integer (value {codeParameter.StringValue})");
+            throw new InvalidParameterTypeException(codeParameter, typeof(int?));
         }
 
         /// <summary>
-        /// Implicit conversion operator to uint
+        /// Explicit conversion operator to uint
         /// </summary>
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
-        /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator uint([NotNull] CodeParameter? codeParameter)
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public static explicit operator uint([NotNull] CodeParameter? codeParameter)
+        {
+            if (codeParameter is not null)
+            {
+                if (codeParameter.ParsedValue is uint uintValue)
+                {
+                    return uintValue;
+                }
+                if (codeParameter.ParsedValue is DriverId driverIdValue)
+                {
+                    return driverIdValue;
+                }
+                if (codeParameter.ParsedValue is int intValue)
+                {
+                    return Convert.ToUInt32(intValue);
+                }
+                if (codeParameter.ParsedValue is float floatValue)
+                {
+                    return Convert.ToUInt32(floatValue);
+                }
+                // long won't fit
+            }
+            throw new InvalidParameterTypeException(codeParameter, typeof(uint));
+        }
+
+        /// <summary>
+        /// Explicit conversion operator to uint?
+        /// </summary>
+        /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public static explicit operator uint?(CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
-                throw new ArgumentNullException(nameof(codeParameter));
+                return null;
             }
             if (codeParameter.ParsedValue is uint uintValue)
             {
@@ -301,43 +383,50 @@ namespace DuetAPI.Commands
                 return Convert.ToUInt32(floatValue);
             }
             // long won't fit
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to unsigned integer (value {codeParameter.StringValue})");
+            throw new InvalidParameterTypeException(codeParameter, typeof(uint?));
         }
 
         /// <summary>
-        /// Implicit conversion operator to a driver ID
+        /// Explicit conversion operator to long
         /// </summary>
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
-        /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator DriverId([NotNull] CodeParameter? codeParameter)
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public static explicit operator long([NotNull] CodeParameter? codeParameter)
         {
-            if (codeParameter is null)
+            if (codeParameter is not null)
             {
-                throw new ArgumentNullException(nameof(codeParameter));
+                if (codeParameter.ParsedValue is long longValue)
+                {
+                    return longValue;
+                }
+                if (codeParameter.ParsedValue is int intValue)
+                {
+                    return Convert.ToInt64(intValue);
+                }
+                if (codeParameter.ParsedValue is uint uintValue)
+                {
+                    return Convert.ToInt64(uintValue);
+                }
+                if (codeParameter.ParsedValue is float floatValue)
+                {
+                    return Convert.ToInt64(floatValue);
+                }
             }
-            if (codeParameter.ParsedValue is DriverId driverId)
-            {
-                return driverId;
-            }
-            if (codeParameter.ParsedValue is uint uintValue)
-            {
-                return new DriverId(uintValue);
-            }
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to driver ID (value {codeParameter.StringValue})");
+            throw new InvalidParameterTypeException(codeParameter, typeof(long));
         }
 
         /// <summary>
-        /// Implicit conversion operator to long
+        /// Explicit conversion operator to long?
         /// </summary>
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
-        /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator long([NotNull] CodeParameter? codeParameter)
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public static explicit operator long?(CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
-                throw new ArgumentNullException(nameof(codeParameter));
+                return null;
             }
             if (codeParameter.ParsedValue is long longValue)
             {
@@ -355,64 +444,101 @@ namespace DuetAPI.Commands
             {
                 return Convert.ToInt64(floatValue);
             }
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to long (value {codeParameter.StringValue})");
+            throw new InvalidParameterTypeException(codeParameter, typeof(long?));
         }
 
         /// <summary>
-        /// Implicit conversion operator to bool
+        /// Explicit conversion operator to bool
         /// </summary>
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
-        /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator bool([NotNull] CodeParameter? codeParameter) => codeParameter > 0;
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public static explicit operator bool([NotNull] CodeParameter? codeParameter) => (int)codeParameter > 0;
 
         /// <summary>
-        /// Implicit conversion operator to string
+        /// Explicit conversion operator to bool?
         /// </summary>
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
-        public static implicit operator string([NotNull] CodeParameter? codeParameter)
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public static explicit operator bool?(CodeParameter? codeParameter) => (codeParameter != null) ? ((int)codeParameter > 0) : null;
+
+        /// <summary>
+        /// Explicit conversion operator to string
+        /// </summary>
+        /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        [return: NotNullIfNotNull(nameof(codeParameter))]
+        public static explicit operator string?(CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
-                throw new ArgumentNullException(nameof(codeParameter));
+                return null;
             }
             if (codeParameter.ParsedValue is string stringValue)
             {
                 return stringValue;
             }
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to string (value {codeParameter.StringValue})");
+            throw new InvalidParameterTypeException(codeParameter, typeof(string));
         }
 
         /// <summary>
-        /// Implicit conversion operator to an IP address
+        /// Explicit conversion operator to a driver ID
         /// </summary>
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
-        public static implicit operator IPAddress([NotNull] CodeParameter? codeParameter)
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        [return: NotNullIfNotNull(nameof(codeParameter))]
+        public static explicit operator DriverId?(CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
-                throw new ArgumentNullException(nameof(codeParameter));
+                return null;
+            }
+            if (codeParameter.ParsedValue is DriverId driverId)
+            {
+                return driverId;
+            }
+            if (codeParameter.ParsedValue is uint uintValue)
+            {
+                return new DriverId(uintValue);
+            }
+            throw new InvalidParameterTypeException(codeParameter, typeof(DriverId));
+        }
+
+        /// <summary>
+        /// Explicit conversion operator to an IP address
+        /// </summary>
+        /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        [return: NotNullIfNotNull(nameof(codeParameter))]
+        public static explicit operator IPAddress?(CodeParameter? codeParameter)
+        {
+            if (codeParameter is null)
+            {
+                return null;
             }
             if (codeParameter.ParsedValue is string stringValue)
             {
                 return IPAddress.Parse(stringValue);
             }
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to IPAddress (value {codeParameter.StringValue})");
+            throw new InvalidParameterTypeException(codeParameter, typeof(IPAddress));
         }
 
         /// <summary>
-        /// Implicit conversion operator to float array
+        /// Explicit conversion operator to float array
         /// </summary>
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
-        /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator float[](CodeParameter? codeParameter)
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        [return: NotNullIfNotNull(nameof(codeParameter))]
+        public static explicit operator float[]?(CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
-                throw new ArgumentNullException(nameof(codeParameter));
+                return null;
             }
             if (codeParameter.ParsedValue is float[] floatArray)
             {
@@ -439,20 +565,21 @@ namespace DuetAPI.Commands
                 return uintArray.Select(Convert.ToSingle).ToArray();
             }
             // long won't fit
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to float array (value {codeParameter.StringValue})");
+            throw new InvalidParameterTypeException(codeParameter, typeof(float[]));
         }
 
         /// <summary>
-        /// Implicit conversion operator to integer array
+        /// Explicit conversion operator to integer array
         /// </summary>
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
-        /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator int[](CodeParameter? codeParameter)
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        [return: NotNullIfNotNull(nameof(codeParameter))]
+        public static explicit operator int[]?(CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
-                throw new ArgumentNullException(nameof(codeParameter));
+                return null;
             }
             if (codeParameter.ParsedValue is int[] intArray)
             {
@@ -471,20 +598,21 @@ namespace DuetAPI.Commands
                 return floatArray.Select(Convert.ToInt32).ToArray();
             }
             // uint and long won't fit
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to integer array (value {codeParameter.StringValue})");
+            throw new InvalidParameterTypeException(codeParameter, typeof(int[]));
         }
 
         /// <summary>
-        /// Implicit conversion operator to unsigned integer array
+        /// Explicit conversion operator to unsigned integer array
         /// </summary>
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
-        /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator uint[](CodeParameter? codeParameter)
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        [return: NotNullIfNotNull(nameof(codeParameter))]
+        public static explicit operator uint[]?(CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
-                throw new ArgumentNullException(nameof(codeParameter));
+                return null;
             }
             if (codeParameter.ParsedValue is uint[] uintArray)
             {
@@ -519,51 +647,21 @@ namespace DuetAPI.Commands
                 return floatArray.Select(Convert.ToUInt32).ToArray();
             }
             // long won't fit
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to unsigned integer array (value {codeParameter.StringValue})");
+            throw new InvalidParameterTypeException(codeParameter, typeof(uint[]));
         }
 
         /// <summary>
-        /// Implicit conversion operator to a driver ID array
+        /// Explicit conversion operator to long array
         /// </summary>
         /// <param name="codeParameter">Target object</param>
         /// <returns>Converted value</returns>
-        /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator DriverId[](CodeParameter? codeParameter)
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        [return: NotNullIfNotNull(nameof(codeParameter))]
+        public static explicit operator long[]?(CodeParameter? codeParameter)
         {
             if (codeParameter is null)
             {
-                throw new ArgumentNullException(nameof(codeParameter));
-            }
-            if (codeParameter.ParsedValue is DriverId[] driverIdArray)
-            {
-                return driverIdArray;
-            }
-            if (codeParameter.ParsedValue is DriverId driverId)
-            {
-                return new DriverId[] { driverId };
-            }
-            if (codeParameter.ParsedValue is uint[] uintArray)
-            {
-                return uintArray.Select(value => new DriverId(value)).ToArray();
-            }
-            if (codeParameter.ParsedValue is uint uintValue)
-            {
-                return new DriverId[] { new DriverId(uintValue) };
-            }
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to driver ID array (value {codeParameter.StringValue})");
-        }
-
-        /// <summary>
-        /// Implicit conversion operator to long array
-        /// </summary>
-        /// <param name="codeParameter">Target object</param>
-        /// <returns>Converted value</returns>
-        /// <exception cref="ArgumentException">Data type is not convertible</exception>
-        public static implicit operator long[](CodeParameter codeParameter)
-        {
-            if (codeParameter is null)
-            {
-                throw new ArgumentNullException(nameof(codeParameter));
+                return null;
             }
             if (codeParameter.ParsedValue is long[] longArray)
             {
@@ -597,8 +695,41 @@ namespace DuetAPI.Commands
             {
                 return floatArray.Select(Convert.ToInt64).ToArray();
             }
-            throw new ArgumentException($"Cannot convert {codeParameter.Letter} parameter to long array (value {codeParameter.StringValue})");
+            throw new InvalidParameterTypeException(codeParameter, typeof(long[]));
         }
+
+        /// <summary>
+        /// Explicit conversion operator to a driver ID array
+        /// </summary>
+        /// <param name="codeParameter">Target object</param>
+        /// <returns>Converted value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        [return: NotNullIfNotNull(nameof(codeParameter))]
+        public static explicit operator DriverId[]?(CodeParameter? codeParameter)
+        {
+            if (codeParameter is null)
+            {
+                return null;
+            }
+            if (codeParameter.ParsedValue is DriverId[] driverIdArray)
+            {
+                return driverIdArray;
+            }
+            if (codeParameter.ParsedValue is DriverId driverId)
+            {
+                return new DriverId[] { driverId };
+            }
+            if (codeParameter.ParsedValue is uint[] uintArray)
+            {
+                return uintArray.Select(value => new DriverId(value)).ToArray();
+            }
+            if (codeParameter.ParsedValue is uint uintValue)
+            {
+                return new DriverId[] { new DriverId(uintValue) };
+            }
+            throw new InvalidParameterTypeException(codeParameter, typeof(DriverId[]));
+        }
+        #endregion
 
         /// <summary>
         /// Equality operator

@@ -211,24 +211,32 @@ namespace DuetControlServer.Commands
             }
 
             // Attempt to process the code internally
-            switch (Type)
+            try
             {
-                case CodeType.GCode:
-                    Result = await Codes.Handlers.GCodes.Process(this);
-                    break;
-                case CodeType.MCode:
-                    Result = await Codes.Handlers.MCodes.Process(this);
-                    break;
-                case CodeType.TCode:
-                    Result = await Codes.Handlers.TCodes.Process(this);
-                    break;
-                case CodeType.Keyword:
-                    Result = await Codes.Handlers.Keywords.Process(this);
-                    break;
-            }
+                switch (Type)
+                {
+                    case CodeType.GCode:
+                        Result = await Codes.Handlers.GCodes.Process(this);
+                        break;
+                    case CodeType.MCode:
+                        Result = await Codes.Handlers.MCodes.Process(this);
+                        break;
+                    case CodeType.TCode:
+                        Result = await Codes.Handlers.TCodes.Process(this);
+                        break;
+                    case CodeType.Keyword:
+                        Result = await Codes.Handlers.Keywords.Process(this);
+                        break;
+                }
 
-            if (Result is not null)
+                if (Result is not null)
+                {
+                    return true;
+                }
+            }
+            catch (Exception e) when (e is MissingParameterException or InvalidParameterTypeException)
             {
+                Result = new(MessageType.Error, $"{ToShortString()}: {e.Message}");
                 return true;
             }
 

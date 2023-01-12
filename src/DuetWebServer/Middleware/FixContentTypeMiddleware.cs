@@ -36,6 +36,11 @@ namespace DuetWebServer.Middleware
         private static PathString MachineFileRequest = new("/machine/file");
 
         /// <summary>
+        /// /machine/file/move request
+        /// </summary>
+        private static PathString MachineFileMoveRequest = new("/machine/file/move");
+
+        /// <summary>
         /// Called when a new HTTP request is received
         /// </summary>
         /// <param name="context">HTTP context</param>
@@ -51,7 +56,7 @@ namespace DuetWebServer.Middleware
             {
                 context.Request.ContentType = "text/plain";
             }
-            else if (context.Request.Method == "POST" && context.Request.Path.StartsWithSegments(MachineFileRequest))
+            else if (context.Request.Method == "POST" && context.Request.Path.StartsWithSegments(MachineFileRequest) && !context.Request.Path.StartsWithSegments(MachineFileMoveRequest))
             {
                 context.Request.ContentType = "application/octet-stream";
             }

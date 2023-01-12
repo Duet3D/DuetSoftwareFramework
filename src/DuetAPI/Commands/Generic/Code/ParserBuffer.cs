@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 
 namespace DuetAPI.Commands
 {
@@ -14,7 +15,7 @@ namespace DuetAPI.Commands
         /// <param name="lineNumbersValid">Indicates if line numbers are valid</param>
         public CodeParserBuffer(int bufferSize, bool lineNumbersValid)
         {
-            Buffer = new char[bufferSize];
+            Buffer = new byte[bufferSize];
             LineNumber = lineNumbersValid ? (long?)1 : null;
         }
 
@@ -36,7 +37,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Internal buffer
         /// </summary>
-        internal readonly char[] Buffer;
+        internal readonly byte[] Buffer;
 
         /// <summary>
         /// Pointer in the buffer
@@ -87,8 +88,16 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Get the actual byte position when reading from a stream
         /// </summary>
-        /// <param name="reader">Reader to read from</param>
+        /// <param name="reader">Stream reader to read from</param>
         /// <returns>Actual position in bytes</returns>
+        [Obsolete("This call is deprecated because the buffer position of a StreamReader is not accessible. Pass your stream directly instead")]
         public long GetPosition(StreamReader reader) => reader.BaseStream.Position - BufferSize + BufferPointer;
+
+        /// <summary>
+        /// Get the actual byte position when reading from a stream
+        /// </summary>
+        /// <param name="stream">Stream to read from</param>
+        /// <returns>Actual position in bytes</returns>
+        public long GetPosition(Stream stream) => stream.Position - BufferSize + BufferPointer;
     }
 }

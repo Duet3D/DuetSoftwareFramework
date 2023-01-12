@@ -1,4 +1,5 @@
-﻿using DuetAPI.Commands;
+﻿using DuetAPI;
+using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.IPC;
 using Nito.AsyncEx;
@@ -43,10 +44,9 @@ namespace DuetControlServer.Commands
         public async IAsyncEnumerable<Code> ParseAsync()
         {
             await using MemoryStream stream = new(Encoding.UTF8.GetBytes(Code));
-            using StreamReader reader = new(stream);
             CodeParserBuffer buffer = new((int)stream.Length, Code.Contains('\n'));
 
-            while (buffer.GetPosition(reader) < stream.Length)
+            while (buffer.GetPosition(stream) < stream.Length)
             {
                 Code code = new()
                 {
@@ -55,7 +55,7 @@ namespace DuetControlServer.Commands
                     SourceConnection = Connection?.Id ?? 0
                 };
 
-                if (await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer))
+                if (await DuetAPI.Commands.Code.ParseAsync(stream, code, buffer))
                 {
                     yield return code;
                 }
@@ -92,7 +92,7 @@ namespace DuetControlServer.Commands
 
                     // M108, M112, M122, and M999 (B0) always go to an idle channel so we (hopefully) get a low-latency response
                     if (code.Type == CodeType.MCode &&
-                        (code.MajorNumber == 108 || code.MajorNumber == 112 || code.MajorNumber == 122 || (code.MajorNumber == 999 && code.Parameter('B', 0) == 0)))
+                        (code.MajorNumber == 108 || code.MajorNumber == 112 || code.MajorNumber == 122 || (code.MajorNumber == 999 && code.GetInt('B', 0) == 0)))
                     {
                         code.Flags |= CodeFlags.IsPrioritized;
                         priorityCodes.Add(code);

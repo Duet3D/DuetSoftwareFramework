@@ -265,9 +265,6 @@ namespace DuetControlServer.FileExecution
             // Update the object model
             using (await Provider.AccessReadWriteAsync())
             {
-#warning check the following two lines
-                Provider.Get.Inputs.File!.Volumetric = false;
-                Provider.Get.Inputs.File2!.Volumetric = false;
                 Provider.Get.Job.File.Assign(info);
             }
 

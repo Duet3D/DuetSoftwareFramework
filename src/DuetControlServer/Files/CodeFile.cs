@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
@@ -44,11 +43,6 @@ namespace DuetControlServer.Files
         private readonly FileStream _fileStream;
 
         /// <summary>
-        /// Reader for the file stream
-        /// </summary>
-        private readonly StreamReader _reader;
-
-        /// <summary>
         /// Internal buffer used for reading from files
         /// </summary>
         private readonly CodeParserBuffer _parserBuffer = new(Settings.FileBufferSize, true);
@@ -84,7 +78,6 @@ namespace DuetControlServer.Files
                 if (!IsClosed)
                 {
                     _fileStream.Seek(value, SeekOrigin.Begin);
-                    _reader.DiscardBufferedData();
                     _position = value;
                     _parserBuffer.Invalidate();
                     _parserBuffer.LineNumber = LineNumber = (value == 0) ? 1 : null;
@@ -142,7 +135,6 @@ namespace DuetControlServer.Files
             Channel = channel;
 
             _fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
-            _reader = new StreamReader(_fileStream, Encoding.UTF8, false, Settings.FileBufferSize, true);
         }
 
         /// <summary>
@@ -178,7 +170,6 @@ namespace DuetControlServer.Files
             if (disposing)
             {
                 IsClosed = true;
-                _reader.Dispose();
                 _fileStream.Dispose();
             }
 
@@ -225,11 +216,11 @@ namespace DuetControlServer.Files
                         }
 
                         // Get the next code
-                        codeRead = await DuetAPI.Commands.Code.ParseAsync(_reader, code, _parserBuffer);
+                        codeRead = await DuetAPI.Commands.Code.ParseAsync(_fileStream, code, _parserBuffer);
                         _position += code.Length ?? 0;
                         LineNumber = code.LineNumber;
                     }
-                    while (!codeRead && _parserBuffer.GetPosition(_reader) < _fileStream.Length);
+                    while (!codeRead && _parserBuffer.GetPosition(_fileStream) < _fileStream.Length);
 
                     if (codeRead)
                     {

@@ -21,14 +21,14 @@ namespace DuetControlServer.Files.ImageProcessing
         /// <summary>
         /// Extract thumbnails images from a file
         /// </summary>
-        /// <param name="reader">Stream reader to read from</param>
+        /// <param name="stream">Stream to read from</param>
         /// <param name="codeParserBuffer">Parser buffer</param>
         /// <param name="parsedFileInfo">File information</param>
         /// <param name="code">Code to reuse while parsing</param>
         /// <param name="readThumbnailContent">Whether thumbnail content shall be returned</param>
         /// <param name="format">Thumbnail format</param>
         /// <returns>Asynchronous task</returns>
-        public static async ValueTask ProcessAsync(StreamReader reader, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, Code code, bool readThumbnailContent, ThumbnailInfoFormat format)
+        public static async ValueTask ProcessAsync(Stream stream, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, Code code, bool readThumbnailContent, ThumbnailInfoFormat format)
         {
             // Need a valid comment to start parsing...
             if (code.Comment is null)
@@ -56,19 +56,19 @@ namespace DuetControlServer.Files.ImageProcessing
                 Format = format,
                 Width = int.Parse(dimensions[0]),
                 Height = int.Parse(dimensions[1]),
-                Offset = codeParserBuffer.GetPosition(reader),
+                Offset = codeParserBuffer.GetPosition(stream),
                 Size = encodedLength
             };
 
             // Keep reading the data from the file
             bool offsetAdjusted = false;
             StringBuilder? data = readThumbnailContent ? new(encodedLength) : null;
-            while (codeParserBuffer.GetPosition(reader) < reader.BaseStream.Length)
+            while (codeParserBuffer.GetPosition(stream) < stream.Length)
             {
                 Program.CancellationToken.ThrowIfCancellationRequested();
 
                 code.Reset();
-                if (!await Code.ParseAsync(reader, code, codeParserBuffer))
+                if (!await Code.ParseAsync(stream, code, codeParserBuffer))
                 {
                     continue;
                 }

@@ -138,54 +138,54 @@ namespace DuetControlServer.SPI.Serialization
                     if (parameter.Type == typeof(int))
                     {
                         binaryParam.Type = DataType.Int;
-                        binaryParam.IntValue = parameter;
+                        binaryParam.IntValue = (int)parameter;
                     }
                     else if (parameter.Type == typeof(uint))
                     {
                         binaryParam.Type = DataType.UInt;
-                        binaryParam.UIntValue = parameter;
+                        binaryParam.UIntValue = (uint)parameter;
                     }
                     else if (parameter.Type == typeof(DriverId))
                     {
                         binaryParam.Type = DataType.DriverId;
-                        binaryParam.UIntValue = parameter;
+                        binaryParam.UIntValue = (DriverId)parameter;
                     }
                     else if (parameter.Type == typeof(float))
                     {
                         binaryParam.Type = DataType.Float;
-                        binaryParam.FloatValue = parameter;
+                        binaryParam.FloatValue = (float)parameter;
                     }
                     else if (parameter.Type == typeof(int[]))
                     {
                         binaryParam.Type = DataType.IntArray;
-                        int[] array = parameter;
+                        int[] array = (int[])parameter;
                         binaryParam.IntValue = array.Length;
                         extraParameters.Add(array);
                     }
                     else if (parameter.Type == typeof(uint[]))
                     {
                         binaryParam.Type = DataType.UIntArray;
-                        uint[] array = parameter;
+                        uint[] array = (uint[])parameter;
                         binaryParam.IntValue = array.Length;
                         extraParameters.Add(array);
                     }
                     else if (parameter.Type == typeof(DriverId[]))
                     {
                         binaryParam.Type = DataType.DriverIdArray;
-                        DriverId[] array = parameter;
+                        DriverId[] array = (DriverId[])parameter;
                         binaryParam.IntValue = array.Length;
                         extraParameters.Add(array);
                     }
                     else if (parameter.Type == typeof(float[]))
                     {
                         binaryParam.Type = DataType.FloatArray;
-                        float[] array = parameter;
+                        float[] array = (float[])parameter;
                         binaryParam.IntValue = array.Length;
                         extraParameters.Add(array);
                     }
                     else if (parameter.Type == typeof(string))
                     {
-                        string value = parameter!;
+                        string value = (string)parameter;
                         binaryParam.Type = parameter.IsExpression ? DataType.Expression : DataType.String;
                         binaryParam.IntValue = Encoding.UTF8.GetByteCount(value);
                         extraParameters.Add(value);
@@ -195,7 +195,7 @@ namespace DuetControlServer.SPI.Serialization
                         binaryParam.Type = DataType.Null;
                         binaryParam.IntValue = 0;
                     }
-                    // Boolean values are not supported for codes. Use integers instead
+                    // Boolean values are not supported for codes, they are represented as integers (> 0 == true, else false)
                     else
                     {
                         throw new ArgumentException("Unsupported type", parameter.Type?.Name);

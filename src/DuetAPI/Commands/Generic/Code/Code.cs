@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Text.Json.Serialization;
 using DuetAPI.Connection;
@@ -146,21 +148,778 @@ namespace DuetAPI.Commands
             Parameters.Clear();
         }
 
-#warning Refactor those two calls and replace implicit cast operators with explicit ones
         /// <summary>
         /// Retrieve the parameter whose letter equals c
         /// </summary>
-        /// <param name="c">Letter of the parameter to find</param>
+        /// <param name="letter">Letter of the parameter to find</param>
         /// <returns>The parsed parameter instance or null if none could be found</returns>
-        public CodeParameter? Parameter(char c) => Parameters.FirstOrDefault(p => p.Letter == c);
+        [Obsolete]
+        public CodeParameter? Parameter(char letter) => Parameters.FirstOrDefault(p => p.Letter == letter);
 
         /// <summary>
         /// Retrieve the parameter whose letter equals c or generate a default parameter
         /// </summary>
-        /// <param name="c">Letter of the parameter to find</param>
+        /// <param name="letter">Letter of the parameter to find</param>
         /// <param name="defaultValue">Default parameter value (no expression)</param>
         /// <returns>The parsed parameter instance or null if none could be found</returns>
-        public CodeParameter Parameter(char c, object defaultValue) => Parameter(c) ?? new CodeParameter(c, defaultValue);
+        [Obsolete]
+        public CodeParameter Parameter(char letter, object defaultValue) => Parameter(letter) ?? new CodeParameter(letter, defaultValue);
+
+        /// <summary>
+        /// Check if a given parameter exists
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <returns>If the parameter is present</returns>
+        public bool HasParameter(char letter) => Parameters.Any(p => p.Letter == letter);
+
+        /// <summary>
+        /// Try to get a parameter by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else null</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        public bool TryGetParameter(char letter, [NotNullWhen(true)] out CodeParameter? parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = param;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
+
+#pragma warning disable CS0612 // Type or member is obsolete
+        /// <summary>
+        /// Get a float parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="MissingParameterException">Parameter not found</exception>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public float GetFloat(char letter)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (float)param : throw new MissingParameterException(letter);
+        }
+
+        /// <summary>
+        /// Get a float parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public float GetFloat(char letter, float defaultValue)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (float)param : defaultValue;
+        }
+
+        /// <summary>
+        /// Try to get a float parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else default</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetFloat(char letter, out float parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (float)param;
+                    return true;
+                }
+            }
+            parameter = default;
+            return false;
+        }
+
+        /// <summary>
+        /// Try to get a float parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else null</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetFloat(char letter, out float? parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (float)param;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Get an integer parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="MissingParameterException">Parameter not found</exception>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public int GetInt(char letter)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (int)param : throw new MissingParameterException(letter);
+        }
+
+        /// <summary>
+        /// Get an integer parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public int GetInt(char letter, int defaultValue)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (int)param : defaultValue;
+        }
+
+        /// <summary>
+        /// Try to get an integer parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else default</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetInt(char letter, out int parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (int)param;
+                    return true;
+                }
+            }
+            parameter = default;
+            return false;
+        }
+
+        /// <summary>
+        /// Try to get an integer parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else null</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetInt(char letter, out int? parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (int?)param;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Get an unsigned integer parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="MissingParameterException">Parameter not found</exception>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public uint GetUInt(char letter)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (uint)param : throw new MissingParameterException(letter);
+        }
+
+        /// <summary>
+        /// Get an unsigned integer parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public uint GetUInt(char letter, uint defaultValue)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (uint)param : defaultValue;
+        }
+
+        /// <summary>
+        /// Try to get an unsigned integer parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else default</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetUInt(char letter, out uint parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (uint)param;
+                    return true;
+                }
+            }
+            parameter = default;
+            return false;
+        }
+
+        /// <summary>
+        /// Try to get an unsigned integer parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else null</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetUInt(char letter, out uint? parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (uint)param;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Get a long parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="MissingParameterException">Parameter not found</exception>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public long GetLong(char letter)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (long)param : throw new MissingParameterException(letter);
+        }
+
+        /// <summary>
+        /// Get a long parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public long GetLong(char letter, long defaultValue)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (long)param : defaultValue;
+        }
+
+        /// <summary>
+        /// Try to get a long parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else default</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetLong(char letter, out long parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (long)param;
+                    return true;
+                }
+            }
+            parameter = default;
+            return false;
+        }
+
+        /// <summary>
+        /// Try to get a long parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else null</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetLong(char letter, out long? parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (long)param;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Get a boolean parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="MissingParameterException">Parameter not found</exception>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool GetBool(char letter)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (bool)param : throw new MissingParameterException(letter);
+        }
+
+        /// <summary>
+        /// Get a boolean parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool GetBool(char letter, bool defaultValue)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (bool)param : defaultValue;
+        }
+
+        /// <summary>
+        /// Try to get a long parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else default</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetBool(char letter, out bool parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (bool)param;
+                    return true;
+                }
+            }
+            parameter = default;
+            return false;
+        }
+
+        /// <summary>
+        /// Try to get a long parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else null</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetBool(char letter, out bool? parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (bool)param;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Get a string parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="MissingParameterException">Parameter not found</exception>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public string GetString(char letter)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (string)param : throw new MissingParameterException(letter);
+        }
+
+        /// <summary>
+        /// Get a string parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <returns>Parameter value or null</returns>
+        public string? GetOptionalString(char letter)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (string)param : null;
+        }
+
+        /// <summary>
+        /// Get an unsigned integer parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public string GetString(char letter, string defaultValue)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (string)param : defaultValue;
+        }
+
+        /// <summary>
+        /// Try to get a string parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else null</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetString(char letter, [NotNullWhen(true)] out string? parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (string)param;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Get a driver ID parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="MissingParameterException">Parameter not found</exception>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public DriverId GetDriverId(char letter)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (DriverId)param : throw new MissingParameterException(letter);
+        }
+
+        /// <summary>
+        /// Get a driver ID parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public DriverId GetDriverId(char letter, DriverId defaultValue)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (DriverId)param : defaultValue;
+        }
+
+        /// <summary>
+        /// Try to get a driver ID parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else null</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetDriverId(char letter, [NotNullWhen(true)] out DriverId? parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (DriverId)param;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Get an IP address parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="MissingParameterException">Parameter not found</exception>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public IPAddress GetIPAddress(char letter)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (IPAddress)param : throw new MissingParameterException(letter);
+        }
+
+        /// <summary>
+        /// Get an IP address parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public IPAddress GetIPAddress(char letter, IPAddress defaultValue)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (IPAddress)param : defaultValue;
+        }
+
+        /// <summary>
+        /// Try to get a driver ID parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else null</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetIPAddress(char letter, [NotNullWhen(true)] out IPAddress? parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (IPAddress)param;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Get a float array parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="MissingParameterException">Parameter not found</exception>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public float[] GetFloatArray(char letter)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (float[])param : throw new MissingParameterException(letter);
+        }
+
+        /// <summary>
+        /// Get a float array parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public float[] GetFloatArray(char letter, float[] defaultValue)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (float[])param : defaultValue;
+        }
+
+        /// <summary>
+        /// Try to get a float array parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else null</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetFloatArray(char letter, [NotNullWhen(true)] out float[]? parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (float[])param;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Get an integer array parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="MissingParameterException">Parameter not found</exception>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public int[] GetIntArray(char letter)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (int[])param : throw new MissingParameterException(letter);
+        }
+
+        /// <summary>
+        /// Get an integer array parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public int[] GetIntArray(char letter, int[] defaultValue)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (int[])param : defaultValue;
+        }
+
+        /// <summary>
+        /// Try to get an integer array parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else null</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetIntArray(char letter, [NotNullWhen(true)] out int[]? parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (int[])param;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Get an unsigned integer array parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="MissingParameterException">Parameter not found</exception>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public uint[] GetUIntArray(char letter)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (uint[])param : throw new MissingParameterException(letter);
+        }
+
+        /// <summary>
+        /// Get an unsigned integer array parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public uint[] GetUIntArray(char letter, uint[] defaultValue)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (uint[])param : defaultValue;
+        }
+
+        /// <summary>
+        /// Try to get an unsigned integer array parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else null</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetUIntArray(char letter, [NotNullWhen(true)] out uint[]? parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (uint[])param;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Get a long array parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="MissingParameterException">Parameter not found</exception>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public long[] GetLongArray(char letter)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (long[])param : throw new MissingParameterException(letter);
+        }
+
+        /// <summary>
+        /// Get a long array parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public long[] GetLongArray(char letter, long[] defaultValue)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (long[])param : defaultValue;
+        }
+
+        /// <summary>
+        /// Try to get a long array parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else null</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetLongArray(char letter, [NotNullWhen(true)] out long[]? parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (long[])param;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Get a driver ID array parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="MissingParameterException">Parameter not found</exception>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public DriverId[] GetDriverIdArray(char letter)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (DriverId[])param : throw new MissingParameterException(letter);
+        }
+
+        /// <summary>
+        /// Get a driver ID array parameter value
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+        /// <returns>Parameter value</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public DriverId[] GetDriverIdArray(char letter, DriverId[] defaultValue)
+        {
+            CodeParameter? param = Parameter(letter);
+            return (param != null) ? (DriverId[])param : defaultValue;
+        }
+
+        /// <summary>
+        /// Try to get a long array parameter value by letter
+        /// </summary>
+        /// <param name="letter">Letter of the parameter to find</param>
+        /// <param name="parameter">Parameter if found, else null</param>
+        /// <returns>True if the requested parameter could be found</returns>
+        /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+        public bool TryGetDriverIdArray(char letter, [NotNullWhen(true)] out DriverId[]? parameter)
+        {
+            foreach (CodeParameter param in Parameters)
+            {
+                if (param.Letter == letter)
+                {
+                    parameter = (DriverId[])param;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
+#pragma warning restore CS0612 // Type or member is obsolete
 
         /// <summary>
         /// Reconstruct an unprecedented string from the parameter list or
@@ -168,13 +927,16 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <param name="quoteStrings">Encapsulate strings in double quotes</param>
         /// <returns>Unprecedented string</returns>
+        /// <remarks>
+        /// If no parameter is present, an empty string is returned
+        /// </remarks>
         public string GetUnprecedentedString(bool quoteStrings = false)
         {
             foreach (CodeParameter p in Parameters)
             {
                 if (p.Letter == '@')
                 {
-                    return (string?)p ?? string.Empty;
+                    return (string)p;
                 }
             }
 

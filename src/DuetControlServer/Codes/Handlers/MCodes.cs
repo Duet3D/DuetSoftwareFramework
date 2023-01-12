@@ -100,8 +100,7 @@ namespace DuetControlServer.Codes.Handlers
                     if (await Processor.FlushAsync(code))
                     {
                         // Resolve the directory
-                        string? virtualDirectory = code.Parameter('P');
-                        if (virtualDirectory is null)
+                        if (!code.TryGetString('P', out string? virtualDirectory))
                         {
                             using (await Provider.AccessReadOnlyAsync())
                             {
@@ -118,14 +117,13 @@ namespace DuetControlServer.Codes.Handlers
                         }
 
                         // Check if JSON file lists were requested
-                        int startAt = Math.Max(code.Parameter('R') ?? 0, 0);
-                        CodeParameter sParam = code.Parameter('S', 0);
-                        if (sParam == 2)
+                        int startAt = Math.Max(code.GetInt('R', 0), 0), type = code.GetInt('S', 0);
+                        if (type == 2)
                         {
                             string json = FileLists.GetFiles(virtualDirectory, physicalDirectory, startAt, true, maxSize);
                             return new Message(MessageType.Success, json);
                         }
-                        if (sParam == 3)
+                        if (type == 3)
                         {
                             string json = FileLists.GetFileList(virtualDirectory, physicalDirectory, startAt, maxSize);
                             return new Message(MessageType.Success, json);
@@ -188,7 +186,7 @@ namespace DuetControlServer.Codes.Handlers
                 case 21:
                     if (await Processor.FlushAsync(code))
                     {
-                        if (code.Parameter('P', 0) == 0)
+                        if (code.GetInt('P', 0) == 0)
                         {
                             // M21 (P0) will always work because it's always mounted
                             return new Message();
@@ -255,6 +253,7 @@ namespace DuetControlServer.Codes.Handlers
                     {
                         // Wait for inputs[].motionSystem to be up-to-date
                         await Updater.WaitForFullUpdate();
+
                         int motionSystem;
                         using (await Provider.AccessReadOnlyAsync())
                         {
@@ -268,15 +267,14 @@ namespace DuetControlServer.Codes.Handlers
                                 return new Message(MessageType.Error, "Not printing a file");
                             }
 
-                            CodeParameter? sParam = code.Parameter('S');
-                            if (sParam is not null)
+                            if (code.TryGetLong('S', out long newPosition))
                             {
-                                if (sParam < 0L || sParam > FileExecution.Job.FileLength)
+                                if (newPosition < 0L || newPosition > FileExecution.Job.FileLength)
                                 {
                                     return new Message(MessageType.Error, "Position is out of range");
                                 }
 
-                                await FileExecution.Job.SetFilePosition(motionSystem, sParam);
+                                await FileExecution.Job.SetFilePosition(motionSystem, newPosition);
                             }
                         }
 
@@ -411,19 +409,8 @@ namespace DuetControlServer.Codes.Handlers
                                 }
 
                                 // Get thumbnail
-                                string? pParam = code.Parameter('P');
-                                CodeParameter? sParam = code.Parameter('S');
-                                if (pParam is null)
-                                {
-                                    return new Message(MessageType.Error, "Missing parameter 'P'");
-                                }
-                                if (sParam is null)
-                                {
-                                    return new Message(MessageType.Error, "Missing parameter 'S'");
-                                }
-
-                                string filename = await FilePath.ToPhysicalAsync(pParam, FileDirectory.GCodes);
-                                string thumbnailJson = await InfoParser.ParseThumbnail(filename, sParam);
+                                string filename = await FilePath.ToPhysicalAsync(code.GetString('P'), FileDirectory.GCodes);
+                                string thumbnailJson = await InfoParser.ParseThumbnail(filename, code.GetLong('S'));
                                 return new Message(MessageType.Success, thumbnailJson);
                             }
                             catch (Exception e)
@@ -440,12 +427,7 @@ namespace DuetControlServer.Codes.Handlers
                 case 37:
                     if (await Processor.FlushAsync(code))
                     {
-                        string? file = code.Parameter('P', string.Empty);
-                        if (string.IsNullOrWhiteSpace(file))
-                        {
-                            return new Message(MessageType.Error, "Filename expected");
-                        }
-
+                        string file = code.GetString('P');
                         string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
                         if (!File.Exists(physicalFile))
                         {
@@ -472,9 +454,7 @@ namespace DuetControlServer.Codes.Handlers
                 case 38:
                     if (await Processor.FlushAsync(code))
                     {
-                        string file = code.GetUnprecedentedString();
-                        string physicalFile = await FilePath.ToPhysicalAsync(file);
-
+                        string file = code.GetUnprecedentedString(), physicalFile = await FilePath.ToPhysicalAsync(file);
                         try
                         {
                             await using FileStream stream = new(physicalFile, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
@@ -502,8 +482,8 @@ namespace DuetControlServer.Codes.Handlers
                     {
                         using (await Provider.AccessReadOnlyAsync())
                         {
-                            int index = code.Parameter('P', 0);
-                            if (code.Parameter('S', 0) == 2)
+                            int index = code.GetInt('P', 0);
+                            if (code.GetInt('S', 0) == 2)
                             {
                                 if (index < 0 || index >= Provider.Get.Volumes.Count)
                                 {
@@ -541,11 +521,11 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Flag current macro file as (not) pausable
                 case 98:
-                    if (code.Parameter('R') is not null)
+                    if (code.TryGetInt('R', out int rParam))
                     {
                         if (await Processor.FlushAsync(code))
                         {
-                            await SPI.Interface.SetMacroPausable(code.Channel, code.Parameter('R') != 0);
+                            await SPI.Interface.SetMacroPausable(code.Channel, rParam == 1);
                         }
                         else
                         {
@@ -582,7 +562,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Immediate DSF diagnostics
                 case 122:
-                    if (code.Parameter('B', 0) == 0 && code.GetUnprecedentedString() == "DSF")
+                    if (code.GetInt('B', 0) == 0 && code.GetUnprecedentedString() == "DSF")
                     {
                         Message result = new();
                         await Diagnostics(result);
@@ -594,13 +574,7 @@ namespace DuetControlServer.Codes.Handlers
                 case 470:
                     if (await Processor.FlushAsync(code))
                     {
-                        string? path = code.Parameter('P');
-                        if (path is null)
-                        {
-                            return new Message(MessageType.Error, "Missing directory name");
-                        }
-                        string physicalPath = await FilePath.ToPhysicalAsync(path);
-
+                        string path = code.GetString('P'), physicalPath = await FilePath.ToPhysicalAsync(path);
                         try
                         {
                             Directory.CreateDirectory(physicalPath);
@@ -617,26 +591,13 @@ namespace DuetControlServer.Codes.Handlers
                 case 471:
                     if (await Processor.FlushAsync(code))
                     {
-                        string? from = code.Parameter('S');
-                        if (from is null)
-                        {
-                            return new Message(MessageType.Error, "Missing S parameter");
-                        }
-
-                        string? to = code.Parameter('T');
-                        if (to is null)
-                        {
-                            return new Message(MessageType.Error, "Missing T parameter");
-                        }
-
+                        string from = code.GetString('S'), to = code.GetString('T');
                         try
                         {
-                            string source = await FilePath.ToPhysicalAsync(from);
-                            string destination = await FilePath.ToPhysicalAsync(to);
-
+                            string source = await FilePath.ToPhysicalAsync(from), destination = await FilePath.ToPhysicalAsync(to);
                             if (File.Exists(source))
                             {
-                                if (File.Exists(destination) && code.Parameter('D', false))
+                                if (File.Exists(destination) && code.GetBool('D', false))
                                 {
                                     File.Delete(destination);
                                 }
@@ -644,7 +605,7 @@ namespace DuetControlServer.Codes.Handlers
                             }
                             else if (Directory.Exists(source))
                             {
-                                if (Directory.Exists(destination) && code.Parameter('D', false))
+                                if (Directory.Exists(destination) && code.GetBool('D', false))
                                 {
                                     // This could be recursive but at the moment we mimic RRF's behaviour
                                     Directory.Delete(destination);
@@ -689,8 +650,7 @@ namespace DuetControlServer.Codes.Handlers
                 case 505:
                     if (await Processor.FlushAsync(code))
                     {
-                        string? directory = code.Parameter('P');
-                        if (!string.IsNullOrEmpty(directory))
+                        if (code.TryGetString('P', out string? directory))
                         {
                             await using (await SPI.Interface.LockAllMovementSystemsAndWaitForStandstill(code.Channel))
                             {
@@ -719,11 +679,9 @@ namespace DuetControlServer.Codes.Handlers
                 case 550:
                     if (await Processor.FlushAsync(code))
                     {
-                        // Verify the P parameter
-                        string? pParam = code.Parameter('P');
-                        if (!string.IsNullOrEmpty(pParam))
+                        if (code.TryGetString('P', out string? newName))
                         {
-                            if (pParam.Length > 40)
+                            if (newName.Length > 40)
                             {
                                 return new Message(MessageType.Error, "Machine name is too long");
                             }
@@ -740,7 +698,7 @@ namespace DuetControlServer.Codes.Handlers
 
                             // Strip letters and digits from the desired name
                             string desiredName = string.Empty;
-                            foreach (char c in pParam)
+                            foreach (char c in newName)
                             {
                                 if (char.IsLetterOrDigit(c))
                                 {
@@ -764,8 +722,7 @@ namespace DuetControlServer.Codes.Handlers
                 case 551:
                     if (await Processor.FlushAsync(code))
                     {
-                        string? password = code.Parameter('P');
-                        if (password is not null)
+                        if (code.TryGetString('P', out string? password))
                         {
                             using (await Provider.AccessReadWriteAsync())
                             {
@@ -780,8 +737,7 @@ namespace DuetControlServer.Codes.Handlers
                 case 586:
                     if (await Processor.FlushAsync(code))
                     {
-                        string? corsSite = code.Parameter('C');
-                        if (corsSite is not null)
+                        if (code.TryGetString('C', out string? corsSite))
                         {
                             using (await Provider.AccessReadWriteAsync())
                             {
@@ -807,10 +763,9 @@ namespace DuetControlServer.Codes.Handlers
                     {
                         bool seen = false;
 
-                        CodeParameter? pParam = code.Parameter('P');
-                        if (pParam is not null)
+                        if (code.TryGetString('P', out string? dayString))
                         {
-                            if (DateTime.TryParseExact(pParam, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date))
+                            if (DateTime.TryParseExact(dayString, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date))
                             {
                                 await System.Diagnostics.Process.Start("timedatectl", $"set-time {date:yyyy-MM-dd}").WaitForExitAsync(Program.CancellationToken);
                                 seen = true;
@@ -821,10 +776,9 @@ namespace DuetControlServer.Codes.Handlers
                             }
                         }
 
-                        CodeParameter? sParam = code.Parameter('S');
-                        if (sParam is not null)
+                        if (code.TryGetString('S', out string? timeString))
                         {
-                            if (DateTime.TryParseExact(sParam, "HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime time))
+                            if (DateTime.TryParseExact(timeString, "HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime time))
                             {
                                 await System.Diagnostics.Process.Start("timedatectl", $"set-time {time:HH:mm:ss}").WaitForExitAsync(Program.CancellationToken);
                                 seen = true;
@@ -835,12 +789,11 @@ namespace DuetControlServer.Codes.Handlers
                             }
                         }
 
-                        CodeParameter? tParam = code.Parameter('T');
-                        if (tParam is not null)
+                        if (code.TryGetString('T', out string? timezone))
                         {
-                            if (File.Exists($"/usr/share/zoneinfo/{tParam}"))
+                            if (File.Exists($"/usr/share/zoneinfo/{timezone}"))
                             {
-                                await System.Diagnostics.Process.Start("timedatectl", $"set-timezone ${tParam}").WaitForExitAsync(Program.CancellationToken);
+                                await System.Diagnostics.Process.Start("timedatectl", $"set-timezone ${timezone}").WaitForExitAsync(Program.CancellationToken);
                                 seen = true;
                             }
                             else
@@ -860,8 +813,7 @@ namespace DuetControlServer.Codes.Handlers
                 case 929:
                     if (await Processor.FlushAsync(code))
                     {
-                        CodeParameter? sParam = code.Parameter('S');
-                        if (sParam is null)
+                        if (code.TryGetInt('S', out int sParam))
                         {
                             using (await Provider.AccessReadOnlyAsync())
                             {
@@ -891,13 +843,8 @@ namespace DuetControlServer.Codes.Handlers
                                     defaultLogFile = Provider.Get.State.LogFile;
                                 }
                             }
-                            string? logFile = code.Parameter('P', defaultLogFile);
-                            if (string.IsNullOrWhiteSpace(logFile))
-                            {
-                                return new Message(MessageType.Error, "Missing filename in M929 command");
-                            }
 
-                            await Logger.StartAsync(logFile, logLevel);
+                            await Logger.StartAsync(code.GetString('P'), logLevel);
                         }
                         else
                         {
@@ -909,7 +856,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Update the firmware
                 case 997:
-                    if (((int[])code.Parameter('S', new[] { 0 })).Contains(0) && code.Parameter('B', 0) == 0)
+                    if (code.GetIntArray('S', new[] { 0 }).Contains(0) && code.GetInt('B', 0) == 0)
                     {
                         if (await Processor.FlushAsync(code))
                         {
@@ -924,7 +871,10 @@ namespace DuetControlServer.Codes.Handlers
 
                                 // There are now two different IAP binaries, check which one to use
                                 iapFile = Provider.Get.Boards[0].IapFileNameSBC;
-                                firmwareFile = code.Parameter('P') ?? Provider.Get.Boards[0].FirmwareFileName;
+                                if (code.TryGetString('P', out firmwareFile))
+                                {
+                                    firmwareFile = Provider.Get.Boards[0].FirmwareFileName;
+                                }
                             }
 
                             if (string.IsNullOrEmpty(iapFile) || string.IsNullOrEmpty(firmwareFile))
@@ -1070,8 +1020,9 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Diagnostics
                 case 122:
-                    if (code.Parameter('B', 0) == 0 && code.Parameter('P', 0) == 0 && code.GetUnprecedentedString() != "DSF" && !string.IsNullOrEmpty(code.Result.Content))
+                    if (code.GetInt('B', 0) == 0 && code.GetInt('P', 0) == 0 && code.GetUnprecedentedString() != "DSF" && !string.IsNullOrEmpty(code.Result.Content))
                     {
+                        // Append our own diagnostics to RRF's M122 output
                         await Diagnostics(code.Result);
                     }
                     break;

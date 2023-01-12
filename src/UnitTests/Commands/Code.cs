@@ -39,7 +39,7 @@ namespace UnitTests.Commands
                 Assert.IsNull(code.MinorNumber);
                 Assert.AreEqual(1, code.Parameters.Count);
                 Assert.AreEqual('S', code.Parameters[0].Letter);
-                Assert.AreEqual(1, (int)code.Parameter('S', 0));
+                Assert.AreEqual(1, code.GetInt('S', 0));
             }
         }
 
@@ -107,7 +107,7 @@ namespace UnitTests.Commands
                 Assert.AreEqual(1, code.Parameters.Count);
 
                 int[] steps = { 810, 810, 407, 407 };
-                Assert.AreEqual(steps, (int[])code.Parameter('E')!);
+                Assert.AreEqual(steps, code.GetIntArray('E')!);
             }
         }
 
@@ -141,7 +141,7 @@ namespace UnitTests.Commands
                 Assert.AreEqual('H', code.Parameters[2].Letter);
                 Assert.AreEqual(-1, (int)code.Parameters[2]);
                 Assert.AreEqual('S', code.Parameters[3].Letter);
-                Assert.AreEqual(0.5, code.Parameters[3], 0.0001);
+                Assert.AreEqual(0.5, (float)code.Parameters[3], 0.0001);
 
                 TestContext.Out.WriteLine(JsonSerializer.Serialize(code, typeof(DuetAPI.Commands.Code), new JsonSerializerOptions { WriteIndented = true }));
             }
@@ -252,7 +252,7 @@ namespace UnitTests.Commands
                 Assert.AreEqual('S', code.Parameters[1].Letter);
                 Assert.AreEqual(1, (int)code.Parameters[1]);
                 Assert.AreEqual('T', code.Parameters[2].Letter);
-                Assert.AreEqual(0.5, code.Parameters[2], 0.0001);
+                Assert.AreEqual(0.5, (float)code.Parameters[2], 0.0001);
             }
         }
 
@@ -271,7 +271,7 @@ namespace UnitTests.Commands
                 Assert.AreEqual('S', code.Parameters[1].Letter);
                 Assert.AreEqual(1, (int)code.Parameters[1]);
                 Assert.AreEqual('T', code.Parameters[2].Letter);
-                Assert.AreEqual(0.5, code.Parameters[2], 0.0001);
+                Assert.AreEqual(0.5, (float)code.Parameters[2], 0.0001);
             }
         }
 
@@ -467,13 +467,13 @@ namespace UnitTests.Commands
                 Assert.AreEqual('X', code.Parameters[0].Letter);
                 Assert.AreEqual(3, (int)code.Parameters[0]);
                 Assert.AreEqual('Y', code.Parameters[1].Letter);
-                Assert.AreEqual(1.25, code.Parameters[1], 0.0001);
+                Assert.AreEqual(1.25, (float)code.Parameters[1], 0.0001);
                 Assert.AreEqual('A', code.Parameters[2].Letter);
-                Assert.AreEqual(2, code.Parameters[2], 0.0001);
+                Assert.AreEqual(2, (float)code.Parameters[2], 0.0001);
                 Assert.AreEqual('a', code.Parameters[3].Letter);
-                Assert.AreEqual(3, code.Parameters[3], 0.0001);
+                Assert.AreEqual(3, (float)code.Parameters[3], 0.0001);
                 Assert.AreEqual('B', code.Parameters[4].Letter);
-                Assert.AreEqual(4, code.Parameters[4], 0.0001);
+                Assert.AreEqual(4, (float)code.Parameters[4], 0.0001);
             }
         }
 
@@ -926,46 +926,45 @@ namespace UnitTests.Commands
             byte[] codeBytes = Encoding.UTF8.GetBytes(codeString);
             await using (MemoryStream memoryStream = new(codeBytes))
             {
-                using StreamReader reader = new(memoryStream);
                 CodeParserBuffer buffer = new(128, true);
                 DuetAPI.Commands.Code code = new() { LineNumber = 1 };
 
-                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                await DuetAPI.Commands.Code.ParseAsync(memoryStream, code, buffer);
                 Assert.AreEqual(CodeType.GCode, code.Type);
                 Assert.AreEqual(1, code.MajorNumber);
                 Assert.AreEqual(CodeFlags.EnforceAbsolutePosition, code.Flags);
                 Assert.AreEqual(1, code.LineNumber);
                 Assert.AreEqual(3, code.Parameters.Count);
-                Assert.AreEqual(0, (int)code.Parameter('X'));
-                Assert.AreEqual(5, (int)code.Parameter('Y'));
-                Assert.AreEqual(3000, (int)code.Parameter('F'));
+                Assert.AreEqual(0, code.GetInt('X'));
+                Assert.AreEqual(5, code.GetInt('Y'));
+                Assert.AreEqual(3000, code.GetInt('F'));
+
 
                 code.Reset();
-                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                await DuetAPI.Commands.Code.ParseAsync(memoryStream, code, buffer);
                 Assert.AreEqual(CodeType.GCode, code.Type);
                 Assert.AreEqual(0, code.MajorNumber);
                 Assert.AreEqual(CodeFlags.EnforceAbsolutePosition | CodeFlags.IsLastCode, code.Flags);
                 Assert.AreEqual(1, code.LineNumber);
                 Assert.AreEqual(2, code.Parameters.Count);
-                Assert.AreEqual(5, (int)code.Parameter('X'));
-                Assert.AreEqual(10, (int)code.Parameter('Y'));
+                Assert.AreEqual(5, code.GetInt('X'));
+                Assert.AreEqual(10, code.GetInt('Y'));
             }
 
             codeString = "G1 X1 Y5 F3000\nG1 X5 F300\nG0 Y40";
             codeBytes = Encoding.UTF8.GetBytes(codeString);
             await using (MemoryStream memoryStream = new(codeBytes))
             {
-                using StreamReader reader = new(memoryStream);
                 CodeParserBuffer buffer = new(128, true);
 
                 DuetAPI.Commands.Code code = new() { LineNumber = 0 };
-                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                await DuetAPI.Commands.Code.ParseAsync(memoryStream, code, buffer);
 
                 code.Reset();
-                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                await DuetAPI.Commands.Code.ParseAsync(memoryStream, code, buffer);
 
                 code.Reset();
-                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                await DuetAPI.Commands.Code.ParseAsync(memoryStream, code, buffer);
 
                 Assert.AreEqual(CodeType.GCode, code.Type);
                 Assert.AreEqual(0, code.MajorNumber);
@@ -977,76 +976,74 @@ namespace UnitTests.Commands
             codeBytes = Encoding.UTF8.GetBytes(codeString);
             await using (MemoryStream memoryStream = new(codeBytes))
             {
-                using StreamReader reader = new(memoryStream);
                 CodeParserBuffer buffer = new(128, true) { MayRepeatCode = true };
                 DuetAPI.Commands.Code code = new() { LineNumber = 0 };
 
-                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                await DuetAPI.Commands.Code.ParseAsync(memoryStream, code, buffer);
                 Assert.AreEqual(1, code.LineNumber);
                 Assert.AreEqual(CodeType.GCode, code.Type);
                 Assert.AreEqual(1, code.MajorNumber);
                 Assert.AreEqual(3, code.Parameters.Count);
-                Assert.AreEqual(1, (int)code.Parameter('X'));
-                Assert.AreEqual(5, (int)code.Parameter('Y'));
-                Assert.AreEqual(3000, (int)code.Parameter('F'));
+                Assert.AreEqual(1, code.GetInt('X'));
+                Assert.AreEqual(5, code.GetInt('Y'));
+                Assert.AreEqual(3000, code.GetInt('F'));
 
                 code.Reset();
-                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                await DuetAPI.Commands.Code.ParseAsync(memoryStream, code, buffer);
                 Assert.AreEqual(CodeType.GCode, code.Type);
                 Assert.AreEqual(1, code.MajorNumber);
                 Assert.AreEqual(2, code.LineNumber);
                 Assert.AreEqual(2, code.Parameters.Count);
-                Assert.AreEqual(5, (int)code.Parameter('X'));
-                Assert.AreEqual(300, (int)code.Parameter('F'));
+                Assert.AreEqual(5, code.GetInt('X'));
+                Assert.AreEqual(300, code.GetInt('F'));
 
                 code.Reset();
-                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                await DuetAPI.Commands.Code.ParseAsync(memoryStream, code, buffer);
                 Assert.AreEqual(3, code.LineNumber);
                 Assert.AreEqual(CodeType.GCode, code.Type);
                 Assert.AreEqual(1, code.MajorNumber);
                 Assert.AreEqual(1, code.Parameters.Count);
-                Assert.AreEqual(40, (int)code.Parameter('Y'));
+                Assert.AreEqual(40, code.GetInt('Y'));
             }
 
             codeString = "G1 X1 Y5 F3000\n  G53 G1 X5 F300\n    G53 G0 Y40 G1 Z50\n  G4 S3\nG1 Z3";
             codeBytes = Encoding.UTF8.GetBytes(codeString);
             await using (MemoryStream memoryStream = new(codeBytes))
             {
-                using StreamReader reader = new(memoryStream);
                 CodeParserBuffer buffer = new(128, true);
 
                 DuetAPI.Commands.Code code = new() { LineNumber = 0 };
-                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                await DuetAPI.Commands.Code.ParseAsync(memoryStream, code, buffer);
                 Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
                 Assert.AreEqual(0, code.Indent);
                 Assert.AreEqual(1, code.LineNumber);
 
                 code.Reset();
-                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                await DuetAPI.Commands.Code.ParseAsync(memoryStream, code, buffer);
                 Assert.AreEqual(CodeFlags.EnforceAbsolutePosition | CodeFlags.IsLastCode, code.Flags);
                 Assert.AreEqual(2, code.Indent);
                 Assert.AreEqual(2, code.LineNumber);
 
                 code.Reset();
-                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                await DuetAPI.Commands.Code.ParseAsync(memoryStream, code, buffer);
                 Assert.AreEqual(CodeFlags.EnforceAbsolutePosition, code.Flags);
                 Assert.AreEqual(4, code.Indent);
                 Assert.AreEqual(3, code.LineNumber);
 
                 code.Reset();
-                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                await DuetAPI.Commands.Code.ParseAsync(memoryStream, code, buffer);
                 Assert.AreEqual(CodeFlags.EnforceAbsolutePosition | CodeFlags.IsLastCode, code.Flags);
                 Assert.AreEqual(4, code.Indent);
                 Assert.AreEqual(3, code.LineNumber);
 
                 code.Reset();
-                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                await DuetAPI.Commands.Code.ParseAsync(memoryStream, code, buffer);
                 Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
                 Assert.AreEqual(2, code.Indent);
                 Assert.AreEqual(4, code.LineNumber);
 
                 code.Reset();
-                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                await DuetAPI.Commands.Code.ParseAsync(memoryStream, code, buffer);
                 Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
                 Assert.AreEqual(0, code.Indent);
                 Assert.AreEqual(5, code.LineNumber);
@@ -1056,17 +1053,16 @@ namespace UnitTests.Commands
             codeBytes = Encoding.UTF8.GetBytes(codeString);
             await using (MemoryStream memoryStream = new(codeBytes))
             {
-                using StreamReader reader = new(memoryStream);
                 CodeParserBuffer buffer = new(128, true);
 
                 DuetAPI.Commands.Code code = new();
-                await DuetAPI.Commands.Code.ParseAsync(reader, code, buffer);
+                await DuetAPI.Commands.Code.ParseAsync(memoryStream, code, buffer);
                 Assert.AreEqual(CodeType.MCode, code.Type);
                 Assert.AreEqual(291, code.MajorNumber);
-                Assert.AreEqual("Please go to <a href=\"https://www.duet3d.com/StartHere\" target=\"_blank\">this</a> page for further instructions on how to set it up.", (string?)code.Parameter('P'));
-                Assert.AreEqual("Welcome to your new Duet 3!", (string?)code.Parameter('R'));
-                Assert.AreEqual(1, (int)code.Parameter('S'));
-                Assert.AreEqual(0, (int)code.Parameter('T'));
+                Assert.AreEqual("Please go to <a href=\"https://www.duet3d.com/StartHere\" target=\"_blank\">this</a> page for further instructions on how to set it up.", code.GetString('P'));
+                Assert.AreEqual("Welcome to your new Duet 3!", code.GetString('R'));
+                Assert.AreEqual(1, code.GetInt('S'));
+                Assert.AreEqual(0, code.GetInt('T'));
             }
         }
 
@@ -1076,10 +1072,9 @@ namespace UnitTests.Commands
 
             byte[] codeBytes = Encoding.UTF8.GetBytes(code);
             using MemoryStream memoryStream = new(codeBytes);
-            using StreamReader reader = new(memoryStream);
             CodeParserBuffer buffer = new(128, true);
             DuetAPI.Commands.Code codeObj = new();
-            DuetAPI.Commands.Code.ParseAsync(reader, codeObj, buffer).AsTask().Wait();
+            DuetAPI.Commands.Code.ParseAsync(memoryStream, codeObj, buffer).AsTask().Wait();
             yield return codeObj;
         }
     }

@@ -1,5 +1,4 @@
 ﻿using DuetAPI.ObjectModel;
-using DuetPiManagementPlugin.Network.Protocols;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;

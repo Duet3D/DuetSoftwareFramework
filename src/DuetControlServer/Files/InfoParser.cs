@@ -31,7 +31,6 @@ namespace DuetControlServer.Files
         public static async Task<GCodeFileInfo> Parse(string fileName, bool readThumbnailContent)
         {
             await using FileStream fileStream = new(fileName, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
-            using StreamReader reader = new(fileStream, Encoding.UTF8, true, Settings.FileBufferSize);
             GCodeFileInfo result = new()
             {
                 FileName = await FilePath.ToVirtualAsync(fileName),
@@ -47,8 +46,8 @@ namespace DuetControlServer.Files
                     fileName.EndsWith(".nc", StringComparison.InvariantCultureIgnoreCase)
                ))
             {
-                await ParseHeader(reader, readThumbnailContent, result);
-                await ParseFooter(reader, result);
+                await ParseHeader(fileStream, readThumbnailContent, result);
+                await ParseFooter(fileStream, result);
 
                 while (result.Filament.Count > 0 && result.Filament[0] == 0F)
                 {
@@ -72,23 +71,23 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Parse the header of a G-code file
         /// </summary>
-        /// <param name="reader">Stream reader</param>
+        /// <param name="stream">Stream</param>
         /// <param name="readThumbnailContent">Whether thumbnail content shall be returned</param>
         /// <param name="partialFileInfo">G-code file information</param>
         /// <returns>Asynchronous task</returns>
-        private static async Task ParseHeader(StreamReader reader, bool readThumbnailContent, GCodeFileInfo partialFileInfo)
+        private static async Task ParseHeader(Stream stream, bool readThumbnailContent, GCodeFileInfo partialFileInfo)
         {
             Code code = new();
             CodeParserBuffer codeParserBuffer = new(Settings.FileBufferSize, true);
 
             bool lastCodeHadInfo = false, gotNewInfo = false;
-            long fileReadLimit = Math.Min(Settings.FileInfoReadLimitHeader, reader.BaseStream.Length);
-            while (codeParserBuffer.GetPosition(reader) < fileReadLimit || gotNewInfo)
+            long fileReadLimit = Math.Min(Settings.FileInfoReadLimitHeader, stream.Length);
+            while (codeParserBuffer.GetPosition(stream) < fileReadLimit || gotNewInfo)
             {
                 Program.CancellationToken.ThrowIfCancellationRequested();
 
                 gotNewInfo = false;
-                if (!await DuetAPI.Commands.Code.ParseAsync(reader, code, codeParserBuffer))
+                if (!await DuetAPI.Commands.Code.ParseAsync(stream, code, codeParserBuffer))
                 {
                     continue;
                 }
@@ -101,7 +100,7 @@ namespace DuetControlServer.Files
                     gotNewInfo |= (partialFileInfo.NumLayers == 0) && FindNumLayers(code.Comment, ref partialFileInfo);
                     gotNewInfo |= FindFilamentUsed(code.Comment, ref partialFileInfo);
                     gotNewInfo |= string.IsNullOrEmpty(partialFileInfo.GeneratedBy) && FindGeneratedBy(code.Comment, ref partialFileInfo);
-                    gotNewInfo |= await ParseThumbnails(reader, code, codeParserBuffer, partialFileInfo, readThumbnailContent);
+                    gotNewInfo |= await ParseThumbnails(stream, code, codeParserBuffer, partialFileInfo, readThumbnailContent);
                 }
 
                 // Is the file info complete?
@@ -117,14 +116,14 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Parse the footer of a G-code file
         /// </summary>
-        /// <param name="reader">Stream reader</param>
+        /// <param name="stream">Stream</param>
         /// <param name="partialFileInfo">G-code file information</param>
         /// <returns>Asynchronous task</returns>
-        private static async Task ParseFooter(StreamReader reader, GCodeFileInfo partialFileInfo)
+        private static async Task ParseFooter(Stream stream, GCodeFileInfo partialFileInfo)
         {
-            reader.BaseStream.Seek(0, SeekOrigin.End);
-            ReadLineFromEndData readData = new(reader.BaseStream.Position);
-            char[] buffer = new char[Settings.FileBufferSize];
+            stream.Seek(0, SeekOrigin.End);
+            ReadLineFromEndData readData = new(stream.Position);
+            byte[] buffer = new byte[Settings.FileBufferSize];
 
             Code code = new();
             bool inRelativeMode = false, lastLineHadInfo = false, hadFilament = partialFileInfo.Filament.Count > 0;
@@ -133,7 +132,7 @@ namespace DuetControlServer.Files
                 Program.CancellationToken.ThrowIfCancellationRequested();
 
                 // Read another line
-                if (!await ReadLineFromEndAsync(reader, buffer, readData))
+                if (!await ReadLineFromEndAsync(stream, buffer, readData))
                 {
                     break;
                 }
@@ -158,16 +157,12 @@ namespace DuetControlServer.Files
                                 inRelativeMode = (code.MajorNumber != 91);
                                 gotNewInfo = true;
                             }
-                            else if (code.MajorNumber == 0 || code.MajorNumber == 1)
+                            else if ((code.MajorNumber == 0 || code.MajorNumber == 1) && code.TryGetFloat('Z', out float zParam) &&
+                                     (code.Comment is null || !code.Comment.TrimStart().StartsWith("E", StringComparison.InvariantCultureIgnoreCase)))
                             {
-                                // G0/G1 is an absolute move, see if there is a Z parameter present
-                                CodeParameter? zParam = code.Parameter('Z');
-                                if (zParam is not null && (zParam.Type == typeof(int) || zParam.Type == typeof(float)) &&
-                                    (code.Comment is null || !code.Comment.TrimStart().StartsWith("E", StringComparison.InvariantCultureIgnoreCase)))
-                                {
-                                    gotNewInfo = true;
-                                    partialFileInfo.Height = zParam;
-                                }
+                                // G0/G1 is an absolute move
+                                gotNewInfo = true;
+                                partialFileInfo.Height = zParam;
                             }
                         }
                         else if (!string.IsNullOrWhiteSpace(code.Comment))
@@ -192,7 +187,7 @@ namespace DuetControlServer.Files
                 }
                 lastLineHadInfo = gotNewInfo;
             }
-            while (reader.BaseStream.Length - reader.BaseStream.Position < Settings.FileInfoReadLimitFooter + buffer.Length);
+            while (stream.Length - stream.Position < Settings.FileInfoReadLimitFooter + buffer.Length);
         }
 
         /// <summary>
@@ -229,7 +224,7 @@ namespace DuetControlServer.Files
         /// <param name="buffer">Internal buffer</param>
         /// <param name="bufferPointer">Pointer to the next byte in the buffer</param>
         /// <returns>Read result</returns>
-        private static async ValueTask<bool> ReadLineFromEndAsync(StreamReader reader, char[] buffer, ReadLineFromEndData readData)
+        private static async ValueTask<bool> ReadLineFromEndAsync(Stream stream, byte[] buffer, ReadLineFromEndData readData)
         {
             string line = string.Empty;
             do
@@ -241,23 +236,22 @@ namespace DuetControlServer.Files
                         return false;
                     }
 
-                    reader.DiscardBufferedData();
                     if (readData.FilePosition < buffer.Length)
                     {
-                        reader.BaseStream.Seek(0, SeekOrigin.Begin);
-                        readData.BufferPointer = Math.Min(await reader.ReadBlockAsync(buffer), (int)readData.FilePosition);
+                        stream.Seek(0, SeekOrigin.Begin);
+                        readData.BufferPointer = Math.Min(await stream.ReadAsync(buffer), (int)readData.FilePosition);
                         readData.FilePosition = 0;
                     }
                     else
                     {
                         readData.FilePosition -= buffer.Length;
-                        reader.BaseStream.Seek(readData.FilePosition, SeekOrigin.Begin);
-                        readData.BufferPointer = await reader.ReadBlockAsync(buffer);
+                        stream.Seek(readData.FilePosition, SeekOrigin.Begin);
+                        readData.BufferPointer = await stream.ReadAsync(buffer);
                         readData.FilePosition += buffer.Length - readData.BufferPointer;    // ... in case the number of chars read is different from the buffer length
                     }
                 }
 
-                char c = buffer[--readData.BufferPointer];
+                char c = (char)buffer[--readData.BufferPointer];
                 if (c == '\n' || line.Length > buffer.Length)
                 {
                     readData.Line = line;
@@ -521,12 +515,12 @@ namespace DuetControlServer.Files
         /// Check if the current code contains thumbnail data
         /// </summary>
         /// <param name="code">Code being parsed which must have a valid comment</param>
-        /// <param name="reader">Stream reader</param>
+        /// <param name="stream">Stream</param>
         /// <param name="parsedFileInfo">G-code file information</param>
         /// <param name="codeParserBuffer">Parser buffer</param>
         /// <param name="readThumbnailContent">Whether thumbnail content shall be returned</param>
         /// <returns>True if the code contains thumbnail data</returns>
-        private static async ValueTask<bool> ParseThumbnails(StreamReader reader, Code code, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, bool readThumbnailContent)
+        private static async ValueTask<bool> ParseThumbnails(Stream stream, Code code, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, bool readThumbnailContent)
         {
             if (code.Comment is null)
             {
@@ -539,19 +533,19 @@ namespace DuetControlServer.Files
             if (trimmedComment.StartsWith("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
             {
                 _logger.Debug("Found embedded thumbnail PNG image");
-                await ImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.PNG);
+                await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.PNG);
                 return true;
             }
             if (trimmedComment.StartsWith("thumbnail_JPG", StringComparison.InvariantCultureIgnoreCase))
             {
                 _logger.Debug("Found embedded thumbnail JPG Image");
-                await ImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.JPEG);
+                await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.JPEG);
                 return true;
             }
             if (trimmedComment.StartsWith("thumbnail_QOI", StringComparison.InvariantCultureIgnoreCase))
             {
                 _logger.Debug("Found embedded thumbnail QOI Image");
-                await ImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.QOI);
+                await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.QOI);
                 return true;
             }
 
@@ -559,7 +553,7 @@ namespace DuetControlServer.Files
             if (trimmedComment.Contains("Icon:"))
             {
                 _logger.Debug("Found Icon Image");
-                await IconImageParser.ProcessAsync(reader, codeParserBuffer, parsedFileInfo, code, readThumbnailContent);
+                await IconImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent);
                 return true;
             }
 

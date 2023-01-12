@@ -1,4 +1,5 @@
-﻿using DuetAPI.Commands;
+﻿using DuetAPI;
+using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using System;
 using System.Collections;
@@ -159,7 +160,7 @@ namespace DuetControlServer.Model
             // Regular G/M/T-code
             foreach (CodeParameter parameter in code.Parameters)
             {
-                if (parameter.IsExpression && ContainsSbcFields(parameter!))
+                if (parameter.IsExpression && ContainsSbcFields((string)parameter))
                 {
                     return true;
                 }

@@ -1,5 +1,4 @@
-﻿using DuetAPI.Commands;
-using DuetAPI.ObjectModel;
+﻿using DuetAPI.ObjectModel;
 using System;
 using System.IO;
 using System.Linq;
@@ -81,7 +80,7 @@ namespace DuetPiManagementPlugin.Network
         /// <param name="pParam">P parameter</param>
         /// <param name="sParam">S parameter</param>
         /// <returns>Configuration result</returns>
-        public static async Task<Message> SetConfig(int index, CodeParameter? pParam, CodeParameter? sParam)
+        public static async Task<Message> SetConfig(int index, string? pParam, int? sParam)
         {
             NetworkInterface iface = Get(index);
             StringBuilder result = new();
@@ -130,7 +129,7 @@ namespace DuetPiManagementPlugin.Network
                     {
                         // Find the network index
                         string networkList = await Command.Execute("wpa_cli", "list_networks");
-                        Regex ssidRegex = new($"^(\\d+)\\s+{Regex.Escape(sParam!)}\\W", RegexOptions.IgnoreCase);
+                        Regex ssidRegex = new($"^(\\d+)\\s+{Regex.Escape(pParam)}\\W", RegexOptions.IgnoreCase);
 
                         int networkIndex = -1;
                         using (StringReader reader = new(networkList))
@@ -206,10 +205,10 @@ namespace DuetPiManagementPlugin.Network
                     result.AppendLine(setResult);
                 }
 
-                if (sParam is not null && (iface.OperationalStatus != OperationalStatus.Up) != sParam)
+                if (sParam is not null && (iface.OperationalStatus != OperationalStatus.Up) != sParam > 0)
                 {
                     // Enable or disable the adapter if required
-                    result.AppendLine(await Command.Execute("ip", $"link set {iface.Name} {(sParam ? "up" : "down")}"));
+                    result.AppendLine(await Command.Execute("ip", $"link set {iface.Name} {(sParam > 0 ? "up" : "down")}"));
                 }
             }
             return new Message(MessageType.Success, result.ToString().Trim());

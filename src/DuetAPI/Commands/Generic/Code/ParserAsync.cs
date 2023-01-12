@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -7,14 +8,25 @@ namespace DuetAPI.Commands
     public partial class Code
     {
         /// <summary>
-        /// Parse the next available G/M/T-code from the given stream asynchronously
+        /// Parse the next available G/M/T-code from the given stream reader asynchronously
         /// </summary>
-        /// <param name="reader">Input to read from</param>
+        /// <param name="reader">Stream reader to read from</param>
         /// <param name="result">Code to fill</param>
         /// <param name="buffer">Internal buffer for parsing codes</param>
         /// <returns>Whether anything could be read</returns>
         /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
-        public static async ValueTask<bool> ParseAsync(StreamReader reader, Code result, CodeParserBuffer buffer)
+        [Obsolete("This call is deprecated because the buffer position of a StreamReader is not accessible. Pass your stream directly instead")]
+        public static ValueTask<bool> ParseAsync(StreamReader reader, Code result, CodeParserBuffer buffer) => ParseAsync(reader.BaseStream, result, buffer);
+
+        /// <summary>
+        /// Parse the next available G/M/T-code from the given stream asynchronously
+        /// </summary>
+        /// <param name="stream">Stream to read from</param>
+        /// <param name="result">Code to fill</param>
+        /// <param name="buffer">Internal buffer for parsing codes</param>
+        /// <returns>Whether anything could be read</returns>
+        /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
+        public static async ValueTask<bool> ParseAsync(Stream stream, Code result, CodeParserBuffer buffer)
         {
             char letter = '\0', lastC, c = '\0';
             string value = string.Empty;
@@ -36,14 +48,14 @@ namespace DuetAPI.Commands
                 // Check if the buffer needs to be filled
                 if (buffer.BufferPointer >= buffer.BufferSize)
                 {
-                    buffer.BufferSize = await reader.ReadAsync(buffer.Buffer, 0, buffer.Buffer.Length);
+                    buffer.BufferSize = await stream.ReadAsync(buffer.Buffer, 0, buffer.Buffer.Length);
                     buffer.BufferPointer = 0;
                 }
 
                 // Read the next character
                 lastC = c;
-                c = (buffer.BufferPointer < buffer.BufferSize) ? buffer.Buffer[buffer.BufferPointer] : '\n';
-                result.Length += reader.CurrentEncoding.GetByteCount(buffer.Buffer, buffer.BufferPointer, 1);
+                c = (buffer.BufferPointer < buffer.BufferSize) ? (char)buffer.Buffer[buffer.BufferPointer] : '\n';
+                result.Length++;
                 buffer.BufferPointer++;
 
                 if (c == '\n' && !hadLineNumber && buffer.LineNumber is not null)
@@ -79,10 +91,10 @@ namespace DuetAPI.Commands
                         // Add next character to the comment unless it is the "artificial" 0-character termination
                         result.Comment += c;
                     }
-                    else if (result.Comment is null)
+                    else
                     {
                         // Something started a comment, so the comment cannot be null any more
-                        result.Comment = string.Empty;
+                        result.Comment ??= string.Empty;
                     }
                     continue;
                 }
@@ -97,12 +109,8 @@ namespace DuetAPI.Commands
                     }
                     else
                     {
-                        // End of encapsulated comment
-                        if (result.Comment is null)
-                        {
-                            // Something started a comment, so the comment cannot be null any more
-                            result.Comment = string.Empty;
-                        }
+                        // End of encapsulated comment, it cannot be null any more
+                        result.Comment ??= string.Empty;
                         inEncapsulatedComment = false;
                     }
                     continue;
@@ -119,11 +127,11 @@ namespace DuetAPI.Commands
                         {
                             if (buffer.BufferPointer >= buffer.BufferSize)
                             {
-                                buffer.BufferSize = await reader.ReadAsync(buffer.Buffer, 0, buffer.Buffer.Length);
+                                buffer.BufferSize = await stream.ReadAsync(buffer.Buffer, 0, buffer.Buffer.Length);
                                 buffer.BufferPointer = 0;
                             }
 
-                            char nextC = (buffer.BufferPointer < buffer.BufferSize) ? buffer.Buffer[buffer.BufferPointer] : '\0';
+                            char nextC = (buffer.BufferPointer < buffer.BufferSize) ? (char)buffer.Buffer[buffer.BufferPointer] : '\0';
                             if (nextC == '"')
                             {
                                 // Subsequent double quotes are treated as a single quote char
@@ -214,11 +222,11 @@ namespace DuetAPI.Commands
                         {
                             if (buffer.BufferPointer >= buffer.BufferSize)
                             {
-                                buffer.BufferSize = await reader.ReadAsync(buffer.Buffer, 0, buffer.Buffer.Length);
+                                buffer.BufferSize = await stream.ReadAsync(buffer.Buffer, 0, buffer.Buffer.Length);
                                 buffer.BufferPointer = 0;
                             }
 
-                            char nextC = (buffer.BufferPointer < buffer.BufferSize) ? buffer.Buffer[buffer.BufferPointer] : '\0';
+                            char nextC = (buffer.BufferPointer < buffer.BufferSize) ? (char)buffer.Buffer[buffer.BufferPointer] : '\0';
                             if (nextC == '"')
                             {
                                 // Treat subsequent double quotes as a single double-quote char
@@ -537,7 +545,7 @@ namespace DuetAPI.Commands
                                 result.KeywordArgument = string.Empty;
                                 inCondition = true;
                             }
-                            else if (result.Parameter(letter) is null)
+                            else if (!result.HasParameter(letter))
                             {
                                 AddParameter(result, letter, value, false, buffer.MayRepeatCode);
                             }
@@ -555,7 +563,7 @@ namespace DuetAPI.Commands
                                 letter = '@';
                             }
 
-                            if (result.Parameter(letter) is null)
+                            if (!result.HasParameter(letter))
                             {
                                 if (wasExpression && (!value.StartsWith("{") || !value.EndsWith("}")))
                                 {

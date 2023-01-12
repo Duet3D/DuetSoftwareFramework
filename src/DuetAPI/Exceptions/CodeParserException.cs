@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DuetAPI.Commands
+namespace DuetAPI
 {
     /// <summary>
     /// Exception class that is thrown when a G/M/T-code could not be parsed
@@ -23,7 +23,7 @@ namespace DuetAPI.Commands
         /// </summary>
         /// <param name="message">Exception message</param>
         /// <param name="code">Code being parsed</param>
-        public CodeParserException(string message, Code code)
+        public CodeParserException(string message, Commands.Code code)
             : base(message + ((code?.LineNumber is not null) ? $" in line {code.LineNumber}" : string.Empty)) { }
 
         /// <summary>

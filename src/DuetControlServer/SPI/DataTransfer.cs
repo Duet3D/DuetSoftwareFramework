@@ -14,7 +14,6 @@ using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.Model;
 using DuetControlServer.Utility;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 
 namespace DuetControlServer.SPI
 {
