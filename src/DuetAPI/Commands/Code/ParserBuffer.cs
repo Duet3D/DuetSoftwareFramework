@@ -12,15 +12,16 @@ namespace DuetAPI.Commands
         /// Default constructor of this class
         /// </summary>
         /// <param name="bufferSize">How many bytes to buffer when reading from a file</param>
-        /// <param name="lineNumbersValid">Indicates if line numbers are valid</param>
-        public CodeParserBuffer(int bufferSize, bool lineNumbersValid)
+        /// <param name="isFile">Indicates if line numbers and file positions are valid</param>
+        public CodeParserBuffer(int bufferSize, bool isFile)
         {
-            Buffer = new byte[bufferSize];
-            LineNumber = lineNumbersValid ? (long?)1 : null;
+            Content = new byte[bufferSize];
+            IsFile = isFile;
+            LineNumber = isFile ? (long?)1 : null;
         }
 
         /// <summary>
-        /// Indicates if the last 
+        /// Indicates if a NL was seen before
         /// </summary>
         internal bool SeenNewLine = true;
 
@@ -35,19 +36,19 @@ namespace DuetAPI.Commands
         internal bool EnforcingAbsolutePosition;
 
         /// <summary>
-        /// Internal buffer
+        /// Buffer content
         /// </summary>
-        internal readonly byte[] Buffer;
+        internal readonly byte[] Content;
 
         /// <summary>
         /// Pointer in the buffer
         /// </summary>
-        internal int BufferPointer;
+        internal int Pointer;
 
         /// <summary>
         /// How many bytes are available for reading
         /// </summary>
-        internal int BufferSize;
+        internal int Size;
 
         /// <summary>
         /// Invalidate the buffer internally
@@ -58,6 +59,11 @@ namespace DuetAPI.Commands
             Indent = 0;
             EnforcingAbsolutePosition = false;
         }
+
+        /// <summary>
+        /// Indicates if this buffer is used for reading from a file
+        /// </summary>
+        internal bool IsFile;
 
         /// <summary>
         /// Current line number
@@ -80,7 +86,7 @@ namespace DuetAPI.Commands
         public void Invalidate()
         {
             InvalidateData();
-            BufferSize = 0;
+            Size = 0;
             LineNumber = null;
             LastGCode = -1;
         }
@@ -91,13 +97,13 @@ namespace DuetAPI.Commands
         /// <param name="reader">Stream reader to read from</param>
         /// <returns>Actual position in bytes</returns>
         [Obsolete("This call is deprecated because the buffer position of a StreamReader is not accessible. Pass your stream directly instead")]
-        public long GetPosition(StreamReader reader) => reader.BaseStream.Position - BufferSize + BufferPointer;
+        public long GetPosition(StreamReader reader) => reader.BaseStream.Position - Size + Pointer;
 
         /// <summary>
         /// Get the actual byte position when reading from a stream
         /// </summary>
         /// <param name="stream">Stream to read from</param>
         /// <returns>Actual position in bytes</returns>
-        public long GetPosition(Stream stream) => stream.Position - BufferSize + BufferPointer;
+        public long GetPosition(Stream stream) => stream.Position - Size + Pointer;
     }
 }

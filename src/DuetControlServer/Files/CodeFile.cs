@@ -80,7 +80,7 @@ namespace DuetControlServer.Files
                     _fileStream.Seek(value, SeekOrigin.Begin);
                     _position = value;
                     _parserBuffer.Invalidate();
-                    _parserBuffer.LineNumber = LineNumber = (value == 0) ? 1 : null;
+                    _parserBuffer.LineNumber = (value == 0) ? 1 : null;
                 }
             }
         }
@@ -108,11 +108,6 @@ namespace DuetControlServer.Files
         /// Result of the last G/M/T-code (0 = success, 1 = warning, 2 = error)
         /// </summary>
         public int LastResult { get; set; }
-
-        /// <summary>
-        /// Number of the current line
-        /// </summary>
-        public long? LineNumber { get; private set; } = 1;
 
         /// <summary>
         /// Returns the length of the file in bytes
@@ -194,8 +189,6 @@ namespace DuetControlServer.Files
                 Code code = sharedCode ?? new Code();
                 code.Channel = Channel;
                 code.File = this;
-                code.LineNumber = LineNumber;
-                code.FilePosition = Position;
 
                 // Read the next available code
                 bool codeRead;
@@ -218,7 +211,6 @@ namespace DuetControlServer.Files
                         // Get the next code
                         codeRead = await DuetAPI.Commands.Code.ParseAsync(_fileStream, code, _parserBuffer);
                         _position += code.Length ?? 0;
-                        LineNumber = code.LineNumber;
                     }
                     while (!codeRead && _parserBuffer.GetPosition(_fileStream) < _fileStream.Length);
 
@@ -261,7 +253,7 @@ namespace DuetControlServer.Files
                                     using (await _lock.LockAsync(Program.CancellationToken))
                                     {
                                         Position = state.StartingCode.FilePosition ?? 0;
-                                        _parserBuffer.LineNumber = LineNumber = state.StartingCode.LineNumber;
+                                        _parserBuffer.LineNumber = state.StartingCode.LineNumber;
                                         state.ProcessBlock = true;
                                         state.ContinueLoop = false;
                                         state.Iterations++;

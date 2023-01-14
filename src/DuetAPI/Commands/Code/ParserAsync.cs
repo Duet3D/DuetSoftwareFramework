@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace DuetAPI.Commands
@@ -25,9 +27,40 @@ namespace DuetAPI.Commands
         /// <param name="result">Code to fill</param>
         /// <param name="buffer">Internal buffer for parsing codes</param>
         /// <returns>Whether anything could be read</returns>
+        /// <exception cref="ArgumentException">BOM from start of file showed that this file is neither ASCII nor UTF-8</exception>
         /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
         public static async ValueTask<bool> ParseAsync(Stream stream, Code result, CodeParserBuffer buffer)
         {
+            // Deal with BOM when starting to parse a file. Previously this was done by the used StreamReader instance
+            if (buffer.IsFile && stream.Position + buffer.Pointer == 0)
+            {
+                buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length);
+                buffer.Pointer = 0;
+
+                if (buffer.Size >= 2 && buffer.Content[0] == 0xFF && (buffer.Content[1] & 0xFE) == 0xFE)
+                {
+                    throw new ArgumentException("Cannot parse codes from UTF-16 files. Use UTF-8 or ASCII instead");
+                }
+                else if (buffer.Size >= 3 && buffer.Content[0] == 0xEF && buffer.Content[1] == 0xBB && buffer.Content[2] == 0xBF)
+                {
+                    // Skip BOM in UTF-8 files
+                    buffer.Pointer = 3;
+                }
+                else if (buffer.Size >= 4)
+                {
+                    if ((buffer.Content[0] == 0x00 && buffer.Content[1] == 0x00 && buffer.Content[2] == 0xFF && buffer.Content[3] == 0xFF) ||
+                        (buffer.Content[0] == 0xFF && buffer.Content[1] == 0xFF && buffer.Content[2] == 0x00 && buffer.Content[3] == 0x00))
+                    {
+                        throw new ArgumentException("Cannot parse codes from UTF-32 files. Use UTF-8 or ASCII instead");
+                    }
+                    if (buffer.Content[0] == 0x2B && buffer.Content[1] == 0x2F && buffer.Content[2] == 0x76 && buffer.Content[3] is 0x38 or 0x39 or 0x2B or 0x2F)
+                    {
+                        throw new ArgumentException("Cannot parse codes from UTF-7 files. Use UTF-8 or ASCII instead");
+                    }
+                }
+            }
+
+            // Start parsing
             char letter = '\0', lastC, c = '\0';
             string value = string.Empty;
 
@@ -41,22 +74,23 @@ namespace DuetAPI.Commands
             result.Flags = buffer.EnforcingAbsolutePosition ? CodeFlags.EnforceAbsolutePosition : CodeFlags.None;
             result.Indent = buffer.Indent;
             result.Length = 0;
+            result.FilePosition = buffer.IsFile ? stream.Position + buffer.Pointer : null;
             result.LineNumber = buffer.LineNumber;
 
             do
             {
                 // Check if the buffer needs to be filled
-                if (buffer.BufferPointer >= buffer.BufferSize)
+                if (buffer.Pointer >= buffer.Size)
                 {
-                    buffer.BufferSize = await stream.ReadAsync(buffer.Buffer, 0, buffer.Buffer.Length);
-                    buffer.BufferPointer = 0;
+                    buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length);
+                    buffer.Pointer = 0;
                 }
 
                 // Read the next character
                 lastC = c;
-                c = (buffer.BufferPointer < buffer.BufferSize) ? (char)buffer.Buffer[buffer.BufferPointer] : '\n';
+                c = (buffer.Pointer < buffer.Size) ? (char)buffer.Content[buffer.Pointer] : '\n';
                 result.Length++;
-                buffer.BufferPointer++;
+                buffer.Pointer++;
 
                 if (c == '\n' && !hadLineNumber && buffer.LineNumber is not null)
                 {
@@ -78,7 +112,7 @@ namespace DuetAPI.Commands
                         (nextChar != 'T' || result.Type == CodeType.TCode || result.Parameters.Any(item => item.Letter == 'T')))
                     {
                         // Note that M-codes may have G or T parameters but only one
-                        buffer.BufferPointer--;
+                        buffer.Pointer--;
                         break;
                     }
                 }
@@ -125,18 +159,18 @@ namespace DuetAPI.Commands
 
                         if (c == '"')
                         {
-                            if (buffer.BufferPointer >= buffer.BufferSize)
+                            if (buffer.Pointer >= buffer.Size)
                             {
-                                buffer.BufferSize = await stream.ReadAsync(buffer.Buffer, 0, buffer.Buffer.Length);
-                                buffer.BufferPointer = 0;
+                                buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length);
+                                buffer.Pointer = 0;
                             }
 
-                            char nextC = (buffer.BufferPointer < buffer.BufferSize) ? (char)buffer.Buffer[buffer.BufferPointer] : '\0';
+                            char nextC = (buffer.Pointer < buffer.Size) ? (char)buffer.Content[buffer.Pointer] : '\0';
                             if (nextC == '"')
                             {
                                 // Subsequent double quotes are treated as a single quote char
                                 result.KeywordArgument += c;
-                                buffer.BufferPointer++;
+                                buffer.Pointer++;
                                 result.Length++;
                             }
                             else
@@ -220,18 +254,18 @@ namespace DuetAPI.Commands
                         }
                         else if (c == '"')
                         {
-                            if (buffer.BufferPointer >= buffer.BufferSize)
+                            if (buffer.Pointer >= buffer.Size)
                             {
-                                buffer.BufferSize = await stream.ReadAsync(buffer.Buffer, 0, buffer.Buffer.Length);
-                                buffer.BufferPointer = 0;
+                                buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length);
+                                buffer.Pointer = 0;
                             }
 
-                            char nextC = (buffer.BufferPointer < buffer.BufferSize) ? (char)buffer.Buffer[buffer.BufferPointer] : '\0';
+                            char nextC = (buffer.Pointer < buffer.Size) ? (char)buffer.Content[buffer.Pointer] : '\0';
                             if (nextC == '"')
                             {
                                 // Treat subsequent double quotes as a single double-quote char
                                 value += '"';
-                                buffer.BufferPointer++;
+                                buffer.Pointer++;
                                 result.Length++;
                             }
                             else
