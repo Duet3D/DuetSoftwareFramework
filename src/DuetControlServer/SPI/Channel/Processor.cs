@@ -902,23 +902,23 @@ namespace DuetControlServer.SPI.Channel
         /// <returns>True if the code could be buffered</returns>
         private bool BufferCode(Code pendingCode)
         {
-            // Figure out how much space this code needs
-            if (pendingCode.Stage != Codes.PipelineStage.Firmware)
-            {
-                pendingCode.BinarySize = Communication.Consts.BufferedCodeHeaderSize + DataTransfer.GetCodeSize(pendingCode);
-                pendingCode.Stage = Codes.PipelineStage.Firmware;
-            }
-
-            // Don't send cancelled codes to the firmware
-            if (pendingCode.CancellationToken.IsCancellationRequested)
-            {
-                Codes.Processor.CancelCode(pendingCode);
-                return true;
-            }
-
-            // Try to send it to RepRapFirmware
             try
             {
+                // Figure out how much space this code needs
+                if (pendingCode.Stage != Codes.PipelineStage.Firmware)
+                {
+                    pendingCode.BinarySize = Communication.Consts.BufferedCodeHeaderSize + DataTransfer.GetCodeSize(pendingCode);
+                    pendingCode.Stage = Codes.PipelineStage.Firmware;
+                }
+
+                // Don't send cancelled codes to the firmware
+                if (pendingCode.CancellationToken.IsCancellationRequested)
+                {
+                    Codes.Processor.CancelCode(pendingCode);
+                    return true;
+                }
+
+                // Try to send it to RepRapFirmware
                 if ((BytesBuffered == 0 || BytesBuffered + pendingCode.BinarySize <= Settings.MaxBufferSpacePerChannel) &&
                     Interface.SendCode(pendingCode, pendingCode.BinarySize))
                 {

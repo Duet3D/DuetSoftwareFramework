@@ -1,4 +1,5 @@
-﻿using DuetAPI.Commands;
+﻿using DuetAPI;
+using DuetAPI.Commands;
 using DuetAPI.Utility;
 using NUnit.Framework;
 using System.Collections.Generic;
@@ -202,6 +203,19 @@ namespace UnitTests.Commands
             }
         }
 #endif
+
+        [Test]
+        public void TestBadM291()
+        {
+            using MemoryStream stream = new(Encoding.UTF8.GetBytes("M291 P\"Please select the tool to load.Press\"Cancel\" to abort\" R\"Load Tool\" S4 K{\"Cancel\",\"Tool#1\",\"Tool#2\",\"Tool#3\"};display message box with choices"));
+            using StreamReader reader = new(stream);
+            DuetAPI.Commands.Code result = new();
+            Assert.Catch<CodeParserException>(() => DuetAPI.Commands.Code.Parse(reader, result));
+
+            stream.Seek(0, SeekOrigin.Begin);
+            CodeParserBuffer buffer = new(8192, false);
+            Assert.CatchAsync<CodeParserException>(async () => await DuetAPI.Commands.Code.ParseAsync(stream, result, buffer));
+        }
 
         [Test]
         public void ParseM302Compact()

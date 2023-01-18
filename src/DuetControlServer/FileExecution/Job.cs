@@ -170,6 +170,11 @@ namespace DuetControlServer.FileExecution
             {
                 throw new ArgumentException("Code has no file position and cannot be used for sync requests", nameof(code));
             }
+            if (code.Flags.HasFlag(CodeFlags.IsFromMacro))
+            {
+                // Sync points are only valid within the job file
+                return Task.FromResult(true);
+            }
 
             lock (_syncRequests)
             {

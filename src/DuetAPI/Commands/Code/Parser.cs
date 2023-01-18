@@ -655,6 +655,11 @@ namespace DuetAPI.Commands
         /// <param name="isSingleParameter">Whether the parameter is definitely a single parameter</param>
         private static void AddParameter(Code code, char letter, string value, bool isQuoted, bool isSingleParameter)
         {
+            if (letter != '@' && !char.IsLetter(letter))
+            {
+                throw new CodeParserException($"Illegal parameter letter '{letter}'");
+            }
+
             if (isQuoted || isSingleParameter)
             {
                 code.Parameters.Add(new CodeParameter(letter, value, isQuoted, false));
@@ -664,7 +669,15 @@ namespace DuetAPI.Commands
                 code.Parameters.Add(new CodeParameter(letter, string.Empty, false, false));
                 foreach (char c in value)
                 {
-                    code.Parameters.Add(new CodeParameter(c, string.Empty, false, false));
+                    if (c == '"')
+                    {
+                        throw new CodeParserException("Unterminated string", code);
+                    }
+                    if (c != '@' && !char.IsLetter(c))
+                    {
+                        throw new CodeParserException($"Illegal parameter letter '{c}'");
+                    }
+                    code.Parameters.Add(new CodeParameter(c, string.Empty, false, false)); 
                 }
             }
         }

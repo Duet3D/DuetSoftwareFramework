@@ -433,7 +433,6 @@ namespace DuetControlServer.FileExecution
             if (result is not null)
             {
                 result.CancellationToken = CancellationToken;
-                result.FilePosition = null;
                 result.Flags |= CodeFlags.Asynchronous | CodeFlags.IsFromMacro;
                 result.Macro = this;
                 if (IsConfig) { result.Flags |= CodeFlags.IsFromConfig; }
