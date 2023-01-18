@@ -261,7 +261,7 @@ namespace DuetWebServer.Controllers
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [DisableRequestSizeLimit]
         [HttpPost("rr_upload")]
-        public async Task<IActionResult> UploadFile(string name, string time, string crc32, [FromServices] ISessionStorage sessionStorage)
+        public async Task<IActionResult> UploadFile(string name, string time, string? crc32, [FromServices] ISessionStorage sessionStorage)
         {
             name = HttpUtility.UrlDecode(name);
 
@@ -279,27 +279,36 @@ namespace DuetWebServer.Controllers
                         Directory.CreateDirectory(directory);
                     }
 
-                    uint computedCrc32 = 0;
-                    await using (FileStream stream = new(resolvedPath, FileMode.Create, FileAccess.ReadWrite))
+                    if (string.IsNullOrEmpty(crc32))
                     {
-                        // Write file
+                        // Write plain file
+                        await using FileStream stream = new(resolvedPath, FileMode.Create, FileAccess.ReadWrite);
                         await Request.Body.CopyToAsync(stream);
-
-                        // Compute CRC32 if necessary
-                        if (!string.IsNullOrEmpty(crc32))
-                        {
-                            stream.Seek(0, SeekOrigin.Begin);
-                            computedCrc32 = await Utility.CRC32.Calculate(stream);
-                        }
                     }
-
-                    // Verify CRC32 checksum if necessary
-                    if (!string.IsNullOrEmpty(crc32) && !computedCrc32.ToString("x8").Equals(crc32, StringComparison.InvariantCultureIgnoreCase))
+                    else
                     {
-                        _logger.LogWarning("CRC32 check failed in rr_upload ({0} != {1:x8})", crc32, computedCrc32);
-                        _lastUploadSuccessful = false;
-                        System.IO.File.Delete(resolvedPath);
-                        return Content("{\"err\":1}", "application/json");
+                        uint computedCrc32 = 0;
+                        await using (FileStream stream = new(resolvedPath, FileMode.Create, FileAccess.ReadWrite))
+                        {
+                            // Write file
+                            await Request.Body.CopyToAsync(stream);
+
+                            // Compute CRC32
+                            if (!string.IsNullOrEmpty(crc32))
+                            {
+                                stream.Seek(0, SeekOrigin.Begin);
+                                computedCrc32 = await Utility.CRC32.Calculate(stream);
+                            }
+                        }
+
+                        // Verify CRC32 checksum
+                        if (!computedCrc32.ToString("x8").Equals(crc32, StringComparison.InvariantCultureIgnoreCase))
+                        {
+                            _logger.LogWarning("CRC32 check failed in rr_upload ({0} != {1:x8})", crc32, computedCrc32);
+                            _lastUploadSuccessful = false;
+                            System.IO.File.Delete(resolvedPath);
+                            return Content("{\"err\":1}", "application/json");
+                        }
                     }
 
                     // Set last modified time if applicable
