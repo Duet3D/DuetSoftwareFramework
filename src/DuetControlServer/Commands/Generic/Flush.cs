@@ -31,7 +31,7 @@ namespace DuetControlServer.Commands
 
             // Wait for it to be flushed
             Code? codeBeingIntercepted = IPC.Processors.CodeInterception.GetCodeBeingIntercepted(Connection, out _);
-            return await ((codeBeingIntercepted is not null) ? Codes.Processor.FlushAsync(codeBeingIntercepted, false, false, SyncFileStreams) : Codes.Processor.FlushAsync(Channel));
+            return await ((codeBeingIntercepted is not null) ? Codes.Processor.FlushAsync(codeBeingIntercepted, false, false, SyncFileStreams, IfExecuting) : Codes.Processor.FlushAsync(Channel));
         }
     }
 }

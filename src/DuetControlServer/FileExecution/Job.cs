@@ -170,11 +170,6 @@ namespace DuetControlServer.FileExecution
             {
                 throw new ArgumentException("Code has no file position and cannot be used for sync requests", nameof(code));
             }
-            if (code.Flags.HasFlag(CodeFlags.IsFromMacro))
-            {
-                // Sync points are only valid within the job file
-                return Task.FromResult(true);
-            }
 
             lock (_syncRequests)
             {
@@ -388,7 +383,8 @@ namespace DuetControlServer.FileExecution
                         catch (OperationCanceledException)
                         {
                             // Code has been cancelled, don't log this.
-                            // Note this can happen as well when the file being printed is exchanged or when a pausable macro is interrupted
+                            // Note this can happen as well when the file being printed is exchanged, when a pausable macro is interrupted,
+                            // or when a code interceptor attempted to intercept a code on an inactive channel
                         }
                         catch (CodeParserException cpe)
                         {

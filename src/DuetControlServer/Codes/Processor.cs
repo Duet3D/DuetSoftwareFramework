@@ -86,8 +86,9 @@ namespace DuetControlServer.Codes
         /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
         /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
         /// <param name="syncFileStreams">Whether the file streams are supposed to be synchronized (if applicable)</param>
+        /// <param name="ifExecuting">Return true only if the corresponding code input is actually active (ignored if syncFileStreams is true)</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static async Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true, bool syncFileStreams = true)
+        public static async Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true, bool syncFileStreams = false, bool ifExecuting = true)
         {
             if (code is null)
             {
@@ -100,11 +101,21 @@ namespace DuetControlServer.Codes
                 return false;
             }
 
-            // If this request is coming from a File channel, make sure we get both streams in sync.
-            // For now, skip this check if the code is indented (i.e. in a conditional code block that may be never reached)
-            if (code.IsFromFileChannel && code.Indent == 0 && syncFileStreams)
+            if (syncFileStreams && code.IsFromFileChannel)
             {
+                // Wait for both file streams to reach the same position
                 return await FileExecution.Job.DoSync(code);
+            }
+            else if (ifExecuting)
+            {
+                // Make sure the current code channel is executing G/M/T-codes
+                using (await Model.Provider.AccessReadOnlyAsync(code.CancellationToken))
+                {
+                    if (Model.Provider.Get.Inputs[code.Channel]?.Active != true)
+                    {
+                        return false;
+                    }
+                }
             }
 
             // Done

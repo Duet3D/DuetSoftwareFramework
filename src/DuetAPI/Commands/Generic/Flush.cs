@@ -19,8 +19,20 @@ namespace DuetAPI.Commands
         public CodeChannel Channel { get; set; }
 
         /// <summary>
-        /// Whether the File and File2 streams are supposed to synchronize at the same code if a code is being intercepted (recommended)
+        /// Whether the File and File2 streams are supposed to synchronize if a code is being intercepted
         /// </summary>
-        public bool SyncFileStreams { get; set; } = true;
+        /// <remarks>
+        /// This option should be used with care, under certain circumstances this can lead to a deadlock!
+        /// </remarks>
+        public bool SyncFileStreams { get; set; } = false;
+
+        /// <summary>
+        /// Check if the corresponding channel is actually executing codes (i.e. if it is active).
+        /// If the input channel is not active, this command returns false
+        /// </summary>
+        /// <remarks>
+        /// This option is ignored if <see cref="SyncFileStreams"/> is true
+        /// </remarks>
+        public bool IfExecuting { get; set; } = true;
     }
 }

@@ -5,7 +5,6 @@ using DuetAPI.Utility;
 using DuetControlServer.Files;
 using DuetControlServer.Model;
 using DuetControlServer.Utility;
-using Nito.AsyncEx;
 using System;
 using System.Globalization;
 using System.IO;
@@ -27,20 +26,15 @@ namespace DuetControlServer.Codes.Handlers
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
         /// <summary>
-        /// Async monitor to ensure correct order of M0/M1/M2 when cancelling a job file from the File/File2 channels
-        /// </summary>
-        private static readonly AsyncMonitor _stopPrintMonitor = new();
-
-        /// <summary>
         /// Process an M-code that should be interpreted by the control server
         /// </summary>
         /// <param name="code">Code to process</param>
         /// <returns>Result of the code if the code completed, else null</returns>
         public static async Task<Message?> Process(Commands.Code code)
         {
-            if (code.IsFromFileChannel && FileExecution.Job.IsSimulating)
+            if (code.IsFromFileChannel && FileExecution.Job.IsSimulating && code.MajorNumber is not 0 and not 1 and not 2)
             {
-                // Ignore M-codes from files in simulation mode...
+                // Ignore most M-codes from files in simulation mode...
                 return null;
             }
 
@@ -52,30 +46,24 @@ namespace DuetControlServer.Codes.Handlers
                 case 0:
                 case 1:
                 case 2:
-                    if (await Processor.FlushAsync(code))
+                    if (await Processor.FlushAsync(code, syncFileStreams: true))
                     {
-                        // File2 must wait for File to cancel the print first, else the cancellation token may be invalidated
-                        if (code.Channel == CodeChannel.File2)
+                        // Attempt to cancel the print from any channel other than File2
+                        if (code.Channel != CodeChannel.File2)
                         {
-                            using (await _stopPrintMonitor.EnterAsync(Program.CancellationToken))
+                            using (await FileExecution.Job.LockAsync())
                             {
-                                await _stopPrintMonitor.WaitAsync(Program.CancellationToken);
-                            }
-                        }
-
-                        // Attempt to cancel the print
-                        using (await FileExecution.Job.LockAsync())
-                        {
-                            if (code.Channel != CodeChannel.File2 && FileExecution.Job.IsFileSelected)
-                            {
-                                // M0/M1/M2 is permitted from inside a job file, but only permitted from elsewhere if the job is already paused
-                                if (!code.IsFromFileChannel && !FileExecution.Job.IsPaused)
+                                if (FileExecution.Job.IsFileSelected)
                                 {
-                                    return new Message(MessageType.Error, "Pause the print before attempting to cancel it");
-                                }
+                                    // M0/M1/M2 is permitted from inside a job file, but only permitted from elsewhere if the job is already paused
+                                    if (!code.IsFromFileChannel && !FileExecution.Job.IsPaused)
+                                    {
+                                        return new Message(MessageType.Error, "Pause the print before attempting to cancel it");
+                                    }
 
-                                // Invalidate the print file and make sure no more codes are read from it
-                                await FileExecution.Job.CancelAsync();
+                                    // Invalidate the print file and make sure no more codes are read from it
+                                    await FileExecution.Job.CancelAsync();
+                                }
                             }
                         }
 
@@ -83,13 +71,6 @@ namespace DuetControlServer.Codes.Handlers
                         if (code.IsFromFileChannel)
                         {
                             code.ResetCancellationToken();
-                            if (code.Channel == CodeChannel.File)
-                            {
-                                using (await _stopPrintMonitor.EnterAsync(Program.CancellationToken))
-                                {
-                                    _stopPrintMonitor.Pulse();
-                                }
-                            }
                         }
                         break;
                     }
@@ -1025,6 +1006,11 @@ namespace DuetControlServer.Codes.Handlers
                         // Append our own diagnostics to RRF's M122 output
                         await Diagnostics(code.Result);
                     }
+                    break;
+
+                // Select movement queue number
+                case 596:
+                    await Provider.WaitForUpdateAsync(code.CancellationToken);      // This changes inputs[].active, so sync the OM here
                     break;
 
                 // Reset controller

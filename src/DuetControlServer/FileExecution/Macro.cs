@@ -336,6 +336,7 @@ namespace DuetControlServer.FileExecution
                     catch (OperationCanceledException)
                     {
                         // Code has been cancelled, don't log this. This can happen when a pausable macro is interrupted
+                        // or if a code interceptor attempted to intercept a code on an inactive channel
                     }
                     catch (CodeParserException cpe)
                     {
