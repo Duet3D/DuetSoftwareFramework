@@ -14,7 +14,7 @@ on:
         - stable
 
 jobs:
-  log-the-inputs:
+  build:
     runs-on: ubuntu-22.04
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
@@ -22,13 +22,13 @@ jobs:
 
       # Install NodeJS environment (TODO: Update to 16 when v3.5 is out)
       - name: Set up NodeJs
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: 14
 
       # Install .NET environment
       - name: Set up .NET 6
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v3
         with:
           dotnet-version: 6
 
@@ -50,6 +50,7 @@ jobs:
           ./build.sh --signing-key=C406404B2459FE0B1C6CC19D3738126EDA91C86B --target-arch=armhf --dest-dir=./armhf
           ./build.sh --signing-key=C406404B2459FE0B1C6CC19D3738126EDA91C86B --target-arch=arm64 --dest-dir=./arm64
 
+  upload:
       # Upload packages to pkg.duet3d.com
       - name: Upload package files
         uses: Creepios/sftp-action@v1.0.3
