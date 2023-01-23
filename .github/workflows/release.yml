@@ -1,0 +1,40 @@
+name: Publish .NET packages on GitHub and NuGet
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      # Install .NET environment
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 6
+
+      # Build DSF
+      - name: Build DSF packages
+        run: |
+          cd src
+          dotnet restore
+          dotnet build
+
+      # Publish packages
+      - name: Publish packages
+        run: |
+          # Publish to GitHub package registry
+          dotnet nuget push src/DuetAPI/bin/Debug/DuetAPI.*.nupkg --api-key $GH_API_KEY --source "https://nuget.pkg.github.com/Duet3D/index.json"
+          dotnet nuget push src/DuetAPIClient/bin/Debug/DuetAPIClient.*.nupkg --api-key $GH_API_KEY --source "https://nuget.pkg.github.com/Duet3D/index.json"
+          dotnet nuget push src/DuetHttpClient/bin/Debug/DuetHttpClient.*.nupkg --api-key $GH_API_KEY --source "https://nuget.pkg.github.com/Duet3D/index.json"
+          # Publish to NuGet package registry
+          dotnet nuget push src/DuetAPI/bin/Debug/DuetAPI.*.nupkg --api-key $NUGET_API_KEY --source "nuget.org"
+          dotnet nuget push src/DuetAPIClient/bin/Debug/DuetAPIClient.*.nupkg --api-key $NUGET_API_KEY --source "nuget.org"
+          dotnet nuget push src/DuetHttpClient/bin/Debug/DuetHttpClient.*.nupkg --api-key $NUGET_API_KEY --source "nuget.org"
+        env: |
+          GH_API_KEY: ${{ secrets.GITHUB_API_KEY }}
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
