@@ -40,7 +40,6 @@ jobs:
       - name: Configure GPG key
         run: |
           echo -n "$GPG_SIGNING_KEY" | base64 --decode | gpg --import
-          gpg --list-secret-keys
         env:
           GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
 
@@ -48,10 +47,10 @@ jobs:
       - name: Build DSF packages
         run: |
           cd pkg
-          ./build.sh --signing-key=C406404B2459FE0B1C6CC19D3738126EDA91C86B --target-arch=armhf --dest-dir=./armhf
-          ./build.sh --signing-key=C406404B2459FE0B1C6CC19D3738126EDA91C86B --target-arch=arm64 --dest-dir=./arm64
+          ./build.sh --signing-key=C406404B2459FE0B1C6CC19D3738126EDA91C86B --target-arch=armhf --dest-dir=./out
+          ./build.sh --signing-key=C406404B2459FE0B1C6CC19D3738126EDA91C86B --target-arch=arm64 --dest-dir=./out
 
-      # Upload packages to pkg.duet3d.com
+      # Upload armhf packages to pkg.duet3d.com
       - name: Upload package files
         uses: Creepios/sftp-action@v1.0.3
         with:
@@ -60,5 +59,15 @@ jobs:
           username: ${{ secrets.PKG_SSH_USER }}
           password: ${{ secrets.PKG_SSH_PASS }}
           privateKey: ${{ secrets.PKG_SSH_KEY }}
-          localPath: ./pkg/armhf
-          remotePath: /tmp/${{ inputs.target }}
+          localPath: ./pkg/out
+          remotePath: /var/www/pkg/dists/${{ inputs.target }}/armv7
+
+      # Refresh package lists if the dev target is selected
+      - name: Refresh package lists
+        if: inputs.target == "dev"
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: pkg.duet3d.com
+          username: ${{ secrets.PKG_SSH_USER }}
+          key: ${{ secrets.PKG_SSH_KEY }}
+          script: update-pkg-feed dev
