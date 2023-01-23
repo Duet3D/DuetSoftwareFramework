@@ -34,7 +34,7 @@ jobs:
 
       # Install required tools
       - name: Install dependencies
-        run: sudo apt install -y dpkg-sig xmllint
+        run: sudo apt install -y dpkg-sig libxml2-utils
       
       # Import GPG key for package signing
       - name: Configure GPG key
