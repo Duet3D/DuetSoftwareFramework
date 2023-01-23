@@ -64,7 +64,7 @@ jobs:
 
       # Refresh package lists if the dev target is selected
       - name: Refresh package lists
-        if: inputs.target == "dev"
+        if: inputs.target == 'dev'
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: pkg.duet3d.com
