@@ -21,13 +21,13 @@ jobs:
       - uses: actions/checkout@v3
 
       # Install NodeJS environment (TODO: Update to 16 when v3.5 is out)
-      - name: Set up NodeJs
+      - name: Set up NodeJS
         uses: actions/setup-node@v3
         with:
           node-version: 14
 
       # Install .NET environment
-      - name: Set up .NET 6
+      - name: Set up .NET
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: 6
@@ -40,6 +40,7 @@ jobs:
       - name: Configure GPG key
         run: |
           echo -n "$GPG_SIGNING_KEY" | base64 --decode | gpg --import
+          gpg --list-secret-keys
         env:
           GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
 
