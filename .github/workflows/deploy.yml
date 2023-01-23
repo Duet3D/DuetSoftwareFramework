@@ -1,3 +1,5 @@
+name: Build and and deploy DSF packages
+
 on:
   workflow_dispatch:
     inputs:
