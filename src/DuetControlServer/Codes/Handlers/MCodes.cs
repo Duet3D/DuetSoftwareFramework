@@ -852,7 +852,7 @@ namespace DuetControlServer.Codes.Handlers
 
                                 // There are now two different IAP binaries, check which one to use
                                 iapFile = Provider.Get.Boards[0].IapFileNameSBC;
-                                if (code.TryGetString('P', out firmwareFile))
+                                if (!code.TryGetString('P', out firmwareFile))
                                 {
                                     firmwareFile = Provider.Get.Boards[0].FirmwareFileName;
                                 }

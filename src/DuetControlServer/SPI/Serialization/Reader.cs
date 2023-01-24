@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
+using System.Threading;
 using DuetAPI;
 using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
@@ -264,8 +267,121 @@ namespace DuetControlServer.SPI.Serialization
                     result = boolArray;
                     break;
                 case DataType.Expression:
-                    string errorMessage = Encoding.UTF8.GetString(from.Slice(bytesRead, header.IntValue));
-                    result = new CodeParserException(errorMessage);
+                    ReadOnlySpan<byte> expressionContent = from.Slice(bytesRead, header.IntValue);
+                    result = null;
+                    try
+                    {
+                        // Read an entire object from a JSON reader
+                        Dictionary<string, object?> readObject(ref Utf8JsonReader reader)
+                        {
+                            Dictionary<string, object?> result = new();
+                            string? propertyName = null;
+                            while (reader.Read())
+                            {
+                                switch (reader.TokenType)
+                                {
+                                    case JsonTokenType.PropertyName:
+                                        propertyName = reader.GetString();
+                                        break;
+                                    case JsonTokenType.StartObject:
+                                        result.Add(propertyName!, readObject(ref reader));
+                                        break;
+                                    case JsonTokenType.EndObject:
+                                        return result;
+                                    case JsonTokenType.StartArray:
+                                        result.Add(propertyName!, readArray(ref reader));
+                                        break;
+                                    case JsonTokenType.String:
+                                        result.Add(propertyName!, reader.GetString());
+                                        break;
+                                    case JsonTokenType.Number:
+                                        result.Add(propertyName!, reader.GetDouble());
+                                        break;
+                                    case JsonTokenType.True:
+                                        result.Add(propertyName!, true);
+                                        break;
+                                    case JsonTokenType.False:
+                                        result.Add(propertyName!, false);
+                                        break;
+                                    case JsonTokenType.Null:
+                                        result.Add(propertyName!, null);
+                                        break;
+                                }
+                            }
+                            throw new JsonException();
+                        }
+
+                        // Read an entire array from a JSON reader
+                        object?[] readArray(ref Utf8JsonReader reader)
+                        {
+                            List<object?> result = new();
+                            while (reader.Read())
+                            {
+                                switch (reader.TokenType)
+                                {
+                                    case JsonTokenType.StartObject:
+                                        result.Add(readObject(ref reader));
+                                        break;
+                                    case JsonTokenType.StartArray:
+                                        result.Add(readArray(ref reader));
+                                        break;
+                                    case JsonTokenType.EndArray:
+                                        return result.ToArray();
+                                    case JsonTokenType.String:
+                                        result.Add(reader.GetString());
+                                        break;
+                                    case JsonTokenType.Number:
+                                        result.Add(reader.GetDouble());
+                                        break;
+                                    case JsonTokenType.True:
+                                        result.Add(true);
+                                        break;
+                                    case JsonTokenType.False:
+                                        result.Add(false);
+                                        break;
+                                    case JsonTokenType.Null:
+                                        result.Add(null);
+                                        break;
+                                }
+                            }
+                            throw new JsonException();
+                        }
+
+                        // Try to parse JSON from the received data. If that fails, it must be an error message
+                        Utf8JsonReader reader = new(expressionContent);
+                        while (result == null && reader.Read())
+                        {
+                            switch (reader.TokenType)
+                            {
+                                case JsonTokenType.StartObject:
+                                    result = readObject(ref reader);
+                                    break;
+                                case JsonTokenType.StartArray:
+                                    result = readArray(ref reader);
+                                    break;
+                                case JsonTokenType.String:
+                                    result = reader.GetString();
+                                    break;
+                                case JsonTokenType.Number:
+                                    result = reader.GetDouble();
+                                    break;
+                                case JsonTokenType.True:
+                                    result = true;
+                                    break;
+                                case JsonTokenType.False:
+                                    result = false;
+                                    break;
+                                case JsonTokenType.Null:
+                                    result = null;
+                                    return AddPadding(bytesRead);
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        string expressionValue = Encoding.UTF8.GetString(expressionContent);
+                        result = new CodeParserException(expressionValue);
+                    }
                     break;
                 case DataType.DateTime:
                     result = DateTime.Parse(Encoding.UTF8.GetString(from.Slice(bytesRead, header.IntValue)));
