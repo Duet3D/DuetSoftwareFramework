@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Web;
 using DuetAPI;
+using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
@@ -33,15 +36,64 @@ namespace DuetWebServer.Controllers
         /// </summary>
         private readonly IConfiguration _configuration;
 
+        #region Logging
         /// <summary>
         /// Logger instance
         /// </summary>
         private readonly ILogger _logger;
 
         /// <summary>
-        /// Host application lifetime
+        /// Log an information
         /// </summary>
-        private readonly IHostApplicationLifetime _applicationLifetime;
+        /// <param name="message">Message</param>
+        /// <param name="memberName">Method calling this method</param>
+        private void LogInformation(string message, [CallerMemberName] string memberName = "")
+        {
+            _logger.LogInformation("[{method}] {message}", memberName, message);
+        }
+
+        /// <summary>
+        /// Log a warning
+        /// </summary>
+        /// <param name="message">Message</param>
+        /// <param name="memberName">Method calling this method</param>
+        private void LogWarning(string message, [CallerMemberName] string memberName = "")
+        {
+            _logger.LogWarning("[{method}] {message}", memberName, message);
+        }
+
+        /// <summary>
+        /// Log a warning
+        /// </summary>
+        /// <param name="e">Exception</param>
+        /// <param name="message">Message</param>
+        /// <param name="memberName">Method calling this method</param>
+        private void LogWarning(Exception? exception, string message, [CallerMemberName] string memberName = "")
+        {
+            _logger.LogWarning(exception, "[{method}] {message}", memberName, message);
+        }
+
+        /// <summary>
+        /// Log an error
+        /// </summary>
+        /// <param name="message">Message</param>
+        /// <param name="memberName">Method calling this method</param>
+        private void LogError(string message, [CallerMemberName] string memberName = "")
+        {
+            _logger.LogError("[{method}] {message}", memberName, message);
+        }
+
+        /// <summary>
+        /// Log an error
+        /// </summary>
+        /// <param name="e">Exception</param>
+        /// <param name="message">Message</param>
+        /// <param name="memberName">Method calling this method</param>
+        private void LogError(Exception? exception, string message, [CallerMemberName] string memberName = "")
+        {
+            _logger.LogError(exception, "[{method}] {message}", memberName, message);
+        }
+        #endregion
 
         /// <summary>
         /// Object model provider
@@ -55,11 +107,10 @@ namespace DuetWebServer.Controllers
         /// <param name="logger">Logger instance</param>
         /// <param name="applicationLifetime">Application lifecycle instance</param>
         /// <param name="modelProvider">Model provider</param>
-        public RepRapFirmwareController(IConfiguration configuration, ILogger<RepRapFirmwareController> logger, IHostApplicationLifetime applicationLifetime, IModelProvider modelProvider)
+        public RepRapFirmwareController(IConfiguration configuration, ILogger<RepRapFirmwareController> logger, IModelProvider modelProvider)
         {
             _configuration = configuration;
             _logger = logger;
-            _applicationLifetime = applicationLifetime;
             _modelProvider = modelProvider;
         }
 
@@ -75,12 +126,12 @@ namespace DuetWebServer.Controllers
         /// </returns>
         [AllowAnonymous]
         [HttpGet("rr_connect")]
-        public async Task<IActionResult> Connect(string password, [FromServices] ISessionStorage sessionStorage)
+        public async Task<IActionResult> Connect(string? password, [FromServices] ISessionStorage sessionStorage)
         {
             try
             {
                 using CommandConnection connection = await BuildConnection();
-                if (await connection.CheckPassword(password))
+                if (await connection.CheckPassword(password ?? string.Empty))
                 {
                     int sessionId = await connection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, HttpContext.Connection.RemoteIpAddress!.ToString());
                     _ = sessionStorage.MakeSessionKey(sessionId, HttpContext.Connection.RemoteIpAddress.ToString(), true);
@@ -112,7 +163,7 @@ namespace DuetWebServer.Controllers
                 }
                 else
                 {
-                    _logger.LogWarning("Invalid password");
+                    LogWarning("Invalid password");
                     return Content("{\"err\":1,\"isEmulated\":true}", "application/json");
                 }
             }
@@ -124,7 +175,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(Connect)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -133,14 +184,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(Connect)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(Connect)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(Connect)}] Failed to handle connect request");
+                LogWarning(e, "Failed to handle connect request");
                 return StatusCode(500, e.Message);
             }
         }
@@ -176,7 +227,7 @@ namespace DuetWebServer.Controllers
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Failed to handle rr_disconnect request");
+                LogError(e, "Failed to handle rr_disconnect request");
             }
             return Content("{\"err\":1}", "application/json");
         }
@@ -193,18 +244,21 @@ namespace DuetWebServer.Controllers
         /// </returns>
         [HttpGet("rr_gcode")]
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
-        public async Task<IActionResult> DoCode(string gcode, [FromServices] ISessionStorage sessionStorage)
+        public async Task<IActionResult> DoCode(string? gcode)
         {
             try
             {
-                using CommandConnection connection = await BuildConnection();
-                _logger.LogInformation($"[{nameof(DoCode)}] Executing code '{gcode}'");
-                _ = await connection.PerformSimpleCode(gcode, CodeChannel.HTTP, true);
+                if (!string.IsNullOrWhiteSpace(gcode))
+                {
+                    using CommandConnection connection = await BuildConnection();
+                    LogInformation($"Executing code '{gcode}'");
+                    _ = await connection.PerformSimpleCode(gcode, CodeChannel.HTTP, true);
+                }
                 return Content("{\"bufferSpace\":255,\"err\":0}", "application/json");
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Failed to handle rr_gcode request");
+                LogError(e, "Failed to handle rr_gcode request");
             }
             return Content("{\"err\":1}", "application/json");
         }
@@ -226,7 +280,7 @@ namespace DuetWebServer.Controllers
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Failed to handle rr_reply request");
+                LogError(e, "Failed to handle rr_reply request");
             }
             return Content("{\"err\":1}", "application/json");
         }
@@ -261,74 +315,76 @@ namespace DuetWebServer.Controllers
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [DisableRequestSizeLimit]
         [HttpPost("rr_upload")]
-        public async Task<IActionResult> UploadFile(string name, string time, string? crc32, [FromServices] ISessionStorage sessionStorage)
+        public async Task<IActionResult> UploadFile(string? name, string? time, string? crc32, [FromServices] ISessionStorage sessionStorage)
         {
-            name = HttpUtility.UrlDecode(name);
-
             try
             {
-                sessionStorage.SetLongRunningHttpRequest(HttpContext.User, true);
-                try
+                if (!string.IsNullOrWhiteSpace(name))
                 {
-                    string resolvedPath = await ResolvePath(name);
+                    name = HttpUtility.UrlDecode(name);
+                    sessionStorage.SetLongRunningHttpRequest(HttpContext.User, true);
+                    try
+                    {
+                        string resolvedPath = await ResolvePath(name);
 
-                    // Create directory if necessary
-                    string directory = Path.GetDirectoryName(resolvedPath)!;
-                    if (!Directory.Exists(directory))
-                    {
-                        Directory.CreateDirectory(directory);
-                    }
-
-                    if (string.IsNullOrEmpty(crc32))
-                    {
-                        // Write plain file
-                        await using FileStream stream = new(resolvedPath, FileMode.Create, FileAccess.ReadWrite);
-                        await Request.Body.CopyToAsync(stream);
-                    }
-                    else
-                    {
-                        uint computedCrc32 = 0;
-                        await using (FileStream stream = new(resolvedPath, FileMode.Create, FileAccess.ReadWrite))
+                        // Create directory if necessary
+                        string directory = Path.GetDirectoryName(resolvedPath)!;
+                        if (!Directory.Exists(directory))
                         {
-                            // Write file
-                            await Request.Body.CopyToAsync(stream);
+                            Directory.CreateDirectory(directory);
+                        }
 
-                            // Compute CRC32
-                            if (!string.IsNullOrEmpty(crc32))
+                        if (string.IsNullOrEmpty(crc32))
+                        {
+                            // Write plain file
+                            await using FileStream stream = new(resolvedPath, FileMode.Create, FileAccess.ReadWrite);
+                            await Request.Body.CopyToAsync(stream);
+                        }
+                        else
+                        {
+                            uint computedCrc32 = 0;
+                            await using (FileStream stream = new(resolvedPath, FileMode.Create, FileAccess.ReadWrite))
                             {
-                                stream.Seek(0, SeekOrigin.Begin);
-                                computedCrc32 = await Utility.CRC32.Calculate(stream);
+                                // Write file
+                                await Request.Body.CopyToAsync(stream);
+
+                                // Compute CRC32
+                                if (!string.IsNullOrEmpty(crc32))
+                                {
+                                    stream.Seek(0, SeekOrigin.Begin);
+                                    computedCrc32 = await Utility.CRC32.Calculate(stream);
+                                }
+                            }
+
+                            // Verify CRC32 checksum
+                            if (!computedCrc32.ToString("x8").Equals(crc32, StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                LogWarning($"CRC32 check failed in rr_upload ({crc32} != {computedCrc32:x8})");
+                                _lastUploadSuccessful = false;
+                                System.IO.File.Delete(resolvedPath);
+                                return Content("{\"err\":1}", "application/json");
                             }
                         }
 
-                        // Verify CRC32 checksum
-                        if (!computedCrc32.ToString("x8").Equals(crc32, StringComparison.InvariantCultureIgnoreCase))
+                        // Set last modified time if applicable
+                        if (!string.IsNullOrEmpty(time) && DateTime.TryParse(time, out DateTime lastModified))
                         {
-                            _logger.LogWarning("CRC32 check failed in rr_upload ({0} != {1:x8})", crc32, computedCrc32);
-                            _lastUploadSuccessful = false;
-                            System.IO.File.Delete(resolvedPath);
-                            return Content("{\"err\":1}", "application/json");
+                            System.IO.File.SetLastWriteTime(resolvedPath, lastModified);
                         }
-                    }
 
-                    // Set last modified time if applicable
-                    if (!string.IsNullOrEmpty(time) && DateTime.TryParse(time, out DateTime lastModified))
+                        _lastUploadSuccessful = true;
+                        return Content("{\"err\":0}", "application/json");
+                    }
+                    finally
                     {
-                        System.IO.File.SetLastWriteTime(resolvedPath, lastModified);
+                        sessionStorage.SetLongRunningHttpRequest(HttpContext.User, false);
                     }
-
-                    _lastUploadSuccessful = true;
-                    return Content("{\"err\":0}", "application/json");
-                }
-                finally
-                {
-                    sessionStorage.SetLongRunningHttpRequest(HttpContext.User, false);
                 }
             }
             catch (Exception e)
             {
                 _lastUploadSuccessful = false;
-                _logger.LogError(e, "Failed to handle rr_upload request");
+                LogError(e, "Failed to handle rr_upload request");
             }
             return Content("{\"err\":1}", "application/json");
         }
@@ -344,25 +400,27 @@ namespace DuetWebServer.Controllers
         /// (404) File not found
         /// </returns>_
         [HttpGet("rr_download")]
-        public async Task<IActionResult> DownloadFile(string name)
+        public async Task<IActionResult> DownloadFile(string? name)
         {
-            name = HttpUtility.UrlDecode(name);
-
             try
             {
-                string resolvedPath = await ResolvePath(name);
-                if (!System.IO.File.Exists(resolvedPath))
+                if (!string.IsNullOrWhiteSpace(name))
                 {
-                    _logger.LogWarning($"[{nameof(DownloadFile)}] Could not find file {name} (resolved to {resolvedPath})");
-                    return NotFound(HttpUtility.UrlPathEncode(name));
-                }
+                    name = HttpUtility.UrlDecode(name);
+                    string resolvedPath = await ResolvePath(name);
+                    if (!System.IO.File.Exists(resolvedPath))
+                    {
+                        LogWarning($"Could not find file {name} (resolved to {resolvedPath})");
+                        return NotFound(HttpUtility.UrlPathEncode(name));
+                    }
 
-                FileStream stream = new(resolvedPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                return File(stream, "application/octet-stream");
+                    FileStream stream = new(resolvedPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                    return File(stream, "application/octet-stream");
+                }
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Failed to handle rr_download request");
+                LogError(e, "Failed to handle rr_download request");
             }
             return Content("{\"err\":1}", "application/json");
         }
@@ -378,32 +436,33 @@ namespace DuetWebServer.Controllers
         /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpGet("rr_delete")]
-        public async Task<IActionResult> DeleteFileOrDirectory(string name)
+        public async Task<IActionResult> DeleteFileOrDirectory(string? name)
         {
-            name = HttpUtility.UrlDecode(name);
-
-            string resolvedPath = "n/a";
             try
             {
-                resolvedPath = await ResolvePath(name);
-
-                if (Directory.Exists(resolvedPath))
+                if (!string.IsNullOrWhiteSpace(name))
                 {
-                    Directory.Delete(resolvedPath);
-                    return Content("{\"err\":0}", "application/json");
-                }
+                    name = HttpUtility.UrlDecode(name);
+                    string resolvedPath = await ResolvePath(name);
 
-                if (System.IO.File.Exists(resolvedPath))
-                {
-                    System.IO.File.Delete(resolvedPath);
-                    return Content("{\"err\":0}", "application/json");
-                }
+                    if (Directory.Exists(resolvedPath))
+                    {
+                        Directory.Delete(resolvedPath);
+                        return Content("{\"err\":0}", "application/json");
+                    }
 
-                _logger.LogWarning($"[{nameof(DeleteFileOrDirectory)} Could not find file {name} (resolved to {resolvedPath})");
+                    if (System.IO.File.Exists(resolvedPath))
+                    {
+                        System.IO.File.Delete(resolvedPath);
+                        return Content("{\"err\":0}", "application/json");
+                    }
+
+                    LogWarning($"Could not find file {name} (resolved to {resolvedPath})");
+                }
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Failed to handle rr_delete request");
+                LogError(e, "Failed to handle rr_delete request");
             }
             return Content("{\"err\":1}", "application/json");
         }
@@ -417,16 +476,20 @@ namespace DuetWebServer.Controllers
         /// (200) JSON response
         /// </returns>
         [HttpGet("rr_filelist")]
-        public async Task<IActionResult> GetFileList(string dir, int first = -1)
+        public async Task<IActionResult> GetFileList(string? dir, int first = -1)
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(dir))
+                {
+                    return Content("{\"err\":1}");
+                }
                 string resolvedPath = await ResolvePath(dir);
                 return Content(FileLists.GetFileList(dir, resolvedPath, first), "application/json");
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Failed to handle rr_filelist request");
+                LogError(e, "Failed to handle rr_filelist request");
             }
             return Content("{\"err\":2}");
         }
@@ -440,16 +503,19 @@ namespace DuetWebServer.Controllers
         /// (200) JSON response
         /// </returns>
         [HttpGet("rr_files")]
-        public async Task<IActionResult> GetFiles(string dir, int first = 0, int flagDirs = 0)
+        public async Task<IActionResult> GetFiles(string? dir, int first = 0, int flagDirs = 0)
         {
             try
             {
-                string resolvedPath = await ResolvePath(dir);
-                return Content(FileLists.GetFiles(dir, resolvedPath, first, flagDirs != 0), "application/json");
+                if (!string.IsNullOrWhiteSpace(dir))
+                {
+                    string resolvedPath = await ResolvePath(dir);
+                    return Content(FileLists.GetFiles(dir, resolvedPath, first, flagDirs != 0), "application/json");
+                }
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Failed to handle rr_filelist request");
+                LogError(e, "Failed to handle rr_filelist request");
             }
             return Content("{\"err\":1}");
         }
@@ -464,30 +530,36 @@ namespace DuetWebServer.Controllers
         /// (503) Service Unavailable
         /// </returns>
         [HttpGet("rr_model")]
-        public async Task<IActionResult> GetModel(string key = "", string flags = "")
+        public async Task<IActionResult> GetModel(string? key = "", string? flags = "")
         {
             try
             {
                 // Check key and flags for valid chars
-                foreach (char c in key)
+                if (key is not null)
                 {
-                    if (!char.IsLetterOrDigit(c) && c != '.' && c != '[' && c != ']')
+                    foreach (char c in key)
                     {
-                        _logger.LogWarning("Invalid character in rr_model key parameter: '{0}'", c);
-                        return Content("{\"err\":1}", "application/json");
+                        if (!char.IsLetterOrDigit(c) && c != '.' && c != '[' && c != ']')
+                        {
+                            LogWarning($"Invalid character in rr_model key parameter: '{c}'");
+                            return Content("{\"err\":1}", "application/json");
+                        }
                     }
                 }
-                foreach (char c in flags)
+                if (flags is not null)
                 {
-                    if (!char.IsLetterOrDigit(c))
+                    foreach (char c in flags)
                     {
-                        _logger.LogWarning("Invalid character in rr_model flags parameter: '{0}'", c);
-                        return Content("{\"err\":1}", "application/json");
+                        if (!char.IsLetterOrDigit(c))
+                        {
+                            LogWarning($"Invalid character in rr_model flags parameter: '{c}'");
+                            return Content("{\"err\":1}", "application/json");
+                        }
                     }
                 }
 
                 // Update special "seqs" values in common live query result, retrieve partial DSF OM, or fall back to M409
-                if (string.IsNullOrWhiteSpace(key) && flags.Contains('f'))
+                if (string.IsNullOrWhiteSpace(key) && flags is not null && flags.Contains('f'))
                 {
                     // Get live values from RRF
                     using CommandConnection connection = await BuildConnection();
@@ -525,7 +597,7 @@ namespace DuetWebServer.Controllers
                     // Otherwise pass it on
                     return Content(response, "application/json");
                 }
-                else if (!key.Contains('[') && !flags.Contains('f'))
+                else if ((key is null || !key.Contains('[')) && (flags is null || !flags.Contains('f')))
                 {
                     // If no live parameters are requested, return data from the main DSF object model
                     using SubscribeConnection connection = await BuildSubscribeConnection(key + ".**");
@@ -533,14 +605,17 @@ namespace DuetWebServer.Controllers
 
                     // Get down to the requested depth
                     JsonElement result = queryResult.RootElement;
-                    foreach (string depth in key.Split('.'))
+                    if (key is not null)
                     {
-                        if (result.ValueKind == JsonValueKind.Object)
+                        foreach (string depth in key.Split('.'))
                         {
-                            foreach (var subItem in result.EnumerateObject())
+                            if (result.ValueKind == JsonValueKind.Object)
                             {
-                                result = subItem.Value;
-                                break;
+                                foreach (var subItem in result.EnumerateObject())
+                                {
+                                    result = subItem.Value;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -563,7 +638,7 @@ namespace DuetWebServer.Controllers
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Failed to handle rr_model request");
+                LogError(e, "Failed to handle rr_model request");
             }
             return StatusCode(503);
         }
@@ -580,11 +655,12 @@ namespace DuetWebServer.Controllers
         /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpGet("rr_move")]
-        public async Task<IActionResult> MoveFileOrDirectory(string old, string @new, string deleteexisting = "no")
+        public async Task<IActionResult> MoveFileOrDirectory(string? old, string? @new, string? deleteexisting = "no")
         {
             try
             {
-                string source = await ResolvePath(old), destination = await ResolvePath(@new);
+                string source = await ResolvePath(old ?? string.Empty);
+                string destination = await ResolvePath(@new ?? string.Empty);
 
                 // Deal with directories
                 if (Directory.Exists(source))
@@ -597,7 +673,7 @@ namespace DuetWebServer.Controllers
                         }
                         else
                         {
-                            _logger.LogWarning("Directory {0} already exists", old);
+                            LogWarning($"Directory {old} already exists");
                             return Content("{\"err\":1}", "application/json");
                         }
                     }
@@ -617,7 +693,7 @@ namespace DuetWebServer.Controllers
                         }
                         else
                         {
-                            _logger.LogWarning("File {0} already exists", old);
+                            LogWarning($"File {old} already exists");
                             return Content("{\"err\":1}", "application/json");
                         }
                     }
@@ -626,11 +702,11 @@ namespace DuetWebServer.Controllers
                     return Content("{\"err\":0}", "application/json");
                 }
 
-                _logger.LogWarning("File or directory {0} not found in rr_move", old);
+                LogWarning($"File or directory {old} not found in rr_move");
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Failed to handle rr_move request");
+                LogError(e, "Failed to handle rr_move request");
             }
             return Content("{\"err\":1}", "application/json");
         }
@@ -646,17 +722,20 @@ namespace DuetWebServer.Controllers
         /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpGet("rr_mkdir")]
-        public async Task<IActionResult> CreateDirectory(string dir)
+        public async Task<IActionResult> CreateDirectory(string? dir)
         {
             try
             {
-                string resolvedPath = await ResolvePath(dir);
-                Directory.CreateDirectory(resolvedPath);
-                return Content("{\"err\":0}", "application/json");
+                if (!string.IsNullOrWhiteSpace(dir))
+                {
+                    string resolvedPath = await ResolvePath(dir);
+                    Directory.CreateDirectory(resolvedPath);
+                    return Content("{\"err\":0}", "application/json");
+                }
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Failed to handle rr_mkdir request");
+                LogError(e, "Failed to handle rr_mkdir request");
             }
             return Content("{\"err\":1}", "application/json");
         }
@@ -677,7 +756,7 @@ namespace DuetWebServer.Controllers
         /// (200) JSON response
         /// </returns>
         [HttpGet("rr_fileinfo")]
-        public async Task<IActionResult> GetFileInfo(string name = "")
+        public async Task<IActionResult> GetFileInfo(string? name)
         {
             try
             {
@@ -700,7 +779,7 @@ namespace DuetWebServer.Controllers
                 string resolvedPath = await connection.ResolvePath(name);
                 if (!System.IO.File.Exists(resolvedPath))
                 {
-                    _logger.LogWarning($"[{nameof(GetFileInfo)}] Could not find file {name} (resolved to {resolvedPath})");
+                    LogWarning($"Could not find file {name} (resolved to {resolvedPath})");
                     return Content("{\"err\":1}", "application/json");
                 }
                 GCodeFileInfo info = await connection.GetFileInfo(resolvedPath, true);
@@ -767,7 +846,7 @@ namespace DuetWebServer.Controllers
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Failed to handle rr_fileinfo request");
+                LogError(e, "Failed to handle rr_fileinfo request");
             }
             return Content("{\"err\":1}", "application/json");
         }
@@ -783,7 +862,7 @@ namespace DuetWebServer.Controllers
         /// (200) JSON response
         /// </returns>
         [HttpGet("rr_thumbnail")]
-        public async Task<IActionResult> GetThumbnail(string name, long offset)
+        public async Task<IActionResult> GetThumbnail(string? name, long offset)
         {
             try
             {
@@ -791,7 +870,7 @@ namespace DuetWebServer.Controllers
                 using CommandConnection connection = await BuildConnection();
                 if (string.IsNullOrEmpty(name))
                 {
-                    _logger.LogWarning("Missing name parameter in rr_thumbnail");
+                    LogWarning("Missing name parameter in rr_thumbnail");
                     return Content("{\"err\":1}", "application/json");
                 }
 
@@ -799,7 +878,7 @@ namespace DuetWebServer.Controllers
                 string resolvedPath = await connection.ResolvePath(name);
                 if (!System.IO.File.Exists(resolvedPath))
                 {
-                    _logger.LogWarning($"[{nameof(GetThumbnail)}] Could not find file {name} (resolved to {resolvedPath})");
+                    LogWarning($"Could not find file {name} (resolved to {resolvedPath})");
                     return Content("{\"err\":1}", "application/json");
                 }
 
@@ -837,7 +916,7 @@ namespace DuetWebServer.Controllers
                 // Return result
                 if (data is null)
                 {
-                    _logger.LogWarning("Failed to find corresponding thumbnail in rr_thumbnail");
+                    LogWarning("Failed to find corresponding thumbnail in rr_thumbnail");
                     return Content("{\"err\":1}", "application/json");
                 }
                 return Content(JsonSerializer.Serialize(new
@@ -851,7 +930,7 @@ namespace DuetWebServer.Controllers
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Failed to handle rr_thumbnail request");
+                LogError(e, "Failed to handle rr_thumbnail request");
             }
             return Content("{\"err\":1}", "application/json");
         }

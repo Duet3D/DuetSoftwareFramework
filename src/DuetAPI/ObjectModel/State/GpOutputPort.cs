@@ -6,6 +6,16 @@
     public sealed class GpOutputPort : ModelObject
     {
         /// <summary>
+        /// PWM frequency of this port (in Hz)
+        /// </summary>
+        public int Freq
+        {
+            get => _freq;
+            set => SetPropertyValue(ref _freq, value);
+        }
+        private int freq;
+
+        /// <summary>
         /// PWM value of this port (0..1)
         /// </summary>
         public float Pwm

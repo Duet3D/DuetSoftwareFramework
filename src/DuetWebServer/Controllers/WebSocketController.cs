@@ -2,6 +2,7 @@
 using System.IO;
 using System.Net.Sockets;
 using System.Net.WebSockets;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -39,10 +40,53 @@ namespace DuetWebServer.Controllers
         /// </summary>
         private readonly IConfiguration _configuration;
 
+        #region Logging
         /// <summary>
         /// Logger instance
         /// </summary>
-        private readonly ILogger _logger;
+        private readonly ILogger _logger2;
+
+        /// <summary>
+        /// Log an information
+        /// </summary>
+        /// <param name="message">Message</param>
+        /// <param name="memberName">Method calling this method</param>
+        private void LogInformation(string message, [CallerMemberName] string memberName = "")
+        {
+            _logger2.LogInformation("[{method}] {message}", memberName, message);
+        }
+
+        /// <summary>
+        /// Log a warning
+        /// </summary>
+        /// <param name="message">Message</param>
+        /// <param name="memberName">Method calling this method</param>
+        private void LogWarning(string message, [CallerMemberName] string memberName = "")
+        {
+            _logger2.LogWarning("[{method}] {message}", memberName, message);
+        }
+
+        /// <summary>
+        /// Log an error
+        /// </summary>
+        /// <param name="message">Message</param>
+        /// <param name="memberName">Method calling this method</param>
+        private void LogError(string message, [CallerMemberName] string memberName = "")
+        {
+            _logger2.LogError("[{method}] {message}", memberName, message);
+        }
+
+        /// <summary>
+        /// Log an error
+        /// </summary>
+        /// <param name="e">Exception</param>
+        /// <param name="message">Message</param>
+        /// <param name="memberName">Method calling this method</param>
+        private void LogError(Exception? exception, string message, [CallerMemberName] string memberName = "")
+        {
+            _logger2.LogError(exception, "[{method}] {message}", memberName, message);
+        }
+        #endregion
 
         /// <summary>
         /// Host application lifetime
@@ -58,7 +102,7 @@ namespace DuetWebServer.Controllers
         public WebSocketController(IConfiguration configuration, ILogger<WebSocketController> logger, IHostApplicationLifetime applicationLifetime)
         {
             _configuration = configuration;
-            _logger = logger;
+            _logger2 = logger;
             _applicationLifetime = applicationLifetime;
         }
 
@@ -84,7 +128,7 @@ namespace DuetWebServer.Controllers
             {
                 // Not a WebSocket request
                 HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-                _logger.LogWarning("{0} did not send a WebSocket request", HttpContext.Connection.RemoteIpAddress);
+                LogWarning($"{HttpContext.Connection.RemoteIpAddress} did not send a WebSocket request");
                 return;
             }
 
@@ -92,7 +136,7 @@ namespace DuetWebServer.Controllers
             {
                 // Origin check failed
                 HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
-                _logger.LogWarning("Origin check failed for {0}", HttpContext.Connection.RemoteIpAddress);
+                LogWarning($"Origin check failed for {HttpContext.Connection.RemoteIpAddress}");
                 return;
             }
 
@@ -107,7 +151,7 @@ namespace DuetWebServer.Controllers
                     {
                         // Non-default password set and no sessionKey passed
                         HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
-                        _logger.LogWarning("Machine password is set but WebSocket request from {0} had no session key", HttpContext.Connection.RemoteIpAddress);
+                        LogWarning($"Machine password is set but WebSocket request from {HttpContext.Connection.RemoteIpAddress} had no session key");
                         return;
                     }
                 }
@@ -139,7 +183,7 @@ namespace DuetWebServer.Controllers
             {
                 // Session key passed but it is invalid
                 HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
-                _logger.LogWarning("WebSocket request from {0} passed an invalid session key", HttpContext.Connection.RemoteIpAddress);
+                LogWarning($"WebSocket request from {HttpContext.Connection.RemoteIpAddress} passed an invalid session key");
                 return;
             }
 
@@ -182,7 +226,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(WebSocketController)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError, "Incompatible DCS version");
                     return;
                 }
@@ -192,16 +236,16 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(WebSocketController)}] {startError}");
+                        LogError(startError);
                         await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, startError);
                         return;
                     }
 
-                    _logger.LogError($"[{nameof(WebSocketController)}] DCS is not started");
+                    LogError("DCS is not started");
                     await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, "Failed to connect to Duet, please check your connection (DCS is not started)");
                     return;
                 }
-                _logger.LogError(e, $"[{nameof(WebSocketController)}] Failed to connect to DCS");
+                LogError(e, "Failed to connect to DCS");
                 await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, e.Message);
                 return;
             }
@@ -209,7 +253,7 @@ namespace DuetWebServer.Controllers
             // Log this event
             string? ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
             int port = HttpContext.Connection.RemotePort;
-            _logger.LogInformation("WebSocket connected from {0}:{1}", ipAddress, port);
+            LogInformation($"WebSocket connected from {ipAddress}:{port}");
 
             // Register this client and keep it up-to-date
             using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_applicationLifetime.ApplicationStopping);
@@ -241,7 +285,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
-                    _logger.LogError($"[{nameof(WebSocketController)}] DCS has been stopped");
+                    LogError("DCS has been stopped");
                     await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, "DCS has been stopped");
                 }
                 else if (e is OperationCanceledException)
@@ -250,14 +294,14 @@ namespace DuetWebServer.Controllers
                 }
                 else
                 {
-                    _logger.LogError(e, $"[{nameof(WebSocketController)}] Connection from {ipAddress}:{port} terminated with an exception");
+                    LogError(e, $"Connection from {ipAddress}:{port} terminated with an exception");
                     await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError, e.Message);
                 }
             }
             finally
             {
                 cts.Cancel();
-                _logger.LogInformation("WebSocket disconnected from {0}:{1}", ipAddress, port);
+                LogInformation($"WebSocket disconnected from {ipAddress}:{port}");
             }
         }
 
@@ -307,7 +351,7 @@ namespace DuetWebServer.Controllers
                     }
                     else if (!string.IsNullOrWhiteSpace(line))
                     {
-                        _logger.LogWarning("Received unsupported line from WebSocket: '{0}'", line);
+                        LogWarning($"Received unsupported line from WebSocket: '{line}'");
                         await CloseConnection(webSocket, WebSocketCloseStatus.InvalidMessageType, UnsupportedCommandResponse);
                         break;
                     }

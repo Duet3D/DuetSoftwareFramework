@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -32,10 +33,53 @@ namespace DuetWebServer.Controllers
         /// </summary>
         private readonly IConfiguration _configuration;
 
+        #region Logging
         /// <summary>
         /// Logger instance
         /// </summary>
         private readonly ILogger _logger;
+
+        /// <summary>
+        /// Log an information
+        /// </summary>
+        /// <param name="message">Message</param>
+        /// <param name="memberName">Method calling this method</param>
+        private void LogInformation(string message, [CallerMemberName] string memberName = "")
+        {
+            _logger.LogInformation("[{method}] {message}", memberName, message);
+        }
+
+        /// <summary>
+        /// Log a warning
+        /// </summary>
+        /// <param name="message">Message</param>
+        /// <param name="memberName">Method calling this method</param>
+        private void LogWarning(string message, [CallerMemberName] string memberName = "")
+        {
+            _logger.LogWarning("[{method}] {message}", memberName, message);
+        }
+
+        /// <summary>
+        /// Log a warning
+        /// </summary>
+        /// <param name="e">Exception</param>
+        /// <param name="message">Message</param>
+        /// <param name="memberName">Method calling this method</param>
+        private void LogWarning(Exception? exception, string message, [CallerMemberName] string memberName = "")
+        {
+            _logger.LogWarning(exception, "[{method}] {message}", memberName, message);
+        }
+
+        /// <summary>
+        /// Log an error
+        /// </summary>
+        /// <param name="message">Message</param>
+        /// <param name="memberName">Method calling this method</param>
+        private void LogError(string message, [CallerMemberName] string memberName = "")
+        {
+            _logger.LogError("[{method}] {message}", memberName, message);
+        }
+        #endregion
 
         /// <summary>
         /// Host application lifetime
@@ -56,8 +100,6 @@ namespace DuetWebServer.Controllers
         }
 
         #region Authorization
-        // TODO Add challenge request here returning remote IP address and allow hashed password for Connect
-
         /// <summary>
         /// GET /machine/connect
         /// Check the password and register a new session on success
@@ -74,12 +116,12 @@ namespace DuetWebServer.Controllers
         /// </returns>
         [AllowAnonymous]
         [HttpGet("connect")]
-        public async Task<IActionResult> Connect(string password, [FromServices] ISessionStorage sessionStorage)
+        public async Task<IActionResult> Connect(string? password, [FromServices] ISessionStorage sessionStorage)
         {
             try
             {
                 using CommandConnection connection = await BuildConnection();
-                if (await connection.CheckPassword(password))
+                if (await connection.CheckPassword(password ?? string.Empty))
                 {
                     int sessionId = await connection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, HttpContext.Connection.RemoteIpAddress!.ToString());
                     string sessionKey = sessionStorage.MakeSessionKey(sessionId, string.Empty, true);
@@ -100,7 +142,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(Connect)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -109,14 +151,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(Connect)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(Connect)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(Connect)}] Failed to handle connect request");
+                LogWarning(e, "Failed to handle connect request");
                 return StatusCode(500, e.Message);
             }
         }
@@ -172,7 +214,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(Disconnect)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -181,14 +223,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(Disconnect)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(Disconnect)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(Disconnect)}] Failed to handle disconnect request");
+                LogWarning(e, "Failed to handle disconnect request");
                 return StatusCode(500, e.Message);
             }
         }
@@ -223,7 +265,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(Status)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -232,14 +274,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(Status)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(Status)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(Status)}] Failed to retrieve status");
+                LogWarning(e, "Failed to retrieve status");
                 return StatusCode(500, e.Message);
             }
         }
@@ -277,7 +319,7 @@ namespace DuetWebServer.Controllers
                 try
                 {
                     using CommandConnection connection = await BuildConnection();
-                    _logger.LogInformation($"[{nameof(DoCode)}] Executing code '{code}'");
+                    LogInformation($"Executing code '{code}'");
                     return Content(await connection.PerformSimpleCode(code, CodeChannel.HTTP, async));
                 }
                 finally
@@ -296,7 +338,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(DoCode)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -305,14 +347,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(DoCode)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(DoCode)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(DoCode)}] Failed to perform code");
+                LogWarning(e, "Failed to perform code");
                 return StatusCode(500, e.Message);
             }
         }
@@ -343,7 +385,7 @@ namespace DuetWebServer.Controllers
                 resolvedPath = await ResolvePath(filename);
                 if (!System.IO.File.Exists(resolvedPath))
                 {
-                    _logger.LogWarning($"[{nameof(DownloadFile)}] Could not find file {filename} (resolved to {resolvedPath})");
+                    LogWarning($"Could not find file {filename} (resolved to {resolvedPath})");
                     return NotFound(HttpUtility.UrlPathEncode(filename));
                 }
 
@@ -358,7 +400,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(DownloadFile)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -367,14 +409,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(DownloadFile)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(DownloadFile)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(DownloadFile)}] Failed download file {filename} (resolved to {resolvedPath})");
+                LogWarning(e, $"Failed download file {filename} (resolved to {resolvedPath})");
                 return StatusCode(500, e.Message);
             }
         }
@@ -441,7 +483,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(UploadFile)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -450,14 +492,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(UploadFile)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(UploadFile)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(UploadFile)} Failed upload file {filename} (resolved to {resolvedPath})");
+                LogWarning(e, $"Failed upload file {filename} (resolved to {resolvedPath})");
                 return StatusCode(500, e.Message);
             }
         }
@@ -487,7 +529,7 @@ namespace DuetWebServer.Controllers
                 resolvedPath = await ResolvePath(filename);
                 if (!System.IO.File.Exists(resolvedPath))
                 {
-                    _logger.LogWarning($"[{nameof(GetFileInfo)}] Could not find file {filename} (resolved to {resolvedPath})");
+                    LogWarning($"Could not find file {filename} (resolved to {resolvedPath})");
                     return NotFound(HttpUtility.UrlPathEncode(filename));
                 }
 
@@ -505,7 +547,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(GetFileInfo)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -514,14 +556,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(GetFileInfo)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(GetFileInfo)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(GetFileInfo)}] Failed to retrieve file info for {filename} (resolved to {resolvedPath})");
+                LogWarning(e, $"Failed to retrieve file info for {filename} (resolved to {resolvedPath})");
                 return StatusCode(500, e.Message);
             }
         }
@@ -564,7 +606,7 @@ namespace DuetWebServer.Controllers
                     return NoContent();
                 }
 
-                _logger.LogWarning($"[{nameof(DeleteFileOrDirectory)} Could not find file {filename} (resolved to {resolvedPath})");
+                LogWarning($"Could not find file {filename} (resolved to {resolvedPath})");
                 return NotFound(HttpUtility.UrlPathEncode(filename));
             }
             catch (Exception e)
@@ -575,7 +617,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(DeleteFileOrDirectory)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -584,14 +626,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(DeleteFileOrDirectory)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(DeleteFileOrDirectory)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(DeleteFileOrDirectory)} Failed to delete file {filename} (resolved to {resolvedPath})");
+                LogWarning(e, $"Failed to delete file {filename} (resolved to {resolvedPath})");
                 return StatusCode(500, e.Message);
             }
         }
@@ -668,7 +710,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(MoveFileOrDirectory)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -677,14 +719,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(MoveFileOrDirectory)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(MoveFileOrDirectory)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(MoveFileOrDirectory)} Failed to move file {from} to {to} (resolved to {source} and {destination})");
+                LogWarning(e, $"Failed to move file {from} to {to} (resolved to {source} and {destination})");
                 return StatusCode(500, e.Message);
             }
         }
@@ -705,20 +747,20 @@ namespace DuetWebServer.Controllers
         /// (503) DCS is unavailable
         /// </returns>
         [HttpGet("directory/{*directory}")]
-        public async Task<IActionResult> GetFileList(string directory)
+        public async Task<IActionResult> GetFileList(string? directory)
         {
             directory = HttpUtility.UrlDecode(directory);
 
             string resolvedPath = "n/a";
             try
             {
-                resolvedPath = await ResolvePath(directory);
+                resolvedPath = await ResolvePath(directory ?? string.Empty);
                 if (!Directory.Exists(resolvedPath))
                 {
-                    _logger.LogWarning($"[{nameof(GetFileList)}] Could not find directory {directory} (resolved to {resolvedPath})");
+                    LogWarning($"Could not find directory {directory} (resolved to {resolvedPath})");
                     return NotFound(HttpUtility.UrlPathEncode(directory));
                 }
-                return Content(FileLists.GetFileList(directory, resolvedPath), "application/json");
+                return Content(FileLists.GetFileList(directory ?? string.Empty, resolvedPath), "application/json");
             }
             catch (Exception e)
             {
@@ -728,7 +770,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(GetFileList)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -737,14 +779,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(GetFileList)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(GetFileList)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(GetFileList)}] Failed to retrieve file list for {directory} (resolved to {resolvedPath})");
+                LogWarning(e, $"Failed to retrieve file list for {directory} (resolved to {resolvedPath})");
                 return StatusCode(500, e.Message);
             }
         }
@@ -782,7 +824,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(CreateDirectory)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -791,14 +833,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(CreateDirectory)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(CreateDirectory)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(CreateDirectory)}] Failed to create directory {directory} (resolved to {resolvedPath})");
+                LogWarning(e, $"Failed to create directory {directory} (resolved to {resolvedPath})");
                 return StatusCode(500, e.Message);
             }
         }
@@ -848,7 +890,7 @@ namespace DuetWebServer.Controllers
                     }
                     if (e is IncompatibleVersionException)
                     {
-                        _logger.LogError($"[{nameof(InstallPlugin)}] Incompatible DCS version");
+                        LogError("Incompatible DCS version");
                         return StatusCode(502, "Incompatible DCS version");
                     }
                     if (e is SocketException)
@@ -857,14 +899,14 @@ namespace DuetWebServer.Controllers
                         if (System.IO.File.Exists(startErrorFile))
                         {
                             string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                            _logger.LogError($"[{nameof(InstallPlugin)}] {startError}");
+                            LogError(startError);
                             return StatusCode(503, startError);
                         }
 
-                        _logger.LogError($"[{nameof(InstallPlugin)}] DCS is not started");
+                        LogError("DCS is not started");
                         return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                     }
-                    _logger.LogWarning(e, $"[{nameof(InstallPlugin)} Failed to upload ZIP file to {zipFile}");
+                    LogWarning(e, $"Failed to upload ZIP file to {zipFile}");
                     return StatusCode(500, e.Message);
                 }
             }
@@ -922,7 +964,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(UninstallPlugin)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -931,14 +973,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(UninstallPlugin)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(UninstallPlugin)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(UninstallPlugin)} Failed to uninstall plugin");
+                LogWarning(e, "Failed to uninstall plugin");
                 return StatusCode(500, e.Message);
             }
         }
@@ -992,7 +1034,7 @@ namespace DuetWebServer.Controllers
                 {
                     if (!string.IsNullOrEmpty(plugin.SbcExecutable))
                     {
-                        _logger.LogWarning("Tried to set plugin data for {0} but it has an SBC executable set", plugin.Id);
+                        LogWarning($"Tried to set plugin data for {plugin.Id} but it has an SBC executable set");
                         return Forbid();
                     }
 
@@ -1009,7 +1051,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(SetPluginData)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -1018,14 +1060,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(SetPluginData)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(SetPluginData)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(SetPluginData)} Failed to set plugin data");
+                LogWarning(e, "Failed to set plugin data");
                 return StatusCode(500, e.Message);
             }
         }
@@ -1068,7 +1110,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(StartPlugin)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -1077,14 +1119,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(StartPlugin)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(StartPlugin)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(StartPlugin)} Failed to start plugin");
+                LogWarning(e, "Failed to start plugin");
                 return StatusCode(500, e.Message);
             }
         }
@@ -1127,7 +1169,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(StopPlugin)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -1136,14 +1178,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(StopPlugin)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(StopPlugin)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(StopPlugin)} Failed to stop plugin");
+                LogWarning(e, "Failed to stop plugin");
                 return StatusCode(500, e.Message);
             }
         }
@@ -1187,7 +1229,7 @@ namespace DuetWebServer.Controllers
                     }
                     catch (OperationCanceledException)
                     {
-                        _logger.LogWarning("Application is shutting down due to system package update");
+                        LogWarning("Application is shutting down due to system package update");
                     }
                     return NoContent();
                 }
@@ -1199,7 +1241,7 @@ namespace DuetWebServer.Controllers
                     }
                     if (e is IncompatibleVersionException)
                     {
-                        _logger.LogError($"[{nameof(InstallSystemPackage)}] Incompatible DCS version");
+                        LogError("Incompatible DCS version");
                         return StatusCode(502, "Incompatible DCS version");
                     }
                     if (e is SocketException)
@@ -1208,14 +1250,14 @@ namespace DuetWebServer.Controllers
                         if (System.IO.File.Exists(startErrorFile))
                         {
                             string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                            _logger.LogError($"[{nameof(InstallSystemPackage)}] {startError}");
+                            LogError(startError);
                             return StatusCode(503, startError);
                         }
 
-                        _logger.LogError($"[{nameof(InstallSystemPackage)}] DCS is not started");
+                        LogError("DCS is not started");
                         return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                     }
-                    _logger.LogWarning(e, $"[{nameof(InstallSystemPackage)} Failed to upload package file to {packageFile}");
+                    LogWarning(e, $"Failed to upload package file to {packageFile}");
                     return StatusCode(500, e.Message);
                 }
             }
@@ -1273,7 +1315,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(UninstallPlugin)}] Incompatible DCS version");
+                    LogError("Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -1282,14 +1324,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(UninstallPlugin)}] {startError}");
+                        LogError(startError);
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(UninstallPlugin)}] DCS is not started");
+                    LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(UninstallPlugin)} Failed to uninstall system package");
+                LogWarning(e, "Failed to uninstall system package");
                 return StatusCode(500, e.Message);
             }
         }
