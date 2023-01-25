@@ -72,19 +72,17 @@ namespace DuetControlServer.Files
         /// </summary>
         public long Position
         {
-            get => _position;
+            get => _parserBuffer.GetPosition(_fileStream);
             set
             {
                 if (!IsClosed)
                 {
                     _fileStream.Seek(value, SeekOrigin.Begin);
-                    _position = value;
                     _parserBuffer.Invalidate();
                     _parserBuffer.LineNumber = (value == 0) ? 1 : null;
                 }
             }
         }
-        private long _position;
 
         /// <summary>
         /// Get the current number of iterations of the current loop
@@ -210,7 +208,6 @@ namespace DuetControlServer.Files
 
                         // Get the next code
                         codeRead = await DuetAPI.Commands.Code.ParseAsync(_fileStream, code, _parserBuffer);
-                        _position += code.Length ?? 0;
                     }
                     while (!codeRead && _parserBuffer.GetPosition(_fileStream) < _fileStream.Length);
 

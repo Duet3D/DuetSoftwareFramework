@@ -72,7 +72,7 @@ namespace DuetAPI.Commands
             result.Flags = buffer.EnforcingAbsolutePosition ? CodeFlags.EnforceAbsolutePosition : CodeFlags.None;
             result.Indent = buffer.Indent;
             result.Length = 0;
-            result.FilePosition = buffer.IsFile ? stream.Position + buffer.Pointer : null;
+            result.FilePosition = buffer.IsFile ? buffer.GetPosition(stream) : null;
             result.LineNumber = buffer.LineNumber;
 
             do

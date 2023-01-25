@@ -13,7 +13,7 @@
             get => _freq;
             set => SetPropertyValue(ref _freq, value);
         }
-        private int freq;
+        private int _freq;
 
         /// <summary>
         /// PWM value of this port (0..1)

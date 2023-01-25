@@ -86,7 +86,7 @@ namespace DuetAPI.Commands
         public void Invalidate()
         {
             InvalidateData();
-            Size = 0;
+            Pointer = Size = 0;
             LineNumber = null;
             LastGCode = -1;
         }
