@@ -10,7 +10,7 @@ namespace DuetAPI.Commands
     public partial class Code
     {
         // Numeric parameters may hold only characters of this string 
-        private const string NumericParameterChars = "01234567890+-.e";
+        private const string NumericParameterChars = "01234567890+-.";
 
         /// <summary>
         /// Parse the next available G/M/T-code from the given stream
@@ -286,7 +286,7 @@ namespace DuetAPI.Commands
                         else
                         {
                             // Starting numeric or string parameter
-                            isNumericParameter = (c != 'e') && (c == ':' || NumericParameterChars.Contains(c)) && !unprecedentedParameter;
+                            isNumericParameter = (c == ':' || NumericParameterChars.Contains(c)) && !unprecedentedParameter;
                             value += c;
                         }
                     }
@@ -306,6 +306,11 @@ namespace DuetAPI.Commands
                             {
                                 numCurlyBraces++;
                             }
+                        }
+                        else if ((c == 'e' || c == 'x') && !value.Contains(c))
+                        {
+                            // Parameter contains special letter for hex or exp display
+                            value += c;
                         }
                         else
                         {
@@ -390,9 +395,6 @@ namespace DuetAPI.Commands
                                 {
                                     throw new CodeParserException("Dynamic command numbers are only supported for T-codes");
                                 }
-                            }
-                            else if (letter == 'g' && value == "lobal")
-                            {
                             }
                             else if (value.Contains('.'))
                             {

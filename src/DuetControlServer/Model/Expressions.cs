@@ -83,7 +83,7 @@ namespace DuetControlServer.Model
         /// <returns>Expression items</returns>
         private static IEnumerable<string> SplitExpression(string expression)
         {
-            int numBraces = 0;
+            int numCurlyBraces = 0, numSquareBraces = 0, numRoundBraces = 0;
             StringBuilder parsedExpression = new();
             bool inQuotes = false;
             char lastC = '\0';
@@ -102,20 +102,33 @@ namespace DuetControlServer.Model
                     inQuotes = true;
                     parsedExpression.Append(c);
                 }
-                else if (c == ',' && numBraces == 0)
+                else if (c == ',' && numCurlyBraces + numSquareBraces + numRoundBraces == 0)
                 {
                     yield return parsedExpression.ToString().Trim();
                     parsedExpression.Clear();
                 }
                 else
                 {
-                    if (c == '(')
+                    switch (c)
                     {
-                        numBraces++;
-                    }
-                    else if (c == ')')
-                    {
-                        numBraces--;
+                        case '{':
+                            numCurlyBraces++;
+                            break;
+                        case '}':
+                            numCurlyBraces--;
+                            break;
+                        case '[':
+                            numSquareBraces++;
+                            break;
+                        case ']':
+                            numSquareBraces--;
+                            break;
+                        case '(':
+                            numRoundBraces++;
+                            break;
+                        case ')':
+                            numRoundBraces--;
+                            break;
                     }
                     parsedExpression.Append(c);
                 }

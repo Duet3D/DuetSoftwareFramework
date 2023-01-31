@@ -360,7 +360,7 @@ namespace DuetAPI.Commands
                         else
                         {
                             // Starting numeric or string parameter
-                            isNumericParameter = (c != 'e') && (c == ':' || NumericParameterChars.Contains(c)) && !unprecedentedParameter;
+                            isNumericParameter = (c == ':' || NumericParameterChars.Contains(c)) && !unprecedentedParameter;
                             value += c;
                         }
                     }
@@ -380,6 +380,11 @@ namespace DuetAPI.Commands
                             {
                                 numCurlyBraces++;
                             }
+                        }
+                        else if ((c == 'e' || c == 'x') && !value.Contains(c))
+                        {
+                            // Parameter contains special letter for hex or exp display
+                            value += c;
                         }
                         else
                         {

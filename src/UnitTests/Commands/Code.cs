@@ -813,6 +813,49 @@ namespace UnitTests.Commands
         }
 
         [Test]
+        public void ParseSpecialNumbers()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse("M106 P0x123 S3"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(106, code.MajorNumber);
+                Assert.IsNull(code.MinorNumber);
+                Assert.AreEqual(2, code.Parameters.Count);
+                Assert.AreEqual('P', code.Parameters[0].Letter);
+                Assert.AreEqual('S', code.Parameters[1].Letter);
+                Assert.AreEqual(0x123, (int)code.Parameters[0]);
+                Assert.AreEqual(3, (int)code.Parameters[1]);
+                Assert.IsNull(code.Comment);
+            }
+
+            foreach (DuetAPI.Commands.Code code in Parse("M106 P0 S3e2 ; foo"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(106, code.MajorNumber);
+                Assert.IsNull(code.MinorNumber);
+                Assert.AreEqual(2, code.Parameters.Count);
+                Assert.AreEqual('P', code.Parameters[0].Letter);
+                Assert.AreEqual('S', code.Parameters[1].Letter);
+                Assert.AreEqual(0, (int)code.Parameters[0]);
+                Assert.AreEqual(3e2, (float)code.Parameters[1]);
+                Assert.AreEqual(" foo", code.Comment);
+            }
+
+            foreach (DuetAPI.Commands.Code code in Parse("M106 P0 S3e-2 ; foobar"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(106, code.MajorNumber);
+                Assert.IsNull(code.MinorNumber);
+                Assert.AreEqual(2, code.Parameters.Count);
+                Assert.AreEqual('P', code.Parameters[0].Letter);
+                Assert.AreEqual('S', code.Parameters[1].Letter);
+                Assert.AreEqual(0, (int)code.Parameters[0]);
+                Assert.AreEqual(3e-2, (float)code.Parameters[1], 1e-3);
+                Assert.AreEqual(" foobar", code.Comment);
+            }
+        }
+
+        [Test]
         public async Task SimpleCodes()
         {
             DuetControlServer.Commands.SimpleCode simpleCode = new() { Code = "G91 G1 X5 Y2" };

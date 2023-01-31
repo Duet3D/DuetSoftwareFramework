@@ -18,6 +18,11 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         public override Task<bool> Execute()
         {
+            if (!Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Command is only supported in non-SPI mode");
+            }
+
             if (!IPC.LockManager.IsLocked)
             {
                 throw new InvalidOperationException("Machine model has not been locked");

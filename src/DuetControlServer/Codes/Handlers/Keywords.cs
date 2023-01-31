@@ -33,6 +33,7 @@ namespace DuetControlServer.Codes.Handlers
                 throw new ArgumentException("KeywordArgument must not be empty");
             }
 
+            bool inQuotes = false;
             switch (code.Keyword)
             {
                 case KeywordType.Echo:
@@ -54,7 +55,7 @@ namespace DuetControlServer.Codes.Handlers
                             keywordArgument = keywordArgument[(appendNoNL ? 3 : (append ? 2 : 1))..].TrimStart();
 
                             // Get the file string or expression to write to
-                            bool inQuotes = false, isComplete = false;
+                            bool isComplete = false;
                             int numCurlyBraces = 0;
                             string filenameExpression = string.Empty;
                             for (int i = 0; i < keywordArgument.Length; i++)
@@ -138,6 +139,7 @@ namespace DuetControlServer.Codes.Handlers
                     // Validate the keyword and expression first
                     string varName = string.Empty, expression = string.Empty;
                     bool inExpression = false, wantExpression = false;
+                    int numSquareBrackets = 0;
                     foreach (char c in code.KeywordArgument)
                     {
                         if (inExpression)
@@ -148,8 +150,30 @@ namespace DuetControlServer.Codes.Handlers
                         {
                             inExpression = true;
                         }
+                        else if (numSquareBrackets > 0 || c == '[')
+                        {
+                            // Contents of square brackets are not trimmed
+                            if (inQuotes)
+                            {
+                                inQuotes = c != '"';
+                            }
+                            else if (c == '"')
+                            {
+                                inQuotes = true;
+                            }
+                            else if (c == '[')
+                            {
+                                numSquareBrackets++;
+                            }
+                            else if (c == ']')
+                            {
+                                numSquareBrackets--;
+                            }
+                            varName += c;
+                        }
                         else if (!char.IsWhiteSpace(c))
                         {
+                            // Permit only a certain subset of chars for variable names
                             if (!char.IsLetterOrDigit(c) && c != '_' && (c != '.' || code.Keyword != KeywordType.Set) || wantExpression)
                             {
                                 if (!await Processor.FlushAsync(code, false, ifExecuting: code.Keyword == KeywordType.Global))
@@ -162,6 +186,7 @@ namespace DuetControlServer.Codes.Handlers
                         }
                         else if (!string.IsNullOrEmpty(varName))
                         {
+                            // Don't allow illegal variable names like "global. fo o", although a name like "global.foo [4]" is valid
                             wantExpression = true;
                         }
                     }

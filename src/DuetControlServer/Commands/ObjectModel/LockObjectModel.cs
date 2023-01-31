@@ -1,4 +1,5 @@
 ﻿using DuetControlServer.IPC;
+using System;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -17,6 +18,14 @@ namespace DuetControlServer.Commands
         /// Lock the machine model for write access
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public override Task Execute() => LockManager.LockMachineModel(Connection!);
+        public override async Task Execute()
+        {
+            if (!Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Command is only supported in non-SPI mode");
+            }
+
+            await LockManager.LockMachineModel(Connection!);
+        }
     }
 }

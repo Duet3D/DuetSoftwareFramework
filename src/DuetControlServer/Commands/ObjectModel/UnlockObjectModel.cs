@@ -1,4 +1,5 @@
 ﻿using DuetControlServer.IPC;
+using System;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -19,6 +20,11 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         public override async Task Execute()
         {
+            if (!Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Command is only supported in non-SPI mode");
+            }
+
             await LockManager.UnlockMachineModel(Connection!);
         }
     }
