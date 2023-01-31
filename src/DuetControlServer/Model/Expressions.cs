@@ -475,6 +475,10 @@ namespace DuetControlServer.Model
                 {
                     return longValue.ToString("G", CultureInfo.InvariantCulture);
                 }
+                if (obj is DateTime dateTimeValue)
+                {
+                    return encodeStrings ? $"\"{dateTimeValue:s}\"" : dateTimeValue.ToString("s");
+                }
                 if (wantsCount && obj is IList list)
                 {
                     return list.Count.ToString();
