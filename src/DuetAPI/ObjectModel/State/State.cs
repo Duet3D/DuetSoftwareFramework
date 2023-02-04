@@ -38,16 +38,6 @@ namespace DuetAPI.ObjectModel
         private BeepRequest? _beep;
 
         /// <summary>
-        /// First error in config.g or null if there was none
-        /// </summary>
-        public ConfigError? ConfigErr
-        {
-            get => _configErr;
-            set => SetPropertyValue(ref _configErr, value);
-        }
-        private ConfigError? _configErr;
-
-        /// <summary>
         /// Number of the currently selected tool or -1 if none is selected
         /// </summary>
         public int CurrentTool
@@ -239,6 +229,16 @@ namespace DuetAPI.ObjectModel
         /// List of restore points
         /// </summary>
         public ModelCollection<RestorePoint> RestorePoints { get; } = new ModelCollection<RestorePoint>();
+
+        /// <summary>
+        /// First error on start-up or null if there was none
+        /// </summary>
+        public StartupError? StartupErr
+        {
+            get => _startupErr;
+            set => SetPropertyValue(ref _startupErr, value);
+        }
+        private StartupError? _startupErr;
 
         /// <summary>
         /// Current state of the machine

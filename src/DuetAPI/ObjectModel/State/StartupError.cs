@@ -1,9 +1,9 @@
 ﻿namespace DuetAPI.ObjectModel
 {
     /// <summary>
-    /// Details about the first error in config.g
+    /// Details about the first error on start-up
     /// </summary>
-    public sealed class ConfigError : ModelObject
+    public sealed class StartupError : ModelObject
     {
         /// <summary>
         /// Filename of the macro where the error occurred
