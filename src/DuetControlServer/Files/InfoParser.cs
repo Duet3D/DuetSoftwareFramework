@@ -203,12 +203,17 @@ namespace DuetControlServer.Files
             /// <summary>
             /// New pointer in the buffer
             /// </summary>
-            public int BufferPointer = 0;
+            public int BufferPointer;
 
             /// <summary>
             /// Last file position
             /// </summary>
             public long FilePosition;
+
+            /// <summary>
+            /// Buffer used for caching line data
+            /// </summary>
+            public byte[] LineBuffer = new byte[Settings.FileBufferSize];
 
             /// <summary>
             /// Constructor of this class
@@ -220,22 +225,18 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Read another line from the end of a file
         /// </summary>
-        /// <param name="reader">Stream reader</param>
+        /// <param name="stream">Stream</param>
         /// <param name="buffer">Internal buffer</param>
         /// <param name="bufferPointer">Pointer to the next byte in the buffer</param>
-        /// <returns>Read result</returns>
+        /// <returns>Whether another line could be read</returns>
         private static async ValueTask<bool> ReadLineFromEndAsync(Stream stream, byte[] buffer, ReadLineFromEndData readData)
         {
-            string line = string.Empty;
+            int bytesRead = 0;
             do
             {
-                if (readData.BufferPointer == 0)
+                // Read more from the file if necessary
+                if (readData.BufferPointer == 0 && readData.FilePosition != 0)
                 {
-                    if (readData.FilePosition == 0)
-                    {
-                        return false;
-                    }
-
                     if (readData.FilePosition < buffer.Length)
                     {
                         stream.Seek(0, SeekOrigin.Begin);
@@ -244,23 +245,35 @@ namespace DuetControlServer.Files
                     }
                     else
                     {
-                        readData.FilePosition -= buffer.Length;
+                        readData.FilePosition -= Math.Min(readData.FilePosition, buffer.Length);
                         stream.Seek(readData.FilePosition, SeekOrigin.Begin);
                         readData.BufferPointer = await stream.ReadAsync(buffer);
-                        readData.FilePosition += buffer.Length - readData.BufferPointer;    // ... in case the number of chars read is different from the buffer length
                     }
                 }
 
-                char c = (char)buffer[--readData.BufferPointer];
-                if (c == '\n' || line.Length > buffer.Length)
+                // Stop reading if we've reached NL or SOF
+                byte c = (readData.BufferPointer == 0) ? (byte)0 : buffer[--readData.BufferPointer];
+                if (c == '\0' || c == '\n')
                 {
-                    readData.Line = line;
+                    if (c == '\0' && bytesRead == 0)
+                    {
+                        // reached SOF, cannot read any more
+                        return false;
+                    }
+                    if (bytesRead == readData.LineBuffer.Length)
+                    {
+                        readData.Line = string.Empty;   // overflow
+                        return true;
+                    }
+                    readData.Line = Encoding.UTF8.GetString(readData.LineBuffer.AsSpan(readData.LineBuffer.Length - bytesRead));
                     return true;
                 }
 
-                if (c != '\0' && c != '\r')
+                // Add more to the line buffer if possible
+                if (c != '\r' && bytesRead < readData.LineBuffer.Length)
                 {
-                    line = c + line;
+                    bytesRead++;
+                    readData.LineBuffer[^bytesRead] = c;
                 }
 
                 Program.CancellationToken.ThrowIfCancellationRequested();
