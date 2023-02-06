@@ -136,14 +136,14 @@ namespace DuetAPI.ObjectModel
         private float _tolerance = 0.03F;
 
         /// <summary>
-        /// Travel speed when probing multiple points (in mm/s)
+        /// Travel speed when probing multiple points (in mm/min)
         /// </summary>
         public float TravelSpeed
         {
             get => _travelSpeed;
 			set => SetPropertyValue(ref _travelSpeed, value);
         }
-        private float _travelSpeed = 100F;
+        private float _travelSpeed = 6000F;
 
         /// <summary>
         /// Z height at which the probe is triggered (in mm)
