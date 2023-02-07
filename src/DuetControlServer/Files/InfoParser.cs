@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -123,8 +124,8 @@ namespace DuetControlServer.Files
         private static async Task ParseFooter(StreamReader reader, GCodeFileInfo partialFileInfo)
         {
             reader.BaseStream.Seek(0, SeekOrigin.End);
-            char[] buffer = new char[Settings.FileBufferSize];
-            int bufferPointer = 0;
+            ReadLineFromEndData readData = new ReadLineFromEndData(reader.BaseStream.Position);
+            byte[] buffer = new byte[Settings.FileBufferSize];
 
             Code code = new();
             bool inRelativeMode = false, lastLineHadInfo = false, hadFilament = partialFileInfo.Filament.Count > 0;
@@ -133,16 +134,14 @@ namespace DuetControlServer.Files
                 Program.CancellationToken.ThrowIfCancellationRequested();
 
                 // Read another line
-                ReadLineFromEndResult readResult = await ReadLineFromEndAsync(reader, buffer, bufferPointer);
-                if (readResult == null)
+                if (!await ReadLineFromEndAsync(reader.BaseStream, buffer, readData))
                 {
                     break;
                 }
-                bufferPointer = readResult.BufferPointer;
 
                 // See what codes to deal with
                 bool gotNewInfo = false;
-                using (StringReader stringReader = new(readResult.Line))
+                using (StringReader stringReader = new(readData.Line))
                 {
                     while (DuetAPI.Commands.Code.Parse(stringReader, code))
                     {
@@ -200,7 +199,7 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Result for wrapping the buffer pointer because ref parameters are not supported for async functions
         /// </summary>
-        private class ReadLineFromEndResult
+        private class ReadLineFromEndData
         {
             /// <summary>
             /// Read line
@@ -211,57 +210,76 @@ namespace DuetControlServer.Files
             /// New pointer in the buffer
             /// </summary>
             public int BufferPointer;
+
+            /// <summary>
+            /// Last file position
+            /// </summary>
+            public long FilePosition;
+
+            /// <summary>
+            /// Buffer used for caching line data
+            /// </summary>
+            public byte[] LineBuffer = new byte[Settings.FileBufferSize];
+
+            /// <summary>
+            /// Constructor of this class
+            /// </summary>
+            /// <param name="filePosition">Current file position</param>
+            public ReadLineFromEndData(long filePosition) => FilePosition = filePosition;
         }
 
         /// <summary>
         /// Read another line from the end of a file
         /// </summary>
-        /// <param name="reader">Stream reader</param>
+        /// <param name="stream">Stream</param>
         /// <param name="buffer">Internal buffer</param>
         /// <param name="bufferPointer">Pointer to the next byte in the buffer</param>
-        /// <returns>Read result</returns>
-        private static async ValueTask<ReadLineFromEndResult> ReadLineFromEndAsync(StreamReader reader, char[] buffer, int bufferPointer)
+        /// <returns>Whether another line could be read</returns>
+        private static async ValueTask<bool> ReadLineFromEndAsync(Stream stream, byte[] buffer, ReadLineFromEndData readData)
         {
-            string line = string.Empty;
+            int bytesRead = 0;
             do
             {
-                if (bufferPointer == 0)
+                // Read more from the file if necessary
+                if (readData.BufferPointer == 0 && readData.FilePosition != 0)
                 {
-                    if (reader.BaseStream.Position == 0)
+                    if (readData.FilePosition < buffer.Length)
                     {
-                        return null;
-                    }
-
-                    reader.DiscardBufferedData();
-                    if (reader.BaseStream.Position < buffer.Length)
-                    {
-                        int prevPosition = (int)reader.BaseStream.Position;
-                        reader.BaseStream.Seek(0, SeekOrigin.Begin);
-                        await reader.ReadBlockAsync(buffer);
-                        bufferPointer = prevPosition;
-                        reader.BaseStream.Seek(0, SeekOrigin.Begin);
+                        stream.Seek(0, SeekOrigin.Begin);
+                        readData.BufferPointer = Math.Min(await stream.ReadAsync(buffer), (int)readData.FilePosition);
+                        readData.FilePosition = 0;
                     }
                     else
                     {
-                        long position = reader.BaseStream.Position - buffer.Length;
-                        reader.BaseStream.Seek(position, SeekOrigin.Begin);
-                        bufferPointer = await reader.ReadBlockAsync(buffer);
-                        reader.BaseStream.Seek(position, SeekOrigin.Begin);
+                        readData.FilePosition -= Math.Min(readData.FilePosition, buffer.Length);
+                        stream.Seek(readData.FilePosition, SeekOrigin.Begin);
+                        readData.BufferPointer = await stream.ReadAsync(buffer);
                     }
                 }
 
-                char c = buffer[--bufferPointer];
-                if (c == '\n' || line.Length > buffer.Length)
+                // Stop reading if we've reached NL or SOF
+                byte c = (readData.BufferPointer == 0) ? (byte)0 : buffer[--readData.BufferPointer];
+                if (c == '\0' || c == '\n')
                 {
-                    return new ReadLineFromEndResult
+                    if (c == '\0' && bytesRead == 0)
                     {
-                        Line = line,
-                        BufferPointer = bufferPointer
-                    };
+                        // reached SOF, cannot read any more
+                        return false;
+                    }
+                    if (bytesRead == readData.LineBuffer.Length)
+                    {
+                        readData.Line = string.Empty;   // overflow
+                        return true;
+                    }
+                    readData.Line = Encoding.UTF8.GetString(readData.LineBuffer.AsSpan(readData.LineBuffer.Length - bytesRead));
+                    return true;
                 }
-                if (c != '\0' && c != '\r')
+
+                // Add more to the line buffer if possible
+                if (c != '\r' && bytesRead < readData.LineBuffer.Length)
                 {
-                    line = c + line;
+                    bytesRead++;
+                    readData.LineBuffer[^bytesRead] = c;
                 }
 
                 Program.CancellationToken.ThrowIfCancellationRequested();

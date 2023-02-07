@@ -242,19 +242,17 @@ namespace DuetControlServer.SPI
                         Logger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
                     }
 
-                    // Deal with timeouts
+                    // Deal with timeouts and the first transmission
                     if (_hadTimeout)
                     {
                         Logger.LogOutput(MessageType.Success, "Connection to Duet established");
                         _hadTimeout = _resetting = false;
                     }
-
-                    // Deal with the first transmission
-                    if (!_connected)
+                    else if (!_connected)
                     {
                         _lastTransferNumber = (ushort)(_rxHeader.SequenceNumber - 1);
-                        _connected = true;
                     }
+                    _connected = true;
 
                     // Transfer OK
                     _numMeasuredTransfers++;

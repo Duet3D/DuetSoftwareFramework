@@ -130,7 +130,7 @@ namespace DuetPiManagementPlugin.Network
                     {
                         // Find the network index
                         string networkList = await Command.Execute("wpa_cli", "list_networks");
-                        Regex ssidRegex = new($"^(\\d+)\\s+{Regex.Escape(sParam)}\\W", RegexOptions.IgnoreCase);
+                        Regex ssidRegex = new($"^(\\d+)\\s+{Regex.Escape(pParam)}\\W", RegexOptions.IgnoreCase);
 
                         int networkIndex = -1;
                         using (StringReader reader = new(networkList))

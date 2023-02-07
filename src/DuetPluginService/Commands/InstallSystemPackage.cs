@@ -1,5 +1,6 @@
 ﻿using DuetAPIClient;
 using System;
+using System.Collections;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -70,7 +71,8 @@ namespace DuetPluginService.Commands
                 ZipFile.ExtractToDirectory(PackageFile, packageDirectory);
 
                 // Assemble the arguments
-                args = Settings.InstallLocalPackageArguments.Replace("{file}", string.Join(' ', Directory.GetFiles(packageDirectory)));
+                string packageFiles = string.Join(' ', Directory.GetFiles(packageDirectory).Where(file => Path.GetFileName(file) != "update.sh"));
+                args = Settings.InstallLocalPackageArguments.Replace("{file}", packageFiles);
             }
             else
             {
@@ -81,20 +83,25 @@ namespace DuetPluginService.Commands
 
             try
             {
-                // Run the installation process
-                using Process process = Process.Start(Settings.InstallLocalPackageCommand, args);
-                try
+                int exitCode = 0;
+                if (!string.IsNullOrWhiteSpace(args))
                 {
-                    await process.WaitForExitAsync(Program.CancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    if (Program.CancelSource.IsCancellationRequested)
+                    // Run the installation process
+                    using Process process = Process.Start(Settings.InstallLocalPackageCommand, args);
+                    try
                     {
-                        // Probably updating DPS as well so stop here
-                        return;
+                        await process.WaitForExitAsync(Program.CancellationToken);
+                        exitCode = process.ExitCode;
                     }
-                    throw;
+                    catch (OperationCanceledException)
+                    {
+                        if (Program.CancelSource.IsCancellationRequested)
+                        {
+                            // Probably updating DPS as well so stop here
+                            return;
+                        }
+                        throw;
+                    }
                 }
 
                 if (packageDirectory != null)
@@ -129,9 +136,9 @@ namespace DuetPluginService.Commands
                 }
 
                 // Check the installation result
-                if (process.ExitCode != 0)
+                if (exitCode != 0)
                 {
-                    throw new ArgumentException($"Failed to install system package (exit code {process.ExitCode})");
+                    throw new ArgumentException($"Failed to install system package (exit code {exitCode})");
                 }
             }
             finally
