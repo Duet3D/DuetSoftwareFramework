@@ -13,7 +13,7 @@ namespace DuetControlServer.Files
     /// <summary>
     /// Class to read G/M/T-codes from files
     /// </summary>
-    public sealed class CodeFile : IDisposable
+    public class CodeFile : IDisposable
     {
         /// <summary>
         /// Logger instance
@@ -46,6 +46,11 @@ namespace DuetControlServer.Files
         /// Internal buffer used for reading from files
         /// </summary>
         private readonly CodeParserBuffer _parserBuffer = new(Settings.FileBufferSize, true);
+
+        /// <summary>
+        /// Current line number in the file
+        /// </summary>
+        public long LineNumber => _parserBuffer.LineNumber ?? 0;
 
         /// <summary>
         /// File path to the file being executed

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -289,6 +290,53 @@ namespace DuetControlServer.Model
         /// </summary>
         /// <returns>Asynchronous task</returns>
         public static Task WaitForUpdateAsync() => WaitForUpdateAsync(Program.CancellationToken);
+
+        /// <summary>
+        /// Indicates if dsf-config.g is being processed
+        /// </summary>
+        private static volatile int _numRunningConfigFiles = 0;
+
+        /// <summary>
+        /// Flag asynchronously that a start-up file is being executed. Must be called WITHOUT locking this instance first!
+        /// </summary>
+        /// <param name="v"></param>
+        /// <returns></returns>
+        public static void SetExecutingConfig(bool executing)
+        {
+            if (executing)
+            {
+                _numRunningConfigFiles++;
+            }
+            else
+            {
+                _numRunningConfigFiles--;
+            }
+        }
+
+        /// <summary>
+        /// Handle a macro file error asynchronously. Must be called WITHOUT locking this instance first!
+        /// </summary>
+        /// <param name="fileName"></param>
+        /// <param name="lineNumber"></param>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        public static async Task HandleMacroErrorAsync(string fileName, long lineNumber, string message)
+        {
+            string shortFileName = Path.GetFileName(fileName);
+            using (await AccessReadWriteAsync())
+            {
+                if (_numRunningConfigFiles > 0 && Get.State.StartupError == null)
+                {
+                    Get.State.StartupError = new()
+                    {
+                        File = shortFileName,
+                        Line = lineNumber,
+                        Message = message
+                    };
+                }
+            }
+        }
 
         /// <summary>
         /// Output a generic message

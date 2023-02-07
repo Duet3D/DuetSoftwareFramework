@@ -272,12 +272,12 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Task to complete when this code is complete
         /// </summary>
-        internal Task Task => _tcs.Task;
+        internal Task<Message?> Task => _tcs.Task;
 
         /// <summary>
         /// Set this code as complete
         /// </summary>
-        public void SetFinished() => _tcs.TrySetResult();
+        public void SetFinished() => _tcs.TrySetResult(Result);
 
         /// <summary>
         /// Set this code as cancelled
@@ -293,7 +293,7 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Internal TCS representing the lifecycle of a code
         /// </summary>
-        private TaskCompletionSource _tcs = new();
+        private TaskCompletionSource<Message?> _tcs = new();
 
         /// <summary>
         /// Resets more <see cref="Code"/> fields

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
@@ -217,7 +218,7 @@ namespace DuetAPI.Commands
         public float GetFloat(char letter)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (float)param : throw new MissingParameterException(letter);
+            return (param is not null) ? (float)param : throw new MissingParameterException(letter);
         }
 
         /// <summary>
@@ -230,7 +231,7 @@ namespace DuetAPI.Commands
         public float GetFloat(char letter, float defaultValue)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (float)param : defaultValue;
+            return (param is not null) ? (float)param : defaultValue;
         }
 
         /// <summary>
@@ -285,7 +286,7 @@ namespace DuetAPI.Commands
         public int GetInt(char letter)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (int)param : throw new MissingParameterException(letter);
+            return (param is not null) ? (int)param : throw new MissingParameterException(letter);
         }
 
         /// <summary>
@@ -298,7 +299,7 @@ namespace DuetAPI.Commands
         public int GetInt(char letter, int defaultValue)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (int)param : defaultValue;
+            return (param is not null) ? (int)param : defaultValue;
         }
 
         /// <summary>
@@ -353,7 +354,7 @@ namespace DuetAPI.Commands
         public uint GetUInt(char letter)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (uint)param : throw new MissingParameterException(letter);
+            return (param is not null) ? (uint)param : throw new MissingParameterException(letter);
         }
 
         /// <summary>
@@ -366,7 +367,7 @@ namespace DuetAPI.Commands
         public uint GetUInt(char letter, uint defaultValue)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (uint)param : defaultValue;
+            return (param is not null) ? (uint)param : defaultValue;
         }
 
         /// <summary>
@@ -421,7 +422,7 @@ namespace DuetAPI.Commands
         public long GetLong(char letter)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (long)param : throw new MissingParameterException(letter);
+            return (param is not null) ? (long)param : throw new MissingParameterException(letter);
         }
 
         /// <summary>
@@ -434,7 +435,7 @@ namespace DuetAPI.Commands
         public long GetLong(char letter, long defaultValue)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (long)param : defaultValue;
+            return (param is not null) ? (long)param : defaultValue;
         }
 
         /// <summary>
@@ -489,7 +490,7 @@ namespace DuetAPI.Commands
         public bool GetBool(char letter)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (bool)param : throw new MissingParameterException(letter);
+            return (param is not null) ? (bool)param : throw new MissingParameterException(letter);
         }
 
         /// <summary>
@@ -502,7 +503,7 @@ namespace DuetAPI.Commands
         public bool GetBool(char letter, bool defaultValue)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (bool)param : defaultValue;
+            return (param is not null) ? (bool)param : defaultValue;
         }
 
         /// <summary>
@@ -557,7 +558,7 @@ namespace DuetAPI.Commands
         public string GetString(char letter)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (string)param : throw new MissingParameterException(letter);
+            return (param is not null) ? (string)param : throw new MissingParameterException(letter);
         }
 
         /// <summary>
@@ -568,7 +569,7 @@ namespace DuetAPI.Commands
         public string? GetOptionalString(char letter)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (string)param : null;
+            return (param is not null) ? (string)param : null;
         }
 
         /// <summary>
@@ -581,7 +582,7 @@ namespace DuetAPI.Commands
         public string GetString(char letter, string defaultValue)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (string)param : defaultValue;
+            return (param is not null) ? (string)param : defaultValue;
         }
 
         /// <summary>
@@ -615,7 +616,7 @@ namespace DuetAPI.Commands
         public DriverId GetDriverId(char letter)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (DriverId)param : throw new MissingParameterException(letter);
+            return (param is not null) ? (DriverId)param : throw new MissingParameterException(letter);
         }
 
         /// <summary>
@@ -628,7 +629,7 @@ namespace DuetAPI.Commands
         public DriverId GetDriverId(char letter, DriverId defaultValue)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (DriverId)param : defaultValue;
+            return (param is not null) ? (DriverId)param : defaultValue;
         }
 
         /// <summary>
@@ -662,7 +663,7 @@ namespace DuetAPI.Commands
         public IPAddress GetIPAddress(char letter)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (IPAddress)param : throw new MissingParameterException(letter);
+            return (param is not null) ? (IPAddress)param : throw new MissingParameterException(letter);
         }
 
         /// <summary>
@@ -675,7 +676,7 @@ namespace DuetAPI.Commands
         public IPAddress GetIPAddress(char letter, IPAddress defaultValue)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (IPAddress)param : defaultValue;
+            return (param is not null) ? (IPAddress)param : defaultValue;
         }
 
         /// <summary>
@@ -709,7 +710,7 @@ namespace DuetAPI.Commands
         public float[] GetFloatArray(char letter)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (float[])param : throw new MissingParameterException(letter);
+            return (param is not null) ? (float[])param : throw new MissingParameterException(letter);
         }
 
         /// <summary>
@@ -722,7 +723,7 @@ namespace DuetAPI.Commands
         public float[] GetFloatArray(char letter, float[] defaultValue)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (float[])param : defaultValue;
+            return (param is not null) ? (float[])param : defaultValue;
         }
 
         /// <summary>
@@ -756,7 +757,7 @@ namespace DuetAPI.Commands
         public int[] GetIntArray(char letter)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (int[])param : throw new MissingParameterException(letter);
+            return (param is not null) ? (int[])param : throw new MissingParameterException(letter);
         }
 
         /// <summary>
@@ -769,7 +770,7 @@ namespace DuetAPI.Commands
         public int[] GetIntArray(char letter, int[] defaultValue)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (int[])param : defaultValue;
+            return (param is not null) ? (int[])param : defaultValue;
         }
 
         /// <summary>
@@ -803,7 +804,7 @@ namespace DuetAPI.Commands
         public uint[] GetUIntArray(char letter)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (uint[])param : throw new MissingParameterException(letter);
+            return (param is not null) ? (uint[])param : throw new MissingParameterException(letter);
         }
 
         /// <summary>
@@ -816,7 +817,7 @@ namespace DuetAPI.Commands
         public uint[] GetUIntArray(char letter, uint[] defaultValue)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (uint[])param : defaultValue;
+            return (param is not null) ? (uint[])param : defaultValue;
         }
 
         /// <summary>
@@ -850,7 +851,7 @@ namespace DuetAPI.Commands
         public long[] GetLongArray(char letter)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (long[])param : throw new MissingParameterException(letter);
+            return (param is not null) ? (long[])param : throw new MissingParameterException(letter);
         }
 
         /// <summary>
@@ -863,7 +864,7 @@ namespace DuetAPI.Commands
         public long[] GetLongArray(char letter, long[] defaultValue)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (long[])param : defaultValue;
+            return (param is not null) ? (long[])param : defaultValue;
         }
 
         /// <summary>
@@ -897,7 +898,7 @@ namespace DuetAPI.Commands
         public DriverId[] GetDriverIdArray(char letter)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (DriverId[])param : throw new MissingParameterException(letter);
+            return (param is not null) ? (DriverId[])param : throw new MissingParameterException(letter);
         }
 
         /// <summary>
@@ -910,7 +911,7 @@ namespace DuetAPI.Commands
         public DriverId[] GetDriverIdArray(char letter, DriverId[] defaultValue)
         {
             CodeParameter? param = GetParameter(letter);
-            return (param != null) ? (DriverId[])param : defaultValue;
+            return (param is not null) ? (DriverId[])param : defaultValue;
         }
 
         /// <summary>
@@ -949,26 +950,28 @@ namespace DuetAPI.Commands
             {
                 if (p.Letter == '@')
                 {
-                    return (string)p;
+                    return quoteStrings ? $"\"${p.StringValue.Replace("\"", "\"\"")}\"" : p.StringValue;
                 }
             }
 
             StringBuilder builder = new();
             foreach (CodeParameter p in Parameters)
             {
-                if (builder.Length != 0)
+                if (builder.Length is not 0)
                 {
                     builder.Append(' ');
                 }
+
                 builder.Append(p.Letter);
-                if (quoteStrings && p.Type == typeof(string))
+                if (quoteStrings && !p.IsExpression && p.Type == typeof(string))
                 {
+                    builder.Append('"');
+                    builder.Append(quoteStrings ? p.StringValue.Replace("\"", "\"\"") : p.StringValue);
                     builder.Append('"');
                 }
-                builder.Append((string?)p);
-                if (quoteStrings && p.Type == typeof(string))
+                else
                 {
-                    builder.Append('"');
+                    builder.Append(p.StringValue);
                 }
             }
             return builder.ToString();
@@ -980,7 +983,7 @@ namespace DuetAPI.Commands
         /// <returns>Reconstructed code string</returns>
         public override string ToString()
         {
-            if (Keyword != KeywordType.None)
+            if (Keyword is not KeywordType.None)
             {
                 string asString = KeywordToString() + ((KeywordArgument is null) ? string.Empty : " " + KeywordArgument);
                 if (Result is not null && !string.IsNullOrEmpty(Result.Content))
@@ -1009,12 +1012,12 @@ namespace DuetAPI.Commands
                     builder.Append(' ');
                 }
 
-                if (parameter.Letter != '@')
+                if (parameter.Letter is not '@')
                 {
                     builder.Append(parameter.Letter);
                 }
 
-                if (parameter.StringValue is not null)
+                if (parameter.ParsedValue is not null)
                 {
                     if (parameter.Type == typeof(string) && !parameter.IsExpression)
                     {
@@ -1057,7 +1060,7 @@ namespace DuetAPI.Commands
         /// <returns>Command fraction of the code</returns>
         public string ToShortString()
         {
-            if (Keyword != KeywordType.None)
+            if (Keyword is not KeywordType.None)
             {
                 return KeywordToString();
             }

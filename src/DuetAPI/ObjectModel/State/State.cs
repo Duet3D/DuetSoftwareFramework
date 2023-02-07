@@ -233,12 +233,13 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// First error on start-up or null if there was none
         /// </summary>
-        public StartupError? StartupErr
+        [SbcProperty(true)]
+        public StartupError? StartupError
         {
-            get => _startupErr;
-            set => SetPropertyValue(ref _startupErr, value);
+            get => _startupError;
+            set => SetPropertyValue(ref _startupError, value);
         }
-        private StartupError? _startupErr;
+        private StartupError? _startupError;
 
         /// <summary>
         /// Current state of the machine

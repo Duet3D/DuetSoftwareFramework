@@ -17,10 +17,7 @@ namespace DuetControlServer.Codes.Pipelines
         /// Constructor of this class
         /// </summary>
         /// <param name="processor">Channel processor</param>
-        public Executed(ChannelProcessor processor) : base(PipelineStage.Executed, processor)
-        {
-            _stackItem = _stack.Peek();
-        }
+        public Executed(ChannelProcessor processor) : base(PipelineStage.Executed, processor) => _stackItem = _stack.Peek();
 
         /// <summary>
         /// The only state for this
@@ -36,7 +33,7 @@ namespace DuetControlServer.Codes.Pipelines
         {
             if (code.Result is not null)
             {
-                // Process the code result
+                // Notify code handlers
                 switch (code.Type)
                 {
                     case CodeType.GCode:
@@ -52,6 +49,7 @@ namespace DuetControlServer.Codes.Pipelines
                         break;
                 }
 
+                // Check if the result came from a DSF-only source
                 if (!code.Flags.HasFlag(CodeFlags.IsPostProcessed))
                 {
                     // RepRapFirmware generally prefixes error messages with the code itself, mimic this behavior if DSF resolved this code
@@ -98,29 +96,23 @@ namespace DuetControlServer.Codes.Pipelines
                         code.Result.AppendLine(string.Empty);
                     }
                 }
-
-                // Update the last code result
-                if (code.File is not null)
-                {
-                    code.File.LastResult = (int)code.Result.Type;
-                }
             }
 
-            // Code is complete. Send it to the Executed processor and then resolve it
             try
             {
+                // Send it to the Executed processor
                 await IPC.Processors.CodeInterception.Intercept(code, InterceptionMode.Executed);
-            }
-            catch (Exception e) when ((e is OperationCanceledException) != Program.CancellationToken.IsCancellationRequested)
-            {
-                Processor.Logger.Error(e, "Executed interceptor threw an exception when finishing code {0}", code);
-                code.SetException(e);
-            }
-            finally
-            {
+
+                // Deal with its result if applicable
                 if (code.Result is not null)
                 {
-                    Processor.Logger.Debug("Finished code {0}", code);
+                    // Update the 'result' variable
+                    if (code.File is not null)
+                    {
+                        code.File.LastResult = (int)code.Result.Type;
+                    }
+
+                    // Output and log the result from async codes
                     if (code.Flags.HasFlag(CodeFlags.Asynchronous))
                     {
                         if (code.IsFromFileChannel)
@@ -132,13 +124,26 @@ namespace DuetControlServer.Codes.Pipelines
                             await Model.Provider.OutputAsync(code.Result);
                         }
                     }
+
+                    // Done
+                    Processor.Logger.Debug("Finished code {0}", code);
                     code.SetFinished();
                 }
                 else
                 {
+                    // Cancelled
                     Processor.Logger.Debug("Cancelled code {0}", code);
                     code.SetCancelled();
                 }
+            }
+            catch (Exception e)
+            {
+                // Failed to finish code (IPC error?)
+                if ((e is OperationCanceledException) != Program.CancellationToken.IsCancellationRequested)
+                {
+                    Processor.Logger.Error(e, "Executed interceptor threw an exception when finishing code {0}", code);
+                }
+                code.SetException(e);
             }
         }
 

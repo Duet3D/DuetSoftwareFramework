@@ -730,7 +730,7 @@ namespace DuetAPI.Commands
             {
                 List<DriverId> drivers = new();
 
-                string[] parameters = parameter.StringValue?.Split(':') ?? Array.Empty<string>();
+                string[] parameters = parameter.StringValue.Split(':') ?? Array.Empty<string>();
                 foreach (string value in parameters)
                 {
                     try

@@ -298,19 +298,12 @@ namespace DuetControlServer.Model
                     StringBuilder builder = new();
                     foreach (string expression in SplitExpression(code.KeywordArgument))
                     {
-                        try
+                        string result = await EvaluateExpression(code, expression, !evaluateAll, false);
+                        if (builder.Length != 0)
                         {
-                            string result = await EvaluateExpression(code, expression, !evaluateAll, false);
-                            if (builder.Length != 0)
-                            {
-                                builder.Append(' ');
-                            }
-                            builder.Append(result);
+                            builder.Append(' ');
                         }
-                        catch (CodeParserException cpe)
-                        {
-                            throw new CodeParserException($"Failed to evaluate \"{expression}\": {cpe.Message}", cpe);
-                        }
+                        builder.Append(result);
                     }
                     return builder.ToString();
                 }
@@ -318,15 +311,7 @@ namespace DuetControlServer.Model
                 if (code.Keyword == KeywordType.Abort)
                 {
                     string keywordArgument = code.KeywordArgument.Trim();
-                    try
-                    {
-                        string result = await EvaluateExpression(code, keywordArgument, !evaluateAll, false);
-                        return result;
-                    }
-                    catch (CodeParserException cpe)
-                    {
-                        throw new CodeParserException($"Failed to evaluate \"{keywordArgument}\": {cpe.Message}", cpe);
-                    }
+                    return await EvaluateExpression(code, keywordArgument, !evaluateAll, false);
                 }
 
                 string keywordExpression;
@@ -354,15 +339,7 @@ namespace DuetControlServer.Model
                 }
 
                 // Evaluate SBC properties
-                try
-                {
-                    string result = await EvaluateExpression(code, keywordExpression.Trim(), !evaluateAll, false);
-                    return result;
-                }
-                catch (CodeParserException cpe)
-                {
-                    throw new CodeParserException($"Failed to evaluate \"{keywordExpression}\": {cpe.Message}", cpe);
-                }
+                return await EvaluateExpression(code, keywordExpression.Trim(), !evaluateAll, false);
             }
 
             for (int i = 0; i < code.Parameters.Count; i++)
@@ -370,20 +347,13 @@ namespace DuetControlServer.Model
                 if (code.Parameters[i].IsExpression)
                 {
                     string trimmedExpression = ((string)code.Parameters[i]!).Trim();
-                    try
+                    string parameterValue = await EvaluateExpression(code, trimmedExpression, !evaluateAll, !evaluateAll);
+                    if (!evaluateAll && !parameterValue.StartsWith('{') && !parameterValue.EndsWith('}'))
                     {
-                        string parameterValue = await EvaluateExpression(code, trimmedExpression, !evaluateAll, !evaluateAll);
-                        if (!evaluateAll && !parameterValue.StartsWith('{') && !parameterValue.EndsWith('}'))
-                        {
-                            // Encapsulate fully expanded parameters so that plugins and RRF know it was an expression
-                            parameterValue = '{' + parameterValue + '}';
-                        }
-                        code.Parameters[i] = new CodeParameter(code.Parameters[i].Letter, parameterValue, false, false);
+                        // Encapsulate fully expanded parameters so that plugins and RRF know it was an expression
+                        parameterValue = '{' + parameterValue + '}';
                     }
-                    catch (CodeParserException cpe)
-                    {
-                        throw new CodeParserException($"Failed to evaluate \"{trimmedExpression}\": {cpe.Message}", cpe);
-                    }
+                    code.Parameters[i] = new CodeParameter(code.Parameters[i].Letter, parameterValue, false, false);
                 }
             }
             code.ConvertDriverIds();

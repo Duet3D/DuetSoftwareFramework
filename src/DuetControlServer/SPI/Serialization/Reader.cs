@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
 using DuetAPI;
 using DuetAPI.Utility;
 using DuetControlServer.SPI.Communication.FirmwareRequests;

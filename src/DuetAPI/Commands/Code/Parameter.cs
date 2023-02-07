@@ -38,7 +38,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Unparsed string representation of the code parameter or an empty string if none present
         /// </summary>
-        internal readonly string? StringValue;
+        internal readonly string StringValue;
 
         /// <summary>
         /// Internal parsed representation of the string value (one of string, int, uint, float, int[], uint[] or float[])
@@ -214,7 +214,11 @@ namespace DuetAPI.Commands
             }
             else if (value is not null)
             {
-                StringValue = value.ToString();
+                StringValue = value.ToString() ?? string.Empty;
+            }
+            else
+            {
+                StringValue = string.Empty;
             }
         }
 

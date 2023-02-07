@@ -2,7 +2,6 @@
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
-using DuetControlServer.Utility;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -145,13 +144,14 @@ namespace DuetControlServer.FileExecution
             IsNested = isNested;
             SourceConnection = sourceConnection;
 
-            // Are we executing config.g?
-            string name = Path.GetFileName(physicalFile);
+            // Are we executing config.g or config-override.g?
             if (isNested)
             {
-                IsConfigOverride = (name == FilePath.ConfigOverrideFile);
+                // FIXME This should check if the starting code is M501
+                IsConfigOverride = (Path.GetFileName(fileName) == FilePath.ConfigOverrideFile);
             }
-            else if (name == FilePath.ConfigFile || name == FilePath.ConfigFileFallback)
+            else if (fileName == Path.Combine(Settings.BaseDirectory, "sys", FilePath.ConfigFile) ||
+                     fileName == Path.Combine(Settings.BaseDirectory, "sys", FilePath.ConfigFileFallback))
             {
                 IsConfig = true;
             }
@@ -273,8 +273,25 @@ namespace DuetControlServer.FileExecution
         /// <returns>Asynchronous task</returns>
         private async Task Run()
         {
-            Queue<Code> codes = new();
+            // Reset start-up error
+            if (IsConfig)
+            {
+                using (await Model.Provider.AccessReadWriteAsync())
+                {
+                    Model.Provider.Get.State.StartupError = null;
+                }
+            }
 
+            // Check if we're executing a config file
+            bool executingConfigFile = false;
+            if (IsConfig || IsConfigOverride || Path.GetFileName(FileName) == FilePath.DsfConfigFile)
+            {
+                executingConfigFile = true;
+                Model.Provider.SetExecutingConfig(true);
+            }
+
+            // Start processing codes
+            Queue<Code> codes = new();
             do
             {
                 // Fill up the macro code buffer
@@ -292,36 +309,20 @@ namespace DuetControlServer.FileExecution
                         codes.Enqueue(readCode);
                         await readCode.Execute();       // actual execution happens in the background
                     }
-                    catch (OperationCanceledException oce)
-                    {
-                        using (await _lock.LockAsync(Program.CancellationToken))
-                        {
-                            if (!IsAborted)
-                            {
-                                _logger.Debug(oce, "Cancelling macro file because of cancelled code");
-                                await AbortAsync();
-                            }
-                        }
-                    }
-                    catch (AggregateException ae)
-                    {
-                        using (await _file!.LockAsync())
-                        {
-                            _file.Close();
-                        }
-
-                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from macro {Path.GetFileName(FileName)}: {ae.InnerException!.Message}");
-                        _logger.Error(ae.InnerException, "Failed to read code from macro {0}", FileName);
-                    }
                     catch (Exception e)
                     {
-                        using (await _file!.LockAsync())
+                        if (e is not OperationCanceledException)
                         {
-                            _file.Close();
-                        }
+                            if (e is AggregateException ae)
+                            {
+                                e = ae.InnerException!;
+                            }
 
-                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from macro {Path.GetFileName(FileName)}: {e.Message}");
-                        _logger.Error(e, "Failed to read code from macro {0}", FileName);
+                            await Model.Provider.HandleMacroErrorAsync(FileName, _file!.LineNumber, e.Message);
+                            await Utility.Logger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FileName)} line {_file.LineNumber}: {e.Message}");
+                            _logger.Error(e);
+                        }
+                        await AbortAsync();
                     }
                 }
 
@@ -331,26 +332,25 @@ namespace DuetControlServer.FileExecution
                     try
                     {
                         // Logging of regular messages is done by the code itself, no need to take care of it here
-                        await code.Task;
+                        Message? codeResult = await code.Task;
+                        if (codeResult?.Type is MessageType.Error)
+                        {
+                            await Model.Provider.HandleMacroErrorAsync(FileName, code.LineNumber ?? 0, codeResult.Content);
+                        }
                     }
                     catch (OperationCanceledException)
                     {
                         // Code has been cancelled, don't log this. This can happen when a pausable macro is interrupted
                         // or if a code interceptor attempted to intercept a code on an inactive channel
                     }
-                    catch (CodeParserException cpe)
-                    {
-                        await Logger.LogOutputAsync(MessageType.Error, cpe.Message + " of " + Path.GetFileName(FileName));
-                        _logger.Debug(cpe);
-                    }
-                    catch (AggregateException ae)
-                    {
-                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{ae.InnerException!.GetType().Name}] {ae.InnerException.Message}");
-                        _logger.Warn(ae);
-                    }
                     catch (Exception e)
                     {
-                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to execute {code.ToShortString()} in {Path.GetFileName(FileName)}: [{e.GetType().Name}] {e.Message}");
+                        if (e is AggregateException ae)
+                        {
+                            e = ae.InnerException!;
+                        }
+                        await Model.Provider.HandleMacroErrorAsync(FileName, _file!.LineNumber, e.Message);
+                        await Utility.Logger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FileName)} line {_file.LineNumber}: {e.Message}");
                         _logger.Warn(e);
                     }
                 }
@@ -376,6 +376,12 @@ namespace DuetControlServer.FileExecution
                     _finishTcs.SetResult();
                     _finishTcs = null;
                 }
+            }
+
+            // Check if we've finished executing a config file
+            if (executingConfigFile)
+            {
+                Model.Provider.SetExecutingConfig(true);
             }
 
             // Release this instance when done

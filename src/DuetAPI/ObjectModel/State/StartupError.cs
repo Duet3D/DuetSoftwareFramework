@@ -18,12 +18,12 @@
         /// <summary>
         /// Line number of the error
         /// </summary>
-        public int Line
+        public long Line
         {
             get => _line;
 			set => SetPropertyValue(ref _line, value);
         }
-        private int _line;
+        private long _line;
 
         /// <summary>
         /// Message of the error

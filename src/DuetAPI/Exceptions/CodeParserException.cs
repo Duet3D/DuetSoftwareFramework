@@ -8,6 +8,11 @@ namespace DuetAPI
     public class CodeParserException : Exception
     {
         /// <summary>
+        /// Code causing the error
+        /// </summary>
+        public Commands.Code? Code { get; }
+
+        /// <summary>
         /// Creates a new CodeParserException
         /// </summary>
         public CodeParserException() { }
@@ -23,14 +28,22 @@ namespace DuetAPI
         /// </summary>
         /// <param name="message">Exception message</param>
         /// <param name="code">Code being parsed</param>
-        public CodeParserException(string message, Commands.Code code)
-            : base(message + ((code?.LineNumber is not null) ? $" in line {code.LineNumber}" : string.Empty)) { }
+        public CodeParserException(string message, Commands.Code code) : base(message)
+        {
+            Code = code;
+        }
 
         /// <summary>
         /// Creates a new CodeParserException
         /// </summary>
         /// <param name="message">Exception message</param>
         /// <param name="inner">Inner exception</param>
-        public CodeParserException(string message, Exception inner) : base(message, inner) { }
+        public CodeParserException(string message, Exception inner) : base(message, inner)
+        {
+            if (inner is CodeParserException cpe)
+            {
+                Code = cpe.Code;
+            }
+        }
     }
 }

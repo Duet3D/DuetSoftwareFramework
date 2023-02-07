@@ -472,7 +472,7 @@ namespace DuetAPI.Commands
                                 }
                                 else
                                 {
-                                    throw new CodeParserException("Dynamic command numbers are only supported for T-codes");
+                                    throw new CodeParserException("Dynamic command numbers are only supported for T-codes", result);
                                 }
                             }
                             else if (value.Contains('.'))

@@ -1,6 +1,6 @@
 using System;
 
-namespace DuetAPI.Connection
+namespace DuetAPI
 {
     /// <summary>
     /// Exception class that is thrown if the API version of the client is incompatible to the server

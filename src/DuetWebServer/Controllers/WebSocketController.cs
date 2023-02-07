@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI;
 using DuetAPI.Connection;
 using DuetAPIClient;
 using DuetWebServer.Singletons;

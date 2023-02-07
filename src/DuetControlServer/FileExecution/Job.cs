@@ -340,32 +340,18 @@ namespace DuetControlServer.FileExecution
                         codes.Enqueue(readCode);
                         await readCode.Execute();
                     }
-                    catch (OperationCanceledException)
-                    {
-                        using (await file.LockAsync())
-                        {
-                            file.Close();
-                        }
-                    }
-                    catch (AggregateException ae)
-                    {
-                        using (await file.LockAsync())
-                        {
-                            file.Close();
-                        }
-
-                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from job file (channel {file.Channel}): {ae.InnerException!.Message}");
-                        _logger.Error(ae.InnerException);
-                    }
                     catch (Exception e)
                     {
-                        using (await LockAsync())
+                        if (e is not OperationCanceledException)
                         {
-                            file.Close();
+                            if (e is AggregateException ae)
+                            {
+                                e = ae.InnerException!;
+                            }
+                            await Logger.LogOutputAsync(MessageType.Error, $"in job file (channel {file.Channel}) line {file.LineNumber}: {e.Message}");
+                            _logger.Error(e);
                         }
-
-                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to read code from job file (channel {file.Channel}): {e.Message}");
-                        _logger.Error(e);
+                        await AbortAsync();
                     }
                 }
 
@@ -382,23 +368,17 @@ namespace DuetControlServer.FileExecution
                         }
                         catch (OperationCanceledException)
                         {
-                            // Code has been cancelled, don't log this.
-                            // Note this can happen as well when the file being printed is exchanged, when a pausable macro is interrupted,
-                            // or when a code interceptor attempted to intercept a code on an inactive channel
-                        }
-                        catch (CodeParserException cpe)
-                        {
-                            await Logger.LogOutputAsync(MessageType.Error, cpe.Message);
-                        }
-                        catch (AggregateException ae)
-                        {
-                            await Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception (channel {file.Channel}): [{ae.InnerException!.GetType().Name}] {ae.InnerException.Message}");
-                            _logger.Error(ae.InnerException);
+                            // Code has been cancelled, don't log this. This can happen when the file being printed is exchanged, when a
+                            // pausable macro is interrupted, or when a code interceptor attempted to intercept a code on an inactive channel
                         }
                         catch (Exception e)
                         {
-                            await Logger.LogOutputAsync(MessageType.Error, $"{code.ToShortString()} has thrown an exception (channel {file.Channel}): [{e.GetType().Name}] {e.Message}");
-                            _logger.Error(e);
+                            if (e is AggregateException ae)
+                            {
+                                e = ae.InnerException!;
+                            }
+                            await Logger.LogOutputAsync(MessageType.Error, $"in job file (channel {file.Channel}) line {file.LineNumber}: {e.Message}");
+                            _logger.Warn(e);
                         }
                     }
                     finally

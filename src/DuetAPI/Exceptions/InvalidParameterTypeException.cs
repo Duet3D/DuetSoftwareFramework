@@ -28,7 +28,8 @@ namespace DuetAPI
         /// </summary>
         /// <param name="parameter">Parameter to convert</param>
         /// <param name="targetType">Target type</param>
-        public InvalidParameterTypeException(CodeParameter? parameter, Type targetType) : base($"Cannot convert {(parameter != null ? parameter.Letter : "n/a")} parameter to {targetType.Name} (value {parameter?.StringValue ?? "null"})")
+        public InvalidParameterTypeException(CodeParameter? parameter, Type targetType)
+            : base($"Cannot convert {(parameter != null ? parameter.Letter : "n/a")} parameter to {targetType.Name} (value {parameter?.StringValue ?? "null"})")
         {
             Letter = parameter?.Letter;
             TargetType = targetType;
