@@ -148,10 +148,10 @@ namespace DuetControlServer.FileExecution
             if (isNested)
             {
                 // FIXME This should check if the starting code is M501
-                IsConfigOverride = (Path.GetFileName(fileName) == FilePath.ConfigOverrideFile);
+                IsConfigOverride = (Path.GetFileName(physicalFile) == FilePath.ConfigOverrideFile);
             }
-            else if (fileName == Path.Combine(Settings.BaseDirectory, "sys", FilePath.ConfigFile) ||
-                     fileName == Path.Combine(Settings.BaseDirectory, "sys", FilePath.ConfigFileFallback))
+            else if (physicalFile == Path.Combine(Settings.BaseDirectory, "sys", FilePath.ConfigFile) ||
+                     physicalFile == Path.Combine(Settings.BaseDirectory, "sys", FilePath.ConfigFileFallback))
             {
                 IsConfig = true;
             }
