@@ -505,7 +505,7 @@ namespace DuetAPI.Commands
                             }
                             else if (!result.HasParameter(letter))
                             {
-                                AddParameter(result, letter, value, false, false);
+                                AddParameter(result, letter, value, false, unprecedentedParameter || isNumericParameter);
                             }
                             // Ignore duplicate parameters
                         }
@@ -664,10 +664,12 @@ namespace DuetAPI.Commands
 
             if (isQuoted || isSingleParameter)
             {
+                // Standard parameter
                 code.Parameters.Add(new CodeParameter(letter, value, isQuoted, false));
             }
             else
             {
+                // Parameters like "XYZ" in M84 XYZ
                 code.Parameters.Add(new CodeParameter(letter, string.Empty, false, false));
                 foreach (char c in value)
                 {

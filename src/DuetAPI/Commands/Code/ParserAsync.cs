@@ -584,7 +584,7 @@ namespace DuetAPI.Commands
                             }
                             else if (!result.HasParameter(letter))
                             {
-                                AddParameter(result, letter, value, false, buffer.MayRepeatCode);
+                                AddParameter(result, letter, value, false, buffer.MayRepeatCode || unprecedentedParameter || isNumericParameter);
                             }
                             // Ignore duplicate parameters
                         }
