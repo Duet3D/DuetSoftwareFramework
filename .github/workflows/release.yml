@@ -38,5 +38,5 @@ jobs:
           dotnet nuget push src/DuetAPIClient/bin/Debug/DuetAPIClient.*.nupkg --source "nuget.org" --api-key $NUGET_API_KEY
           dotnet nuget push src/DuetHttpClient/bin/Debug/DuetHttpClient.*.nupkg --source "nuget.org" --api-key $NUGET_API_KEY
         env:
-          GH_API_KEY: ${{ secrets.GITHUB_API_KEY }}
+          GH_API_KEY: ${{ secrets.GH_API_KEY }}
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
