@@ -30,13 +30,13 @@ jobs:
       - name: Publish packages
         run: |
           # Publish to GitHub package registry
-          dotnet nuget push src/DuetAPI/bin/Debug/DuetAPI.*.nupkg --api-key $GH_API_KEY --source "https://nuget.pkg.github.com/Duet3D/index.json"
-          dotnet nuget push src/DuetAPIClient/bin/Debug/DuetAPIClient.*.nupkg --api-key $GH_API_KEY --source "https://nuget.pkg.github.com/Duet3D/index.json"
-          dotnet nuget push src/DuetHttpClient/bin/Debug/DuetHttpClient.*.nupkg --api-key $GH_API_KEY --source "https://nuget.pkg.github.com/Duet3D/index.json"
+          dotnet nuget push src/DuetAPI/bin/Debug/DuetAPI.*.nupkg --source "https://nuget.pkg.github.com/Duet3D/index.json" --api-key $GH_API_KEY
+          dotnet nuget push src/DuetAPIClient/bin/Debug/DuetAPIClient.*.nupkg --source "https://nuget.pkg.github.com/Duet3D/index.json" --api-key $GH_API_KEY
+          dotnet nuget push src/DuetHttpClient/bin/Debug/DuetHttpClient.*.nupkg --source "https://nuget.pkg.github.com/Duet3D/index.json" --api-key $GH_API_KEY
           # Publish to NuGet package registry
-          dotnet nuget push src/DuetAPI/bin/Debug/DuetAPI.*.nupkg --api-key $NUGET_API_KEY --source "nuget.org"
-          dotnet nuget push src/DuetAPIClient/bin/Debug/DuetAPIClient.*.nupkg --api-key $NUGET_API_KEY --source "nuget.org"
-          dotnet nuget push src/DuetHttpClient/bin/Debug/DuetHttpClient.*.nupkg --api-key $NUGET_API_KEY --source "nuget.org"
+          dotnet nuget push src/DuetAPI/bin/Debug/DuetAPI.*.nupkg --source "nuget.org" --api-key $NUGET_API_KEY
+          dotnet nuget push src/DuetAPIClient/bin/Debug/DuetAPIClient.*.nupkg --source "nuget.org" --api-key $NUGET_API_KEY
+          dotnet nuget push src/DuetHttpClient/bin/Debug/DuetHttpClient.*.nupkg --source "nuget.org" --api-key $NUGET_API_KEY
         env:
           GH_API_KEY: ${{ secrets.GITHUB_API_KEY }}
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
