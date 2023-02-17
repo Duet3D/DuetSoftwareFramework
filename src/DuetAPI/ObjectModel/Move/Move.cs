@@ -15,6 +15,16 @@ namespace DuetAPI.ObjectModel
         public ModelCollection<Axis> Axes { get; } = new ModelCollection<Axis>();
 
         /// <summary>
+        /// Backlash distance multiplier
+        /// </summary>
+        public int BacklashFactor
+        {
+            get => _backlashFactor;
+            set => SetPropertyValue(ref _backlashFactor, value);
+        }
+        private int _backlashFactor = 10;
+
+        /// <summary>
         /// Information about the automatic calibration
         /// </summary>
         public MoveCalibration Calibration { get; } = new MoveCalibration();
@@ -134,16 +144,5 @@ namespace DuetAPI.ObjectModel
             set => SetPropertyValue(ref _workplaceNumber, value);
         }
         private int _workplaceNumber;
-
-        /// <summary>
-        /// Index of the currently selected workspace
-        /// </summary>
-        [JsonIgnore]
-        [Obsolete("Use WorkplaceNumber instead")]
-        public int WorkspaceNumber
-        {
-            get => _workplaceNumber + 1;
-            set => _workplaceNumber = value - 1;
-        }
     }
 }

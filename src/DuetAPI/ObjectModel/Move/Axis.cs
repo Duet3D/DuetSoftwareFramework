@@ -38,6 +38,16 @@ namespace DuetAPI.ObjectModel
         private float _babystep;
 
         /// <summary>
+        /// Configured backlash of this axis (in mm)
+        /// </summary>
+        public float Backlash
+        {
+            get => _backlash;
+            set => SetPropertyValue(ref _backlash, value);
+        }
+        private float _backlash;
+
+        /// <summary>
         /// Motor current (in mA)
         /// </summary>
         public int Current
