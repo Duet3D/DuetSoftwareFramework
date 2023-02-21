@@ -16,6 +16,16 @@
         private bool _highEnd;
 
         /// <summary>
+        /// Number of the referenced probe if type is ZProbeAsEndstop, else null
+        /// </summary>
+        public int? Probe
+        {
+            get => _probe;
+            set => SetPropertyValue(ref _probe, value);
+        }
+        private int? _probe;
+
+        /// <summary>
         /// Whether or not the endstop is hit
         /// </summary>
         public bool Triggered

@@ -175,12 +175,11 @@ namespace DuetControlServer.FileExecution
             {
                 foreach (Code item in _syncRequests.Keys)
                 {
-                    if (code.FilePosition == item.FilePosition)
+                    if (code.Channel != item.Channel && code.FilePosition == item.FilePosition)
                     {
                         _syncRequests[item].TrySetResult(true);
                         return Task.FromResult(true);
                     }
-
                 }
 
                 TaskCompletionSource<bool> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
