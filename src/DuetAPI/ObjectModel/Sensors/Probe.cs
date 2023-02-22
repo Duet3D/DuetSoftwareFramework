@@ -46,7 +46,7 @@ namespace DuetAPI.ObjectModel
             get => _diveHeight;
 			set => SetPropertyValue(ref _diveHeight, value);
         }
-        private float _diveHeight;
+        private float _diveHeight = 5F;
 
         /// <summary>
         /// Height of the probe where it stopped last time (in mm)
