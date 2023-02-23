@@ -184,6 +184,19 @@ namespace DuetControlServer.IPC.Processors
                                                     }
                                                 }
                                             }
+                                            catch (CodeParserException cpe)
+                                            {
+                                                await streamWriter.WriteLineAsync("Error: " + cpe.Message);
+                                                using (await Model.Provider.AccessReadOnlyAsync())
+                                                {
+                                                    // Repetier or other host servers expect an "ok" after error messages
+                                                    if (Model.Provider.Get.Inputs[_channel].Compatibility is Compatibility.Marlin or Compatibility.NanoDLP)
+                                                    {
+                                                        await streamWriter.WriteLineAsync("ok");
+                                                    }
+                                                }
+                                                await streamWriter.FlushAsync();
+                                            }
                                             catch (SocketException)
                                             {
                                                 // Connection has been terminated
@@ -226,6 +239,13 @@ namespace DuetControlServer.IPC.Processors
                                 }
 
                                 await streamWriter.WriteLineAsync($"Error: Failed to parse code from line '{line}'");
+                                using (await Model.Provider.AccessReadOnlyAsync())
+                                {
+                                    if (Model.Provider.Get.Inputs[_channel].Compatibility is Compatibility.Marlin or Compatibility.NanoDLP)
+                                    {
+                                        await streamWriter.WriteLineAsync("ok");
+                                    }
+                                }
                                 await streamWriter.FlushAsync();
                                 break;
                             }

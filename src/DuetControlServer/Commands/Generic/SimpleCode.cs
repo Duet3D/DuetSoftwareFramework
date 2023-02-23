@@ -79,6 +79,7 @@ namespace DuetControlServer.Commands
             }
 
             // Parse the input string
+            Message result = new();
             List<Code> codes = new(), priorityCodes = new();
             try
             {
@@ -108,13 +109,20 @@ namespace DuetControlServer.Commands
                     }
                 }
             }
-            catch (CodeParserException e)
+            catch (CodeParserException cpe)
             {
-                // Report parsing errors as an error message
-                return (new Message(MessageType.Error, e.Message)).ToString();
+                result.Append(MessageType.Error, cpe.Message);
+                using (await Model.Provider.AccessReadOnlyAsync())
+                {
+                    // Repetier or other host servers expect an "ok" after error messages
+                    if (Model.Provider.Get.Inputs[Channel]?.Compatibility is Compatibility.Marlin or Compatibility.NanoDLP)
+                    {
+                        result.AppendLine("ok");
+                    }
+                }
+                return result.ToString();
             }
 
-            Message result = new();
             try
             {
                 // Execute priority codes first
@@ -166,6 +174,14 @@ namespace DuetControlServer.Commands
             catch (CodeParserException cpe)
             {
                 result.Append(MessageType.Error, cpe.Message);
+                using (await Model.Provider.AccessReadOnlyAsync())
+                {
+                    // Repetier or other host servers expect an "ok" after error messages
+                    if (Model.Provider.Get.Inputs[Channel]?.Compatibility is Compatibility.Marlin or Compatibility.NanoDLP)
+                    {
+                        result.AppendLine("ok");
+                    }
+                }
             }
             return result.ToString();
         }
