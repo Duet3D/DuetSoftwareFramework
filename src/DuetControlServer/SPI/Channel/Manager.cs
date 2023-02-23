@@ -69,9 +69,18 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Get a channel that is currently idle in order to process a priority code
         /// </summary>
+        /// <param name="preferredChannel">Preferred code channel</param>
         /// <returns>Idle code channel</returns>
-        public async Task<CodeChannel> GetIdleChannel()
+        public async Task<CodeChannel> GetIdleChannel(CodeChannel preferredChannel)
         {
+            using (await _channels[(int)preferredChannel].LockAsync())
+            {
+                if (_channels[(int)preferredChannel].BufferedCodes.Count == 0)
+                {
+                    return preferredChannel;
+                }
+            }
+
             foreach (Processor channel in _channels)
             {
                 using (await channel.LockAsync())
