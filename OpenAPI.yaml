@@ -170,7 +170,7 @@ paths:
                   schema:
                       type: string
                 - name: recursive
-                  in: path
+                  in: query
                   description: 'Whether the directory shall be deleted recursively'
                   required: false
             responses:
