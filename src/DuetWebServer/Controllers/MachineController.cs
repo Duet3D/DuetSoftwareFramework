@@ -575,6 +575,7 @@ namespace DuetWebServer.Controllers
         /// Delete the given file or directory.
         /// </summary>
         /// <param name="filename">File or directory to delete</param>
+        /// <param name="recursive">Whether the directory shall be deleted recursively</param>
         /// <returns>
         /// HTTP status code:
         /// (204) File or directory deleted
@@ -585,7 +586,7 @@ namespace DuetWebServer.Controllers
         /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpDelete("file/{*filename}")]
-        public async Task<IActionResult> DeleteFileOrDirectory(string filename)
+        public async Task<IActionResult> DeleteFileOrDirectory(string filename, bool recursive = false)
         {
             filename = HttpUtility.UrlDecode(filename);
 
@@ -596,7 +597,7 @@ namespace DuetWebServer.Controllers
 
                 if (Directory.Exists(resolvedPath))
                 {
-                    Directory.Delete(resolvedPath);
+                    Directory.Delete(resolvedPath, recursive);
                     return NoContent();
                 }
 

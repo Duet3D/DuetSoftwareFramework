@@ -169,6 +169,10 @@ paths:
                   required: true
                   schema:
                       type: string
+                - name: recursive
+                  in: path
+                  description: 'Whether the directory shall be deleted recursively'
+                  required: false
             responses:
                 '204':
                     description: 'File or directory succesfully deleted'
