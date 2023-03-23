@@ -966,7 +966,8 @@ namespace DuetControlServer.SPI
                     HandleCheckFileExists();
                     break;
                 case Request.DeleteFileOrDirectory:
-                    HandleDeleteFileOrDirectory();
+                case Request.DeleteFileOrDirectoryRecursively:
+                    HandleDeleteFileOrDirectory((Request)packet.Request == Request.DeleteFileOrDirectoryRecursively);
                     break;
                 case Request.OpenFile:
                     HandleOpenFile();
@@ -1375,7 +1376,8 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Delete a file or directory
         /// </summary>
-        private static void HandleDeleteFileOrDirectory()
+        /// <param name="recursive">Delete file or directory recursively</param>
+        private static void HandleDeleteFileOrDirectory(bool recursive)
         {
             DataTransfer.ReadDeleteFileOrDirectory(out string filename);
             _logger.Debug("Attempting to delete {0}", filename);
@@ -1385,7 +1387,7 @@ namespace DuetControlServer.SPI
                 string physicalFile = FilePath.ToPhysical(filename);
                 if (Directory.Exists(physicalFile))
                 {
-                    Directory.Delete(physicalFile);
+                    Directory.Delete(physicalFile, recursive);
                     DataTransfer.WriteFileDeleteResult(true);
                 }
                 else

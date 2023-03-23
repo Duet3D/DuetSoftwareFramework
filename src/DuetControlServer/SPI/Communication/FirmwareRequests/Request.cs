@@ -142,6 +142,11 @@ namespace DuetControlServer.SPI.Communication.FirmwareRequests
         /// <summary>
         /// Close a file again
         /// </summary>
-        CloseFile = 24
+        CloseFile = 24,
+
+        /// <summary>
+        /// Delete a file or directory recursively
+        /// </summary>
+        DeleteFileOrDirectoryRecursively = 25
     }
 }

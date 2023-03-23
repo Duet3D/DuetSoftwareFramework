@@ -190,7 +190,7 @@ namespace DuetControlServer.IPC.Processors
                                                 using (await Model.Provider.AccessReadOnlyAsync())
                                                 {
                                                     // Repetier or other host servers expect an "ok" after error messages
-                                                    if (Model.Provider.Get.Inputs[_channel].Compatibility is Compatibility.Marlin or Compatibility.NanoDLP)
+                                                    if (Model.Provider.Get.Inputs[_channel]?.Compatibility is Compatibility.Marlin or Compatibility.NanoDLP)
                                                     {
                                                         await streamWriter.WriteLineAsync("ok");
                                                     }
@@ -241,7 +241,7 @@ namespace DuetControlServer.IPC.Processors
                                 await streamWriter.WriteLineAsync($"Error: Failed to parse code from line '{line}'");
                                 using (await Model.Provider.AccessReadOnlyAsync())
                                 {
-                                    if (Model.Provider.Get.Inputs[_channel].Compatibility is Compatibility.Marlin or Compatibility.NanoDLP)
+                                    if (Model.Provider.Get.Inputs[_channel]?.Compatibility is Compatibility.Marlin or Compatibility.NanoDLP)
                                     {
                                         await streamWriter.WriteLineAsync("ok");
                                     }
