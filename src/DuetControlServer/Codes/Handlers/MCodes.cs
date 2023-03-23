@@ -794,7 +794,7 @@ namespace DuetControlServer.Codes.Handlers
                 case 929:
                     if (await Processor.FlushAsync(code))
                     {
-                        if (code.TryGetInt('S', out int sParam))
+                        if (!code.TryGetInt('S', out int sParam))
                         {
                             using (await Provider.AccessReadOnlyAsync())
                             {
@@ -808,7 +808,7 @@ namespace DuetControlServer.Codes.Handlers
 
                         if (sParam > 0 && sParam < 4)
                         {
-                            LogLevel logLevel = (int)sParam switch
+                            LogLevel logLevel = sParam switch
                             {
                                 1 => LogLevel.Warn,
                                 2 => LogLevel.Info,

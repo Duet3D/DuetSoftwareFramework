@@ -192,8 +192,8 @@ namespace DuetControlServer.Model
                         // Update object model keys depending on the sequence numbers
                         foreach (JsonProperty seqProperty in statusResult.GetProperty("seqs").EnumerateObject())
                         {
-                            if (seqProperty.Name != "reply" && (!Settings.UpdateOnly || seqProperty.Name == "boards" || seqProperty.Name == "directories" || seqProperty.Name == "state") &&
-                                seqProperty.Value.ValueKind == JsonValueKind.Number)
+                            if (seqProperty.Name != "reply" && seqProperty.Value.ValueKind == JsonValueKind.Number &&
+                                (!Settings.UpdateOnly || seqProperty.Name is "boards" or "directories" or "state"))
                             {
                                 int newSeq = seqProperty.Value.GetInt32();
                                 if (!_lastSeqs.TryGetValue(seqProperty.Name, out int lastSeq) || lastSeq != newSeq)
