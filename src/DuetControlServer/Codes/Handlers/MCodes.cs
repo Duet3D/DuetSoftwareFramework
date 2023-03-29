@@ -606,6 +606,31 @@ namespace DuetControlServer.Codes.Handlers
                     }
                     throw new OperationCanceledException();
 
+                // Delete file/directory
+                case 472:
+                    if (await Processor.FlushAsync(code))
+                    {
+                        string path = code.GetString('P'), physicalPath = await FilePath.ToPhysicalAsync(path);
+                        try
+                        {
+                            if (Directory.Exists(physicalPath))
+                            {
+                                _ = code.TryGetBool('R', out bool recursive);
+                                Directory.Delete(physicalPath, recursive);
+                            }
+                            else
+                            {
+                                File.Delete(physicalPath);
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            _logger.Debug(e, "Failed to delete file or directory");
+                            return new Message(MessageType.Error, $"Failed to delete file or directory {path}: {e.Message}");
+                        }
+                    }
+                    throw new OperationCanceledException();
+
                 // Print settings
                 case 503:
                     if (await Processor.FlushAsync(code))
