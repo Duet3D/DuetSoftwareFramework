@@ -158,7 +158,7 @@ namespace DuetControlServer.Codes.Pipelines
             {
                 // Allocate an extra task only if we cannot store the executed code yet. Should never get here!
                 Processor.Logger.Warn("Pipeline failed to store code immediately so waiting synchronously for it to be added");
-                _stackItem.PendingCodes.Writer.WriteAsync(code).AsTask().Wait();
+                _stackItem.PendingCodes.Writer.WriteAsync(code, Program.CancellationToken).AsTask().Wait();
             }
         }
 

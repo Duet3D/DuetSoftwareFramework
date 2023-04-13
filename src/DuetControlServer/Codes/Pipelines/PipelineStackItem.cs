@@ -46,19 +46,20 @@ namespace DuetControlServer.Codes.Pipelines
                 {
                     await foreach (Code code in PendingCodes.Reader.ReadAllAsync(Program.CancellationToken))
                     {
+                        // Do not process cancelled codes
                         if (code.CancellationToken.IsCancellationRequested && pipeline.Stage != PipelineStage.Executed)
                         {
                             Processor.CancelCode(code);
                             continue;
                         }
 
-                        lock (this)
-                        {
-                            CodeBeingExecuted = code;
-                        }
-
+                        // Start processing the next code
                         try
                         {
+                            lock (this)
+                            {
+                                CodeBeingExecuted = code;
+                            }
                             code.Stage = pipeline.Stage;
                             await pipeline.ProcessCodeAsync(code);
                         }
@@ -66,13 +67,12 @@ namespace DuetControlServer.Codes.Pipelines
                         {
                             pipeline.Processor.Logger.Error(e, "Failed to process code in stage {0}", pipeline.Stage);
                         }
-                        finally
+
+                        // Code processed, see if there is more to do
+                        lock (this)
                         {
-                            lock (this)
-                            {
-                                Busy = PendingCodes.Reader.TryPeek(out _);
-                                CodeBeingExecuted = null;
-                            }
+                            Busy = PendingCodes.Reader.TryPeek(out _);
+                            CodeBeingExecuted = null;
                         }
                     }
                 }).Unwrap();
@@ -127,7 +127,6 @@ namespace DuetControlServer.Codes.Pipelines
         /// <summary>
         /// Wait for the pipeline state to finish processing codes
         /// </summary>
-        /// <param name="code">Code waiting for the flush</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
         public async Task<bool> FlushAsync()
         {
@@ -171,7 +170,7 @@ namespace DuetControlServer.Codes.Pipelines
             {
                 Busy = true;
             }
-            return PendingCodes.Writer.WriteAsync(code, code.CancellationToken);
+            return PendingCodes.Writer.WriteAsync(code, Program.CancellationToken);
         }
     }
 }

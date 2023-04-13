@@ -121,13 +121,13 @@ namespace DuetControlServer.Codes.Pipelines
         /// Check if this stage is currently idle
         /// </summary>
         /// <param name="code">Optional code requesting the check</param>
-        /// <returns>Whether the corresponding state is empty</returns>
+        /// <returns>Whether this pipeline stage is idle</returns>
         public bool IsIdle(Commands.Code? code)
         {
             lock (_stack)
             {
                 PipelineStackItem topState = _stack.Peek();
-                return !topState.Busy && (code is null || code.Macro == topState.Macro);
+                return (code is null || code.Macro == topState.Macro) && !topState.Busy;
             }
         }
 
