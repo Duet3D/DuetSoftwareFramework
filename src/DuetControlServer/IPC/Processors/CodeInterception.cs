@@ -74,6 +74,11 @@ namespace DuetControlServer.IPC.Processors
         private readonly bool _priorityCodes;
 
         /// <summary>
+        /// Lock to guard against the case of multiple codes being sent to this interceptor at once
+        /// </summary>
+        private readonly AsyncLock _lock = new();
+
+        /// <summary>
         /// Monitor for exchanging data during interceptions
         /// </summary>
         private readonly AsyncMonitor _codeMonitor = new();
@@ -244,43 +249,46 @@ namespace DuetControlServer.IPC.Processors
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         private async Task<bool> Intercept(Code code)
         {
-            using (await _codeMonitor.EnterAsync(Program.CancellationToken))
+            using (await _lock.LockAsync(code.CancellationToken))
             {
-                try
+                using (await _codeMonitor.EnterAsync(code.CancellationToken))
                 {
-                    // Send the code being intercepted to the IPC client
-                    _codeBeingIntercepted = code;
-                    _codeMonitor.Pulse();
-
                     try
                     {
-                        // Wait for the IPC client to send back a result
-                        await _codeMonitor.WaitAsync(Program.CancellationToken);
+                        // Send the code being intercepted to the IPC client
+                        _codeBeingIntercepted = code;
+                        _codeMonitor.Pulse();
 
-                        // Code is cancelled. This invokes an OperationCanceledException on the code's task
-                        if (_interceptionResult is Cancel)
+                        try
                         {
-                            throw new OperationCanceledException();
-                        }
+                            // Wait for the IPC client to send back a result
+                            await _codeMonitor.WaitAsync(Program.CancellationToken);
 
-                        // Code is resolved with a given result and the request is acknowledged
-                        if (_interceptionResult is Resolve resolveCommand)
+                            // Code is cancelled. This invokes an OperationCanceledException on the code's task
+                            if (_interceptionResult is Cancel)
+                            {
+                                throw new OperationCanceledException();
+                            }
+
+                            // Code is resolved with a given result and the request is acknowledged
+                            if (_interceptionResult is Resolve resolveCommand)
+                            {
+                                code.Result = new Message(resolveCommand.Type, resolveCommand.Content);
+                                return true;
+                            }
+
+                            // Code is ignored. Don't do anything
+                        }
+                        catch (Exception e) when (e is not OperationCanceledException)
                         {
-                            code.Result = new Message(resolveCommand.Type, resolveCommand.Content);
-                            return true;
+                            _logger.Error(e, "Interception processor for IPC#{0} caught an exception", Connection.Id);
                         }
-
-                        // Code is ignored. Don't do anything
                     }
-                    catch (Exception e) when (e is not OperationCanceledException)
+                    finally
                     {
-                        _logger.Error(e, "Interception processor for IPC#{0} caught an exception", Connection.Id);
+                        // No longer intercepting a code...
+                        _codeBeingIntercepted = null;
                     }
-                }
-                finally
-                {
-                    // No longer intercepting a code...
-                    _codeBeingIntercepted = null;
                 }
             }
             return false;
