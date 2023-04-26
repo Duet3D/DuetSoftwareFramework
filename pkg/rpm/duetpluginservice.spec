@@ -65,6 +65,7 @@ fi
 %dir %{dsfoptdir}/plugins
 %{dsfoptdir}/bin/DuetPluginService
 %{dsfoptdir}/bin/DuetPluginService.*
+%{dsfoptdir}/bin/pip3_install.py
 %config(noreplace) %{dsfoptdir}/conf/plugins.json
 %config(noreplace) %{dsfoptdir}/conf/apparmor.conf
 

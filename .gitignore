@@ -19,6 +19,7 @@ x64/
 x86/
 bld/
 [Bb]in/
+!pkg/**/bin
 [Oo]bj/
 [Ll]og/
 

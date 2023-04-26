@@ -11,8 +11,8 @@ chmod 755 /opt/dsf/plugins/DuetPiManagementPlugin
 if [ -f /opt/dsf/plugins/DuetPiManagementPlugin/.start ]; then
         rm /opt/dsf/plugins/DuetPiManagementPlugin/.start
         if (systemctl is-active -q duetcontrolserver && systemctl is-active -q duetpluginservice && systemctl is-active -q duetpluginservice-root); then
-                /opt/dsf/bin/PluginManager -q reload DuetPiManagementPlugin
-                /opt/dsf/bin/PluginManager -q start DuetPiManagementPlugin
+				# Don't wait for the plugin manager to complete because it could result in a deadlock in case the installation was kicked off from DPS-root
+                /opt/dsf/bin/PluginManager -q reload DuetPiManagementPlugin && /opt/dsf/bin/PluginManager -q start DuetPiManagementPlugin &
         else
                 echo "DuetPiManagementPlugin" >> /opt/dsf/conf/plugins.txt
         fi
