@@ -48,6 +48,11 @@
         public MotorsIdleControl Idle { get; } = new MotorsIdleControl();
 
         /// <summary>
+        /// List of configured keep-out zones
+        /// </summary>
+        public ModelCollection<KeepoutZone> Keepout { get; } = new ModelCollection<KeepoutZone>();
+
+        /// <summary>
         /// Configured kinematics options
         /// </summary>
         public Kinematics Kinematics
@@ -76,6 +81,16 @@
             set => SetPropertyValue(ref _noMovesBeforeHoming, value);
         }
         private bool _noMovesBeforeHoming = true;
+
+        /// <summary>
+        /// Reduced accelerations used by Z probing and stall homing moves (in mm/s^2)
+        /// </summary>
+        public float ReducedAcceleration
+        {
+            get => _reducedAcceleration;
+			set => SetPropertyValue(ref _reducedAcceleration, value);
+        }
+        private float _reducedAcceleration
 
         /// <summary>
         /// Maximum acceleration allowed while printing (in mm/s^2)

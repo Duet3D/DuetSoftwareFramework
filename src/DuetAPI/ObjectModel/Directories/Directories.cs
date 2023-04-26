@@ -59,16 +59,6 @@
         private string _menu = "0:/menu";
 
         /// <summary>
-        /// Path to the scans directory
-        /// </summary>
-        public string Scans
-        {
-            get => _scans;
-			set => SetPropertyValue(ref _scans, value);
-        }
-        private string _scans = "0:/scans";
-
-        /// <summary>
         /// Path to the system directory
         /// </summary>
         [SbcProperty(true)]
