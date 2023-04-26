@@ -90,7 +90,7 @@
             get => _reducedAcceleration;
 			set => SetPropertyValue(ref _reducedAcceleration, value);
         }
-        private float _reducedAcceleration
+        private float _reducedAcceleration = 10000F;
 
         /// <summary>
         /// Maximum acceleration allowed while printing (in mm/s^2)
