@@ -340,6 +340,16 @@ namespace DuetControlServer.FileExecution
                         }
                         else
                         {
+                            try
+                            {
+                                // Wait for custom codes to go in case a plugin inserted them
+                                await SPI.Interface.Flush(CodeChannel.File);
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                // ignored
+                            }
+
                             using (await LockAsync())
                             {
                                 if (IsPaused)
@@ -379,16 +389,6 @@ namespace DuetControlServer.FileExecution
                         }
                         else
                         {
-                            try
-                            {
-                                // Wait for custom codes to go in case a plugin inserted them
-                                await SPI.Interface.Flush(CodeChannel.File);
-                            }
-                            catch (OperationCanceledException)
-                            {
-                                // ignored
-                            }
-
                             await SPI.Interface.StopPrint(PrintStoppedReason.NormalCompletion);
                             _logger.Info("Finished job file");
                         }
