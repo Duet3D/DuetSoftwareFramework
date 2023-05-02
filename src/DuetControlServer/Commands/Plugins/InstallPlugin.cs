@@ -59,9 +59,9 @@ namespace DuetControlServer.Commands
             using (await Model.Provider.AccessReadOnlyAsync())
             {
                 // Check the required DSF version
-                if (!PluginManifest.CheckVersion(Model.Provider.Get.State.DsfVersion!, plugin.SbcDsfVersion!))
+                if (!PluginManifest.CheckVersion(Program.Version, plugin.SbcDsfVersion!))
                 {
-                    throw new ArgumentException($"Incompatible DSF version (requires {plugin.SbcDsfVersion}, got {Model.Provider.Get.State.DsfVersion!})");
+                    throw new ArgumentException($"Incompatible DSF version (requires {plugin.SbcDsfVersion}, got {Program.Version})");
                 }
 
                 // Check the required RRF version
@@ -160,12 +160,7 @@ namespace DuetControlServer.Commands
         private static async Task<Plugin> ExtractManifest(ZipArchive zipArchive)
         {
             // Extract the plugin manifest
-            ZipArchiveEntry? manifestFile = zipArchive.GetEntry("plugin.json");
-            if (manifestFile is null)
-            {
-                throw new ArgumentException("plugin.json not found in the ZIP file");
-            }
-
+            ZipArchiveEntry? manifestFile = zipArchive.GetEntry("plugin.json") ?? throw new ArgumentException("plugin.json not found in the ZIP file");
             Plugin plugin = new();
             await using (Stream manifestStream = manifestFile.Open())
             {

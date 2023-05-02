@@ -31,11 +31,6 @@
         Menu,
 
         /// <summary>
-        /// Scans directory
-        /// </summary>
-        Scans,
-        
-        /// <summary>
         /// System directory
         /// </summary>
         System,

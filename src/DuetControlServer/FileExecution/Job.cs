@@ -243,8 +243,14 @@ namespace DuetControlServer.FileExecution
         {
             // Analyze and open the file
             GCodeFileInfo info = await InfoParser.Parse(fileName, true);
+
+            bool supportsAyncMoves;
+            using (await Provider.AccessReadOnlyAsync())
+            {
+                supportsAyncMoves = Provider.Get.Inputs[CodeChannel.File2] != null;
+            }
             CodeFile file = new(fileName, CodeChannel.File);
-            CodeFile file2 = new(fileName, CodeChannel.File2);
+            CodeFile? file2 = supportsAyncMoves ? new(fileName, CodeChannel.File2) : null;
 
             // A file being printed may start another file print
             if (IsFileSelected)
@@ -387,6 +393,16 @@ namespace DuetControlServer.FileExecution
                 }
                 else
                 {
+                    // Flush one last time in case plugins inserted codes at the end of a print file
+                    try
+                    {
+                        await SPI.Interface.FlushAsync(file.Channel);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // ignored
+                    }
+
                     using (await LockAsync())
                     {
                         if (IsPaused)
@@ -424,7 +440,7 @@ namespace DuetControlServer.FileExecution
                 using (await LockAsync())
                 {
                     await _resume.WaitAsync(Program.CancellationToken);
-                    startingNewPrint = !_file!.IsClosed && !_file2!.IsClosed;
+                    startingNewPrint = !_file!.IsClosed && !(_file2?.IsClosed ?? true);
                     IsProcessing = startingNewPrint;
                 }
 
@@ -435,19 +451,8 @@ namespace DuetControlServer.FileExecution
 
                     // Run the same file print on two distinct channels
                     Task firstFileTask = DoFilePrint(_file!);
-                    Task secondFileTask = DoFilePrint(_file2!);
+                    Task secondFileTask = (_file2 is not null) ? DoFilePrint(_file2) : Task.CompletedTask;
                     await Task.WhenAll(firstFileTask, secondFileTask);
-
-                    // Flush one last time in case plugins inserted codes at the end of a print file
-                    try
-                    {
-                        await SPI.Interface.FlushAsync(CodeChannel.File);
-                        await SPI.Interface.FlushAsync(CodeChannel.File2);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        // ignored
-                    }
 
                     // Deal with the print result
                     using (await LockAsync())
@@ -526,7 +531,7 @@ namespace DuetControlServer.FileExecution
 
                     // Dispose the file
                     _file!.Dispose();
-                    _file2!.Dispose();
+                    _file2?.Dispose();
                     _file = _file2 = null;
                     _filename = null;
 
@@ -583,9 +588,12 @@ namespace DuetControlServer.FileExecution
                 {
                     _file.Close();
                 }
-                using (_file2!.Lock())
+                if (_file2 is not null)
                 {
-                    _file2.Close();
+                    using (_file2.Lock())
+                    {
+                        _file2.Close();
+                    }
                 }
                 IsCancelled = IsPaused;
                 Resume();
@@ -608,9 +616,12 @@ namespace DuetControlServer.FileExecution
                 {
                     _file.Close();
                 }
-                using (await _file2!.LockAsync())
+                if (_file2 is not null)
                 {
-                    _file2.Close();
+                    using (await _file2.LockAsync())
+                    {
+                        _file2.Close();
+                    }
                 }
                 IsCancelled = IsPaused;
                 Resume();
@@ -633,9 +644,12 @@ namespace DuetControlServer.FileExecution
                 {
                     _file.Close();
                 }
-                using (_file2!.Lock())
+                if (_file2 is not null)
                 {
-                    _file2.Close();
+                    using (_file2.Lock())
+                    {
+                        _file2.Close();
+                    }
                 }
                 IsAborted = true;
                 Resume();
@@ -658,9 +672,12 @@ namespace DuetControlServer.FileExecution
                 {
                     _file.Close();
                 }
-                using (await _file2!.LockAsync())
+                if (_file2 is not null)
                 {
-                    _file2.Close();
+                    using (await _file2.LockAsync())
+                    {
+                        _file2.Close();
+                    }
                 }
                 IsAborted = true;
                 Resume();

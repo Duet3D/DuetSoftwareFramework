@@ -61,13 +61,16 @@ namespace DuetWebServer.Authorization
         {
             if (Request.Headers.TryGetValue("X-Session-Key", out StringValues sessionKeys))
             {
-                foreach (string sessionKey in sessionKeys)
+                foreach (string? sessionKey in sessionKeys)
                 {
-                    AuthenticationTicket? ticket = _sessionStorage.GetTicketFromKey(sessionKey);
-                    if (ticket is not null)
+                    if (sessionKey is not null)
                     {
-                        // Got a ticket, success!
-                        return AuthenticateResult.Success(ticket);
+                        AuthenticationTicket? ticket = _sessionStorage.GetTicketFromKey(sessionKey);
+                        if (ticket is not null)
+                        {
+                            // Got a ticket, success!
+                            return AuthenticateResult.Success(ticket);
+                        }
                     }
                 }
             }
@@ -110,7 +113,7 @@ namespace DuetWebServer.Authorization
         private async Task<CommandConnection> BuildConnection()
         {
             CommandConnection connection = new();
-            await connection.Connect(_configuration.GetValue("SocketPath", Defaults.FullSocketPath));
+            await connection.Connect(_configuration.GetValue("SocketPath", Defaults.FullSocketPath)!);
             return connection;
         }
     }

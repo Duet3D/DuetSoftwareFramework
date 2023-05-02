@@ -21,13 +21,13 @@ namespace DuetControlServer.Commands
         {
             using (await Model.Provider.AccessReadWriteAsync())
             {
-                for (int i = 0; i < Model.Provider.Get.HttpEndpoints.Count; i++)
+                for (int i = 0; i < Model.Provider.Get.SBC!.DSF.HttpEndpoints.Count; i++)
                 {
-                    HttpEndpoint ep = Model.Provider.Get.HttpEndpoints[i];
+                    HttpEndpoint ep = Model.Provider.Get.SBC!.DSF.HttpEndpoints[i];
                     if (ep.EndpointType == EndpointType && ep.Namespace == Namespace && ep.Path == Path)
                     {
                         _logger.Debug("Removed HTTP endpoint {0} machine/{1}/{2}", EndpointType, Namespace, Path);
-                        Model.Provider.Get.HttpEndpoints.RemoveAt(i);
+                        Model.Provider.Get.SBC!.DSF.HttpEndpoints.RemoveAt(i);
                         return true;
                     }
                 }

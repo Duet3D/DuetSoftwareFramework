@@ -71,42 +71,6 @@ namespace DuetAPI.ObjectModel
         private string _displayMessage = string.Empty;
 
         /// <summary>
-        /// Version of the Duet Software Framework package
-        /// </summary>
-        [Obsolete("This field will be removed in favour of a new dsf main key in v3.5")]
-        [SbcProperty(false)]
-        public string? DsfVersion
-        {
-            get => _dsfVersion;
-            set => SetPropertyValue(ref _dsfVersion, value);
-        }
-        private string? _dsfVersion;
-
-        /// <summary>
-        /// Indicates if DSF allows the installation and usage of third-party plugins
-        /// </summary>
-        [Obsolete("This field will be removed in favour of a new dsf main key in v3.5")]
-        [SbcProperty(false)]
-        public bool DsfPluginSupport
-        {
-            get => _dsfPluginSupport;
-            set => SetPropertyValue(ref _dsfPluginSupport, value);
-        }
-        private bool _dsfPluginSupport;
-
-        /// <summary>
-        /// Indicates if DSF allows the installation and usage of third-party root plugins (potentially dangerous)
-        /// </summary>
-        [Obsolete("This field will be removed in favour of a new dsf main key in v3.5")]
-        [SbcProperty(false)]
-        public bool DsfRootPluginSupport
-        {
-            get => _dsfRootPluginSupport;
-            set => SetPropertyValue(ref _dsfRootPluginSupport, value);
-        }
-        private bool _dsfRootPluginSupport;
-
-        /// <summary>
         /// List of general-purpose output ports
         /// </summary>
         /// <seealso cref="GpOutputPort"/>

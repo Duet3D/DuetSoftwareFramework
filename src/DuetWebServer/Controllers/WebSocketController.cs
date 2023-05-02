@@ -141,7 +141,7 @@ namespace DuetWebServer.Controllers
                 return;
             }
 
-            string socketPath = _configuration.GetValue("SocketPath", Defaults.FullSocketPath);
+            string socketPath = _configuration.GetValue("SocketPath", Defaults.FullSocketPath)!;
             if (string.IsNullOrEmpty(sessionKey))
             {
                 try
@@ -233,7 +233,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
-                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile)!;
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);

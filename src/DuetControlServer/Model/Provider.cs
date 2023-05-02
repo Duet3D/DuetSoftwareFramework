@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
@@ -186,11 +187,205 @@ namespace DuetControlServer.Model
         public static void Init()
         {
             ObjectModel.OnDeserializationFailed += OnDeserializationFailed;
-            Get.State.DsfVersion = Program.Version;
-            Get.State.DsfPluginSupport = Settings.PluginSupport;
-            Get.State.DsfRootPluginSupport = Settings.PluginSupport && Settings.RootPluginSupport;
+            Get.SBC = new()
+            {
+                AppArmor = Directory.Exists("/sys/module/apparmor"),
+                Distribution = GetDistribution(),
+                DistributionBuildTime = GetDistributionBuildTime()
+            };
+            Get.SBC.CPU.Hardware = GetCpuHardware();
+            Get.SBC.CPU.NumCores = GetCpuNumCores();
+            Get.SBC.DSF.Version = Program.Version;
+            Get.SBC.DSF.PluginSupport = Settings.PluginSupport;
+            Get.SBC.DSF.RootPluginSupport = Settings.PluginSupport && Settings.RootPluginSupport;
+            Get.SBC.Memory.Total = GetTotalMemory();
+            Get.SBC.Model = GetSbcModel();
+            Get.SBC.Serial = GetSbcSerial();
             Get.Network.Hostname = Environment.MachineName;
             Get.Network.Name = Environment.MachineName;
+        }
+
+        /// <summary>
+        /// Get the CPU hardware
+        /// </summary>
+        /// <returns>CPU hardware or null if unknown</returns>
+        public static string? GetCpuHardware()
+        {
+            try
+            {
+                Regex hardwareRegex = new(@"^Hardware\s*:\s*(\w+)", RegexOptions.IgnoreCase);
+                IEnumerable<string> procInfo = File.ReadLines("/proc/cpuinfo");
+                foreach (string line in procInfo)
+                {
+                    Match hardwareMatch = hardwareRegex.Match(line);
+                    if (hardwareMatch.Success)
+                    {
+                        return hardwareMatch.Groups[1].Value;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                _logger.Warn(e, "Failed to get CPU hardware");
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Get the number of processor cores/threads
+        /// </summary>
+        /// <returns>Number of cores/threads or 1 if unknown</returns>
+        public static int GetCpuNumCores()
+        {
+            try
+            {
+                Regex cpuIndexRegex = new(@"^cpu\d", RegexOptions.IgnoreCase);
+                IEnumerable<string> procInfo = File.ReadLines("/proc/stat");
+
+                int numCores = 0;
+                foreach (string line in procInfo)
+                {
+                    if (cpuIndexRegex.IsMatch(line))
+                    {
+                        numCores++;
+                    }
+                }
+                return Math.Max(numCores, 1);
+            }
+            catch (Exception e)
+            {
+                _logger.Warn(e, "Failed to get number of CPU cores");
+            }
+            return 1;
+        }
+
+        /// <summary>
+        /// Get the current Linux distribution
+        /// </summary>
+        /// <returns>Distribution name or null if unknown</returns>
+        public static string? GetDistribution()
+        {
+            if (File.Exists("/etc/os-release"))
+            {
+                try
+                {
+                    IEnumerable<string> osReleaseLines = File.ReadAllLines("/etc/os-release");
+                    foreach (string line in osReleaseLines)
+                    {
+                        if (line.StartsWith("PRETTY_NAME="))
+                        {
+                            return line["PRETTY_NAME=".Length..].Trim('"', '\'');
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    _logger.Warn(e, "Failed to get distribution");
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Get the SBC model name
+        /// </summary>
+        /// <returns>SBC model or null if unknown</returns>
+        public static string? GetSbcModel()
+        {
+            try
+            {
+                Regex modelRegex = new(@"^Model\s*:\s*(.+)", RegexOptions.IgnoreCase);
+                IEnumerable<string> procInfo = File.ReadLines("/proc/cpuinfo");
+                foreach (string line in procInfo)
+                {
+                    Match modelMatch = modelRegex.Match(line);
+                    if (modelMatch.Success)
+                    {
+                        return modelMatch.Groups[1].Value;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                _logger.Warn(e, "Failed to get SBC model");
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Get the SBC serial
+        /// </summary>
+        /// <returns>SBC model or null if unknown</returns>
+        public static string? GetSbcSerial()
+        {
+            try
+            {
+                Regex modelRegex = new(@"^Serial\s*:\s*(\w+)", RegexOptions.IgnoreCase);
+                IEnumerable<string> procInfo = File.ReadLines("/proc/cpuinfo");
+                foreach (string line in procInfo)
+                {
+                    Match modelMatch = modelRegex.Match(line);
+                    if (modelMatch.Success)
+                    {
+                        return modelMatch.Groups[1].Value;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                _logger.Warn(e, "Failed to get SBC serial");
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Determine when the current Linux distribution was built
+        /// </summary>
+        /// <returns>Build datetime or null if unknown</returns>
+        public static DateTime? GetDistributionBuildTime()
+        {
+            if (File.Exists("/etc/os-release"))
+            {
+                try
+                {
+                    return File.GetCreationTime("/etc/os-release");
+                }
+                catch (Exception e)
+                {
+                    _logger.Warn(e, "Failed to get distribution build time");
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Get the total memory of this SBC
+        /// </summary>
+        /// <returns></returns>
+        public static long? GetTotalMemory()
+        {
+            if (File.Exists("/proc/meminfo"))
+            {
+                try
+                {
+                    Regex totalMemoryRegex = new(@"^MemTotal:\s*(\d+)( kB| KiB)", RegexOptions.IgnoreCase);
+                    IEnumerable<string> memoryInfo = File.ReadAllLines("/proc/meminfo");
+                    foreach (string line in memoryInfo)
+                    {
+                        Match totalMemoryMatch = totalMemoryRegex.Match(line);
+                        if (totalMemoryMatch.Success)
+                        {
+                            long totalMemory = long.Parse(totalMemoryMatch.Groups[1].Value);
+                            return (totalMemoryMatch.Groups.Count > 2) ? totalMemory * 1024 : totalMemory;
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    _logger.Warn(e, "Failed to get distribution build time");
+                }
+            }
+            return null;
         }
 
         /// <summary>

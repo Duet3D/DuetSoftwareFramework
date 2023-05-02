@@ -76,7 +76,7 @@ namespace DuetWebServer.Services
                 if (!CorsPolicy.Origins.Any(origin =>
                     {
                         Regex corsRegex = new('^' + Regex.Escape(origin).Replace("\\*", ".*").Replace("\\?", ".") + '$', RegexOptions.IgnoreCase);
-                        return corsRegex.IsMatch(httpContext.Request.Headers[CorsConstants.Origin]);
+                        return corsRegex.IsMatch(httpContext.Request.Headers[CorsConstants.Origin]!);
                     }))
                 {
                     // Origin does not match Host (if applicable) and no CORS policy allows the specified Origin
@@ -146,7 +146,7 @@ namespace DuetWebServer.Services
         /// </summary>
         public async Task Execute()
         {
-            string unixSocket = _configuration.GetValue("SocketPath", DuetAPI.Connection.Defaults.FullSocketPath);
+            string unixSocket = _configuration.GetValue("SocketPath", DuetAPI.Connection.Defaults.FullSocketPath)!;
             int retryDelay = _configuration.GetValue("ModelRetryDelay", 5000);
 
             ObjectModel model;
@@ -175,7 +175,7 @@ namespace DuetWebServer.Services
                         // Initialize CORS site
                         if (!string.IsNullOrEmpty(model.Network.CorsSite))
                         {
-                            _logger.LogInformation("Changing CORS policy to accept site '{0}'", model.Network.CorsSite);
+                            _logger.LogInformation("Changing CORS policy to accept site '{corsSite}'", model.Network.CorsSite);
                             CorsPolicy.Origins.Add(model.Network.CorsSite);
                         }
 
@@ -183,11 +183,11 @@ namespace DuetWebServer.Services
                         lock (_modelProvider.Endpoints)
                         {
                             _modelProvider.Endpoints.Clear();
-                            foreach (HttpEndpoint ep in model.HttpEndpoints)
+                            foreach (HttpEndpoint ep in model.SBC!.DSF.HttpEndpoints)
                             {
                                 string fullPath = (ep.Namespace == HttpEndpoint.RepRapFirmwareNamespace) ? $"{ep.EndpointType}/rr_{ep.Path}" : $"{ep.EndpointType}/machine/{ep.Namespace}/{ep.Path}";
                                 _modelProvider.Endpoints[fullPath] = ep;
-                                _logger.LogInformation("Registered HTTP endpoint {0}", fullPath);
+                                _logger.LogInformation("Registered HTTP endpoint {endpoint}", fullPath);
                             }
                         }
 
@@ -231,7 +231,7 @@ namespace DuetWebServer.Services
                                 CorsPolicy.Origins.Clear();
                                 if (!string.IsNullOrEmpty(model.Network.CorsSite))
                                 {
-                                    _logger.LogInformation("Changing CORS policy to accept site '{0}'", model.Network.CorsSite);
+                                    _logger.LogInformation("Changing CORS policy to accept site '{corsSite}'", model.Network.CorsSite);
                                     CorsPolicy.Origins.Add(model.Network.CorsSite);
                                 }
                                 else
@@ -243,16 +243,16 @@ namespace DuetWebServer.Services
                             // Check if the HTTP sessions have changed and rebuild them on demand
                             if (jsonPatch.RootElement.TryGetProperty("httpEndpoints", out _))
                             {
-                                _logger.LogInformation("New number of custom HTTP endpoints: {0}", model.HttpEndpoints.Count);
+                                _logger.LogInformation("New number of custom HTTP endpoints: {numEndpoints}", model.SBC!.DSF.HttpEndpoints.Count);
 
                                 lock (_modelProvider.Endpoints)
                                 {
                                     _modelProvider.Endpoints.Clear();
-                                    foreach (HttpEndpoint ep in model.HttpEndpoints)
+                                    foreach (HttpEndpoint ep in model.SBC!.DSF.HttpEndpoints)
                                     {
                                         string fullPath = $"{ep.EndpointType}/machine/{ep.Namespace}/{ep.Path}";
                                         _modelProvider.Endpoints[fullPath] = ep;
-                                        _logger.LogInformation("Registered HTTP {0} endpoint via /machine/{1}/{2}", ep.EndpointType, ep.Namespace, ep.Path);
+                                        _logger.LogInformation("Registered HTTP {endpoint} endpoint via /machine/{namespace}/{path}", ep.EndpointType, ep.Namespace, ep.Path);
                                     }
                                 }
                             }

@@ -26,7 +26,7 @@ namespace DuetWebServer.FileProviders
         {
             _modelProvider = modelProvider;
             _modelProvider.OnWebDirectoryChanged += SetWebDirectory;
-            _provider = new PhysicalFileProvider(_modelProvider.WebDirectory);
+            _provider = new PhysicalFileProvider(_modelProvider.WebDirectory!);
         }
 
         /// <summary>

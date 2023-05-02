@@ -31,7 +31,7 @@ namespace DuetControlServer.Commands
             // Check if the requested HTTP endpoint has already been registered. If yes, it may be reused
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                foreach (HttpEndpoint endpoint in Model.Provider.Get.HttpEndpoints)
+                foreach (HttpEndpoint endpoint in Model.Provider.Get.SBC!.DSF.HttpEndpoints)
                 {
                     if (endpoint.EndpointType == EndpointType && endpoint.Namespace == Namespace && endpoint.Path == Path)
                     {
@@ -51,7 +51,7 @@ namespace DuetControlServer.Commands
             using (await Model.Provider.AccessReadWriteAsync())
             {
                 HttpEndpoint endpoint = new();
-                Model.Provider.Get.HttpEndpoints.Add(endpoint);
+                Model.Provider.Get.SBC!.DSF.HttpEndpoints.Add(endpoint);
 
                 endpoint.EndpointType = EndpointType;
                 endpoint.Namespace = Namespace;

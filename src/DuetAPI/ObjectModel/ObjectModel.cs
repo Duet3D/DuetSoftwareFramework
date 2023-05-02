@@ -51,8 +51,9 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of registered third-party HTTP endpoints
         /// </summary>
+        [Obsolete("Will be moved to the SBC.DSF key in v3.6")]
         [SbcProperty(false)]
-        public ModelCollection<HttpEndpoint> HttpEndpoints { get; } = new ModelCollection<HttpEndpoint>();
+        public ModelCollection<HttpEndpoint>? HttpEndpoints { get => SBC?.DSF.HttpEndpoints; }
 
         /// <summary>
         /// Information about every available G/M/T-code channel
@@ -88,14 +89,26 @@ namespace DuetAPI.ObjectModel
         public Network Network { get; } = new Network();
 
         /// <summary>
-        /// Dictionary of SBC plugins where each key is the plugin identifier
+        /// Dictionary of loaded plugins where each key is the plugin identifier
         /// </summary>
         /// <remarks>
-        /// Values in this dictionary cannot become null. If a change to null is reported, the corresponding key is deleted.
-        /// Do not rely on the setter of this property; it will be removed from a future version.
+        /// This is only populated by DSF in SBC mode, however it may be populated manually as well in standalone mode.
+        /// Values in this dictionary cannot become null. If a value is changed to null, the corresponding item is deleted
         /// </remarks>
         [SbcProperty(false)]
         public ModelDictionary<Plugin> Plugins { get; } = new ModelDictionary<Plugin>(true);
+
+        /// <summary>
+        /// Information about the SBC which Duet Software Framework is running on.
+        /// This is null if the system is operating in standalone mode
+        /// </summary>
+        [SbcProperty(false)]
+        public SBC? SBC
+        {
+            get => _sbc;
+            set => SetPropertyValue(ref _sbc, value);
+        }
+        private SBC? _sbc = new();
 
         /// <summary>
         /// Information about connected sensors including Z-probes and endstops

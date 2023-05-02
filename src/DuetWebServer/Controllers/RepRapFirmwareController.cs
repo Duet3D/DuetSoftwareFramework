@@ -177,8 +177,8 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
-                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile);
-                    if (System.IO.File.Exists(startErrorFile))
+                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile)!;
+                    if ( System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
                         LogError(startError);
@@ -935,14 +935,14 @@ namespace DuetWebServer.Controllers
         private async Task<CommandConnection> BuildConnection()
         {
             CommandConnection connection = new();
-            await connection.Connect(_configuration.GetValue("SocketPath", Defaults.FullSocketPath));
+            await connection.Connect(_configuration.GetValue("SocketPath", Defaults.FullSocketPath)!);
             return connection;
         }
 
         private async Task<SubscribeConnection> BuildSubscribeConnection(string filter)
         {
             SubscribeConnection connection = new();
-            await connection.Connect(SubscriptionMode.Patch, new string[] { filter }, _configuration.GetValue("SocketPath", Defaults.FullSocketPath));
+            await connection.Connect(SubscriptionMode.Patch, new string[] { filter }, _configuration.GetValue("SocketPath", Defaults.FullSocketPath)!);
             return connection;
         }
 

@@ -182,6 +182,16 @@ namespace DuetControlServer
         public static int TransferReadyPin { get; set; } = 25;      // Pin 22 on the RaspPi expansion header
 
         /// <summary>
+        /// File containing the current CPU temperature
+        /// </summary>
+        public static string CpuTemperaturePath { get; set; } = "/sys/class/thermal/thermal_zone0/temp";
+
+        /// <summary>
+        /// Divide numeric value of <see cref="CpuTemperaturePath"/> by this
+        /// </summary>
+        public static float CpuTemperatureDivider { get; set; } = 1000F;
+
+        /// <summary>
         /// Number of codes to buffer in the internal print subsystem
         /// </summary>
         public static int BufferedPrintCodes { get; set; } = 32;
@@ -277,7 +287,7 @@ namespace DuetControlServer
 
         /// <summary>
         /// Regular expressions for finding the total number of layers
-        /// </summary>]
+        /// </summary>
         /// <remarks>
         /// If the number of layers cannot be found, the total number of layers is calculated from the layer and object heights (if applicable)
         /// </remarks>

@@ -88,6 +88,7 @@ namespace DuetControlServer.Model
                 using (await Provider.AccessReadWriteAsync())
                 {
                     UpdateNetwork(networkInterfaces);
+                    UpdateSbc();
                     UpdateVolumes(drives);
                     CleanMessages();
                 }
@@ -229,6 +230,67 @@ namespace DuetControlServer.Model
             for (int i = Provider.Get.Network.Interfaces.Count; i > index; i--)
             {
                 Provider.Get.Network.Interfaces.RemoveAt(i - 1);
+            }
+        }
+
+        /// <summary>
+        /// Update SBC data key
+        /// </summary>
+        public static void UpdateSbc()
+        {
+            Regex cpuRegex = new(@"^cpu\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)");
+            Regex availableMemoryRegex = new(@"^MemAvailable:\s*(\d+)( kB| KiB)", RegexOptions.IgnoreCase);
+            try
+            {
+                // Compute average CPU load
+                double? avgLoad = null;
+                IEnumerable<string> statsInfo = File.ReadLines("/proc/stat");
+                foreach (string line in statsInfo)
+                {
+                    Match match = cpuRegex.Match(line);
+                    if (match.Success)
+                    {
+                        double total = 0;
+                        for (int i = 1; i < match.Groups.Count; i++)
+                        {
+                            total += double.Parse(match.Groups[i].Value);
+                        }
+                        avgLoad = Math.Round(100 - 100 * double.Parse(match.Groups[4].Value) / total, 2);
+                        break;
+                    }
+                }
+                Provider.Get.SBC!.CPU.AvgLoad = (float?)avgLoad;
+
+                // Try to get the CPU temperature
+                if (File.Exists(Settings.CpuTemperaturePath))
+                {
+                    Provider.Get.SBC!.CPU.Temperature = float.Parse(File.ReadAllText(Settings.CpuTemperaturePath)) / Settings.CpuTemperatureDivider;
+                }
+
+                // Try to update memory stats
+                long? availableMemory = null;
+                if (File.Exists("/proc/meminfo"))
+                {
+                    IEnumerable<string> memoryInfo = File.ReadAllLines("/proc/meminfo");
+                    foreach (string line in memoryInfo)
+                    {
+                        Match availableMemoryMatch = availableMemoryRegex.Match(line);
+                        if (availableMemoryMatch.Success)
+                        {
+                            long parsedAvailableMemory = long.Parse(availableMemoryMatch.Groups[1].Value);
+                            availableMemory = (availableMemoryMatch.Groups.Count > 2) ? parsedAvailableMemory * 1024 : parsedAvailableMemory;
+                            break;
+                        }
+                    }
+                }
+                Provider.Get.SBC.Memory.Available = availableMemory;
+
+                // Update current SBC uptime
+                Provider.Get.SBC.Uptime = double.Parse(File.ReadAllText("/proc/uptime").Split(' ')[0]);
+            }
+            catch (Exception e)
+            {
+                _logger.Debug(e, "Failed to update SBC stats");
             }
         }
 

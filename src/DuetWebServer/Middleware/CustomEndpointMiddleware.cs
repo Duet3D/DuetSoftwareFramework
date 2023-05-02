@@ -1,6 +1,7 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetWebServer.Singletons;
+using Microsoft.AspNetCore.Connections.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -86,7 +87,7 @@ namespace DuetWebServer.Middleware
                 }
                 else
                 {
-                    _logger.LogDebug("No endpoint found for {0} request via {1}", method, context.Request.Path.Value);
+                    _logger.LogDebug("No endpoint found for {method} request via {path}", method, context.Request.Path.Value);
                 }
             }
 
@@ -102,12 +103,15 @@ namespace DuetWebServer.Middleware
                 {
                     if (context.Request.Query.TryGetValue("sessionKey", out StringValues sessionKeys))
                     {
-                        foreach (string sessionKey in sessionKeys)
+                        foreach (string? sessionKey in sessionKeys)
                         {
-                            sessionId = _sessionStorage.GetSessionId(sessionKey);
-                            if (sessionId != -1)
+                            if (sessionKey is not null)
                             {
-                                break;
+                                sessionId = _sessionStorage.GetSessionId(sessionKey);
+                                if (sessionId != -1)
+                                {
+                                    break;
+                                }
                             }
                         }
                     }
@@ -128,12 +132,15 @@ namespace DuetWebServer.Middleware
                 {
                     if (context.Request.Headers.TryGetValue("X-Session-Key", out StringValues sessionKeys))
                     {
-                        foreach (string sessionKey in sessionKeys)
+                        foreach (string? sessionKey in sessionKeys)
                         {
-                            sessionId = _sessionStorage.GetSessionId(sessionKey);
-                            if (sessionId != -1)
+                            if (sessionKey is not null)
                             {
-                                break;
+                                sessionId = _sessionStorage.GetSessionId(sessionKey);
+                                if (sessionId != -1)
+                                {
+                                    break;
+                                }
                             }
                         }
                     }
@@ -203,7 +210,7 @@ namespace DuetWebServer.Middleware
                 SendHttpResponse response = await endpointConnection.GetHttpResponse(cancellationToken);
                 if (response.StatusCode >= 1000)
                 {
-                    _logger.LogDebug("Closing WebSocket with status code {0} ({1})", response.StatusCode, response.Response);
+                    _logger.LogDebug("Closing WebSocket with status code {statusCode} ({response})", response.StatusCode, response.Response);
                     await CloseConnection(webSocket, (WebSocketCloseStatus)response.StatusCode, response.Response);
                     break;
                 }

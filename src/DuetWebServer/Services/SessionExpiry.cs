@@ -85,7 +85,7 @@ namespace DuetWebServer.Services
             {
                 do
                 {
-                    _sessionStorage.MaintainSessions(sessionTimeout, _configuration.GetValue("SocketPath", Defaults.FullSocketPath));
+                    _sessionStorage.MaintainSessions(sessionTimeout, _configuration.GetValue("SocketPath", Defaults.FullSocketPath)!);
                     await Task.Delay(1000, _stopRequest.Token);
                 }
                 while (!_stopRequest.IsCancellationRequested);
