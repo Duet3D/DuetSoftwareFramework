@@ -49,13 +49,6 @@ namespace DuetAPI.ObjectModel
         public Heat Heat { get; } = new Heat();
 
         /// <summary>
-        /// List of registered third-party HTTP endpoints
-        /// </summary>
-        [Obsolete("Will be moved to the SBC.DSF key in v3.6")]
-        [SbcProperty(false)]
-        public ModelCollection<HttpEndpoint>? HttpEndpoints { get => SBC?.DSF.HttpEndpoints; }
-
-        /// <summary>
         /// Information about every available G/M/T-code channel
         /// </summary>
         public Inputs Inputs { get; } = new Inputs();
