@@ -42,6 +42,7 @@ namespace DuetHttpClient.Connector
         {
             public bool IsEmulated { get; set; }
             public int ApiLevel { get; set; }
+            public uint? SessionKey { get; set; }
         }
 
         /// <summary>
@@ -57,6 +58,7 @@ namespace DuetHttpClient.Connector
         /// <exception cref="InvalidVersionException">Unsupported DSF version</exception>
         public static async Task<PollConnector> ConnectAsync(Uri baseUri, DuetHttpOptions options, CancellationToken cancellationToken)
         {
+            uint? sessionKey = null;
             using (HttpClient client = new() { Timeout = options.Timeout })
             {
                 using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, "rr_connect?password={HttpUtility.UrlPathEncode(password)}&time={DateTime.Now:s}"), cancellationToken);
@@ -68,14 +70,13 @@ namespace DuetHttpClient.Connector
                 using Stream responseStream = await response.Content.ReadAsStreamAsync();
 #endif
                 ConnectResponse connectResponse = (await JsonSerializer.DeserializeAsync<ConnectResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!;
-                switch (connectResponse.Err)
+                sessionKey = connectResponse.Err switch
                 {
-                    case 0: break;
-                    case 1: throw new InvalidPasswordException();
-                    case 2: throw new NoFreeSessionException();
-                    default: throw new LoginException($"rr_connect returned unknown err {connectResponse.Err}");
-                }
-
+                    0 => connectResponse.SessionKey,
+                    1 => throw new InvalidPasswordException(),
+                    2 => throw new NoFreeSessionException(),
+                    _ => throw new LoginException($"rr_connect returned unknown err {connectResponse.Err}"),
+                };
                 if (connectResponse.IsEmulated)
                 {
                     // Don't attempt to use emulated endpoints since the remote server provides support for RESTful calls too
@@ -88,7 +89,7 @@ namespace DuetHttpClient.Connector
                 }
             }
 
-            return new PollConnector(baseUri, options);
+            return new PollConnector(baseUri, options, sessionKey);
         }
 
         /// <summary>
@@ -96,11 +97,17 @@ namespace DuetHttpClient.Connector
         /// </summary>
         /// <param name="baseUri">Base URI of the remote board</param>
         /// <param name="options">Connection options or null</param>
-        private PollConnector(Uri baseUri, DuetHttpOptions options) : base(baseUri, options)
+        private PollConnector(Uri baseUri, DuetHttpOptions options, uint? sessionKey) : base(baseUri, options)
         {
             // Make new task to keep the session alive
+            _sessionKey = sessionKey;
             _ = Task.Run(MaintainSession);
         }
+
+        /// <summary>
+        /// Optional session key to be used for HTTP requests
+        /// </summary>
+        private uint? _sessionKey;
 
         /// <summary>
         /// Dictionary of keys vs sequence numbers
@@ -136,27 +143,26 @@ namespace DuetHttpClient.Connector
             response.EnsureSuccessStatusCode();
 
 #if NET6_0_OR_GREATER
-            using Stream responseData = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
 #else
-            using Stream responseData = await response.Content.ReadAsStreamAsync();
+            using Stream responseStream = await response.Content.ReadAsStreamAsync();
 #endif
-            using JsonDocument document = await JsonDocument.ParseAsync(responseData, cancellationToken: cancellationToken);
-            if (document.RootElement.TryGetProperty("err", out JsonElement errProperty) && errProperty.TryGetInt32(out int errValue))
+            ConnectResponse connectResponse = (await JsonSerializer.DeserializeAsync<ConnectResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!;
+            _sessionKey = connectResponse.Err switch
             {
-                switch (errValue)
-                {
-                    case 0: break;
-                    case 1: throw new InvalidPasswordException();
-                    case 2: throw new NoFreeSessionException();
-                    default: throw new LoginException($"Received unknown err value {errValue}");
-                }
-            }
-            if (document.RootElement.TryGetProperty("isEmulated", out JsonElement isEmulatedProperty) && isEmulatedProperty.GetBoolean())
+                0 => connectResponse.SessionKey,
+                1 => throw new InvalidPasswordException(),
+                2 => throw new NoFreeSessionException(),
+                _ => throw new LoginException($"rr_connect returned unknown err {connectResponse.Err}"),
+            };
+
+            if (connectResponse.IsEmulated)
             {
                 // Don't attempt to use emulated endpoints since the remote server provides support for RESTful calls too
-                throw new OperationCanceledException("HTTP backend is emulated");
+                throw new HttpRequestException("HTTP backend is emulated");
             }
-            if (!document.RootElement.TryGetProperty("apiLevel", out JsonElement apiLevelProperty) || !apiLevelProperty.TryGetInt32(out int apiLevel) || apiLevel < MinApiLevel)
+
+            if (connectResponse.ApiLevel < MinApiLevel)
             {
                 throw new InvalidVersionException("Incompatible API level");
             }
@@ -170,6 +176,10 @@ namespace DuetHttpClient.Connector
         /// <returns>HTTP response</returns>
         protected override async ValueTask<HttpResponseMessage> SendRequest(HttpRequestMessage request, TimeSpan timeout, CancellationToken cancellationToken = default)
         {
+            if (_sessionKey != null)
+            {
+                request.Headers.Add("X-Session-Key", _sessionKey.ToString());
+            }
             HttpResponseMessage response = await base.SendRequest(request, timeout, cancellationToken);
             if (response.StatusCode == HttpStatusCode.ServiceUnavailable &&
                 (request.Method != HttpMethod.Get || request.RequestUri?.AbsolutePath != "/rr_reply"))
