@@ -34,5 +34,15 @@
 			set => SetPropertyValue(ref _limit, value);
         }
         private float? _limit = null;
+
+        /// <summary>
+        /// Sensor number to monitor
+        /// </summary>
+        public int Sensor
+        {
+            get => _sensor;
+            set => SetPropertyValue(ref _sensor, value);
+        }
+        private int _sensor = -1;
     }
 }
