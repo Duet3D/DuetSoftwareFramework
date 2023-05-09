@@ -13,7 +13,7 @@
             get => _action;
 			set => SetPropertyValue(ref _action, value);
         }
-        private HeaterMonitorAction? _action = HeaterMonitorAction.GenerateFault;
+        private HeaterMonitorAction? _action = null;
 
         /// <summary>
         /// Condition to meet to perform an action
