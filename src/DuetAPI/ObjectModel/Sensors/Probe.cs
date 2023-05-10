@@ -9,6 +9,26 @@ namespace DuetAPI.ObjectModel
     public sealed class Probe : ModelObject
     {
         /// <summary>
+        /// Linear coefficient for scanning probes
+        /// </summary>
+        public float? CalibA
+        {
+            get => _calibA;
+            set => SetPropertyValue(ref _calibA, value);
+        }
+        private float? _calibA;
+
+        /// <summary>
+        /// Quadratic coefficient for scanning probes
+        /// </summary>
+        public float? CalibB
+        {
+            get => _calibB;
+            set => SetPropertyValue(ref _calibB, value);
+        }
+        private float? _calibB;
+
+        /// <summary>
         /// Calibration temperature (in C)
         /// </summary>
         public float CalibrationTemperature
@@ -49,6 +69,16 @@ namespace DuetAPI.ObjectModel
         private float _diveHeight = 5F;
 
         /// <summary>
+        /// Indicates if the scanning probe is calibrated
+        /// </summary>
+        public bool? IsCalibrated
+        {
+            get => _isCalibrated;
+            set => SetPropertyValue(ref _isCalibrated, value);
+        }
+        private bool? _isCalibrated;
+
+        /// <summary>
         /// Height of the probe where it stopped last time (in mm)
         /// </summary>
         public float LastStopHeight
@@ -84,31 +114,9 @@ namespace DuetAPI.ObjectModel
         private float _recoveryTime;
 
         /// <summary>
-        /// Probe speed (in mm/s)
-        /// </summary>
-        [JsonIgnore]
-        [Obsolete("Use Speeds[0] instead")]
-        public float Speed
-        {
-            get => Speeds[0];
-            set => Speeds[0] = value;
-        }
-
-        /// <summary>
         /// Fast and slow probing speeds (in mm/s)
         /// </summary>
         public ModelCollection<float> Speeds { get; } = new ModelCollection<float>() { 2F, 2F };
-
-        /// <summary>
-        /// First temperature coefficient
-        /// </summary>
-        [JsonIgnore]
-        [Obsolete("Use TemperatureCoefficients instead")]
-        public float TemperatureCoefficient
-        {
-            get => TemperatureCoefficients[0];
-            set => TemperatureCoefficients[0] = value;
-        }
 
         /// <summary>
         /// List of temperature coefficients

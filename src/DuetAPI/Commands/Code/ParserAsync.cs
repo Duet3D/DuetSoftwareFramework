@@ -677,7 +677,7 @@ namespace DuetAPI.Commands
                     buffer.LastGCode = result.MajorNumber.Value;
                 }
                 else if (result.Type == CodeType.None &&
-                         (buffer.LastGCode is 0 or 1 or 2 or 3) &&
+                         buffer.LastGCode is 0 or 1 or 2 or 3 &&
                          result.Parameters.Any(parameter => ObjectModel.Axis.Letters.Contains(parameter.Letter)))
                 {
                     result.Type = CodeType.GCode;

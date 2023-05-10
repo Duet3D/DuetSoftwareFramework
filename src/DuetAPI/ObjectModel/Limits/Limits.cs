@@ -146,6 +146,16 @@
 		private int? _heatersPerTool;
 
 		/// <summary>
+		/// Maximum number of configured LED strips or null if unknown
+		/// </summary>
+		public int? LedStrips
+        {
+			get => _ledStrips;
+			set => SetPropertyValue(ref _ledStrips, value);
+		}
+		private int? _ledStrips;
+
+		/// <summary>
 		/// Maximum number of monitors per heater or null if unknown
 		/// </summary>
 		public int? MonitorsPerHeater
@@ -156,9 +166,19 @@
 		private int? _monitorsPerHeater;
 
 		/// <summary>
-		/// Maximum number of restore points or null if unknown
+		/// Maximum number of output ports per heater or null if unknown
 		/// </summary>
-		public int? RestorePoints
+		public int? PortsPerHeater
+        {
+			get => _portsPerHeater;
+			set => SetPropertyValue(ref _portsPerHeater, value);
+		}
+		private int? _portsPerHeater;
+
+        /// <summary>
+        /// Maximum number of restore points or null if unknown
+        /// </summary>
+        public int? RestorePoints
 		{
 			get => _restorePoints;
 			set => SetPropertyValue(ref _restorePoints, value);
