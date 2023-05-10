@@ -1,38 +1,23 @@
 ﻿namespace DuetAPI.ObjectModel
 {
     /// <summary>
-    /// Class providing information about a connected display
+    /// Class providing information about a connected direct-connect display
     /// </summary>
     public sealed class DirectDisplay : ModelObject
     {
         /// <summary>
-        /// Number of pulses per click of the rotary encoder
+        /// Encoder of this screen or null if none
         /// </summary>
-        public int PulsesPerClick
+        public DirectDisplayEncoder? Encoder
         {
-            get => _pulsesPerClick;
-            set => SetPropertyValue(ref _pulsesPerClick, value);
+            get => _encoder;
+            set => SetPropertyValue(ref _encoder, value);
         }
-        private int _pulsesPerClick;
+        private DirectDisplayEncoder? _encoder;
 
         /// <summary>
-        /// SPI frequency of the display (in Hz)
+        /// Screen information
         /// </summary>
-        public int SpiFreq
-        {
-            get => _spiFreq;
-            set => SetPropertyValue(ref _spiFreq, value);
-        }
-        private int _spiFreq;
-
-        /// <summary>
-        /// Name of the attached display type
-        /// </summary>
-        public string TypeName
-        {
-            get => _typeName;
-            set => SetPropertyValue(ref _typeName, value);
-        }
-        private string _typeName = string.Empty;
+        public DirectDisplayScreen Screen { get; } = new DirectDisplayScreen();
     }
 }
