@@ -75,6 +75,7 @@ namespace DuetPluginService.Commands
                         if (File.Exists(installWwwPath))
                         {
                             logger.Debug("Removing {0}", installWwwPath);
+                            File.Delete(installWwwPath);
                         }
 
                         string directory = Path.GetDirectoryName(installWwwPath)!;
