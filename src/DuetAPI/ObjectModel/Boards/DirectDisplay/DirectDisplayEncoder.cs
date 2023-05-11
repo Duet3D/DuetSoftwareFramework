@@ -13,6 +13,6 @@
             get => _pulsesPerClick;
             set => SetPropertyValue(ref _pulsesPerClick, value);
         }
-        private int _pulsesPerClick;
+        private int _pulsesPerClick = 1;
     }
 }
