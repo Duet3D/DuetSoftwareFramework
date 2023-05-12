@@ -455,6 +455,8 @@ namespace DuetControlServer.Model
                 {
                     Provider.Get.State.Status = MachineStatus.Disconnected;
                 }
+                Provider.Get.State.DisplayMessage = string.Empty;
+                Provider.Get.State.MessageBox = null;
             }
 
             _lastSeqs.Clear();
