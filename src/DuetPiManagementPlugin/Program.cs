@@ -8,6 +8,7 @@ using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -243,17 +244,43 @@ namespace DuetPiManagementPlugin
                                     }
                                     else
                                     {
+                                        Regex hostnameRegex = new(@"^\s*127\.0\.[01]\.1\s+" + Environment.MachineName + @"\s*$", RegexOptions.IgnoreCase);
+
+                                        // 1. Apply new hostname using hostnamectl
                                         string setResult = await Command.Execute("hostnamectl", $"set-hostname \"{newHostname}\"");
-                                        if (string.IsNullOrWhiteSpace(setResult))
+                                        if (!string.IsNullOrWhiteSpace(setResult))
                                         {
-                                            // Success, let DSF/RRF process this code too
-                                            await Connection.IgnoreCode(CancellationToken);
+                                            await Connection.ResolveCode(MessageType.Error, setResult, CancellationToken);
+                                            break;
                                         }
-                                        else
+
+                                        // 2. Update hostname in /etc/hosts
+                                        bool hostnameWritten = false;
+                                        string[] hostsFile = await File.ReadAllLinesAsync("/etc/hosts");
+                                        await using (FileStream fs = new("/etc/hosts", FileMode.Create, FileAccess.Write))
                                         {
-                                            // Something is not right
-                                            await Connection.ResolveCode(MessageType.Success, setResult, CancellationToken);
+                                            using StreamWriter writer = new(fs);
+                                            foreach (string line in hostsFile)
+                                            {
+                                                if (!hostnameWritten && hostnameRegex.Match(line).Success)
+                                                {
+                                                    await writer.WriteLineAsync("127.0.1.1       " + Environment.MachineName);
+                                                    hostnameWritten = true;
+                                                }
+                                                else
+                                                {
+                                                    await writer.WriteLineAsync(line);
+                                                }
+                                            }
+
+                                            if (!hostnameWritten)
+                                            {
+                                                await writer.WriteLineAsync("127.0.1.1       " + Environment.MachineName);
+                                            }
                                         }
+
+                                        // Success, let DSF/RRF process this code too
+                                        await Connection.IgnoreCode(CancellationToken);
                                     }
                                 }
                                 else
