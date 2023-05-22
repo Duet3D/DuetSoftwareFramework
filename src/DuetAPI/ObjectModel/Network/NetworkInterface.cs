@@ -108,6 +108,17 @@
         private int? _speed;
 
         /// <summary>
+        /// SSID of the WiFi network or null if not applicable
+        /// </summary>
+        [SbcProperty(true)]
+        public string? SSID
+        {
+            get => _ssid;
+            set => SetPropertyValue(ref _ssid, value);
+        }
+        private string? _ssid = null;
+
+        /// <summary>
         /// Network state
         /// </summary>
         public NetworkState? State

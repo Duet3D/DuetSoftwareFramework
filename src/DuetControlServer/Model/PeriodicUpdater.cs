@@ -142,7 +142,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Update network interfaces
         /// </summary>
-        private static void UpdateNetwork(System.Net.NetworkInformation.NetworkInterface[] networkInterfaces)
+        private static async void UpdateNetwork(System.Net.NetworkInformation.NetworkInterface[] networkInterfaces)
         {
             int index = 0;
             foreach (System.Net.NetworkInformation.NetworkInterface iface in networkInterfaces)
@@ -198,12 +198,12 @@ namespace DuetControlServer.Model
                     };
                     networkInterface.Type = iface.Name.StartsWith("w") ? NetworkInterfaceType.WiFi : NetworkInterfaceType.LAN;
 
-                    // Get WiFi-specific values.
-                    // Note that iface.NetworkInterfaceType is broken on Unix and cannot be used (.NET 5)
+                    // Note that iface.NetworkInterfaceType is broken on Unix and cannot be used (.NET 5-6)
                     if (iface.Name.StartsWith('w'))
                     {
                         try
                         {
+                            // Get WiFi signal
                             string wifiData = File.ReadAllText("/proc/net/wireless");
                             Regex signalRegex = new(iface.Name + @".*(-\d+)\.");
                             Match signalMatch = signalRegex.Match(wifiData);
@@ -211,10 +211,36 @@ namespace DuetControlServer.Model
                             {
                                 networkInterface.Signal = int.Parse(signalMatch.Groups[1].Value);
                             }
+
+                            // Get WiFi SSID
+                            if (File.Exists("/usr/sbin/iwgetid"))
+                            {
+                                ProcessStartInfo startInfo = new()
+                                {
+                                    FileName = "/usr/sbin/iwgetid",
+                                    Arguments = $"{iface.Name} -r",
+                                    RedirectStandardOutput = true
+                                };
+
+                                using Process? process = Process.Start(startInfo);
+                                if (process is not null)
+                                {
+                                    string ssid = string.Empty;
+                                    process.OutputDataReceived += (sender, e) => ssid += e.Data;
+                                    process.BeginOutputReadLine();
+                                    await process.WaitForExitAsync(Program.CancellationToken);
+                                    networkInterface.SSID = ssid;
+                                }
+                                else
+                                {
+                                    networkInterface.SSID = string.Empty;
+                                }
+                            }
                         }
                         catch (Exception e)
                         {
                             networkInterface.Signal = null;
+                            networkInterface.SSID = string.Empty;
                             _logger.Debug(e);
                         }
                         networkInterface.Type = NetworkInterfaceType.WiFi;
@@ -222,6 +248,7 @@ namespace DuetControlServer.Model
                     else
                     {
                         networkInterface.Signal = null;
+                        networkInterface.SSID = null;
                         networkInterface.Type = NetworkInterfaceType.LAN;
                     }
                 }
