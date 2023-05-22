@@ -260,7 +260,6 @@ namespace DuetControlServer.Files
                                         state.ContinueLoop = false;
                                         state.Iterations++;
                                         await DeleteLocalVariables(state);
-                                        state.HasLocalVariables = false;
                                         readAgain = true;
                                         _logger.Debug("Restarting {0} block, iterations = {1}", state.StartingCode.Keyword, state.Iterations);
                                     }
@@ -473,6 +472,7 @@ namespace DuetControlServer.Files
             }
             await Task.WhenAll(deletionTasks);
             codeBlock.LocalVariables.Clear();
+            codeBlock.HasLocalVariables = false;
         }
 
         /// <summary>

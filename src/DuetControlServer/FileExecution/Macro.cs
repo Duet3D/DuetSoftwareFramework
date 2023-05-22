@@ -349,8 +349,8 @@ namespace DuetControlServer.FileExecution
                         {
                             e = ae.InnerException!;
                         }
-                        await Model.Provider.HandleMacroErrorAsync(FileName, _file!.LineNumber, e.Message);
-                        await Utility.Logger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FileName)} line {_file.LineNumber}: {e.Message}");
+                        await Model.Provider.HandleMacroErrorAsync(FileName, code.LineNumber ?? 0, e.Message);
+                        await Utility.Logger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FileName)} line {code.LineNumber ?? 0}: {e.Message}");
                         _logger.Warn(e);
                     }
                 }

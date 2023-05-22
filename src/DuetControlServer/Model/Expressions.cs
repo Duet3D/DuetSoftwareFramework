@@ -512,7 +512,11 @@ namespace DuetControlServer.Model
                         break;
 
                     case "line":
-                        result.Append(code.LineNumber);
+                        if (code.File is null)
+                        {
+                            throw new CodeParserException("not executing a file", code);
+                        }
+                        result.Append(code.LineNumber ?? 0);
                         break;
 
                     case "result":

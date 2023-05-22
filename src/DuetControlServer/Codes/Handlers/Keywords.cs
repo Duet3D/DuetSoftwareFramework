@@ -207,15 +207,19 @@ namespace DuetControlServer.Codes.Handlers
                         throw new CodeParserException("expected '='", code);
                     }
 
-                    // Replace SBC fields and assign the variable
+                    // Replace SBC fields and prepare the variable name
                     expression = await Expressions.Evaluate(code, false) ?? string.Empty;
-
-                    // Assign the variable
                     string fullVarName = varName;
-                    if (code.Keyword != KeywordType.Set)
+                    if (code.Keyword == KeywordType.Set)
+                    {
+                        fullVarName = await Expressions.EvaluateExpression(code, fullVarName, true, false);
+                    }
+                    else
                     {
                         fullVarName = (code.Keyword == KeywordType.Global ? "global." : "var.") + varName;
                     }
+
+                    // Assign the variable
                     object? varContent = await SPI.Interface.SetVariable(code.Channel, code.Keyword != KeywordType.Set, fullVarName, expression);
                     _logger.Debug("Set variable {0} to {1}", fullVarName, varContent);
 

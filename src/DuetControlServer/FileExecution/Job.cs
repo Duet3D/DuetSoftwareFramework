@@ -322,9 +322,9 @@ namespace DuetControlServer.FileExecution
                     }
 
                     // Try to read the next code
+                    Code? readCode = null;
                     try
                     {
-                        Code? readCode;
                         try
                         {
                             readCode = await file.ReadCodeAsync(sharedCode);
@@ -353,7 +353,7 @@ namespace DuetControlServer.FileExecution
                             {
                                 e = ae.InnerException!;
                             }
-                            await Logger.LogOutputAsync(MessageType.Error, $"in job file (channel {file.Channel}) line {file.LineNumber}: {e.Message}");
+                            await Logger.LogOutputAsync(MessageType.Error, $"in job file (channel {file.Channel}) line {readCode?.LineNumber}: {e.Message}");
                             _logger.Error(e);
                         }
                         await AbortAsync();
@@ -382,7 +382,7 @@ namespace DuetControlServer.FileExecution
                             {
                                 e = ae.InnerException!;
                             }
-                            await Logger.LogOutputAsync(MessageType.Error, $"in job file (channel {file.Channel}) line {file.LineNumber}: {e.Message}");
+                            await Logger.LogOutputAsync(MessageType.Error, $"in job file (channel {file.Channel}) line {code.LineNumber ?? 0}: {e.Message}");
                             _logger.Warn(e);
                         }
                     }
