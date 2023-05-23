@@ -6,14 +6,24 @@
     public sealed class LedStrip : ModelObject
     {
         /// <summary>
-        /// Type of this LED strip
+        /// Board address of the corresponding pin
         /// </summary>
-        public LedStripType Type
+        public int Board
         {
-            get => _type;
-            set => SetPropertyValue(ref _type, value);
+            get => _board;
+            set => SetPropertyValue(ref _board, value);
         }
-        private LedStripType _type = LedStripType.DotStar;
+        private int _board;
+
+        /// <summary>
+        /// Name of the pin this LED strip is connected to
+        /// </summary>
+        public string Pin
+        {
+            get => _pin;
+            set => SetPropertyValue(ref _pin, value);
+        }
+        private string _pin = string.Empty;
 
         /// <summary>
         /// Indicates if this strip is bit-banged and therefore requires motion to be stopped before sending a command
@@ -24,5 +34,15 @@
             set => SetPropertyValue(ref _stopMovement, value);
         }
         private bool _stopMovement;
+
+        /// <summary>
+        /// Type of this LED strip
+        /// </summary>
+        public LedStripType Type
+        {
+            get => _type;
+            set => SetPropertyValue(ref _type, value);
+        }
+        private LedStripType _type = LedStripType.DotStar;
     }
 }

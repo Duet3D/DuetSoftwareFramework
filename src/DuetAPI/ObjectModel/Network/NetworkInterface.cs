@@ -12,7 +12,7 @@
         public ModelCollection<NetworkProtocol> ActiveProtocols { get; } = new ModelCollection<NetworkProtocol>();
 
         /// <summary>
-        /// Actual IPv4 address of the network adapter
+        /// Actual IPv4 address of the network adapter or null if unknown
         /// </summary>
         public string? ActualIP
         {
@@ -22,7 +22,7 @@
         private string? _actualIP;
 
         /// <summary>
-        /// Configured IPv4 address of the network adapter
+        /// Configured IPv4 address of the network adapter or null if unknown
         /// </summary>
         [SbcProperty(false)]
         public string? ConfiguredIP
@@ -33,7 +33,7 @@
         private string? _configuredIP;
 
         /// <summary>
-        /// Configured IPv4 DNS server fo the network adapter
+        /// Configured IPv4 DNS server of the network adapter or null if unknown
         /// </summary>
         [SbcProperty(false)]
         public string? DnsServer
@@ -55,7 +55,7 @@
         private string? _firmwareVersion;
 
         /// <summary>
-        /// IPv4 gateway of the network adapter
+        /// IPv4 gateway of the network adapter or null if unknown
         /// </summary>
         public string? Gateway
         {
@@ -65,7 +65,7 @@
         private string? _gateway;
 
         /// <summary>
-        /// Physical address of the network adapter
+        /// Physical address of the network adapter or null if unknown
         /// </summary>
         public string? Mac
         {
@@ -119,7 +119,7 @@
         private string? _ssid = null;
 
         /// <summary>
-        /// Network state
+        /// State of this network interface or null if unknown
         /// </summary>
         public NetworkState? State
         {
@@ -129,7 +129,7 @@
         private NetworkState? _state;
 
         /// <summary>
-        /// Subnet of the network adapter
+        /// Subnet of the network adapter or null if unknown
         /// </summary>
         public string? Subnet
         {
