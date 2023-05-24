@@ -196,18 +196,21 @@ namespace DuetWebServer.Controllers
 
         #region General requests
         /// <summary>
+        /// GET /machine/model
+        /// - and -
         /// GET /machine/status
         /// Retrieve the full object model as JSON.
         /// </summary>
         /// <returns>
         /// HTTP status code:
-        /// (200) Machine object model as application/json
+        /// (200) Object model as application/json
         /// (500) Generic error
         /// (502) Incompatible DCS version
         /// (503) DCS is unavailable
         /// </returns>
+        [HttpGet("model")]
         [HttpGet("status")]
-        public async Task<IActionResult> Status()
+        public async Task<IActionResult> Model()
         {
             try
             {
@@ -223,7 +226,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is IncompatibleVersionException)
                 {
-                    _logger.LogError($"[{nameof(Status)}] Incompatible DCS version");
+                    _logger.LogError($"[{nameof(Model)}] Incompatible DCS version");
                     return StatusCode(502, "Incompatible DCS version");
                 }
                 if (e is SocketException)
@@ -232,14 +235,14 @@ namespace DuetWebServer.Controllers
                     if (System.IO.File.Exists(startErrorFile))
                     {
                         string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
-                        _logger.LogError($"[{nameof(Status)}] {startError}");
+                        _logger.LogError($"[{nameof(Model)}] {startError}");
                         return StatusCode(503, startError);
                     }
 
-                    _logger.LogError($"[{nameof(Status)}] DCS is not started");
+                    _logger.LogError($"[{nameof(Model)}] DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                _logger.LogWarning(e, $"[{nameof(Status)}] Failed to retrieve status");
+                _logger.LogWarning(e, $"[{nameof(Model)}] Failed to retrieve object model");
                 return StatusCode(500, e.Message);
             }
         }
