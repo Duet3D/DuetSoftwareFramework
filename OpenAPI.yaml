@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-    version: '3.4.1'
+    version: '3.5.0'
     title: 'DuetSoftwareFramework'
     license:
         name: GPL-3.0
@@ -63,10 +63,21 @@ paths:
                     description: 'Incompatible DCS version'
                 '503':
                     description: 'DCS is unavailable'
-    /machine/status:
+    /machine/model:
         get:
             summary: |
                 Query the full object model
+            responses:
+                '200':
+                    description: 'Query OK, current object model is returned as application/json'
+                    content:
+                        application/json: {}
+                '403':
+                    description: 'Forbidden (missing or invalid X-Session-Key header)'
+    /machine/status:
+        get:
+            summary: |
+                Query the full object model (equivalent to /machine/model, not supported before v3.4.6 or v3.5-b4)
             responses:
                 '200':
                     description: 'Query OK, current object model is returned as application/json'
