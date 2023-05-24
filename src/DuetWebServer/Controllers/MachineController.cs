@@ -238,18 +238,21 @@ namespace DuetWebServer.Controllers
 
         #region General requests
         /// <summary>
+        /// GET /machine/model
+        /// - and -
         /// GET /machine/status
         /// Retrieve the full object model as JSON.
         /// </summary>
         /// <returns>
         /// HTTP status code:
-        /// (200) Machine object model as application/json
+        /// (200) Object model as application/json
         /// (500) Generic error
         /// (502) Incompatible DCS version
         /// (503) DCS is unavailable
         /// </returns>
+        [HttpGet("model")]
         [HttpGet("status")]
-        public async Task<IActionResult> Status()
+        public async Task<IActionResult> Model()
         {
             try
             {
@@ -281,7 +284,7 @@ namespace DuetWebServer.Controllers
                     LogError("DCS is not started");
                     return StatusCode(503, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 }
-                LogWarning(e, "Failed to retrieve status");
+                LogWarning(e, "Failed to retrieve object model");
                 return StatusCode(500, e.Message);
             }
         }
