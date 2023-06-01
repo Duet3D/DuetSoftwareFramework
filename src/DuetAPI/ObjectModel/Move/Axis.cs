@@ -171,6 +171,16 @@ namespace DuetAPI.ObjectModel
         private int? _percentStstCurrent;
 
         /// <summary>
+        /// Reduced accelerations used by Z probing and stall homing moves (in mm/s^2)
+        /// </summary>
+        public float ReducedAcceleration
+        {
+            get => _reducedAcceleration;
+			set => SetPropertyValue(ref _reducedAcceleration, value);
+        }
+        private float _reducedAcceleration;
+
+        /// <summary>
         /// Maximum speed (in mm/min)
         /// </summary>
         public float Speed

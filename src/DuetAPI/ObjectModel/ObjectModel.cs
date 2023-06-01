@@ -59,6 +59,11 @@ namespace DuetAPI.ObjectModel
         public Job Job { get; } = new Job();
 
         /// <summary>
+        /// List of configured LED strips
+        /// </summary>
+        public ModelCollection<LedStrip> LedStrips { get; } = new ModelCollection<LedStrip>();
+
+        /// <summary>
         /// Machine configuration limits
         /// </summary>
         public Limits Limits { get; } = new Limits();

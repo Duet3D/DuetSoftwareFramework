@@ -98,16 +98,6 @@
         public ModelCollection<MoveQueueItem> Queue { get; } = new ModelCollection<MoveQueueItem>();
 
         /// <summary>
-        /// Reduced accelerations used by Z probing and stall homing moves (in mm/s^2)
-        /// </summary>
-        public float ReducedAcceleration
-        {
-            get => _reducedAcceleration;
-			set => SetPropertyValue(ref _reducedAcceleration, value);
-        }
-        private float _reducedAcceleration = 10000F;
-
-        /// <summary>
         /// Parameters for centre rotation
         /// </summary>
         public MoveRotation Rotation { get; } = new MoveRotation();
