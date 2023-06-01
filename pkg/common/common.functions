@@ -190,8 +190,8 @@ build_plugins() {
 	sed -i "s/DMPVER/$dmpver/g" $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin.json
 	sed -i "s/DCSVER/$dcsver/g" $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin.json
 
-	SBCFILES=`find $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf -type f -printf '%f\n' | sort | jq -R -s -c 'split("\n")[:-1]'`
-	jq -e ".sbcFiles=$SBCFILES" $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin.json > $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin-new.json
+	DSFFILES=`find $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf -type f -printf '%f\n' | sort | jq -R -s -c 'split("\n")[:-1]'`
+	jq -e ".dsfFiles=$DSFFILES" $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin.json > $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin-new.json
 	mv $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin-new.json $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin.json
 }
 
