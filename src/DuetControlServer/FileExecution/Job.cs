@@ -409,8 +409,8 @@ namespace DuetControlServer.FileExecution
                         {
                             // Adjust the file position
                             long newFilePosition = _pausePosition ?? nextFilePosition;
-                            await SetFilePosition(0, newFilePosition);
-                            _logger.Info("Job has been paused at byte {0} on channel {1}, reason {2}", newFilePosition, file.Channel, _pauseReason);
+                            await SetFilePosition((file.Channel == CodeChannel.File) ? 0 : 1 , newFilePosition);
+                            _logger.Info("Job on {0} has been paused at byte {1}, reason {2}", file.Channel, newFilePosition, _pauseReason);
 
                             // Wait for the print to be resumed
                             IsProcessing = false;

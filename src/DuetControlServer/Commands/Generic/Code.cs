@@ -130,7 +130,7 @@ namespace DuetControlServer.Commands
         }
 
         /// <summary>
-        /// Run an arbitrary G/M/T-code and wait for it to finish
+        /// Run an arbitrary G/M/T-code and wait for it to finish or to be enqueued if it is asynchronous
         /// </summary>
         /// <returns>Result of the code</returns>
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>

@@ -61,6 +61,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of configured LED strips
         /// </summary>
+        /// <seealso cref="LedStrip"/>
         public ModelCollection<LedStrip> LedStrips { get; } = new ModelCollection<LedStrip>();
 
         /// <summary>
