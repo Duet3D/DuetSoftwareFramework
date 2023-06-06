@@ -363,29 +363,31 @@ namespace DuetControlServer.FileExecution
             }
             while (!Program.CancellationToken.IsCancellationRequested);
 
-            // Resolve potential tasks waiting for the macro result
             using (await _lock.LockAsync(Program.CancellationToken))
             {
+                // No longer executing
                 IsExecuting = false;
                 if (!IsAborted)
                 {
                     _logger.Info("Finished macro file {0}", FileName);
                 }
+
+                // Resolve potential tasks waiting for the macro result
                 if (_finishTcs is not null)
                 {
                     _finishTcs.SetResult();
                     _finishTcs = null;
                 }
-            }
 
-            // Check if we've finished executing a config file
-            if (executingConfigFile)
-            {
-                Model.Provider.SetExecutingConfig(true);
-            }
+                // Check if we've finished executing a config file
+                if (executingConfigFile)
+                {
+                    Model.Provider.SetExecutingConfig(true);
+                }
 
-            // Release this instance when done
-            Dispose();
+                // Release this instance when done
+                Dispose();
+            }
         }
 
         /// <summary>
@@ -471,7 +473,13 @@ namespace DuetControlServer.FileExecution
 
             // Dispose the used resources
             _cts.Dispose();
-            _file?.Dispose();
+            if (_file != null)
+            {
+                using (_file.Lock())
+                {
+                    _file.Dispose();
+                }
+            }
             _finishTcs?.SetCanceled();
             _disposed = true;
         }

@@ -170,7 +170,6 @@ namespace DuetControlServer.Files
                 IsClosed = true;
                 _fileStream.Dispose();
             }
-
             _disposed = true;
         }
 
