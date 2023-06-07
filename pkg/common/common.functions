@@ -58,6 +58,7 @@ exit 0
 [ $HELP -eq 1 ] && print_help
 
 declare -i BUILD_PROGS=0
+declare -i BUILD_PLUGINS=0
 declare -i BUILD_SD=0
 declare -i BUILD_DWC=0
 declare -i BUILD_META=0
