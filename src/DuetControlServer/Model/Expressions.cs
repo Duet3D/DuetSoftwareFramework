@@ -227,7 +227,7 @@ namespace DuetControlServer.Model
                 }
             }
 
-            return (lastExpression.Length > 0 && IsSbcExpression(lastExpression.ToString(), false));
+            return lastExpression.Length > 0 && IsSbcExpression(lastExpression.ToString(), false);
         }
 
         /// <summary>
