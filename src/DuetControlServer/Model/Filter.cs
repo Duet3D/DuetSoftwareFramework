@@ -410,11 +410,35 @@ namespace DuetControlServer.Model
                                 return true;
                             }
                         }
-                        else if (property.PropertyType.IsSubclassOf(typeof(ModelObject)) || typeof(IList).IsAssignableFrom(property.PropertyType))
+                        else if (property.PropertyType.IsSubclassOf(typeof(ModelObject)) ||
+                                   typeof(IModelDictionary).IsAssignableFrom(property.PropertyType) ||
+                                   typeof(IList).IsAssignableFrom(property.PropertyType))
                         {
                             // Property is somewhere deeper
                             object propertyValue = property.GetValue(model);
                             return InternalGetSpecific(propertyValue, partialFilter, findSbcProperty, hadSbcProperty, out result);
+                        }
+                    }
+                }
+                else if (partialModel is IModelDictionary dict && dict.Contains(propertyName))
+                {
+                    object? dictItem = dict[propertyName];
+                    if (partialFilter.Length == 0)
+                    {
+                        if (!findSbcProperty || hadSbcProperty)
+                        {
+                            // This is exactly the property we've been looking for
+                            result = dictItem;
+                            return true;
+                        }
+                    }
+                    else if (dictItem is not null)
+                    {
+                        Type dictItemType = dictItem.GetType();
+                        if (dictItemType.IsSubclassOf(typeof(ModelObject)) || typeof(IList).IsAssignableFrom(dictItemType))
+                        {
+                            // Property is somewhere deeper
+                            return InternalGetSpecific(dictItem, partialFilter, findSbcProperty, hadSbcProperty, out result);
                         }
                     }
                 }
