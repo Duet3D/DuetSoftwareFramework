@@ -62,11 +62,6 @@
         private float? _laserPwm;
 
         /// <summary>
-        /// The spindle RPMs that were set, negative if anticlockwise direction
-        /// </summary>
-        public ModelCollection<float> SpindleSpeeds { get; } = new ModelCollection<float>();
-
-        /// <summary>
         /// The tool number that was active
         /// </summary>
         public int ToolNumber
