@@ -52,7 +52,7 @@ jobs:
 
       # Upload armhf packages to pkg.duet3d.com
       - name: Upload package files
-        uses: Creepios/sftp-action@v1.0.3
+        uses: Creepios/sftp-action@v1.0.5
         with:
           host: pkg.duet3d.com
           port: 22
