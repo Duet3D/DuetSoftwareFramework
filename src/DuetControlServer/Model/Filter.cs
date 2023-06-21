@@ -422,7 +422,7 @@ namespace DuetControlServer.Model
                 }
                 else if (partialModel is IModelDictionary dict && dict.Contains(propertyName))
                 {
-                    object? dictItem = dict[propertyName];
+                    object dictItem = dict[propertyName];
                     if (partialFilter.Length == 0)
                     {
                         if (!findSbcProperty || hadSbcProperty)
