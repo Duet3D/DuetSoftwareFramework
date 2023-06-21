@@ -11,7 +11,11 @@ on:
         options:
         - dev
         - unstable
+        - unstable-3.4
+        - unstable-3.5
         - stable
+        - stable-3.4
+        - stable-3.5
 
 jobs:
   build:
@@ -20,11 +24,11 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
 
-      # Install NodeJS environment (TODO: Update to 16 when v3.5 is out)
+      # Install NodeJS environment
       - name: Set up NodeJS
         uses: actions/setup-node@v3
         with:
-          node-version: 14
+          node-version: 16
 
       # Install .NET environment
       - name: Set up .NET
