@@ -117,8 +117,13 @@ namespace DuetPiManagementPlugin.Network
                     string disableResult = await Command.Execute("ip", $"link set {iface.Name} down");
                     result.AppendLine(disableResult);
 
+                    // Unblock WiFi
+                    string unblockResult = await Command.Execute("rfkill", "unblock wifi");
+                    result.AppendLine(unblockResult);
+
                     // Start station mode
-                    result.AppendLine(await WPA.Start());
+                    string wpaResult = await WPA.Start();
+                    result.AppendLine(wpaResult);
 
                     // Enable the adapter again
                     string enableResult = await Command.Execute("ip", $"link set {iface.Name} up");
