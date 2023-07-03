@@ -10,10 +10,8 @@ on:
         type: choice
         options:
         - dev
-        - unstable
         - unstable-3.4
         - unstable-3.5
-        - stable
         - stable-3.4
         - stable-3.5
 
@@ -65,6 +63,32 @@ jobs:
           privateKey: ${{ secrets.PKG_SSH_KEY }}
           localPath: ./pkg/out
           remotePath: /var/www/pkg/dists/${{ inputs.target }}/armv7
+
+      # Upload armhf packages to pkg.duet3d.com (main stable feed)
+      - name: Upload package files to the main stable feed
+        if: startsWith(inputs.target, 'stable')
+        uses: Creepios/sftp-action@v1.0.5
+        with:
+          host: pkg.duet3d.com
+          port: 22
+          username: ${{ secrets.PKG_SSH_USER }}
+          password: ${{ secrets.PKG_SSH_PASS }}
+          privateKey: ${{ secrets.PKG_SSH_KEY }}
+          localPath: ./pkg/out
+          remotePath: /var/www/pkg/dists/stable/armv7
+
+      # Upload armhf packages to pkg.duet3d.com (main unstable feed)
+      - name: Upload package files to the main unstable feed
+        if: startsWith(inputs.target, 'unstable')
+        uses: Creepios/sftp-action@v1.0.5
+        with:
+          host: pkg.duet3d.com
+          port: 22
+          username: ${{ secrets.PKG_SSH_USER }}
+          password: ${{ secrets.PKG_SSH_PASS }}
+          privateKey: ${{ secrets.PKG_SSH_KEY }}
+          localPath: ./pkg/out
+          remotePath: /var/www/pkg/dists/unstable/armv7
 
       # Refresh package lists if the dev target is selected
       - name: Refresh package lists
