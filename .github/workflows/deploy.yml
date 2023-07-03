@@ -10,9 +10,7 @@ on:
         type: choice
         options:
         - dev
-        - unstable-3.4
         - unstable-3.5
-        - stable-3.4
         - stable-3.5
 
 jobs:
