@@ -3,7 +3,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
     <TrimUnusedDependencies>true</TrimUnusedDependencies>
-    <Version>3.4.6-rc.1</Version>
+    <Version>3.4.6</Version>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>
     <PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
