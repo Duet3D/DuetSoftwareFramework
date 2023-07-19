@@ -30,9 +30,11 @@ Return Codes:
 66 - Unsupported Conditional
 67 - Pip3 could not handle the request
 
-Verson 1.0.1
+Verson:
+1.0.1
 Initial Release
-
+1.0.2
+Added additional check to function pipinstalled.  Uses pip list because some modules do not show up in global list
 """
 import subprocess
 import sys
@@ -72,24 +74,38 @@ def parseArguments(request):      ##### Get the module name any conditional and 
 def runsubprocess(cmd):
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True, shell=True)
-        if str(result.stderr) != '' and '[Error]' in str(result.stderr):
-            logger.info('Command Failure: ' + str(cmd))
-            logger.debug('Error = ' + str(result.stderr))
-            logger.debug('Output = ' + str(result.stdout))
-            return False
-        else:
-            return result.stdout
+        if result.returncode != 0:
+            if str(result.stderr) != '' and '[Error]' in str(result.stderr):
+                logger.info('Command Failure: ' + str(cmd))
+                logger.debug('Error = ' + str(result.stderr))
+                logger.debug('Output = ' + str(result.stdout))
+                return False
+        return result.stdout
     except subprocess.CalledProcessError as e1:
-        logger.info(str(e1))
+        logger.info('ProcessError -- ' + str(e1))
     except OSError as e2:   
-        logger.info(str(e2))
+        logger.info('OSError -- ' + str(e2))
     return False
 
 def pipInstalled(m): # If installed by pip and not a built-in - should return version number
     try:
-        globals()[m] = __import__(m)  #  Raises ImportError is module is not available
+        globals()[m] = __import__(m)  #  Raises ImportError if module is not available
         result = globals()[m].__version__
         return result
+    except ImportError: #  Check to see if pip3 thinks its installed
+        cmd = 'pip3 list'
+        request = runsubprocess(cmd)
+        # request = 'blabla 123 \ndsf-python     \n'
+        if m in request: #  The module exists
+            # Try to get version number
+            regex = '^'+ m + '\s+(.*)'
+            result = re.findall(regex,request,flags=re.MULTILINE)
+            if result[0] != '': # version number found
+                return result[0]
+            # Module found but no version number available
+            return ''
+        else:
+            raise ImportError # Could not find module
     except AttributeError: # Likely a built-in
         return ''
 
@@ -119,18 +135,18 @@ def checkInstall(mName,mCompare, mVersion): #Check to see if we need to install 
 
         if result == False:  # module could not be installed
             return 3, mVersion  
-        else:  #  Confirm thatthe new module can be imported        
+        else:  #  Confirm that the new module can be imported        
             try:
                 installedVersion = pipInstalled(mName)  # Raises ImportError if still cannot import
                 if mVersion == '':
                     return 1, installedVersion  # Installed no version requested
                 else:
                     return 2, installedVersion # Installed version requested
-            except ImportError:
+            except ImportError as e:
                 return 3, mVersion  # module could not be installed
 
 def main(progName):
-    # Set up logging so jpurnalc can be used
+    # Set up logging so journalc can be used
     createLogger(progName)
 
     #  Validate that the call was well formed
