@@ -220,8 +220,9 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Get a channel that is currently idle in order to process a priority code
         /// </summary>
+        /// <param name="preferredChannel">Preferred code channel</param>
         /// <returns>Idle channel</returns>
-        public static Task<CodeChannel> GetIdleChannel() => _channels.GetIdleChannel();
+        public static Task<CodeChannel> GetIdleChannel(CodeChannel preferredChannel) => _channels.GetIdleChannel(preferredChannel);
 
         /// <summary>
         /// Check if a code channel is waiting for acknowledgement

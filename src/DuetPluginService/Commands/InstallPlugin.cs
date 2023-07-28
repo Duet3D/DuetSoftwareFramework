@@ -200,9 +200,8 @@ namespace DuetPluginService.Commands
                         Directory.CreateDirectory(directory);
                     }
 
-#warning check if this is fixed in ASP.NET 6
 #if true
-                    // Copy the file. ASP.NET 5 does not perform lstat on symlinks so files served from symlinks are always truncated
+                    // Copy the file. ASP.NET 5/6 does not perform lstat on symlinks so files served from symlinks are always truncated
                     _logger.Debug("Copying {0} -> {1}", pluginWwwPath, installWwwPath);
                     File.Copy(pluginWwwPath, installWwwPath, true);
 #else

@@ -171,24 +171,35 @@ namespace DuetControlServer.Model
                     index++;
 
                     // Update IPv4 configuration
-                    IPAddress ipAddress = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
-                                           where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
-                                           select unicastAddress.Address).FirstOrDefault();
-                    IPAddress netMask = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
-                                         where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
-                                         select unicastAddress.IPv4Mask).FirstOrDefault();
-                    IPAddress gateway = (from gatewayAddress in iface.GetIPProperties().GatewayAddresses
-                                         where gatewayAddress.Address.AddressFamily == AddressFamily.InterNetwork
-                                         select gatewayAddress.Address).FirstOrDefault();
-                    IPAddress dnsServer = (from item in iface.GetIPProperties().DnsAddresses
-                                           where item.AddressFamily == AddressFamily.InterNetwork
-                                           select item).FirstOrDefault();
+                    string macAddress = null;
+                    IPAddress ipAddress = null, netMask = null, gateway = null, dnsServer = null;
+                    try
+                    {
+                        macAddress = BitConverter.ToString(iface.GetPhysicalAddress().GetAddressBytes()).Replace('-', ':');
+                        ipAddress = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
+                                     where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                                     select unicastAddress.Address).FirstOrDefault();
+                        netMask = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
+                                   where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                                   select unicastAddress.IPv4Mask).FirstOrDefault();
+                        gateway = (from gatewayAddress in iface.GetIPProperties().GatewayAddresses
+                                   where gatewayAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                                   select gatewayAddress.Address).FirstOrDefault();
+                        dnsServer = (from item in iface.GetIPProperties().DnsAddresses
+                                     where item.AddressFamily == AddressFamily.InterNetwork
+                                     select item).FirstOrDefault();
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.Debug(e, "Failed to get IPv4 configuration data");
+                    }
+
                     // In theory we could use ipInfo.DhcpLeaseLifetime to check if DHCP is configured but it isn't supported on Unix (.NET 5)
                     networkInterface.ActualIP = networkInterface.ConfiguredIP = ipAddress?.ToString();
                     networkInterface.Subnet = netMask?.ToString();
                     networkInterface.Gateway = gateway?.ToString();
                     networkInterface.DnsServer = dnsServer?.ToString();
-                    networkInterface.Mac = BitConverter.ToString(iface.GetPhysicalAddress().GetAddressBytes()).Replace('-', ':');
+                    networkInterface.Mac = macAddress;
                     networkInterface.Speed = (int?)(iface.Speed / 1000000);
                     networkInterface.State = iface.OperationalStatus switch
                     {

@@ -185,7 +185,6 @@ namespace DuetControlServer.Files
                 _reader.Dispose();
                 _fileStream.Dispose();
             }
-
             _disposed = true;
         }
 
