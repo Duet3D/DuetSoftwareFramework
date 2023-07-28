@@ -2488,6 +2488,42 @@ public async Task&lt;IActionResult&gt; InstallSystemPackage([FromServices] ISess
       </tr>
     </tbody>
   </table>
+  <a id="DuetWebServer_Controllers_MachineController_Model_" data-uid="DuetWebServer.Controllers.MachineController.Model*"></a>
+  <h4 id="DuetWebServer_Controllers_MachineController_Model" data-uid="DuetWebServer.Controllers.MachineController.Model">Model()</h4>
+  <div class="markdown level1 summary"><p>GET /machine/model</p>
+<ul>
+<li>and -
+GET /machine/status
+Retrieve the full object model as JSON.</li>
+</ul>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="decalaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[HttpGet(&quot;model&quot;)]
+[HttpGet(&quot;status&quot;)]
+public async Task&lt;IActionResult&gt; Model()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">Microsoft.AspNetCore.Mvc.IActionResult</span>&gt;</td>
+        <td><p>HTTP status code:
+(200) Object model as application/json
+(500) Generic error
+(502) Incompatible DCS version
+(503) DCS is unavailable</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="DuetWebServer_Controllers_MachineController_MoveFileOrDirectory_" data-uid="DuetWebServer.Controllers.MachineController.MoveFileOrDirectory*"></a>
   <h4 id="DuetWebServer_Controllers_MachineController_MoveFileOrDirectory_System_String_System_String_System_Boolean_" data-uid="DuetWebServer.Controllers.MachineController.MoveFileOrDirectory(System.String,System.String,System.Boolean)">MoveFileOrDirectory(String, String, Boolean)</h4>
   <div class="markdown level1 summary"><p>Move a file or directory from a to b</p>
@@ -2637,37 +2673,6 @@ public async Task&lt;IActionResult&gt; StartPlugin()</code></pre>
         <td><p>HTTP status code:
 (204) No content
 (500) Generic error occurred
-(502) Incompatible DCS version
-(503) DCS is unavailable</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <a id="DuetWebServer_Controllers_MachineController_Status_" data-uid="DuetWebServer.Controllers.MachineController.Status*"></a>
-  <h4 id="DuetWebServer_Controllers_MachineController_Status" data-uid="DuetWebServer.Controllers.MachineController.Status">Status()</h4>
-  <div class="markdown level1 summary"><p>GET /machine/status
-Retrieve the full object model as JSON.</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">[HttpGet(&quot;status&quot;)]
-public async Task&lt;IActionResult&gt; Status()</code></pre>
-  </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">Microsoft.AspNetCore.Mvc.IActionResult</span>&gt;</td>
-        <td><p>HTTP status code:
-(200) Machine object model as application/json
-(500) Generic error
 (502) Incompatible DCS version
 (503) DCS is unavailable</p>
 </td>
