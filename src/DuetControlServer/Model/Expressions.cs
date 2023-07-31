@@ -677,7 +677,7 @@ namespace DuetControlServer.Model
             }
 
             // Eat a sub-expression and evaluate SBC-only properties + custom functions where applicable
-            async Task<string> eatExpression(char brace)
+            async Task<string> eatExpression(char brace, bool raw = false)
             {
                 StringBuilder lastToken = new(), result = new();
                 while (i < expression.Length)
@@ -691,16 +691,26 @@ namespace DuetControlServer.Model
                     }
                     else if (c == '(')
                     {
-                        string subExpression = await eatExpression(c);
-                        if (TryGetCustomFunction(lastToken.ToString(), out string functionName, out bool wantsCount, out CustomAsyncFunctionResolver? fn))
+                        bool isCustomFunction = TryGetCustomFunction(lastToken.ToString(), out string functionName, out bool wantsCount, out CustomAsyncFunctionResolver? fn);
+                        string subExpression = await eatExpression(c, functionName == "exists");
+                        if (isCustomFunction)
                         {
-                            List<object?> arguments = new();
-                            foreach (string arg in SplitExpression(subExpression))
+                            object? fnResult;
+                            if (functionName == "exists")
                             {
-                                object? argValue = await getExpressionValue(arg);
-                                arguments.Add(argValue);
+                                // There may be valid properties that are null, so we need a special check for exists()
+                                fnResult = await fn!(functionName, new object[] { subExpression });
                             }
-                            object? fnResult = await fn(functionName, arguments.ToArray());
+                            else
+                            {
+                                List<object?> arguments = new();
+                                foreach (string arg in SplitExpression(subExpression))
+                                {
+                                    object? argValue = await getExpressionValue(arg);
+                                    arguments.Add(argValue);
+                                }
+                                fnResult = await fn!(functionName, arguments.ToArray());
+                            }
                             result.Append(objectToString(fnResult, wantsCount, true));
                         }
                         else
@@ -759,7 +769,14 @@ namespace DuetControlServer.Model
                             throw new CodeParserException("Unexpected curly bracket", code);
                         }
 
-                        await appendToken(result, lastToken);
+                        if (raw)
+                        {
+                            result.Append(lastToken);
+                        }
+                        else
+                        {
+                            await appendToken(result, lastToken);
+                        }
                         return result.ToString();
                     }
                     else if (char.IsLetterOrDigit(c) || c == '#' || c == '.' || c == '_' || char.IsWhiteSpace(c))
@@ -786,7 +803,14 @@ namespace DuetControlServer.Model
                     throw new CodeParserException("Unterminated curly bracket", code);
                 }
 
-                await appendToken(result, lastToken);
+                if (raw)
+                {
+                    result.Append(lastToken);
+                }
+                else
+                {
+                    await appendToken(result, lastToken);
+                }
                 return result.ToString();
             }
 

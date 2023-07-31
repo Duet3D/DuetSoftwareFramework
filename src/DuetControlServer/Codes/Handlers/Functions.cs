@@ -13,8 +13,23 @@ namespace DuetControlServer.Codes.Handlers
         /// </summary>
         public static void Init()
         {
-            // Register custom fileexists() function, evaluating it via RRF would cause a timeout
-            Model.Expressions.CustomFunctions.Add("fileexists", FileExists);
+            Model.Expressions.CustomFunctions.Add("exists", Exists);
+            Model.Expressions.CustomFunctions.Add("fileexists", FileExists);    // Register custom fileexists() function, evaluating it via RRF would cause a deadlock
+        }
+
+        /// <summary>
+        /// Implementation for exists() meta G-code call
+        /// </summary>
+        /// <param name="functionName">Function name</param>
+        /// <param name="argument">Function argument</param>
+        /// <returns>Whether the file exists</returns>
+        public static Task<object?> Exists(string functionName, object?[] arguments)
+        {
+            if (arguments.Length == 1 && arguments[0] is string stringArgument)
+            {
+                return Task.FromResult<object?>(Model.Filter.GetSpecific(stringArgument, true, out _));
+            }
+            throw new ArgumentException("exists requires an argument");
         }
 
         /// <summary>
