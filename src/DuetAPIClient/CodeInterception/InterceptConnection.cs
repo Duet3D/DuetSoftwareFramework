@@ -35,6 +35,15 @@ namespace DuetAPIClient
         public List<CodeChannel> Channels { get; set; } = new List<CodeChannel>();
 
         /// <summary>
+        /// Automatically flush the code channel before notifying the client in case a code filter is specified
+        /// </summary>
+        /// <remarks>
+        /// This option makes extra Flush calls in the interceptor implementation obsolete.
+        /// It is highly recommended to enable this in order to avoid potential deadlocks when dealing with macros!
+        /// </remarks>
+        public bool AutoFlush { get; set; } = true;
+
+        /// <summary>
         /// List of G/M/T-codes to filter or Q0 for comments
         /// </summary>
         /// <remarks>
@@ -101,6 +110,7 @@ namespace DuetAPIClient
             InterceptInitMessage initMessage = new() {
                 InterceptionMode = mode,
                 Channels = Channels,
+                AutoFlush = AutoFlush,
                 Filters = Filters,
                 PriortyCodes = priortyCodes
             };

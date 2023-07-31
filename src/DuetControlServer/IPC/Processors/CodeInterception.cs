@@ -64,6 +64,11 @@ namespace DuetControlServer.IPC.Processors
         private readonly CodeChannel[] _channels;
 
         /// <summary>
+        /// Automatically flush the code channel when a code from the filter list is handled
+        /// </summary>
+        private readonly bool _autoFlush;
+
+        /// <summary>
         /// List of codes that may be intercepted
         /// </summary>
         private readonly List<string> _filters;
@@ -103,6 +108,7 @@ namespace DuetControlServer.IPC.Processors
             InterceptInitMessage interceptInitMessage = (InterceptInitMessage)initMessage;
             _mode = interceptInitMessage.InterceptionMode;
             _channels = (interceptInitMessage.Channels is not null) ? interceptInitMessage.Channels.ToArray() : Inputs.ValidChannels;
+            _autoFlush = interceptInitMessage.AutoFlush && (interceptInitMessage.Filters?.Count ?? 0) > 0;
             _filters = interceptInitMessage.Filters ?? new List<string>();
             _priorityCodes = interceptInitMessage.PriortyCodes;
         }
@@ -249,6 +255,13 @@ namespace DuetControlServer.IPC.Processors
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         private async Task<bool> Intercept(Code code)
         {
+            // Flush the code channel here if required
+            if (_autoFlush && !await Codes.Processor.FlushAsync(code, false, false))
+            {
+                throw new OperationCanceledException();
+            }
+
+            // Deal with the client
             using (await _lock.LockAsync(code.CancellationToken))
             {
                 using (await _codeMonitor.EnterAsync(code.CancellationToken))
