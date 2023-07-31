@@ -1715,14 +1715,32 @@ By default this replaces all expressions as well for convenient parsing by the c
     </tbody>
   </table>
   <a id="DuetControlServer_SPI_Interface_GetIdleChannel_" data-uid="DuetControlServer.SPI.Interface.GetIdleChannel*"></a>
-  <h4 id="DuetControlServer_SPI_Interface_GetIdleChannel" data-uid="DuetControlServer.SPI.Interface.GetIdleChannel">GetIdleChannel()</h4>
+  <h4 id="DuetControlServer_SPI_Interface_GetIdleChannel_DuetAPI_CodeChannel_" data-uid="DuetControlServer.SPI.Interface.GetIdleChannel(DuetAPI.CodeChannel)">GetIdleChannel(CodeChannel)</h4>
   <div class="markdown level1 summary"><p>Get a channel that is currently idle in order to process a priority code</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="decalaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static Task&lt;CodeChannel&gt; GetIdleChannel()</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task&lt;CodeChannel&gt; GetIdleChannel(CodeChannel preferredChannel)</code></pre>
   </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-striped table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
+        <td><span class="parametername">preferredChannel</span></td>
+        <td><p>Preferred code channel</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <h5 class="returns">Returns</h5>
   <table class="table table-bordered table-striped table-condensed">
     <thead>

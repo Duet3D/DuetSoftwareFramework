@@ -11360,19 +11360,6 @@ references:
   isSpec: "True"
   fullName: DuetAPI.ObjectModel.RestorePoint.LaserPwm
   nameWithType: RestorePoint.LaserPwm
-- uid: DuetAPI.ObjectModel.RestorePoint.SpindleSpeeds
-  name: SpindleSpeeds
-  href: api/DuetAPI.ObjectModel.RestorePoint.html#DuetAPI_ObjectModel_RestorePoint_SpindleSpeeds
-  commentId: P:DuetAPI.ObjectModel.RestorePoint.SpindleSpeeds
-  fullName: DuetAPI.ObjectModel.RestorePoint.SpindleSpeeds
-  nameWithType: RestorePoint.SpindleSpeeds
-- uid: DuetAPI.ObjectModel.RestorePoint.SpindleSpeeds*
-  name: SpindleSpeeds
-  href: api/DuetAPI.ObjectModel.RestorePoint.html#DuetAPI_ObjectModel_RestorePoint_SpindleSpeeds_
-  commentId: Overload:DuetAPI.ObjectModel.RestorePoint.SpindleSpeeds
-  isSpec: "True"
-  fullName: DuetAPI.ObjectModel.RestorePoint.SpindleSpeeds
-  nameWithType: RestorePoint.SpindleSpeeds
 - uid: DuetAPI.ObjectModel.RestorePoint.ToolNumber
   name: ToolNumber
   href: api/DuetAPI.ObjectModel.RestorePoint.html#DuetAPI_ObjectModel_RestorePoint_ToolNumber
@@ -14245,6 +14232,19 @@ references:
   isSpec: "True"
   fullName: DuetAPIClient.BaseCommandConnection.InstallSystemPackage
   nameWithType: BaseCommandConnection.InstallSystemPackage
+- uid: DuetAPIClient.BaseCommandConnection.InvalidateChannel(DuetAPI.CodeChannel,System.Threading.CancellationToken)
+  name: InvalidateChannel(CodeChannel, CancellationToken)
+  href: api/DuetAPIClient.BaseCommandConnection.html#DuetAPIClient_BaseCommandConnection_InvalidateChannel_DuetAPI_CodeChannel_System_Threading_CancellationToken_
+  commentId: M:DuetAPIClient.BaseCommandConnection.InvalidateChannel(DuetAPI.CodeChannel,System.Threading.CancellationToken)
+  fullName: DuetAPIClient.BaseCommandConnection.InvalidateChannel(DuetAPI.CodeChannel, System.Threading.CancellationToken)
+  nameWithType: BaseCommandConnection.InvalidateChannel(CodeChannel, CancellationToken)
+- uid: DuetAPIClient.BaseCommandConnection.InvalidateChannel*
+  name: InvalidateChannel
+  href: api/DuetAPIClient.BaseCommandConnection.html#DuetAPIClient_BaseCommandConnection_InvalidateChannel_
+  commentId: Overload:DuetAPIClient.BaseCommandConnection.InvalidateChannel
+  isSpec: "True"
+  fullName: DuetAPIClient.BaseCommandConnection.InvalidateChannel
+  nameWithType: BaseCommandConnection.InvalidateChannel
 - uid: DuetAPIClient.BaseCommandConnection.LockMachineModel(System.Threading.CancellationToken)
   name: LockMachineModel(CancellationToken)
   href: api/DuetAPIClient.BaseCommandConnection.html#DuetAPIClient_BaseCommandConnection_LockMachineModel_System_Threading_CancellationToken_
@@ -19840,12 +19840,12 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.Channel.Manager.Diagnostics
   nameWithType: Manager.Diagnostics
-- uid: DuetControlServer.SPI.Channel.Manager.GetIdleChannel
-  name: GetIdleChannel()
-  href: api/DuetControlServer.SPI.Channel.Manager.html#DuetControlServer_SPI_Channel_Manager_GetIdleChannel
-  commentId: M:DuetControlServer.SPI.Channel.Manager.GetIdleChannel
-  fullName: DuetControlServer.SPI.Channel.Manager.GetIdleChannel()
-  nameWithType: Manager.GetIdleChannel()
+- uid: DuetControlServer.SPI.Channel.Manager.GetIdleChannel(DuetAPI.CodeChannel)
+  name: GetIdleChannel(CodeChannel)
+  href: api/DuetControlServer.SPI.Channel.Manager.html#DuetControlServer_SPI_Channel_Manager_GetIdleChannel_DuetAPI_CodeChannel_
+  commentId: M:DuetControlServer.SPI.Channel.Manager.GetIdleChannel(DuetAPI.CodeChannel)
+  fullName: DuetControlServer.SPI.Channel.Manager.GetIdleChannel(DuetAPI.CodeChannel)
+  nameWithType: Manager.GetIdleChannel(CodeChannel)
 - uid: DuetControlServer.SPI.Channel.Manager.GetIdleChannel*
   name: GetIdleChannel
   href: api/DuetControlServer.SPI.Channel.Manager.html#DuetControlServer_SPI_Channel_Manager_GetIdleChannel_
@@ -23218,12 +23218,12 @@ references:
   isSpec: "True"
   fullName: DuetControlServer.SPI.Interface.Flush
   nameWithType: Interface.Flush
-- uid: DuetControlServer.SPI.Interface.GetIdleChannel
-  name: GetIdleChannel()
-  href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_GetIdleChannel
-  commentId: M:DuetControlServer.SPI.Interface.GetIdleChannel
-  fullName: DuetControlServer.SPI.Interface.GetIdleChannel()
-  nameWithType: Interface.GetIdleChannel()
+- uid: DuetControlServer.SPI.Interface.GetIdleChannel(DuetAPI.CodeChannel)
+  name: GetIdleChannel(CodeChannel)
+  href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_GetIdleChannel_DuetAPI_CodeChannel_
+  commentId: M:DuetControlServer.SPI.Interface.GetIdleChannel(DuetAPI.CodeChannel)
+  fullName: DuetControlServer.SPI.Interface.GetIdleChannel(DuetAPI.CodeChannel)
+  nameWithType: Interface.GetIdleChannel(CodeChannel)
 - uid: DuetControlServer.SPI.Interface.GetIdleChannel*
   name: GetIdleChannel
   href: api/DuetControlServer.SPI.Interface.html#DuetControlServer_SPI_Interface_GetIdleChannel_
@@ -24700,6 +24700,19 @@ references:
   isSpec: "True"
   fullName: DuetWebServer.Controllers.MachineController.InstallSystemPackage
   nameWithType: MachineController.InstallSystemPackage
+- uid: DuetWebServer.Controllers.MachineController.Model
+  name: Model()
+  href: api/DuetWebServer.Controllers.MachineController.html#DuetWebServer_Controllers_MachineController_Model
+  commentId: M:DuetWebServer.Controllers.MachineController.Model
+  fullName: DuetWebServer.Controllers.MachineController.Model()
+  nameWithType: MachineController.Model()
+- uid: DuetWebServer.Controllers.MachineController.Model*
+  name: Model
+  href: api/DuetWebServer.Controllers.MachineController.html#DuetWebServer_Controllers_MachineController_Model_
+  commentId: Overload:DuetWebServer.Controllers.MachineController.Model
+  isSpec: "True"
+  fullName: DuetWebServer.Controllers.MachineController.Model
+  nameWithType: MachineController.Model
 - uid: DuetWebServer.Controllers.MachineController.MoveFileOrDirectory(System.String,System.String,System.Boolean)
   name: MoveFileOrDirectory(String, String, Boolean)
   href: api/DuetWebServer.Controllers.MachineController.html#DuetWebServer_Controllers_MachineController_MoveFileOrDirectory_System_String_System_String_System_Boolean_
@@ -24752,19 +24765,6 @@ references:
   isSpec: "True"
   fullName: DuetWebServer.Controllers.MachineController.StartPlugin
   nameWithType: MachineController.StartPlugin
-- uid: DuetWebServer.Controllers.MachineController.Status
-  name: Status()
-  href: api/DuetWebServer.Controllers.MachineController.html#DuetWebServer_Controllers_MachineController_Status
-  commentId: M:DuetWebServer.Controllers.MachineController.Status
-  fullName: DuetWebServer.Controllers.MachineController.Status()
-  nameWithType: MachineController.Status()
-- uid: DuetWebServer.Controllers.MachineController.Status*
-  name: Status
-  href: api/DuetWebServer.Controllers.MachineController.html#DuetWebServer_Controllers_MachineController_Status_
-  commentId: Overload:DuetWebServer.Controllers.MachineController.Status
-  isSpec: "True"
-  fullName: DuetWebServer.Controllers.MachineController.Status
-  nameWithType: MachineController.Status
 - uid: DuetWebServer.Controllers.MachineController.StopPlugin
   name: StopPlugin()
   href: api/DuetWebServer.Controllers.MachineController.html#DuetWebServer_Controllers_MachineController_StopPlugin
