@@ -64,6 +64,11 @@ namespace DuetControlServer.IPC.Processors
         private readonly List<CodeChannel> _channels;
 
         /// <summary>
+        /// Automatically flush the code channel when a code from the filter list is handled
+        /// </summary>
+        private readonly bool _autoFlush;
+
+        /// <summary>
         /// List of codes that may be intercepted
         /// </summary>
         private readonly List<string> _filters;
@@ -98,6 +103,7 @@ namespace DuetControlServer.IPC.Processors
             InterceptInitMessage interceptInitMessage = (InterceptInitMessage)initMessage;
             _mode = interceptInitMessage.InterceptionMode;
             _channels = (interceptInitMessage.Channels != null) ? interceptInitMessage.Channels.ToList() : new List<CodeChannel>(Enum.GetValues(typeof(CodeChannel)).Cast<CodeChannel>());
+            _autoFlush = interceptInitMessage.AutoFlush && (interceptInitMessage.Filters?.Count ?? 0) > 0;
             _filters = interceptInitMessage.Filters ?? new List<string>();
             _priorityCodes = interceptInitMessage.PriortyCodes;
         }
@@ -244,6 +250,13 @@ namespace DuetControlServer.IPC.Processors
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         private async Task<bool> Intercept(Code code)
         {
+            // Flush the code channel here if required
+            if (_autoFlush && !await SPI.Interface.Flush(code, false, false))
+            {
+                throw new OperationCanceledException();
+            }
+
+            // Deal with the client
             using (await _codeMonitor.EnterAsync(Program.CancellationToken))
             {
                 // Send it to the IPC client and wait for a result
