@@ -107,7 +107,7 @@ namespace DuetAPI.ObjectModel
             get => _sbc;
             set => SetPropertyValue(ref _sbc, value);
         }
-        private SBC? _sbc = new();
+        private SBC? _sbc;
 
         /// <summary>
         /// Information about connected sensors including Z-probes and endstops
@@ -130,12 +130,6 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <seealso cref="Tool"/>
         public ModelCollection<Tool?> Tools { get; } = new ModelCollection<Tool?>();
-
-        /// <summary>
-        /// List of user sessions
-        /// </summary>
-        [SbcProperty(false)]
-        public ModelCollection<UserSession> UserSessions { get; } = new ModelCollection<UserSession>();
 
         /// <summary>
         /// List of available mass storages

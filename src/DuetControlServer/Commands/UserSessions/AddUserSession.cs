@@ -28,7 +28,7 @@ namespace DuetControlServer.Commands
                     Origin = Origin,
                     SessionType = SessionType
                 };
-                Model.Provider.Get.UserSessions.Add(newSession);
+                Model.Provider.Get.SBC!.DSF.UserSessions.Add(newSession);
 
                 return newSession.Id;
             }

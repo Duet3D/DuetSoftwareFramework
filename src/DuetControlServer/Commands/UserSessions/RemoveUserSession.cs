@@ -15,11 +15,11 @@ namespace DuetControlServer.Commands
         {
             using (await Model.Provider.AccessReadWriteAsync())
             {
-                for (int i = 0; i < Model.Provider.Get.UserSessions.Count; i++)
+                for (int i = 0; i < Model.Provider.Get.SBC!.DSF.UserSessions.Count; i++)
                 {
-                    if (Model.Provider.Get.UserSessions[i].Id == Id)
+                    if (Model.Provider.Get.SBC!.DSF.UserSessions[i].Id == Id)
                     {
-                        Model.Provider.Get.UserSessions.RemoveAt(i);
+                        Model.Provider.Get.SBC!.DSF.UserSessions.RemoveAt(i);
                         return true;
                     }
                 }

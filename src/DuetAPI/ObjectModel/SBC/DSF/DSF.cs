@@ -15,7 +15,6 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Indicates if DSF allows the installation and usage of third-party plugins
         /// </summary>
-        [SbcProperty(false)]
         public bool PluginSupport
         {
             get => _pluginSupport;
@@ -29,13 +28,17 @@ namespace DuetAPI.ObjectModel
         /// <remarks>
         /// Requires <see cref="PluginSupport"/> to be true
         /// </remarks>
-        [SbcProperty(false)]
         public bool RootPluginSupport
         {
             get => _rootPluginSupport;
             set => SetPropertyValue(ref _rootPluginSupport, value);
         }
         private bool _rootPluginSupport;
+
+        /// <summary>
+        /// List of user sessions
+        /// </summary>
+        public ModelCollection<UserSession> UserSessions { get; } = new ModelCollection<UserSession>();
 
         /// <summary>
         /// Version of Duet Software Framework (provided by Duet Control Server)
