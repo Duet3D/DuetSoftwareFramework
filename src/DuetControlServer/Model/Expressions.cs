@@ -25,7 +25,7 @@ namespace DuetControlServer.Model
         /// <param name="functionName">Name of the function</param>
         /// <param name="arguments">Function arguments</param>
         /// <returns>Result value</returns>
-        public delegate Task<object?> CustomAsyncFunctionResolver(string functionName, object?[] arguments);
+        public delegate Task<object?> CustomAsyncFunctionResolver(CodeChannel channel, string functionName, object?[] arguments);
 
         /// <summary>
         /// Dictionary of custom meta G-code functions vs. async resolvers
@@ -699,7 +699,7 @@ namespace DuetControlServer.Model
                             if (functionName == "exists")
                             {
                                 // There may be valid properties that are null, so we need a special check for exists()
-                                fnResult = await fn!(functionName, new object[] { subExpression });
+                                fnResult = await fn!(code.Channel, functionName, new object[] { subExpression });
                             }
                             else
                             {
@@ -709,7 +709,7 @@ namespace DuetControlServer.Model
                                     object? argValue = await getExpressionValue(arg);
                                     arguments.Add(argValue);
                                 }
-                                fnResult = await fn!(functionName, arguments.ToArray());
+                                fnResult = await fn!(code.Channel, functionName, arguments.ToArray());
                             }
                             result.Append(objectToString(fnResult, wantsCount, true));
                         }

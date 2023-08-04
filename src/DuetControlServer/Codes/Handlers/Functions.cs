@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DuetAPI;
+using System;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Codes.Handlers
@@ -20,14 +21,20 @@ namespace DuetControlServer.Codes.Handlers
         /// <summary>
         /// Implementation for exists() meta G-code call
         /// </summary>
+        /// <param name="channel">Code channel</param>
         /// <param name="functionName">Function name</param>
-        /// <param name="argument">Function argument</param>
+        /// <param name="arguments">Function arguments</param>
         /// <returns>Whether the file exists</returns>
-        public static Task<object?> Exists(string functionName, object?[] arguments)
+        public static async Task<object?> Exists(CodeChannel channel, string functionName, object?[] arguments)
         {
             if (arguments.Length == 1 && arguments[0] is string stringArgument)
             {
-                return Task.FromResult<object?>(Model.Filter.GetSpecific(stringArgument, true, out _));
+                stringArgument = stringArgument.Trim();
+                if (Model.Filter.GetSpecific(stringArgument, true, out _))
+                {
+                    return true;
+                }
+                return await SPI.Interface.EvaluateExpression(channel, $"exists({stringArgument})");
             }
             throw new ArgumentException("exists requires an argument");
         }
@@ -35,10 +42,11 @@ namespace DuetControlServer.Codes.Handlers
         /// <summary>
         /// Implementation for fileexists() meta G-code call
         /// </summary>
+        /// <param name="channel">Code channel</param>
         /// <param name="functionName">Function name</param>
-        /// <param name="argument">Function argument</param>
+        /// <param name="arguments">Function arguments</param>
         /// <returns>Whether the file exists</returns>
-        public static async Task<object?> FileExists(string functionName, object?[] arguments)
+        public static async Task<object?> FileExists(CodeChannel channel, string functionName, object?[] arguments)
         {
             if (arguments.Length == 1 && arguments[0] is string stringArgument)
             {

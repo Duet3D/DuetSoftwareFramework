@@ -260,7 +260,10 @@ namespace DuetControlServer.Files
                                         state.Iterations++;
                                         await DeleteLocalVariables(state);
                                         readAgain = true;
-                                        _logger.Debug("Restarting {0} block, iterations = {1}", state.StartingCode.Keyword, state.Iterations);
+                                        if (!IsClosed)
+                                        {
+                                            _logger.Debug("Restarting {0} block, iterations = {1}", state.StartingCode.Keyword, state.Iterations);
+                                        }
                                     }
                                     break;
                                 }
@@ -332,7 +335,11 @@ namespace DuetControlServer.Files
                             }
 
                             // Start a new conditional block if necessary
-                            await Codes.Processor.FlushAsync(Channel);
+                            if (!await Codes.Processor.FlushAsync(Channel) || IsClosed)
+                            {
+                                return null;
+                            }
+
                             _logger.Debug("Evaluating {0} block", code.Keyword);
                             if (code.Keyword != KeywordType.While || codeBlock is null || codeBlock.StartingCode.FilePosition != code.FilePosition)
                             {
