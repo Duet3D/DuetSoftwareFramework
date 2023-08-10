@@ -69,6 +69,9 @@ namespace DuetPluginService.Permissions
                             break;
                         case SbcPermissions.WebcamAccess:
                             rules.AppendLine("  /dev/video* rwmlk,");
+                            rules.AppendLine("  /usr/bin/libcamerify rm,");
+                            rules.AppendLine("  /usr/share/libcamera/** r,");
+                            rules.AppendLine("  /usr/libexec/libcamera/* rm,");
                             break;
                         case SbcPermissions.ReadFilaments:
                             rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "filaments")}/ r,");
