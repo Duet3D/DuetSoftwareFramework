@@ -78,7 +78,7 @@ namespace UnitTests.Machine
             result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
             Assert.AreEqual("{\"hello\" ^ (\"there\" +12345)}", result);
 
-            DuetControlServer.Model.Expressions.CustomFunctions.Add("fileexists", async (string functionName, object?[] vals) =>
+            DuetControlServer.Model.Expressions.CustomFunctions.Add("fileexists", async (CodeChannel channel, string functionName, object?[] vals) =>
             {
                 Assert.AreEqual(functionName, "fileexists");
                 Assert.AreEqual(vals.Length, 1);

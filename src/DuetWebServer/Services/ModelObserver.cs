@@ -164,6 +164,7 @@ namespace DuetWebServer.Services
                             "httpEndpoints/**",
                             "messages/**",
                             "network/corsSite",
+                            "sbc/**",
                             "volumes/**"
                         }, unixSocket);
                         await commandConnection.Connect(unixSocket);
