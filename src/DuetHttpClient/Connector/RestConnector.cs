@@ -66,7 +66,7 @@ namespace DuetHttpClient.Connector
                     }
 
                     // Unknown response
-                    throw new HttpRequestException($"Server returned ${response.StatusCode} ${response.ReasonPhrase}");
+                    throw new HttpRequestException($"Server returned {response.StatusCode} {response.ReasonPhrase}");
                 }
             }
         }
@@ -111,7 +111,7 @@ namespace DuetHttpClient.Connector
             {
                 connectCts.CancelAfter(Options.Timeout);
 
-                using (HttpResponseMessage response = await HttpClient.GetAsync($"machine/connect?password=${Options.Password}", connectCts.Token))
+                using (HttpResponseMessage response = await HttpClient.GetAsync($"machine/connect?password={Options.Password}", connectCts.Token))
                 {
                     if (response.IsSuccessStatusCode)
                     {
@@ -131,7 +131,7 @@ namespace DuetHttpClient.Connector
                     else
                     {
                         // Unknown response
-                        throw new HttpRequestException($"Server returned ${response.StatusCode} ${response.ReasonPhrase}");
+                        throw new HttpRequestException($"Server returned {response.StatusCode} {response.ReasonPhrase}");
                     }
                 }
             }
