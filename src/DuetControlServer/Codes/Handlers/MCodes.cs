@@ -799,7 +799,7 @@ namespace DuetControlServer.Codes.Handlers
                         {
                             if (File.Exists($"/usr/share/zoneinfo/{timezone}"))
                             {
-                                await System.Diagnostics.Process.Start("timedatectl", $"set-timezone ${timezone}").WaitForExitAsync(Program.CancellationToken);
+                                await System.Diagnostics.Process.Start("timedatectl", $"set-timezone {timezone}").WaitForExitAsync(Program.CancellationToken);
                                 seen = true;
                             }
                             else

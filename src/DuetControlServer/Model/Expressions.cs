@@ -85,21 +85,34 @@ namespace DuetControlServer.Model
         {
             int numCurlyBraces = 0, numSquareBraces = 0, numRoundBraces = 0;
             StringBuilder parsedExpression = new();
-            bool inQuotes = false;
+            bool inSingleQuotes = false, inDoubleQuotes = false;
             char lastC = '\0';
             foreach (char c in expression)
             {
-                if (inQuotes)
+                if (inSingleQuotes)
+                {
+                    if (lastC != '\'' && c == '\'')
+                    {
+                        inSingleQuotes = false;
+                    }
+                    parsedExpression.Append(c);
+                }
+                else if (inDoubleQuotes)
                 {
                     if (lastC != '"' && c == '"')
                     {
-                        inQuotes = false;
+                        inDoubleQuotes = false;
                     }
+                    parsedExpression.Append(c);
+                }
+                else if (c == '\'')
+                {
+                    inSingleQuotes = true;
                     parsedExpression.Append(c);
                 }
                 else if (c == '"')
                 {
-                    inQuotes = true;
+                    inDoubleQuotes = true;
                     parsedExpression.Append(c);
                 }
                 else if (c == ',' && numCurlyBraces + numSquareBraces + numRoundBraces == 0)
@@ -378,6 +391,32 @@ namespace DuetControlServer.Model
         {
             int i = 0;
 
+            // Eat a single-quoted char and append its content to the given builder instance
+            void eatChar(StringBuilder builder)
+            {
+                builder.Append('\'');
+
+                // Read char
+                if (i < expression.Length)
+                {
+                    builder.Append(expression[i++]);
+                }
+                else
+                {
+                    throw new CodeParserException("Unterminated quotes", code);
+                }
+
+                // Check for terminating quote
+                if (i < expression.Length && expression[i] == '\'')
+                {
+                    builder.Append(expression[i++]);
+                }
+                else
+                {
+                    throw new CodeParserException("Unterminated quotes", code);
+                }
+            }
+
             // Eat a double-quoted string and append its content to the given builder instance
             void eatString(StringBuilder builder)
             {
@@ -421,6 +460,10 @@ namespace DuetControlServer.Model
                 {
                     return boolValue ? "true" : "false";
                 }
+                if (obj is char charValue)
+                {
+                    return encodeStrings ? $"'{charValue}'" : charValue.ToString();
+                }
                 if (obj is string stringValue)
                 {
                     if (wantsCount)
@@ -456,6 +499,10 @@ namespace DuetControlServer.Model
                 if (obj is bool[] boolArray)
                 {
                     return '{' + string.Join(',', boolArray.Select(boolValue => boolValue ? "true" : "false")) + '}';
+                }
+                if (obj is char[] charArray)
+                {
+                    return '{' + string.Join(',', charArray.Select(charValue => $"'{charValue}'")) + '}';
                 }
                 if (obj is string[] stringArray)
                 {
@@ -604,6 +651,16 @@ namespace DuetControlServer.Model
                         // TODO in order to improve performance we could check for extra RRF consts here as well (like pi etc)
                     }
 
+                    // Check for character
+                    if (trimmedValue.StartsWith('\''))
+                    {
+                        if (trimmedValue.Length != 3)
+                        {
+                            throw new CodeParserException("invalid character literal", code);
+                        }
+                        return trimmedValue[1];
+                    }
+
                     // Check for valid string
                     if (trimmedValue.StartsWith('"'))
                     {
@@ -683,7 +740,13 @@ namespace DuetControlServer.Model
                 while (i < expression.Length)
                 {
                     char c = expression[i++];
-                    if (c == '"')
+                    if (c == '\'')
+                    {
+                        result.Append(lastToken);
+                        eatChar(result);
+                        lastToken.Clear();
+                    }
+                    else if (c == '"')
                     {
                         result.Append(lastToken);
                         eatString(result);

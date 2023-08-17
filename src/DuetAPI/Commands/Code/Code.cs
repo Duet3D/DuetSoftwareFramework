@@ -949,7 +949,7 @@ namespace DuetAPI.Commands
             {
                 if (p.Letter == '@')
                 {
-                    return quoteStrings ? $"\"${p.StringValue.Replace("\"", "\"\"")}\"" : p.StringValue;
+                    return quoteStrings ? $"\"{p.StringValue.Replace("\"", "\"\"")}\"" : p.StringValue;
                 }
             }
 

@@ -386,6 +386,9 @@ namespace DuetControlServer.SPI.Serialization
                     result = DateTime.Parse(Encoding.UTF8.GetString(from.Slice(bytesRead, header.IntValue)));
                     bytesRead += header.IntValue;
                     break;
+                case DataType.Char:
+                    result = (char)header.IntValue;
+                    break;
                 case DataType.Null:
                 default:
                     result = null;

@@ -217,7 +217,7 @@ namespace DuetWebServer.Controllers
             try
             {
                 // Subscribe to object model updates targeting the HTTP code channel
-                await subscribeConnection.Connect(SubscriptionMode.Patch, DuetAPI.CodeChannel.HTTP, Array.Empty<string>(), socketPath);
+                await subscribeConnection.Connect(SubscriptionMode.Patch, CodeChannel.HTTP, Array.Empty<string>(), socketPath);
             }
             catch (Exception e)
             {

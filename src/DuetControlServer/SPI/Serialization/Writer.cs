@@ -195,6 +195,14 @@ namespace DuetControlServer.SPI.Serialization
                         binaryParam.Type = DataType.Null;
                         binaryParam.IntValue = 0;
                     }
+#if false
+else {              // Character parameters are not supported yet, they are wrapped as strings
+                    else if (parameter.Type == typeof(char))
+                    {
+                        binaryParam.Type = DataType.Char;
+                        binaryParam.IntValue = (int)(char)parameter;
+                    }
+#endif
                     // Boolean values are not supported for codes, they are represented as integers (> 0 == true, else false)
                     else
                     {
@@ -407,6 +415,11 @@ namespace DuetControlServer.SPI.Serialization
                     MemoryMarshal.Write(to[bytesWritten..], ref byteVal);
                     bytesWritten += sizeof(byte);
                 }
+            }
+            else if (value is char charValue)
+            {
+                request.Type = DataType.Char;
+                request.IntValue = charValue;
             }
             else
             {

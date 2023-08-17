@@ -32,7 +32,7 @@ namespace DuetAPI.Commands
             string value = string.Empty;
 
             bool contentRead = false, unprecedentedParameter = false;
-            bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inQuotes = false, inExpression = false, inCondition = false;
+            bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inSingleQuotes = false, inDoubleQuotes = false, inExpression = false, inCondition = false;
             bool readingAtStart = true, isLineNumber = false, isNumericParameter = false, endingChunk = false;
             bool nextCharLowerCase = false, wasQuoted = false, wasExpression = false;
             int numCurlyBraces = 0, numRoundBraces = 0;
@@ -89,7 +89,25 @@ namespace DuetAPI.Commands
 
                 if (inCondition)
                 {
-                    if (inQuotes)
+                    if (inSingleQuotes)
+                    {
+                        // Add next character to the parameter value
+                        result.KeywordArgument += c;
+                        result.Length++;
+
+                        if (c == '\'')
+                        {
+                            if (reader.Peek() == '\'')
+                            {
+                                // Subsequent single quotes are treated as a single quote char
+                                reader.Read();
+                                result.KeywordArgument += c;
+                                result.Length++;
+                            }
+                            inSingleQuotes = false;
+                        }
+                    }
+                    else if (inDoubleQuotes)
                     {
                         // Add next character to the parameter value
                         result.KeywordArgument += c;
@@ -107,7 +125,7 @@ namespace DuetAPI.Commands
                             else
                             {
                                 // No longer in an escaped parameter
-                                inQuotes = false;
+                                inDoubleQuotes = false;
                             }
                         }
                     }
@@ -118,9 +136,13 @@ namespace DuetAPI.Commands
                             case '\n':
                                 // Ignore final NL
                                 break;
+                            case '\'':
+                                result.KeywordArgument += '\'';
+                                inSingleQuotes = true;
+                                break;
                             case '"':
                                 result.KeywordArgument += '"';
-                                inQuotes = true;
+                                inDoubleQuotes = true;
                                 break;
                             case ';':
                                 inCondition = false;
@@ -167,7 +189,28 @@ namespace DuetAPI.Commands
 
                 if (inChunk)
                 {
-                    if (inQuotes)
+                    if (inSingleQuotes)
+                    {
+                        if (c == '\'')
+                        {
+                            if (reader.Peek() == '\'')
+                            {
+                                // Treat subsequent single quotes as a single quote char
+                                value += '\'';
+                                reader.Read();
+                                result.Length++;
+                            }
+                            inSingleQuotes = false;
+                            wasQuoted = true;
+                            endingChunk = true;
+                        }
+                        else
+                        {
+                            // Add next character to the parameter value
+                            value += c;
+                        }
+                    }
+                    else if (inDoubleQuotes)
                     {
                         if (c == '\'')
                         {
@@ -183,7 +226,7 @@ namespace DuetAPI.Commands
                                 nextCharLowerCase = true;
                             }
                         }
-                        else  if (c == '"')
+                        else if (c == '"')
                         {
                             if (reader.Peek() == '"')
                             {
@@ -195,7 +238,7 @@ namespace DuetAPI.Commands
                             else
                             {
                                 // No longer in an escaped parameter
-                                inQuotes = nextCharLowerCase = false;
+                                inDoubleQuotes = nextCharLowerCase = false;
                                 wasQuoted = true;
                                 endingChunk = true;
                             }
@@ -269,10 +312,16 @@ namespace DuetAPI.Commands
                             // Parameter is empty
                             endingChunk = true;
                         }
+                        else if (c == '\'')
+                        {
+                            // Parameter is a quoted character
+                            inSingleQuotes = true;
+                            isNumericParameter = false;
+                        }
                         else if (c == '"')
                         {
                             // Parameter is a quoted string
-                            inQuotes = true;
+                            inDoubleQuotes = true;
                             isNumericParameter = false;
                         }
                         else if (c == '{')
@@ -567,12 +616,16 @@ namespace DuetAPI.Commands
                         {
                             value = "{";
                             inExpression = true;
-                            inQuotes = false;
+                            inSingleQuotes = inDoubleQuotes = false;
                             numCurlyBraces++;
+                        }
+                        else if (c == '\'')
+                        {
+                            inSingleQuotes = true;
                         }
                         else if (c == '"')
                         {
-                            inQuotes = true;
+                            inDoubleQuotes = true;
                         }
                         else if (nextCharLowerCase)
                         {
@@ -623,7 +676,11 @@ namespace DuetAPI.Commands
             {
                 throw new CodeParserException("Unterminated encapsulated comment", result);
             }
-            if (inQuotes)
+            if (inSingleQuotes)
+            {
+                throw new CodeParserException("Unterminated character literal", result);
+            }
+            if (inDoubleQuotes)
             {
                 throw new CodeParserException("Unterminated string", result);
             }

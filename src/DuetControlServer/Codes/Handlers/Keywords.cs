@@ -33,7 +33,7 @@ namespace DuetControlServer.Codes.Handlers
                 throw new ArgumentException("KeywordArgument must not be empty");
             }
 
-            bool inQuotes = false;
+            bool inSingleQuotes = false, startedSingleQuote = false, inDoubleQuotes = false;
             switch (code.Keyword)
             {
                 case KeywordType.Echo:
@@ -61,17 +61,30 @@ namespace DuetControlServer.Codes.Handlers
                             for (int i = 0; i < keywordArgument.Length; i++)
                             {
                                 char c = keywordArgument[i];
-                                if (inQuotes)
+                                if (inSingleQuotes)
+                                {
+                                    if (c == '\'' && !startedSingleQuote)
+                                    {
+                                        inSingleQuotes = false;
+                                        isComplete = numCurlyBraces == 0;
+                                    }
+                                    startedSingleQuote = false;
+                                }
+                                else if (inDoubleQuotes)
                                 {
                                     if (c == '"')
                                     {
-                                        inQuotes = false;
+                                        inDoubleQuotes = false;
                                         isComplete = numCurlyBraces == 0;
                                     }
                                 }
+                                else if (c == '\'')
+                                {
+                                    inSingleQuotes = startedSingleQuote = true;
+                                }
                                 else if (c == '"')
                                 {
-                                    inQuotes = true;
+                                    inDoubleQuotes = true;
                                 }
                                 else if (c == '{')
                                 {
@@ -153,13 +166,22 @@ namespace DuetControlServer.Codes.Handlers
                         else if (numSquareBrackets > 0 || c == '[')
                         {
                             // Contents of square brackets are not trimmed
-                            if (inQuotes)
+                            if (inSingleQuotes)
                             {
-                                inQuotes = c != '"';
+                                inSingleQuotes = c != '\'' || startedSingleQuote;
+                                startedSingleQuote = false;
+                            }
+                            else if (inDoubleQuotes)
+                            {
+                                inDoubleQuotes = c != '"';
+                            }
+                            else if (c == '\'')
+                            {
+                                inSingleQuotes = startedSingleQuote = true;
                             }
                             else if (c == '"')
                             {
-                                inQuotes = true;
+                                inDoubleQuotes = true;
                             }
                             else if (c == '[')
                             {

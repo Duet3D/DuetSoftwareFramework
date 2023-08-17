@@ -80,6 +80,11 @@ namespace DuetControlServer.SPI.Communication.Shared
         /// <summary>
         /// Parameter is a null value
         /// </summary>
-        Null = 14
+        Null = 14,
+
+        /// <summary>
+        /// Parameter is a char value
+        /// </summary>
+        Char = 15
     }
 }

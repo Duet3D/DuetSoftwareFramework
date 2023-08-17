@@ -379,6 +379,24 @@ namespace UnitTests.Commands
             }
         }
 
+
+        [Test]
+        public void ParseChar()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse("M1234 P'{' S1"))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(1234, code.MajorNumber);
+                Assert.IsNull(code.MinorNumber);
+                Assert.AreEqual(CodeFlags.IsLastCode, code.Flags);
+                Assert.AreEqual(2, code.Parameters.Count);
+                Assert.AreEqual('P', code.Parameters[0].Letter);
+                Assert.AreEqual("{", (string)code.Parameters[0]);
+                Assert.AreEqual('S', code.Parameters[1].Letter);
+                Assert.AreEqual(1, (int)code.Parameters[1]);
+            }
+        }
+
         [Test]
         public void ParseApostropheM32()
         {
