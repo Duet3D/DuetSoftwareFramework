@@ -130,6 +130,11 @@ namespace DuetControlServer.Codes.Pipelines
         /// <returns>Whether the codes have been flushed successfully</returns>
         public async Task<bool> FlushAsync()
         {
+            if (Program.CancellationToken.IsCancellationRequested)
+            {
+                return false;
+            }
+
             try
             {
                 await _idleEvent.WaitAsync(Program.CancellationToken);
