@@ -22,7 +22,7 @@ For clients targeting standalone mode, it can be helpful to check these values t
 There is an extra value `seqs.reply` as well which is used notify clients about new messages (see `rr_reply`).
 Note that these sequence numbers are not exposed in SBC mode.
 
-*This page is preliminary and subject to further changes.*
+*The object model is subject to further changes and additional features are implemented.*
 
 # Object Model Description
 
