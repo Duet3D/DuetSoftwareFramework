@@ -139,9 +139,10 @@ namespace DuetControlServer.Codes.Handlers
                         c = firstLine[i++];
                         if (c == '"')
                         {
-                            if (i + 1 < firstLine.Length && firstLine[i + 1] == '"')
+                            if (i < firstLine.Length && firstLine[i] == '"')
                             {
                                 // escaped double-quote
+                                i++;
                                 lastToken.Append('"');
                             }
                             else

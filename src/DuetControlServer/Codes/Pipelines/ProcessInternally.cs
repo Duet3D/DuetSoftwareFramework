@@ -37,7 +37,13 @@ namespace DuetControlServer.Codes.Pipelines
                     {
                         Processor.Logger.Error(e, "Failed to execute code {0} on internal processing stage", code);
                     }
+
                     Codes.Processor.CancelCode(code, e);
+                    if (code.File is not null)
+                    {
+                        // Stop processing codes from the file immediately if an exception occurred
+                        await SPI.Interface.AbortAsync(code.Channel);
+                    }
                 }
             }
             else

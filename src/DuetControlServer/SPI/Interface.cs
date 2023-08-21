@@ -638,6 +638,26 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Abort the last file  on the given channel asynchronously
+        /// </summary>
+        /// <param name="channel">Channel where all the files have been aborted</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
+        public static async Task AbortAsync(CodeChannel channel)
+        {
+            Program.CancellationToken.ThrowIfCancellationRequested();
+            if (Settings.NoSpi)
+            {
+                throw new InvalidOperationException("Not connected over SPI");
+            }
+
+            using (await _channels[channel].LockAsync())
+            {
+                await _channels[channel].AbortFilesAsync(false, false);
+            }
+        }
+
+        /// <summary>
         /// Abort all files in RRF on the given channel asynchronously
         /// </summary>
         /// <param name="channel">Channel where all the files have been aborted</param>

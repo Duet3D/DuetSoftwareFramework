@@ -275,8 +275,8 @@ namespace DuetAPI.Commands
                             char nextC = (buffer.Pointer < buffer.Size) ? (char)buffer.Content[buffer.Pointer] : '\0';
                             if (nextC == '\'')
                             {
-                                // Treat subsequent single quotes as a single double-quote char
-                                value += '"';
+                                // Treat subsequent single quotes as a single quote char
+                                value += '\'';
                                 buffer.Pointer++;
                                 result.Length++;
                             }

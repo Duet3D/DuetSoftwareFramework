@@ -382,7 +382,7 @@ namespace DuetControlServer.FileExecution
                 // Check if we've finished executing a config file
                 if (executingConfigFile)
                 {
-                    Model.Provider.SetExecutingConfig(true);
+                    Model.Provider.SetExecutingConfig(false);
                 }
 
                 // Release this instance when done
