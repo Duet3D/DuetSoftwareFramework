@@ -94,7 +94,7 @@ namespace DuetAPI.ObjectModel
                 Type requiredType = GetDirectDisplayScreenType(directDisplayController);
                 if (GetType() != requiredType)
                 {
-                    FilamentMonitor newInstance = (FilamentMonitor)Activator.CreateInstance(requiredType)!;
+                    DirectDisplayScreen newInstance = (DirectDisplayScreen)Activator.CreateInstance(requiredType)!;
                     return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
                 }
             }
