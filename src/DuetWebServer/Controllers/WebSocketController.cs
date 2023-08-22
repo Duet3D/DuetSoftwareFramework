@@ -111,7 +111,7 @@ namespace DuetWebServer.Controllers
         /// WS /machine?sessionKey=XXX
         /// Provide WebSocket for continuous model updates. This is primarily used to keep DWC up-to-date
         /// </summary>
-        /// <param name="sessionKey">Session key for authentication</param>
+        /// <param name="sessionKey">Optional session key for authentication</param>
         /// <param name="sessionStorage">Session storage singleton</param>
         /// <returns>
         /// HTTP status code:
@@ -123,7 +123,7 @@ namespace DuetWebServer.Controllers
         /// (503) DCS is not started
         /// </returns>
         [HttpGet]
-        public async Task Get(string sessionKey, [FromServices] ISessionStorage sessionStorage)
+        public async Task Get(string? sessionKey, [FromServices] ISessionStorage sessionStorage)
         {
             if (!HttpContext.WebSockets.IsWebSocketRequest)
             {
@@ -191,13 +191,19 @@ namespace DuetWebServer.Controllers
             // Process the WebSocket request
             try
             {
-                sessionStorage.SetWebSocketState(sessionKey, true);
+                if (!string.IsNullOrEmpty(sessionKey))
+                {
+                    sessionStorage.SetWebSocketState(sessionKey, true);
+                }
                 using WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
                 await Process(webSocket, socketPath);
             }
             finally
             {
-                sessionStorage.SetWebSocketState(sessionKey, false);
+                if (!string.IsNullOrEmpty(sessionKey))
+                {
+                    sessionStorage.SetWebSocketState(sessionKey, false);
+                }
             }
         }
 
