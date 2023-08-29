@@ -114,8 +114,17 @@ namespace DuetPluginService.Commands
                             string file = Path.Combine(Settings.BaseDirectory, sdFile);
                             if (File.Exists(file))
                             {
-                                logger.Debug("Deleting file {0}", file);
-                                File.Delete(file);
+                                if (Path.GetFileName(sdFile).Equals("daemon.g"))
+                                {
+                                    // daemon.g may be still open at this time
+                                    logger.Debug("Renaming file {0} to {1}", sdFile, sdFile + ".bak");
+                                    File.Move(sdFile, sdFile + ".bak", true);
+                                }
+                                else
+                                {
+                                    logger.Debug("Deleting file {0}", file);
+                                    File.Delete(file);
+                                }
                             }
                         }
                     }
