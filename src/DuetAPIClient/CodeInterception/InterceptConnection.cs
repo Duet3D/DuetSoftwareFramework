@@ -87,7 +87,7 @@ namespace DuetAPIClient
         /// <param name="mode">Interception mode</param>
         /// <param name="channels">List of input channels where codes may be intercepted or null for all available channels</param>
         /// <param name="filters">Optional list of codes that may be intercepted</param>
-        /// <param name="priortyCodes">Define if priorty codes may be intercepted</param>
+        /// <param name="priorityCodes">Define if priority codes may be intercepted</param>
         /// <param name="socketPath">Path to the UNIX socket file</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
@@ -95,7 +95,7 @@ namespace DuetAPIClient
         /// <exception cref="IOException">Connection mode is unavailable</exception>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Init message could not be processed</exception>
-        public Task Connect(InterceptionMode mode, IEnumerable<CodeChannel>? channels = null, IEnumerable<string>? filters = null, bool priortyCodes = false, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+        public Task Connect(InterceptionMode mode, IEnumerable<CodeChannel>? channels = null, IEnumerable<string>? filters = null, bool priorityCodes = false, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
         {
             Mode = mode;
             Channels.Clear();
@@ -105,14 +105,14 @@ namespace DuetAPIClient
             {
                 Filters.AddRange(filters);
             }
-            PriortyCodes = priortyCodes;
+            PriortyCodes = priorityCodes;
 
             InterceptInitMessage initMessage = new() {
                 InterceptionMode = mode,
                 Channels = Channels,
                 AutoFlush = AutoFlush,
                 Filters = Filters,
-                PriortyCodes = priortyCodes
+                PriorityCodes = priorityCodes
             };
             return Connect(initMessage, socketPath, cancellationToken);
         }

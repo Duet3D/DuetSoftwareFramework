@@ -110,7 +110,7 @@ namespace DuetControlServer.IPC.Processors
             _channels = (interceptInitMessage.Channels is not null) ? interceptInitMessage.Channels.ToArray() : Inputs.ValidChannels;
             _autoFlush = interceptInitMessage.AutoFlush && (interceptInitMessage.Filters?.Count ?? 0) > 0;
             _filters = interceptInitMessage.Filters ?? new List<string>();
-            _priorityCodes = interceptInitMessage.PriortyCodes;
+            _priorityCodes = interceptInitMessage.PriorityCodes;
         }
 
         /// <summary>
