@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.ObjectModel
 {
@@ -43,6 +44,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Build datetime of the system distribution or null if unknown
         /// </summary>
+        [JsonConverter(typeof(Utility.JsonShortDateTimeConverter))]
         public DateTime? DistributionBuildTime
         {
             get => _distributionBuildTime;

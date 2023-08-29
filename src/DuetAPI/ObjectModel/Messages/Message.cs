@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.ObjectModel
 {
@@ -32,6 +33,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Time at which the message was generated
         /// </summary>
+        [JsonConverter(typeof(Utility.JsonShortDateTimeConverter))]
         public DateTime Time { get; set; } = DateTime.Now;
 
         /// <summary>
