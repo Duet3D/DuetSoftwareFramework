@@ -8,7 +8,7 @@
     <Company>Duet3D Ltd</Company>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
-    <Version>3.5.0-beta.4</Version>
+    <Version>3.5.0-rc.1</Version>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Description>Official remote HTTP API client for Duet3D boards (supports standalone and SBC mode)</Description>
     <PackageProjectUrl>https://github.com/Duet3D/DuetSoftwareFramework</PackageProjectUrl>
