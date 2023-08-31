@@ -337,6 +337,7 @@ namespace DuetControlServer.Codes
                         try
                         {
                             File.Delete(physicalFile);
+                            return new Message();
                         }
                         catch (Exception e)
                         {
