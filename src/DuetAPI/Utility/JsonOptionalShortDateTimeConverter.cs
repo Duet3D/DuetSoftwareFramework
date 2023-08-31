@@ -7,7 +7,7 @@ namespace DuetAPI.Utility
     /// <summary>
     /// JSON converter for short DateTime values
     /// </summary>
-    public class JsonShortDateTimeConverter : JsonConverter<DateTime>
+    public class JsonOptionalShortDateTimeConverter : JsonConverter<DateTime?>
     {
         /// <summary>
         /// Read a short DateTime from JSON
@@ -16,10 +16,10 @@ namespace DuetAPI.Utility
         /// <param name="typeToConvert">Target type</param>
         /// <param name="options">Serializer options</param>
         /// <returns>Deserialized DateTime or null</returns>
-        public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override DateTime? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             string? value = reader.GetString();
-            return string.IsNullOrEmpty(value) ? throw new ArgumentNullException() : DateTime.Parse(value);
+            return string.IsNullOrEmpty(value) ? null : DateTime.Parse(value);
         }
 
         /// <summary>
@@ -28,9 +28,16 @@ namespace DuetAPI.Utility
         /// <param name="writer">JSON writer</param>
         /// <param name="value">Value to write</param>
         /// <param name="options">Serializer options</param>
-        public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
+        public override void Write(Utf8JsonWriter writer, DateTime? value, JsonSerializerOptions options)
         {
-            writer.WriteStringValue(value.ToString("s"));
+            if (value is null)
+            {
+                writer.WriteNullValue();
+            }
+            else
+            {
+                writer.WriteStringValue(value.Value.ToString("s"));
+            }
         }
     }
 }

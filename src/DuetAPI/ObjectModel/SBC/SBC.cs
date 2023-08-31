@@ -44,7 +44,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Build datetime of the system distribution or null if unknown
         /// </summary>
-        [JsonConverter(typeof(Utility.JsonShortDateTimeConverter))]
+        [JsonConverter(typeof(Utility.JsonOptionalShortDateTimeConverter))]
         public DateTime? DistributionBuildTime
         {
             get => _distributionBuildTime;

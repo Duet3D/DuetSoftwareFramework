@@ -243,7 +243,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Internal date and time in RepRapFirmware or null if unknown
         /// </summary>
-        [JsonConverter(typeof(Utility.JsonShortDateTimeConverter))]
+        [JsonConverter(typeof(Utility.JsonOptionalShortDateTimeConverter))]
         public DateTime? Time
         {
             get => _time;

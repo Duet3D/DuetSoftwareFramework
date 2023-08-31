@@ -204,7 +204,7 @@ namespace DuetControlServer.Model
                     {
                         System.Net.NetworkInformation.OperationalStatus.Up => NetworkState.Active,
                         System.Net.NetworkInformation.OperationalStatus.Down or System.Net.NetworkInformation.OperationalStatus.LowerLayerDown => NetworkState.Disabled,
-                        System.Net.NetworkInformation.OperationalStatus.Dormant => NetworkState.EstablishingLink,
+                        System.Net.NetworkInformation.OperationalStatus.Dormant => NetworkState.Idle,
                         _ => null,
                     };
                     networkInterface.Type = iface.Name.StartsWith("w") ? NetworkInterfaceType.WiFi : NetworkInterfaceType.LAN;

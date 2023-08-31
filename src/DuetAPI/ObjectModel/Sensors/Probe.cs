@@ -61,12 +61,19 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Dive height (in mm)
         /// </summary>
+        [Obsolete("Use DiveHeights[0] instead")]
         public float DiveHeight
         {
             get => _diveHeight;
 			set => SetPropertyValue(ref _diveHeight, value);
         }
         private float _diveHeight = 5F;
+
+        /// <summary>
+        /// Dive heights of the probe.
+        /// The first element is the regular dive height, the second element may be used by scanning Z-probes
+        /// </summary>
+        public ModelCollection<float> DiveHeights { get; } = new ModelCollection<float>() { 0F, 0F };
 
         /// <summary>
         /// Indicates if the scanning probe is calibrated
@@ -112,6 +119,16 @@ namespace DuetAPI.ObjectModel
 			set => SetPropertyValue(ref _recoveryTime, value);
         }
         private float _recoveryTime;
+
+        /// <summary>
+        /// Coefficients for the scanning Z-probe (4 elements, if applicable)
+        /// </summary>
+        public ModelCollection<float>? ScanCoefficients
+        {
+            get => _scanCoefficients;
+            set => SetPropertyValue(ref _scanCoefficients, value);
+        }
+        private ModelCollection<float>? _scanCoefficients;
 
         /// <summary>
         /// Fast and slow probing speeds (in mm/s)

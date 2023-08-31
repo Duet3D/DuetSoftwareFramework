@@ -50,7 +50,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Value indicating when the file was last modified or null if unknown
         /// </summary>
-        [JsonConverter(typeof(Utility.JsonShortDateTimeConverter))]
+        [JsonConverter(typeof(Utility.JsonOptionalShortDateTimeConverter))]
         public DateTime? LastModified
         {
             get => _lastModified;

@@ -11,12 +11,23 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Indicates if this filament monitor is enabled
         /// </summary>
+        [Obsolete("Use EnableMode instead")]
         public bool Enabled
         {
             get => _enabled;
 			set => SetPropertyValue(ref _enabled, value);
         }
         private bool _enabled;
+
+        /// <summary>
+        /// Enable mode of this filament monitor
+        /// </summary>
+        public FilamentMonitorEnableMode EnableMode
+        {
+            get => _enableMode;
+            set => SetPropertyValue(ref _enableMode, value);
+        }
+        private FilamentMonitorEnableMode _enableMode = FilamentMonitorEnableMode.Disabled;
 
         /// <summary>
         /// Last reported status of this filament monitor

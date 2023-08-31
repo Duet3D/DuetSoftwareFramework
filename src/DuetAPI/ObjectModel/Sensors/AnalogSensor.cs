@@ -6,6 +6,26 @@
     public sealed class AnalogSensor : ModelObject
     {
         /// <summary>
+        /// Beta value of this sensor (if applicable)
+        /// </summary>
+        public float? Beta
+        {
+            get => _beta;
+            set => SetPropertyValue(ref _beta, value);
+        }
+        private float? _beta;
+
+        /// <summary>
+        /// C value of this sensor
+        /// </summary>
+        public float? C
+        {
+            get => _c;
+            set => SetPropertyValue(ref _c, value);
+        }
+        private float? _c;
+
+        /// <summary>
         /// Last sensor reading (in C) or null if invalid
         /// </summary>
         public float? LastReading
@@ -24,6 +44,36 @@
 			set => SetPropertyValue(ref _name, value);
         }
         private string? _name;
+
+        /// <summary>
+        /// Port of this sensor or null if not applicable
+        /// </summary>
+        public string? Port
+        {
+            get => _port;
+			set => SetPropertyValue(ref _port, value);
+        }
+        private string? _port;
+
+        /// <summary>
+        /// Resistance of this sensor at 25C
+        /// </summary>
+        public float? R25
+        {
+            get => _r25;
+            set => SetPropertyValue(ref _r25, value);
+        }
+        private float? _r25;
+
+        /// <summary>
+        /// Series resistance of this sensor channel
+        /// </summary>
+        public float RRef
+        {
+            get => _rRef;
+            set => SetPropertyValue(ref _rRef, value);
+        }
+        private float _rRef;
 
         /// <summary>
         /// State of this sensor

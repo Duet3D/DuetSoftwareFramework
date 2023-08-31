@@ -53,6 +53,11 @@ namespace DuetAPI.ObjectModel
 		/// <summary>
 		/// Network running
 		/// </summary>
-		Active
+		Active,
+
+		/// <summary>
+		/// WiFi adapter is idle
+		/// </summary>
+		Idle
 	}
 }
