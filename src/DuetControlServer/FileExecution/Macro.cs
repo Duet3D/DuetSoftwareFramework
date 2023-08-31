@@ -338,20 +338,20 @@ namespace DuetControlServer.FileExecution
                             await Model.Provider.HandleMacroErrorAsync(FileName, code.LineNumber ?? 0, codeResult.Content);
                         }
                     }
-                    catch (OperationCanceledException)
-                    {
-                        // Code has been cancelled, don't log this. This can happen when a pausable macro is interrupted
-                        // or if a code interceptor attempted to intercept a code on an inactive channel
-                    }
                     catch (Exception e)
                     {
-                        if (e is AggregateException ae)
+                        if (e is not OperationCanceledException)
                         {
-                            e = ae.InnerException!;
+                            if (e is AggregateException ae)
+                            {
+                                e = ae.InnerException!;
+                            }
+
+                            await Model.Provider.HandleMacroErrorAsync(FileName, code.LineNumber ?? 0, e.Message);
+                            await Utility.Logger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FileName)} line {code.LineNumber ?? 0}: {e.Message}");
+                            _logger.Warn(e);
                         }
-                        await Model.Provider.HandleMacroErrorAsync(FileName, code.LineNumber ?? 0, e.Message);
-                        await Utility.Logger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FileName)} line {code.LineNumber ?? 0}: {e.Message}");
-                        _logger.Warn(e);
+                        await AbortAsync();
                     }
                 }
                 else

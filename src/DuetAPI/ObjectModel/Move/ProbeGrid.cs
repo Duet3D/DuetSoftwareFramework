@@ -1,6 +1,4 @@
 ﻿using DuetAPI.Utility;
-using System;
-using System.Text.Json.Serialization;
 
 namespace DuetAPI.ObjectModel
 {

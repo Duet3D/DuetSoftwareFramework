@@ -1,8 +1,6 @@
 ﻿using DuetAPI;
-using SixLabors.ImageSharp;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -101,10 +99,6 @@ namespace DuetControlServer.Codes.Handlers
             string resolvedPath = await Files.FilePath.ToPhysicalAsync(filePath);
             using StreamReader reader = File.OpenText(resolvedPath);
             string firstLine = await reader.ReadLineAsync() ?? string.Empty;
-            if (firstLine.Trim().Length == 0)
-            {
-                return Array.Empty<object?>();
-            }
 
             // Read the requested contents
             int i = 0, tokenStart = 0;
@@ -206,7 +200,7 @@ namespace DuetControlServer.Codes.Handlers
                         }
                     }
 
-                    if (items.Count == elementsToRead)
+                    if (items.Count >= elementsToRead)
                     {
                         // Cannot read any more
                         break;
@@ -222,7 +216,7 @@ namespace DuetControlServer.Codes.Handlers
                     lastToken.Append(c);
                 }
             }
-            return items.ToArray();
+            return (items.Count > 0) ? items.ToArray() : new object?[] { null };
         }
     }
 }

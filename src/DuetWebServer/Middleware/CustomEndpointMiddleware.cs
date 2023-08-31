@@ -1,7 +1,6 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetWebServer.Singletons;
-using Microsoft.AspNetCore.Connections.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;

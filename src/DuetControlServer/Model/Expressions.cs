@@ -450,6 +450,7 @@ namespace DuetControlServer.Model
             }
 
             // Convert an object to a string value
+#warning This function cannot output empty arrays yet
             string objectToString(object? obj, bool wantsCount, bool encodeStrings)
             {
                 if (obj is null)
@@ -498,35 +499,35 @@ namespace DuetControlServer.Model
                 }
                 if (obj is bool[] boolArray)
                 {
-                    return '{' + string.Join(',', boolArray.Select(boolValue => boolValue ? "true" : "false")) + '}';
+                    return '{' + string.Join(',', boolArray.Select(boolValue => boolValue ? "true" : "false")) + (boolArray.Length == 1 ? ",}" : "}");
                 }
                 if (obj is char[] charArray)
                 {
-                    return '{' + string.Join(',', charArray.Select(charValue => $"'{charValue}'")) + '}';
+                    return '{' + string.Join(',', charArray.Select(charValue => $"'{charValue}'")) + (charArray.Length == 1 ? ",}" : "}");
                 }
                 if (obj is string[] stringArray)
                 {
-                    return '{' + string.Join(',', stringArray.Select(stringValue => encodeString(stringValue))) + '}';
+                    return '{' + string.Join(',', stringArray.Select(stringValue => encodeString(stringValue))) + (stringArray.Length == 1 ? ",}" : "}");
                 }
                 if (obj is int[] intArray)
                 {
-                    return '{' + string.Join(',', intArray.Select(intValue => intValue.ToString("G", CultureInfo.InvariantCulture))) + '}';
+                    return '{' + string.Join(',', intArray.Select(intValue => intValue.ToString("G", CultureInfo.InvariantCulture))) + (intArray.Length == 1 ? ",}" : "}");
                 }
                 if (obj is uint[] uintArray)
                 {
-                    return '{' + string.Join(',', uintArray.Select(uintValue => uintValue.ToString("G", CultureInfo.InvariantCulture))) + '}';
+                    return '{' + string.Join(',', uintArray.Select(uintValue => uintValue.ToString("G", CultureInfo.InvariantCulture))) + (uintArray.Length == 1 ? ",}" : "}");
                 }
                 if (obj is float[] floatArray)
                 {
-                    return '{' + string.Join(',', floatArray.Select(floatValue => floatValue.ToString("G", CultureInfo.InvariantCulture))) + '}';
+                    return '{' + string.Join(',', floatArray.Select(floatValue => floatValue.ToString("G", CultureInfo.InvariantCulture))) + (floatArray.Length == 1 ? ",}" : "}");
                 }
                 if (obj is long[] longArray)
                 {
-                    return '{' + string.Join(',', longArray.Select(longValue => longValue.ToString("G", CultureInfo.InvariantCulture))) + '}';
+                    return '{' + string.Join(',', longArray.Select(longValue => longValue.ToString("G", CultureInfo.InvariantCulture))) + (longArray.Length == 1 ? ",}" : "}");
                 }
                 if (obj is object[] objectArray)
                 {
-                    return '{' + string.Join(',', objectArray.Select(objectValue => objectToString(objectValue, false, true))) + '}';
+                    return '{' + string.Join(',', objectArray.Select(objectValue => objectToString(objectValue, false, true))) + (objectArray.Length == 1 ? ",}" : "}");
                 }
                 if (!wantsCount && obj is IList)
                 {
