@@ -559,6 +559,21 @@ namespace UnitTests.Commands
         }
 
         [Test]
+        public void ParseM118Unicode()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse("M118 P\"💡 - LEDs on\""))
+            {
+                Assert.AreEqual(CodeType.MCode, code.Type);
+                Assert.AreEqual(118, code.MajorNumber);
+                Assert.IsNull(code.MinorNumber);
+                Assert.AreEqual(1, code.Parameters.Count);
+                Assert.AreEqual('P', code.Parameters[0].Letter);
+                Assert.IsFalse(code.Parameters[0].IsExpression);
+                Assert.AreEqual("💡 - LEDs on", (string?)code.Parameters[0]);
+            }
+        }
+
+        [Test]
         public void ParseM117Expression()
         {
             foreach (DuetAPI.Commands.Code code in Parse("M117 { \"Axis \" ^ ( move.axes[0].letter ) ^ \" not homed. Please wait while all axes are homed\" }"))
@@ -791,6 +806,17 @@ namespace UnitTests.Commands
 
             Assert.AreEqual(CodeType.Keyword, codes[0].Type);
             Assert.AreEqual("\"M98 P\"\"revo/define-tool.g\"\" S\"", codes[0].KeywordArgument);
+        }
+
+        [Test]
+        public void ParseEchoWithUnicode()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse("echo \"💡 - LEDs on\""))
+            {
+                Assert.AreEqual(CodeType.Keyword, code.Type);
+                Assert.AreEqual(KeywordType.Echo, code.Keyword);
+                Assert.AreEqual("\"💡 - LEDs on\"", code.KeywordArgument);
+            }
         }
 
         [Test]

@@ -32,7 +32,7 @@ namespace DuetAPI.Commands
             string value = string.Empty;
 
             bool contentRead = false, unprecedentedParameter = false;
-            bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inSingleQuotes = false, inDoubleQuotes = false, inExpression = false, inCondition = false;
+            bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inSingleQuotes = false, inDoubleQuotes = false, inExpression = false, inKeywordArgument = false;
             bool readingAtStart = true, isLineNumber = false, isNumericParameter = false, endingChunk = false;
             bool nextCharLowerCase = false, wasQuoted = false, wasExpression = false;
             int numCurlyBraces = 0, numRoundBraces = 0;
@@ -87,7 +87,7 @@ namespace DuetAPI.Commands
                     continue;
                 }
 
-                if (inCondition)
+                if (inKeywordArgument)
                 {
                     if (inSingleQuotes)
                     {
@@ -145,7 +145,7 @@ namespace DuetAPI.Commands
                                 inDoubleQuotes = true;
                                 break;
                             case ';':
-                                inCondition = false;
+                                inKeywordArgument = false;
                                 inFinalComment = true;
                                 break;
                             case '{':
@@ -181,7 +181,7 @@ namespace DuetAPI.Commands
                         }
                     }
 
-                    if (inCondition)
+                    if (inKeywordArgument)
                     {
                         continue;
                     }
@@ -409,7 +409,7 @@ namespace DuetAPI.Commands
                     }
                 }
 
-                if (!inCondition && !inChunk && !readingAtStart)
+                if (!inKeywordArgument && !inChunk && !readingAtStart)
                 {
                     if (letter != '\0' || !string.IsNullOrEmpty(value) || wasQuoted)
                     {
@@ -485,14 +485,14 @@ namespace DuetAPI.Commands
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.If;
                                 result.KeywordArgument = string.Empty;
-                                inCondition = true;
+                                inKeywordArgument = true;
                             }
                             else if (keyword == "elif")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.ElseIf;
                                 result.KeywordArgument = string.Empty;
-                                inCondition = true;
+                                inKeywordArgument = true;
                             }
                             else if (keyword == "else")
                             {
@@ -504,53 +504,51 @@ namespace DuetAPI.Commands
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.While;
                                 result.KeywordArgument = string.Empty;
-                                inCondition = true;
+                                inKeywordArgument = true;
                             }
                             else if (keyword == "break")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Break;
-                                inCondition = true;
                             }
                             else if (keyword == "continue")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Continue;
-                                inCondition = true;
                             }
                             else if (keyword == "abort")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Abort;
-                                inCondition = true;
+                                inKeywordArgument = true;
                             }
                             else if (keyword == "var")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Var;
                                 result.KeywordArgument = string.Empty;
-                                inCondition = true;
+                                inKeywordArgument = true;
                             }
                             else if (keyword == "global")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Global;
                                 result.KeywordArgument = string.Empty;
-                                inCondition = true;
+                                inKeywordArgument = true;
                             }
                             else if (keyword == "set")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Set;
                                 result.KeywordArgument = string.Empty;
-                                inCondition = true;
+                                inKeywordArgument = true;
                             }
                             else if (keyword == "echo")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Echo;
                                 result.KeywordArgument = string.Empty;
-                                inCondition = true;
+                                inKeywordArgument = true;
                             }
 #warning do not permit duplicate parameters in v3.6
 #if false
@@ -643,7 +641,7 @@ namespace DuetAPI.Commands
                     }
                 }
 
-                if (!inFinalComment && !inEncapsulatedComment && !inCondition && !inChunk)
+                if (!inFinalComment && !inEncapsulatedComment && !inKeywordArgument && !inChunk)
                 {
                     // Stop if another G/M/T code is coming up and this one is complete
                     int next = reader.Peek();

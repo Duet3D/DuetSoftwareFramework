@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetAPI.Commands
@@ -24,15 +27,20 @@ namespace DuetAPI.Commands
         /// <param name="stream">Stream to read from</param>
         /// <param name="result">Code to fill</param>
         /// <param name="buffer">Internal buffer for parsing codes</param>
+        /// <param name="cancellationToken">Cancellation token instance</param>
         /// <returns>Whether anything could be read</returns>
         /// <exception cref="ArgumentException">BOM from start of file showed that this file is neither ASCII nor UTF-8</exception>
         /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
-        public static async ValueTask<bool> ParseAsync(Stream stream, Code result, CodeParserBuffer buffer)
+        public static async ValueTask<bool> ParseAsync(Stream stream, Code result, CodeParserBuffer buffer, CancellationToken cancellationToken = default)
         {
             // Deal with BOM when starting to parse a file. Previously this was done by the used StreamReader instance
             if (buffer.IsFile && stream.Position + buffer.Pointer == 0)
             {
-                buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length);
+#if NETSTANDARD2_1_OR_GREATER || NET6_0_OR_GREATER
+                buffer.Size = await stream.ReadAsync(buffer.Content, cancellationToken);
+#else
+                buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length, cancellationToken);
+#endif
                 buffer.Pointer = 0;
 
                 if (buffer.Size >= 2 && buffer.Content[0] == 0xFF && (buffer.Content[1] & 0xFE) == 0xFE)
@@ -60,10 +68,26 @@ namespace DuetAPI.Commands
 
             // Start parsing
             char letter = '\0', lastC, c = '\0';
-            string value = string.Empty;
+            List<byte> valueList = new();
+            void addToValue(char c)
+            {
+                valueList.Add((byte)c);
+            }
+            string getValue()
+            {
+                return Encoding.UTF8.GetString(valueList.ToArray());
+            }
+            void setValue(string v)
+            {
+                valueList = new(Encoding.UTF8.GetBytes(v));
+            }
+            void clearValue()
+            {
+                valueList.Clear();
+            }
 
             bool contentRead = false, unprecedentedParameter = false;
-            bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inSingleQuotes = false, inDoubleQuotes = false, inExpression = false, inCondition = false;
+            bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inSingleQuotes = false, inDoubleQuotes = false, inExpression = false, inKeywordArgument = false;
             bool readingAtStart = buffer.SeenNewLine, isLineNumber = false, hadLineNumber = false, isNumericParameter = false, endingChunk = false;
             bool nextCharLowerCase = false, wasQuoted = false, wasExpression = false;
             int numCurlyBraces = 0, numRoundBraces = 0;
@@ -80,7 +104,11 @@ namespace DuetAPI.Commands
                 // Check if the buffer needs to be filled
                 if (buffer.Pointer >= buffer.Size)
                 {
-                    buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length);
+#if NETSTANDARD2_1_OR_GREATER || NET6_0_OR_GREATER
+                    buffer.Size = await stream.ReadAsync(buffer.Content, cancellationToken);
+#else
+                    buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length, cancellationToken);
+#endif
                     buffer.Pointer = 0;
                 }
 
@@ -102,7 +130,7 @@ namespace DuetAPI.Commands
                 }
 
                 // Stop if another G/M/T code is coming up and this one is complete
-                if (contentRead && !inFinalComment && !inEncapsulatedComment && !inCondition && !inChunk)
+                if (contentRead && !inFinalComment && !inEncapsulatedComment && !inKeywordArgument && !inChunk)
                 {
                     char nextChar = char.ToUpperInvariant(c);
                     if ((nextChar == 'G' || nextChar == 'M' || nextChar == 'T') && result.Type != CodeType.None &&
@@ -148,18 +176,22 @@ namespace DuetAPI.Commands
                     continue;
                 }
 
-                if (inCondition)
+                if (inKeywordArgument)
                 {
                     if (inSingleQuotes)
                     {
                         // Add next character to the parameter value
-                        result.KeywordArgument += c;
+                        addToValue(c);
 
                         if (c == '\'')
                         {
                             if (buffer.Pointer >= buffer.Size)
                             {
-                                buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length);
+#if NETSTANDARD2_1_OR_GREATER || NET6_0_OR_GREATER
+                                buffer.Size = await stream.ReadAsync(buffer.Content, cancellationToken);
+#else
+                                buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length, cancellationToken);
+#endif
                                 buffer.Pointer = 0;
                             }
 
@@ -167,7 +199,7 @@ namespace DuetAPI.Commands
                             if (nextC == '\'')
                             {
                                 // Subsequent single quotes are treated as a single quote char
-                                result.KeywordArgument += c;
+                                addToValue(c);
                                 buffer.Pointer++;
                                 result.Length++;
                             }
@@ -177,13 +209,17 @@ namespace DuetAPI.Commands
                     else if (inDoubleQuotes)
                     {
                         // Add next character to the parameter value
-                        result.KeywordArgument += c;
+                        addToValue(c);
 
                         if (c == '"')
                         {
                             if (buffer.Pointer >= buffer.Size)
                             {
-                                buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length);
+#if NETSTANDARD2_1_OR_GREATER || NET6_0_OR_GREATER
+                                buffer.Size = await stream.ReadAsync(buffer.Content, cancellationToken);
+#else
+                                buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length, cancellationToken);
+#endif
                                 buffer.Pointer = 0;
                             }
 
@@ -191,7 +227,7 @@ namespace DuetAPI.Commands
                             if (nextC == '"')
                             {
                                 // Subsequent double quotes are treated as a single quote char
-                                result.KeywordArgument += c;
+                                addToValue(c);
                                 buffer.Pointer++;
                                 result.Length++;
                             }
@@ -210,33 +246,35 @@ namespace DuetAPI.Commands
                                 // Ignore final NL
                                 break;
                             case '\'':
-                                result.KeywordArgument += '\'';
+                                addToValue('\'');
                                 inSingleQuotes = true;
                                 break;
                             case '"':
-                                result.KeywordArgument += '"';
+                                addToValue('"');
                                 inDoubleQuotes = true;
                                 break;
                             case ';':
-                                inCondition = false;
+                                result.KeywordArgument = getValue().Trim();
+                                clearValue();
+                                inKeywordArgument = false;
                                 inFinalComment = true;
                                 break;
                             case '{':
-                                result.KeywordArgument += '{';
+                                addToValue('{');
                                 numCurlyBraces++;
                                 break;
                             case '}':
-                                result.KeywordArgument += '}';
+                                addToValue('}');
                                 numCurlyBraces--;
                                 break;
                             case '(':
-                                result.KeywordArgument += '(';
+                                addToValue('(');
                                 numRoundBraces++;
                                 break;
                             case ')':
                                 if (numRoundBraces > 0)
                                 {
-                                    result.KeywordArgument += ')';
+                                    addToValue(')');
                                     numRoundBraces--;
                                 }
                                 else
@@ -245,16 +283,16 @@ namespace DuetAPI.Commands
                                 }
                                 break;
                             default:
-                                if (!char.IsWhiteSpace(c) || !string.IsNullOrEmpty(result.KeywordArgument))
+                                if (!char.IsWhiteSpace(c) || inKeywordArgument)
                                 {
                                     // In fact, it should be possible to leave out whitespaces here but we here don't check for quoted strings yet
-                                    result.KeywordArgument += c;
+                                    addToValue(c);
                                 }
                                 break;
                         }
                     }
 
-                    if (inCondition)
+                    if (inKeywordArgument)
                     {
                         continue;
                     }
@@ -268,7 +306,11 @@ namespace DuetAPI.Commands
                         {
                             if (buffer.Pointer >= buffer.Size)
                             {
-                                buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length);
+#if NETSTANDARD2_1_OR_GREATER || NET6_0_OR_GREATER
+                                buffer.Size = await stream.ReadAsync(buffer.Content, cancellationToken);
+#else
+                                buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length, cancellationToken);
+#endif
                                 buffer.Pointer = 0;
                             }
 
@@ -276,7 +318,7 @@ namespace DuetAPI.Commands
                             if (nextC == '\'')
                             {
                                 // Treat subsequent single quotes as a single quote char
-                                value += '\'';
+                                addToValue('\'');
                                 buffer.Pointer++;
                                 result.Length++;
                             }
@@ -287,7 +329,7 @@ namespace DuetAPI.Commands
                         else
                         {
                             // Add next character to the parameter value
-                            value += c;
+                            addToValue(c);
                         }
                     }
                     else if (inDoubleQuotes)
@@ -297,7 +339,7 @@ namespace DuetAPI.Commands
                             if (nextCharLowerCase)
                             {
                                 // Treat subsequent single-quotes as a single-quite char
-                                value += '\'';
+                                addToValue('\'');
                                 nextCharLowerCase = false;
                             }
                             else
@@ -310,7 +352,11 @@ namespace DuetAPI.Commands
                         {
                             if (buffer.Pointer >= buffer.Size)
                             {
-                                buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length);
+#if NETSTANDARD2_1_OR_GREATER || NET6_0_OR_GREATER
+                                buffer.Size = await stream.ReadAsync(buffer.Content, cancellationToken);
+#else
+                                buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length, cancellationToken);
+#endif
                                 buffer.Pointer = 0;
                             }
 
@@ -318,7 +364,7 @@ namespace DuetAPI.Commands
                             if (nextC == '"')
                             {
                                 // Treat subsequent double quotes as a single double-quote char
-                                value += '"';
+                                addToValue('\"');
                                 buffer.Pointer++;
                                 result.Length++;
                             }
@@ -333,13 +379,13 @@ namespace DuetAPI.Commands
                         else if (nextCharLowerCase)
                         {
                             // Add next lower-case character to the parameter value
-                            value += char.ToLower(c);
+                            addToValue(char.ToLower(c));
                             nextCharLowerCase = false;
                         }
                         else
                         {
                             // Add next character to the parameter value
-                            value += c;
+                            addToValue(c);
                         }
                     }
                     else if (inExpression)
@@ -380,7 +426,7 @@ namespace DuetAPI.Commands
                             // Ending inner expression
                             numRoundBraces--;
                         }
-                        value += c;
+                        addToValue(c);
                     }
                     else if (c == ';')
                     {
@@ -392,7 +438,7 @@ namespace DuetAPI.Commands
                         inEncapsulatedComment = true;
                         inChunk = endingChunk = false;
                     }
-                    else if (!endingChunk && string.IsNullOrEmpty(value))
+                    else if (!endingChunk && valueList.Count == 0)
                     {
                         if (char.IsWhiteSpace(c))
                         {
@@ -414,7 +460,7 @@ namespace DuetAPI.Commands
                         else if (c == '{')
                         {
                             // Parameter is an expression
-                            value = "{";
+                            setValue("{");
                             inExpression = true;
                             isNumericParameter = false;
                             numCurlyBraces++;
@@ -423,7 +469,7 @@ namespace DuetAPI.Commands
                         {
                             // Starting numeric or string parameter
                             isNumericParameter = (c == ':' || NumericParameterChars.Contains(c)) && !unprecedentedParameter;
-                            value += c;
+                            addToValue(c);
                         }
                     }
                     else if (endingChunk ||
@@ -431,11 +477,12 @@ namespace DuetAPI.Commands
                         (!unprecedentedParameter && char.IsWhiteSpace(c)) ||
                         (isNumericParameter && c != ':' && !NumericParameterChars.Contains(c)))
                     {
+                        string value = getValue();
                         if ((c == '{' && value.TrimEnd().EndsWith(":")) ||
                             (c == ':' && wasExpression))
                         {
                             // Array expression, keep on reading
-                            value += c;
+                            addToValue(c);
                             inExpression = true;
                             isNumericParameter = false;
                             if (c == '{')
@@ -446,7 +493,7 @@ namespace DuetAPI.Commands
                         else if ((c == 'e' || c == 'x') && !value.Contains(c))
                         {
                             // Parameter contains special letter for hex or exp display
-                            value += c;
+                            addToValue(c);
                         }
                         else
                         {
@@ -457,7 +504,7 @@ namespace DuetAPI.Commands
                     else
                     {
                         // Reading more of the current chunk
-                        value += c;
+                        addToValue(c);
                     }
 
                     if (endingChunk && c == '\n')
@@ -498,8 +545,9 @@ namespace DuetAPI.Commands
                     }
                 }
 
-                if (!inCondition && !inChunk && !readingAtStart)
+                if (!inKeywordArgument && !inChunk && !readingAtStart)
                 {
+                    string value = getValue();
                     if (letter != '\0' || !string.IsNullOrEmpty(value) || wasQuoted)
                     {
                         // Chunk is complete
@@ -577,14 +625,14 @@ namespace DuetAPI.Commands
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.If;
                                 result.KeywordArgument = string.Empty;
-                                inCondition = true;
+                                inKeywordArgument = true;
                             }
                             else if (keyword == "elif")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.ElseIf;
                                 result.KeywordArgument = string.Empty;
-                                inCondition = true;
+                                inKeywordArgument = true;
                             }
                             else if (keyword == "else")
                             {
@@ -596,53 +644,51 @@ namespace DuetAPI.Commands
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.While;
                                 result.KeywordArgument = string.Empty;
-                                inCondition = true;
+                                inKeywordArgument = true;
                             }
                             else if (keyword == "break")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Break;
-                                inCondition = true;
                             }
                             else if (keyword == "continue")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Continue;
-                                inCondition = true;
                             }
                             else if (keyword == "abort")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Abort;
-                                inCondition = true;
+                                inKeywordArgument = true;
                             }
                             else if (keyword == "var")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Var;
                                 result.KeywordArgument = string.Empty;
-                                inCondition = true;
+                                inKeywordArgument = true;
                             }
                             else if (keyword == "global")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Global;
                                 result.KeywordArgument = string.Empty;
-                                inCondition = true;
+                                inKeywordArgument = true;
                             }
                             else if (keyword == "set")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Set;
                                 result.KeywordArgument = string.Empty;
-                                inCondition = true;
+                                inKeywordArgument = true;
                             }
                             else if (keyword == "echo")
                             {
                                 result.Type = CodeType.Keyword;
                                 result.Keyword = KeywordType.Echo;
                                 result.KeywordArgument = string.Empty;
-                                inCondition = true;
+                                inKeywordArgument = true;
                             }
 #warning do not permit duplicate parameters in v3.6
 #if false
@@ -682,7 +728,7 @@ namespace DuetAPI.Commands
                         }
 
                         letter = '\0';
-                        value = string.Empty;
+                        clearValue();
                         wasQuoted = wasExpression = false;
                     }
 
@@ -706,7 +752,7 @@ namespace DuetAPI.Commands
                         contentRead = inChunk = true;
                         if (c == '{')
                         {
-                            value = "{";
+                            setValue("{");
                             inExpression = true;
                             inSingleQuotes = inDoubleQuotes = false;
                             numCurlyBraces++;
@@ -790,13 +836,13 @@ namespace DuetAPI.Commands
             {
                 throw new CodeParserException("Too many closing curly braces", result);
             }
-            if (result.KeywordArgument is not null)
+            if (inKeywordArgument)
             {
-                result.KeywordArgument = result.KeywordArgument.Trim();
-                if (result.KeywordArgument.Length > 255)
-                {
-                    throw new CodeParserException("Keyword argument too long (> 255)", result);
-                }
+                result.KeywordArgument = getValue().Trim();
+            }
+            if (result.KeywordArgument?.Length > 255)
+            {
+                throw new CodeParserException("Keyword argument too long (> 255)", result);
             }
             if (result.Parameters.Count > 255)
             {
