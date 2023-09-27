@@ -161,10 +161,9 @@ namespace DuetWebServer.Services
                         using CommandConnection commandConnection = new();
                         await subscribeConnection.Connect(DuetAPI.Connection.SubscriptionMode.Patch, new string[] {
                             "directories/www",
-                            "httpEndpoints/**",
                             "messages/**",
                             "network/corsSite",
-                            "sbc/**",
+                            "sbc/dsf/httpEndpoints/**",
                             "volumes/**"
                         }, unixSocket);
                         await commandConnection.Connect(unixSocket);
@@ -242,7 +241,7 @@ namespace DuetWebServer.Services
                             }
 
                             // Check if the HTTP sessions have changed and rebuild them on demand
-                            if (jsonPatch.RootElement.TryGetProperty("httpEndpoints", out _))
+                            if (jsonPatch.RootElement.TryGetProperty("sbc", out _))
                             {
                                 _logger.LogInformation("New number of custom HTTP endpoints: {numEndpoints}", model.SBC!.DSF.HttpEndpoints.Count);
 
