@@ -3,7 +3,7 @@
     /// <summary>
     /// This represents information about closed-loop tuning
     /// </summary>
-    public sealed class ClosedLoop : ModelObject
+    public sealed class BoardClosedLoop : ModelObject
     {
         /// <summary>
         /// Number of collected data points in the last run or 0 if it failed

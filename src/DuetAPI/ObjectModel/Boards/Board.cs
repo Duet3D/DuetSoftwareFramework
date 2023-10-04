@@ -40,12 +40,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Closed loop data of this board or null if unknown
         /// </summary>
-        public ClosedLoop? ClosedLoop
+        public BoardClosedLoop? ClosedLoop
         {
             get => _closedLoop;
             set => SetPropertyValue(ref _closedLoop, value);
         }
-        private ClosedLoop? _closedLoop;
+        private BoardClosedLoop? _closedLoop;
 
         /// <summary>
         /// Details about a connected display or null if none is connected
@@ -56,6 +56,16 @@ namespace DuetAPI.ObjectModel
             set => SetPropertyValue(ref _directDisplay, value);
         }
         private DirectDisplay? _directDisplay;
+
+        /// <summary>
+        /// Drivers of this board
+        /// </summary>
+        public ModelCollection<Driver>? Drivers
+        {
+            get => _drivers;
+            set => SetPropertyValue(ref _drivers, value);
+        }
+        private ModelCollection<Driver>? _drivers;
 
         /// <summary>
         /// Date of the firmware build

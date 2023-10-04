@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -309,7 +310,7 @@ namespace DuetControlServer.Files
                 Match match = item.Match(line);
                 if (match.Success)
                 {
-                    foreach (Group grp in match.Groups)
+                    foreach (Group grp in match.Groups.Cast<Group>())
                     {
                         if (grp.Name == "mm" && float.TryParse(grp.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out float layerHeight) &&
                             float.IsFinite(layerHeight) && layerHeight < Settings.MaxLayerHeight)
@@ -374,7 +375,7 @@ namespace DuetControlServer.Files
                             }
                             else
                             {
-                                foreach (Capture capture in mmGroup.Captures)
+                                foreach (Capture capture in mmGroup.Captures.Cast<Capture>())
                                 {
                                     if (float.TryParse(capture.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out filamentUsage) &&
                                         float.IsFinite(filamentUsage))
@@ -402,7 +403,7 @@ namespace DuetControlServer.Files
                             }
                             else
                             {
-                                foreach (Capture capture in mGroup.Captures)
+                                foreach (Capture capture in mGroup.Captures.Cast<Capture>())
                                 {
                                     if (float.TryParse(capture.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out filamentUsage) &&
                                         float.IsFinite(filamentUsage))
@@ -453,7 +454,7 @@ namespace DuetControlServer.Files
                 if (match.Success)
                 {
                     long seconds = 0;
-                    foreach (Group grp in match.Groups)
+                    foreach (Group grp in match.Groups.Cast<Group>())
                     {
                         if (float.TryParse(grp.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out float printTime) &&
                             float.IsFinite(printTime))
@@ -496,7 +497,7 @@ namespace DuetControlServer.Files
                 if (match.Success)
                 {
                     long seconds = 0;
-                    foreach (Group grp in match.Groups)
+                    foreach (Group grp in match.Groups.Cast<Group>())
                     {
                         if (long.TryParse(grp.Value, out long simulatedTime))
                         {
