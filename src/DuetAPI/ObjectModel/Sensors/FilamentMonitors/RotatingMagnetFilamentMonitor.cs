@@ -105,7 +105,7 @@
     /// <summary>
     /// Information about a rotating magnet filament monitor
     /// </summary>
-    public class RotatingMagnetFilamentMonitor : FilamentMonitor
+    public class RotatingMagnetFilamentMonitor : Duet3DFilamentMonitor
     {
         /// <summary>
         /// Constructor of this class
@@ -128,6 +128,6 @@
         /// <summary>
         /// Configured properties of this filament monitor
         /// </summary>
-        public RotatingMagnetFilamentMonitorConfigured Configured { get; } = new RotatingMagnetFilamentMonitorConfigured();
+        public RotatingMagnetFilamentMonitorConfigured Configured { get; } = new();
     }
 }

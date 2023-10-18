@@ -105,7 +105,7 @@
 	/// <summary>
 	/// Information about a laser filament monitor
 	/// </summary>
-    public class LaserFilamentMonitor : FilamentMonitor
+    public class LaserFilamentMonitor : Duet3DFilamentMonitor
     {
 		/// <summary>
 		/// Constructor of this class

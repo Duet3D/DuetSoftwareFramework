@@ -459,16 +459,29 @@ namespace DuetWebServer.Controllers
                         Directory.CreateDirectory(directory);
                     }
 
-                    // Write file
-                    await using (FileStream stream = new(resolvedPath, FileMode.Create, FileAccess.Write))
+                    string partFile = resolvedPath + ".part";
+                    try
                     {
-                        await Request.Body.CopyToAsync(stream);
-                    }
+                        // Write .part file
+                        await using (FileStream stream = new(partFile, FileMode.Create, FileAccess.Write))
+                        {
+                            await Request.Body.CopyToAsync(stream);
+                        }
 
-                    // Change the datetime of the file if possible
-                    if (timeModified is not null)
+                        // Move it into place
+                        System.IO.File.Move(partFile, resolvedPath, true);
+
+                        // Change the datetime of the file if possible
+                        if (timeModified is not null)
+                        {
+                            System.IO.File.SetLastWriteTime(resolvedPath, timeModified.Value);
+                        }
+                    }
+                    catch
                     {
-                        System.IO.File.SetLastWriteTime(resolvedPath, timeModified.Value);
+                        // Delete the file on error
+                        System.IO.File.Delete(partFile);
+                        throw;
                     }
 
                     return Created(HttpUtility.UrlPathEncode(filename), null);
