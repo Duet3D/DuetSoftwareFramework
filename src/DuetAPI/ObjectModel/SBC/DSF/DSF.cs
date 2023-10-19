@@ -8,6 +8,16 @@ namespace DuetAPI.ObjectModel
     public class DSF : ModelObject
     {
         /// <summary>
+        /// Datetime when DSF was built
+        /// </summary>
+        public string BuildDateTime
+        {
+            get => _buildDateTime;
+            set => SetPropertyValue(ref _buildDateTime, value);
+        }
+        private string _buildDateTime = string.Empty;
+
+        /// <summary>
         /// List of registered third-party HTTP endpoints
         /// </summary>
         public ModelCollection<HttpEndpoint> HttpEndpoints { get; } = new ModelCollection<HttpEndpoint>();

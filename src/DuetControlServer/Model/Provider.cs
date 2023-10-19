@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Utility;
 using Nito.AsyncEx;
 
 namespace DuetControlServer.Model
@@ -187,6 +188,7 @@ namespace DuetControlServer.Model
         public static void Init()
         {
             ObjectModel.OnDeserializationFailed += OnDeserializationFailed;
+            BuildDateTimeAttribute buildAttribute = (BuildDateTimeAttribute)Attribute.GetCustomAttribute(System.Reflection.Assembly.GetExecutingAssembly(), typeof(BuildDateTimeAttribute))!;
             Get.SBC = new()
             {
                 AppArmor = Directory.Exists("/sys/module/apparmor"),
@@ -195,6 +197,7 @@ namespace DuetControlServer.Model
             };
             Get.SBC.CPU.Hardware = GetCpuHardware();
             Get.SBC.CPU.NumCores = GetCpuNumCores();
+            Get.SBC.DSF.BuildDateTime = buildAttribute.Date ?? "unknown build time";
             Get.SBC.DSF.Version = Program.Version;
             Get.SBC.DSF.PluginSupport = Settings.PluginSupport;
             Get.SBC.DSF.RootPluginSupport = Settings.PluginSupport && Settings.RootPluginSupport;

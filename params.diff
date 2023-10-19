@@ -1,0 +1,22 @@
+diff --git a/src/DuetAPI/Commands/Code/Parameter.cs b/src/DuetAPI/Commands/Code/Parameter.cs
+index 059ad6b1..e66f79b4 100644
+--- a/src/DuetAPI/Commands/Code/Parameter.cs
++++ b/src/DuetAPI/Commands/Code/Parameter.cs
+@@ -135,7 +135,7 @@ namespace DuetAPI.Commands
+                     // It is a hex integer
+                     ParsedValue = asHexInt;
+                 }
+-                else if (int.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out int asInt))
++                else if (!value.Contains('.') && int.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out int asInt))
+                 {
+                     // It is a valid integer
+                     ParsedValue = asInt;
+@@ -145,7 +145,7 @@ namespace DuetAPI.Commands
+                     // It is a hex unsigned integer
+                     ParsedValue = asHexUInt;
+                 }
+-                else if (uint.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out uint asUInt))
++                else if (!value.Contains('.') && uint.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out uint asUInt))
+                 {
+                     // It is a valid unsigned integer
+                     ParsedValue = asUInt;
