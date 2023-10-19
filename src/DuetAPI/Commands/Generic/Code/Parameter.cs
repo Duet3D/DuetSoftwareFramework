@@ -129,12 +129,22 @@ namespace DuetAPI.Commands
                         ParsedValue = value;
                     }
                 }
-                else if (int.TryParse(value, out int asInt))
+                else if (value.StartsWith("0x") && int.TryParse(value.Substring(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int asHexInt))
+                {
+                    // It is a hex integer
+                    ParsedValue = asHexInt;
+                }
+                else if (!value.Contains('.') && int.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out int asInt))
                 {
                     // It is a valid integer
                     ParsedValue = asInt;
                 }
-                else if (uint.TryParse(value, out uint asUInt))
+                else if (value.StartsWith("0x") && uint.TryParse(value.Substring(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uint asHexUInt))
+                {
+                    // It is a hex unsigned integer
+                    ParsedValue = asHexUInt;
+                }
+                else if (!value.Contains('.') && uint.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out uint asUInt))
                 {
                     // It is a valid unsigned integer
                     ParsedValue = asUInt;
