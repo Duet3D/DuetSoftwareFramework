@@ -1,0 +1,13 @@
+<Project>
+	<PropertyGroup>
+		<Nullable>enable</Nullable>
+		<LangVersion>10</LangVersion>
+		<Version>3.5.0-rc.2</Version>
+		<Authors>Christian Hammacher</Authors>
+		<Company>Duet3D Ltd</Company>
+		<Copyright>Duet3D Ltd</Copyright>
+		<PackageProjectUrl>https://github.com/Duet3D/DuetSoftwareFramework</PackageProjectUrl>
+		<RepositoryType>git</RepositoryType>
+		<RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>
+	</PropertyGroup>
+</Project>

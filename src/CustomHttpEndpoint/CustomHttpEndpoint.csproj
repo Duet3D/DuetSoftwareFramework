@@ -1,26 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net6.0</TargetFramework>
+		<TrimUnusedDependencies>true</TrimUnusedDependencies>
+		<PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
+	</PropertyGroup>
 
-  <PropertyGroup>
-    <Nullable>enable</Nullable>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net6.0</TargetFramework>
-    <Version>3.5.0-rc.2</Version>
-    <RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <Authors>Christian Hammacher</Authors>
-    <Company>Duet3D Ltd</Company>
-    <PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/Duet3D/DuetSoftwareFramework</PackageProjectUrl>
-    <Copyright>Duet3D Ltd</Copyright>
-  </PropertyGroup>
+	<ItemGroup>
+		<DotNetCliToolReference Include="DotnetPublishSsh" Version="0.1.0" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <DotNetCliToolReference Include="DotnetPublishSsh" Version="0.1.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\DuetAPIClient\DuetAPIClient.csproj" />
-    <ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
-  </ItemGroup>
-
+	<ItemGroup>
+		<ProjectReference Include="..\DuetAPIClient\DuetAPIClient.csproj" />
+	</ItemGroup>
 </Project>

@@ -1,34 +1,23 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<Nullable>enable</Nullable>
+		<TargetFramework>net6.0</TargetFramework>
+		<OutputType>Exe</OutputType>
+		<PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
+	</PropertyGroup>
 
-  <PropertyGroup>
-    <Nullable>enable</Nullable>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net6.0</TargetFramework>
-    <LangVersion>default</LangVersion>
-    <Authors>Christian Hammacher</Authors>
-    <Company>Duet3D Ltd</Company>
-    <Version>3.5.0-rc.2</Version>
-    <PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
-    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-    <RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PackageProjectUrl>https://github.com/Duet3D/DuetSoftwareFramework</PackageProjectUrl>
-    <Copyright>Duet3D Ltd</Copyright>
-  </PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
+		<PackageReference Include="NLog" Version="5.2.5" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
-    <PackageReference Include="NLog" Version="5.2.5" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\DuetAPIClient\DuetAPIClient.csproj" />
+		<ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
+		<ProjectReference Include="..\LinuxApi\LinuxApi.csproj" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\DuetAPIClient\DuetAPIClient.csproj" />
-    <ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
-    <ProjectReference Include="..\LinuxApi\LinuxApi.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <DotNetCliToolReference Include="DotnetPublishSsh" Version="0.1.0" />
-  </ItemGroup>
-
+	<ItemGroup>
+		<DotNetCliToolReference Include="DotnetPublishSsh" Version="0.1.0" />
+	</ItemGroup>
 </Project>
