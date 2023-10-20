@@ -1,5 +1,5 @@
 Package: duetruntime
-Version: DCSVER
+Version: DSFVER
 Section: electronics
 Priority: standard
 Architecture: TARGET_ARCH

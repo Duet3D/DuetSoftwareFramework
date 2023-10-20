@@ -14,43 +14,38 @@ mkdir -p $DEST_DIR
 pkg_progs() {
 	echo "- Packaging programs..."
 
-	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetcontrolserver_$dcsver/DEBIAN/control
-	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetcontrolserver_$dcsver/DEBIAN/control
-	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetcontrolserver_$dcsver/DEBIAN/changelog
-	dpkg-deb --build -Zxz $DEST_DIR/duetcontrolserver_$dcsver $DEST_DIR
+	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetcontrolserver_$dsfver/DEBIAN/control
+	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetcontrolserver_$dsfver/DEBIAN/control
+	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetcontrolserver_$dsfver/DEBIAN/changelog
+	dpkg-deb --build -Zxz $DEST_DIR/duetcontrolserver_$dsfver $DEST_DIR
 
-	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetwebserver_$dwsver/DEBIAN/control
-	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetwebserver_$dwsver/DEBIAN/control
-	sed -i "s/DWSVER/$(echo $dwsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetwebserver_$dwsver/DEBIAN/control
-	sed -i "s/DWSVER/$(echo $dwsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetwebserver_$dwsver/DEBIAN/changelog
-	dpkg-deb --build -Zxz $DEST_DIR/duetwebserver_$dwsver $DEST_DIR
+	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetwebserver_$dsfver/DEBIAN/control
+	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetwebserver_$dsfver/DEBIAN/control
+	dpkg-deb --build -Zxz $DEST_DIR/duetwebserver_$dsfver $DEST_DIR
 
-	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetpluginservice_$dpsver/DEBIAN/control
-	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpluginservice_$dpsver/DEBIAN/control
-	sed -i "s/DPSVER/$(echo $dpsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpluginservice_$dpsver/DEBIAN/control
-	sed -i "s/DPSVER/$(echo $dpsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpluginservice_$dpsver/DEBIAN/changelog
-	dpkg-deb --build -Zxz $DEST_DIR/duetpluginservice_$dpsver $DEST_DIR
+	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetpluginservice_$dsfver/DEBIAN/control
+	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpluginservice_$dsfver/DEBIAN/control
+	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpluginservice_$dsfver/DEBIAN/changelog
+	dpkg-deb --build -Zxz $DEST_DIR/duetpluginservice_$dsfver $DEST_DIR
 
-	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duettools_$dcsver/DEBIAN/control
-	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duettools_$dcsver/DEBIAN/control
-	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duettools_$dcsver/DEBIAN/changelog
-	dpkg-deb --build -Zxz $DEST_DIR/duettools_$dcsver $DEST_DIR
+	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duettools_$dsfver/DEBIAN/control
+	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duettools_$dsfver/DEBIAN/control
+	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duettools_$dsfver/DEBIAN/changelog
+	dpkg-deb --build -Zxz $DEST_DIR/duettools_$dsfver $DEST_DIR
 
-	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetruntime_$dcsver/DEBIAN/control
-	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetruntime_$dcsver/DEBIAN/control
-	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetruntime_$dcsver/DEBIAN/changelog
-	dpkg-deb --build -Zxz $DEST_DIR/duetruntime_$dcsver $DEST_DIR
+	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetruntime_$dsfver/DEBIAN/control
+	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetruntime_$dsfver/DEBIAN/control
+	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetruntime_$dsfver/DEBIAN/changelog
+	dpkg-deb --build -Zxz $DEST_DIR/duetruntime_$dsfver $DEST_DIR
 }
 
 pkg_plugins() {
 	echo "- Packaging plugins..."
 
-	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetpimanagementplugin_$dmpver/DEBIAN/control
-	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpimanagementplugin_$dmpver/DEBIAN/control
-	sed -i "s/DMPVER/$(echo $dmpver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpimanagementplugin_$dmpver/DEBIAN/control
-	sed -i "s/DPSVER/$(echo $dpsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpimanagementplugin_$dmpver/DEBIAN/control
-	sed -i "s/DMPVER/$(echo $dmpver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpimanagementplugin_$dmpver/DEBIAN/changelog
-	dpkg-deb --build -Zxz $DEST_DIR/duetpimanagementplugin_$dmpver $DEST_DIR
+	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetpimanagementplugin_$dsfver/DEBIAN/control
+	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpimanagementplugin_$dsfver/DEBIAN/control
+	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetpimanagementplugin_$dsfver/DEBIAN/changelog
+	dpkg-deb --build -Zxz $DEST_DIR/duetpimanagementplugin_$dsfver $DEST_DIR
 }
 
 pkg_sd() {
@@ -72,14 +67,12 @@ pkg_dwc() {
 pkg_meta() {
 	echo "- Packaging meta..."
 
-	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetsoftwareframework_$dcsver/DEBIAN/control
-	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetsoftwareframework_$dcsver/DEBIAN/control
-	sed -i "s/DWSVER/$(echo $dwsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetsoftwareframework_$dcsver/DEBIAN/control
-	sed -i "s/DPSVER/$(echo $dpsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetsoftwareframework_$dcsver/DEBIAN/control
-	sed -i "s/SDVER/$(echo $sdver | sed -e 's/-/~/g')/g" $DEST_DIR/duetsoftwareframework_$dcsver/DEBIAN/control
-	sed -i "s/DWCVER/$(echo $dwcver | sed -e 's/-/~/g')/g" $DEST_DIR/duetsoftwareframework_$dcsver/DEBIAN/control
-	sed -i "s/DCSVER/$(echo $dcsver | sed -e 's/-/~/g')/g" $DEST_DIR/duetsoftwareframework_$dcsver/DEBIAN/changelog
-	dpkg-deb --build -Zxz $DEST_DIR/duetsoftwareframework_$dcsver $DEST_DIR/
+	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetsoftwareframework_$dsfver/DEBIAN/control
+	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetsoftwareframework_$dsfver/DEBIAN/control
+	sed -i "s/SDVER/$(echo $sdver | sed -e 's/-/~/g')/g" $DEST_DIR/duetsoftwareframework_$dsfver/DEBIAN/control
+	sed -i "s/DWCVER/$(echo $dwcver | sed -e 's/-/~/g')/g" $DEST_DIR/duetsoftwareframework_$dsfver/DEBIAN/control
+	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetsoftwareframework_$dsfver/DEBIAN/changelog
+	dpkg-deb --build -Zxz $DEST_DIR/duetsoftwareframework_$dsfver $DEST_DIR/
 }
 
 [ $BUILD_PROGS -eq 1 ] && { [ $BUILD -eq 1 ] && build_progs || : ; } && [ $PKGS -eq 1 ] && pkg_progs

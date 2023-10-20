@@ -16,15 +16,15 @@ mkdir -p $DEST_DIR
 pkg_progs() {
 	echo "- Packaging programs..."
 	rpmbuild --target=${TARGET_ARCH}-linux-gnu --define="%_topdir $RPMBUILD_DIR" --define="%_arch $TARGET_ARCH" \
-		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dcsver" -ba ${PACKAGER_DIR}/duetcontrolserver.spec
+		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dsfver" -ba ${PACKAGER_DIR}/duetcontrolserver.spec
 	rpmbuild --target=${TARGET_ARCH}-linux-gnu --define="%_topdir $RPMBUILD_DIR" --define="%_arch $TARGET_ARCH" \
-		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dwsver" -ba ${PACKAGER_DIR}/duetwebserver.spec
+		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dsfver" -ba ${PACKAGER_DIR}/duetwebserver.spec
 	rpmbuild --target=${TARGET_ARCH}-linux-gnu --define="%_topdir $RPMBUILD_DIR" --define="%_arch $TARGET_ARCH" \
-		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dwsver" -ba ${PACKAGER_DIR}/duetpluginservice.spec
+		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dsfver" -ba ${PACKAGER_DIR}/duetpluginservice.spec
 	rpmbuild --target=${TARGET_ARCH}-linux-gnu --define="%_topdir $RPMBUILD_DIR" --define="%_arch $TARGET_ARCH" \
-		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dcsver" -ba ${PACKAGER_DIR}/duettools.spec
+		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dsfver" -ba ${PACKAGER_DIR}/duettools.spec
 	rpmbuild --target=${TARGET_ARCH}-linux-gnu --define="%_topdir $RPMBUILD_DIR" --define="%_arch $TARGET_ARCH" \
-		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dcsver" -ba ${PACKAGER_DIR}/duetruntime.spec
+		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dsfver" -ba ${PACKAGER_DIR}/duetruntime.spec
 }
 
 pkg_plugins() {
@@ -49,7 +49,7 @@ pkg_dwc() {
 pkg_meta() {
 	echo "- Packaging meta..."
 	rpmbuild --target=${TARGET_ARCH}-linux-gnu --define="%_topdir $RPMBUILD_DIR" --define="%_arch $TARGET_ARCH" \
-		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dcsver" -ba ${PACKAGER_DIR}/duetsoftwareframework.spec
+		--define="%_build_type ${BUILD_TYPE}" --define="%_tversion $dsfver" -ba ${PACKAGER_DIR}/duetsoftwareframework.spec
 }
 
 [ $BUILD_PROGS -eq 1 ] && { [ $BUILD -eq 1 ] && build_progs || : ; } && [ $PKGS -eq 1 ] && pkg_progs

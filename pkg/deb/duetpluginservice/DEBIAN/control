@@ -1,9 +1,9 @@
 Package: duetpluginservice
-Version: DPSVER
+Version: DSFVER
 Section: electronics
 Priority: standard
 Architecture: TARGET_ARCH
-Depends: duetsoftwareframework (>= 3.3), duetcontrolserver (= DCSVER)
+Depends: duetsoftwareframework (>= 3.3), duetcontrolserver (= DSFVER)
 Recommends: apparmor, python3-pip
 Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
 Homepage: https://pkg.duet3d.com

@@ -1,10 +1,10 @@
 Package: duetsoftwareframework
-Version: DCSVER
+Version: DSFVER
 Section: electronics
 Priority: standard
 Architecture: TARGET_ARCH
-Depends: duetcontrolserver (= DCSVER), duetsd (= SDVER), duettools (= DCSVER), duetwebserver (= DWSVER), duetwebcontrol (= DWCVER), reprapfirmware (>= DCSVER-1), reprapfirmware (<= DCSVER-999)
-Recommends: duetpluginservice (= DPSVER)
+Depends: duetcontrolserver (= DSFVER), duetsd (= SDVER), duettools (= DSFVER), duetwebserver (= DSFVER), duetwebcontrol (= DWCVER), reprapfirmware (>= DSFVER-1), reprapfirmware (<= DSFVER-999)
+Recommends: duetpluginservice (= DSFVER)
 Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
 Homepage: https://pkg.duet3d.com
 Vcs-Git: https://github.com/Duet3D/DuetSoftwareFramework.git

@@ -71,10 +71,7 @@ done
 DEST_DIR=${DEST_DIR:-/tmp/duet/${PACKAGE_TYPE}/${BUILD_TYPE}/${TARGET_ARCH}}
 [ $PKGS -eq 0 ] && CLEANUP=0
 
-dcsver=$(xmllint --xpath "string(//Project/PropertyGroup/Version)" $SRC_DIR/DuetControlServer/DuetControlServer.csproj)
-dwsver=$(xmllint --xpath "string(//Project/PropertyGroup/Version)" $SRC_DIR/DuetWebServer/DuetWebServer.csproj)
-dpsver=$(xmllint --xpath "string(//Project/PropertyGroup/Version)" $SRC_DIR/DuetPluginService/DuetPluginService.csproj)
-dmpver=$(xmllint --xpath "string(//Project/PropertyGroup/Version)" $SRC_DIR/DuetPiManagementPlugin/DuetPiManagementPlugin.csproj)
+dsfver=$(xmllint --xpath "string(//Project/PropertyGroup/Version)" $SRC_DIR/Directory.Build.props)
 # We always get the sd version from the deb control file even if we're building an rpm
 sdver=$(cat $PKG_DIR/deb/duetsd/DEBIAN/control | grep Version | cut -d ' ' -f 2)
 
@@ -110,10 +107,7 @@ print_debug() {
 	echo "DOTNET_ARCH:      $DOTNET_ARCH"
 	echo "BUILD_TYPE:       $BUILD_TYPE"
 	echo "DEST_DIR:         $DEST_DIR"
-	echo "dcsver:           $dcsver"
-	echo "dwsver:           $dwsver"
-	echo "dpsver:           $dpsver"
-	echo "dmpver:           $dmpver"
+	echo "dsfver:           $dsfver"
 	echo "sdver:            $sdver"
 	echo "SIGNING_KEY:      $SIGNING_KEY"
 	echo "PACKAGES:         $PACKAGES"
@@ -125,75 +119,74 @@ print_debug
 [ $PRINT_DEBUG -eq 1 ] && exit 0
 
 build_progs() {
-	echo "Building $DOTNET_ARCH $BUILD_TYPE (DCS $dcsver, DWS $dwsver, DPS $dpsver) to $DEST_DIR,,,"
+	echo "Building $DOTNET_ARCH $BUILD_TYPE (DSF $dsfver) to $DEST_DIR,,,"
 
 	rm -rf $DEST_DIR/files
 	mkdir -p $DEST_DIR/files
 
-	rm -rf $DEST_DIR/duetcontrolserver_$dcsver
+	rm -rf $DEST_DIR/duetcontrolserver_$dsfver
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/DuetControlServer/DuetControlServer.csproj
-	mkdir -p $DEST_DIR/duetcontrolserver_$dcsver/opt/dsf/bin
-	mkdir -p $DEST_DIR/duetcontrolserver_$dcsver/opt/dsf/plugins
-	[ -d $COMMON_DIR/duetcontrolserver/ ] && $RSYNC $COMMON_DIR/duetcontrolserver/. $DEST_DIR/duetcontrolserver_$dcsver/
-	[ -d $PACKAGER_DIR/duetcontrolserver/ ] && $RSYNC $PACKAGER_DIR/duetcontrolserver/. $DEST_DIR/duetcontrolserver_$dcsver/
-	mv $DEST_DIR/files/DuetControlServer* $DEST_DIR/duetcontrolserver_$dcsver/opt/dsf/bin
+	mkdir -p $DEST_DIR/duetcontrolserver_$dsfver/opt/dsf/bin
+	mkdir -p $DEST_DIR/duetcontrolserver_$dsfver/opt/dsf/plugins
+	[ -d $COMMON_DIR/duetcontrolserver/ ] && $RSYNC $COMMON_DIR/duetcontrolserver/. $DEST_DIR/duetcontrolserver_$dsfver/
+	[ -d $PACKAGER_DIR/duetcontrolserver/ ] && $RSYNC $PACKAGER_DIR/duetcontrolserver/. $DEST_DIR/duetcontrolserver_$dsfver/
+	mv $DEST_DIR/files/DuetControlServer* $DEST_DIR/duetcontrolserver_$dsfver/opt/dsf/bin
 
-	rm -rf $DEST_DIR/duetwebserver_$dwsver/
+	rm -rf $DEST_DIR/duetwebserver_$dsfver/
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/DuetWebServer/DuetWebServer.csproj
-	mkdir -p $DEST_DIR/duetwebserver_$dwsver/opt/dsf/bin
-	[ -d $COMMON_DIR/duetwebserver/ ] && $RSYNC $COMMON_DIR/duetwebserver/. $DEST_DIR/duetwebserver_$dwsver/
-	[ -d $PACKAGER_DIR/duetwebserver/ ] && $RSYNC $PACKAGER_DIR/duetwebserver/. $DEST_DIR/duetwebserver_$dwsver/
-	mv $DEST_DIR/files/DuetWebServer* $DEST_DIR/duetwebserver_$dwsver/opt/dsf/bin
-	mv $DEST_DIR/files/appsettings.* $DEST_DIR/duetwebserver_$dwsver/opt/dsf/bin
+	mkdir -p $DEST_DIR/duetwebserver_$dsfver/opt/dsf/bin
+	[ -d $COMMON_DIR/duetwebserver/ ] && $RSYNC $COMMON_DIR/duetwebserver/. $DEST_DIR/duetwebserver_$dsfver/
+	[ -d $PACKAGER_DIR/duetwebserver/ ] && $RSYNC $PACKAGER_DIR/duetwebserver/. $DEST_DIR/duetwebserver_$dsfver/
+	mv $DEST_DIR/files/DuetWebServer* $DEST_DIR/duetwebserver_$dsfver/opt/dsf/bin
+	mv $DEST_DIR/files/appsettings.* $DEST_DIR/duetwebserver_$dsfver/opt/dsf/bin
 
-	rm -rf $DEST_DIR/duetpluginservice_$dpsver
+	rm -rf $DEST_DIR/duetpluginservice_$dsfver
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/DuetPluginService/DuetPluginService.csproj
-	mkdir -p $DEST_DIR/duetpluginservice_$dpsver/opt/dsf/bin
-	mkdir -p $DEST_DIR/duetpluginservice_$dpsver/opt/dsf/plugins
-	[ -d $COMMON_DIR/duetpluginservice/ ] && $RSYNC $COMMON_DIR/duetpluginservice/. $DEST_DIR/duetpluginservice_$dpsver/
-	[ -d $PACKAGER_DIR/duetpluginservice/ ] && $RSYNC $PACKAGER_DIR/duetpluginservice/. $DEST_DIR/duetpluginservice_$dpsver/
-	mv $DEST_DIR/files/DuetPluginService* $DEST_DIR/duetpluginservice_$dpsver/opt/dsf/bin
+	mkdir -p $DEST_DIR/duetpluginservice_$dsfver/opt/dsf/bin
+	mkdir -p $DEST_DIR/duetpluginservice_$dsfver/opt/dsf/plugins
+	[ -d $COMMON_DIR/duetpluginservice/ ] && $RSYNC $COMMON_DIR/duetpluginservice/. $DEST_DIR/duetpluginservice_$dsfver/
+	[ -d $PACKAGER_DIR/duetpluginservice/ ] && $RSYNC $PACKAGER_DIR/duetpluginservice/. $DEST_DIR/duetpluginservice_$dsfver/
+	mv $DEST_DIR/files/DuetPluginService* $DEST_DIR/duetpluginservice_$dsfver/opt/dsf/bin
 
-	rm -rf $DEST_DIR/duettools_$dcsver/
+	rm -rf $DEST_DIR/duettools_$dsfver/
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/CodeConsole/CodeConsole.csproj
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/CodeLogger/CodeLogger.csproj
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/CodeStream/CodeStream.csproj
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/CustomHttpEndpoint/CustomHttpEndpoint.csproj
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/ModelObserver/ModelObserver.csproj
 	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/PluginManager/PluginManager.csproj
-	mkdir -p $DEST_DIR/duettools_$dcsver/opt/dsf/bin
-	[ -d $COMMON_DIR/duettools/ ] && $RSYNC $COMMON_DIR/duettools/. $DEST_DIR/duettools_$dcsver/
-	[ -d $PACKAGER_DIR/duettools/ ] && $RSYNC $PACKAGER_DIR/duettools/. $DEST_DIR/duettools_$dcsver/
-	mv $DEST_DIR/files/CodeConsole* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
-	mv $DEST_DIR/files/CodeLogger* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
-	mv $DEST_DIR/files/CustomHttpEndpoint* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
-	mv $DEST_DIR/files/ModelObserver* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
-	mv $DEST_DIR/files/PluginManager* $DEST_DIR/duettools_$dcsver/opt/dsf/bin
+	mkdir -p $DEST_DIR/duettools_$dsfver/opt/dsf/bin
+	[ -d $COMMON_DIR/duettools/ ] && $RSYNC $COMMON_DIR/duettools/. $DEST_DIR/duettools_$dsfver/
+	[ -d $PACKAGER_DIR/duettools/ ] && $RSYNC $PACKAGER_DIR/duettools/. $DEST_DIR/duettools_$dsfver/
+	mv $DEST_DIR/files/CodeConsole* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
+	mv $DEST_DIR/files/CodeLogger* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
+	mv $DEST_DIR/files/CustomHttpEndpoint* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
+	mv $DEST_DIR/files/ModelObserver* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
+	mv $DEST_DIR/files/PluginManager* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
 
-	rm -rf $DEST_DIR/duetruntime_$dcsver
-	mkdir -p $DEST_DIR/duetruntime_$dcsver/opt/dsf/bin
-	[ -d $COMMON_DIR/duetruntime/ ] && $RSYNC $COMMON_DIR/duetruntime/. $DEST_DIR/duetruntime_$dcsver/
-	[ -d $PACKAGER_DIR/duetruntime/ ] && $RSYNC $PACKAGER_DIR/duetruntime/. $DEST_DIR/duetruntime_$dcsver/
-	mv $DEST_DIR/files/* $DEST_DIR/duetruntime_$dcsver/opt/dsf/bin
-	cp $DEST_DIR/duetruntime_$dcsver/opt/dsf/bin/DuetAPI.xml $DEST_DIR/files/DuetAPI.xml
+	rm -rf $DEST_DIR/duetruntime_$dsfver
+	mkdir -p $DEST_DIR/duetruntime_$dsfver/opt/dsf/bin
+	[ -d $COMMON_DIR/duetruntime/ ] && $RSYNC $COMMON_DIR/duetruntime/. $DEST_DIR/duetruntime_$dsfver/
+	[ -d $PACKAGER_DIR/duetruntime/ ] && $RSYNC $PACKAGER_DIR/duetruntime/. $DEST_DIR/duetruntime_$dsfver/
+	mv $DEST_DIR/files/* $DEST_DIR/duetruntime_$dsfver/opt/dsf/bin
+	cp $DEST_DIR/duetruntime_$dsfver/opt/dsf/bin/DuetAPI.xml $DEST_DIR/files/DuetAPI.xml
 }
 
 build_plugins() {
-	echo "Building $DOTNET_ARCH $BUILD_TYPE (DMP $dmpver) to $DEST_DIR,,,"
+	echo "Building $DOTNET_ARCH $BUILD_TYPE (DMP $dsfver) to $DEST_DIR,,,"
 
-	rm -rf $DEST_DIR/duetpimanagementplugin_$dmpver/
-	mkdir -p $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf
-	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf $SRC_DIR/DuetPiManagementPlugin/DuetPiManagementPlugin.csproj /p:PublishTrimmed=true /noWarn:IL2026,IL2070,IL2072,IL2087
-	[ -d $COMMON_DIR/duetpimanagementplugin/ ] && $RSYNC $COMMON_DIR/duetpimanagementplugin/. $DEST_DIR/duetpimanagementplugin_$dmpver/
-	[ -d $PACKAGER_DIR/duetpimanagementplugin/ ] && $RSYNC $PACKAGER_DIR/duetpimanagementplugin/. $DEST_DIR/duetpimanagementplugin_$dmpver/
-	chmod +x $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf/gen-https-cert.sh
+	rm -rf $DEST_DIR/duetpimanagementplugin_$dsfver/
+	mkdir -p $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin/dsf
+	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin/dsf $SRC_DIR/DuetPiManagementPlugin/DuetPiManagementPlugin.csproj /p:PublishTrimmed=true /noWarn:IL2026,IL2070,IL2072,IL2087
+	[ -d $COMMON_DIR/duetpimanagementplugin/ ] && $RSYNC $COMMON_DIR/duetpimanagementplugin/. $DEST_DIR/duetpimanagementplugin_$dsfver/
+	[ -d $PACKAGER_DIR/duetpimanagementplugin/ ] && $RSYNC $PACKAGER_DIR/duetpimanagementplugin/. $DEST_DIR/duetpimanagementplugin_$dsfver/
+	chmod +x $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin/dsf/gen-https-cert.sh
 
-	sed -i "s/DMPVER/$dmpver/g" $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin.json
-	sed -i "s/DCSVER/$dcsver/g" $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin.json
+	sed -i "s/DSFVER/$dsfver/g" $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin.json
 
-	DSFFILES=`find $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin/dsf -type f -printf '%f\n' | sort | jq -R -s -c 'split("\n")[:-1]'`
-	jq -e ".dsfFiles=$DSFFILES" $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin.json > $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin-new.json
-	mv $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin-new.json $DEST_DIR/duetpimanagementplugin_$dmpver/opt/dsf/plugins/DuetPiManagementPlugin.json
+	DSFFILES=`find $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin/dsf -type f -printf '%f\n' | sort | jq -R -s -c 'split("\n")[:-1]'`
+	jq -e ".dsfFiles=$DSFFILES" $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin.json > $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin-new.json
+	mv $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin-new.json $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin.json
 }
 
 build_sd() {
@@ -249,27 +242,27 @@ build_dwc() {
 build_meta() {
 	echo "Building meta..."
 
-	rm -rf $DEST_DIR/duetsoftwareframework_$dcsver
-	mkdir -p $DEST_DIR/duetsoftwareframework_$dcsver
-	[ -d $COMMON_DIR/duetsoftwareframework/ ] && $RSYNC $COMMON_DIR/duetsoftwareframework/. $DEST_DIR/duetsoftwareframework_$dcsver/ || :
-	[ -d $PACKAGER_DIR/duetsoftwareframework/ ] && $RSYNC $PACKAGER_DIR/duetsoftwareframework/. $DEST_DIR/duetsoftwareframework_$dcsver/ || :
+	rm -rf $DEST_DIR/duetsoftwareframework_$dsfver
+	mkdir -p $DEST_DIR/duetsoftwareframework_$dsfver
+	[ -d $COMMON_DIR/duetsoftwareframework/ ] && $RSYNC $COMMON_DIR/duetsoftwareframework/. $DEST_DIR/duetsoftwareframework_$dsfver/ || :
+	[ -d $PACKAGER_DIR/duetsoftwareframework/ ] && $RSYNC $PACKAGER_DIR/duetsoftwareframework/. $DEST_DIR/duetsoftwareframework_$dsfver/ || :
 }
 
 cleanup_tmp() {
 	echo "Cleaning up"
 	if [ $BUILD_PROGS -eq 1 ] ; then
 		rm -rf $DEST_DIR/files
-		rm -rf $DEST_DIR/duetcontrolserver_$dcsver
-		rm -rf $DEST_DIR/duetwebserver_$dwsver
-		rm -rf $DEST_DIR/duetpluginservice_$dpsver
-		rm -rf $DEST_DIR/duettools_$dcsver
-		rm -rf $DEST_DIR/duetruntime_$dcsver
+		rm -rf $DEST_DIR/duetcontrolserver_$dsfver
+		rm -rf $DEST_DIR/duetwebserver_$dsfver
+		rm -rf $DEST_DIR/duetpluginservice_$dsfver
+		rm -rf $DEST_DIR/duettools_$dsfver
+		rm -rf $DEST_DIR/duetruntime_$dsfver
 	fi
-	[ $BUILD_PLUGINS -eq 1 ] && rm -rf $DEST_DIR/duetpimanagementplugin_$dmpver
+	[ $BUILD_PLUGINS -eq 1 ] && rm -rf $DEST_DIR/duetpimanagementplugin_$dsfver
 	[ $BUILD_SD -eq 1 ] && rm -rf $DEST_DIR/duetsd_$sdver
 	if [ $BUILD_DWC -eq 1 ] ; then
 		rm -rf $DEST_DIR/duetwebcontrol_$dwcver
 		rm -rf $DEST_DIR/DuetWebControl
 	fi
-	[ $BUILD_META -eq 1 ] && rm -rf $DEST_DIR/duetsoftwareframework_$dcsver
+	[ $BUILD_META -eq 1 ] && rm -rf $DEST_DIR/duetsoftwareframework_$dsfver
 }

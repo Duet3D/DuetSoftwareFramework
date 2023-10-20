@@ -35,7 +35,7 @@ namespace LinuxApi
                 1 => UnixSpiMode.SPI_MODE_1,
                 2 => UnixSpiMode.SPI_MODE_2,
                 3 => UnixSpiMode.SPI_MODE_3,
-                _ => throw new ArgumentException($"Transfer mode '{transferMode}' not regignized. Must be between 0 and 3."),
+                _ => throw new ArgumentException($"Transfer mode '{transferMode}' not recognized. Must be between 0 and 3."),
             };
             IntPtr nativePtr = new(&mode);
 
