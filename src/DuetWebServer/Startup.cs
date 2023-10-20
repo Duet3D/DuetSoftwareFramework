@@ -102,8 +102,16 @@ namespace DuetWebServer
                 {
                     OnPrepareResponse = ctx =>
                     {
-                        ctx.Context.Response.Headers[HeaderNames.CacheControl] = $"public,max-age={_configuration.GetValue("MaxAge", 3600)},must-revalidate";
-                        ctx.Context.Response.Headers[HeaderNames.Expires] = "0";
+                        if (ctx.Context.Request.Path.Equals("/"))
+                        {
+                            ctx.Context.Response.Headers[HeaderNames.CacheControl] = "no-store,no-cache,must-revalidate";
+                            ctx.Context.Response.Headers[HeaderNames.Pragma] = "no-cache";
+                        }
+                        else
+                        {
+                            ctx.Context.Response.Headers[HeaderNames.CacheControl] = $"public,max-age={_configuration.GetValue("MaxAge", 3600)},must-revalidate";
+                            ctx.Context.Response.Headers[HeaderNames.Expires] = "0";
+                        }
                     }
                 });
                 app.UseFileServer(new FileServerOptions
