@@ -6,6 +6,7 @@ StartLimitIntervalSec=0
 ExecStart=/opt/dsf/bin/DuetControlServer
 TimeoutStopSec=15
 Restart=always
+RestartSec=5
 Type=notify
 User=dsf
 Group=dsf
