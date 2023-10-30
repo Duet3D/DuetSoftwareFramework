@@ -317,7 +317,12 @@ namespace DuetWebServer.Middleware
                         context.Response.ContentType = "application/json";
                         break;
                 }
-                await context.Response.BodyWriter.WriteAsync(Encoding.UTF8.GetBytes(httpResponse.Response));
+
+                if (httpResponse.ResponseType != HttpResponseType.StatusCode)
+                {
+                    // Don't write to the response body if a status code is supposed to be returned
+                    await context.Response.BodyWriter.WriteAsync(Encoding.UTF8.GetBytes(httpResponse.Response));
+                }
             }
         }
     }
