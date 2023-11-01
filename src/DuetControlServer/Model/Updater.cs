@@ -154,7 +154,7 @@ namespace DuetControlServer.Model
                     {
                         if (_lastSeqs.IsEmpty)
                         {
-                            jsonData = await SPI.Interface.RequestObjectModel("limits", "d99vn");
+                            jsonData = await SPI.Interface.RequestObjectModel("limits", "d99vno");
                             using JsonDocument limitsDocument = JsonDocument.Parse(jsonData);
                             if (limitsDocument.RootElement.TryGetProperty("key", out JsonElement limitsKey) && limitsKey.GetString()!.Equals("limits", StringComparison.InvariantCultureIgnoreCase) &&
                                 limitsDocument.RootElement.TryGetProperty("result", out JsonElement limitsResult))
@@ -173,7 +173,7 @@ namespace DuetControlServer.Model
                     }
 
                     // Request the next status update
-                    jsonData = await SPI.Interface.RequestObjectModel(string.Empty, "d99fn");
+                    jsonData = await SPI.Interface.RequestObjectModel(string.Empty, "d99fno");
                     using JsonDocument statusDocument = JsonDocument.Parse(jsonData);
                     if (statusDocument.RootElement.TryGetProperty("key", out JsonElement statusKey) &&
                         statusDocument.RootElement.TryGetProperty("result", out JsonElement statusResult))
@@ -204,7 +204,7 @@ namespace DuetControlServer.Model
                                     do
                                     {
                                         // Request the next model chunk
-                                        jsonData = await SPI.Interface.RequestObjectModel(seqProperty.Name, (next == 0) ? "d99vn" : $"d99vna{next}");
+                                        jsonData = await SPI.Interface.RequestObjectModel(seqProperty.Name, (next == 0) ? "d99vno" : $"d99vnoa{next}");
                                         using JsonDocument keyDocument = JsonDocument.Parse(jsonData);
                                         int offset = next;
                                         next = keyDocument.RootElement.TryGetProperty("next", out JsonElement nextValue) ? nextValue.GetInt32() : 0;
