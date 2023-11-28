@@ -63,6 +63,11 @@ namespace DuetControlServer
         public static string PluginsFilename { get; set; } = DefaultPluginsFile;
 
         /// <summary>
+        /// Time to wait before auto-restarting a stopped plugin that has the SbcAutoRestart option set
+        /// </summary>
+        public static int PluginAutoRestartInterval { get; set; } = 2000;
+
+        /// <summary>
         /// Minimum log level for console output
         /// </summary>
         public static LogLevel LogLevel { get; set; } = LogLevel.Info;

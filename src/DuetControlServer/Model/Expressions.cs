@@ -378,8 +378,105 @@ namespace DuetControlServer.Model
         /// </summary>
         private static readonly object _nullResult = new();
 
+        // Encode a string
+        private static string encodeString(string value)
+        {
+            return '"' + value.Replace("\"", "\"\"").Replace("'", "''") + '"';
+        }
+
+        // Convert an object to a string value
+#warning This function cannot output empty arrays yet
+        private static string objectToString(object? obj, bool wantsCount, bool encodeStrings, Code code)
+        {
+            if (obj is null)
+            {
+                return "null";
+            }
+            if (obj is bool boolValue)
+            {
+                return boolValue ? "true" : "false";
+            }
+            if (obj is char charValue)
+            {
+                return encodeStrings ? $"'{charValue}'" : charValue.ToString();
+            }
+            if (obj is string stringValue)
+            {
+                if (wantsCount)
+                {
+                    return stringValue.Length.ToString();
+                }
+                return encodeStrings ? encodeString(stringValue) : stringValue;
+            }
+            if (obj is int intValue)
+            {
+                return intValue.ToString("G", CultureInfo.InvariantCulture);
+            }
+            if (obj is uint uintValue)
+            {
+                return uintValue.ToString("G", CultureInfo.InvariantCulture);
+            }
+            if (obj is float floatValue)
+            {
+                return floatValue.ToString("G", CultureInfo.InvariantCulture);
+            }
+            if (obj is long longValue)
+            {
+                return longValue.ToString("G", CultureInfo.InvariantCulture);
+            }
+            if (obj is DateTime dateTimeValue)
+            {
+                return encodeStrings ? $"\"{dateTimeValue:s}\"" : dateTimeValue.ToString("s");
+            }
+            if (wantsCount && obj is IList list)
+            {
+                return list.Count.ToString();
+            }
+            if (obj is bool[] boolArray)
+            {
+                return '{' + string.Join(',', boolArray.Select(boolValue => boolValue ? "true" : "false")) + (boolArray.Length == 1 ? ",}" : "}");
+            }
+            if (obj is char[] charArray)
+            {
+                return '{' + string.Join(',', charArray.Select(charValue => $"'{charValue}'")) + (charArray.Length == 1 ? ",}" : "}");
+            }
+            if (obj is string[] stringArray)
+            {
+                return '{' + string.Join(',', stringArray.Select(stringValue => encodeString(stringValue))) + (stringArray.Length == 1 ? ",}" : "}");
+            }
+            if (obj is int[] intArray)
+            {
+                return '{' + string.Join(',', intArray.Select(intValue => intValue.ToString("G", CultureInfo.InvariantCulture))) + (intArray.Length == 1 ? ",}" : "}");
+            }
+            if (obj is uint[] uintArray)
+            {
+                return '{' + string.Join(',', uintArray.Select(uintValue => uintValue.ToString("G", CultureInfo.InvariantCulture))) + (uintArray.Length == 1 ? ",}" : "}");
+            }
+            if (obj is float[] floatArray)
+            {
+                return '{' + string.Join(',', floatArray.Select(floatValue => floatValue.ToString("G", CultureInfo.InvariantCulture))) + (floatArray.Length == 1 ? ",}" : "}");
+            }
+            if (obj is long[] longArray)
+            {
+                return '{' + string.Join(',', longArray.Select(longValue => longValue.ToString("G", CultureInfo.InvariantCulture))) + (longArray.Length == 1 ? ",}" : "}");
+            }
+            if (obj is object[] objectArray)
+            {
+                return '{' + string.Join(',', objectArray.Select(objectValue => objectToString(objectValue, false, true, code))) + (objectArray.Length == 1 ? ",}" : "}");
+            }
+            if (!wantsCount && obj is IList)
+            {
+                throw new CodeParserException("missing array index", code);
+            }
+            if (obj.GetType().IsClass)
+            {
+                return "{object}";
+            }
+            return obj.ToString() ?? "null";
+        }
+
         /// <summary>
-        /// Evaluate expression(s)
+        /// Evaluate expression(s) and return the raw evaluation result (if applicable)
         /// </summary>
         /// <param name="code">Code holding the expression(s)</param>
         /// <param name="expression">Expression(s) to replace</param>
@@ -387,7 +484,7 @@ namespace DuetControlServer.Model
         /// <param name="encodeResult">Whether the final result shall be encoded</param>
         /// <returns>Replaced expression(s)</returns>
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
-        public static async Task<string> EvaluateExpression(Code code, string expression, bool onlySbcFields, bool encodeResult)
+        public static async Task<object?> EvaluateExpressionRaw(Code code, string expression, bool onlySbcFields, bool encodeResult)
         {
             int i = 0;
 
@@ -443,103 +540,6 @@ namespace DuetControlServer.Model
                 throw new CodeParserException("Unterminated quotes", code);
             }
 
-            // Encode a string
-            string encodeString(string value)
-            {
-                return '"' + value.Replace("\"", "\"\"").Replace("'", "''") + '"';
-            }
-
-            // Convert an object to a string value
-#warning This function cannot output empty arrays yet
-            string objectToString(object? obj, bool wantsCount, bool encodeStrings)
-            {
-                if (obj is null)
-                {
-                    return "null";
-                }
-                if (obj is bool boolValue)
-                {
-                    return boolValue ? "true" : "false";
-                }
-                if (obj is char charValue)
-                {
-                    return encodeStrings ? $"'{charValue}'" : charValue.ToString();
-                }
-                if (obj is string stringValue)
-                {
-                    if (wantsCount)
-                    {
-                        return stringValue.Length.ToString();
-                    }
-                    return encodeStrings ? encodeString(stringValue) : stringValue;
-                }
-                if (obj is int intValue)
-                {
-                    return intValue.ToString("G", CultureInfo.InvariantCulture);
-                }
-                if (obj is uint uintValue)
-                {
-                    return uintValue.ToString("G", CultureInfo.InvariantCulture);
-                }
-                if (obj is float floatValue)
-                {
-                    return floatValue.ToString("G", CultureInfo.InvariantCulture);
-                }
-                if (obj is long longValue)
-                {
-                    return longValue.ToString("G", CultureInfo.InvariantCulture);
-                }
-                if (obj is DateTime dateTimeValue)
-                {
-                    return encodeStrings ? $"\"{dateTimeValue:s}\"" : dateTimeValue.ToString("s");
-                }
-                if (wantsCount && obj is IList list)
-                {
-                    return list.Count.ToString();
-                }
-                if (obj is bool[] boolArray)
-                {
-                    return '{' + string.Join(',', boolArray.Select(boolValue => boolValue ? "true" : "false")) + (boolArray.Length == 1 ? ",}" : "}");
-                }
-                if (obj is char[] charArray)
-                {
-                    return '{' + string.Join(',', charArray.Select(charValue => $"'{charValue}'")) + (charArray.Length == 1 ? ",}" : "}");
-                }
-                if (obj is string[] stringArray)
-                {
-                    return '{' + string.Join(',', stringArray.Select(stringValue => encodeString(stringValue))) + (stringArray.Length == 1 ? ",}" : "}");
-                }
-                if (obj is int[] intArray)
-                {
-                    return '{' + string.Join(',', intArray.Select(intValue => intValue.ToString("G", CultureInfo.InvariantCulture))) + (intArray.Length == 1 ? ",}" : "}");
-                }
-                if (obj is uint[] uintArray)
-                {
-                    return '{' + string.Join(',', uintArray.Select(uintValue => uintValue.ToString("G", CultureInfo.InvariantCulture))) + (uintArray.Length == 1 ? ",}" : "}");
-                }
-                if (obj is float[] floatArray)
-                {
-                    return '{' + string.Join(',', floatArray.Select(floatValue => floatValue.ToString("G", CultureInfo.InvariantCulture))) + (floatArray.Length == 1 ? ",}" : "}");
-                }
-                if (obj is long[] longArray)
-                {
-                    return '{' + string.Join(',', longArray.Select(longValue => longValue.ToString("G", CultureInfo.InvariantCulture))) + (longArray.Length == 1 ? ",}" : "}");
-                }
-                if (obj is object[] objectArray)
-                {
-                    return '{' + string.Join(',', objectArray.Select(objectValue => objectToString(objectValue, false, true))) + (objectArray.Length == 1 ? ",}" : "}");
-                }
-                if (!wantsCount && obj is IList)
-                {
-                    throw new CodeParserException("missing array index", code);
-                }
-                if (obj.GetType().IsClass)
-                {
-                    return "{object}";
-                }
-                return obj.ToString() ?? "null";
-            }
-
             // Finish a token before appending it to the resulting expression
             async Task appendToken(StringBuilder result, StringBuilder lastToken)
             {
@@ -587,7 +587,7 @@ namespace DuetControlServer.Model
                             {
                                 if (Filter.GetSpecific(filterString, true, out object? sbcField))
                                 {
-                                    string subResult = objectToString(sbcField, wantsCount, true);
+                                    string subResult = objectToString(sbcField, wantsCount, true, code);
                                     result.Append(subResult);
                                 }
                                 else
@@ -649,7 +649,7 @@ namespace DuetControlServer.Model
                                 return code.File.LastResult;
                             }
 
-                        // TODO in order to improve performance we could check for extra RRF consts here as well (like pi etc)
+                            // TODO in order to improve performance we could check for extra RRF consts here as well (like pi etc)
                     }
 
                     // Check for character
@@ -775,7 +775,7 @@ namespace DuetControlServer.Model
                                 }
                                 fnResult = await fn!(code.Channel, functionName, arguments.ToArray());
                             }
-                            result.Append(objectToString(fnResult, wantsCount, true));
+                            result.Append(objectToString(fnResult, wantsCount, true, code));
                         }
                         else
                         {
@@ -883,8 +883,22 @@ namespace DuetControlServer.Model
             {
                 return expressionContent;
             }
-            object? expressionValue = await SPI.Interface.EvaluateExpression(code.Channel, expressionContent);
-            return objectToString(expressionValue, false, encodeResult);
+            return await SPI.Interface.EvaluateExpression(code.Channel, expressionContent);
+        }
+
+        /// <summary>
+        /// Evaluate expression(s)
+        /// </summary>
+        /// <param name="code">Code holding the expression(s)</param>
+        /// <param name="expression">Expression(s) to replace</param>
+        /// <param name="onlySbcFields">Whether to replace only SBC fields</param>
+        /// <param name="encodeResult">Whether the final result shall be encoded</param>
+        /// <returns>Replaced expression(s)</returns>
+        /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
+        public static async Task<string> EvaluateExpression(Code code, string expression, bool onlySbcFields, bool encodeResult)
+        {
+            object? result = await EvaluateExpressionRaw(code, expression, onlySbcFields, encodeResult);
+            return (onlySbcFields && result is string resultString) ? resultString : objectToString(result, false, encodeResult, code);
         }
     }
 }

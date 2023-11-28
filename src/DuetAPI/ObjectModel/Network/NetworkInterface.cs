@@ -147,5 +147,20 @@
 			set => SetPropertyValue(ref _type, value);
         }
         private NetworkInterfaceType _type = NetworkInterfaceType.WiFi;
+
+        /// <summary>
+        /// WiFi country code if this is a WiFi adapter and if the country code can be determined
+        /// </summary>
+        /// <remarks>
+        /// For this setting to be populated in SBC mode it is required to have the DuetPiManagementPlugin running.
+        /// This is required due to missing Linux permissions of the control server.
+        /// </remarks>
+        [SbcProperty(false)]
+        public string? WifiCountry
+        {
+            get => _wifiCountry;
+            set => SetPropertyValue(ref _wifiCountry, value);
+        }
+        private string? _wifiCountry;
     }
 }

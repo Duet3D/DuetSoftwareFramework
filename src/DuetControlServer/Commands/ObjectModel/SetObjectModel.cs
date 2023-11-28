@@ -18,11 +18,6 @@ namespace DuetControlServer.Commands
         /// <returns>Asynchronous task</returns>
         public override Task<bool> Execute()
         {
-            if (!Settings.NoSpi)
-            {
-                throw new InvalidOperationException("Command is only supported in non-SPI mode");
-            }
-
             if (!IPC.LockManager.IsLocked)
             {
                 throw new InvalidOperationException("Machine model has not been locked");
@@ -38,7 +33,7 @@ namespace DuetControlServer.Commands
             // Try to find the object that the path references
             string lastPathItem = "<root>";
             object? obj = Model.Provider.Get;
-            for (int i = 0; i < pathItems.Length - 2; i++)
+            for (int i = 0; i < pathItems.Length - 1; i++)
             {
                 string pathItem = pathItems[i];
                 if (string.IsNullOrWhiteSpace(pathItem))

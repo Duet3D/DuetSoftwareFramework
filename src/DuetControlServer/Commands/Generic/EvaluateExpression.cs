@@ -24,7 +24,7 @@ namespace DuetControlServer.Commands
             }
 
             // Attempt to evaluate the expression internally and pass it on to RRF otherwise
-            return Model.Expressions.EvaluateExpression(new Code() { Channel = Channel }, Expression, false, false);
+            return await Model.Expressions.EvaluateExpressionRaw(new Code() { Channel = Channel }, Expression, false, false);
         }
     }
 }

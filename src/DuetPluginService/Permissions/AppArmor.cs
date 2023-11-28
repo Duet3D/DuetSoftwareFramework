@@ -68,6 +68,7 @@ namespace DuetPluginService.Permissions
                             rules.AppendLine("  network,");
                             break;
                         case SbcPermissions.WebcamAccess:
+                            rules.AppendLine("  /dev/media* rwmlk,");
                             rules.AppendLine("  /dev/video* rwmlk,");
                             rules.AppendLine("  /usr/bin/libcamerify rm,");
                             rules.AppendLine("  /usr/share/libcamera/** r,");

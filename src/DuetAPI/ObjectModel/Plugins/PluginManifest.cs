@@ -181,6 +181,16 @@ namespace DuetAPI.ObjectModel
         public ModelCollection<string> SbcExtraExecutables { get; } = new ModelCollection<string>();
 
         /// <summary>
+        /// Automatically restart the SBC process when terminated
+        /// </summary>
+        public bool SbcAutoRestart
+        {
+            get => _sbcAutoRestart;
+            set => SetPropertyValue(ref _sbcAutoRestart, value);
+        }
+        private bool _sbcAutoRestart;
+
+        /// <summary>
         /// Defines if messages from stdout/stderr are output as generic messages
         /// </summary>
         public bool SbcOutputRedirected

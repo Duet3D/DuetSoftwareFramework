@@ -18,14 +18,6 @@ namespace DuetControlServer.Commands
         /// Lock the machine model for write access
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public override async Task Execute()
-        {
-            if (!Settings.NoSpi)
-            {
-                throw new InvalidOperationException("Command is only supported in non-SPI mode");
-            }
-
-            await LockManager.LockMachineModel(Connection!);
-        }
+        public override Task Execute() => LockManager.LockMachineModel(Connection!);
     }
 }

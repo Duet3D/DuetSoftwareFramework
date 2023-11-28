@@ -84,6 +84,9 @@ namespace DuetPiManagementPlugin
             // Create an intercepting connection for codes that are not supported natively by DCS
             await Connection.Connect(InterceptionMode.Pre, null, CodesToIntercept, false, socketPath);
 
+            // Keep the WiFi country up-to-date
+            await CountryCodeUpdater.Init(socketPath);
+
             // Deal with program termination requests (SIGTERM and Ctrl+C)
             AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
             {

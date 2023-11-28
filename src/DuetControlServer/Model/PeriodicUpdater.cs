@@ -144,6 +144,9 @@ namespace DuetControlServer.Model
         /// </summary>
         private static async void UpdateNetwork(System.Net.NetworkInformation.NetworkInterface[] networkInterfaces)
         {
+            // DCS does not maintain the WiFi country code, so we need to cache it if was populated before
+            string? wifiCountry = Provider.Get.Network.Interfaces.FirstOrDefault(iface => iface.WifiCountry != null)?.WifiCountry;
+
             int index = 0;
             foreach (System.Net.NetworkInformation.NetworkInterface iface in networkInterfaces)
             {
@@ -207,7 +210,6 @@ namespace DuetControlServer.Model
                         System.Net.NetworkInformation.OperationalStatus.Dormant => NetworkState.Idle,
                         _ => null,
                     };
-                    networkInterface.Type = iface.Name.StartsWith("w") ? NetworkInterfaceType.WiFi : NetworkInterfaceType.LAN;
 
                     // Note that iface.NetworkInterfaceType is broken on Unix and cannot be used (.NET 5-6)
                     if (iface.Name.StartsWith('w'))
@@ -255,12 +257,14 @@ namespace DuetControlServer.Model
                             _logger.Debug(e);
                         }
                         networkInterface.Type = NetworkInterfaceType.WiFi;
+                        networkInterface.WifiCountry = wifiCountry;
                     }
                     else
                     {
                         networkInterface.Signal = null;
                         networkInterface.SSID = null;
                         networkInterface.Type = NetworkInterfaceType.LAN;
+                        networkInterface.WifiCountry = null;
                     }
                 }
             }
