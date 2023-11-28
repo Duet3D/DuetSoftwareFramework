@@ -388,7 +388,9 @@ namespace DuetControlServer.FileExecution
                     }
                     finally
                     {
-                        codePool.Enqueue(code);
+                        // Codes holding meta G-code keywords may be still referenced by the underlying code file.
+                        // Do not reuse it if that is the case, else we can get out-of-order execution!
+                        codePool.Enqueue((code.Keyword == KeywordType.None) ? code : new Code());
                     }
                 }
                 else
