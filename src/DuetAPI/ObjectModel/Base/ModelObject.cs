@@ -295,19 +295,27 @@ namespace DuetAPI.ObjectModel
                         {
                             newPropertyValue = (IModelObject?)Activator.CreateInstance(property.PropertyType);
                         }
-                        newPropertyValue = newPropertyValue!.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
-                        if (propertyValue != newPropertyValue)
+
+                        try
                         {
-                            if (property.SetMethod is not null)
+                            newPropertyValue = newPropertyValue!.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                            if (propertyValue != newPropertyValue)
                             {
-                                property.SetValue(this, newPropertyValue);
-                            }
+                                if (property.SetMethod is not null)
+                                {
+                                    property.SetValue(this, newPropertyValue);
+                                }
 #if VERIFY_OBJECT_MODEL
-                            else
-                            {
-                                Console.WriteLine("[warn] Tried to assign unsettable property {0} = {1}", jsonProperty.Name, jsonProperty.Value.GetRawText());
-                            }
+                                else
+                                {
+                                    Console.WriteLine("[warn] Tried to assign unsettable property {0} = {1}", jsonProperty.Name, jsonProperty.Value.GetRawText());
+                                }
 #endif
+                            }
+                        }
+                        catch (JsonException e) when (ObjectModel.DeserializationFailed(this, property.PropertyType, jsonProperty.Value.Clone(), e))
+                        {
+                            // suppressed
                         }
                     }
                     else

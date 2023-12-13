@@ -17,10 +17,7 @@ namespace DuetAPI.Utility
         /// <summary>
         /// Creates a new instance
         /// </summary>
-        public JsonCamelCaseStringEnumConverter()
-        {
-            _converter = new JsonStringEnumConverter(JsonNamingPolicy.CamelCase);
-        }
+        public JsonCamelCaseStringEnumConverter() => _converter = new JsonStringEnumConverter(JsonNamingPolicy.CamelCase);
 
         /// <summary>
         /// Checks if the given type can be converted
@@ -35,9 +32,6 @@ namespace DuetAPI.Utility
         /// <param name="typeToConvert">Type to convert</param>
         /// <param name="options">Conversion options</param>
         /// <returns>JSON converter</returns>
-        public override JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options)
-        {
-            return _converter.CreateConverter(typeToConvert, options);
-        }
+        public override JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options) => _converter.CreateConverter(typeToConvert, options);
     }
 }

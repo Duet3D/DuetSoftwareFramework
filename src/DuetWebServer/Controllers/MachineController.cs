@@ -717,7 +717,7 @@ namespace DuetWebServer.Controllers
                     return NoContent();
                 }
 
-                return NotFound(HttpUtility.UrlPathEncode(from));
+                return force ? NoContent() : NotFound(HttpUtility.UrlPathEncode(from));
             }
             catch (Exception e)
             {
