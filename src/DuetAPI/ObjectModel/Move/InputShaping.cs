@@ -36,14 +36,15 @@
         private float _frequency = 40F;
 
         /// <summary>
-        /// Minimum acceleration (in mm/s)
+        /// Minimum fraction of the original acceleration or feed rate to which the acceleration or
+        /// feed rate may be reduced in order to apply input shaping
         /// </summary>
-        public float MinAcceleration
+        public float ReductionLimit
         {
-            get => _minAcceleration;
-            set => SetPropertyValue(ref _minAcceleration, value);
+            get => _reductionLimit;
+            set => SetPropertyValue(ref _reductionLimit, value);
         }
-        private float _minAcceleration = 10F;
+        private float _reductionLimit = 0.25F;
 
         /// <summary>
         /// Configured input shaping type
