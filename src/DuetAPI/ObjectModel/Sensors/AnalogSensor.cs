@@ -66,14 +66,14 @@
         private float? _r25;
 
         /// <summary>
-        /// Series resistance of this sensor channel
+        /// Series resistance of this sensor channel (only applicable for thermistors)
         /// </summary>
-        public float RRef
+        public float? RRef
         {
             get => _rRef;
             set => SetPropertyValue(ref _rRef, value);
         }
-        private float _rRef;
+        private float? _rRef;
 
         /// <summary>
         /// State of this sensor
