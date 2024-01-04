@@ -177,7 +177,7 @@ build_plugins() {
 
 	rm -rf $DEST_DIR/duetpimanagementplugin_$dsfver/
 	mkdir -p $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin/dsf
-	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin/dsf $SRC_DIR/DuetPiManagementPlugin/DuetPiManagementPlugin.csproj /p:PublishTrimmed=true /noWarn:IL2026,IL2070,IL2072,IL2087
+	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin/dsf $SRC_DIR/DuetPiManagementPlugin/DuetPiManagementPlugin.csproj
 	[ -d $COMMON_DIR/duetpimanagementplugin/ ] && $RSYNC $COMMON_DIR/duetpimanagementplugin/. $DEST_DIR/duetpimanagementplugin_$dsfver/
 	[ -d $PACKAGER_DIR/duetpimanagementplugin/ ] && $RSYNC $PACKAGER_DIR/duetpimanagementplugin/. $DEST_DIR/duetpimanagementplugin_$dsfver/
 	chmod +x $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin/dsf/gen-https-cert.sh

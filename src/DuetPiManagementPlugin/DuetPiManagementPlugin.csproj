@@ -3,6 +3,7 @@
 		<Nullable>enable</Nullable>
 		<TargetFramework>net6.0</TargetFramework>
 		<OutputType>Exe</OutputType>
+		<TrimUnusedDependencies>true</TrimUnusedDependencies>
 		<PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
 	</PropertyGroup>
 
