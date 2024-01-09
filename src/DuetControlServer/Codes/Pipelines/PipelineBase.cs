@@ -100,7 +100,7 @@ namespace DuetControlServer.Codes.Pipelines
                                 builder.Append("Idle");
                             }
 
-                            if (stackItem.PendingCodes.Reader.Count > 0)
+                            if (stackItem.PendingCodes.Reader.CanCount && stackItem.PendingCodes.Reader.Count > 0)
                             {
                                 builder.Append(" (");
                                 builder.Append(stackItem.PendingCodes.Reader.Count);
