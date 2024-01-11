@@ -14,7 +14,7 @@ namespace DuetPiManagementPlugin.Network
     /// <summary>
     /// Functions for WiFi network management via wpa_supplicant
     /// </summary>
-    public static class WPA
+    public static class WpaSupplicant
     {
         /// <summary>
         /// Start wpa_supplicant for station mode
@@ -25,7 +25,7 @@ namespace DuetPiManagementPlugin.Network
             StringBuilder builder = new();
             if (!await Command.ExecQuery("systemctl", "is-enabled -q wpa_supplicant.service"))
             {
-                builder.AppendLine(await SetIPAddress(null, null, null, null));
+                builder.AppendLine(await DHCP.SetIPAddress("wlan0", null, null, null, null));
                 builder.AppendLine(await Command.Execute("systemctl", "start wpa_supplicant.service"));
                 builder.AppendLine(await Command.Execute("systemctl", "enable -q wpa_supplicant.service"));
             }
@@ -115,7 +115,6 @@ namespace DuetPiManagementPlugin.Network
             {
                 StringBuilder builder = new();
 
-                // List SSIDs
                 builder.AppendLine("Remembered networks:");
                 foreach (string ssid in ssids)
                 {
@@ -188,7 +187,7 @@ namespace DuetPiManagementPlugin.Network
         /// <param name="ssid">SSID to update or an asterisk with password set to null to delete all the profiles</param>
         /// <param name="psk">Password of the new network or null to delete it</param>
         /// <param name="countryCode">Optional country code, must be set if no country code is present yet</param>
-        /// <returns></returns>
+        /// <returns>Update result</returns>
         public static async Task<Message> UpdateSSID(string? ssid, string? psk, string? countryCode = null)
         {
             // Create template if it doesn't already exist or if the 
@@ -322,20 +321,6 @@ namespace DuetPiManagementPlugin.Network
                 result.Content += '\n' + restartResult;
             }
             return result;
-        }
-
-        /// <summary>
-        /// Update the IP address of the WiFi network interface
-        /// </summary>
-        /// <param name="ip">IP address or null if unchanged</param>
-        /// <param name="netmask">Subnet mask or null if unchanged</param>
-        /// <param name="gateway">Gateway or null if unchanged</param>
-        /// <param name="netmask">Subnet mask or null if unchanged</param>
-        /// <param name="dnsServer">Set IP address for AP mode</param>
-        /// <returns>Asynchronous task</returns>
-        public static Task<string> SetIPAddress(IPAddress? ip, IPAddress? netmask, IPAddress? gateway, IPAddress? dnsServer, bool forAP = false)
-        {
-            return DHCP.SetIPAddress("wlan0", ip, netmask, gateway, dnsServer, forAP);
         }
     }
 }

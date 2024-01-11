@@ -303,13 +303,7 @@ namespace DuetPiManagementPlugin
                             if (await Connection.Flush(CancellationToken))
                             {
                                 bool hasPParam = code.TryGetString('P', out string? pParam), hasSParam = code.TryGetInt('S', out int? sParam);
-                                if (hasPParam && hasSParam)
-                                {
-                                    StringBuilder builder = new();
-                                    await Network.Interface.Report(builder, null, code.GetInt('I', -1));
-                                    await Connection.ResolveCode(MessageType.Success, builder.ToString().TrimEnd(), CancellationToken);
-                                }
-                                else
+                                if (hasPParam || hasSParam)
                                 {
                                     int index = code.GetInt('I', 0);
                                     try
@@ -322,6 +316,12 @@ namespace DuetPiManagementPlugin
                                         await Connection.ResolveCode(MessageType.Error, e.Message, CancellationToken);
                                         Console.WriteLine(e);
                                     }
+                                }
+                                else
+                                {
+                                    StringBuilder builder = new();
+                                    await Network.Interface.Report(builder, null, code.GetInt('I', -1));
+                                    await Connection.ResolveCode(MessageType.Success, builder.ToString().TrimEnd(), CancellationToken);
                                 }
                             }
                             else
@@ -437,20 +437,20 @@ namespace DuetPiManagementPlugin
                                     code.TryGetIPAddress('K', out IPAddress? netmask);
                                     code.TryGetIPAddress('L', out IPAddress? dnsServer);
 
-                                    if ((ssid is null || psk is null) && countryCode is null)
+                                    if (ssid is null && countryCode is null)
                                     {
                                         // Output currently configured SSIDs
-                                        Message ssidReport = await Network.WPA.Report();
+                                        Message ssidReport = await Network.Interface.ReportSSIDs();
                                         await Connection.ResolveCode(ssidReport, CancellationToken);
                                     }
                                     else
                                     {
                                         // Update SSID/PSK and/or country code
-                                        Message configResult = await Network.WPA.UpdateSSID(ssid, psk, countryCode);
+                                        Message configResult = await Network.Interface.UpdateSSID(ssid, psk, countryCode);
                                         if (configResult.Type == MessageType.Success)
                                         {
                                             // Update IP configuration as well if needed
-                                            string setIPResult = await Network.WPA.SetIPAddress(ip, netmask, gateway, dnsServer);
+                                            string setIPResult = await Network.Interface.SetIPAddress("wlan0", ip, netmask, gateway, dnsServer);
                                             configResult.Content = (configResult.Content + '\n' + setIPResult).Trim();
                                         }
                                         await Connection.ResolveCode(configResult, CancellationToken);
@@ -475,7 +475,7 @@ namespace DuetPiManagementPlugin
                                 try
                                 {
                                     // Remove SSID(s) if possible
-                                    Message configResult = await Network.WPA.UpdateSSID(code.GetString('S'), null);
+                                    Message configResult = await Network.Interface.UpdateSSID(code.GetString('S'), null);
                                     await Connection.ResolveCode(configResult, CancellationToken);
                                 }
                                 catch (Exception e)
@@ -497,7 +497,7 @@ namespace DuetPiManagementPlugin
                                 try
                                 {
                                     // Set up hostapd configuration
-                                    Message configResult = await Network.AccessPoint.Configure(code.GetString('S'), code.GetString('P'), code.GetIPAddress('I'), code.GetInt('C', 6));
+                                    Message configResult = await Network.AccessPoint.Configure(code.GetString('S'), code.GetString('P'), code.GetIPAddress('I', IPAddress.Any), code.GetInt('C', 6));
                                     await Connection.ResolveCode(configResult, CancellationToken);
                                 }
                                 catch (Exception e)

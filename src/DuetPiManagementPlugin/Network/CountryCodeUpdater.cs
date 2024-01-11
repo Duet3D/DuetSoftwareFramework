@@ -74,7 +74,12 @@ namespace DuetPiManagementPlugin
             try
             {
                 string? countryCode = null;
-                if (File.Exists("/etc/default/crda"))
+                if (await NetworkManager.IsActive())
+                {
+                    // CRDA is deprecated in Bookworm, use an alternative
+                    countryCode = await NetworkManager.GetWiFiCountry();
+                }
+                else if (File.Exists("/etc/default/crda"))
                 {
                     // CRDA may override cfg80211, so we check this first
                     try
@@ -99,7 +104,7 @@ namespace DuetPiManagementPlugin
                 else
                 {
                     // Try to fall back to wpa_supplicant
-                    countryCode = await WPA.GetCountryCode();
+                    countryCode = await WpaSupplicant.GetCountryCode();
                     if (string.IsNullOrWhiteSpace(countryCode) && File.Exists("/sys/module/cfg80211/parameters/ieee80211_regdom"))
                     {
                         // If CRDA is not present and wpa_supplicant didn't set the regdom, it may be configured via cfg80211

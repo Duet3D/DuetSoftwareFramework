@@ -18,6 +18,10 @@ namespace DuetPiManagementPlugin.Network
         /// <returns>True if the adapter is in AP mode</returns>
         public static async Task<bool> IsEnabled()
         {
+            if (await NetworkManager.IsActive())
+            {
+                return await NetworkManager.IsHotspotEnabled();
+            }
             return File.Exists("/etc/hostapd/wlan0.conf") && (await Command.ExecQuery("systemctl", "is-active -q hostapd@wlan0.service"));
         }
 
@@ -28,15 +32,22 @@ namespace DuetPiManagementPlugin.Network
         public static async Task<string> Start()
         {
             StringBuilder builder = new();
-            if (!await Command.ExecQuery("systemctl", "is-active -q hostapd@wlan0.service"))
+            if (await NetworkManager.IsActive())
             {
-                builder.AppendLine(await Command.Execute("systemctl", "start hostapd@wlan0.service"));
-                builder.AppendLine(await Command.Execute("systemctl", "enable -q hostapd@wlan0.service"));
+                builder.AppendLine(await NetworkManager.StartHotspot());
             }
-            if (!await Command.ExecQuery("systemctl", "is-active -q dnsmasq.service"))
+            else
             {
-                builder.AppendLine(await Command.Execute("systemctl", "start dnsmasq.service"));
-                builder.AppendLine(await Command.Execute("systemctl", "enable -q dnsmasq.service"));
+                if (!await Command.ExecQuery("systemctl", "is-active -q hostapd@wlan0.service"))
+                {
+                    builder.AppendLine(await Command.Execute("systemctl", "start hostapd@wlan0.service"));
+                    builder.AppendLine(await Command.Execute("systemctl", "enable -q hostapd@wlan0.service"));
+                }
+                if (!await Command.ExecQuery("systemctl", "is-active -q dnsmasq.service"))
+                {
+                    builder.AppendLine(await Command.Execute("systemctl", "start dnsmasq.service"));
+                    builder.AppendLine(await Command.Execute("systemctl", "enable -q dnsmasq.service"));
+                }
             }
             return builder.ToString().Trim();
         }
@@ -48,15 +59,22 @@ namespace DuetPiManagementPlugin.Network
         public static async Task<string> Stop()
         {
             StringBuilder builder = new();
-            if (await Command.ExecQuery("systemctl", "is-active -q hostapd@wlan0.service"))
+            if (await NetworkManager.IsActive())
             {
-                builder.AppendLine(await Command.Execute("systemctl", "stop hostapd@wlan0.service"));
-                builder.AppendLine(await Command.Execute("systemctl", "disable -q hostapd@wlan0.service"));
+                builder.AppendLine(await NetworkManager.StopHotspot());
             }
-            if (await Command.ExecQuery("systemctl", "is-active -q dnsmasq.service"))
+            else
             {
-                builder.AppendLine(await Command.Execute("systemctl", "stop dnsmasq.service"));
-                builder.AppendLine(await Command.Execute("systemctl", "disable -q dnsmasq.service"));
+                if (await Command.ExecQuery("systemctl", "is-active -q hostapd@wlan0.service"))
+                {
+                    builder.AppendLine(await Command.Execute("systemctl", "stop hostapd@wlan0.service"));
+                    builder.AppendLine(await Command.Execute("systemctl", "disable -q hostapd@wlan0.service"));
+                }
+                if (await Command.ExecQuery("systemctl", "is-active -q dnsmasq.service"))
+                {
+                    builder.AppendLine(await Command.Execute("systemctl", "stop dnsmasq.service"));
+                    builder.AppendLine(await Command.Execute("systemctl", "disable -q dnsmasq.service"));
+                }
             }
             return builder.ToString().Trim();
         }
@@ -71,7 +89,13 @@ namespace DuetPiManagementPlugin.Network
         /// <returns></returns>
         public static async Task<Message> Configure(string ssid, string psk, IPAddress ipAddress, int channel)
         {
-            string? countryCode = await WPA.GetCountryCode();
+            if (await NetworkManager.IsActive())
+            {
+                NetworkManager.ConfigureHotspot(ssid, psk, ipAddress, channel);
+                return new Message();
+            }
+
+            string? countryCode = await WpaSupplicant.GetCountryCode();
             if (string.IsNullOrWhiteSpace(countryCode))
             {
                 return new Message(MessageType.Error, "Cannot configure access point because no country code has been set. Use M587 C to set it first");
@@ -96,7 +120,7 @@ namespace DuetPiManagementPlugin.Network
                 if (fileDeleted)
                 {
                     // Reset IP address configuration to station mode
-                    await WPA.SetIPAddress(IPAddress.Any, null, null, null);
+                    await DHCP.SetIPAddress("wlan0", IPAddress.Any, null, null, null);
                 }
             }
             else
@@ -151,7 +175,7 @@ namespace DuetPiManagementPlugin.Network
                 }
 
                 // Set IP address configuration for AP mode
-                await WPA.SetIPAddress(ipAddress, null, null, null, true);
+                await DHCP.SetIPAddress("wlan0", ipAddress, null, null, null, true);
             }
 
             // Done
