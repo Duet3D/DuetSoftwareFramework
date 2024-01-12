@@ -31,7 +31,7 @@ To use all the features of this plugin, the following packages should be install
 
 ## Build instructions
 
-This plugin requires .NET 5 SDK to be installed first.
+This plugin requires the .NET SDK to be installed first.
 
 1. Open a command prompt in this directory
 2. Run `dotnet publish -r linux-arm -o .\zip\dsf\ /p:PublishTrimmed=true`
@@ -46,4 +46,4 @@ Unlike in RRF the changes performed by this plugin are permanently saved. This m
 In addition it comes with the following limitations:
 
 - `M586 P2 R` cannot be used to set the Telnet port. If this is required, the file `/etc/inetd.conf` must be manually edited (change `telnet` to a port of your choice).
-- `M587` does not save the IP address configuration per SSID. Once set, the configuration is used for every available SSID
+- Unless NetworkManager is used (Debian Bookworm or newer), `M587` does not save the IP address configuration per SSID. Once set, the configuration is used for every available SSID
