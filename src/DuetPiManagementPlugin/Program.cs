@@ -4,6 +4,7 @@ using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetAPIClient;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Reflection;
@@ -41,6 +42,7 @@ namespace DuetPiManagementPlugin
             "M587",     // Add WiFi host network to remembered list, or list remembered networks
             "M588",     // Forget WiFi host network
             "M589",     // Configure access point parameters
+            "M997",     // Perform update
             "M999"      // Reboot or shutdown SBC (priority codes are not handled)
         };
 
@@ -512,7 +514,65 @@ namespace DuetPiManagementPlugin
                             }
                             break;
 
-                        // Reboot SBC
+                        // Perform update
+                        case 997:
+                            if (code.GetInt('S', 0) == 2)
+                            {
+                                if (await Connection.Flush(CancellationToken))
+                                {
+                                    try
+                                    {
+                                        // Put DSF into update status
+                                        await Connection.SetUpdateStatus(true);
+
+                                        // Get package lists
+                                        using (Process updateProcess = Process.Start("/usr/bin/apt-get", "-y update"))
+                                        {
+                                            await updateProcess.WaitForExitAsync(CancelSource.Token);
+                                            if (updateProcess.ExitCode != 0)
+                                            {
+                                                throw new Exception("Update process return non-zero exit code");
+                                            }
+                                        }
+
+                                        // Perform upgrade
+                                        using (Process upgradeProcess = Process.Start("/usr/bin/unattended-upgrade"))
+                                        {
+                                            await upgradeProcess.WaitForExitAsync(CancelSource.Token);
+                                            if (upgradeProcess.ExitCode != 0)
+                                            {
+                                                throw new Exception("Upgrade process return non-zero exit code");
+                                            }
+                                        }
+
+                                        // Done
+                                        await Connection.SetUpdateStatus(false, CancelSource.Token);
+                                        await Connection.ResolveCode(MessageType.Success, string.Empty, CancelSource.Token);
+                                    }
+                                    catch (OperationCanceledException)
+                                    {
+                                        // Plugin is being updated, attempt to resolve the code at last
+                                        await Connection.ResolveCode(MessageType.Success, string.Empty);
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        // Something went wrong
+                                        await Connection.SetUpdateStatus(false, CancelSource.Token);
+                                        await Connection.ResolveCode(MessageType.Error, $"Failed to perform update: ${e.Message}", CancelSource.Token);
+                                    }
+                                }
+                                else
+                                {
+                                    await Connection.CancelCode(CancellationToken);
+                                }
+                            }
+                            else
+                            {
+                                await Connection.IgnoreCode(CancellationToken);
+                            }
+                            break;
+
+                        // Reboot or shut down SBC
                         case 999:
                             if (code.GetInt('B', 0) == -1)
                             {
