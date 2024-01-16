@@ -162,7 +162,7 @@ namespace DuetControlServer.SPI
             {
                 foreach (EvaluateExpressionRequest item in _evaluateExpressionRequests)
                 {
-                    if (item.Expression == expression)
+                    if (item.Channel == channel && item.Expression == expression)
                     {
                         // There is no reason to evaluate the same expression twice...
                         return item.Task;
@@ -1246,7 +1246,9 @@ namespace DuetControlServer.SPI
             {
                 foreach (EvaluateExpressionRequest request in _evaluateExpressionRequests)
                 {
-                    if (request.Expression == expression)
+                    // FIXME This should continue to work, but the next time the protocol is
+                    // updated, the evaluation response should include the channel as well
+                    if (request.Written && /*request.Channel == channel &&*/ request.Expression == expression)
                     {
                         if (result is Exception exception)
                         {
@@ -1329,7 +1331,7 @@ namespace DuetControlServer.SPI
             DataTransfer.ReadEvaluationResult(out string varName, out object? result);
             _logger.Trace("Received variable assignment result for {0} = {1}", varName, result);
 
-            lock (_evaluateExpressionRequests)
+            lock (_variableRequests)
             {
                 foreach (VariableRequest request in _variableRequests)
                 {
