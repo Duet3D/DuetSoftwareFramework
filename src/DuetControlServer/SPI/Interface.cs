@@ -820,13 +820,21 @@ namespace DuetControlServer.SPI
                     {
                         foreach (EvaluateExpressionRequest request in _evaluateExpressionRequests)
                         {
-                            if (!request.Written && DataTransfer.WriteEvaluateExpression(request.Channel, request.Expression))
+                            if (!request.Written)
                             {
-                                request.Written = true;
-
-                                numEvaluationsSent++;
-                                if (numEvaluationsSent >= Consts.MaxEvaluationRequestsPerTransfer)
+                                if (DataTransfer.WriteEvaluateExpression(request.Channel, request.Expression))
                                 {
+                                    request.Written = true;
+
+                                    numEvaluationsSent++;
+                                    if (numEvaluationsSent >= Consts.MaxEvaluationRequestsPerTransfer)
+                                    {
+                                        break;
+                                    }
+                                }
+                                else
+                                {
+                                    // Don't attempt to write any more evaluation requests, else we risk getting out of order
                                     break;
                                 }
                             }
@@ -858,6 +866,11 @@ namespace DuetControlServer.SPI
                                     {
                                         break;
                                     }
+                                }
+                                else
+                                {
+                                    // Don't attempt to write any more variable requests, else we risk getting out of order
+                                    break;
                                 }
                             }
                         }
