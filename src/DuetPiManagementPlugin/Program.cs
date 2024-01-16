@@ -377,7 +377,7 @@ namespace DuetPiManagementPlugin
                                     if (code.TryGetInt('P', out int protocol))
                                     {
                                         code.TryGetBool('S', out bool? enabled);
-                                        Message result = await Network.Protocols.Manager.ConfigureProtocols(protocol, enabled, code.GetBool('T', false), code.GetInt('R'));
+                                        Message result = await Network.Protocols.Manager.ConfigureProtocols(protocol, enabled, code.GetBool('T', false), code.GetInt('R', 0));
                                         if (string.IsNullOrWhiteSpace(result.Content) && code.HasParameter('C'))
                                         {
                                             // Let DSF/RRF process the combined C parameter
