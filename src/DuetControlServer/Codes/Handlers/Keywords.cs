@@ -40,7 +40,11 @@ namespace DuetControlServer.Codes.Handlers
                 case KeywordType.Abort:
                     if (!await Processor.FlushAsync(code, false, ifExecuting: code.Keyword == KeywordType.Echo))
                     {
-                        // echo may be executed only if the channel is active, abort is unconditional
+                        if (code.Keyword == KeywordType.Echo && !code.CancellationToken.IsCancellationRequested)
+                        {
+                            // echo may be executed only if the channel is active, abort is unconditional
+                            return new Message();
+                        }
                         throw new OperationCanceledException();
                     }
 

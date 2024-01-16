@@ -300,6 +300,10 @@ namespace DuetControlServer.FileExecution
                 codePool.Enqueue(new Code());
             }
 
+            // Wait for the object model to be updated.
+            // This is necessary to determine if the File and File2 channels are active or not
+            await Provider.WaitForUpdateAsync(cancellationToken);
+
             // Process the file being printed
             Queue<Code> codes = new();
             long nextFilePosition = 0;

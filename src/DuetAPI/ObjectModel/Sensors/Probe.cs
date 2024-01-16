@@ -105,6 +105,16 @@ namespace DuetAPI.ObjectModel
         private int _maxProbeCount = 1;
 
         /// <summary>
+        /// Measured height (only applicable for scanning probes, in mm or null)
+        /// </summary>
+        public float? MeasuredHeight
+        {
+            get => _measuredHeight;
+            set => SetPropertyValue(ref _measuredHeight, value);
+        }
+        private float? _measuredHeight;
+
+        /// <summary>
         /// X+Y offsets (in mm)
         /// </summary>
         public ModelCollection<float> Offsets { get; } = new ModelCollection<float>() { 0F, 0F };
