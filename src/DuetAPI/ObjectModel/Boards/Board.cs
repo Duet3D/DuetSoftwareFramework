@@ -121,6 +121,16 @@ namespace DuetAPI.ObjectModel
         private string? _iapFileNameSBC;
 
         /// <summary>
+        /// Amount of free RAM on this board (in bytes or null if unknown)
+        /// </summary>
+        public int? FreeRam
+        {
+            get => _freeRam;
+            set => SetPropertyValue(ref _freeRam, value);
+        }
+        private int? _freeRam;
+
+        /// <summary>
         /// Filename of the IAP binary that is used for updates from the SD card or null if unsupported
         /// </summary>
         /// <remarks>
