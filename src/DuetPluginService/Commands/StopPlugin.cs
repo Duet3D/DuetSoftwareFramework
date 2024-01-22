@@ -19,6 +19,8 @@ namespace DuetPluginService.Commands
         /// <exception cref="ArgumentException">Plugin is invalid</exception>
         public override async Task Execute()
         {
+            NLog.Logger logger = NLog.LogManager.GetLogger($"Plugin {Plugin}");
+
             using (await Plugins.LockAsync())
             {
                 // Try to find the plugin first
@@ -49,16 +51,21 @@ namespace DuetPluginService.Commands
                     try
                     {
                         // Ask process to terminate
+                        logger.Info("Attempting to stop process (pid {0})...", process.Id);
                         LinuxApi.Commands.Kill(process.Id, LinuxApi.Signal.SIGTERM);
 
                         // Wait a moment. Do not link this CTS to the main CTS because we may be shutting down at this point
                         using CancellationTokenSource timeoutCts = new(Settings.StopTimeout);
                         await process.WaitForExitAsync(timeoutCts.Token);
+
+                        // Process terminated
+                        logger.Info("Process stopped by SIGTERM");
                     }
                     catch (OperationCanceledException)
                     {
                         // Kill it and any potentially left-over child processes
                         process.Kill(true);
+                        logger.Info("Process killed");
                     }
                 }
             }
