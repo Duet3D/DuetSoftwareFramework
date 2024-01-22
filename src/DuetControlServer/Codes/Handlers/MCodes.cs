@@ -851,7 +851,7 @@ namespace DuetControlServer.Codes.Handlers
                                 }
                             }
 
-                            await Logger.StartAsync(code.GetString('P'), logLevel);
+                            await Logger.StartAsync(code.GetString('P', defaultLogFile), logLevel);
                         }
                         else
                         {
