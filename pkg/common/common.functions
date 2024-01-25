@@ -119,7 +119,7 @@ print_debug
 [ $PRINT_DEBUG -eq 1 ] && exit 0
 
 build_progs() {
-	echo "Building $DOTNET_ARCH $BUILD_TYPE (DSF $dsfver) to $DEST_DIR,,,"
+	echo "Building $DOTNET_ARCH $BUILD_TYPE (DSF $dsfver) to $DEST_DIR..."
 
 	rm -rf $DEST_DIR/files
 	mkdir -p $DEST_DIR/files
@@ -173,7 +173,7 @@ build_progs() {
 }
 
 build_plugins() {
-	echo "Building $DOTNET_ARCH $BUILD_TYPE (DMP $dsfver) to $DEST_DIR,,,"
+	echo "Building $DOTNET_ARCH $BUILD_TYPE (DMP $dsfver) to $DEST_DIR..."
 
 	rm -rf $DEST_DIR/duetpimanagementplugin_$dsfver/
 	mkdir -p $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin/dsf
@@ -181,6 +181,7 @@ build_plugins() {
 	[ -d $COMMON_DIR/duetpimanagementplugin/ ] && $RSYNC $COMMON_DIR/duetpimanagementplugin/. $DEST_DIR/duetpimanagementplugin_$dsfver/
 	[ -d $PACKAGER_DIR/duetpimanagementplugin/ ] && $RSYNC $PACKAGER_DIR/duetpimanagementplugin/. $DEST_DIR/duetpimanagementplugin_$dsfver/
 	chmod +x $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin/dsf/gen-https-cert.sh
+	chmod +x $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin/dsf/install-dsf.sh
 
 	sed -i "s/DSFVER/$dsfver/g" $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin.json
 
