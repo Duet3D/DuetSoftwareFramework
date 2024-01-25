@@ -8,7 +8,7 @@ fi
 VERSION=`echo $1 | sed 's/-/~/g'`
 
 # Determine the corresponding RRF package version. There may be multiple RRF packages per DSF version
-RRF_VERSION=`apt-cache show reprapfirmware | grep "Version:" | cut -d ' ' -f 2 | grep "$VERSION" | head -n 1`
+RRF_VERSION=`apt-cache show reprapfirmware | grep "Version:" | cut -d ' ' -f 2 | grep "$VERSION-" | head -n 1`
 if [[ -z "$RRF_VERSION" ]]; then
 	echo "Could not find RepRapFirmware package for version $1. Invalid version or wrong package feed?"
 	exit 1
