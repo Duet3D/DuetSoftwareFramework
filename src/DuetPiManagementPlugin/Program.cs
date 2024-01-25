@@ -520,12 +520,42 @@ namespace DuetPiManagementPlugin
                             {
                                 if (await Connection.Flush(CancellationToken))
                                 {
+                                    // Check if we need to change the package feed
+                                    if (code.TryGetString('F', out string? packageFeed))
+                                    {
+                                        if (!Regex.IsMatch(packageFeed, @"^(un)?stable(-\d+\.\d+)?$") && packageFeed != "dev")
+                                        {
+                                            await Connection.ResolveCode(MessageType.Error, "Invalid package feed");
+                                            break;
+                                        }
+
+                                        try
+                                        {
+                                            // Delete obsolete package lists
+                                            if (File.Exists("/etc/apt/sources.list.d/duet3d-unstable.list"))
+                                            {
+                                                File.Delete("/etc/apt/sources.list.d/duet3d-unstable.list");
+                                            }
+
+                                            // Rewrite duet3d.list
+                                            await File.WriteAllTextAsync("/etc/apt/sources.list.d/duet3d.list", $"deb https://pkg.duet3d.com/ {packageFeed} armv7");
+
+                                            // Done
+                                            await Connection.ResolveCode(MessageType.Success, string.Empty);
+                                            break;
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            await Connection.ResolveCode(MessageType.Error, $"Failed to perform update: ${e.Message}", CancelSource.Token);
+                                        }
+                                    }
+
                                     try
                                     {
                                         // Put DSF into update status
                                         await Connection.SetUpdateStatus(true);
 
-                                        // Get package lists
+                                        // Update package lists
                                         using (Process updateProcess = Process.Start("/usr/bin/apt-get", "-y update"))
                                         {
                                             await updateProcess.WaitForExitAsync(CancelSource.Token);
@@ -535,11 +565,16 @@ namespace DuetPiManagementPlugin
                                             }
                                         }
 
-                                        // Perform upgrade
-                                        using (Process upgradeProcess = Process.Start("/usr/bin/unattended-upgrade"))
+                                        string result = string.Empty;
+                                        if (code.TryGetString('V', out string? version))
                                         {
-                                            await upgradeProcess.WaitForExitAsync(CancelSource.Token);
-                                            if (upgradeProcess.ExitCode != 0)
+                                            // Install specific DSF/RRF version
+                                            result = await Command.Execute("install-dsf.sh", version);
+                                        }
+                                        else
+                                        {
+                                            // Perform upgrade
+                                            if (await Command.ExecQuery("/usr/bin/unattended-upgrade", string.Empty))
                                             {
                                                 throw new Exception("Upgrade process return non-zero exit code");
                                             }
@@ -547,7 +582,7 @@ namespace DuetPiManagementPlugin
 
                                         // Done
                                         await Connection.SetUpdateStatus(false, CancelSource.Token);
-                                        await Connection.ResolveCode(MessageType.Success, string.Empty, CancelSource.Token);
+                                        await Connection.ResolveCode(string.IsNullOrEmpty(result) ? MessageType.Success : MessageType.Error, result, CancelSource.Token);
                                     }
                                     catch (OperationCanceledException)
                                     {
