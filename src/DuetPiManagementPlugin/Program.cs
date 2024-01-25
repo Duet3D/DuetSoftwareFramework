@@ -546,7 +546,7 @@ namespace DuetPiManagementPlugin
                                         }
                                         catch (Exception e)
                                         {
-                                            await Connection.ResolveCode(MessageType.Error, $"Failed to perform update: ${e.Message}", CancelSource.Token);
+                                            await Connection.ResolveCode(MessageType.Error, $"Failed to perform update: {e.Message}", CancelSource.Token);
                                         }
                                     }
 
@@ -593,7 +593,7 @@ namespace DuetPiManagementPlugin
                                     {
                                         // Something went wrong
                                         await Connection.SetUpdateStatus(false, CancelSource.Token);
-                                        await Connection.ResolveCode(MessageType.Error, $"Failed to perform update: ${e.Message}", CancelSource.Token);
+                                        await Connection.ResolveCode(MessageType.Error, $"Failed to perform update: {e.Message}", CancelSource.Token);
                                     }
                                 }
                                 else
