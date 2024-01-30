@@ -175,7 +175,7 @@ namespace DuetControlServer.Codes.Pipelines
         public virtual void WriteCode(Commands.Code code) => throw new NotSupportedException();
 
         /// <summary>
-        /// Enqueue a given code asynchronousl;y on this pipeline state for execution
+        /// Enqueue a given code asynchronously on this pipeline state for execution
         /// </summary>
         /// <param name="code">Code to enqueue</param>
         /// <returns>Asynchronous task</returns>

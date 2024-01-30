@@ -166,7 +166,7 @@ namespace DuetControlServer.Codes
             if (codeBeingIntercepted is not null)
             {
                 // Make sure new codes from macros go the same route as regular macro codes
-                if (codeBeingIntercepted.Flags.HasFlag(CodeFlags.IsFromMacro))
+                if (code.Channel == codeBeingIntercepted.Channel && codeBeingIntercepted.Flags.HasFlag(CodeFlags.IsFromMacro))
                 {
                     code.Flags |= CodeFlags.IsFromMacro;
                     code.File = codeBeingIntercepted.File;
