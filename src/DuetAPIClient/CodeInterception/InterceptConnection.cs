@@ -44,6 +44,12 @@ namespace DuetAPIClient
         public bool AutoFlush { get; set; } = true;
 
         /// <summary>
+        /// Automatically evaluate expression parameters to their final values before sending it over to the client.
+        /// This requires <see cref="AutoFlush"/> to be true and happens when the remaining codes have been processed.
+        /// </summary>
+        public bool AutoEvaluateExpressions { get; set; } = true;
+
+        /// <summary>
         /// List of G/M/T-codes to filter or Q0 for comments
         /// </summary>
         /// <remarks>
@@ -111,6 +117,7 @@ namespace DuetAPIClient
                 InterceptionMode = mode,
                 Channels = Channels,
                 AutoFlush = AutoFlush,
+                AutoEvaluateExpressions = AutoEvaluateExpressions,
                 Filters = Filters,
                 PriorityCodes = priorityCodes
             };

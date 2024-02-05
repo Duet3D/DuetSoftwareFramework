@@ -74,8 +74,8 @@ namespace DuetPluginService.Permissions
                             rules.AppendLine("  /dev/video* rwmlk,");
                             rules.AppendLine("  /run/udev/data/** rwmlk,");
                             rules.AppendLine("  /usr/bin/libcamerify rm,");
-                            rules.AppendLine("  /usr/share/libcamera/** r,");
                             rules.AppendLine("  /usr/libexec/libcamera/* rm,");
+                            rules.AppendLine("  /usr/share/libcamera/** r,");
                             break;
                         case SbcPermissions.ReadFilaments:
                             rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "filaments")}/ r,");

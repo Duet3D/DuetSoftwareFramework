@@ -196,8 +196,37 @@ namespace DuetControlServer.Model
                         _logger.Debug(e, "Failed to get IPv4 configuration data");
                     }
 
-                    // In theory we could use ipInfo.DhcpLeaseLifetime to check if DHCP is configured but it isn't supported on Unix (.NET 5)
-                    networkInterface.ActualIP = networkInterface.ConfiguredIP = ipAddress?.ToString();
+                    // .NET cannot determine if DHCP is used for a given adapter on Linux, so use "ip -4 addr" to get the IPv4 address lifetime (if any)
+                    string? ipAddr = ipAddress?.ToString();
+                    if (ipAddr != null)
+                    {
+                        if (ipAddr != networkInterface.ActualIP && File.Exists("/usr/sbin/ip"))
+                        {
+                            try
+                            {
+                                using Process? proc = Process.Start(new ProcessStartInfo("/usr/sbin/ip", $"-4 address show dev {iface.Name}") { RedirectStandardOutput = true });
+                                if (proc != null)
+                                {
+                                    await proc.WaitForExitAsync();
+
+                                    // Static IPv4 addresses do not have limited lifetimes
+                                    string output = await proc.StandardOutput.ReadToEndAsync();
+                                    networkInterface.ConfiguredIP = output.Contains("valid_lft forever") ? ipAddr : "0.0.0.0";
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                _logger.Debug(e, "Failed to query DHCP info via ip utility");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        networkInterface.ConfiguredIP = null;
+                    }
+
+                    // Assign other IPv4 properties
+                    networkInterface.ActualIP = ipAddr;
                     networkInterface.Subnet = netMask?.ToString();
                     networkInterface.Gateway = gateway?.ToString();
                     networkInterface.DnsServer = dnsServer?.ToString();
