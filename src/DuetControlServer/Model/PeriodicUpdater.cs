@@ -200,7 +200,7 @@ namespace DuetControlServer.Model
                     string? ipAddr = ipAddress?.ToString();
                     if (ipAddr != null)
                     {
-                        if (ipAddr != networkInterface.ActualIP && File.Exists("/usr/sbin/ip"))
+                        if (File.Exists("/usr/sbin/ip"))
                         {
                             try
                             {

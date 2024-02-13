@@ -86,8 +86,8 @@ namespace DuetPluginService.Commands
                     FileName = sbcExecutable,
                     Arguments = plugin.SbcExecutableArguments,
                     WorkingDirectory = Path.GetDirectoryName(sbcExecutable),
-                    RedirectStandardError = true,
-                    RedirectStandardOutput = true
+                    RedirectStandardError = plugin.SbcOutputRedirected,
+                    RedirectStandardOutput = plugin.SbcOutputRedirected
                 };
 
                 Process? process = Process.Start(startInfo);
@@ -96,12 +96,15 @@ namespace DuetPluginService.Commands
                     throw new IOException($"Failed to create process {sbcExecutable}");
                 }
 
-                DataReceivedEventHandler outputHandler = MakeOutputHandler(Plugin, MessageType.Success, plugin.SbcOutputRedirected);
-                DataReceivedEventHandler errorHandler = MakeOutputHandler(Plugin, MessageType.Error, plugin.SbcOutputRedirected);
-                process.OutputDataReceived += outputHandler;
-                process.ErrorDataReceived += errorHandler;
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
+                DataReceivedEventHandler outputHandler = MakeOutputHandler(Plugin, MessageType.Success);
+                DataReceivedEventHandler errorHandler = MakeOutputHandler(Plugin, MessageType.Error);
+                if (plugin.SbcOutputRedirected)
+                {
+                    process.OutputDataReceived += outputHandler;
+                    process.ErrorDataReceived += errorHandler;
+                    process.BeginOutputReadLine();
+                    process.BeginErrorReadLine();
+                }
 
                 // Update the PID
                 plugin.Pid = process.Id;
@@ -119,9 +122,12 @@ namespace DuetPluginService.Commands
                     try
                     {
                         // Wait for it to be terminated
-                        await process.WaitForExitAsync();
-                        process.ErrorDataReceived -= errorHandler;
-                        process.OutputDataReceived -= outputHandler;
+                        await process.WaitForExitAsync(Program.CancellationToken);
+                        if (plugin.SbcOutputRedirected)
+                        {
+                            process.ErrorDataReceived -= errorHandler;
+                            process.OutputDataReceived -= outputHandler;
+                        }
 
                         // Update the PID again
                         using (await Plugins.LockAsync())
@@ -164,38 +170,23 @@ namespace DuetPluginService.Commands
         /// </summary>
         /// <param name="pluginName">Name of the plugin</param>
         /// <param name="messageType">Message type</param>
-        /// <param name="outputMessages">Output messages through the object model</param>
         /// <returns>Event handler</returns>
-        private DataReceivedEventHandler MakeOutputHandler(string pluginName, MessageType messageType, bool outputMessages)
+        private DataReceivedEventHandler MakeOutputHandler(string pluginName, MessageType messageType)
         {
             return (object sender, DataReceivedEventArgs e) =>
             {
                 if (!string.IsNullOrWhiteSpace(e.Data))
                 {
-                    // Send messages to DSF
-                    if (outputMessages)
+                    try
                     {
-                        try
-                        {
-                            using CommandConnection connection = new();
-                            connection.Connect(Settings.SocketPath, Program.CancellationToken).Wait();
-                            connection.WriteMessage(messageType, $"[{pluginName}]: {e.Data}").Wait();
-                            return;
-                        }
-                        catch
-                        {
-                            _logger!.Warn("Failed to send console message to DCS");
-                        }
+                        using CommandConnection connection = new();
+                        connection.Connect(Settings.SocketPath, Program.CancellationToken).Wait();
+                        connection.WriteMessage(messageType, $"[{pluginName}]: {e.Data}").Wait();
+                        return;
                     }
-
-                    // Fall back to normal logging output via this service
-                    if (messageType == MessageType.Error)
+                    catch
                     {
-                        _logger!.Error(e.Data);
-                    }
-                    else
-                    {
-                        _logger!.Info(e.Data);
+                        _logger!.Warn("Failed to send console message to DCS");
                     }
                 }
             };
