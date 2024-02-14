@@ -1,5 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using System.IO;
 using System.Text.Json;
 
@@ -19,13 +20,13 @@ namespace UnitTests.Machine
 
             model.UpdateFromJson(parsedJson.RootElement, false);
 
-            Assert.IsNotNull(model.State.MessageBox);
-            Assert.AreEqual(MessageBoxMode.OkOnly, model.State.MessageBox?.Mode);
-            Assert.AreEqual("message", model.State.MessageBox?.Message);
-            Assert.AreEqual("title", model.State.MessageBox?.Title);
+            ClassicAssert.IsNotNull(model.State.MessageBox);
+            ClassicAssert.AreEqual(MessageBoxMode.OkOnly, model.State.MessageBox?.Mode);
+            ClassicAssert.AreEqual("message", model.State.MessageBox?.Message);
+            ClassicAssert.AreEqual("title", model.State.MessageBox?.Title);
 
             string serializedModel = model.ToString();
-            Assert.AreEqual(jsonText, serializedModel);
+            ClassicAssert.AreEqual(jsonText, serializedModel);
         }
 
         [Test]
@@ -79,15 +80,15 @@ namespace UnitTests.Machine
             using JsonDocument jsonPatch = JsonDocument.Parse(patch);
             modelToUpdate.UpdateFromJson(jsonPatch.RootElement, false);
 
-            Assert.AreEqual("Yum", modelToUpdate.Boards[0].FirmwareName);
-            Assert.AreEqual(2, modelToUpdate.Heat.BedHeaters.Count);
-            Assert.AreEqual(90F, modelToUpdate.Heat.Heaters[0]?.Active);
-            Assert.AreEqual(21F, modelToUpdate.Heat.Heaters[0]?.Standby);
-            Assert.AreEqual(20F, modelToUpdate.Heat.Heaters[1]?.Standby);
-            Assert.AreEqual(1, modelToUpdate.Fans.Count);
-            Assert.AreEqual(0.5F, modelToUpdate.Fans[0]?.ActualValue);
-            Assert.AreEqual(0.75F, modelToUpdate.Fans[0]?.RequestedValue);
-            Assert.AreEqual(MachineStatus.Pausing, modelToUpdate.State.Status);
+            ClassicAssert.AreEqual("Yum", modelToUpdate.Boards[0].FirmwareName);
+            ClassicAssert.AreEqual(2, modelToUpdate.Heat.BedHeaters.Count);
+            ClassicAssert.AreEqual(90F, modelToUpdate.Heat.Heaters[0]?.Active);
+            ClassicAssert.AreEqual(21F, modelToUpdate.Heat.Heaters[0]?.Standby);
+            ClassicAssert.AreEqual(20F, modelToUpdate.Heat.Heaters[1]?.Standby);
+            ClassicAssert.AreEqual(1, modelToUpdate.Fans.Count);
+            ClassicAssert.AreEqual(0.5F, modelToUpdate.Fans[0]?.ActualValue);
+            ClassicAssert.AreEqual(0.75F, modelToUpdate.Fans[0]?.RequestedValue);
+            ClassicAssert.AreEqual(MachineStatus.Pausing, modelToUpdate.State.Status);
         }
 
         [Test]
@@ -104,7 +105,7 @@ namespace UnitTests.Machine
             newModel.Assign(model);
 
             string serializedModel = newModel.ToString();
-            Assert.AreEqual(jsonText, serializedModel);
+            ClassicAssert.AreEqual(jsonText, serializedModel);
         }
 
         [Test]
@@ -120,7 +121,7 @@ namespace UnitTests.Machine
             ObjectModel newModel = (ObjectModel)model.Clone();
 
             string serializedModel = newModel.ToString();
-            Assert.AreEqual(jsonText, serializedModel);
+            ClassicAssert.AreEqual(jsonText, serializedModel);
         }
 
         [Test]
@@ -133,7 +134,7 @@ namespace UnitTests.Machine
             ObjectModel model = new();
             bool success = model.UpdateFromFirmwareJson("state", parsedJson.RootElement);
 
-            Assert.IsTrue(success);
+            ClassicAssert.IsTrue(success);
         }
     }
 }

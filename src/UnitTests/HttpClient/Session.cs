@@ -2,6 +2,7 @@
 using DuetHttpClient;
 using DuetHttpClient.Utility;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -33,7 +34,7 @@ namespace UnitTests.HttpClient
         {
             // Wait for the object model to be up-to-date
             await session!.WaitForModelUpdate();
-            Assert.AreNotEqual(MachineStatus.Starting, session.Model.State.Status);
+            ClassicAssert.AreNotEqual(MachineStatus.Starting, session.Model.State.Status);
 
             // Save the current uptime
             int now;
@@ -49,7 +50,7 @@ namespace UnitTests.HttpClient
             // Make sure the object model is updated
             lock (session.Model)
             {
-                Assert.Greater(session.Model.State.UpTime, now);
+                ClassicAssert.Greater(session.Model.State.UpTime, now);
             }
         }
 
@@ -61,7 +62,7 @@ namespace UnitTests.HttpClient
 
             // Check generic G-code reply
             string response = await session.SendCode("M115");
-            Assert.IsTrue(response.StartsWith("FIRMWARE"));
+            ClassicAssert.IsTrue(response.StartsWith("FIRMWARE"));
         }
 
         [Test]
@@ -82,7 +83,7 @@ namespace UnitTests.HttpClient
             using (HttpResponseMessage downloadResponse = await session.Download("0:/sys/unitTest.txt"))
             {
                 string downloadContent = await downloadResponse.Content.ReadAsStringAsync();
-                Assert.AreEqual(uploadContent, downloadContent);
+                ClassicAssert.AreEqual(uploadContent, downloadContent);
             }
 
             // Move it
@@ -107,11 +108,11 @@ namespace UnitTests.HttpClient
         {
             // List files in 0:/sys and check for valid config.g
             IEnumerable<FileListItem> fileList = await session!.GetFileList("0:/sys");
-            Assert.IsTrue(fileList.Any(item => !item.IsDirectory && item.Filename == "config.g" && item.Size > 0 && item.Size < 192_000));
+            ClassicAssert.IsTrue(fileList.Any(item => !item.IsDirectory && item.Filename == "config.g" && item.Size > 0 && item.Size < 192_000));
 
             // List root directories and check for sys directory
             fileList = await session!.GetFileList("0:/");
-            Assert.IsTrue(fileList.Any(item => item.IsDirectory && item.Filename == "sys"));
+            ClassicAssert.IsTrue(fileList.Any(item => item.IsDirectory && item.Filename == "sys"));
         }
 
         [Test]
@@ -119,8 +120,8 @@ namespace UnitTests.HttpClient
         {
             // Get fileinfo for 0:/sys/config.g
             GCodeFileInfo info = await session!.GetFileInfo("0:/sys/config.g");
-            Assert.Greater(info.Size, 0);
-            Assert.Less(info.Size, 192_000);
+            ClassicAssert.Greater(info.Size, 0);
+            ClassicAssert.Less(info.Size, 192_000);
         }
 
         [OneTimeTearDown]

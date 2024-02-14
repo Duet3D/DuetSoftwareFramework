@@ -1,5 +1,6 @@
 ﻿using DuetAPI.Utility;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using System.IO;
 
 namespace UnitTests.Utility
@@ -15,22 +16,22 @@ namespace UnitTests.Utility
             Heightmap map = new();
             map.Load(path).Wait();
 
-            Assert.AreEqual(30, map.XMin, 0.0001);
-            Assert.AreEqual(180, map.XMax, 0.0001);
-            Assert.AreEqual(30, map.XSpacing, 0.0001);
-            Assert.AreEqual(30, map.YMin, 0.0001);
-            Assert.AreEqual(180, map.YMax, 0.0001);
-            Assert.AreEqual(30, map.YSpacing, 0.0001);
-            Assert.AreEqual(-1, map.Radius, 0.0001);
-            Assert.AreEqual(6, map.NumX);
-            Assert.AreEqual(6, map.NumY);
-            Assert.AreEqual(36, map.ZCoordinates.Length);
+            ClassicAssert.AreEqual(30, map.XMin, 0.0001);
+            ClassicAssert.AreEqual(180, map.XMax, 0.0001);
+            ClassicAssert.AreEqual(30, map.XSpacing, 0.0001);
+            ClassicAssert.AreEqual(30, map.YMin, 0.0001);
+            ClassicAssert.AreEqual(180, map.YMax, 0.0001);
+            ClassicAssert.AreEqual(30, map.YSpacing, 0.0001);
+            ClassicAssert.AreEqual(-1, map.Radius, 0.0001);
+            ClassicAssert.AreEqual(6, map.NumX);
+            ClassicAssert.AreEqual(6, map.NumY);
+            ClassicAssert.AreEqual(36, map.ZCoordinates.Length);
 
-            Assert.AreEqual(0.088, map.ZCoordinates[0], 0.0001);
-            Assert.AreEqual(0.086, map.ZCoordinates[1], 0.0001);
+            ClassicAssert.AreEqual(0.088, map.ZCoordinates[0], 0.0001);
+            ClassicAssert.AreEqual(0.086, map.ZCoordinates[1], 0.0001);
             // ...
-            Assert.AreEqual(0.056, map.ZCoordinates[34], 0.0001);
-            Assert.IsNaN(map.ZCoordinates[35]);
+            ClassicAssert.AreEqual(0.056, map.ZCoordinates[34], 0.0001);
+            ClassicAssert.IsNaN(map.ZCoordinates[35]);
         }
 
         [Test]
@@ -47,20 +48,20 @@ namespace UnitTests.Utility
             Heightmap map = new();
             map.Load(tempFile).Wait();
 
-            Assert.AreEqual(30, map.XMin, 0.0001);
-            Assert.AreEqual(180, map.XMax, 0.0001);
-            Assert.AreEqual(30, map.XSpacing, 0.0001);
-            Assert.AreEqual(30, map.YMin, 0.0001);
-            Assert.AreEqual(180, map.YMax, 0.0001);
-            Assert.AreEqual(30, map.YSpacing, 0.0001);
-            Assert.AreEqual(-1, map.Radius, 0.0001);
-            Assert.AreEqual(6, map.NumX);
-            Assert.AreEqual(6, map.NumY);
-            Assert.AreEqual(36, map.ZCoordinates.Length);
+            ClassicAssert.AreEqual(30, map.XMin, 0.0001);
+            ClassicAssert.AreEqual(180, map.XMax, 0.0001);
+            ClassicAssert.AreEqual(30, map.XSpacing, 0.0001);
+            ClassicAssert.AreEqual(30, map.YMin, 0.0001);
+            ClassicAssert.AreEqual(180, map.YMax, 0.0001);
+            ClassicAssert.AreEqual(30, map.YSpacing, 0.0001);
+            ClassicAssert.AreEqual(-1, map.Radius, 0.0001);
+            ClassicAssert.AreEqual(6, map.NumX);
+            ClassicAssert.AreEqual(6, map.NumY);
+            ClassicAssert.AreEqual(36, map.ZCoordinates.Length);
 
             for (int i = 0; i < tempMap.ZCoordinates.Length; i++)
             {
-                Assert.AreEqual(tempMap.ZCoordinates[i], map.ZCoordinates[i], 0.0001);
+                ClassicAssert.AreEqual(tempMap.ZCoordinates[i], map.ZCoordinates[i], 0.0001);
             }
         }
     }

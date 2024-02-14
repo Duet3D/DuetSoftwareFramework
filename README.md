@@ -243,7 +243,6 @@ To ensure flawless operation of the most critical components, Duet Software Fram
 ## Known incompatibilities
 
 - G-Code checksums and M998 are not supported
-- `exists()` may be used in meta G-code expressions only for fields that are managed by RRF
 
 ## Reporting issues
 

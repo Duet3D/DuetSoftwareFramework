@@ -378,16 +378,15 @@ namespace DuetControlServer.Model
         /// </summary>
         private static readonly object _nullResult = new();
 
-        // Encode a string
-        private static string encodeString(string value)
-        {
-            return '"' + value.Replace("\"", "\"\"").Replace("'", "''") + '"';
-        }
-
         // Convert an object to a string value
 #warning This function cannot output empty arrays yet
-        private static string objectToString(object? obj, bool wantsCount, bool encodeStrings, Code code)
+        private static string ObjectToString(object? obj, bool wantsCount, bool encodeStrings, Code code)
         {
+            static string encodeString(string value)
+            {
+                return '"' + value.Replace("\"", "\"\"").Replace("'", "''") + '"';
+            }
+
             if (obj is null)
             {
                 return "null";
@@ -462,7 +461,7 @@ namespace DuetControlServer.Model
             }
             if (obj is object[] objectArray)
             {
-                return '{' + string.Join(',', objectArray.Select(objectValue => objectToString(objectValue, false, true, code))) + (objectArray.Length == 1 ? ",}" : "}");
+                return '{' + string.Join(',', objectArray.Select(objectValue => ObjectToString(objectValue, false, true, code))) + (objectArray.Length == 1 ? ",}" : "}");
             }
             if (!wantsCount && obj is IList)
             {
@@ -481,10 +480,9 @@ namespace DuetControlServer.Model
         /// <param name="code">Code holding the expression(s)</param>
         /// <param name="expression">Expression(s) to replace</param>
         /// <param name="onlySbcFields">Whether to replace only SBC fields</param>
-        /// <param name="encodeResult">Whether the final result shall be encoded</param>
         /// <returns>Replaced expression(s)</returns>
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
-        public static async Task<object?> EvaluateExpressionRaw(Code code, string expression, bool onlySbcFields, bool encodeResult)
+        public static async Task<object?> EvaluateExpressionRaw(Code code, string expression, bool onlySbcFields)
         {
             int i = 0;
 
@@ -576,7 +574,7 @@ namespace DuetControlServer.Model
                             {
                                 if (Filter.GetSpecific(filterString, true, out object? sbcField))
                                 {
-                                    string subResult = objectToString(sbcField, wantsCount, true, code);
+                                    string subResult = ObjectToString(sbcField, wantsCount, true, code);
                                     result.Append(subResult);
                                 }
                                 else
@@ -753,7 +751,7 @@ namespace DuetControlServer.Model
                                 }
                                 fnResult = await fn!(code.Channel, functionName, arguments.ToArray());
                             }
-                            result.Append(objectToString(fnResult, wantsCount, true, code));
+                            result.Append(ObjectToString(fnResult, wantsCount, true, code));
                         }
                         else
                         {
@@ -875,8 +873,8 @@ namespace DuetControlServer.Model
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
         public static async Task<string> EvaluateExpression(Code code, string expression, bool onlySbcFields, bool encodeResult)
         {
-            object? result = await EvaluateExpressionRaw(code, expression, onlySbcFields, encodeResult);
-            return (onlySbcFields && result is string resultString) ? resultString : objectToString(result, false, encodeResult, code);
+            object? result = await EvaluateExpressionRaw(code, expression, onlySbcFields);
+            return (onlySbcFields && result is string resultString) ? resultString : ObjectToString(result, false, encodeResult, code);
         }
     }
 }

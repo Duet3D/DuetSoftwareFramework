@@ -8,6 +8,7 @@ using DuetControlServer.SPI.Communication.FirmwareRequests;
 using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.SPI.Serialization;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 
 namespace UnitTests.SPI
 {
@@ -22,13 +23,13 @@ namespace UnitTests.SPI
             TransferHeader header = MemoryMarshal.Read<TransferHeader>(blob);
             
             // Header
-            Assert.AreEqual(Consts.FormatCode, header.FormatCode);
-            Assert.AreEqual(4, header.NumPackets);
-            Assert.AreEqual(Consts.ProtocolVersion, header.ProtocolVersion);
-            Assert.AreEqual(12345, header.SequenceNumber);
-            Assert.AreEqual(1436, header.DataLength);
-            Assert.AreEqual(0, header.ChecksumData32);
-            Assert.AreEqual(0, header.ChecksumHeader32);
+            ClassicAssert.AreEqual(Consts.FormatCode, header.FormatCode);
+            ClassicAssert.AreEqual(4, header.NumPackets);
+            ClassicAssert.AreEqual(Consts.ProtocolVersion, header.ProtocolVersion);
+            ClassicAssert.AreEqual(12345, header.SequenceNumber);
+            ClassicAssert.AreEqual(1436, header.DataLength);
+            ClassicAssert.AreEqual(0, header.ChecksumData32);
+            ClassicAssert.AreEqual(0, header.ChecksumHeader32);
             
             // No padding
         }
@@ -39,12 +40,12 @@ namespace UnitTests.SPI
             Span<byte> blob = GetBlob("packetHeader.bin");
             
             int bytesRead = Reader.ReadPacketHeader(blob, out PacketHeader header);
-            Assert.AreEqual(8, bytesRead);
+            ClassicAssert.AreEqual(8, bytesRead);
             
             // Header
-            Assert.AreEqual((ushort)Request.ObjectModel, header.Request);
-            Assert.AreEqual(12, header.Id);
-            Assert.AreEqual(300, header.Length);
+            ClassicAssert.AreEqual((ushort)Request.ObjectModel, header.Request);
+            ClassicAssert.AreEqual(12, header.Id);
+            ClassicAssert.AreEqual(300, header.Length);
         }
 
         [Test]
@@ -53,13 +54,13 @@ namespace UnitTests.SPI
             Span<byte> blob = GetBlob("packetHeaderResend.bin");
 
             int bytesRead = Reader.ReadPacketHeader(blob, out PacketHeader header);
-            Assert.AreEqual(8, bytesRead);
+            ClassicAssert.AreEqual(8, bytesRead);
 
             // Header
-            Assert.AreEqual((ushort)Request.ResendPacket, header.Request);
-            Assert.AreEqual(23, header.Id);
-            Assert.AreEqual(0, header.Length);
-            Assert.AreEqual(12, header.ResendPacketId);
+            ClassicAssert.AreEqual((ushort)Request.ResendPacket, header.Request);
+            ClassicAssert.AreEqual(23, header.Id);
+            ClassicAssert.AreEqual(0, header.Length);
+            ClassicAssert.AreEqual(12, header.ResendPacketId);
         }
 
         [Test]
@@ -68,10 +69,10 @@ namespace UnitTests.SPI
             Span<byte> blob = GetBlob("stringRequest.bin");
             
             int bytesRead = Reader.ReadStringRequest(blob, out ReadOnlySpan<byte> json);
-            Assert.AreEqual(24, bytesRead);
+            ClassicAssert.AreEqual(24, bytesRead);
             
             // JSON
-            Assert.AreEqual("{\"hello\":\"json!\"}", Encoding.UTF8.GetString(json));
+            ClassicAssert.AreEqual("{\"hello\":\"json!\"}", Encoding.UTF8.GetString(json));
         }
 
         [Test]
@@ -80,10 +81,10 @@ namespace UnitTests.SPI
             Span<byte> blob = GetBlob("codeBufferUpdate.bin");
 
             int bytesRead = Reader.ReadCodeBufferUpdate(blob, out ushort bufferSpace);
-            Assert.AreEqual(4, bytesRead);
+            ClassicAssert.AreEqual(4, bytesRead);
 
             // Header
-            Assert.AreEqual(787, bufferSpace);
+            ClassicAssert.AreEqual(787, bufferSpace);
         }
 
         [Test]
@@ -92,18 +93,18 @@ namespace UnitTests.SPI
             Span<byte> blob = GetBlob("message.bin");
 
             int bytesRead = Reader.ReadMessage(blob, out MessageTypeFlags messageType, out string reply);
-            Assert.AreEqual(28, bytesRead);
+            ClassicAssert.AreEqual(28, bytesRead);
 
             // Header
-            Assert.IsTrue(messageType.HasFlag(MessageTypeFlags.HttpMessage));
-            Assert.IsTrue(messageType.HasFlag(MessageTypeFlags.TelnetMessage));
-            Assert.IsTrue(messageType.HasFlag(MessageTypeFlags.UsbMessage));
-            Assert.IsTrue(messageType.HasFlag(MessageTypeFlags.AuxMessage));
-            Assert.IsTrue(messageType.HasFlag(MessageTypeFlags.WarningMessageFlag));
-            Assert.IsTrue(messageType.HasFlag(MessageTypeFlags.PushFlag));
+            ClassicAssert.IsTrue(messageType.HasFlag(MessageTypeFlags.HttpMessage));
+            ClassicAssert.IsTrue(messageType.HasFlag(MessageTypeFlags.TelnetMessage));
+            ClassicAssert.IsTrue(messageType.HasFlag(MessageTypeFlags.UsbMessage));
+            ClassicAssert.IsTrue(messageType.HasFlag(MessageTypeFlags.AuxMessage));
+            ClassicAssert.IsTrue(messageType.HasFlag(MessageTypeFlags.WarningMessageFlag));
+            ClassicAssert.IsTrue(messageType.HasFlag(MessageTypeFlags.PushFlag));
             
             // Message
-            Assert.AreEqual("This is just a test", reply);
+            ClassicAssert.AreEqual("This is just a test", reply);
         }
         
         [Test]
@@ -112,13 +113,13 @@ namespace UnitTests.SPI
             Span<byte> blob = GetBlob("emptyMessage.bin");
 
             int bytesRead = Reader.ReadMessage(blob, out MessageTypeFlags messageType, out string reply);
-            Assert.AreEqual(8, bytesRead);
+            ClassicAssert.AreEqual(8, bytesRead);
 
             // Header
-            Assert.IsTrue(messageType.HasFlag(MessageTypeFlags.UsbMessage));
+            ClassicAssert.IsTrue(messageType.HasFlag(MessageTypeFlags.UsbMessage));
 
             // Message
-            Assert.IsEmpty(reply);
+            ClassicAssert.IsEmpty(reply);
         }
         
         [Test]
@@ -127,14 +128,14 @@ namespace UnitTests.SPI
             Span<byte> blob = GetBlob("macroRequest.bin");
             
             int bytesRead = Reader.ReadMacroRequest(blob, out CodeChannel channel, out bool fromCode, out string filename);
-            Assert.AreEqual(16, bytesRead);
+            ClassicAssert.AreEqual(16, bytesRead);
             
             // Header
-            Assert.AreEqual(DuetAPI.CodeChannel.USB, channel);
-            Assert.IsTrue(fromCode);
+            ClassicAssert.AreEqual(DuetAPI.CodeChannel.USB, channel);
+            ClassicAssert.IsTrue(fromCode);
             
             // Message
-            Assert.AreEqual("homeall.g", filename);
+            ClassicAssert.AreEqual("homeall.g", filename);
         }
 
         [Test]
@@ -143,11 +144,11 @@ namespace UnitTests.SPI
             Span<byte> blob = GetBlob("abortFile.bin");
 
             int bytesRead = Reader.ReadAbortFile(blob, out CodeChannel channel, out bool abortAll);
-            Assert.AreEqual(4, bytesRead);
+            ClassicAssert.AreEqual(4, bytesRead);
 
             // Header
-            Assert.AreEqual(DuetAPI.CodeChannel.File, channel);
-            Assert.IsFalse(abortAll);
+            ClassicAssert.AreEqual(DuetAPI.CodeChannel.File, channel);
+            ClassicAssert.IsFalse(abortAll);
         }
 
         [Test]
@@ -156,11 +157,11 @@ namespace UnitTests.SPI
             Span<byte> blob = GetBlob("printPaused.bin");
             
             int bytesRead = Reader.ReadPrintPaused(blob, out uint filePosition, out PrintPausedReason reason);
-            Assert.AreEqual(8, bytesRead);
+            ClassicAssert.AreEqual(8, bytesRead);
             
             // Header
-            Assert.AreEqual(123456, filePosition);
-            Assert.AreEqual(PrintPausedReason.GCode, reason);
+            ClassicAssert.AreEqual(123456, filePosition);
+            ClassicAssert.AreEqual(PrintPausedReason.GCode, reason);
         } 
 
         [Test]
@@ -169,10 +170,10 @@ namespace UnitTests.SPI
             Span<byte> blob = GetBlob("codeChannel.bin");
 
             int bytesRead = Reader.ReadCodeChannel(blob, out CodeChannel channel);
-            Assert.AreEqual(bytesRead, 4);
+            ClassicAssert.AreEqual(bytesRead, 4);
 
             // Header
-            Assert.AreEqual(DuetAPI.CodeChannel.SBC, channel);
+            ClassicAssert.AreEqual(DuetAPI.CodeChannel.SBC, channel);
         }
 
         [Test]
@@ -181,14 +182,14 @@ namespace UnitTests.SPI
             Span<byte> blob = GetBlob("fileChunk.bin");
 
             int bytesRead = Reader.ReadFileChunkRequest(blob, out string filename, out uint offset, out int maxLength);
-            Assert.AreEqual(20, bytesRead);
+            ClassicAssert.AreEqual(20, bytesRead);
 
             // Header
-            Assert.AreEqual(1234, offset);
-            Assert.AreEqual(5678, maxLength);
+            ClassicAssert.AreEqual(1234, offset);
+            ClassicAssert.AreEqual(5678, maxLength);
 
             // Filename
-            Assert.AreEqual("test.bin", filename);
+            ClassicAssert.AreEqual("test.bin", filename);
         }
 
         [Test]
@@ -197,13 +198,13 @@ namespace UnitTests.SPI
             Span<byte> blob = GetBlob("evaluationResult.bin");
 
             int bytesRead = Reader.ReadEvaluationResult(blob, out string expression, out object? result);
-            Assert.AreEqual(32, bytesRead);
+            ClassicAssert.AreEqual(32, bytesRead);
 
             // Header
-            Assert.AreEqual(300, (int)result!);
+            ClassicAssert.AreEqual(300, (int)result!);
 
             // Expression
-            Assert.AreEqual("move.axes[0].position", expression);
+            ClassicAssert.AreEqual("move.axes[0].position", expression);
         }
 
         [Test]
@@ -212,13 +213,13 @@ namespace UnitTests.SPI
             Span<byte> blob = GetBlob("doCode.bin");
 
             int bytesRead = Reader.ReadDoCode(blob, out CodeChannel channel, out string code);
-            Assert.AreEqual(24, bytesRead);
+            ClassicAssert.AreEqual(24, bytesRead);
 
             // Header
-            Assert.AreEqual(DuetAPI.CodeChannel.Aux, channel);
+            ClassicAssert.AreEqual(DuetAPI.CodeChannel.Aux, channel);
 
             // Code
-            Assert.AreEqual("M20 S2 P\"0:/macros\"", code);
+            ClassicAssert.AreEqual("M20 S2 P\"0:/macros\"", code);
         }
 
         private static Span<byte> GetBlob(string filename)
