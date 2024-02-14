@@ -191,6 +191,15 @@ namespace DuetAPI.ObjectModel
         private bool _sbcAutoRestart;
 
         /// <summary>
+        /// List of files in the sys or virtual SD directory that should not be overwritten on upgrade
+        /// </summary>
+        /// <remarks>
+        /// The file may be specified either relative to 0:/sys directory (e.g. motion.conf) or relative to the
+        /// virtual SD directory (e.g. sys/motion.conf). Drive indices as in 0:/sys/motion.conf are not allowed!
+        /// </remarks>
+        public ModelCollection<string> SbcConfigFiles { get; } = new ModelCollection<string>();
+
+        /// <summary>
         /// Defines if messages from stdout/stderr are output as generic messages
         /// </summary>
         public bool SbcOutputRedirected

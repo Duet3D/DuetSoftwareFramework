@@ -8,6 +8,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace DuetPluginService.Commands
@@ -154,21 +155,28 @@ namespace DuetPluginService.Commands
                     }
 
                     // Extract the file
-                    _logger.Debug("Extracting {0} to {1}", entry.FullName, fileName);
-                    await using FileStream fileStream = new(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
-                    await using Stream zipFileStream = entry.Open();
-                    await zipFileStream.CopyToAsync(fileStream);
-
-                    // Make program binaries executable
-                    if (!string.IsNullOrEmpty(plugin.SbcExecutable) &&
-                        (entry.FullName == "dsf/" + plugin.SbcExecutable || entry.FullName == $"dsf/{architecture}/{plugin.SbcExecutable}" ||
-                         plugin.SbcExtraExecutables.Any(executable => (entry.FullName == "dsf/" + executable) || (entry.FullName == $"dsf/{architecture}/{executable}"))))
+                    if (File.Exists(fileName) && plugin.SbcConfigFiles.Any(file => fileName == Path.Combine(Settings.BaseDirectory, "sys", file) || fileName == Path.Combine(Settings.BaseDirectory, file)))
                     {
-                        _logger.Debug("Changing mode of {0} to 770", fileName);
-                        LinuxApi.Commands.Chmod(fileName,
-                            LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Execute,
-                            LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Execute,
-                            LinuxApi.UnixPermissions.None);
+                        _logger.Debug("Not overwriting config file {0}", entry.FullName);
+                    }
+                    else
+                    {
+                        _logger.Debug("Extracting {0} to {1}", entry.FullName, fileName);
+                        await using FileStream fileStream = new(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
+                        await using Stream zipFileStream = entry.Open();
+                        await zipFileStream.CopyToAsync(fileStream);
+
+                        // Make program binaries executable
+                        if (!string.IsNullOrEmpty(plugin.SbcExecutable) &&
+                            (entry.FullName == "dsf/" + plugin.SbcExecutable || entry.FullName == $"dsf/{architecture}/{plugin.SbcExecutable}" ||
+                             plugin.SbcExtraExecutables.Any(executable => (entry.FullName == "dsf/" + executable) || (entry.FullName == $"dsf/{architecture}/{executable}"))))
+                        {
+                            _logger.Debug("Changing mode of {0} to 770", fileName);
+                            LinuxApi.Commands.Chmod(fileName,
+                                LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Execute,
+                                LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Execute,
+                                LinuxApi.UnixPermissions.None);
+                        }
                     }
                 }
 
@@ -278,7 +286,7 @@ namespace DuetPluginService.Commands
         }
 
         /// <summary>
-        /// Lock 
+        /// Lock for installing system packages
         /// </summary>
         private static readonly AsyncLock _packageLock = new();
 

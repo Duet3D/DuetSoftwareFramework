@@ -1487,7 +1487,7 @@ namespace DuetControlServer.SPI
         private static void HandleReadFile()
         {
             DataTransfer.ReadFileRequest(out uint handle, out int maxLength);
-            _logger.Debug("Reading up to {0} bytes from file #{1}", maxLength, handle);
+            _logger.Trace("Reading up to {0} bytes from file #{1}", maxLength, handle);
 
             try
             {
@@ -1513,7 +1513,7 @@ namespace DuetControlServer.SPI
         private static void HandleWriteFile()
         {
             DataTransfer.ReadWriteRequest(out uint handle, out ReadOnlySpan<byte> data);
-            _logger.Debug("Writing {0} bytes to file #{1}", data.Length, handle);
+            _logger.Trace("Writing {0} bytes to file #{1}", data.Length, handle);
 
             try
             {
@@ -1537,7 +1537,7 @@ namespace DuetControlServer.SPI
         private static void HandleSeekFile()
         {
             DataTransfer.ReadSeekFile(out uint handle, out long offset);
-            _logger.Debug("Seeking to position {0} in file #{1}", offset, handle);
+            _logger.Trace("Seeking to position {0} in file #{1}", offset, handle);
 
             try
             {
