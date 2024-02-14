@@ -7,7 +7,6 @@ using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
-using DuetControlServer.FileExecution;
 using DuetControlServer.IPC;
 using DuetControlServer.IPC.Processors;
 using DuetControlServer.Model;
@@ -165,11 +164,6 @@ namespace DuetControlServer.Commands
         internal Files.CodeFile? File { get; set; }
 
         /// <summary>
-        /// Macro that started this code or null
-        /// </summary>
-        internal Macro? Macro { get; set; }
-
-        /// <summary>
         /// Attempt to process this code internally
         /// </summary>
         /// <returns>Whether the code could be processed internally</returns>
@@ -304,7 +298,6 @@ namespace DuetControlServer.Commands
             Connection = null;
             Stage = Codes.PipelineStage.Start;
             File = null;
-            Macro = null;
             _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
             BinarySize = 0;
         }

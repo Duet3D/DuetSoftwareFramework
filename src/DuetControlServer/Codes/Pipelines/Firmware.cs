@@ -1,4 +1,5 @@
 ﻿using DuetControlServer.Commands;
+using DuetControlServer.Files;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Codes.Pipelines
@@ -19,14 +20,17 @@ namespace DuetControlServer.Codes.Pipelines
         /// <summary>
         /// Wait for the pipeline stage to become idle
         /// </summary>
-        /// <param name="code">Code waiting for the flush</param>
-        /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
-        /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
         public override Task<bool> FlushAsync()
         {
             return SPI.Interface.FlushAsync(Processor.Channel);
         }
+
+        /// <summary>
+        /// Wait for the pipeline stage to become idle
+        /// </summary>
+        /// <returns>Whether the codes have been flushed successfully</returns>
+        public override Task<bool> FlushAsync(CodeFile file) => SPI.Interface.FlushAsync(file);
 
         /// <summary>
         /// Wait for the pipeline stage to become idle

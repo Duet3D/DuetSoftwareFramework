@@ -1,7 +1,6 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
-using DuetControlServer.Files;
 using DuetControlServer.Model;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
 using DuetControlServer.SPI.Communication.Shared;
@@ -15,15 +14,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
-namespace DuetControlServer.FileExecution
+namespace DuetControlServer.Files
 {
     /// <summary>
-    /// Main class dealing with a file job
+    /// Main class dealing with job files
     /// </summary>
     /// <remarks>
     /// Lock this class whenever it is accessed (except for <see cref="Diagnostics(StringBuilder)"/>)
     /// </remarks>
-    public static class Job
+    public static class JobProcessor
     {
         /// <summary>
         /// Logger instance
@@ -58,9 +57,9 @@ namespace DuetControlServer.FileExecution
         private static readonly AsyncConditionVariable _finished = new(_lock);
 
         /// <summary>
-        /// Name of the job file
+        /// Physical filename of the job file
         /// </summary>
-        private static string? _filename;
+        private static string _physicalFileName = string.Empty;
 
         /// <summary>
         /// First job file being read from
@@ -228,29 +227,30 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Returns the length of the file being printed in bytes
         /// </summary>
-        public static long FileLength => (_file is not null) ? _file.Length : 0;
+        public static long FileLength => _file is not null ? _file.Length : 0;
 
         /// <summary>
         /// Start a new file print
         /// </summary>
         /// <param name="fileName">File to print</param>
+        /// <param name="physicalFile">Physical file to print</param>
         /// <param name="simulating">Whether the file is being simulated</param>
         /// <returns>Asynchronous task</returns>
         /// <remarks>
         /// This class has to be locked when this method is called
         /// </remarks>
-        public static async Task SelectFile(string fileName, bool simulating = false)
+        public static async Task SelectFile(string fileName, string physicalFile, bool simulating = false)
         {
             // Analyze and open the file
-            GCodeFileInfo info = await InfoParser.Parse(fileName, true);
+            GCodeFileInfo info = await InfoParser.Parse(physicalFile, true);
 
             bool supportsAyncMoves;
             using (await Provider.AccessReadOnlyAsync())
             {
-                supportsAyncMoves = Provider.Get.Inputs[CodeChannel.File2] != null;
+                supportsAyncMoves = Provider.Get.Inputs[CodeChannel.File2] is not null;
             }
-            CodeFile file = new(fileName, CodeChannel.File);
-            CodeFile? file2 = supportsAyncMoves ? new(fileName, CodeChannel.File2) : null;
+            CodeFile file = new(fileName, physicalFile, CodeChannel.File);
+            CodeFile? file2 = supportsAyncMoves ? new(fileName, physicalFile, CodeChannel.File2) : null;
 
             // A file being printed may start another file print
             if (IsFileSelected)
@@ -262,7 +262,7 @@ namespace DuetControlServer.FileExecution
             // Update the state
             IsCancelled = IsAborted = false;
             IsSimulating = simulating;
-            _filename = fileName;
+            _physicalFileName = physicalFile;
             _file = file;
             _file2 = file2;
             _pausePosition = null;
@@ -275,7 +275,7 @@ namespace DuetControlServer.FileExecution
 
             // Notify RepRapFirmware and start processing the file in the background
             await SPI.Interface.SetPrintFileInfo();
-            _logger.Info("Selected file {0}", _file.FileName);
+            _logger.Info("Selected file {0}", fileName);
         }
 
         /// <summary>
@@ -299,6 +299,9 @@ namespace DuetControlServer.FileExecution
             {
                 codePool.Enqueue(new Code());
             }
+
+            // Assign the job file so flush requests are properly handled
+            Codes.Processor.SetJobFile(file.Channel, file);
 
             // Wait for the object model to be updated.
             // This is necessary to determine if the File and File2 channels are active or not
@@ -394,7 +397,7 @@ namespace DuetControlServer.FileExecution
                     {
                         // Codes holding meta G-code keywords may be still referenced by the underlying code file.
                         // Do not reuse it if that is the case, else we can get out-of-order execution!
-                        codePool.Enqueue((code.Keyword == KeywordType.None) ? code : new Code());
+                        codePool.Enqueue(code.Keyword == KeywordType.None ? code : new Code());
                     }
                 }
                 else
@@ -402,7 +405,7 @@ namespace DuetControlServer.FileExecution
                     // Flush one last time in case plugins inserted codes at the end of a print file
                     try
                     {
-                        await SPI.Interface.FlushAsync(file.Channel);
+                        await Codes.Processor.FlushAsync(file);
                     }
                     catch (OperationCanceledException)
                     {
@@ -415,7 +418,7 @@ namespace DuetControlServer.FileExecution
                         {
                             // Adjust the file position
                             long newFilePosition = _pausePosition ?? nextFilePosition;
-                            await SetFilePosition((file.Channel == CodeChannel.File) ? 0 : 1 , newFilePosition);
+                            await SetFilePosition(file.Channel == CodeChannel.File ? 0 : 1, newFilePosition);
                             _logger.Info("Job on {0} has been paused at byte {1}, reason {2}", file.Channel, newFilePosition, _pauseReason);
 
                             // Wait for the print to be resumed
@@ -432,6 +435,9 @@ namespace DuetControlServer.FileExecution
                 }
             }
             while (!Program.CancellationToken.IsCancellationRequested);
+
+            // No longer printing
+            Codes.Processor.SetJobFile(file.Channel, null);
         }
 
         /// <summary>
@@ -457,7 +463,7 @@ namespace DuetControlServer.FileExecution
 
                     // Run the same file print on two distinct channels
                     Task firstFileTask = DoFilePrint(_file!);
-                    Task secondFileTask = (_file2 is not null) ? DoFilePrint(_file2) : Task.CompletedTask;
+                    Task secondFileTask = _file2 is not null ? DoFilePrint(_file2) : Task.CompletedTask;
                     await Task.WhenAll(firstFileTask, secondFileTask);
 
                     // Deal with the print result
@@ -510,7 +516,7 @@ namespace DuetControlServer.FileExecution
                             // Try to update the last simulated time
                             if (lastDuration > 0)
                             {
-                                await InfoParser.UpdateSimulatedTime(_filename!, lastDuration.Value);
+                                await InfoParser.UpdateSimulatedTime(_physicalFileName, lastDuration.Value);
                             }
                             else
                             {
@@ -539,7 +545,7 @@ namespace DuetControlServer.FileExecution
                     _file!.Dispose();
                     _file2?.Dispose();
                     _file = _file2 = null;
-                    _filename = null;
+                    _physicalFileName = string.Empty;
 
                     // End
                     IsProcessing = IsSimulating = IsPaused = false;

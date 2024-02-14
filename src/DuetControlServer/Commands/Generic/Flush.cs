@@ -15,11 +15,6 @@ namespace DuetControlServer.Commands
         public Connection? Connection { get; set; }
 
         /// <summary>
-        /// Logger instance
-        /// </summary>
-        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
-        /// <summary>
         /// Wait for all pending codes of the given channel to finish
         /// </summary>
         /// <returns>Asynchronous task</returns>

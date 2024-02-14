@@ -1,4 +1,4 @@
-﻿using DuetControlServer.FileExecution;
+﻿using DuetControlServer.Files;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -79,10 +79,10 @@ namespace DuetControlServer.Codes.Pipelines
 
                             builder.Append(prefix);
                             builder.Append(' ');
-                            if (stackItem.Macro is not null)
+                            if (stackItem.File is not null)
                             {
                                 builder.Append("Macro ");
-                                builder.Append(Path.GetFileName(stackItem.Macro.FileName));
+                                builder.Append(stackItem.File.FileName);
                                 builder.Append(": ");
                             }
 
@@ -126,8 +126,7 @@ namespace DuetControlServer.Codes.Pipelines
         {
             lock (_stack)
             {
-                PipelineStackItem topState = _stack.Peek();
-                return (code is null || code.Macro == topState.Macro) && !topState.Busy;
+                return (code is null || code.File == CurrentStackItem.File) && !CurrentStackItem.Busy;
             }
         }
 
@@ -135,6 +134,28 @@ namespace DuetControlServer.Codes.Pipelines
         /// Wait for the current pipeline stack item to become idle
         /// </summary>
         public virtual Task<bool> FlushAsync() => CurrentStackItem.FlushAsync();
+
+        /// <summary>
+        /// Wait for the pipeline stage to become idle
+        /// </summary>
+        /// <param name="file">Code file</param>
+        /// <returns>Whether the codes have been flushed successfully</returns>
+        public virtual Task<bool> FlushAsync(CodeFile file)
+        {
+            lock (_stack)
+            {
+                foreach (PipelineStackItem stackItem in _stack)
+                {
+                    if (stackItem.File == file)
+                    {
+                        return stackItem.FlushAsync();
+                    }
+                }
+
+                Processor.Logger.Warn("Failed to find corresponding state for file flush request, falling back to current state");
+                return CurrentStackItem.FlushAsync();
+            }
+        }
 
         /// <summary>
         /// Wait for the pipeline stage to become idle
@@ -149,14 +170,14 @@ namespace DuetControlServer.Codes.Pipelines
             {
                 foreach (PipelineStackItem stackItem in _stack)
                 {
-                    if (stackItem.Macro == code.Macro)
+                    if (stackItem.File == code.File)
                     {
                         return stackItem.FlushAsync(code);
                     }
                 }
 
-                Processor.Logger.Warn("Failed to find corresponding state for code flush request, falling back to top state");
-                return _stack.Peek().FlushAsync(code);
+                Processor.Logger.Warn("Failed to find corresponding state for code flush request, falling back to current state");
+                return CurrentStackItem.FlushAsync(code);
             }
         }
 
@@ -185,7 +206,7 @@ namespace DuetControlServer.Codes.Pipelines
             {
                 foreach (PipelineStackItem stackItem in _stack)
                 {
-                    if (stackItem.Macro == code.Macro)
+                    if (stackItem.File == code.File)
                     {
                         return stackItem.WriteCodeAsync(code);
                     }
@@ -200,10 +221,10 @@ namespace DuetControlServer.Codes.Pipelines
         /// <summary>
         /// Push a new element onto the stack
         /// </summary>
-        /// <param name="macro">Macro file or null if waiting for acknowledgment</param>
-        internal virtual PipelineStackItem Push(Macro? macro)
+        /// <param name="file">Code file or null if waiting for acknowledgment</param>
+        internal virtual PipelineStackItem Push(CodeFile? file)
         {
-            PipelineStackItem newState = new(this, macro);
+            PipelineStackItem newState = new(this, file);
             lock (_stack)
             {
                 _stack.Push(newState);
@@ -224,6 +245,17 @@ namespace DuetControlServer.Codes.Pipelines
                     throw new ArgumentException($"Stack underrun on pipeline {Processor.Channel}");
                 }
                 _stack.Pop().PendingCodes.Writer.Complete();
+            }
+        }
+
+        /// <summary>
+        /// Set the job file
+        /// </summary>
+        internal void SetJobFile(CodeFile? file)
+        {
+            lock (_stack)
+            {
+                _baseItem.File = file;
             }
         }
 

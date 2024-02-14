@@ -490,7 +490,7 @@ namespace DuetControlServer.Model
         public static Task WaitForUpdateAsync() => WaitForUpdateAsync(Program.CancellationToken);
 
         /// <summary>
-        /// Indicates if dsf-config.g is being processed
+        /// Indicates how many config files are being processed
         /// </summary>
         private static volatile int _numRunningConfigFiles = 0;
 

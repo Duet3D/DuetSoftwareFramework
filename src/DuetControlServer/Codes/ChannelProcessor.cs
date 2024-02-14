@@ -1,5 +1,5 @@
 ﻿using DuetAPI;
-using DuetControlServer.FileExecution;
+using DuetControlServer.Files;
 using System;
 using System.Linq;
 using System.Text;
@@ -93,18 +93,18 @@ namespace DuetControlServer.Codes
         /// Push a new state on the stack
         /// </summary>
         /// <returns>New pipeline state of the firmware for the SPI connector</returns>
-        public Pipelines.PipelineStackItem Push(Macro? macro)
+        public Pipelines.PipelineStackItem Push(CodeFile? file)
         {
             Pipelines.PipelineStackItem? newState = null;
             foreach (PipelineStage stage in StagesWithStack)
             {
                 if (stage == PipelineStage.Firmware)
                 {
-                    newState = _pipelines[(int)stage].Push(macro);
+                    newState = _pipelines[(int)stage].Push(file);
                 }
                 else
                 {
-                    _pipelines[(int)stage].Push(macro);
+                    _pipelines[(int)stage].Push(file);
                 }
             }
             return newState!;
@@ -118,6 +118,18 @@ namespace DuetControlServer.Codes
             foreach (PipelineStage stage in StagesWithStack)
             {
                 _pipelines[(int)stage].Pop();
+            }
+        }
+
+        /// <summary>
+        /// Set the job file of this channel
+        /// </summary>
+        /// <param name="file">Job file</param>
+        public void SetJobFile(CodeFile? file)
+        {
+            foreach (PipelineStage stage in StagesWithStack)
+            {
+                _pipelines[(int)stage].SetJobFile(file);
             }
         }
 
@@ -155,6 +167,26 @@ namespace DuetControlServer.Codes
                     return false;
                 }
                 //Logger.Debug("Flushed codes on stage {0}", pipeline.Stage);
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Wait for all pending codes on the same stack level as the given file to finish
+        /// </summary>
+        /// <param name="file">Code file</param>
+        /// <returns>Whether the codes have been flushed successfully</returns>
+        public async Task<bool> FlushAsync(CodeFile file)
+        {
+            foreach (PipelineStage stage in StagesWithStack)
+            {
+                //Logger.Debug("Flushing file codes on stage {0} for {1}", stage, code);
+                if (!await _pipelines[(int)stage].FlushAsync(file))
+                {
+                    Logger.Debug("Failed to flush file codes on stage {0} for {1}", stage, file.FileName);
+                    return false;
+                }
+                //Logger.Debug("Flushed file codes on stage {0} for {1}", stage, code);
             }
             return true;
         }

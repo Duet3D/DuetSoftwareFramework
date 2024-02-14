@@ -253,6 +253,27 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Wait for all pending codes to finish
+        /// </summary>
+        /// <param name="file">Code file</param>
+        /// <returns>Whether the codes have been flushed successfully</returns>
+        public static async Task<bool> FlushAsync(CodeFile file)
+        {
+            Program.CancellationToken.ThrowIfCancellationRequested();
+            if (Settings.NoSpi)
+            {
+                return true;
+            }
+
+            Task<bool> flushTask;
+            using (await _channels[file.Channel].LockAsync())
+            {
+                flushTask = _channels[file.Channel].FlushAsync(file);
+            }
+            return await flushTask;
+        }
+
+        /// <summary>
         /// Wait for all pending codes on the same stack level as the given code to finish.
         /// By default this replaces all expressions as well for convenient parsing by the code processors.
         /// </summary>
@@ -271,7 +292,7 @@ namespace DuetControlServer.SPI
             Task<bool> flushTask;
             using (await _channels[code.Channel].LockAsync())
             {
-                flushTask = _channels[code.Channel].FlushAsync(code);
+                flushTask = _channels[code.Channel].FlushAsync(code.File);
             }
 
             if (await flushTask)
@@ -614,10 +635,7 @@ namespace DuetControlServer.SPI
         /// <exception cref="ArgumentException">Invalid parameter</exception>
         public static void SendMessage(MessageTypeFlags flags, string message)
         {
-            if (Program.CancellationToken.IsCancellationRequested)
-            {
-                throw new OperationCanceledException();
-            }
+            Program.CancellationToken.ThrowIfCancellationRequested();
             if (Settings.NoSpi)
             {
                 throw new InvalidOperationException("Not connected over SPI");
@@ -1172,11 +1190,11 @@ namespace DuetControlServer.SPI
             }
 
             // Pause the print
-            using (FileExecution.Job.Lock())
+            using (JobProcessor.Lock())
             {
                 // Do NOT supply a file position if this is a pause request initiated from G-code because that would lead to an endless loop
                 bool filePositionValid = (filePosition != Consts.NoFilePosition) && (pauseReason != PrintPausedReason.GCode) && (pauseReason != PrintPausedReason.FilamentChange);
-                FileExecution.Job.Pause(filePositionValid ? filePosition : null, pauseReason);
+                JobProcessor.Pause(filePositionValid ? filePosition : null, pauseReason);
             }
 
             // Resolve pending and buffered codes on the file channels
@@ -1608,9 +1626,9 @@ namespace DuetControlServer.SPI
             }
 
             // Cancel the file being printed
-            using (FileExecution.Job.Lock())
+            using (JobProcessor.Lock())
             {
-                FileExecution.Job.Abort();
+                JobProcessor.Abort();
             }
 
             // Resolve pending macros, unbuffered (system) codes and flush requests
@@ -1691,9 +1709,9 @@ namespace DuetControlServer.SPI
             }
 
             // Cancel the file being printed
-            using (await FileExecution.Job.LockAsync())
+            using (await JobProcessor.LockAsync())
             {
-                await FileExecution.Job.AbortAsync();
+                await JobProcessor.AbortAsync();
             }
 
             // Resolve pending macros, unbuffered (system) codes and flush requests

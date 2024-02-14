@@ -567,17 +567,6 @@ namespace DuetControlServer.Model
                         result.Append(code.LineNumber ?? 0);
                         break;
 
-                    case "result":
-                        if (code.File is null)
-                        {
-                            throw new CodeParserException("not executing a file", code);
-                        }
-                        using (await code.File.LockAsync())
-                        {
-                            result.Append(code.File.LastResult);
-                        }
-                        break;
-
                     default:
                         bool wantsCount = lastTokenValue.TrimStart().StartsWith('#');
                         string filterString = wantsCount ? lastTokenValue[1..].Trim() : lastTokenValue.Trim();
@@ -639,17 +628,6 @@ namespace DuetControlServer.Model
                                 throw new CodeParserException("not executing a file", code);
                             }
                             return code.LineNumber;
-                        case "result":
-                            if (code.File is null)
-                            {
-                                throw new CodeParserException("not executing a file", code);
-                            }
-                            using (await code.File.LockAsync())
-                            {
-                                return code.File.LastResult;
-                            }
-
-                            // TODO in order to improve performance we could check for extra RRF consts here as well (like pi etc)
                     }
 
                     // Check for character

@@ -2,7 +2,7 @@
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
-using DuetControlServer.FileExecution;
+using DuetControlServer.Files;
 using System;
 using System.Linq;
 using System.Text;
@@ -59,9 +59,9 @@ namespace DuetControlServer.Codes
         /// Push a new state on the stack of a given channel procesor. Only to be used by the SPI channel processor!
         /// </summary>
         /// <param name="channel">Code channel</param>
-        /// <param name="macro">Optional macro file</param>
+        /// <param name="file">Optional file</param>
         /// <returns>Pipeline state</returns>
-        internal static Pipelines.PipelineStackItem Push(CodeChannel channel, Macro? macro = null) => _processors[(int)channel].Push(macro);
+        internal static Pipelines.PipelineStackItem Push(CodeChannel channel, CodeFile? file = null) => _processors[(int)channel].Push(file);
 
         /// <summary>
         /// Push a new state on the stack of a given pipeline. Only to be used by the SPI channel processor!
@@ -72,11 +72,25 @@ namespace DuetControlServer.Codes
         internal static void Pop(CodeChannel channel) => _processors[(int)channel].Pop();
 
         /// <summary>
+        /// Assign the job file to the given channel. Only used by the job tasks!
+        /// </summary>
+        /// <param name="channel">Code channel</param>
+        /// <param name="file">Job file</param>
+        internal static void SetJobFile(CodeChannel channel, CodeFile? file) => _processors[(int)channel].SetJobFile(file);
+
+        /// <summary>
         /// Wait for all pending codes to finish
         /// </summary>
         /// <param name="channel">Code channel to wait for</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
         public static Task<bool> FlushAsync(CodeChannel channel) => _processors[(int)channel].FlushAsync();
+
+        /// <summary>
+        /// Wait for all pending codes of the given file to finish
+        /// </summary>
+        /// <param name="file">Code file</param>
+        /// <returns>Whether the codes have been flushed successfully</returns>
+        public static Task<bool> FlushAsync(CodeFile file) => _processors[(int)file.Channel].FlushAsync(file);
 
         /// <summary>
         /// Wait for all pending codes on the same stack level as the given code to finish.
@@ -104,7 +118,7 @@ namespace DuetControlServer.Codes
             if (syncFileStreams && code.IsFromFileChannel)
             {
                 // Wait for both file streams to reach the same position
-                return await FileExecution.Job.DoSync(code);
+                return await JobProcessor.DoSync(code);
             }
             else if (ifExecuting)
             {
@@ -170,7 +184,6 @@ namespace DuetControlServer.Codes
                 {
                     code.Flags |= CodeFlags.IsFromMacro;
                     code.File = codeBeingIntercepted.File;
-                    code.Macro = codeBeingIntercepted.Macro;
                 }
 
                 // Skip start or pre stage if a new code from an active interception targets the same channel. That stage may be blocking when we get here

@@ -1,5 +1,4 @@
 ﻿using DuetControlServer.IPC;
-using System;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands

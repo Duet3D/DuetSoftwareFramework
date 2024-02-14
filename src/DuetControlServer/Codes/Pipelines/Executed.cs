@@ -106,12 +106,6 @@ namespace DuetControlServer.Codes.Pipelines
                 // Deal with its result if applicable
                 if (code.Result is not null)
                 {
-                    // Update the 'result' variable
-                    if (code.File is not null)
-                    {
-                        code.File.LastResult = (int)code.Result.Type;
-                    }
-
                     // Output and log the result from async codes
                     if (code.Flags.HasFlag(CodeFlags.Asynchronous))
                     {

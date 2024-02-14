@@ -108,11 +108,6 @@ namespace DuetControlServer.Files
         }
 
         /// <summary>
-        /// Result of the last G/M/T-code (0 = success, 1 = warning, 2 = error)
-        /// </summary>
-        public int LastResult { get; set; }
-
-        /// <summary>
         /// Returns the length of the file in bytes
         /// </summary>
         public long Length => _fileStream.Length;
@@ -123,16 +118,28 @@ namespace DuetControlServer.Files
         public bool IsClosed { get; private set; }
 
         /// <summary>
+        /// Close this file
+        /// </summary>
+        public void Close()
+        {
+            if (IsClosed)
+            {
+                return;
+            }
+            IsClosed = true;
+        }
+
+        /// <summary>
         /// Constructor of the base class for reading from a G-code file
         /// </summary>
         /// <param name="fileName">Name of the file to process or null if it is optional</param>
         /// <param name="channel">Channel to send the codes to</param>
-        public CodeFile(string fileName, CodeChannel channel)
+        public CodeFile(string fileName, string physicalFile, CodeChannel channel)
         {
             FileName = fileName;
             Channel = channel;
 
-            _fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
+            _fileStream = new FileStream(physicalFile, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
         }
 
         /// <summary>
@@ -143,7 +150,7 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Dispose this instance
         /// </summary>
-        public void Dispose()
+        public virtual void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
@@ -229,8 +236,9 @@ namespace DuetControlServer.Files
                     {
                         if (state.HasLocalVariables)
                         {
-                            // Wait for pending commands to be executed so all the local variables can be disposed of again
-                            await Codes.Processor.FlushAsync(Channel);
+                            // Wait for pending commands to be executed so all the local variables can be disposed of again.
+                            // We don't care if this fails, because we need to tidy up in any case
+                            await Codes.Processor.FlushAsync(this);
                         }
 
                         if (state.StartingCode.Keyword == KeywordType.While)
@@ -247,8 +255,9 @@ namespace DuetControlServer.Files
                                 {
                                     if (!state.HasLocalVariables)
                                     {
-                                        // Wait for pending codes to be fully executed so that "iterations" can be incremented
-                                        await Codes.Processor.FlushAsync(Channel);
+                                        // Wait for pending codes to be fully executed so that "iterations" can be incremented.
+                                        // We don't care if this fails, because we need to tidy up in any case
+                                        await Codes.Processor.FlushAsync(this);
                                     }
 
                                     using (await _lock.LockAsync(Program.CancellationToken))
@@ -335,7 +344,7 @@ namespace DuetControlServer.Files
                             }
 
                             // Start a new conditional block if necessary
-                            if (!await Codes.Processor.FlushAsync(Channel) || IsClosed)
+                            if (!await Codes.Processor.FlushAsync(this) || IsClosed)
                             {
                                 return null;
                             }
@@ -386,9 +395,12 @@ namespace DuetControlServer.Files
                                 throw new CodeParserException("break or continue cannot be called outside while loop", code);
                             }
 
-                            _logger.Debug("Doing {0}", code.Keyword);
-                            await Codes.Processor.FlushAsync(Channel);
+                            if (!await Codes.Processor.FlushAsync(this) || IsClosed)
+                            {
+                                return null;
+                            }
 
+                            _logger.Debug("Doing {0}", code.Keyword);
                             foreach (CodeBlock state in _codeBlocks)
                             {
                                 state.ProcessBlock = false;
@@ -511,18 +523,6 @@ namespace DuetControlServer.Files
                     _lastCodeBlock = codeBlock;
                 }
             }
-        }
-
-        /// <summary>
-        /// Close this file
-        /// </summary>
-        public void Close()
-        {
-            if (IsClosed)
-            {
-                return;
-            }
-            IsClosed = true;
         }
     }
 }

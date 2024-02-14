@@ -1,6 +1,6 @@
 ﻿using DuetControlServer.Codes.Pipelines;
 using DuetControlServer.Commands;
-using DuetControlServer.FileExecution;
+using DuetControlServer.Files;
 using System.Collections.Generic;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -39,12 +39,17 @@ namespace DuetControlServer.SPI.Channel
         public Queue<Code> SuspendedCodes { get; } = new();
 
         /// <summary>
-        /// Macro being executed on this state
+        /// File being executed on this state
         /// </summary>
         /// <remarks>
         /// This is only assigned once after an instance has been created
         /// </remarks>
-        public Macro? Macro { get => _pipelineStackItem.Macro; }
+        public CodeFile? File { get => _pipelineStackItem.File; }
+
+        /// <summary>
+        /// Indicates if a macro was supposed to be opened but it failed
+        /// </summary>
+        public bool MacroError { get; set; }
 
         /// <summary>
         /// Indicates if the firmware has been notified about the macro completion

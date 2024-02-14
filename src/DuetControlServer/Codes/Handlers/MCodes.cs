@@ -32,7 +32,7 @@ namespace DuetControlServer.Codes.Handlers
         /// <returns>Result of the code if the code completed, else null</returns>
         public static async Task<Message?> Process(Commands.Code code)
         {
-            if (code.IsFromFileChannel && FileExecution.Job.IsSimulating && code.MajorNumber is not 0 and not 1 and not 2)
+            if (code.IsFromFileChannel && JobProcessor.IsSimulating && code.MajorNumber is not 0 and not 1 and not 2)
             {
                 // Ignore most M-codes from files in simulation mode...
                 return null;
@@ -51,18 +51,18 @@ namespace DuetControlServer.Codes.Handlers
                         // Attempt to cancel the print from any channel other than File2
                         if (code.Channel != CodeChannel.File2)
                         {
-                            using (await FileExecution.Job.LockAsync())
+                            using (await JobProcessor.LockAsync())
                             {
-                                if (FileExecution.Job.IsFileSelected)
+                                if (JobProcessor.IsFileSelected)
                                 {
                                     // M0/M1/M2 is permitted from inside a job file, but only permitted from elsewhere if the job is already paused
-                                    if (!code.IsFromFileChannel && !FileExecution.Job.IsPaused)
+                                    if (!code.IsFromFileChannel && !JobProcessor.IsPaused)
                                     {
                                         return new Message(MessageType.Error, "Pause the print before attempting to cancel it");
                                     }
 
                                     // Invalidate the print file and make sure no more codes are read from it
-                                    await FileExecution.Job.CancelAsync();
+                                    await JobProcessor.CancelAsync();
                                 }
                             }
                         }
@@ -185,25 +185,25 @@ namespace DuetControlServer.Codes.Handlers
                 case 32:
                     if (await Processor.FlushAsync(code))
                     {
-                        string file = code.GetUnprecedentedString();
-                        if (string.IsNullOrWhiteSpace(file))
+                        string fileName = code.GetUnprecedentedString();
+                        if (string.IsNullOrWhiteSpace(fileName))
                         {
                             return new Message(MessageType.Error, "Filename expected");
                         }
 
-                        string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
+                        string physicalFile = await FilePath.ToPhysicalAsync(fileName, FileDirectory.GCodes);
                         if (!File.Exists(physicalFile))
                         {
-                            return new Message(MessageType.Error, $"Could not find file {file}");
+                            return new Message(MessageType.Error, $"Could not find file {fileName}");
                         }
 
-                        using (await FileExecution.Job.LockAsync())
+                        using (await JobProcessor.LockAsync())
                         {
-                            if (!code.IsFromFileChannel && FileExecution.Job.IsProcessing)
+                            if (!code.IsFromFileChannel && JobProcessor.IsProcessing)
                             {
                                 return new Message(MessageType.Error, "Cannot set file to print, because a file is already being printed");
                             }
-                            await FileExecution.Job.SelectFile(physicalFile);
+                            await JobProcessor.SelectFile(fileName, physicalFile);
                         }
 
                         // Let RRF do everything else
@@ -215,9 +215,9 @@ namespace DuetControlServer.Codes.Handlers
                 case 24:
                     if (await Processor.FlushAsync(code))
                     {
-                        using (await FileExecution.Job.LockAsync())
+                        using (await JobProcessor.LockAsync())
                         {
-                            if (!FileExecution.Job.IsFileSelected)
+                            if (!JobProcessor.IsFileSelected)
                             {
                                 return new Message(MessageType.Error, "Cannot print, because no file is selected!");
                             }
@@ -241,21 +241,21 @@ namespace DuetControlServer.Codes.Handlers
                             motionSystem = Provider.Get.Inputs[code.Channel]?.MotionSystem ?? 0;
                         }
 
-                        using (await FileExecution.Job.LockAsync())
+                        using (await JobProcessor.LockAsync())
                         {
-                            if (!FileExecution.Job.IsFileSelected)
+                            if (!JobProcessor.IsFileSelected)
                             {
                                 return new Message(MessageType.Error, "Not printing a file");
                             }
 
                             if (code.TryGetLong('S', out long newPosition))
                             {
-                                if (newPosition < 0L || newPosition > FileExecution.Job.FileLength)
+                                if (newPosition < 0L || newPosition > JobProcessor.FileLength)
                                 {
                                     return new Message(MessageType.Error, "Position is out of range");
                                 }
 
-                                await FileExecution.Job.SetFilePosition(motionSystem, newPosition);
+                                await JobProcessor.SetFilePosition(motionSystem, newPosition);
                             }
                         }
 
@@ -276,12 +276,12 @@ namespace DuetControlServer.Codes.Handlers
                             motionSystem = Provider.Get.Inputs[code.Channel]?.MotionSystem ?? 0;
                         }
 
-                        using (await FileExecution.Job.LockAsync())
+                        using (await JobProcessor.LockAsync())
                         {
-                            if (FileExecution.Job.IsFileSelected)
+                            if (JobProcessor.IsFileSelected)
                             {
-                                long filePosition = await FileExecution.Job.GetFilePosition(motionSystem);
-                                return new Message(MessageType.Success, $"SD printing byte {filePosition}/{FileExecution.Job.FileLength}");
+                                long filePosition = await JobProcessor.GetFilePosition(motionSystem);
+                                return new Message(MessageType.Success, $"SD printing byte {filePosition}/{JobProcessor.FileLength}");
                             }
                             return new Message(MessageType.Success, "Not SD printing.");
                         }
@@ -409,21 +409,21 @@ namespace DuetControlServer.Codes.Handlers
                 case 37:
                     if (await Processor.FlushAsync(code))
                     {
-                        string file = code.GetString('P');
-                        string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
+                        string fileName = code.GetString('P');
+                        string physicalFile = await FilePath.ToPhysicalAsync(fileName, FileDirectory.GCodes);
                         if (!File.Exists(physicalFile))
                         {
-                            return new Message(MessageType.Error, $"GCode file \"{file}\" not found");
+                            return new Message(MessageType.Error, $"GCode file \"{fileName}\" not found");
                         }
 
-                        using (await FileExecution.Job.LockAsync())
+                        using (await JobProcessor.LockAsync())
                         {
-                            if (!code.IsFromFileChannel && FileExecution.Job.IsProcessing)
+                            if (!code.IsFromFileChannel && JobProcessor.IsProcessing)
                             {
                                 return new Message(MessageType.Error, "Cannot set file to simulate, because a file is already being printed");
                             }
 
-                            await FileExecution.Job.SelectFile(physicalFile, true);
+                            await JobProcessor.SelectFile(fileName, physicalFile, true);
                             // Simulation is started when M37 has been processed by the firmware
                         }
 
@@ -1018,10 +1018,10 @@ namespace DuetControlServer.Codes.Handlers
                 case 24:
                 case 32:
                 case 37:
-                    using (await FileExecution.Job.LockAsync())
+                    using (await JobProcessor.LockAsync())
                     {
                         // Start sending file instructions to RepRapFirmware or finish the cancellation process
-                        FileExecution.Job.Resume();
+                        JobProcessor.Resume();
                     }
                     break;
 
@@ -1067,7 +1067,7 @@ namespace DuetControlServer.Codes.Handlers
             builder.AppendLine($"Duet Control Server version {Program.Version} ({buildAttribute.Date ?? "unknown build time"})");
 
             Processor.Diagnostics(builder);
-            await FileExecution.Job.Diagnostics(builder);
+            await JobProcessor.Diagnostics(builder);
             IPC.Processors.CodeInterception.Diagnostics(builder);
             Provider.Diagnostics(builder);
             await SPI.Interface.Diagnostics(builder);

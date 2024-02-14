@@ -1,8 +1,6 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
-using DuetControlServer.Files;
-using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,39 +8,17 @@ using System.Threading;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
-namespace DuetControlServer.FileExecution
+namespace DuetControlServer.Files
 {
     /// <summary>
     /// Class representing a macro being executed
     /// </summary>
-    public sealed class Macro : IDisposable
+    public sealed class MacroFile : CodeFile, IDisposable
     {
         /// <summary>
         /// Static logger instance
         /// </summary>
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
-        /// <summary>
-        /// Lock for this instance
-        /// </summary>
-        private readonly AsyncLock _lock = new();
-
-        /// <summary>
-        /// Lock this instance
-        /// </summary>
-        /// <returns>Disposable lock</returns>
-        public IDisposable Lock() => _lock.Lock(Program.CancellationToken);
-
-        /// <summary>
-        /// Lock this instance asynchronously
-        /// </summary>
-        /// <returns>Disposable lock</returns>
-        public AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync(Program.CancellationToken);
-
-        /// <summary>
-        /// Channel on which this macro is running
-        /// </summary>
-        public CodeChannel Channel { get; }
 
         /// <summary>
         /// IPC connection that (indirectly) requested this macro file
@@ -70,39 +46,19 @@ namespace DuetControlServer.FileExecution
         public CancellationToken CancellationToken => _cts.Token;
 
         /// <summary>
-        /// File to read from
-        /// </summary>
-        private readonly CodeFile? _file;
-
-        /// <summary>
-        /// Name of the file being executed
-        /// </summary>
-        public string FileName { get; }
-
-        /// <summary>
         /// Whether this file is config.g or config.g.bak
         /// </summary>
         public bool IsConfig { get; }
 
         /// <summary>
-        /// Extra steps to perform before config.g is processed
-        /// </summary>
-        private enum ConfigExtraSteps
-        {
-            SendHostname,
-            SendDateTime,
-            Done
-        }
-
-        /// <summary>
-        /// Current extra step being performed (provided config.g is being executed)
-        /// </summary>
-        private ConfigExtraSteps _extraStep = ConfigExtraSteps.SendHostname;
-
-        /// <summary>
         /// Whether this file is config-override.g
         /// </summary>
         public bool IsConfigOverride { get; }
+
+        /// <summary>
+        /// Whether this file is dsf-config.g
+        /// </summary>
+        public bool IsDsfConfig { get; }
 
         /// <summary>
         /// Indicates if the macro file has just started
@@ -125,42 +81,22 @@ namespace DuetControlServer.FileExecution
         public bool IsAborted { get; private set; }
 
         /// <summary>
-        /// Indicates if the macro file could be opened
-        /// </summary>
-        public bool FileOpened => _file is not null;
-
-        /// <summary>
-        /// Constructor of a macro
+        /// Create a macro file for execution on the given channel
         /// </summary>
         /// <param name="fileName">Filename of the macro</param>
         /// <param name="physicalFile">Physical path of the macro</param>
         /// <param name="channel">Code requesting the macro</param>
-        /// <param name="isNested">Whether the code was started from a G/M/T-code</param>
+        /// <param name="startingCode">Code starting the macro file</param>
         /// <param name="sourceConnection">Original IPC connection requesting this macro file</param>
-        public Macro(string fileName, string physicalFile, CodeChannel channel, bool isNested = false, int sourceConnection = 0)
+        /// <returns>Macro file or null if it could not be opened</returns>
+
+        public static MacroFile? Open(string fileName, string physicalFile, CodeChannel channel, Code? startCode = null, int sourceConnection = 0)
         {
-            FileName = fileName;
-            Channel = channel;
-            IsNested = isNested;
-            SourceConnection = sourceConnection;
-
-            // Are we executing config.g or config-override.g?
-            if (isNested)
-            {
-                // FIXME This should check if the starting code is M501
-                IsConfigOverride = (Path.GetFileName(physicalFile) == FilePath.ConfigOverrideFile);
-            }
-            else if (physicalFile == Path.Combine(Settings.BaseDirectory, "sys", FilePath.ConfigFile) ||
-                     physicalFile == Path.Combine(Settings.BaseDirectory, "sys", FilePath.ConfigFileFallback))
-            {
-                IsConfig = true;
-            }
-
-            // Try to start the macro file
             try
             {
-                _file = new CodeFile(physicalFile, channel);
+                MacroFile macro = new(fileName, physicalFile, channel, startCode, sourceConnection);
                 _logger.Info("Starting macro file {0} on channel {1}", fileName, channel);
+                return macro;
             }
             catch (FileNotFoundException)
             {
@@ -177,19 +113,42 @@ namespace DuetControlServer.FileExecution
             {
                 _logger.Error(e, "Failed to start macro file {0}: {1}", fileName, e.Message);
             }
+            return null;
         }
 
         /// <summary>
-        /// Start the execution of this macro file
+        /// Constructor of a macro
+        /// </summary>
+        /// <param name="fileName">Filename of the macro</param>
+        /// <param name="physicalFile">Physical path of the macro</param>
+        /// <param name="channel">Code requesting the macro</param>
+        /// <param name="startCode">Code starting the macro file</param>
+        /// <param name="sourceConnection">Original IPC connection requesting this macro file</param>
+        private MacroFile(string fileName, string physicalFile, CodeChannel channel, Code? startCode, int sourceConnection) : base(fileName, physicalFile, channel)
+        {
+            SourceConnection = sourceConnection;
+
+            // Are we executing config.g, config-override.g, or dsf-config.g?
+            if (startCode is not null)
+            {
+                IsNested = true;
+                IsConfigOverride = startCode is { Type: CodeType.MCode, MajorNumber: 501 } && (fileName == FilePath.ConfigOverrideFile);
+                IsDsfConfig = fileName == FilePath.DsfConfigFile;
+            }
+            else if (physicalFile == Path.Combine(Settings.BaseDirectory, "sys", FilePath.ConfigFile) ||
+                     physicalFile == Path.Combine(Settings.BaseDirectory, "sys", FilePath.ConfigFileFallback))
+            {
+                IsConfig = true;
+            }
+        }
+
+        /// <summary>
+        /// Start executing this macro file in the background
         /// </summary>
         public void Start()
         {
-            string name = Path.GetFileName(FileName);
-            if (_file is not null || (name == FilePath.ConfigFile && _file is not null) || name == FilePath.ConfigFileFallback)
-            {
-                IsExecuting = JustStarted = true;
-                _ = Task.Run(Run);
-            }
+            IsExecuting = JustStarted = true;
+            Task.Run(Run);
         }
 
         /// <summary>
@@ -205,38 +164,7 @@ namespace DuetControlServer.FileExecution
             IsAborted = true;
             _cts.Cancel();
 
-            if (_file is not null)
-            {
-                using (_file.Lock())
-                {
-                    _file.Close();
-                }
-            }
-
-            _logger.Info("Aborted macro file {0}", FileName);
-        }
-
-        /// <summary>
-        /// Abort this macro asynchronously
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public async Task AbortAsync()
-        {
-            if (IsAborted || _disposed)
-            {
-                return;
-            }
-            IsAborted = true;
-            _cts.Cancel();
-
-            if (_file is not null)
-            {
-                using (await _file.LockAsync())
-                {
-                    _file.Close();
-                }
-            }
-
+            Close();
             _logger.Info("Aborted macro file {0}", FileName);
         }
 
@@ -268,6 +196,87 @@ namespace DuetControlServer.FileExecution
         }
 
         /// <summary>
+        /// Extra steps to perform before config.g is processed
+        /// </summary>
+        private enum ConfigExtraSteps
+        {
+            SendHostname,
+            SendDateTime,
+            Done
+        }
+
+        /// <summary>
+        /// Current extra step being performed (provided config.g is being executed)
+        /// </summary>
+        private ConfigExtraSteps _extraConfigStep = ConfigExtraSteps.SendHostname;
+
+        /// <summary>
+        /// Read the next available code asynchronously
+        /// </summary>
+        /// <returns>Read code</returns>
+        private async Task<Code?> ReadCodeAsync()
+        {
+            Code? result;
+
+            // When executing config.g, perform some extra steps...
+            if (IsConfig)
+            {
+                switch (_extraConfigStep)
+                {
+                    case ConfigExtraSteps.SendHostname:
+                        result = new Code
+                        {
+                            Channel = Channel,
+                            File = this,
+                            Flags = CodeFlags.IsInternallyProcessed,        // don't check our own hostname
+                            Type = CodeType.MCode,
+                            MajorNumber = 550
+                        };
+                        result.Parameters.Add(new CodeParameter('P', Environment.MachineName));
+                        _extraConfigStep = ConfigExtraSteps.SendDateTime;
+                        break;
+
+                    case ConfigExtraSteps.SendDateTime:
+                        result = new Code
+                        {
+                            Channel = Channel,
+                            File = this,
+                            Flags = CodeFlags.IsInternallyProcessed,        // don't update our own datetime
+                            Type = CodeType.MCode,
+                            MajorNumber = 905
+                        };
+                        result.Parameters.Add(new CodeParameter('P', DateTime.Now.ToString("yyyy-MM-dd")));
+                        result.Parameters.Add(new CodeParameter('S', DateTime.Now.ToString("HH:mm:ss")));
+                        _extraConfigStep = ConfigExtraSteps.Done;
+                        break;
+
+                    default:
+                        result = await base.ReadCodeAsync();
+                        break;
+                }
+            }
+            else
+            {
+                result = await base.ReadCodeAsync();
+            }
+
+            // Update code information
+            if (result is not null)
+            {
+                result.CancellationToken = CancellationToken;
+                result.Flags |= CodeFlags.Asynchronous | CodeFlags.IsFromMacro;
+                if (IsConfig) { result.Flags |= CodeFlags.IsFromConfig; }
+                if (IsConfigOverride) { result.Flags |= CodeFlags.IsFromConfigOverride; }
+                if (IsNested) { result.Flags |= CodeFlags.IsNestedMacro; }
+                result.SourceConnection = SourceConnection;
+                return result;
+            }
+
+            // File has finished
+            return null;
+        }
+
+        /// <summary>
         /// Method representing the lifecycle of a macro being executed
         /// </summary>
         /// <returns>Asynchronous task</returns>
@@ -284,7 +293,7 @@ namespace DuetControlServer.FileExecution
 
             // Check if we're executing a config file
             bool executingConfigFile = false;
-            if (IsConfig || IsConfigOverride || Path.GetFileName(FileName) == FilePath.DsfConfigFile)
+            if (IsConfig || IsConfigOverride || IsDsfConfig)
             {
                 executingConfigFile = true;
                 Model.Provider.SetExecutingConfig(true);
@@ -318,11 +327,15 @@ namespace DuetControlServer.FileExecution
                                 e = ae.InnerException!;
                             }
 
-                            await Model.Provider.HandleMacroErrorAsync(FileName, _file!.LineNumber, e.Message);
-                            await Utility.Logger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FileName)} line {_file.LineNumber}: {e.Message}");
+                            await Model.Provider.HandleMacroErrorAsync(FileName, LineNumber, e.Message);
+                            await Utility.Logger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FileName)} line {LineNumber}: {e.Message}");
                             _logger.Error(e);
                         }
-                        await AbortAsync();
+
+                        using (await LockAsync())
+                        {
+                            Abort();
+                        }
                     }
                 }
 
@@ -351,7 +364,11 @@ namespace DuetControlServer.FileExecution
                             await Utility.Logger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FileName)} line {code.LineNumber ?? 0}: {e.Message}");
                             _logger.Warn(e);
                         }
-                        await AbortAsync();
+
+                        using (await LockAsync())
+                        {
+                            Abort();
+                        }
                     }
                 }
                 else
@@ -363,7 +380,7 @@ namespace DuetControlServer.FileExecution
             }
             while (!Program.CancellationToken.IsCancellationRequested);
 
-            using (await _lock.LockAsync(Program.CancellationToken))
+            using (await LockAsync())
             {
                 // No longer executing
                 IsExecuting = false;
@@ -391,71 +408,6 @@ namespace DuetControlServer.FileExecution
         }
 
         /// <summary>
-        /// Read the next available code asynchronously
-        /// </summary>
-        /// <returns>Read code</returns>
-        private async Task<Code?> ReadCodeAsync()
-        {
-            Code? result;
-
-            // When executing config.g, perform some extra steps...
-            if (IsConfig)
-            {
-                switch (_extraStep)
-                {
-                    case ConfigExtraSteps.SendHostname:
-                        result = new Code
-                        {
-                            Channel = Channel,
-                            Flags = CodeFlags.IsInternallyProcessed,        // don't check our own hostname
-                            Type = CodeType.MCode,
-                            MajorNumber = 550
-                        };
-                        result.Parameters.Add(new CodeParameter('P', Environment.MachineName));
-                        _extraStep = ConfigExtraSteps.SendDateTime;
-                        break;
-
-                    case ConfigExtraSteps.SendDateTime:
-                        result = new Code
-                        {
-                            Channel = Channel,
-                            Flags = CodeFlags.IsInternallyProcessed,        // don't update our own datetime
-                            Type = CodeType.MCode,
-                            MajorNumber = 905
-                        };
-                        result.Parameters.Add(new CodeParameter('P', DateTime.Now.ToString("yyyy-MM-dd")));
-                        result.Parameters.Add(new CodeParameter('S', DateTime.Now.ToString("HH:mm:ss")));
-                        _extraStep = ConfigExtraSteps.Done;
-                        break;
-
-                    default:
-                        result = (_file is not null) ? await _file.ReadCodeAsync() : null;
-                        break;
-                }
-            }
-            else
-            {
-                result = (_file is not null) ? await _file.ReadCodeAsync() : null;
-            }
-
-            // Update code information
-            if (result is not null)
-            {
-                result.CancellationToken = CancellationToken;
-                result.Flags |= CodeFlags.Asynchronous | CodeFlags.IsFromMacro;
-                result.Macro = this;
-                if (IsConfig) { result.Flags |= CodeFlags.IsFromConfig; }
-                if (IsConfigOverride) { result.Flags |= CodeFlags.IsFromConfigOverride; }
-                if (IsNested) { result.Flags |= CodeFlags.IsNestedMacro; }
-                result.SourceConnection = SourceConnection;
-                return result;
-            }
-
-            // File has finished
-            return null;
-        }
-
-        /// <summary>
         /// Indicates if this instance has been _disposed
         /// </summary>
         private bool _disposed;
@@ -463,7 +415,7 @@ namespace DuetControlServer.FileExecution
         /// <summary>
         /// Dispose this instance
         /// </summary>
-        public void Dispose()
+        public override void Dispose()
         {
             // Don't dispose this instance twice...
             if (_disposed)
@@ -471,15 +423,9 @@ namespace DuetControlServer.FileExecution
                 return;
             }
 
-            // Dispose the used resources
+            // Dispose used resources
             _cts.Dispose();
-            if (_file != null)
-            {
-                using (_file.Lock())
-                {
-                    _file.Dispose();
-                }
-            }
+            base.Dispose();
             _finishTcs?.SetCanceled();
             _disposed = true;
         }

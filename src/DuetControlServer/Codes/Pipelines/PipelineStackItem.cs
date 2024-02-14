@@ -1,5 +1,5 @@
 ﻿using DuetControlServer.Commands;
-using DuetControlServer.FileExecution;
+using DuetControlServer.Files;
 using Nito.AsyncEx;
 using System;
 using System.Threading.Channels;
@@ -17,8 +17,8 @@ namespace DuetControlServer.Codes.Pipelines
         /// Constructor of this class
         /// </summary>
         /// <param name="pipeline">Pipeline holding this stack item</param>
-        /// <param name="macro">Current macro file or null if not present</param>
-        public PipelineStackItem(PipelineBase pipeline, Macro? macro)
+        /// <param name="file">Current file or null if not present</param>
+        public PipelineStackItem(PipelineBase pipeline, CodeFile? file)
         {
             if (pipeline.Stage != PipelineStage.Executed)
             {
@@ -37,7 +37,7 @@ namespace DuetControlServer.Codes.Pipelines
                     SingleWriter = false
                 });
             }
-            Macro = macro;
+            File = file;
 
             // Feed incoming codes to the code handler
             if (pipeline.Stage != PipelineStage.Firmware)
@@ -89,9 +89,9 @@ namespace DuetControlServer.Codes.Pipelines
         public readonly Channel<Code> PendingCodes;
 
         /// <summary>
-        /// Macro corresponding to this stack item
+        /// Code file corresponding to this stack item
         /// </summary>
-        public readonly Macro? Macro;
+        public CodeFile? File;
 
         /// <summary>
         /// Internal task processing incoming codes

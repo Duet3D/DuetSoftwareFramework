@@ -1,6 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetControlServer.Commands;
-using DuetControlServer.FileExecution;
 using DuetControlServer.Files;
 using LinuxApi;
 using System;
@@ -165,7 +164,7 @@ namespace DuetControlServer
                 { Utility.PriorityThreadRunner.Start(SPI.Interface.Run, ThreadPriority.Highest), "SPI" },
                 { Task.Factory.StartNew(Model.Updater.Run, TaskCreationOptions.LongRunning).Unwrap(), "Update" },
                 { Task.Factory.StartNew(IPC.Server.Run, TaskCreationOptions.LongRunning).Unwrap(), "IPC" },
-                { Task.Factory.StartNew(FileExecution.Job.Run, TaskCreationOptions.LongRunning).Unwrap(), "Job" },
+                { Task.Factory.StartNew(JobProcessor.Run, TaskCreationOptions.LongRunning).Unwrap(), "Job" },
                 { Task.Factory.StartNew(Model.PeriodicUpdater.Run, TaskCreationOptions.LongRunning).Unwrap(), "Periodic updater" }
             };
 
@@ -271,7 +270,8 @@ namespace DuetControlServer
 
                     if (!CancellationToken.IsCancellationRequested)
                     {
-                        using (Macro macro = new(FilePath.RunOnceFile, runOnceFile, DuetAPI.CodeChannel.Trigger))
+                        using MacroFile? macro = MacroFile.Open(FilePath.RunOnceFile, runOnceFile, DuetAPI.CodeChannel.Trigger);
+                        if (macro is not null)
                         {
                             macro.Start();
                             await macro.WaitForFinishAsync();
