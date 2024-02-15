@@ -704,28 +704,44 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // 4. Macro files (must come before any other code)
-            if (CurrentState.MacroError)
-            {
-                CurrentState.MacroError = !DataTransfer.WriteMacroCompleted(Channel, true);
-                return;
-            }
-
-            if (CurrentState.File is MacroFile macro)
+            if (CurrentState.File is MacroFile || CurrentState.MacroError)
             {
                 // Tell RRF as quickly as possible about the new macro being started
-                if (macro.JustStarted)
+                if (CurrentState.File is MacroFile macro && macro.JustStarted)
                 {
                     macro.JustStarted = (DataTransfer.ProtocolVersion >= 3) && !DataTransfer.WriteMacroStarted(Channel);
                     return;
                 }
 
                 // Check if the macro file has finished
-                if (!macro.IsExecuting)
+                if (CurrentState.File is MacroFile { IsExecuting: false } || CurrentState.MacroError)
                 {
-                    if (!CurrentState.MacroCompleted && DataTransfer.WriteMacroCompleted(Channel, false))
+                    if (!CurrentState.MacroCompleted && DataTransfer.WriteMacroCompleted(Channel, CurrentState.MacroError))
                     {
                         CurrentState.MacroCompleted = true;
-                        if (DataTransfer.ProtocolVersion < 3)
+                        if (DataTransfer.ProtocolVersion >= 3)
+                        {
+                            if (CurrentState.MacroError)
+                            {
+                                // In newer protocol versions we don't expect a response because RRF will be waiting in a semaphore
+                                Code? startCode = CurrentState.StartCode;
+                                if (startCode is not null)
+                                {
+                                    BytesBuffered += startCode.BinarySize;
+                                    BufferedCodes.Insert(0, startCode);
+                                    CurrentState.StartCode = null;
+                                    ResolvePendingReplies();
+                                }
+
+                                // Macro has finished, pop the stack
+                                Pop();
+                                if (startCode is not null)
+                                {
+                                    _logger.Debug("==> Unfinished starting code: {0}", startCode);
+                                }
+                            }
+                        }
+                        else
                         {
                             // Wait for a response first if an older firmware version is used, then pop the stack
                             return;
@@ -1130,38 +1146,34 @@ namespace DuetControlServer.SPI.Channel
             {
                 if (CurrentState.MacroCompleted)
                 {
+                    _logger.Info("Finished intermediate macro file {0}", CurrentState.File!.FileName);
                     startCode = CurrentState.StartCode;
+                    CurrentState.StartCode = null;     // don't add it back to the buffered codes because it's about to be pushed on the stack again
+                    Pop();
                 }
                 else if (BufferedCodes.Count > 0)
                 {
                     startCode = BufferedCodes[0];
+                    BytesBuffered -= startCode.BinarySize;
+                    BufferedCodes.RemoveAt(0);
                 }
             }
+            else if (Stack.Count > 1)
+            {
+                _logger.Warn("System macro {0} is requested but the stack is not empty. Discarding request.", fileName);
+                DataTransfer.WriteMacroCompleted(Channel, true);
+                return;
+            }
 
-            // Try to locate the macro file and start it
+            // Try to locate the macro file
             string physicalFile = FilePath.ToPhysical(fileName, FileDirectory.System);
             MacroFile? macro = MacroFile.Open(fileName, physicalFile, Channel, startCode, startCode?.SourceConnection ?? 0);
+
+            State newState = Push(macro);
+            newState.StartCode = startCode;
             if (macro is not null)
             {
-                // Need to treat macro starting codes differently, it is no longer executing
-                if (fromCode)
-                {
-                    if (CurrentState.MacroCompleted)
-                    {
-                        _logger.Info("Finished intermediate macro file {0}", CurrentState.File!.FileName);
-                        CurrentState.StartCode = null;     // don't add it back to the buffered codes because it's about to be pushed on the stack again
-                        Pop();
-                    }
-                    else if (BufferedCodes.Count > 0)
-                    {
-                        BytesBuffered -= startCode!.BinarySize;
-                        BufferedCodes.RemoveAt(0);
-                    }
-                }
-
-                // Push the new state on the stack and start the macro file
-                State newState = Push(macro);
-                newState.StartCode = startCode;
+                // Start it
                 if (startCode is not null)
                 {
                     _logger.Debug("==> Starting code {0}", startCode);
@@ -1171,7 +1183,7 @@ namespace DuetControlServer.SPI.Channel
             else
             {
                 // Report back to RRF that the file could not be opened
-                CurrentState.MacroError = true;
+                newState.MacroError = true;
             }
         }
 
