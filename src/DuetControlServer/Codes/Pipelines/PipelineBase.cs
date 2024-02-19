@@ -81,7 +81,7 @@ namespace DuetControlServer.Codes.Pipelines
                             builder.Append(' ');
                             if (stackItem.File is not null)
                             {
-                                builder.Append("Macro ");
+                                builder.Append(stackItem.File is MacroFile ? "Macro " : "File ");
                                 builder.Append(stackItem.File.FileName);
                                 builder.Append(": ");
                             }

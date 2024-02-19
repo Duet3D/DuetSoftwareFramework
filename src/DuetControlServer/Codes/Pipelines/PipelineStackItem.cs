@@ -46,22 +46,25 @@ namespace DuetControlServer.Codes.Pipelines
                 {
                     await foreach (Code code in PendingCodes.Reader.ReadAllAsync(Program.CancellationToken))
                     {
-                        // Do not process cancelled codes
-                        if (code.CancellationToken.IsCancellationRequested && pipeline.Stage != PipelineStage.Executed)
+                        // Set it up
+                        lock (this)
                         {
-                            Processor.CancelCode(code);
-                            continue;
+                            CodeBeingExecuted = code;
                         }
+                        code.Stage = pipeline.Stage;
 
-                        // Start processing the next code
+                        // Process it
                         try
                         {
-                            lock (this)
+                            if (code.CancellationToken.IsCancellationRequested && pipeline.Stage != PipelineStage.Executed)
                             {
-                                CodeBeingExecuted = code;
+                                // Do not deal with cancelled codes
+                                Processor.CancelCode(code);
                             }
-                            code.Stage = pipeline.Stage;
-                            await pipeline.ProcessCodeAsync(code);
+                            else
+                            {
+                                await pipeline.ProcessCodeAsync(code);
+                            }
                         }
                         catch (Exception e)
                         {
