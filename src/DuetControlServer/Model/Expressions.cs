@@ -355,21 +355,34 @@ namespace DuetControlServer.Model
                 return await EvaluateExpression(code, keywordExpression.Trim(), !evaluateAll, false);
             }
 
-            for (int i = 0; i < code.Parameters.Count; i++)
+            if (code.Parameters.Any(parameter => parameter.IsExpression))
             {
-                if (code.Parameters[i].IsExpression)
+                List<CodeParameter> newParameters = new();
+                foreach (CodeParameter parameter in code.Parameters)
                 {
-                    string trimmedExpression = ((string)code.Parameters[i]!).Trim();
-                    string parameterValue = await EvaluateExpression(code, trimmedExpression, !evaluateAll, !evaluateAll);
-                    if (!evaluateAll && !parameterValue.StartsWith('{') && !parameterValue.EndsWith('}'))
+                    if (parameter.IsExpression)
                     {
-                        // Encapsulate fully expanded parameters so that plugins and RRF know it was an expression
-                        parameterValue = '{' + parameterValue + '}';
+                        string trimmedExpression = ((string)parameter).Trim();
+                        string parameterValue = await EvaluateExpression(code, trimmedExpression, !evaluateAll, !evaluateAll);
+                        if (!evaluateAll && !parameterValue.StartsWith('{') && !parameterValue.EndsWith('}'))
+                        {
+                            // Encapsulate fully expanded parameters so that plugins and RRF know it was an expression
+                            parameterValue = '{' + parameterValue + '}';
+                        }
+                        newParameters.Add(new CodeParameter(parameter.Letter, parameterValue, false, false));
                     }
-                    code.Parameters[i] = new CodeParameter(code.Parameters[i].Letter, parameterValue, false, false);
+                    else
+                    {
+                        newParameters.Add(parameter);
+                    }
+                }
+
+                lock (code)
+                {
+                    code.Parameters = newParameters;
+                    code.ConvertDriverIds();
                 }
             }
-            code.ConvertDriverIds();
             return null;
         }
 

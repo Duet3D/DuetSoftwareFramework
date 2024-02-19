@@ -88,8 +88,11 @@ namespace DuetControlServer.Codes.Pipelines
 
                             if (stackItem.CodeBeingExecuted is not null)
                             {
-                                builder.Append("Executing ");
-                                builder.Append((stackItem.CodeBeingExecuted.Type == DuetAPI.Commands.CodeType.MCode && stackItem.CodeBeingExecuted.MajorNumber == 122) ? "M122" : stackItem.CodeBeingExecuted);
+                                lock (stackItem.CodeBeingExecuted)
+                                {
+                                    builder.Append("Executing ");
+                                    builder.Append((stackItem.CodeBeingExecuted.Type == DuetAPI.Commands.CodeType.MCode && stackItem.CodeBeingExecuted.MajorNumber == 122) ? "M122" : stackItem.CodeBeingExecuted);
+                                }
                             }
                             else if (stackItem.Busy)
                             {
