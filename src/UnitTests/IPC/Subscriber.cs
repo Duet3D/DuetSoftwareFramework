@@ -28,12 +28,12 @@ namespace UnitTests.IPC
                 }
                 else
                 {
-                    ClassicAssert.Fail("Invalid state type");
+                    Assert.Fail("Invalid state type");
                 }
             }
             else
             {
-                ClassicAssert.Fail("Missing state");
+                Assert.Fail("Missing state");
             }
 
             // boards[0 of 2]/v12/current
@@ -58,17 +58,17 @@ namespace UnitTests.IPC
                             }
                             else
                             {
-                                ClassicAssert.Fail("Invalid board[0].v12 type");
+                                Assert.Fail("Invalid board[0].v12 type");
                             }
                         }
                         else
                         {
-                            ClassicAssert.Fail("Missing boards[0].v12");
+                            Assert.Fail("Missing boards[0].v12");
                         }
                     }
                     else
                     {
-                        ClassicAssert.Fail("Invalid board[0] type");
+                        Assert.Fail("Invalid board[0] type");
                     }
 
                     if (boards[1] is Dictionary<string, object?> boardB)
@@ -77,13 +77,13 @@ namespace UnitTests.IPC
                     }
                     else
                     {
-                        ClassicAssert.Fail("Invalid board[1] type");
+                        Assert.Fail("Invalid board[1] type");
                     }
                 }
             }
             else
             {
-                ClassicAssert.Fail("Missing boards");
+                Assert.Fail("Missing boards");
             }
 
             // move.axes[0 of 2].homed
@@ -117,28 +117,28 @@ namespace UnitTests.IPC
                                 }
                                 else
                                 {
-                                    ClassicAssert.Fail($"Invalid move.axes[{i}] type");
+                                    Assert.Fail($"Invalid move.axes[{i}] type");
                                 }
                             }
                         }
                         else
                         {
-                            ClassicAssert.Fail("Invalid move.axes type");
+                            Assert.Fail("Invalid move.axes type");
                         }
                     }
                     else
                     {
-                        ClassicAssert.Fail("Missing move.axes");
+                        Assert.Fail("Missing move.axes");
                     }
                 }
                 else
                 {
-                    ClassicAssert.Fail("Invalid move type");
+                    Assert.Fail("Invalid move type");
                 }
             }
             else
             {
-                ClassicAssert.Fail("Missing move");
+                Assert.Fail("Missing move");
             }
 
             // tools[0 of 1]/retraction/length
@@ -161,27 +161,27 @@ namespace UnitTests.IPC
                             }
                             else
                             {
-                                ClassicAssert.Fail("Invalid tools[0].retraction type");
+                                Assert.Fail("Invalid tools[0].retraction type");
                             }
                         }
                         else
                         {
-                            ClassicAssert.Fail("Missing tools[0].retraction");
+                            Assert.Fail("Missing tools[0].retraction");
                         }
                     }
                     else
                     {
-                        ClassicAssert.Fail("Invalid tools[0] type");
+                        Assert.Fail("Invalid tools[0] type");
                     }
                 }
                 else
                 {
-                    ClassicAssert.Fail("Invalid tools type");
+                    Assert.Fail("Invalid tools type");
                 }
             }
             else
             {
-                ClassicAssert.Fail("Missing tools");
+                Assert.Fail("Missing tools");
             }
         }
     }

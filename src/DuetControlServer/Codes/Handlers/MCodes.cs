@@ -1064,7 +1064,7 @@ namespace DuetControlServer.Codes.Handlers
             BuildDateTimeAttribute buildAttribute = (BuildDateTimeAttribute)Attribute.GetCustomAttribute(System.Reflection.Assembly.GetExecutingAssembly(), typeof(BuildDateTimeAttribute))!;
             StringBuilder builder = new();
             builder.AppendLine("=== Duet Control Server ===");
-            builder.AppendLine($"Duet Control Server version {Program.Version} ({buildAttribute.Date ?? "unknown build time"})");
+            builder.AppendLine($"Duet Control Server version {Program.Version} ({buildAttribute.Date ?? "unknown build time"}, {(Environment.Is64BitProcess ? "64-bit" : "32-bit")})");
 
             Processor.Diagnostics(builder);
             await JobProcessor.Diagnostics(builder);

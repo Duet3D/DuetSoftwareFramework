@@ -198,6 +198,7 @@ namespace DuetControlServer.Model
             Get.SBC.CPU.Hardware = GetCpuHardware();
             Get.SBC.CPU.NumCores = GetCpuNumCores();
             Get.SBC.DSF.BuildDateTime = buildAttribute.Date ?? "unknown build time";
+            Get.SBC.DSF.Is64Bit = Environment.Is64BitProcess;
             Get.SBC.DSF.Version = Program.Version;
             Get.SBC.DSF.PluginSupport = Settings.PluginSupport;
             Get.SBC.DSF.RootPluginSupport = Settings.PluginSupport && Settings.RootPluginSupport;

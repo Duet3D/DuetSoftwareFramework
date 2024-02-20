@@ -23,6 +23,16 @@ namespace DuetAPI.ObjectModel
         public ModelCollection<HttpEndpoint> HttpEndpoints { get; } = new ModelCollection<HttpEndpoint>();
 
         /// <summary>
+        /// Indicates if the process is 64-bit
+        /// </summary>
+        public bool Is64Bit
+        {
+            get => _is64Bit;
+            set => SetPropertyValue(ref _is64Bit, value);
+        }
+        private bool _is64Bit;
+
+        /// <summary>
         /// Indicates if DSF allows the installation and usage of third-party plugins
         /// </summary>
         public bool PluginSupport

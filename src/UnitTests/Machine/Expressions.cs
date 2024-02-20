@@ -11,10 +11,10 @@ namespace UnitTests.Machine
         [Test]
         public void HasSbcExpressions()
         {
-            ClassicAssert.Throws<CodeParserException>(() => new DuetControlServer.Commands.Code("G1 Z{move.axes[0].machinePosition -"));
-            ClassicAssert.Throws<CodeParserException>(() => new DuetControlServer.Commands.Code("G92 Z{{3 + 3} + (volumes[0].freeSpace - 4}"));
-            ClassicAssert.Throws<CodeParserException>(() => new DuetControlServer.Commands.Code("G92 Z{{3 + 3} + (volumes[0].freeSpace - 4)"));
-            ClassicAssert.Throws<CodeParserException>(() => new DuetControlServer.Commands.Code("G92 Z{{3 + 3 + (move.axes[0].userPosition - 4)"));
+            Assert.Throws<CodeParserException>(() => new DuetControlServer.Commands.Code("G1 Z{move.axes[0].machinePosition -"));
+            Assert.Throws<CodeParserException>(() => new DuetControlServer.Commands.Code("G92 Z{{3 + 3} + (volumes[0].freeSpace - 4}"));
+            Assert.Throws<CodeParserException>(() => new DuetControlServer.Commands.Code("G92 Z{{3 + 3} + (volumes[0].freeSpace - 4)"));
+            Assert.Throws<CodeParserException>(() => new DuetControlServer.Commands.Code("G92 Z{{3 + 3 + (move.axes[0].userPosition - 4)"));
 
             DuetControlServer.Commands.Code code = new("G1 Z{move.axes[2].userPosition - 3}");
             ClassicAssert.IsFalse(DuetControlServer.Model.Expressions.ContainsSbcFields(code));
@@ -61,7 +61,7 @@ namespace UnitTests.Machine
             ClassicAssert.AreEqual("1", result);
 
             code = new DuetControlServer.Commands.Code("echo volumes");
-            ClassicAssert.ThrowsAsync<CodeParserException>(async () => await DuetControlServer.Model.Expressions.Evaluate(code, true));
+            Assert.ThrowsAsync<CodeParserException>(async () => await DuetControlServer.Model.Expressions.Evaluate(code, true));
 
             code = new DuetControlServer.Commands.Code("echo plugins");
             result = await DuetControlServer.Model.Expressions.Evaluate(code, false);

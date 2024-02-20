@@ -3,6 +3,7 @@ using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetAPIClient;
+using DuetPiManagementPlugin.Network;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -40,6 +41,8 @@ namespace DuetPiManagementPlugin
             "M554",     // Set Gateway
             "M586",     // Configure network protocols
             "M587",     // Add WiFi host network to remembered list, or list remembered networks
+            "M587.1",   // Start WiFi scan
+            "M587.2",   // List WiFi scan results
             "M588",     // Forget WiFi host network
             "M589",     // Configure access point parameters
             "M997",     // Perform update
@@ -187,12 +190,12 @@ namespace DuetPiManagementPlugin
                                 int index = code.GetInt('I', 0);
                                 if (code.TryGetString('P', out string? address))
                                 {
-                                    Message setResult = await Network.Interface.SetMACAddress(index, address);
+                                    Message setResult = await Interface.SetMACAddress(index, address);
                                     await Connection.ResolveCode(setResult, CancellationToken);
                                 }
                                 else
                                 {
-                                    byte[] macAddress = Network.Interface.Get(index).GetPhysicalAddress().GetAddressBytes();
+                                    byte[] macAddress = Interface.Get(index).GetPhysicalAddress().GetAddressBytes();
                                     await Connection.ResolveCode(MessageType.Success, $"MAC: {BitConverter.ToString(macAddress).Replace('-', ':')}", CancellationToken);
                                 }
                             }
@@ -272,7 +275,7 @@ namespace DuetPiManagementPlugin
                                     int index = code.GetInt('I', 0);
                                     try
                                     {
-                                        Message manageResult = await Network.Interface.SetConfig(index, pParam, sParam);
+                                        Message manageResult = await Interface.SetConfig(index, pParam, sParam);
                                         await Connection.ResolveCode(manageResult, CancellationToken);
                                     }
                                     catch (Exception e)
@@ -284,7 +287,7 @@ namespace DuetPiManagementPlugin
                                 else
                                 {
                                     StringBuilder builder = new();
-                                    await Network.Interface.Report(builder, null, code.GetInt('I', -1));
+                                    await Interface.Report(builder, null, code.GetInt('I', -1));
                                     await Connection.ResolveCode(MessageType.Success, builder.ToString().TrimEnd(), CancellationToken);
                                 }
                             }
@@ -295,7 +298,7 @@ namespace DuetPiManagementPlugin
                             try
                             {
                                 int index = code.GetInt('I', 0);
-                                string result = await Network.Interface.ManageNetmask(index, code.GetIPAddress('P'));
+                                string result = await Interface.ManageNetmask(index, code.GetIPAddress('P'));
                                 await Connection.ResolveCode(MessageType.Success, result, CancellationToken);
                             }
                             catch (Exception e)
@@ -310,7 +313,7 @@ namespace DuetPiManagementPlugin
                             try
                             {
                                 int index = code.GetInt('I', 0);
-                                string result = await Network.Interface.ManageGateway(index, code.GetIPAddress('P'), code.GetIPAddress('S'));
+                                string result = await Interface.ManageGateway(index, code.GetIPAddress('P'), code.GetIPAddress('S'));
                                 await Connection.ResolveCode(MessageType.Success, result, CancellationToken);
                             }
                             catch (Exception e)
@@ -358,47 +361,66 @@ namespace DuetPiManagementPlugin
                             }
                             break;
 
-                        // Add WiFi host network to remembered list, or list remembered networks
+                        // M587: Add WiFi host network to remembered list, or list remembered networks
+                        // M587.1: Start WiFi scan
+                        // M587.2: List WiFi scan results
                         case 587:
                             try
                             {
-                                code.TryGetString('S', out string? ssid);
-                                if (code.TryGetString('P', out string? psk))
+                                if (code.MinorNumber is null || code.MinorNumber == 0)
                                 {
-                                    if (ssid is null)
+                                    code.TryGetString('S', out string? ssid);
+                                    if (code.TryGetString('P', out string? psk))
                                     {
-                                        await Connection.ResolveCode(MessageType.Error, "Missing S parameter");
-                                        break;
+                                        if (ssid is null)
+                                        {
+                                            await Connection.ResolveCode(MessageType.Error, "Missing S parameter");
+                                            break;
+                                        }
+                                        if (psk.Length < 8 || psk.Length > 64)
+                                        {
+                                            await Connection.ResolveCode(MessageType.Error, "WiFi password must be between 8 and 64 characters");
+                                            break;
+                                        }
                                     }
-                                    if (psk.Length < 8 || psk.Length > 64)
+                                    code.TryGetString('C', out string? countryCode);
+                                    code.TryGetIPAddress('I', out IPAddress? ip);
+                                    code.TryGetIPAddress('J', out IPAddress? gateway);
+                                    code.TryGetIPAddress('K', out IPAddress? netmask);
+                                    code.TryGetIPAddress('L', out IPAddress? dnsServer);
+
+                                    if (ssid is null && countryCode is null)
                                     {
-                                        await Connection.ResolveCode(MessageType.Error, "WiFi password must be between 8 and 64 characters");
-                                        break;
+                                        // Output currently configured SSIDs
+                                        Message ssidReport = await Interface.ReportSSIDs();
+                                        await Connection.ResolveCode(ssidReport, CancellationToken);
+                                    }
+                                    else
+                                    {
+                                        // Update SSID/PSK and/or country code
+                                        Message configResult = await Interface.UpdateSSID(ssid, psk, countryCode);
+                                        if (configResult.Type == MessageType.Success)
+                                        {
+                                            // Update IP configuration as well if needed
+                                            string setIPResult = await Interface.SetIPAddress("wlan0", ip, netmask, gateway, dnsServer);
+                                            configResult.Content = (configResult.Content + '\n' + setIPResult).Trim();
+                                        }
+                                        await Connection.ResolveCode(configResult, CancellationToken);
                                     }
                                 }
-                                code.TryGetString('C', out string? countryCode);
-                                code.TryGetIPAddress('I', out IPAddress? ip);
-                                code.TryGetIPAddress('J', out IPAddress? gateway);
-                                code.TryGetIPAddress('K', out IPAddress? netmask);
-                                code.TryGetIPAddress('L', out IPAddress? dnsServer);
-
-                                if (ssid is null && countryCode is null)
+                                else if (code.MinorNumber == 1)
                                 {
-                                    // Output currently configured SSIDs
-                                    Message ssidReport = await Network.Interface.ReportSSIDs();
-                                    await Connection.ResolveCode(ssidReport, CancellationToken);
+                                    Message startResult = WifiScan.Start();
+                                    await Connection.ResolveCode(startResult, CancellationToken);
+                                }
+                                else if (code.MinorNumber == 2)
+                                {
+                                    Message scanResult = WifiScan.GetResult(code.GetBool('F', false));
+                                    await Connection.ResolveCode(scanResult, CancellationToken);
                                 }
                                 else
                                 {
-                                    // Update SSID/PSK and/or country code
-                                    Message configResult = await Network.Interface.UpdateSSID(ssid, psk, countryCode);
-                                    if (configResult.Type == MessageType.Success)
-                                    {
-                                        // Update IP configuration as well if needed
-                                        string setIPResult = await Network.Interface.SetIPAddress("wlan0", ip, netmask, gateway, dnsServer);
-                                        configResult.Content = (configResult.Content + '\n' + setIPResult).Trim();
-                                    }
-                                    await Connection.ResolveCode(configResult, CancellationToken);
+                                    await Connection.ResolveCode(MessageType.Warning, "Command is not supported");
                                 }
                             }
                             catch (Exception e)
@@ -413,7 +435,7 @@ namespace DuetPiManagementPlugin
                             try
                             {
                                 // Remove SSID(s) if possible
-                                Message configResult = await Network.Interface.UpdateSSID(code.GetString('S'), null);
+                                Message configResult = await Interface.UpdateSSID(code.GetString('S'), null);
                                 await Connection.ResolveCode(configResult, CancellationToken);
                             }
                             catch (Exception e)
@@ -428,7 +450,7 @@ namespace DuetPiManagementPlugin
                             try
                             {
                                 // Set up hostapd configuration
-                                Message configResult = await Network.AccessPoint.Configure(code.GetString('S'), code.GetString('P'), code.GetIPAddress('I', IPAddress.Any), code.GetInt('C', 6));
+                                Message configResult = await AccessPoint.Configure(code.GetString('S'), code.GetString('P'), code.GetIPAddress('I', IPAddress.Any), code.GetInt('C', 6));
                                 await Connection.ResolveCode(configResult, CancellationToken);
                             }
                             catch (Exception e)

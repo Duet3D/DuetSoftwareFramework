@@ -438,7 +438,7 @@ namespace UnitTests.Machine
             }
             else
             {
-                ClassicAssert.Fail("Invalid change value type");
+                Assert.Fail("Invalid change value type");
             }
 
             // Reset
