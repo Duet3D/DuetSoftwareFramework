@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace DuetPiManagementPlugin.Network
 {
@@ -63,6 +64,14 @@ namespace DuetPiManagementPlugin.Network
         {
             try
             {
+                // Unblock WiFi and enable the adapter
+                if (!await Command.ExecQuery("rfkill", "unblock wifi") || !await Command.ExecQuery("ip", "link set wlan0 up"))
+                {
+                    _scanning = false;
+                    _scanFailed = true;
+                    return;
+                }
+
                 // Capture output from scan command
                 string scanOutput;
                 ProcessStartInfo startInfo = new("iw", "dev wlan0 scan") { RedirectStandardOutput = true };
@@ -70,6 +79,7 @@ namespace DuetPiManagementPlugin.Network
                 {
                     if (process is null)
                     {
+                        _scanning = false;
                         _scanFailed = true;
                         return;
                     }
@@ -77,6 +87,7 @@ namespace DuetPiManagementPlugin.Network
 
                     if (process.ExitCode != 0)
                     {
+                        _scanning = false;
                         _scanFailed = true;
                         return;
                     }
