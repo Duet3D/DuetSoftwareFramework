@@ -6,6 +6,7 @@ using DuetControlServer.SPI.Communication.FirmwareRequests;
 using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.Utility;
 using Nito.AsyncEx;
+using SixLabors.ImageSharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -161,13 +162,20 @@ namespace DuetControlServer.Files
         /// <param name="code">Code to synchronize at</param>
         /// <returns>True if the sync request was successful, false otherwise</returns>
         /// <remarks>
-        /// This must be called while the Job class is NOT locked!
+        /// This must be called while the Job class is NOT locked and it must be called from the same
+        /// code on File *AND* File2, else the sync request is never resolved (or at least not before the file is cancelled)
         /// </remarks>
         public static Task<bool> DoSync(Code code)
         {
             if (code.FilePosition is null)
             {
                 throw new ArgumentException("Code has no file position and cannot be used for sync requests", nameof(code));
+            }
+
+            if (_file2 is null)
+            {
+                // There is nothing to sync if there is only one file stream...
+                return Task.FromResult(true);
             }
 
             lock (_syncRequests)
@@ -452,7 +460,7 @@ namespace DuetControlServer.Files
                 using (await LockAsync())
                 {
                     await _resume.WaitAsync(Program.CancellationToken);
-                    startingNewPrint = !_file!.IsClosed && !(_file2?.IsClosed ?? true);
+                    startingNewPrint = !_file!.IsClosed;
                     IsProcessing = startingNewPrint;
                 }
 
@@ -463,7 +471,7 @@ namespace DuetControlServer.Files
 
                     // Run the same file print on two distinct channels
                     Task firstFileTask = DoFilePrint(_file!);
-                    Task secondFileTask = _file2 is not null ? DoFilePrint(_file2) : Task.CompletedTask;
+                    Task secondFileTask = (_file2 is not null) ? DoFilePrint(_file2) : Task.CompletedTask;
                     await Task.WhenAll(firstFileTask, secondFileTask);
 
                     // Deal with the print result
