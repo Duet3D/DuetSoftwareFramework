@@ -2,7 +2,7 @@
   "profiles": {
     "DocGen": {
       "commandName": "Project",
-      "workingDirectory": "C:\\Users\\ch-ha\\source\\repos\\Duet3D\\DuetSoftwareFramework\\src\\DocGen"
+      "workingDirectory": "C:\\Users\\VM\\source\\repos\\Duet3D\\DuetSoftwareFramework\\src\\DocGen"
     }
   }
 }
