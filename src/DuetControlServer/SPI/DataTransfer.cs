@@ -14,7 +14,6 @@ using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.Model;
 using DuetControlServer.Utility;
 using System.Diagnostics;
-using System.Net.Http.Headers;
 
 namespace DuetControlServer.SPI
 {
@@ -1451,7 +1450,7 @@ namespace DuetControlServer.SPI
                             }
                             else
                             {
-                                _logger.Warn("Restarting full transfer because an unexpected response code has been received");
+                                _logger.Warn("Restarting full transfer because an unexpected response code has been received (code 0x{0:x8})", responseCode);
                                 ExchangeResponse(TransferResponse.BadResponse);
                             }
                             return false;
@@ -1609,7 +1608,7 @@ namespace DuetControlServer.SPI
                             }
                             else
                             {
-                                _logger.Warn("Restarting full transfer because an unexpected response code has been received");
+                                _logger.Warn("Restarting full transfer because an unexpected response code has been received (code 0x{0:x8})", responseCode);
                                 ExchangeResponse(TransferResponse.BadResponse);
                             }
                             return false;

@@ -6,7 +6,6 @@ using DuetControlServer.SPI.Communication.FirmwareRequests;
 using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.Utility;
 using Nito.AsyncEx;
-using SixLabors.ImageSharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
