@@ -84,6 +84,16 @@
 			set => SetPropertyValue(ref _rpm, value);
         }
         private int _rpm = -1;
+
+        /// <summary>
+        /// Pulses per tacho revolution
+        /// </summary>
+        public float TachoPpr
+        {
+            get => _tachoPpr;
+            set => SetPropertyValue(ref _tachoPpr, value);
+        }
+        private float _tachoPpr = 2.0F;
         
         /// <summary>
         /// Thermostatic control parameters

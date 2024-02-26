@@ -46,6 +46,19 @@
         private string? _name;
 
         /// <summary>
+        /// Offset adjustment (in K)
+        /// </summary>
+        /// <remarks>
+        /// See also M308 U
+        /// </remarks>
+        public float OffsetAdj
+        {
+            get => _offsetAdj;
+            set => SetPropertyValue(ref _offsetAdj, value);
+        }
+        private float _offsetAdj = 0F;
+
+        /// <summary>
         /// Port of this sensor or null if not applicable
         /// </summary>
         public string? Port
@@ -74,6 +87,19 @@
             set => SetPropertyValue(ref _rRef, value);
         }
         private float? _rRef;
+
+        /// <summary>
+        /// Slope adjustment factor
+        /// </summary>
+        /// <remarks>
+        /// See also M308 V
+        /// </remarks>
+        public float SlopeAdj
+        {
+            get => _slopeAdj;
+            set => SetPropertyValue(ref _slopeAdj, value);
+        }
+        private float _slopeAdj = 0F;
 
         /// <summary>
         /// State of this sensor
