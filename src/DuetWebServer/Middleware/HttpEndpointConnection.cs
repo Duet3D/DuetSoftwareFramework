@@ -59,10 +59,7 @@ namespace DuetWebServer.Middleware
         /// <summary>
         /// Closes the current connection and disposes it
         /// </summary>
-        public void Close()
-        {
-            Dispose();
-        }
+        public void Close() => Dispose();
 
         /// <summary>
         /// Send an HTTP request notification to the endpoint provider

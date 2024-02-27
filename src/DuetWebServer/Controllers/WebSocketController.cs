@@ -215,7 +215,7 @@ namespace DuetWebServer.Controllers
         /// </summary>
         /// <param name="webSocket">WebSocket connection</param>
         /// <returns>Asynchronous task</returns>
-        public async Task Process(WebSocket webSocket)
+        private async Task Process(WebSocket webSocket)
         {
             using SubscribeConnection subscribeConnection = new();
             try

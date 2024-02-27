@@ -26,6 +26,16 @@ namespace DuetWebServer
         public int MaxAge { get; set; } = 3600;
 
         /// <summary>
+        /// Time to wait before attempting to subscribe to the DSF OM again (in ms)
+        /// </summary>
+        public int ModelRetryDelay { get; set; } = 5000;
+
+        /// <summary>
+        /// Timeout for web sessions (in ms)
+        /// </summary>
+        public int SessionTimeout { get; set; } = 8000;
+
+        /// <summary>
         /// Full filename of the DSF IPC socket to use
         /// </summary>
         public string SocketPath { get; set; } = Defaults.FullSocketPath;

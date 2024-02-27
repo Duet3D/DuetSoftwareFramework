@@ -20,7 +20,7 @@ namespace DuetWebServer.Services
     /// <summary>
     /// Class used to observe the machine model
     /// </summary>
-    public sealed class ModelObserver : IHostedService, IDisposable
+    public sealed class ModelObserver : BackgroundService
     {
         /// <summary>
         /// Configured CORS policy for cross-origin requests
@@ -36,9 +36,9 @@ namespace DuetWebServer.Services
         private static CommandConnection? _commandConnection;
 
         /// <summary>
-        /// Configuration of this application
+        /// App settings
         /// </summary>
-        private readonly IConfiguration _configuration;
+        private readonly Settings _settings;
 
         /// <summary>
         /// Logger instance
@@ -88,16 +88,6 @@ namespace DuetWebServer.Services
         }
 
         /// <summary>
-        /// Task representing the lifecycle of this service
-        /// </summary>
-        private Task? _task;
-
-        /// <summary>
-        /// Cancellation token source that is triggered when the service is supposed to shut down
-        /// </summary>
-        private readonly CancellationTokenSource _stopRequest = new();
-
-        /// <summary>
         /// Constructor of this service class
         /// </summary>
         /// <param name="configuration">App configuration</param>
@@ -106,49 +96,16 @@ namespace DuetWebServer.Services
         public ModelObserver(IConfiguration configuration, ILogger<ModelObserver> logger, IModelProvider modelProvider, ISessionStorage sessionStorage)
         {
             _logger = logger;
-            _configuration = configuration;
+            _settings = configuration.Get<Settings>();
             _modelProvider = modelProvider;
             _sessionStorage = sessionStorage;
         }
 
         /// <summary>
-        /// Dispose this instance
-        /// </summary>
-        public void Dispose()
-        {
-            _stopRequest.Dispose();
-        }
-
-        /// <summary>
-        /// Start this service
-        /// </summary>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Asynchronous task</returns>
-        public Task StartAsync(CancellationToken cancellationToken)
-        {
-            _task = Task.Run(Execute, cancellationToken);
-            return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// Stop this service
-        /// </summary>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Asynchronous task</returns>
-        public async Task StopAsync(CancellationToken cancellationToken)
-        {
-            _stopRequest.Cancel();
-            await _task!;
-        }
-
-        /// <summary>
         /// Synchronize all registered endpoints and user sessions
         /// </summary>
-        public async Task Execute()
+        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            string unixSocket = _configuration.GetValue("SocketPath", DuetAPI.Connection.Defaults.FullSocketPath)!;
-            int retryDelay = _configuration.GetValue("ModelRetryDelay", 5000);
-
             ObjectModel model;
             try
             {
@@ -165,12 +122,12 @@ namespace DuetWebServer.Services
                             "network/corsSite",
                             "sbc/dsf/httpEndpoints/**",
                             "volumes/**"
-                        }, unixSocket);
-                        await commandConnection.Connect(unixSocket);
+                        }, _settings.SocketPath);
+                        await commandConnection.Connect(_settings.SocketPath);
                         _logger.LogInformation("Connections to DuetControlServer established");
 
                         // Get the machine model and keep it up-to-date
-                        model = await subscribeConnection.GetObjectModel(_stopRequest.Token);
+                        model = await subscribeConnection.GetObjectModel(cancellationToken);
 
                         // Initialize CORS site
                         if (!string.IsNullOrEmpty(model.Network.CorsSite))
@@ -206,7 +163,7 @@ namespace DuetWebServer.Services
                             model.Messages.Clear();
 
                             // Wait for more updates
-                            using JsonDocument jsonPatch = await subscribeConnection.GetObjectModelPatch(_stopRequest.Token);
+                            using JsonDocument jsonPatch = await subscribeConnection.GetObjectModelPatch(cancellationToken);
                             model.UpdateFromJson(jsonPatch.RootElement, false);
 
                             // Increment sequence numbers
@@ -257,15 +214,15 @@ namespace DuetWebServer.Services
                                 }
                             }
                         }
-                        while (!_stopRequest.IsCancellationRequested);
+                        while (!cancellationToken.IsCancellationRequested);
                     }
                     catch (Exception e) when (e is not OperationCanceledException)
                     {
                         _logger.LogWarning(e, "Failed to synchronize machine model");
-                        await Task.Delay(retryDelay, _stopRequest.Token);
+                        await Task.Delay(_settings.ModelRetryDelay, cancellationToken);
                     }
                 }
-                while (!_stopRequest.IsCancellationRequested);
+                while (!cancellationToken.IsCancellationRequested);
             }
             catch (OperationCanceledException)
             {

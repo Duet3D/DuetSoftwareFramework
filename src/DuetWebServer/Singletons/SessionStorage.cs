@@ -116,10 +116,7 @@ namespace DuetWebServer.Singletons
         /// Constructor of the session storage singleton
         /// </summary>
         /// <param name="logger">Logger instance</param>
-        public SessionStorage(ILogger<SessionStorage> logger)
-        {
-            _logger = logger;
-        }
+        public SessionStorage(ILogger<SessionStorage> logger) => _logger = logger;
 
         /// <summary>
         /// Internal session wrapper around auth tickets
@@ -164,10 +161,7 @@ namespace DuetWebServer.Singletons
                 return result;
             }
 
-            public Session(AuthenticationTicket ticket)
-            {
-                Ticket = ticket;
-            }
+            public Session(AuthenticationTicket ticket) => Ticket = ticket;
         }
 
         /// <summary>

@@ -32,10 +32,7 @@ namespace DuetWebServer.FileProviders
         /// <summary>
         /// Finalizer of this instance
         /// </summary>
-        ~DuetFileProvider()
-        {
-            _modelProvider.OnWebDirectoryChanged -= SetWebDirectory;
-        }
+        ~DuetFileProvider() => _modelProvider.OnWebDirectoryChanged -= SetWebDirectory;
 
         /// <summary>
         /// Gets the file info of the specified path
