@@ -38,11 +38,11 @@ namespace DuetControlServer.Codes.Handlers
             {
                 case KeywordType.Echo:
                 case KeywordType.Abort:
-                    if (!await Processor.FlushAsync(code, false, ifExecuting: code.Keyword == KeywordType.Echo))
+                    if (!await Processor.FlushAsync(code))
                     {
-                        if (code.Keyword == KeywordType.Echo && !code.CancellationToken.IsCancellationRequested)
+                        if (!code.CancellationToken.IsCancellationRequested)
                         {
-                            // echo may be executed only if the channel is active, abort is unconditional
+                            // echo and abort may be executed only if the channel is active
                             return new Message();
                         }
                         throw new OperationCanceledException();
