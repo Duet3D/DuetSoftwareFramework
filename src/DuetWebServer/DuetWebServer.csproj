@@ -23,7 +23,6 @@
 		<PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="6.0.0" />
 		<PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
 		<PackageReference Include="System.Formats.Asn1" Version="6.0.0" />
-		<PackageReference Include="System.Threading.Channels" Version="6.0.0" />
 	</ItemGroup>
 
 	<ItemGroup>

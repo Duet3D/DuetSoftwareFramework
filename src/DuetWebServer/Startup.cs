@@ -15,18 +15,15 @@ namespace DuetWebServer
     public class Startup
     {
         /// <summary>
-        /// Copy of the app configuration
+        /// App settings
         /// </summary>
-        private readonly IConfiguration _configuration;
+        private readonly Settings _settings;
 
         /// <summary>
         /// Create a new Startup instance
         /// </summary>
         /// <param name="configuration">Launch configuration (see appsettings.json)</param>
-        public Startup(IConfiguration configuration)
-        {
-            _configuration = configuration;
-        }
+        public Startup(IConfiguration configuration) => _settings = configuration.Get<Settings>();
 
         /// <summary>
         /// Configure web services and add service to the container
@@ -76,7 +73,7 @@ namespace DuetWebServer
             // Define a keep-alive interval for operation as a reverse proxy
             app.UseWebSockets(new WebSocketOptions
             {
-                KeepAliveInterval = TimeSpan.FromSeconds(_configuration.GetValue("KeepAliveInterval", 30)),
+                KeepAliveInterval = TimeSpan.FromSeconds(_settings.KeepAliveInterval),
             });
 
             // Use middleware to fix content types
@@ -96,7 +93,7 @@ namespace DuetWebServer
             app.UseMiddleware(typeof(Middleware.FallbackMiddleware));
 
             // Use static files from 0:/www if applicable
-            if (_configuration.GetValue("UseStaticFiles", true))
+            if (_settings.UseStaticFiles)
             {
                 app.UseStaticFiles(new StaticFileOptions
                 {
@@ -109,7 +106,7 @@ namespace DuetWebServer
                         }
                         else
                         {
-                            ctx.Context.Response.Headers[HeaderNames.CacheControl] = $"public,max-age={_configuration.GetValue("MaxAge", 3600)},must-revalidate";
+                            ctx.Context.Response.Headers[HeaderNames.CacheControl] = $"public,max-age={_settings.MaxAge},must-revalidate";
                             ctx.Context.Response.Headers[HeaderNames.Expires] = "0";
                         }
                     }

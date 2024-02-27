@@ -25,9 +25,9 @@ namespace DuetWebServer.Middleware
         private readonly RequestDelegate _next;
 
         /// <summary>
-        /// Configuration of this application
+        /// App settings
         /// </summary>
-        private readonly IConfiguration _configuration;
+        private readonly Settings _settings;
 
         /// <summary>
         /// Logger instance
@@ -61,7 +61,7 @@ namespace DuetWebServer.Middleware
         public CustomEndpointMiddleware(RequestDelegate next, IConfiguration configuration, ILogger<CustomEndpointMiddleware> logger, IHostApplicationLifetime applicationLifetime, IModelProvider modelProvider, ISessionStorage sessionStorage)
         {
             _next = next;
-            _configuration = configuration;
+            _settings = configuration.Get<Settings>();
             _logger = logger;
             _applicationLifetime = applicationLifetime;
             _modelProvider = modelProvider;
@@ -164,8 +164,7 @@ namespace DuetWebServer.Middleware
         /// <returns>Asynchronous task</returns>
         private async Task ReadFromWebSocket(WebSocket webSocket, HttpEndpointConnection endpointConnection, int sessionId, CancellationToken cancellationToken)
         {
-            int bufferSize = _configuration.GetValue("WebSocketBufferSize", 8192);
-            byte[] rxBuffer = new byte[bufferSize];
+            byte[] rxBuffer = new byte[_settings.WebSocketBufferSize];
 
             do
             {

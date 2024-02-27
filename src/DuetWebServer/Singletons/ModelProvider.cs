@@ -84,9 +84,6 @@ namespace DuetWebServer.Singletons
         /// Constructor of this singleton
         /// </summary>
         /// <param name="configuration">Configuration provider</param>
-        public ModelProvider(IConfiguration configuration)
-        {
-            WebDirectory = configuration.GetValue("DefaultWebDirectory", "/opt/dsf/sd/www");
-        }
+        public ModelProvider(IConfiguration configuration) => WebDirectory = configuration.Get<Settings>().DefaultWebDirectory;
     }
 }

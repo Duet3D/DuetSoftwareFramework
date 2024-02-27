@@ -28,9 +28,9 @@ namespace DuetWebServer.Authorization
         public const string SchemeName = "SessionKey";
 
         /// <summary>
-        /// App configuration
+        /// App settings
         /// </summary>
-        private readonly IConfiguration _configuration;
+        private readonly Settings _settings;
 
         /// <summary>
         /// Session storage singleton
@@ -49,7 +49,7 @@ namespace DuetWebServer.Authorization
         public SessionKeyAuthenticationHandler(IOptionsMonitor<SessionKeyAuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock, IConfiguration configuration, ISessionStorage sessionStorage)
             : base(options, logger, encoder, clock)
         {
-            _configuration = configuration;
+            _settings = configuration.Get<Settings>();
             _sessionStorage = sessionStorage;
         }
 
@@ -113,7 +113,7 @@ namespace DuetWebServer.Authorization
         private async Task<CommandConnection> BuildConnection()
         {
             CommandConnection connection = new();
-            await connection.Connect(_configuration.GetValue("SocketPath", Defaults.FullSocketPath)!);
+            await connection.Connect(_settings.SocketPath);
             return connection;
         }
     }

@@ -37,15 +37,15 @@ namespace DuetWebServer.Controllers
         private const string UnsupportedCommandResponse = "Unsupported command. The only supported commands are 'OK' and 'PING'";
 
         /// <summary>
-        /// Configuration of the application
+        /// App settings
         /// </summary>
-        private readonly IConfiguration _configuration;
+        private readonly Settings _settings;
 
         #region Logging
         /// <summary>
         /// Logger instance
         /// </summary>
-        private readonly ILogger _logger2;
+        private readonly ILogger _logger;
 
         /// <summary>
         /// Log an information
@@ -54,7 +54,7 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogInformation(string message, [CallerMemberName] string memberName = "")
         {
-            _logger2.LogInformation("[{method}] {message}", memberName, message);
+            _logger.LogInformation("[{method}] {message}", memberName, message);
         }
 
         /// <summary>
@@ -64,7 +64,7 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogWarning(string message, [CallerMemberName] string memberName = "")
         {
-            _logger2.LogWarning("[{method}] {message}", memberName, message);
+            _logger.LogWarning("[{method}] {message}", memberName, message);
         }
 
         /// <summary>
@@ -74,7 +74,7 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogError(string message, [CallerMemberName] string memberName = "")
         {
-            _logger2.LogError("[{method}] {message}", memberName, message);
+            _logger.LogError("[{method}] {message}", memberName, message);
         }
 
         /// <summary>
@@ -85,7 +85,7 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogError(Exception? exception, string message, [CallerMemberName] string memberName = "")
         {
-            _logger2.LogError(exception, "[{method}] {message}", memberName, message);
+            _logger.LogError(exception, "[{method}] {message}", memberName, message);
         }
         #endregion
 
@@ -102,8 +102,8 @@ namespace DuetWebServer.Controllers
         /// <param name="applicationLifetime">Application lifecycle instance</param>
         public WebSocketController(IConfiguration configuration, ILogger<WebSocketController> logger, IHostApplicationLifetime applicationLifetime)
         {
-            _configuration = configuration;
-            _logger2 = logger;
+            _settings = configuration.Get<Settings>();
+            _logger = logger;
             _applicationLifetime = applicationLifetime;
         }
 
@@ -141,13 +141,12 @@ namespace DuetWebServer.Controllers
                 return;
             }
 
-            string socketPath = _configuration.GetValue("SocketPath", Defaults.FullSocketPath)!;
             if (string.IsNullOrEmpty(sessionKey))
             {
                 try
                 {
                     using CommandConnection connection = new();
-                    await connection.Connect(socketPath);
+                    await connection.Connect(_settings.SocketPath);
                     if (!await connection.CheckPassword(Defaults.Password))
                     {
                         // Non-default password set and no sessionKey passed
@@ -196,7 +195,7 @@ namespace DuetWebServer.Controllers
                     sessionStorage.SetWebSocketState(sessionKey, true);
                 }
                 using WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-                await Process(webSocket, socketPath);
+                await Process(webSocket);
             }
             finally
             {
@@ -215,15 +214,14 @@ namespace DuetWebServer.Controllers
         /// (1011) Internal error
         /// </summary>
         /// <param name="webSocket">WebSocket connection</param>
-        /// <param name="socketPath">API socket path</param>
         /// <returns>Asynchronous task</returns>
-        public async Task Process(WebSocket webSocket, string socketPath)
+        public async Task Process(WebSocket webSocket)
         {
             using SubscribeConnection subscribeConnection = new();
             try
             {
                 // Subscribe to object model updates targeting the HTTP code channel
-                await subscribeConnection.Connect(SubscriptionMode.Patch, CodeChannel.HTTP, Array.Empty<string>(), socketPath);
+                await subscribeConnection.Connect(SubscriptionMode.Patch, CodeChannel.HTTP, Array.Empty<string>(), _settings.SocketPath);
             }
             catch (Exception e)
             {
@@ -239,10 +237,9 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
-                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile)!;
-                    if (System.IO.File.Exists(startErrorFile))
+                    if (System.IO.File.Exists(_settings.StartErrorFile))
                     {
-                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        string startError = await System.IO.File.ReadAllTextAsync(_settings.StartErrorFile);
                         LogError(startError);
                         await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, startError);
                         return;

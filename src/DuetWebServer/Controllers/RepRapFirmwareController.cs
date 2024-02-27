@@ -29,9 +29,9 @@ namespace DuetWebServer.Controllers
     public class RepRapFirmwareController : ControllerBase
     {
         /// <summary>
-        /// App configuration
+        /// App settings
         /// </summary>
-        private readonly IConfiguration _configuration;
+        private readonly Settings _settings;
 
         #region Logging
         /// <summary>
@@ -106,7 +106,7 @@ namespace DuetWebServer.Controllers
         /// <param name="modelProvider">Model provider</param>
         public RepRapFirmwareController(IConfiguration configuration, ILogger<RepRapFirmwareController> logger, IModelProvider modelProvider)
         {
-            _configuration = configuration;
+            _settings = configuration.Get<Settings>();
             _logger = logger;
             _modelProvider = modelProvider;
         }
@@ -177,10 +177,9 @@ namespace DuetWebServer.Controllers
                 }
                 if (e is SocketException)
                 {
-                    string startErrorFile = _configuration.GetValue("StartErrorFile", Defaults.StartErrorFile)!;
-                    if ( System.IO.File.Exists(startErrorFile))
+                    if (System.IO.File.Exists(_settings.StartErrorFile))
                     {
-                        string startError = await System.IO.File.ReadAllTextAsync(startErrorFile);
+                        string startError = await System.IO.File.ReadAllTextAsync(_settings.StartErrorFile);
                         LogError(startError);
                         return StatusCode(503, startError);
                     }
@@ -935,14 +934,14 @@ namespace DuetWebServer.Controllers
         private async Task<CommandConnection> BuildConnection()
         {
             CommandConnection connection = new();
-            await connection.Connect(_configuration.GetValue("SocketPath", Defaults.FullSocketPath)!);
+            await connection.Connect(_settings.SocketPath);
             return connection;
         }
 
         private async Task<SubscribeConnection> BuildSubscribeConnection(string filter)
         {
             SubscribeConnection connection = new();
-            await connection.Connect(SubscriptionMode.Patch, new string[] { filter }, _configuration.GetValue("SocketPath", Defaults.FullSocketPath)!);
+            await connection.Connect(SubscriptionMode.Patch, new string[] { filter }, _settings.SocketPath);
             return connection;
         }
 
