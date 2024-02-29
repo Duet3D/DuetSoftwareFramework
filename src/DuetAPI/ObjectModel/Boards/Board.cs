@@ -144,6 +144,16 @@ namespace DuetAPI.ObjectModel
         private string? _iapFileNameSD;
 
         /// <summary>
+        /// Information about an inductive sensor or null if not present
+        /// </summary>
+        public InductiveSensor? InductiveSensor
+        {
+            get => _inductiveSensor;
+            set => SetPropertyValue(ref _inductiveSensor, value);
+        }
+        private InductiveSensor? _inductiveSensor;
+
+        /// <summary>
         /// Maximum number of heaters this board can control
         /// </summary>
         public int MaxHeaters
