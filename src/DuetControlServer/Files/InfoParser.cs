@@ -462,7 +462,7 @@ namespace DuetControlServer.Files
                             switch (grp.Name)
                             {
                                 case "d":
-                                    seconds += (long)Math.Round(printTime) * 86400;
+                                    seconds += (long)Math.Round(printTime) * 86400L;
                                     break;
                                 case "h":
                                     seconds += (long)Math.Round(printTime) * 3600L;
