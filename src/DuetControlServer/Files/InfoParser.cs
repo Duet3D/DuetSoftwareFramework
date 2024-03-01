@@ -461,6 +461,9 @@ namespace DuetControlServer.Files
                         {
                             switch (grp.Name)
                             {
+                                case "d":
+                                    seconds += (long)Math.Round(printTime) * 86400L;
+                                    break;
                                 case "h":
                                     seconds += (long)Math.Round(printTime) * 3600L;
                                     break;
@@ -503,6 +506,9 @@ namespace DuetControlServer.Files
                         {
                             switch (grp.Name)
                             {
+                                case "d":
+                                    seconds += simulatedTime * 86400;
+                                    break;
                                 case "h":
                                     seconds += simulatedTime * 3600;
                                     break;

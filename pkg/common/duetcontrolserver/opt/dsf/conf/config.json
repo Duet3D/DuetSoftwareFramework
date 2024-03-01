@@ -141,7 +141,7 @@
   ],
   "PrintTimeFilters": [
     {
-      "Pattern": "estimated printing time .*= ((?<h>(\\d+))h\\s*)?((?<m>(\\d+))m\\s*)?((?<s>(\\d+))s)?",
+      "Pattern": "estimated printing time .*= ((?<d>(\\d+))d\\s*)?((?<h>(\\d+))h\\s*)?((?<m>(\\d+))m\\s*)?((?<s>(\\d+))s)?",
       "Options": 17
     },
     {

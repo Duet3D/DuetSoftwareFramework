@@ -333,7 +333,7 @@ namespace DuetControlServer
         /// </summary>
         public static List<Regex> PrintTimeFilters { get; set; } = new()
         {
-            new Regex(@"estimated printing time .*= ((?<h>(\d+))h\s*)?((?<m>(\d+))m\s*)?((?<s>(\d+))s)?", RegexFlags),                                  // Slic3r PE
+            new Regex(@"estimated printing time .*= ((?<d>(\d+))d\s*)?((?<h>(\d+))h\s*)?((?<m>(\d+))m\s*)?((?<s>(\d+))s)?", RegexFlags),                // Slic3r PE
             new Regex(@"TIME:(?<s>(\d+\.?\d*))", RegexFlags),                                                                                           // Cura
             new Regex(@"Build Time:\s+((?<h>(\d+\.?\d*)) hour(s)?\s*)?((?<m>(\d+\.?\d*)) minute(s)?\s*)?((?<s>(\d+\.?\d*)) second(s)?)?", RegexFlags),  // Simplify3D, KISSlicer, Canvas, IceSL
             new Regex(@"print time:\s+(?<s>(\d+\.?\d*))(s)?", RegexFlags),                                                                              // Kiri:Moto, and IdeaMaker v4
