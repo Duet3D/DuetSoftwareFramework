@@ -18,10 +18,25 @@ namespace DuetControlServer.SPI.Channel
         private readonly PipelineStackItem _pipelineStackItem;
 
         /// <summary>
+        /// Indicates if the motion system was active when this stack item was created
+        /// </summary>
+        public bool MotionSystemWasActive { get; }
+
+        /// <summary>
         /// Constructor of this class
         /// </summary>
         /// <param name="stackItem">Corresponding state of the firmware stage on the code pipeline</param>
         public State(PipelineStackItem stackItem) => _pipelineStackItem = stackItem;
+
+        /// <summary>
+        /// Constructor of this class
+        /// </summary>
+        /// <param name="stackItem">Corresponding state of the firmware stage on the code pipeline</param>
+        public State(PipelineStackItem stackItem, bool msActive)
+        {
+            _pipelineStackItem = stackItem;
+            MotionSystemWasActive = msActive;
+        }
 
         /// <summary>
         /// Indicates if this state is waiting for a confirmation

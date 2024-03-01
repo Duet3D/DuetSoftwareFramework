@@ -192,12 +192,23 @@ namespace DuetControlServer.Files
         /// </remarks>
         public async Task<Code?> ReadCodeAsync(Code? sharedCode = null)
         {
+            Code code = sharedCode ?? new Code();
+            code.Channel = Channel;
+            code.File = this;
+
+            bool readingAgain = false;
             while (true)
             {
-                // Prepare the result
-                Code code = sharedCode ?? new Code();
-                code.Channel = Channel;
-                code.File = this;
+                // Make sure shared codes are not referenced in code flow, else it can lead to erratic behavior
+                if (readingAgain && sharedCode is not null)
+                {
+                    code = new Code()
+                    {
+                        Channel = Channel,
+                        File = this
+                    };
+                }
+                readingAgain = true;
 
                 // Read the next available code
                 bool codeRead;
@@ -447,12 +458,6 @@ namespace DuetControlServer.Files
                         default:
                             throw new CodeParserException($"Keyword {code.Keyword} is not supported", code);
                     }
-                }
-
-                // Make a new shared code so it isn't reused in code blocks
-                if (sharedCode is not null)
-                {
-                    sharedCode = new Code();
                 }
             }
         }

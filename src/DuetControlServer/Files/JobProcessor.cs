@@ -166,6 +166,10 @@ namespace DuetControlServer.Files
         /// </remarks>
         public static Task<bool> DoSync(Code code)
         {
+            if (!code.IsFromFileChannel)
+            {
+                throw new ArgumentException("Code is not from a file channel");
+            }
             if (code.FilePosition is null)
             {
                 throw new ArgumentException("Code has no file position and cannot be used for sync requests", nameof(code));

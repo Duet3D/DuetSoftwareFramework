@@ -183,27 +183,30 @@ namespace DuetControlServer.Codes.Handlers
                 // Select a file to print
                 case 23:
                 case 32:
-                    if (await Processor.FlushAsync(code))
+                    if (await Processor.FlushAsync(code, syncFileStreams: true))
                     {
-                        string fileName = code.GetUnprecedentedString();
-                        if (string.IsNullOrWhiteSpace(fileName))
+                        if (code.Channel != CodeChannel.File2)
                         {
-                            return new Message(MessageType.Error, "Filename expected");
-                        }
-
-                        string physicalFile = await FilePath.ToPhysicalAsync(fileName, FileDirectory.GCodes);
-                        if (!File.Exists(physicalFile))
-                        {
-                            return new Message(MessageType.Error, $"Could not find file {fileName}");
-                        }
-
-                        using (await JobProcessor.LockAsync())
-                        {
-                            if (!code.IsFromFileChannel && JobProcessor.IsProcessing)
+                            string fileName = code.GetUnprecedentedString();
+                            if (string.IsNullOrWhiteSpace(fileName))
                             {
-                                return new Message(MessageType.Error, "Cannot set file to print, because a file is already being printed");
+                                return new Message(MessageType.Error, "Filename expected");
                             }
-                            await JobProcessor.SelectFile(fileName, physicalFile);
+
+                            string physicalFile = await FilePath.ToPhysicalAsync(fileName, FileDirectory.GCodes);
+                            if (!File.Exists(physicalFile))
+                            {
+                                return new Message(MessageType.Error, $"Could not find file {fileName}");
+                            }
+
+                            using (await JobProcessor.LockAsync())
+                            {
+                                if (!code.IsFromFileChannel && JobProcessor.IsProcessing)
+                                {
+                                    return new Message(MessageType.Error, "Cannot set file to print, because a file is already being printed");
+                                }
+                                await JobProcessor.SelectFile(fileName, physicalFile);
+                            }
                         }
 
                         // Let RRF do everything else
@@ -213,13 +216,16 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Resume a file print
                 case 24:
-                    if (await Processor.FlushAsync(code))
+                    if (await Processor.FlushAsync(code, syncFileStreams: true))
                     {
-                        using (await JobProcessor.LockAsync())
+                        if (code.Channel != CodeChannel.File2)
                         {
-                            if (!JobProcessor.IsFileSelected)
+                            using (await JobProcessor.LockAsync())
                             {
-                                return new Message(MessageType.Error, "Cannot print, because no file is selected!");
+                                if (!JobProcessor.IsFileSelected)
+                                {
+                                    return new Message(MessageType.Error, "Cannot print, because no file is selected!");
+                                }
                             }
                         }
 
@@ -407,24 +413,27 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Simulate file
                 case 37:
-                    if (await Processor.FlushAsync(code))
+                    if (await Processor.FlushAsync(code, syncFileStreams: true))
                     {
-                        string fileName = code.GetString('P');
-                        string physicalFile = await FilePath.ToPhysicalAsync(fileName, FileDirectory.GCodes);
-                        if (!File.Exists(physicalFile))
+                        if (code.Channel != CodeChannel.File2)
                         {
-                            return new Message(MessageType.Error, $"GCode file \"{fileName}\" not found");
-                        }
-
-                        using (await JobProcessor.LockAsync())
-                        {
-                            if (!code.IsFromFileChannel && JobProcessor.IsProcessing)
+                            string fileName = code.GetString('P');
+                            string physicalFile = await FilePath.ToPhysicalAsync(fileName, FileDirectory.GCodes);
+                            if (!File.Exists(physicalFile))
                             {
-                                return new Message(MessageType.Error, "Cannot set file to simulate, because a file is already being printed");
+                                return new Message(MessageType.Error, $"GCode file \"{fileName}\" not found");
                             }
 
-                            await JobProcessor.SelectFile(fileName, physicalFile, true);
-                            // Simulation is started when M37 has been processed by the firmware
+                            using (await JobProcessor.LockAsync())
+                            {
+                                if (!code.IsFromFileChannel && JobProcessor.IsProcessing)
+                                {
+                                    return new Message(MessageType.Error, "Cannot set file to simulate, because a file is already being printed");
+                                }
+
+                                await JobProcessor.SelectFile(fileName, physicalFile, true);
+                                // Simulation is started when M37 has been processed by the firmware
+                            }
                         }
 
                         // Let RRF do everything else
@@ -1032,6 +1041,11 @@ namespace DuetControlServer.Codes.Handlers
                         // Append our own diagnostics to RRF's M122 output
                         await Diagnostics(code.Result);
                     }
+                    break;
+
+                // Pop
+                case 121:
+                    await Provider.WaitForUpdateAsync(code.CancellationToken);      // This may change inputs[].active, so sync the OM here
                     break;
 
                 // Select movement queue number

@@ -683,6 +683,14 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual(KeywordType.While, code.Keyword);
                 ClassicAssert.AreEqual("machine.autocal.stddev > 0.04", code.KeywordArgument);
             }
+
+            foreach (DuetAPI.Commands.Code code in Parse("  while var.i < var.N"))
+            {
+                Assert.That(code.Indent, Is.EqualTo(2));
+                Assert.That(code.Type, Is.EqualTo(CodeType.Keyword));
+                Assert.That(code.Keyword, Is.EqualTo(KeywordType.While));
+                Assert.That(code.KeywordArgument, Is.EqualTo("var.i < var.N"));
+            }
         }
 
         [Test]
@@ -742,6 +750,7 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual(CodeType.Keyword, code.Type);
                 ClassicAssert.AreEqual(KeywordType.Set, code.Keyword);
                 ClassicAssert.AreEqual("asdf=\"meh\"", code.KeywordArgument);
+                ClassicAssert.AreEqual(0, code.Parameters.Count);
             }
         }
 
