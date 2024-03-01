@@ -34,7 +34,9 @@ jobs:
 
       # Install required tools
       - name: Install dependencies
-        run: sudo apt install -y dpkg-sig libxml2-utils
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y dpkg-sig libxml2-utils
       
       # Import GPG key for package signing
       - name: Configure GPG key
