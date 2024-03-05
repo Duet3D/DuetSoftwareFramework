@@ -303,8 +303,7 @@ namespace DuetControlServer.Files
                 cancellationToken = _cancellationTokenSource.Token;
             }
 
-            // Use a code pool for print files. This is possible for regular codes but should be avoided
-            // for macro codes, because those codes may be referenced even after they finish
+            // Use a code pool for print files
             Queue<Code> codePool = new();
             for (int i = 0; i < Math.Max(Settings.BufferedPrintCodes, 1); i++)
             {
@@ -406,9 +405,8 @@ namespace DuetControlServer.Files
                     }
                     finally
                     {
-                        // Codes holding meta G-code keywords may be still referenced by the underlying code file.
-                        // Do not reuse it if that is the case, else we can get out-of-order execution!
-                        codePool.Enqueue(code.Keyword == KeywordType.None ? code : new Code());
+                        // Code has finished, add it back to the code pool
+                        codePool.Enqueue(code);
                     }
                 }
                 else

@@ -99,7 +99,7 @@ namespace DuetControlServer.Files
         {
             foreach (CodeBlock codeBlock in _codeBlocks)
             {
-                if (codeBlock.StartingCode.Keyword == KeywordType.While)
+                if (codeBlock.Keyword == KeywordType.While)
                 {
                     return codeBlock.Iterations;
                 }
@@ -193,22 +193,20 @@ namespace DuetControlServer.Files
         public async Task<Code?> ReadCodeAsync(Code? sharedCode = null)
         {
             Code code = sharedCode ?? new Code();
-            code.Channel = Channel;
-            code.File = this;
-
-            bool readingAgain = false;
+            bool resetCode = sharedCode is not null;
             while (true)
             {
-                // Make sure shared codes are not referenced in code flow, else it can lead to erratic behavior
-                if (readingAgain && sharedCode is not null)
+                // Start with a fresh code instance
+                if (resetCode)
                 {
-                    code = new Code()
-                    {
-                        Channel = Channel,
-                        File = this
-                    };
+                    code.Reset();
                 }
-                readingAgain = true;
+                else
+                {
+                    resetCode = true;
+                }
+                code.Channel = Channel;
+                code.File = this;
 
                 // Read the next available code
                 bool codeRead;
@@ -252,14 +250,14 @@ namespace DuetControlServer.Files
                             await Codes.Processor.FlushAsync(this);
                         }
 
-                        if (state.StartingCode.Keyword == KeywordType.While)
+                        if (state.Keyword == KeywordType.While)
                         {
                             if (state.ProcessBlock && !state.SeenCodes)
                             {
                                 throw new CodeParserException("empty while loop detected", code);
                             }
 
-                            if (!codeRead || code.FilePosition != state.StartingCode.FilePosition)
+                            if (!codeRead || code.FilePosition != state.FilePosition)
                             {
                                 // End of while loop
                                 if (state.ProcessBlock || state.ContinueLoop)
@@ -273,8 +271,8 @@ namespace DuetControlServer.Files
 
                                     using (await _lock.LockAsync(Program.CancellationToken))
                                     {
-                                        Position = state.StartingCode.FilePosition ?? 0;
-                                        _parserBuffer.LineNumber = state.StartingCode.LineNumber;
+                                        Position = state.FilePosition ?? 0;
+                                        _parserBuffer.LineNumber = state.LineNumber;
                                         state.ProcessBlock = true;
                                         state.ContinueLoop = false;
                                         state.Iterations++;
@@ -282,7 +280,7 @@ namespace DuetControlServer.Files
                                         readAgain = true;
                                         if (!IsClosed)
                                         {
-                                            _logger.Debug("Restarting {0} block, iterations = {1}", state.StartingCode.Keyword, state.Iterations);
+                                            _logger.Debug("Restarting {0} block, iterations = {1}", state.Keyword, state.Iterations);
                                         }
                                     }
                                     break;
@@ -323,7 +321,7 @@ namespace DuetControlServer.Files
                 if (!_codeBlocks.TryPeek(out CodeBlock? codeBlock) || codeBlock.ProcessBlock)
                 {
                     // FIXME If/ElseIf/Else/While are not sent to the interceptors
-                    if (codeBlock is not null && (code.Keyword != KeywordType.While || code.FilePosition != codeBlock.StartingCode.FilePosition))
+                    if (codeBlock is not null && (code.Keyword != KeywordType.While || code.FilePosition != codeBlock.FilePosition))
                     {
                         codeBlock.SeenCodes = true;
                     }
@@ -336,8 +334,8 @@ namespace DuetControlServer.Files
                             // Check elif condition
                             if (code.Keyword == KeywordType.ElseIf)
                             {
-                                if (_lastCodeBlock is null || _lastCodeBlock.StartingCode.Indent != code.Indent ||
-                                    (_lastCodeBlock.StartingCode.Keyword != KeywordType.If && _lastCodeBlock.StartingCode.Keyword != KeywordType.ElseIf))
+                                if (_lastCodeBlock is null || _lastCodeBlock.Indent != code.Indent ||
+                                    (_lastCodeBlock.Keyword != KeywordType.If && _lastCodeBlock.Keyword != KeywordType.ElseIf))
                                 {
                                     throw new CodeParserException("unexpected elif condition", code);
                                 }
@@ -361,7 +359,7 @@ namespace DuetControlServer.Files
                             }
 
                             _logger.Debug("Evaluating {0} block", code.Keyword);
-                            if (code.Keyword != KeywordType.While || codeBlock is null || codeBlock.StartingCode.FilePosition != code.FilePosition)
+                            if (code.Keyword != KeywordType.While || codeBlock is null || codeBlock.FilePosition != code.FilePosition)
                             {
                                 using (await _lock.LockAsync(Program.CancellationToken))
                                 {
@@ -385,8 +383,8 @@ namespace DuetControlServer.Files
                             break;
 
                         case KeywordType.Else:
-                            if (_lastCodeBlock is null || _lastCodeBlock.StartingCode.Indent != code.Indent ||
-                                (_lastCodeBlock.StartingCode.Keyword != KeywordType.If && _lastCodeBlock.StartingCode.Keyword != KeywordType.ElseIf))
+                            if (_lastCodeBlock is null || _lastCodeBlock.Indent != code.Indent ||
+                                (_lastCodeBlock.Keyword != KeywordType.If && _lastCodeBlock.Keyword != KeywordType.ElseIf))
                             {
                                 throw new CodeParserException("unexpected else", code);
                             }
@@ -401,7 +399,7 @@ namespace DuetControlServer.Files
 
                         case KeywordType.Break:
                         case KeywordType.Continue:
-                            if (!_codeBlocks.Any(codeBlock => codeBlock.StartingCode.Keyword == KeywordType.While))
+                            if (!_codeBlocks.Any(codeBlock => codeBlock.Keyword == KeywordType.While))
                             {
                                 throw new CodeParserException("break or continue cannot be called outside while loop", code);
                             }
@@ -415,9 +413,9 @@ namespace DuetControlServer.Files
                             foreach (CodeBlock state in _codeBlocks)
                             {
                                 state.ProcessBlock = false;
-                                if (state.StartingCode.Keyword == KeywordType.While)
+                                if (state.Keyword == KeywordType.While)
                                 {
-                                    state.ContinueLoop = (code.Keyword == KeywordType.Continue);
+                                    state.ContinueLoop = code.Keyword == KeywordType.Continue;
                                     break;
                                 }
                             }
@@ -432,7 +430,7 @@ namespace DuetControlServer.Files
                             return code;
 
                         case KeywordType.Var:
-                            if (codeBlock is null || code.Indent > codeBlock.StartingCode.Indent)
+                            if (codeBlock is null || code.Indent > codeBlock.Indent)
                             {
                                 using (await _lock.LockAsync(Program.CancellationToken))
                                 {
@@ -509,12 +507,9 @@ namespace DuetControlServer.Files
                 if (_codeBlocks.TryPop(out CodeBlock? codeBlock))
                 {
                     // Log the end of this block
-                    if (codeBlock.StartingCode.Keyword == KeywordType.If ||
-                        codeBlock.StartingCode.Keyword == KeywordType.ElseIf ||
-                        codeBlock.StartingCode.Keyword == KeywordType.Else ||
-                        codeBlock.StartingCode.Keyword == KeywordType.While)
+                    if (codeBlock.Keyword is KeywordType.If or KeywordType.ElseIf or KeywordType.Else or KeywordType.While)
                     {
-                        _logger.Debug("End of {0} block", codeBlock.StartingCode.Keyword);
+                        _logger.Debug("End of {0} block", codeBlock.Keyword);
                     }
                     else
                     {

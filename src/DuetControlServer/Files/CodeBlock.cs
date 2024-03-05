@@ -1,4 +1,4 @@
-﻿using DuetControlServer.Commands;
+﻿using DuetAPI.Commands;
 using System.Collections.Generic;
 
 namespace DuetControlServer.Files
@@ -15,28 +15,39 @@ namespace DuetControlServer.Files
         /// <param name="processBlock">Whether instructions from this block may be processed</param>
         public CodeBlock(Code startingCode, bool processBlock)
         {
-            StartingCode = startingCode;
+            Indent = startingCode.Indent;
+            FilePosition = startingCode.FilePosition;
+            LineNumber = startingCode.LineNumber;
+            Keyword = startingCode.Keyword;
             ProcessBlock = processBlock;
         }
 
         /// <summary>
-        /// Code starting this block
+        /// Indentation of this block
         /// </summary>
-        public Code StartingCode { get; }
+        public int Indent { get; }
+
+        /// <summary>
+        /// File position where the block started
+        /// </summary>
+        public long? FilePosition { get; }
+
+        /// <summary>
+        /// Line number where the block started
+        /// </summary>
+        public long? LineNumber { get; }
+
+        /// <summary>
+        /// Keyword starting the block
+        /// </summary>
+        public KeywordType Keyword { get; }
 
         /// <summary>
         /// Check if the given indentation level finishes this block
         /// </summary>
         /// <param name="indent">Current indentation level</param>
         /// <returns>Whether the block is complete</returns>
-        public bool IsFinished(int indent)
-        {
-            if (StartingCode.Keyword == DuetAPI.Commands.KeywordType.Var)
-            {
-                return indent < StartingCode.Indent;
-            }
-            return indent <= StartingCode.Indent;
-        }
+        public bool IsFinished(int indent) => (Keyword == KeywordType.Var) ? indent < Indent : indent <= Indent;
 
         /// <summary>
         /// Last evaluation result of the conditional start code indicating if this block is supposed to be processed
