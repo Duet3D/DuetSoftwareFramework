@@ -8,12 +8,12 @@
         /// <summary>
         /// Number of segments per second
         /// </summary>
-        public int SegmentsPerSec
+        public float SegmentsPerSec
         {
             get => _segmentsPerSec;
             set => SetPropertyValue(ref _segmentsPerSec, value);
         }
-        private int _segmentsPerSec;
+        private float _segmentsPerSec;
 
         /// <summary>
         /// Minimum length of a segment (in mm)
