@@ -564,10 +564,7 @@ namespace DuetControlServer.Model
                         {
                             throw new CodeParserException("not executing a file", code);
                         }
-                        using (await code.File.LockAsync())
-                        {
-                            result.Append(code.File.GetIterations(code));
-                        }
+                        result.Append(code.File.GetIterations(code));
                         break;
 
                     case "line":
@@ -609,7 +606,7 @@ namespace DuetControlServer.Model
             {
                 // Attempt to evaluate an atomic value and return the parsed result, returns null if that failed
                 // Note that it returns _nullResult instead of null in case value is "null"
-                async Task<object?> attemptToEvaluate(string value)
+                object? attemptToEvaluate(string value)
                 {
                     string trimmedValue = value.Trim();
 
@@ -629,10 +626,7 @@ namespace DuetControlServer.Model
                             {
                                 throw new CodeParserException("not executing a file", code);
                             }
-                            using (await code.File.LockAsync())
-                            {
-                                return code.File.GetIterations(code);
-                            }
+                            return code.File.GetIterations(code);
                         case "line":
                             if (code.LineNumber is null)
                             {
@@ -715,7 +709,7 @@ namespace DuetControlServer.Model
                 }
 
                 // Perform final expression evalution here
-                object? evaluatedSubExpression = await attemptToEvaluate(subExpression);
+                object? evaluatedSubExpression = attemptToEvaluate(subExpression);
                 if (evaluatedSubExpression is not null)
                 {
                     return (evaluatedSubExpression != _nullResult) ? evaluatedSubExpression : null;

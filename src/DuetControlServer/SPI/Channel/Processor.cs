@@ -630,7 +630,7 @@ namespace DuetControlServer.SPI.Channel
             {
                 using (await JobProcessor.LockAsync())
                 {
-                    await JobProcessor.AbortAsync();
+                    JobProcessor.Abort();
                 }
             }
         }

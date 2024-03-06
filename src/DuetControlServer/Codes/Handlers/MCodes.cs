@@ -51,7 +51,7 @@ namespace DuetControlServer.Codes.Handlers
                         // Attempt to cancel the print from any channel other than File2
                         if (code.Channel != CodeChannel.File2)
                         {
-                            using (await JobProcessor.LockAsync())
+                            using (await JobProcessor.LockAsync(code.CancellationToken))
                             {
                                 if (JobProcessor.IsFileSelected)
                                 {
@@ -62,7 +62,7 @@ namespace DuetControlServer.Codes.Handlers
                                     }
 
                                     // Invalidate the print file and make sure no more codes are read from it
-                                    await JobProcessor.CancelAsync();
+                                    JobProcessor.Cancel();
                                 }
                             }
                         }
@@ -199,7 +199,7 @@ namespace DuetControlServer.Codes.Handlers
                                 return new Message(MessageType.Error, $"Could not find file {fileName}");
                             }
 
-                            using (await JobProcessor.LockAsync())
+                            using (await JobProcessor.LockAsync(code.CancellationToken))
                             {
                                 if (!code.IsFromFileChannel && JobProcessor.IsProcessing)
                                 {
@@ -220,7 +220,7 @@ namespace DuetControlServer.Codes.Handlers
                     {
                         if (code.Channel != CodeChannel.File2)
                         {
-                            using (await JobProcessor.LockAsync())
+                            using (await JobProcessor.LockAsync(code.CancellationToken))
                             {
                                 if (!JobProcessor.IsFileSelected)
                                 {
@@ -247,7 +247,7 @@ namespace DuetControlServer.Codes.Handlers
                             motionSystem = Provider.Get.Inputs[code.Channel]?.MotionSystem ?? 0;
                         }
 
-                        using (await JobProcessor.LockAsync())
+                        using (await JobProcessor.LockAsync(code.CancellationToken))
                         {
                             if (!JobProcessor.IsFileSelected)
                             {
@@ -282,7 +282,7 @@ namespace DuetControlServer.Codes.Handlers
                             motionSystem = Provider.Get.Inputs[code.Channel]?.MotionSystem ?? 0;
                         }
 
-                        using (await JobProcessor.LockAsync())
+                        using (await JobProcessor.LockAsync(code.CancellationToken))
                         {
                             if (JobProcessor.IsFileSelected)
                             {
@@ -424,7 +424,7 @@ namespace DuetControlServer.Codes.Handlers
                                 return new Message(MessageType.Error, $"GCode file \"{fileName}\" not found");
                             }
 
-                            using (await JobProcessor.LockAsync())
+                            using (await JobProcessor.LockAsync(code.CancellationToken))
                             {
                                 if (!code.IsFromFileChannel && JobProcessor.IsProcessing)
                                 {
@@ -1027,7 +1027,7 @@ namespace DuetControlServer.Codes.Handlers
                 case 24:
                 case 32:
                 case 37:
-                    using (await JobProcessor.LockAsync())
+                    using (await JobProcessor.LockAsync(code.CancellationToken))
                     {
                         // Start sending file instructions to RepRapFirmware or finish the cancellation process
                         JobProcessor.Resume();

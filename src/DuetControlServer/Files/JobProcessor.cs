@@ -41,10 +41,24 @@ namespace DuetControlServer.Files
         public static IDisposable Lock() => _lock.Lock(Program.CancellationToken);
 
         /// <summary>
+        /// Lock this class
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Disposable lock</returns>
+        public static IDisposable Lock(CancellationToken cancellationToken) => _lock.Lock(cancellationToken);
+
+        /// <summary>
         /// Lock this class asynchronously
         /// </summary>
         /// <returns>Disposable lock</returns>
-        public static Task<IDisposable> LockAsync() => _lock.LockAsync(Program.CancellationToken);
+        public static AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync(Program.CancellationToken);
+
+        /// <summary>
+        /// Lock this class asynchronously
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Disposable lock</returns>
+        public static AwaitableDisposable<IDisposable> LockAsync(CancellationToken cancellationToken) => _lock.LockAsync(cancellationToken);
 
         /// <summary>
         /// Condition to trigger when the print is supposed to resume
@@ -164,7 +178,7 @@ namespace DuetControlServer.Files
         /// This must be called while the Job class is NOT locked and it must be called from the same
         /// code on File *AND* File2, else the sync request is never resolved (or at least not before the file is cancelled)
         /// </remarks>
-        public static Task<bool> DoSync(Code code)
+        public static async Task<bool> DoSync(Code code)
         {
             if (!code.IsFromFileChannel)
             {
@@ -175,12 +189,16 @@ namespace DuetControlServer.Files
                 throw new ArgumentException("Code has no file position and cannot be used for sync requests", nameof(code));
             }
 
-            if (_file2 is null)
+            using (await LockAsync(code.CancellationToken))
             {
-                // There is nothing to sync if there is only one file stream...
-                return Task.FromResult(true);
+                if (_file is null || _file.IsClosed || _file2 is null || _file2.IsClosed)
+                {
+                    // There is nothing to sync if the files have finished or if there is only one file stream...
+                    return true;
+                }
             }
 
+            Task<bool> syncTask;
             lock (_syncRequests)
             {
                 foreach (Code item in _syncRequests.Keys)
@@ -188,14 +206,15 @@ namespace DuetControlServer.Files
                     if (code.Channel != item.Channel && code.FilePosition == item.FilePosition)
                     {
                         _syncRequests[item].TrySetResult(true);
-                        return Task.FromResult(true);
+                        return true;
                     }
                 }
 
                 TaskCompletionSource<bool> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
                 _syncRequests.Add(code, tcs);
-                return tcs.Task;
+                syncTask = tcs.Task;
             }
+            return await syncTask;
         }
 
         /// <summary>
@@ -266,7 +285,7 @@ namespace DuetControlServer.Files
             // A file being printed may start another file print
             if (IsFileSelected)
             {
-                await CancelAsync();
+                Cancel();
                 await _finished.WaitAsync(Program.CancellationToken);
             }
 
@@ -330,7 +349,7 @@ namespace DuetControlServer.Files
                     // Stop reading codes if the print has been paused or aborted
                     using (await LockAsync())
                     {
-                        if (IsPaused)
+                        if (IsPaused || IsAborted)
                         {
                             cancellationToken = _cancellationTokenSource.Token;
                             codePool.Enqueue(sharedCode);
@@ -364,16 +383,22 @@ namespace DuetControlServer.Files
                     }
                     catch (Exception e)
                     {
-                        if (e is not OperationCanceledException)
+                        using (await LockAsync())
                         {
-                            if (e is AggregateException ae)
+                            if (!IsAborted)
                             {
-                                e = ae.InnerException!;
+                                if (e is not OperationCanceledException)
+                                {
+                                    if (e is AggregateException ae)
+                                    {
+                                        e = ae.InnerException!;
+                                    }
+                                    await Logger.LogOutputAsync(MessageType.Error, $"in job file (channel {file.Channel}) line {readCode?.LineNumber ?? file.LineNumber}: {e.Message}");
+                                    _logger.Error(e);
+                                }
+                                Abort();
                             }
-                            await Logger.LogOutputAsync(MessageType.Error, $"in job file (channel {file.Channel}) line {readCode?.LineNumber}: {e.Message}");
-                            _logger.Error(e);
                         }
-                        await AbortAsync();
                     }
                 }
 
@@ -411,7 +436,21 @@ namespace DuetControlServer.Files
                 }
                 else
                 {
-                    // Flush one last time in case plugins inserted codes at the end of a print file
+                    // Resolve pending sync requests waiting for this particular file channel
+                    lock (_syncRequests)
+                    {
+                        foreach (Code syncingCode in _syncRequests.Keys.ToArray())
+                        {
+                            if (syncingCode.File != file)
+                            {
+                                _syncRequests[syncingCode].TrySetResult(false);
+                                _syncRequests.Remove(syncingCode);
+                            }
+                        }
+                    }
+
+                    // Flush one last time in case plugins inserted codes at the end of a print file.
+                    // Do this only if the job finished successfully, else we may get stuck in a deadlock
                     try
                     {
                         await Codes.Processor.FlushAsync(file);
@@ -480,7 +519,7 @@ namespace DuetControlServer.Files
                     {
                         if (IsCancelled)
                         {
-                            // Prints are cancelled by M0/M1 which is processed by RRF
+                            // Prints are cancelled by M0/M1/M2 which is processed by RRF
                             _logger.Info("Cancelled job file");
                         }
                         else if (IsAborted)
@@ -540,17 +579,7 @@ namespace DuetControlServer.Files
                     // We are no longer printing a file...
                     _finished.NotifyAll();
 
-                    // Clean up pending sync requests
-                    lock (_syncRequests)
-                    {
-                        foreach (Code code in _syncRequests.Keys)
-                        {
-                            _syncRequests[code].TrySetResult(false);
-                        }
-                        _syncRequests.Clear();
-                    }
-
-                    // Dispose the file
+                    // Dispose of the files
                     _file!.Dispose();
                     _file2?.Dispose();
                     _file = _file2 = null;
@@ -605,45 +634,9 @@ namespace DuetControlServer.Files
                 _cancellationTokenSource.Dispose();
                 _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
 
-                using (_file!.Lock())
-                {
-                    _file.Close();
-                }
-                if (_file2 is not null)
-                {
-                    using (_file2.Lock())
-                    {
-                        _file2.Close();
-                    }
-                }
-                IsCancelled = IsPaused;
-                Resume();
-            }
-        }
+                _file!.Close();
+                _file2?.Close();
 
-        /// <summary>
-        /// Cancel the current print (e.g. when M0/M1/M2 is called)
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public static async Task CancelAsync()
-        {
-            if (IsFileSelected)
-            {
-                _cancellationTokenSource.Cancel();
-                _cancellationTokenSource.Dispose();
-                _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-
-                using (await _file!.LockAsync())
-                {
-                    _file.Close();
-                }
-                if (_file2 is not null)
-                {
-                    using (await _file2.LockAsync())
-                    {
-                        _file2.Close();
-                    }
-                }
                 IsCancelled = IsPaused;
                 Resume();
             }
@@ -661,45 +654,9 @@ namespace DuetControlServer.Files
                 _cancellationTokenSource.Dispose();
                 _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
 
-                using (_file!.Lock())
-                {
-                    _file.Close();
-                }
-                if (_file2 is not null)
-                {
-                    using (_file2.Lock())
-                    {
-                        _file2.Close();
-                    }
-                }
-                IsAborted = true;
-                Resume();
-            }
-        }
+                _file!.Close();
+                _file2?.Close();
 
-        /// <summary>
-        /// Abort the current print asynchronously. This is called when the print could not complete as expected
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public static async Task AbortAsync()
-        {
-            if (IsFileSelected)
-            {
-                _cancellationTokenSource.Cancel();
-                _cancellationTokenSource.Dispose();
-                _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
-
-                using (await _file!.LockAsync())
-                {
-                    _file.Close();
-                }
-                if (_file2 is not null)
-                {
-                    using (await _file2.LockAsync())
-                    {
-                        _file2.Close();
-                    }
-                }
                 IsAborted = true;
                 Resume();
             }
@@ -721,7 +678,7 @@ namespace DuetControlServer.Files
             }
             catch (OperationCanceledException)
             {
-                builder.AppendLine("Failed to lock Job task within 2 seconds");
+                builder.AppendLine("Failed to lock JobProcessor within 2 seconds");
             }
 
             if (IsFileSelected)

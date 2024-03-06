@@ -1711,7 +1711,7 @@ namespace DuetControlServer.SPI
             // Cancel the file being printed
             using (await JobProcessor.LockAsync())
             {
-                await JobProcessor.AbortAsync();
+                JobProcessor.Abort();
             }
 
             // Resolve pending macros, unbuffered (system) codes and flush requests

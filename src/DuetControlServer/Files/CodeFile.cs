@@ -68,7 +68,7 @@ namespace DuetControlServer.Files
         private readonly Stack<CodeBlock> _codeBlocks = new();
 
         /// <summary>
-        /// Last code block
+        /// Last ended code block
         /// </summary>
         private CodeBlock? _lastCodeBlock;
 
@@ -97,11 +97,14 @@ namespace DuetControlServer.Files
         /// <exception cref="CodeParserException">Query came outside a while loop</exception>
         public int GetIterations(Code code)
         {
-            foreach (CodeBlock codeBlock in _codeBlocks)
+            lock (_codeBlocks)
             {
-                if (codeBlock.Keyword == KeywordType.While)
+                foreach (CodeBlock codeBlock in _codeBlocks)
                 {
-                    return codeBlock.Iterations;
+                    if (codeBlock.Keyword == KeywordType.While)
+                    {
+                        return codeBlock.Iterations;
+                    }
                 }
             }
             throw new CodeParserException("'iterations' used when not inside a loop", code);
@@ -115,19 +118,13 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Indicates if this file is closed
         /// </summary>
-        public bool IsClosed { get; private set; }
+        public bool IsClosed => _isClosed;
+        private volatile bool _isClosed = false;
 
         /// <summary>
         /// Close this file
         /// </summary>
-        public void Close()
-        {
-            if (IsClosed)
-            {
-                return;
-            }
-            IsClosed = true;
-        }
+        public void Close() => _isClosed = true;
 
         /// <summary>
         /// Constructor of the base class for reading from a G-code file
@@ -174,7 +171,7 @@ namespace DuetControlServer.Files
 
             if (disposing)
             {
-                IsClosed = true;
+                _isClosed = true;
                 _fileStream.Dispose();
             }
             _disposed = true;
@@ -210,7 +207,7 @@ namespace DuetControlServer.Files
 
                 // Read the next available code
                 bool codeRead;
-                using (await _lock.LockAsync(Program.CancellationToken))
+                using (await LockAsync())
                 {
                     if (IsClosed)
                     {
@@ -269,7 +266,7 @@ namespace DuetControlServer.Files
                                         await Codes.Processor.FlushAsync(this);
                                     }
 
-                                    using (await _lock.LockAsync(Program.CancellationToken))
+                                    using (await LockAsync())
                                     {
                                         Position = state.FilePosition ?? 0;
                                         _parserBuffer.LineNumber = state.LineNumber;
@@ -344,7 +341,7 @@ namespace DuetControlServer.Files
                                 {
                                     // Last if/elif condition was true, ignore the following block
                                     _logger.Debug("Skipping {0} block", code.Keyword);
-                                    using (await _lock.LockAsync(Program.CancellationToken))
+                                    lock (_codeBlocks)
                                     {
                                         _codeBlocks.Push(new CodeBlock(code, false));
                                     }
@@ -361,9 +358,9 @@ namespace DuetControlServer.Files
                             _logger.Debug("Evaluating {0} block", code.Keyword);
                             if (code.Keyword != KeywordType.While || codeBlock is null || codeBlock.FilePosition != code.FilePosition)
                             {
-                                using (await _lock.LockAsync(Program.CancellationToken))
+                                codeBlock = new CodeBlock(code, false);
+                                lock (_codeBlocks)
                                 {
-                                    codeBlock = new CodeBlock(code, false);
                                     _codeBlocks.Push(codeBlock);
                                 }
                             }
@@ -391,7 +388,7 @@ namespace DuetControlServer.Files
 
                             // else condition is true if the last if/elif condition was false
                             _logger.Debug("{0} {1} block", _lastCodeBlock.ExpectingElse ? "Starting" : "Skipping", code.Keyword);
-                            using (await _lock.LockAsync(Program.CancellationToken))
+                            lock (_codeBlocks)
                             {
                                 _codeBlocks.Push(new CodeBlock(code, _lastCodeBlock.ExpectingElse));
                             }
@@ -423,21 +420,18 @@ namespace DuetControlServer.Files
 
                         case KeywordType.Abort:
                             _logger.Debug("Doing {0}", code.Keyword);
-                            using (await _lock.LockAsync(Program.CancellationToken))
-                            {
-                                Close();
-                            }
+                            Close();
                             return code;
 
                         case KeywordType.Var:
                             if (codeBlock is null || code.Indent > codeBlock.Indent)
                             {
-                                using (await _lock.LockAsync(Program.CancellationToken))
+                                codeBlock = new CodeBlock(code, true)
                                 {
-                                    codeBlock = new CodeBlock(code, true)
-                                    {
-                                        HasLocalVariables = true
-                                    };
+                                    HasLocalVariables = true
+                                };
+                                lock (_codeBlocks)
+                                {
                                     _codeBlocks.Push(codeBlock);
                                 }
                             }
@@ -466,16 +460,19 @@ namespace DuetControlServer.Files
         /// <param name="varName">Name of the variable</param>
         public void AddLocalVariable(string varName)
         {
-            if (_codeBlocks.TryPeek(out CodeBlock? codeBlock))
+            lock (_codeBlocks)
             {
-                if (!codeBlock.LocalVariables.Contains(varName))
+                if (_codeBlocks.TryPeek(out CodeBlock? codeBlock))
                 {
-                    codeBlock.LocalVariables.Add(varName);
+                    if (!codeBlock.LocalVariables.Contains(varName))
+                    {
+                        codeBlock.LocalVariables.Add(varName);
+                    }
                 }
-            }
-            else
-            {
-                _logger.Warn("Cannot add local variable because there is no open code block");
+                else
+                {
+                    _logger.Warn("Cannot add local variable because there is no open code block");
+                }
             }
         }
 
@@ -484,7 +481,7 @@ namespace DuetControlServer.Files
         /// </summary>
         /// <param name="codeBlock">Code block</param>
         /// <returns>Asynchronous task</returns>
-        public async Task DeleteLocalVariables(CodeBlock codeBlock)
+        private async Task DeleteLocalVariables(CodeBlock codeBlock)
         {
             Task[] deletionTasks = new Task[codeBlock.LocalVariables.Count];
             for (int i = 0; i < codeBlock.LocalVariables.Count; i++)
@@ -502,9 +499,18 @@ namespace DuetControlServer.Files
         /// <returns>Asynchronous task</returns>
         private async Task EndCodeBlock()
         {
-            using (await _lock.LockAsync(Program.CancellationToken))
+            using (await LockAsync())
             {
-                if (_codeBlocks.TryPop(out CodeBlock? codeBlock))
+                CodeBlock? codeBlock;
+                lock (_codeBlocks)
+                {
+                    if (!_codeBlocks.TryPop(out codeBlock))
+                    {
+                        codeBlock = null;
+                    }
+                }
+
+                if (codeBlock is not null)
                 {
                     // Log the end of this block
                     if (codeBlock.Keyword is KeywordType.If or KeywordType.ElseIf or KeywordType.Else or KeywordType.While)

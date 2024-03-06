@@ -153,6 +153,9 @@ namespace DuetControlServer.Codes.Handlers
                 case KeywordType.Global:
                 case KeywordType.Var:
                 case KeywordType.Set:
+                    // Do not attempt to process cancelled codes
+                    code.CancellationToken.ThrowIfCancellationRequested();
+
                     // Validate the keyword and expression first
                     string varName = string.Empty, expression = string.Empty;
                     bool inExpression = false, wantExpression = false;
