@@ -80,10 +80,17 @@ namespace DocGen
         }
 
         /// <summary>
+        /// Regular expression to find and replace "see cref" instances
+        /// </summary>
+        private static readonly Regex seeRegex = new("<see cref=\\\"(?:\\w:)?(?:.*\\.)+?(.*)\"\\s*/>", RegexOptions.Compiled);
+
+        /// <summary>
         /// Convert an XML-based documentation node into human-readable markup text
         /// </summary>
         /// <param name="xmlContent">XML node content</param>
         /// <returns>Content formatted in markup language</returns>
+        /// <see cref=""/>
+        /// <seealso cref=""/>
         private static string? GenerateDocFromXml(string xmlContent)
         {
             string? summary = null, remarks = null;
@@ -95,11 +102,11 @@ namespace DocGen
                 {
                     if (node.Name == "summary")
                     {
-                        summary = node.InnerText.TrimLines();
+                        summary = node.InnerXml.TrimLines();
                     }
                     else if (node.Name == "remarks")
                     {
-                        remarks = node.InnerText.TrimLines();
+                        remarks = node.InnerXml.TrimLines();
                     }
                 }
             }
@@ -108,6 +115,7 @@ namespace DocGen
             {
                 return null;
             }
+            summary = seeRegex.Replace(summary, "$1");
             if (remarks is null)
             {
                 return summary;
