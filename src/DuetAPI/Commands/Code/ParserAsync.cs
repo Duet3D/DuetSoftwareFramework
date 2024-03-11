@@ -132,7 +132,7 @@ namespace DuetAPI.Commands
                 // Stop if another G/M/T code is coming up and this one is complete
                 if (contentRead && !inFinalComment && !inEncapsulatedComment && !inKeywordArgument && !inChunk)
                 {
-                    char nextChar = char.ToUpperInvariant(c);
+                    char nextChar = nextCharLowerCase ? c : char.ToUpperInvariant(c);
                     if ((nextChar == 'G' || nextChar == 'M' || nextChar == 'T') && result.Type != CodeType.None &&
                         (result.Type != CodeType.GCode || result.MajorNumber != 53) &&
                         (nextChar != 'T' || result.Type == CodeType.TCode || result.Parameters.Any(item => item.Letter == 'T')))
@@ -516,7 +516,7 @@ namespace DuetAPI.Commands
 
                 if (readingAtStart)
                 {
-                    isLineNumber = (char.ToUpperInvariant(c) == 'N');
+                    isLineNumber = char.ToUpperInvariant(c) == 'N';
                     if (char.IsWhiteSpace(c) && c != '\n')
                     {
                         if (c == '\t')
