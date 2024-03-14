@@ -424,15 +424,19 @@ namespace UnitTests.Commands
         [Test]
         public void ParseM584WithExpressions()
         {
-            foreach (DuetAPI.Commands.Code code in Parse("M584 E123:{456}"))
+            foreach (DuetAPI.Commands.Code code in Parse("M584 E123:{456} 'f7.8 'g9.0"))
             {
                 ClassicAssert.AreEqual(CodeType.MCode, code.Type);
                 ClassicAssert.AreEqual(584, code.MajorNumber);
                 ClassicAssert.IsNull(code.MinorNumber);
-                ClassicAssert.AreEqual(1, code.Parameters.Count);
+                ClassicAssert.AreEqual(3, code.Parameters.Count);
                 ClassicAssert.AreEqual('E', code.Parameters[0].Letter);
                 ClassicAssert.IsTrue(code.Parameters[0].IsExpression);
                 ClassicAssert.AreEqual("{123:{456}}", (string?)code.Parameters[0]);
+                ClassicAssert.AreEqual('f', code.Parameters[1].Letter);
+                ClassicAssert.AreEqual(new DriverId(7, 8), (DriverId)code.Parameters[1]);
+                ClassicAssert.AreEqual('g', code.Parameters[2].Letter);
+                ClassicAssert.AreEqual(new DriverId(9, 0), (DriverId)code.Parameters[2]);
             }
 
             foreach (DuetAPI.Commands.Code code in Parse("M584 E{123}:{456}:789"))
