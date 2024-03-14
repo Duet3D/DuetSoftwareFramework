@@ -334,7 +334,6 @@ namespace DuetControlServer.Files
             do
             {
                 // Fill up the macro code buffer
-                SetReading(true);
                 while (codes.Count < Settings.BufferedMacroCodes)
                 {
                     try
@@ -375,15 +374,6 @@ namespace DuetControlServer.Files
                 {
                     try
                     {
-                        // Keep the next file position up-to-date in case we need to fork this macro file
-                        NextFilePosition = (code.FilePosition ?? 0L) + (code.Length ?? 0L);
-
-                        // Are we waiting for pending codes to be processed?
-                        if (!code.Task.IsCompleted)
-                        {
-                            SetReading(false);
-                        }
-
                         // Logging of regular messages is done by the code itself, no need to take care of it here
                         Message? codeResult = await code.Task;
                         if (codeResult?.Type is MessageType.Error)
@@ -423,7 +413,6 @@ namespace DuetControlServer.Files
             using (await LockAsync())
             {
                 // No longer executing
-                SetReading(false);
                 IsExecuting = false;
                 if (!IsAborted)
                 {

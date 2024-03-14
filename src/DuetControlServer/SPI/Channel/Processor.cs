@@ -1,7 +1,6 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
-using DuetControlServer.Codes.Pipelines;
 using DuetControlServer.Files;
 using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.Utility;
@@ -290,7 +289,7 @@ namespace DuetControlServer.SPI.Channel
         /// </summary>
         /// <param name="from">Source</param>
         /// <returns>Asynchronous task</returns>
-        public async ValueTask CopyStateAsync(Processor from)
+        public void CopyState(Processor from)
         {
             if (Stack.Count != 1)
             {
@@ -299,6 +298,7 @@ namespace DuetControlServer.SPI.Channel
 
             List<MacroFile> macrosToStart = new();
 
+            // Create macro/state copies but don't start the macros yet. Some may need to wait before they can start execution
             State baseItem = from.Stack.Last();
             foreach (State item in from.Stack.Reverse())
             {
@@ -306,10 +306,6 @@ namespace DuetControlServer.SPI.Channel
                 {
                     if (item.File is MacroFile macro)
                     {
-                        // Make sure the macro file to copy has processed everything so far
-                        await macro.FinishReadingAsync();
-
-                        // Create a copy but don't start it yet. It may need to wait before resuming execution
                         MacroFile copy = new(macro, Channel);
                         Push(copy);
                         macrosToStart.Add(copy);
@@ -322,6 +318,7 @@ namespace DuetControlServer.SPI.Channel
                 }
             }
 
+            // Start them once the order is correct
             foreach (MacroFile file in macrosToStart)
             {
                 file.Start(false);
@@ -1120,6 +1117,7 @@ namespace DuetControlServer.SPI.Channel
                 if (BufferedCodes.Count > 0)
                 {
                     startCode = BufferedCodes[0];
+                    startCode.UpdateNextFilePosition();
                     BytesBuffered -= startCode.BinarySize;
                     BufferedCodes.RemoveAt(0);
                 }
@@ -1235,6 +1233,7 @@ namespace DuetControlServer.SPI.Channel
                 // Start it
                 if (startCode is not null)
                 {
+                    startCode.UpdateNextFilePosition();
                     _logger.Debug("==> Starting code {0}", startCode);
                 }
                 macro.Start();

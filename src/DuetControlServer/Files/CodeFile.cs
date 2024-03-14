@@ -90,6 +90,7 @@ namespace DuetControlServer.Files
                     _fileStream.Seek(value, SeekOrigin.Begin);
                     _parserBuffer.Invalidate();
                     _parserBuffer.LineNumber = (value == 0) ? 1 : null;
+                    NextFilePosition = value;
                 }
             }
         }
@@ -98,33 +99,6 @@ namespace DuetControlServer.Files
         /// File position of the next code to actually run
         /// </summary>
         public long NextFilePosition { get; set; }
-
-        /// <summary>
-        /// Event to be set when the file has finished reading codes
-        /// </summary>
-        private readonly AsyncManualResetEvent _finishedReading = new(true);
-
-        /// <summary>
-        /// Set if the macro is busy reading or not
-        /// </summary>
-        /// <param name="isReading"></param>
-        public void SetReading(bool isReading)
-        {
-            if (isReading)
-            {
-                _finishedReading.Reset();
-            }
-            else
-            {
-                _finishedReading.Set();
-            }
-        }
-
-        /// <summary>
-        /// Wait for the macro file to finish reading codes
-        /// </summary>
-        /// <returns></returns>
-        public Task FinishReadingAsync() => _finishedReading.WaitAsync(Program.CancellationToken);
 
         /// <summary>
         /// Get the current number of iterations of the current loop
@@ -230,7 +204,6 @@ namespace DuetControlServer.Files
 
             if (disposing)
             {
-                _finishedReading.Set();
                 _isClosed = true;
                 _fileStream.Dispose();
             }

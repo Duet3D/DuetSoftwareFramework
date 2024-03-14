@@ -319,7 +319,7 @@ namespace DuetControlServer.SPI
             {
                 using (await _channels[from].LockAsync())
                 {
-                    await _channels[to].CopyStateAsync(_channels[from]);
+                    _channels[to].CopyState(_channels[from]);
                 }
             }
         }

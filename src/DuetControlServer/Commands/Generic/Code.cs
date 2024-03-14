@@ -164,6 +164,43 @@ namespace DuetControlServer.Commands
         internal Files.CodeFile? File { get; set; }
 
         /// <summary>
+        /// Update the next file position in case we need to fork this file
+        /// </summary>
+        internal void UpdateNextFilePosition()
+        {
+            if (File is not null && FilePosition is not null)
+            {
+                using (File.Lock())
+                {
+                    long nextFilePosition = FilePosition.Value + (Length ?? 0L);
+                    if (File.NextFilePosition < nextFilePosition)
+                    {
+                        File.NextFilePosition = nextFilePosition;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Update the next file position in case we need to fork this file
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        internal async ValueTask UpdateNextFilePositionAsync()
+        {
+            if (File is not null && FilePosition is not null)
+            {
+                using (await File.LockAsync())
+                {
+                    long nextFilePosition = FilePosition.Value + (Length ?? 0L);
+                    if (File.NextFilePosition < nextFilePosition)
+                    {
+                        File.NextFilePosition = nextFilePosition;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// Attempt to process this code internally
         /// </summary>
         /// <returns>Whether the code could be processed internally</returns>

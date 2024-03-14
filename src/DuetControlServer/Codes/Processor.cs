@@ -118,7 +118,12 @@ namespace DuetControlServer.Codes
             if (syncFileStreams && code.IsFromFileChannel)
             {
                 // Wait for both file streams to reach the same position
-                return await JobProcessor.DoSync(code);
+                if (await JobProcessor.DoSync(code))
+                {
+                    await code.UpdateNextFilePositionAsync();
+                    return true;
+                }
+                return false;
             }
             else if (ifExecuting)
             {
@@ -133,6 +138,7 @@ namespace DuetControlServer.Codes
             }
 
             // Done
+            await code.UpdateNextFilePositionAsync();
             return true;
         }
 

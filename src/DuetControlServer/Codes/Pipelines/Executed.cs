@@ -148,6 +148,7 @@ namespace DuetControlServer.Codes.Pipelines
         /// <returns>Asynchronous task</returns>
         public override void WriteCode(Commands.Code code)
         {
+            code.UpdateNextFilePosition();
             if (!_stackItem.PendingCodes.Writer.TryWrite(code))
             {
                 // Allocate an extra task only if we cannot store the executed code yet. Should never get here!
@@ -161,6 +162,10 @@ namespace DuetControlServer.Codes.Pipelines
         /// </summary>
         /// <param name="code">Code to enqueue</param>
         /// <returns>Asynchronous task</returns>
-        public override ValueTask WriteCodeAsync(Commands.Code code) => _stackItem.PendingCodes.Writer.WriteAsync(code);
+        public override async ValueTask WriteCodeAsync(Commands.Code code)
+        {
+            await code.UpdateNextFilePositionAsync();
+            await _stackItem.PendingCodes.Writer.WriteAsync(code);
+        }
     }
 }

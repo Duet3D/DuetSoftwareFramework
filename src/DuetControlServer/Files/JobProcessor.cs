@@ -330,10 +330,6 @@ namespace DuetControlServer.Files
                 Provider.Get.Inputs[CodeChannel.File2]!.Active = true;
             }
 
-            // Wait for the job file to stop reading and update this macro's position just in case
-            await _file.FinishReadingAsync();
-            code.File!.NextFilePosition = code.FilePosition!.Value + code.Length!.Value;
-
             // Copy the stack in case this is invoked from a macro file.
             // We need to pass the macro file position as well if applicable to resume the second macro file from the right position
             await SPI.Interface.CopyStateAsync(CodeChannel.File, CodeChannel.File2);
@@ -383,7 +379,6 @@ namespace DuetControlServer.Files
             do
             {
                 // Fill up the code buffer
-                file.SetReading(true);
                 while (codePool.TryDequeue(out Code? sharedCode))
                 {
                     sharedCode.Reset();
@@ -453,13 +448,6 @@ namespace DuetControlServer.Files
                         {
                             // Keep the next file position up-to-date in case we need to pause or fork this macro file
                             currentFilePosition = code.FilePosition ?? 0L;
-                            file.NextFilePosition = (code.FilePosition ?? 0L) + (code.Length ?? 0L);
-
-                            // Are we waiting for pending codes to be processed?
-                            if (!code.Task.IsCompleted)
-                            {
-                                file.SetReading(false);
-                            }
 
                             // Logging of regular messages is done by the code itself, no need to take care of it here
                             await code.Task;
@@ -487,9 +475,6 @@ namespace DuetControlServer.Files
                 }
                 else
                 {
-                    // No longer reading...
-                    file.SetReading(false);
-
                     // Resolve pending sync requests waiting for this particular file channel
                     lock (_syncRequests)
                     {

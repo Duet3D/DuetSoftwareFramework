@@ -19,7 +19,7 @@ namespace DuetControlServer.Codes.Pipelines
         /// <summary>
         /// Counter for unbuffered codes
         /// </summary>
-        private AsyncCountdownEvent _unbufferedCodesCounter = new(0);
+        private readonly AsyncCountdownEvent _unbufferedCodesCounter = new(0);
 
         /// <summary>
         /// Process an incoming code
