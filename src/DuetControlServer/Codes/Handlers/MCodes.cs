@@ -773,6 +773,34 @@ namespace DuetControlServer.Codes.Handlers
                     }
                     throw new OperationCanceledException();
 
+                // Fork input reader
+                case 606:
+                    if (await Processor.FlushAsync(code))
+                    {
+                        using (await Provider.AccessReadOnlyAsync())
+                        {
+                            if (Provider.Get.Inputs[CodeChannel.File2] is null)
+                            {
+                                // Command not supported. Let RRF decide what to do
+                                break;
+                            }
+                        }
+
+                        // Try to fork the file and report an error if anything went wrong
+                        using (await JobProcessor.LockAsync(code.CancellationToken))
+                        {
+                            Message result = await JobProcessor.ForkAsync(code);
+                            if (result.Type != MessageType.Success)
+                            {
+                                return result;
+                            }
+                        }
+
+                        // Let RRF carry on duplicating the stack
+                        break;
+                    }
+                    throw new OperationCanceledException();
+
                 // Set current RTC date and time
                 case 905:
                     if (await Processor.FlushAsync(code))

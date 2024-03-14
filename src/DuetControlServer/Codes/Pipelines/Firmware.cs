@@ -21,10 +21,7 @@ namespace DuetControlServer.Codes.Pipelines
         /// Wait for the pipeline stage to become idle
         /// </summary>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public override Task<bool> FlushAsync()
-        {
-            return SPI.Interface.FlushAsync(Processor.Channel);
-        }
+        public override Task<bool> FlushAsync() => SPI.Interface.FlushAsync(Processor.Channel);
 
         /// <summary>
         /// Wait for the pipeline stage to become idle

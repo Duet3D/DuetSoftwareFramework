@@ -1,6 +1,7 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Codes.Pipelines;
 using DuetControlServer.Files;
 using DuetControlServer.SPI.Communication.Shared;
 using DuetControlServer.Utility;
@@ -282,6 +283,49 @@ namespace DuetControlServer.SPI.Channel
                 source.SetResult(false);
             }
             oldState.SetBusy(false);
+        }
+
+        /// <summary>
+        /// Copy the state from another channel processor
+        /// </summary>
+        /// <param name="from">Source</param>
+        /// <returns>Asynchronous task</returns>
+        public async ValueTask CopyStateAsync(Processor from)
+        {
+            if (Stack.Count != 1)
+            {
+                throw new ArgumentException("Cannot copy state because the stack is not empty");
+            }
+
+            List<MacroFile> macrosToStart = new();
+
+            State baseItem = from.Stack.Last();
+            foreach (State item in from.Stack.Reverse())
+            {
+                if (item != baseItem)
+                {
+                    if (item.File is MacroFile macro)
+                    {
+                        // Make sure the macro file to copy has processed everything so far
+                        await macro.FinishReadingAsync();
+
+                        // Create a copy but don't start it yet. It may need to wait before resuming execution
+                        MacroFile copy = new(macro, Channel);
+                        Push(copy);
+                        macrosToStart.Add(copy);
+                    }
+                    else
+                    {
+                        Push();
+                        CurrentState.WaitingForAcknowledgement = item.WaitingForAcknowledgement;
+                    }
+                }
+            }
+
+            foreach (MacroFile file in macrosToStart)
+            {
+                file.Start(false);
+            }
         }
 
         /// <summary>

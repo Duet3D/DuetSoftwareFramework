@@ -6,7 +6,7 @@ namespace DuetControlServer.Files
     /// <summary>
     /// Class representing a code block in a conditional G-code file
     /// </summary>
-    public sealed class CodeBlock
+    public record CodeBlock
     {
         /// <summary>
         /// Constructor of this class

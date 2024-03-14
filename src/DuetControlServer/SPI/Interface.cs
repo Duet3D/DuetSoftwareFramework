@@ -308,6 +308,23 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
+        /// Copy the state from one channel processor to another
+        /// </summary>
+        /// <param name="from">Source channel</param>
+        /// <param name="to">Target channel</param>
+        /// <exception cref="NotImplementedException"></exception>
+        public static async Task CopyStateAsync(CodeChannel from, CodeChannel to)
+        {
+            using (await _channels[to].LockAsync())
+            {
+                using (await _channels[from].LockAsync())
+                {
+                    await _channels[to].CopyStateAsync(_channels[from]);
+                }
+            }
+        }
+
+        /// <summary>
         /// Request an immediate emergency stop
         /// </summary>
         /// <returns>Asynchronous task</returns>

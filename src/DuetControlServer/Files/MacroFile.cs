@@ -1,6 +1,7 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Codes;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -143,12 +144,32 @@ namespace DuetControlServer.Files
         }
 
         /// <summary>
+        /// Copy constructor
+        /// </summary>
+        /// <param name="copyFrom">File to copy from</param>
+        /// <param name="channel">Code channel to assign</param>
+        public MacroFile(MacroFile copyFrom, CodeChannel channel) : base(copyFrom, channel)
+        {
+            SourceConnection = copyFrom.SourceConnection;
+            IsNested = copyFrom.IsNested;
+            IsPausable = copyFrom.IsPausable;
+            IsConfig = copyFrom.IsConfig;
+            IsConfigOverride = copyFrom.IsConfigOverride;
+            IsDsfConfig = copyFrom.IsDsfConfig;
+            IsAborted = copyFrom.IsAborted;
+        }
+
+        /// <summary>
         /// Start executing this macro file in the background
         /// </summary>
-        public void Start()
+        public void Start(bool notifyFirmware = true)
         {
-            IsExecuting = JustStarted = true;
-            Task.Run(Run);
+            if (!IsAborted)
+            {
+                IsExecuting = true;
+                JustStarted = notifyFirmware;
+                Task.Run(Run);
+            }
         }
 
         /// <summary>
@@ -299,11 +320,21 @@ namespace DuetControlServer.Files
                 Model.Provider.SetExecutingConfig(true);
             }
 
+            // Flush this code channel to make sure it's our turn now
+            if (!await Processor.FlushAsync(this))
+            {
+                using (await LockAsync())
+                {
+                    Abort();
+                }
+            }
+
             // Start processing codes
             Queue<Code> codes = new();
             do
             {
                 // Fill up the macro code buffer
+                SetReading(true);
                 while (codes.Count < Settings.BufferedMacroCodes)
                 {
                     try
@@ -344,6 +375,15 @@ namespace DuetControlServer.Files
                 {
                     try
                     {
+                        // Keep the next file position up-to-date in case we need to fork this macro file
+                        NextFilePosition = (code.FilePosition ?? 0L) + (code.Length ?? 0L);
+
+                        // Are we waiting for pending codes to be processed?
+                        if (!code.Task.IsCompleted)
+                        {
+                            SetReading(false);
+                        }
+
                         // Logging of regular messages is done by the code itself, no need to take care of it here
                         Message? codeResult = await code.Task;
                         if (codeResult?.Type is MessageType.Error)
@@ -383,6 +423,7 @@ namespace DuetControlServer.Files
             using (await LockAsync())
             {
                 // No longer executing
+                SetReading(false);
                 IsExecuting = false;
                 if (!IsAborted)
                 {

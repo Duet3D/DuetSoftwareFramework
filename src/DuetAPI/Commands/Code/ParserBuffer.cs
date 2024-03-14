@@ -73,7 +73,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Last major G-code to repeat
         /// </summary>
-        internal int LastGCode = -1;
+        public int LastGCode = -1;
 
         /// <summary>
         /// Indicates if the last code may be repeated as per Fanuc or LaserWeb style
