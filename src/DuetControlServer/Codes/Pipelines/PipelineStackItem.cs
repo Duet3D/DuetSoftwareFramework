@@ -14,12 +14,19 @@ namespace DuetControlServer.Codes.Pipelines
     public class PipelineStackItem
     {
         /// <summary>
+        /// Pipeline holding this stack item
+        /// </summary>
+        private readonly PipelineBase _pipeline;
+
+        /// <summary>
         /// Constructor of this class
         /// </summary>
         /// <param name="pipeline">Pipeline holding this stack item</param>
         /// <param name="file">Current file or null if not present</param>
         public PipelineStackItem(PipelineBase pipeline, CodeFile? file)
         {
+            _pipeline = pipeline;
+
             if (pipeline.Stage != PipelineStage.Executed)
             {
                 PendingCodes = Channel.CreateBounded<Code>(new BoundedChannelOptions(Settings.MaxCodesPerInput)
@@ -165,6 +172,23 @@ namespace DuetControlServer.Codes.Pipelines
                 return false;
             }
             return true;
+        }
+
+        /// <summary>
+        /// Enqueue a given code on this pipeline state for execution
+        /// </summary>
+        /// <param name="code">Code to enqueue</param>
+        public void WriteCode(Code code)
+        {
+            lock (this)
+            {
+                Busy = true;
+            }
+            if (!PendingCodes.Writer.TryWrite(code))
+            {
+                _pipeline.Processor.Logger.Error("Pipeline failed to store code immediately so waiting synchronously for it to be added");
+                PendingCodes.Writer.WriteAsync(code, Program.CancellationToken).AsTask().Wait();
+            }
         }
 
         /// <summary>

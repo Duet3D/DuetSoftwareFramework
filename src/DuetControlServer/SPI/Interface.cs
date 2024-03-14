@@ -232,11 +232,12 @@ namespace DuetControlServer.SPI
         public static bool IsWaitingForAcknowledgment(CodeChannel channel) => _channels[channel].IsWaitingForAcknowledgment;
 
         /// <summary>
-        /// Wait for all pending codes to finish
+        /// Wait for all pending codes of the first or last stack item to finish
         /// </summary>
         /// <param name="channel">Code channel to wait for</param>
+        /// <param name="flushAll">Flush everything</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static async Task<bool> FlushAsync(CodeChannel channel)
+        public static async Task<bool> FlushAsync(CodeChannel channel, bool flushAll)
         {
             Program.CancellationToken.ThrowIfCancellationRequested();
             if (Settings.NoSpi)
@@ -247,7 +248,7 @@ namespace DuetControlServer.SPI
             Task<bool> flushTask;
             using (await _channels[channel].LockAsync())
             {
-                flushTask = _channels[channel].FlushAsync();
+                flushTask = flushAll ? _channels[channel].FlushAllAsync() : _channels[channel].FlushAsync();
             }
             return await flushTask;
         }
@@ -1288,7 +1289,7 @@ namespace DuetControlServer.SPI
         private static void HandleEvaluationResult()
         {
             DataTransfer.ReadEvaluationResult(out string expression, out object? result);
-            _logger.Trace("Received evaluation result for expression {0} = {1}", expression, result);
+            _logger.Debug("Received evaluation result for expression {0} = {1}", expression, result);
 
             lock (_evaluateExpressionRequests)
             {

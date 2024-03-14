@@ -133,9 +133,10 @@ namespace DuetControlServer.Codes.Pipelines
         }
 
         /// <summary>
-        /// Wait for the current pipeline stack item to become idle
+        /// Wait for the first or current pipeline stack item to become idle
         /// </summary>
-        public virtual Task<bool> FlushAsync() => CurrentStackItem.FlushAsync();
+        /// <param name="flushAll">Flush everything</param>
+        public virtual Task<bool> FlushAsync(bool flushAll) => flushAll ? _baseItem.FlushAsync() : CurrentStackItem.FlushAsync();
 
         /// <summary>
         /// Wait for the pipeline stage to become idle

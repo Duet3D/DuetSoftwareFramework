@@ -83,7 +83,7 @@ namespace DuetControlServer.Codes
         /// </summary>
         /// <param name="channel">Code channel to wait for</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static Task<bool> FlushAsync(CodeChannel channel) => _processors[(int)channel].FlushAsync();
+        public static Task<bool> FlushAsync(CodeChannel channel, bool flushAll = false) => _processors[(int)channel].FlushAsync(flushAll);
 
         /// <summary>
         /// Wait for all pending codes of the given file to finish

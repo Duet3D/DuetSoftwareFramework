@@ -786,18 +786,22 @@ namespace DuetControlServer.Codes.Handlers
                             }
                         }
 
-                        // Try to fork the file and report an error if anything went wrong
-                        using (await JobProcessor.LockAsync(code.CancellationToken))
+                        // start.g may be still executing on File2 when we get here. So flush File2 completely before attempting to continue
+                        if (await Processor.FlushAsync(CodeChannel.File2, true))
                         {
-                            Message result = await JobProcessor.ForkAsync(code);
-                            if (result.Type != MessageType.Success)
+                            // Try to fork the file and report an error if anything went wrong
+                            using (await JobProcessor.LockAsync(code.CancellationToken))
                             {
-                                return result;
+                                Message result = await JobProcessor.ForkAsync(code);
+                                if (result.Type != MessageType.Success)
+                                {
+                                    return result;
+                                }
                             }
-                        }
 
-                        // Let RRF carry on duplicating the stack
-                        break;
+                            // Let RRF carry on duplicating its stack
+                            break;
+                        }
                     }
                     throw new OperationCanceledException();
 
@@ -1073,12 +1077,12 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Pop
                 case 121:
-                    await Provider.WaitForUpdateAsync(code.CancellationToken);      // This may change inputs[].active, so sync the OM here
+                    await Updater.WaitForFullUpdate(code.CancellationToken);      // This may change inputs[].active, so sync the OM here
                     break;
 
                 // Select movement queue number
                 case 596:
-                    await Provider.WaitForUpdateAsync(code.CancellationToken);      // This changes inputs[].active, so sync the OM here
+                    await Updater.WaitForFullUpdate(code.CancellationToken);      // This changes inputs[].active, so sync the OM here
                     break;
 
                 // Reset controller

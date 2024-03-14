@@ -1,6 +1,7 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Codes;
 using DuetControlServer.Model;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
 using DuetControlServer.SPI.Communication.Shared;
@@ -317,17 +318,6 @@ namespace DuetControlServer.Files
             if (code.GetInt('S') != 1)
             {
                 return new Message(MessageType.Error, "Only S1 is supported");
-            }
-            if (_file2 is not null)
-            {
-                // Already forked, don't do anything
-                return new Message();
-            }
-
-            // When we fork a file, the second file reader is automatically active
-            using (await Provider.AccessReadWriteAsync())
-            {
-                Provider.Get.Inputs[CodeChannel.File2]!.Active = true;
             }
 
             // Copy the stack in case this is invoked from a macro file.
