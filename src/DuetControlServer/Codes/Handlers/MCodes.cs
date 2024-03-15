@@ -1081,14 +1081,18 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Select movement queue number
                 case 596:
-                    await Updater.WaitForFullUpdate(code.CancellationToken);      // This changes inputs[].active, so sync the OM here
+                    _logger.Debug("Requesting full model update after M596");
+                    await Updater.WaitForFullUpdate(code.CancellationToken);    // This changes inputs[].active, so sync the OM here
+                    _logger.Debug("Requested full model update after M596");
                     break;
 
                 // Fork input reader
                 case 606:
                     if (code.TryGetInt('S', out int sParam) && sParam == 1)
                     {
-                        await Updater.WaitForFullUpdate(code.CancellationToken);      // This changes inputs[].active, so sync the OM here
+                        _logger.Debug("Requesting full model update after M606 S1");
+                        await Updater.WaitForFullUpdate(code.CancellationToken);    // This changes inputs[].active, so sync the OM here
+                        _logger.Debug("Requested full model update after M606 S1");
 
                         SPI.Channel.Processor.StartCopiedMacros();
                         using (await JobProcessor.LockAsync())

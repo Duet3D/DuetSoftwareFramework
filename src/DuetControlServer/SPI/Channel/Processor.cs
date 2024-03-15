@@ -316,7 +316,6 @@ namespace DuetControlServer.SPI.Channel
                     {
                         MacroFile copy = new(macro, Channel);
                         Push(copy);
-
                         lock (_macrosToStart)
                         {
                             _macrosToStart.Add(copy);
@@ -327,6 +326,7 @@ namespace DuetControlServer.SPI.Channel
                         Push();
                         CurrentState.WaitingForAcknowledgement = item.WaitingForAcknowledgement;
                     }
+                    CurrentState.MotionSystemWasActive = !item.MotionSystemWasActive;
                 }
             }
         }

@@ -20,7 +20,7 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Indicates if the motion system was active when this stack item was created
         /// </summary>
-        public bool MotionSystemWasActive { get; }
+        public bool MotionSystemWasActive { get; set; }
 
         /// <summary>
         /// Constructor of this class
