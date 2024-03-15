@@ -288,6 +288,45 @@ namespace DuetAPI.ObjectModel
                         }
 #endif
                     }
+                    else if (typeof(IModelCollection).IsAssignableFrom(property.PropertyType))
+                    {
+                        IModelCollection? propertyValue = (IModelCollection?)property.GetValue(this), newPropertyValue = propertyValue;
+                        if (propertyValue is null)
+                        {
+                            newPropertyValue = (IModelCollection?)Activator.CreateInstance(property.PropertyType);
+                        }
+
+                        try
+                        {
+                            if (Attribute.IsDefined(property, typeof(LimitedResponseCountAttribute)))
+                            {
+                                LimitedResponseCountAttribute attribute = (LimitedResponseCountAttribute)Attribute.GetCustomAttribute(property, typeof(LimitedResponseCountAttribute))!;
+                                newPropertyValue!.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties, 0, jsonProperty.Value.GetArrayLength() < attribute.MaxCount);
+                            }
+                            else
+                            {
+                                newPropertyValue!.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                            }
+
+                            if (propertyValue != newPropertyValue)
+                            {
+                                if (property.SetMethod is not null)
+                                {
+                                    property.SetValue(this, newPropertyValue);
+                                }
+#if VERIFY_OBJECT_MODEL
+                                else
+                                {
+                                    Console.WriteLine("[warn] Tried to assign unsettable property {0} = {1}", jsonProperty.Name, jsonProperty.Value.GetRawText());
+                                }
+#endif
+                            }
+                        }
+                        catch (JsonException e) when (ObjectModel.DeserializationFailed(this, property.PropertyType, jsonProperty.Value.Clone(), e))
+                        {
+                            // suppressed
+                        }
+                    }
                     else if (typeof(IModelObject).IsAssignableFrom(property.PropertyType))
                     {
                         IModelObject? propertyValue = (IModelObject?)property.GetValue(this), newPropertyValue = propertyValue;

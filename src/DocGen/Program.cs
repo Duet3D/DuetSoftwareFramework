@@ -176,6 +176,12 @@ namespace DocGen
                     }
                     writeNL = true;
                 }
+                if (Attribute.IsDefined(property, typeof(LimitedResponseCountAttribute)))
+                {
+                    LimitedResponseCountAttribute attribute = (LimitedResponseCountAttribute)Attribute.GetCustomAttribute(property, typeof(LimitedResponseCountAttribute))!;
+                    await writer.WriteLineAsync($"*Standard model responses return up to {attribute.MaxCount} elements of this field. It may be necessary to request more of this field using the 'a' flag.*");
+                    writeNL = true;
+                }
                 if (writeNL)
                 {
                     await writer.WriteLineAsync();

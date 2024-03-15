@@ -238,7 +238,7 @@ namespace DuetControlServer.Model
                                             // move.axes requires special querying if it exceeds 9 items
                                             if (keyName.GetString() == "move" && keyResult.TryGetProperty("axes", out JsonElement moveAxes) && moveAxes.GetArrayLength() >= 9)
                                             {
-                                                int nextAxis = 0, axisOffset = 0;
+                                                int nextAxis = moveAxes.GetArrayLength(), axisOffset = 0;
                                                 do
                                                 {
                                                     jsonData = await SPI.Interface.RequestObjectModel("move.axes", $"d99vnoa{nextAxis}");

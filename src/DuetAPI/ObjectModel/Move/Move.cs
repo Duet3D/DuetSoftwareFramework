@@ -9,6 +9,7 @@
         /// List of the configured axes
         /// </summary>
         /// <seealso cref="Axis"/>
+        [LimitedResponseCount(9)]
         public ModelCollection<Axis> Axes { get; } = new ModelCollection<Axis>();
 
         /// <summary>
