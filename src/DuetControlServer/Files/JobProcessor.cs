@@ -307,10 +307,6 @@ namespace DuetControlServer.Files
         /// <returns>Message result</returns>
         public static async Task<Message> ForkAsync(Code code)
         {
-            if (code.GetInt('S') != 1)
-            {
-                return new Message(MessageType.Error, "Only S1 is supported");
-            }
             if (_file is null)
             {
                 return new Message(MessageType.Error, "No file is selected");
@@ -329,13 +325,19 @@ namespace DuetControlServer.Files
                 {
                     _file2 = new(_file, CodeChannel.File2);
                 }
-
-                if (IsProcessing)
-                {
-                    _secondFileTask = DoFilePrint(_file2);
-                }
             }
             return new Message();
+        }
+
+        /// <summary>
+        /// Start the second file job if applicable
+        /// </summary>
+        public static void StartSecondJob()
+        {
+            if (IsProcessing && _file2 is not null && _secondFileTask is null)
+            {
+                _secondFileTask = DoFilePrint(_file2);
+            }
         }
 
         /// <summary>

@@ -777,26 +777,29 @@ namespace DuetControlServer.Codes.Handlers
                 case 606:
                     if (await Processor.FlushAsync(code))
                     {
-                        using (await Provider.AccessReadOnlyAsync())
+                        if (code.TryGetInt('S', out int sParam) && sParam == 1)
                         {
-                            if (Provider.Get.Inputs[CodeChannel.File2] is null)
+                            using (await Provider.AccessReadOnlyAsync())
                             {
-                                // Command not supported. Let RRF decide what to do
-                                break;
+                                if (Provider.Get.Inputs[CodeChannel.File2] is null)
+                                {
+                                    // Command not supported. Let RRF decide what to do
+                                    break;
+                                }
+                            }
+
+                            // Try to fork the file and report an error if anything went wrong
+                            using (await JobProcessor.LockAsync(code.CancellationToken))
+                            {
+                                Message result = await JobProcessor.ForkAsync(code);
+                                if (result.Type != MessageType.Success)
+                                {
+                                    return result;
+                                }
                             }
                         }
 
-                        // Try to fork the file and report an error if anything went wrong
-                        using (await JobProcessor.LockAsync(code.CancellationToken))
-                        {
-                            Message result = await JobProcessor.ForkAsync(code);
-                            if (result.Type != MessageType.Success)
-                            {
-                                return result;
-                            }
-                        }
-
-                        // Let RRF carry on duplicating its stack
+                        // Let RRF carry on
                         break;
                     }
                     throw new OperationCanceledException();
@@ -1083,8 +1086,16 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Fork input reader
                 case 606:
-                    SPI.Channel.Processor.StartCopiedMacros();
-                    await Updater.WaitForFullUpdate(code.CancellationToken);      // This changes inputs[].active, so sync the OM here
+                    if (code.TryGetInt('S', out int sParam) && sParam == 1)
+                    {
+                        await Updater.WaitForFullUpdate(code.CancellationToken);      // This changes inputs[].active, so sync the OM here
+
+                        SPI.Channel.Processor.StartCopiedMacros();
+                        using (await JobProcessor.LockAsync())
+                        {
+                            JobProcessor.StartSecondJob();
+                        }
+                    }
                     break;
 
                 // Reset controller

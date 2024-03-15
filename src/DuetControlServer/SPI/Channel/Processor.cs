@@ -316,7 +316,11 @@ namespace DuetControlServer.SPI.Channel
                     {
                         MacroFile copy = new(macro, Channel);
                         Push(copy);
-                        _macrosToStart.Add(copy);
+
+                        lock (_macrosToStart)
+                        {
+                            _macrosToStart.Add(copy);
+                        }
                     }
                     else
                     {
@@ -332,11 +336,14 @@ namespace DuetControlServer.SPI.Channel
         /// </summary>
         public static void StartCopiedMacros()
         {
-            foreach (MacroFile file in _macrosToStart)
+            lock (_macrosToStart)
             {
-                file.Start(false);
+                foreach (MacroFile file in _macrosToStart)
+                {
+                    file.Start(false);
+                }
+                _macrosToStart.Clear();
             }
-            _macrosToStart.Clear();
         }
 
         /// <summary>
@@ -461,7 +468,7 @@ namespace DuetControlServer.SPI.Channel
             // Generic flush requests are not meant for temporary macro states
             foreach (State state in Stack)
             {
-                if ((state.File == file) || (file is null && (state.File is not MacroFile macro || macro.IsExecuting) && !state.MacroCompleted))
+                if ((state.File == file) || (file is null && (state.File is not MacroFile macro || !macro.WasStarted || macro.IsExecuting) && !state.MacroCompleted))
                 {
                     return GetFlushTask(state);
                 }
