@@ -300,7 +300,7 @@ namespace DuetHttpClient.Connector
                             bool isSeqsEmpty;
                             lock (_seqs)
                             {
-                                isSeqsEmpty = (_seqs.Count == 0);
+                                isSeqsEmpty = _seqs.Count == 0;
                             }
 
                             if (isSeqsEmpty)
@@ -351,7 +351,7 @@ namespace DuetHttpClient.Connector
                                                 do
                                                 {
                                                     // Request the next model chunk
-                                                    using JsonDocument keyDocument = await GetObjectModel(seqProperty.Name, (next == 0) ? "d99vn" : $"d99vna{next}");
+                                                    using JsonDocument keyDocument = await GetObjectModel(seqProperty.Name, (next == 0) ? "d99vno" : $"d99vnoa{next}");
                                                     offset = next;
                                                     next = keyDocument.RootElement.TryGetProperty("next", out JsonElement nextValue) ? nextValue.GetInt32() : 0;
 
@@ -390,10 +390,28 @@ namespace DuetHttpClient.Connector
                                                                 Model.Job.File.Thumbnails.Assign(fileInfoToUpdate.Thumbnails);
                                                             }
                                                         }
-                                                    }
 
-                                                    // Check the index of the next element
-                                                    offset = next;
+                                                        // move.axes requires special querying if it exceeds 9 items
+                                                        if (keyName.GetString() == "move" && keyResult.TryGetProperty("axes", out JsonElement moveAxes) && moveAxes.GetArrayLength() >= 9)
+                                                        {
+                                                            int nextAxis = 0, axisOffset = 0;
+                                                            do
+                                                            {
+                                                                using JsonDocument moveAxesDocument = await GetObjectModel("move.axes", $"d99vnoa{nextAxis}");
+                                                                axisOffset = nextAxis;
+                                                                nextAxis = moveAxesDocument.RootElement.TryGetProperty("next", out JsonElement nextAxisValue) ? nextAxisValue.GetInt32() : 0;
+
+                                                                if (moveAxesDocument.RootElement.TryGetProperty("result", out JsonElement moveAxesResult))
+                                                                {
+                                                                    lock (Model)
+                                                                    {
+                                                                        Model.Move.Axes.UpdateFromJson(moveAxesResult, false, axisOffset, nextAxis == 0);
+                                                                    }
+                                                                }
+                                                            }
+                                                            while (nextAxis != 0);
+                                                        }
+                                                    }
                                                 }
                                                 while (next != 0);
                                             }

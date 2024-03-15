@@ -291,7 +291,7 @@ namespace DuetAPI.ObjectModel
                     else
                     {
                         IModelObject? newItem = (IModelObject?)Activator.CreateInstance(itemType)!;
-                        Add((T?)newItem.UpdateFromJson(jsonElement[i]!, ignoreSbcProperties)!);
+                        Add((T?)newItem.UpdateFromJson(jsonItem, ignoreSbcProperties)!);
                     }
                 }
             }
