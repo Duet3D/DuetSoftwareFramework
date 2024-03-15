@@ -38,7 +38,7 @@ namespace DuetControlServer.Codes.Handlers
             {
                 case KeywordType.Echo:
                 case KeywordType.Abort:
-                    if (!await Processor.FlushAsync(code))
+                    if (!await Processor.FlushAsync(code, false))
                     {
                         if (!code.CancellationToken.IsCancellationRequested)
                         {

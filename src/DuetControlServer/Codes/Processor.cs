@@ -83,7 +83,7 @@ namespace DuetControlServer.Codes
         /// </summary>
         /// <param name="channel">Code channel to wait for</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static Task<bool> FlushAsync(CodeChannel channel) => _processors[(int)channel].FlushAsync();
+        public static Task<bool> FlushAsync(CodeChannel channel, bool flushAll = false) => _processors[(int)channel].FlushAsync(flushAll);
 
         /// <summary>
         /// Wait for all pending codes of the given file to finish
@@ -118,7 +118,12 @@ namespace DuetControlServer.Codes
             if (syncFileStreams && code.IsFromFileChannel)
             {
                 // Wait for both file streams to reach the same position
-                return await JobProcessor.DoSync(code);
+                if (await JobProcessor.DoSync(code))
+                {
+                    await code.UpdateNextFilePositionAsync();
+                    return true;
+                }
+                return false;
             }
             else if (ifExecuting)
             {
@@ -133,6 +138,7 @@ namespace DuetControlServer.Codes
             }
 
             // Done
+            await code.UpdateNextFilePositionAsync();
             return true;
         }
 

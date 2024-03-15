@@ -33,10 +33,10 @@ namespace DuetControlServer.SPI.Communication.SbcRequests
         GetObjectModel = 3,
 
         /// <summary>
-        /// Set a value in the machine's object model (reserved)
+        /// Set a value in the machine's object model (never implemented)
         /// </summary>
         /// <seealso cref="SetObjectModelHeader"/>
-        SetObjectModel = 4,
+        SetObjectModel_deprecated = 4,
 
         /// <summary>
         /// Tell the firmware a print has started and set information about the file being processed

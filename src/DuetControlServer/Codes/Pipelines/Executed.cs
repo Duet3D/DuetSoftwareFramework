@@ -2,6 +2,7 @@
 using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Codes.Handlers;
+using DuetControlServer.Files;
 using System;
 using System.Threading.Tasks;
 
@@ -33,6 +34,9 @@ namespace DuetControlServer.Codes.Pipelines
         {
             if (code.Result is not null)
             {
+                // Update the file position
+                await code.UpdateNextFilePositionAsync();
+
                 // Notify code handlers
                 switch (code.Type)
                 {
@@ -142,18 +146,22 @@ namespace DuetControlServer.Codes.Pipelines
         }
 
         /// <summary>
-        /// Execute a given code on this pipeline stage
+        /// Wait for the pipeline stage to become idle
         /// </summary>
-        /// <param name="code">Code to enqueue</param>
-        /// <returns>Asynchronous task</returns>
-        public override void WriteCode(Commands.Code code)
+        /// <param name="file">Code file</param>
+        /// <returns>Whether the codes have been flushed successfully</returns>
+        public override Task<bool> FlushAsync(CodeFile file) => _stackItem.FlushAsync();
+
+        /// <summary>
+        /// Wait for the pipeline stage to become idle
+        /// </summary>
+        /// <param name="code">Code waiting for the flush</param>
+        /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
+        /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
+        /// <returns>Whether the codes have been flushed successfully</returns>
+        public override Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true)
         {
-            if (!_stackItem.PendingCodes.Writer.TryWrite(code))
-            {
-                // Allocate an extra task only if we cannot store the executed code yet. Should never get here!
-                Processor.Logger.Warn("Pipeline failed to store code immediately so waiting synchronously for it to be added");
-                _stackItem.PendingCodes.Writer.WriteAsync(code, Program.CancellationToken).AsTask().Wait();
-            }
+            return _stackItem.FlushAsync(code);
         }
 
         /// <summary>
@@ -161,6 +169,13 @@ namespace DuetControlServer.Codes.Pipelines
         /// </summary>
         /// <param name="code">Code to enqueue</param>
         /// <returns>Asynchronous task</returns>
-        public override ValueTask WriteCodeAsync(Commands.Code code) => _stackItem.PendingCodes.Writer.WriteAsync(code);
+        public override void WriteCode(Commands.Code code) => _stackItem.WriteCode(code);
+
+        /// <summary>
+        /// Execute a given code on this pipeline stage
+        /// </summary>
+        /// <param name="code">Code to enqueue</param>
+        /// <returns>Asynchronous task</returns>
+        public override ValueTask WriteCodeAsync(Commands.Code code) => _stackItem.WriteCodeAsync(code);
     }
 }

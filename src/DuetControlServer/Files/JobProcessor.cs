@@ -1,6 +1,7 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Codes;
 using DuetControlServer.Model;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
 using DuetControlServer.SPI.Communication.Shared;
@@ -71,11 +72,6 @@ namespace DuetControlServer.Files
         private static readonly AsyncConditionVariable _finished = new(_lock);
 
         /// <summary>
-        /// Physical filename of the job file
-        /// </summary>
-        private static string _physicalFileName = string.Empty;
-
-        /// <summary>
         /// First job file being read from
         /// </summary>
         private static CodeFile? _file;
@@ -84,6 +80,11 @@ namespace DuetControlServer.Files
         /// Second job file being read from
         /// </summary>
         private static CodeFile? _file2;
+
+        /// <summary>
+        /// Second job task (if any)
+        /// </summary>
+        private static Task? _secondFileTask;
 
         /// <summary>
         /// Internal cancellation token source used to cancel pending codes when necessary
@@ -273,14 +274,7 @@ namespace DuetControlServer.Files
         {
             // Analyze and open the file
             GCodeFileInfo info = await InfoParser.Parse(physicalFile, true);
-
-            bool supportsAyncMoves;
-            using (await Provider.AccessReadOnlyAsync())
-            {
-                supportsAyncMoves = Provider.Get.Inputs[CodeChannel.File2] is not null;
-            }
             CodeFile file = new(fileName, physicalFile, CodeChannel.File);
-            CodeFile? file2 = supportsAyncMoves ? new(fileName, physicalFile, CodeChannel.File2) : null;
 
             // A file being printed may start another file print
             if (IsFileSelected)
@@ -292,9 +286,7 @@ namespace DuetControlServer.Files
             // Update the state
             IsCancelled = IsAborted = false;
             IsSimulating = simulating;
-            _physicalFileName = physicalFile;
             _file = file;
-            _file2 = file2;
             _pausePosition = null;
 
             // Update the object model
@@ -306,6 +298,45 @@ namespace DuetControlServer.Files
             // Notify RepRapFirmware and start processing the file in the background
             await SPI.Interface.SetPrintFileInfo();
             _logger.Info("Selected file {0}", fileName);
+        }
+
+        /// <summary>
+        /// Fork the file being processed to execute concurrently
+        /// </summary>
+        /// <param name="code">Code initiating the fork</param>
+        /// <returns>Message result</returns>
+        public static async Task<Message> ForkAsync(Code code)
+        {
+            if (_file is null)
+            {
+                return new Message(MessageType.Error, "No file is selected");
+            }
+            if (code.Channel != CodeChannel.File)       // FIXME or from resurrect.g / M916?
+            {
+                return new Message(MessageType.Error, "this command is valid only when running a job from a stored file");
+            }
+            if (code.GetInt('S') != 1)
+            {
+                return new Message(MessageType.Error, "Only S1 is supported");
+            }
+
+            // Copy the stack in case this is invoked from a macro file.
+            // We need to pass the macro file position as well if applicable to resume the second macro file from the right position
+            await SPI.Interface.CopyStateAsync(CodeChannel.File, CodeChannel.File2);
+
+            // Start printing using the second file channel if applicable.
+            // Lock the file here because the copy constructor accesses file.NextFilePosition
+            using (await _file.LockAsync())
+            {
+                _file2 = new(_file, CodeChannel.File2);
+            }
+
+            if (IsProcessing)
+            {
+                _secondFileTask = DoFilePrint(_file2);
+            }
+
+            return new Message();
         }
 
         /// <summary>
@@ -329,16 +360,12 @@ namespace DuetControlServer.Files
                 codePool.Enqueue(new Code());
             }
 
-            // Assign the job file so flush requests are properly handled
+            // Copy the full stack and assign the job file so flush requests are properly handled
             Codes.Processor.SetJobFile(file.Channel, file);
-
-            // Wait for the object model to be updated.
-            // This is necessary to determine if the File and File2 channels are active or not
-            await Provider.WaitForUpdateAsync(cancellationToken);
 
             // Process the file being printed
             Queue<Code> codes = new();
-            long nextFilePosition = 0;
+            long currentFilePosition = 0L;
             do
             {
                 // Fill up the code buffer
@@ -409,9 +436,11 @@ namespace DuetControlServer.Files
                     {
                         try
                         {
+                            // Keep the next file position up-to-date in case we need to pause or fork this macro file
+                            currentFilePosition = code.FilePosition ?? 0L;
+
                             // Logging of regular messages is done by the code itself, no need to take care of it here
                             await code.Task;
-                            nextFilePosition = code.FilePosition ?? 0 + code.Length ?? 0;
                         }
                         catch (OperationCanceledException)
                         {
@@ -465,7 +494,7 @@ namespace DuetControlServer.Files
                         if (IsPaused)
                         {
                             // Adjust the file position
-                            long newFilePosition = _pausePosition ?? nextFilePosition;
+                            long newFilePosition = _pausePosition ?? currentFilePosition;
                             await SetFilePosition(file.Channel == CodeChannel.File ? 0 : 1, newFilePosition);
                             _logger.Info("Job on {0} has been paused at byte {1}, reason {2}", file.Channel, newFilePosition, _pauseReason);
 
@@ -509,10 +538,30 @@ namespace DuetControlServer.Files
                 {
                     _logger.Info("Starting file print");
 
-                    // Run the same file print on two distinct channels
-                    Task firstFileTask = DoFilePrint(_file!);
-                    Task secondFileTask = (_file2 is not null) ? DoFilePrint(_file2) : Task.CompletedTask;
-                    await Task.WhenAll(firstFileTask, secondFileTask);
+                    // In case a forked print is supposed to start, start it here
+                    using (await LockAsync())
+                    {
+                        if (_file2 is not null && _secondFileTask is null)
+                        {
+                            _secondFileTask = DoFilePrint(_file2);
+                        }
+                    }
+
+                    // Run the main job
+                    await DoFilePrint(_file);
+
+                    // Wait for the forked job to complete (if any)
+                    Task? secondFileTask;
+                    using (await LockAsync())
+                    {
+                        secondFileTask = _secondFileTask;
+                        _secondFileTask = null;
+                    }
+
+                    if (secondFileTask is not null)
+                    {
+                        await secondFileTask;
+                    }
 
                     // Deal with the print result
                     using (await LockAsync())
@@ -564,7 +613,7 @@ namespace DuetControlServer.Files
                             // Try to update the last simulated time
                             if (lastDuration > 0)
                             {
-                                await InfoParser.UpdateSimulatedTime(_physicalFileName, lastDuration.Value);
+                                await InfoParser.UpdateSimulatedTime(_file.PhysicalFileName, lastDuration.Value);
                             }
                             else
                             {
@@ -583,7 +632,6 @@ namespace DuetControlServer.Files
                     _file!.Dispose();
                     _file2?.Dispose();
                     _file = _file2 = null;
-                    _physicalFileName = string.Empty;
 
                     // End
                     IsProcessing = IsSimulating = IsPaused = false;

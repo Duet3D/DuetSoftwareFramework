@@ -155,13 +155,14 @@ namespace DuetControlServer.Codes
         /// Wait for all pending codes to finish
         /// </summary>
         /// <param name="channel">Code channel to wait for</param>
+        /// <param name="flushAll">Whether to flush all states</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public async Task<bool> FlushAsync()
+        public async Task<bool> FlushAsync(bool flushAll)
         {
             foreach (Pipelines.PipelineBase pipeline in _pipelines)
             {
                 //Logger.Debug("Flushing codes on stage {0}", pipeline.Stage);
-                if (!await pipeline.FlushAsync())
+                if (!await pipeline.FlushAsync(flushAll))
                 {
                     Logger.Debug("Failed to flush codes on stage {0}", pipeline.Stage);
                     return false;
@@ -178,15 +179,15 @@ namespace DuetControlServer.Codes
         /// <returns>Whether the codes have been flushed successfully</returns>
         public async Task<bool> FlushAsync(CodeFile file)
         {
-            foreach (PipelineStage stage in StagesWithStack)
+            foreach (Pipelines.PipelineBase pipeline in _pipelines)
             {
-                //Logger.Debug("Flushing file codes on stage {0} for {1}", stage, code);
-                if (!await _pipelines[(int)stage].FlushAsync(file))
+                //Logger.Debug("Flushing file codes on stage {0} for {1}", pipeline.Stage, code);
+                if (!await pipeline.FlushAsync(file))
                 {
-                    Logger.Debug("Failed to flush file codes on stage {0} for {1}", stage, file.FileName);
+                    Logger.Debug("Failed to flush file codes on stage {0} for {1}", pipeline.Stage, file.FileName);
                     return false;
                 }
-                //Logger.Debug("Flushed file codes on stage {0} for {1}", stage, code);
+                //Logger.Debug("Flushed file codes on stage {0} for {1}", pipeline.Stage, code);
             }
             return true;
         }
@@ -201,17 +202,17 @@ namespace DuetControlServer.Codes
         /// <returns>Whether the codes have been flushed successfully</returns>
         public async Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true)
         {
-            foreach (PipelineStage stage in StagesWithStack)
+            foreach (Pipelines.PipelineBase pipeline in _pipelines)
             {
-                if (code.Stage == PipelineStage.Executed || stage > code.Stage)
+                if (code.Stage == PipelineStage.Executed || pipeline.Stage > code.Stage)
                 {
-                    //Logger.Debug("Flushing codes on stage {0} for {1}", stage, code);
-                    if (!await _pipelines[(int)stage].FlushAsync(code, evaluateExpressions, evaluateAll))
+                    //Logger.Debug("Flushing codes on stage {0} for {1}", pipeline.Stage, code);
+                    if (!await pipeline.FlushAsync(code, evaluateExpressions, evaluateAll))
                     {
-                        Logger.Debug("Failed to flush codes on stage {0} for {1}", stage, code);
+                        Logger.Debug("Failed to flush codes on stage {0} for {1}", pipeline.Stage, code);
                         return false;
                     }
-                    //Logger.Debug("Flushed codes on stage {0} for {1}", stage, code);
+                    //Logger.Debug("Flushed codes on stage {0} for {1}", pipeline.Stage, code);
                 }
             }
             return true;

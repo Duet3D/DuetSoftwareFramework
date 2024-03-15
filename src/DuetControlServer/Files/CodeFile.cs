@@ -58,6 +58,11 @@ namespace DuetControlServer.Files
         public string FileName { get; }
 
         /// <summary>
+        /// Physical file path to the file being executed
+        /// </summary>
+        public string PhysicalFileName { get; }
+
+        /// <summary>
         /// Channel to send the codes to
         /// </summary>
         public CodeChannel Channel { get; }
@@ -85,9 +90,15 @@ namespace DuetControlServer.Files
                     _fileStream.Seek(value, SeekOrigin.Begin);
                     _parserBuffer.Invalidate();
                     _parserBuffer.LineNumber = (value == 0) ? 1 : null;
+                    NextFilePosition = value;
                 }
             }
         }
+
+        /// <summary>
+        /// File position of the next code to actually run
+        /// </summary>
+        public long NextFilePosition { get; set; }
 
         /// <summary>
         /// Get the current number of iterations of the current loop
@@ -134,9 +145,31 @@ namespace DuetControlServer.Files
         public CodeFile(string fileName, string physicalFile, CodeChannel channel)
         {
             FileName = fileName;
+            PhysicalFileName = physicalFile;
             Channel = channel;
 
             _fileStream = new FileStream(physicalFile, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
+        }
+
+        /// <summary>
+        /// Copy constructor
+        /// </summary>
+        /// <param name="copyFrom"></param>
+        public CodeFile(CodeFile copyFrom, CodeChannel channel) : this(copyFrom.FileName, copyFrom.PhysicalFileName, channel)
+        {
+            // Copy conditional states
+            _codeBlocks.Clear();
+            foreach (CodeBlock block in copyFrom._codeBlocks.Reverse())
+            {
+                _codeBlocks.Push(block with { });
+            }
+            _lastCodeBlock = (copyFrom._lastCodeBlock is not null) ? copyFrom._lastCodeBlock with { } : null;
+
+            // Seek to the next code's file position and shallow-copy the parser state
+            Position = copyFrom.NextFilePosition;
+
+            _parserBuffer.LineNumber = copyFrom._parserBuffer.LineNumber;
+            _parserBuffer.LastGCode = copyFrom._parserBuffer.LastGCode;
         }
 
         /// <summary>

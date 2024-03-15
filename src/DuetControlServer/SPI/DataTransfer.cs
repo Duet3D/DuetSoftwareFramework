@@ -749,6 +749,7 @@ namespace DuetControlServer.SPI
             return true;
         }
 
+#if false
         /// <summary>
         /// Set a specific value in the object model of RepRapFirmware
         /// </summary>
@@ -772,6 +773,7 @@ namespace DuetControlServer.SPI
             span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
             return true;
         }
+#endif
 
         /// <summary>
         /// Notify the firmware that a file print has started

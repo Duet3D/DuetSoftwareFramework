@@ -42,7 +42,7 @@ namespace DuetControlServer.SPI.Channel
             _logger = NLog.LogManager.GetLogger(channel.ToString());
             Channel = channel;
 
-            CurrentState = new State(Codes.Processor.GetFirmwareState(channel));
+            BaseState = CurrentState = new State(Codes.Processor.GetFirmwareState(channel));
             Stack.Push(CurrentState);
         }
 
@@ -72,6 +72,11 @@ namespace DuetControlServer.SPI.Channel
         /// Stack of the different channel states
         /// </summary>
         public Stack<State> Stack { get; } = new();
+
+        /// <summary>
+        /// First item on the stack
+        /// </summary>
+        public State BaseState { get; }
 
         /// <summary>
         /// Get the current state from the stack
@@ -285,6 +290,47 @@ namespace DuetControlServer.SPI.Channel
         }
 
         /// <summary>
+        /// Copy the state from another channel processor
+        /// </summary>
+        /// <param name="from">Source</param>
+        /// <returns>Asynchronous task</returns>
+        public void CopyState(Processor from)
+        {
+            if (Stack.Count != 1)
+            {
+                throw new ArgumentException("Cannot copy state because the stack is not empty");
+            }
+
+            List<MacroFile> macrosToStart = new();
+
+            // Create macro/state copies but don't start the macros yet. Some may need to wait before they can start execution
+            State baseItem = from.Stack.Last();
+            foreach (State item in from.Stack.Reverse())
+            {
+                if (item != baseItem)
+                {
+                    if (item.File is MacroFile macro)
+                    {
+                        MacroFile copy = new(macro, Channel);
+                        Push(copy);
+                        macrosToStart.Add(copy);
+                    }
+                    else
+                    {
+                        Push();
+                        CurrentState.WaitingForAcknowledgement = item.WaitingForAcknowledgement;
+                    }
+                }
+            }
+
+            // Start them once the order is correct
+            foreach (MacroFile file in macrosToStart)
+            {
+                file.Start(false);
+            }
+        }
+
+        /// <summary>
         /// List of buffered G/M/T-codes that are being processed by the firmware
         /// </summary>
         public List<Code> BufferedCodes { get; } = new();
@@ -373,6 +419,28 @@ namespace DuetControlServer.SPI.Channel
         private volatile bool _isWaitingForAcknowledgment;
 
         /// <summary>
+        /// Get a flush task
+        /// </summary>
+        /// <param name="state">Stack item</param>
+        /// <returns>Asynchronous task</returns>
+        private Task<bool> GetFlushTask(State state)
+        {
+            // Check if we can resolve the flush request immediately if nothing is being done
+            if (state == CurrentState &&
+                BufferedCodes.Count == 0 && state.LockRequests.Count == 0 && !_allFilesAborted &&
+                (state.File is not MacroFile macro || (!macro.JustStarted && macro.IsExecuting)) && !state.MacroCompleted &&
+                state.SuspendedCodes.Count == 0 && !state.PendingCodes.Reader.TryPeek(out _))
+            {
+                return Task.FromResult(true);
+            }
+
+            // Need to wait for the SPI connector to finish other operations first
+            TaskCompletionSource<bool> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            state.FlushRequests.Enqueue(tcs);
+            return tcs.Task;
+        }
+
+        /// <summary>
         /// Flush pending codes and return true on success or false on failure.
         /// This method may be deprecated; in theory it should suffice to flush the pipeline only (with stricter Busy conditions)
         /// </summary>
@@ -380,23 +448,6 @@ namespace DuetControlServer.SPI.Channel
         /// <returns>Whether the codes could be flushed</returns>
         public Task<bool> FlushAsync(CodeFile? file = null)
         {
-            Task<bool> GetFlushTask(State state)
-            {
-                // Check if we can resolve the flush request immediately if nothing is being done
-                if (state == CurrentState &&
-                    BufferedCodes.Count == 0 && state.LockRequests.Count == 0 && !_allFilesAborted &&
-                    (state.File is not MacroFile macro || (!macro.JustStarted && macro.IsExecuting)) && !state.MacroCompleted &&
-                    state.SuspendedCodes.Count == 0 && !state.PendingCodes.Reader.TryPeek(out _))
-                {
-                    return Task.FromResult(true);
-                }
-
-                // Need to wait for the SPI connector to finish other operations first
-                TaskCompletionSource<bool> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                state.FlushRequests.Enqueue(tcs);
-                return tcs.Task;
-            }
-
             // Need to find the correct state for a flush request first.
             // Generic flush requests are not meant for temporary macro states
             foreach (State state in Stack)
@@ -411,6 +462,13 @@ namespace DuetControlServer.SPI.Channel
             _logger.Warn("Failed to find suitable stack level for flush request, falling back to current one");
             return GetFlushTask(CurrentState);
         }
+
+        /// <summary>
+        /// Flush all pending codes and return true on success or false on failure.
+        /// This method may be deprecated; in theory it should suffice to flush the pipeline only (with stricter Busy conditions)
+        /// </summary>
+        /// <returns>Whether the codes could be flushed</returns>
+        public Task<bool> FlushAllAsync() => GetFlushTask(BaseState);
 
         /// <summary>
         /// Lock all movement systems and wait for standstill
@@ -1076,6 +1134,7 @@ namespace DuetControlServer.SPI.Channel
                 if (BufferedCodes.Count > 0)
                 {
                     startCode = BufferedCodes[0];
+                    startCode.UpdateNextFilePosition();
                     BytesBuffered -= startCode.BinarySize;
                     BufferedCodes.RemoveAt(0);
                 }
@@ -1191,6 +1250,7 @@ namespace DuetControlServer.SPI.Channel
                 // Start it
                 if (startCode is not null)
                 {
+                    startCode.UpdateNextFilePosition();
                     _logger.Debug("==> Starting code {0}", startCode);
                 }
                 macro.Start();
