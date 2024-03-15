@@ -307,35 +307,34 @@ namespace DuetControlServer.Files
         /// <returns>Message result</returns>
         public static async Task<Message> ForkAsync(Code code)
         {
-            if (_file is null)
-            {
-                return new Message(MessageType.Error, "No file is selected");
-            }
-            if (code.Channel != CodeChannel.File)       // FIXME or from resurrect.g / M916?
-            {
-                return new Message(MessageType.Error, "this command is valid only when running a job from a stored file");
-            }
             if (code.GetInt('S') != 1)
             {
                 return new Message(MessageType.Error, "Only S1 is supported");
             }
-
-            // Copy the stack in case this is invoked from a macro file.
-            // We need to pass the macro file position as well if applicable to resume the second macro file from the right position
-            await SPI.Interface.CopyStateAsync(CodeChannel.File, CodeChannel.File2);
-
-            // Start printing using the second file channel if applicable.
-            // Lock the file here because the copy constructor accesses file.NextFilePosition
-            using (await _file.LockAsync())
+            if (_file is null)
             {
-                _file2 = new(_file, CodeChannel.File2);
+                return new Message(MessageType.Error, "No file is selected");
             }
 
-            if (IsProcessing)
+            // Ignore the command if already forked
+            if (_file2 is null)
             {
-                _secondFileTask = DoFilePrint(_file2);
-            }
+                // Copy the stack in case this is invoked from a macro file.
+                // We need to pass the macro file position as well if applicable to resume the second macro file from the right position
+                await SPI.Interface.CopyStateAsync(CodeChannel.File, CodeChannel.File2);
 
+                // Start printing using the second file channel if applicable.
+                // Lock the file here because the copy constructor accesses file.NextFilePosition
+                using (await _file.LockAsync())
+                {
+                    _file2 = new(_file, CodeChannel.File2);
+                }
+
+                if (IsProcessing)
+                {
+                    _secondFileTask = DoFilePrint(_file2);
+                }
+            }
             return new Message();
         }
 
@@ -538,6 +537,9 @@ namespace DuetControlServer.Files
                 {
                     _logger.Info("Starting file print");
 
+                    // Start the main job
+                    Task fileTask = DoFilePrint(_file);
+
                     // In case a forked print is supposed to start, start it here
                     using (await LockAsync())
                     {
@@ -548,7 +550,7 @@ namespace DuetControlServer.Files
                     }
 
                     // Run the main job
-                    await DoFilePrint(_file);
+                    await fileTask;
 
                     // Wait for the forked job to complete (if any)
                     Task? secondFileTask;

@@ -786,22 +786,18 @@ namespace DuetControlServer.Codes.Handlers
                             }
                         }
 
-                        // start.g may be still executing on File2 when we get here. So flush File2 completely before attempting to continue
-                        if (await Processor.FlushAsync(CodeChannel.File2, true))
+                        // Try to fork the file and report an error if anything went wrong
+                        using (await JobProcessor.LockAsync(code.CancellationToken))
                         {
-                            // Try to fork the file and report an error if anything went wrong
-                            using (await JobProcessor.LockAsync(code.CancellationToken))
+                            Message result = await JobProcessor.ForkAsync(code);
+                            if (result.Type != MessageType.Success)
                             {
-                                Message result = await JobProcessor.ForkAsync(code);
-                                if (result.Type != MessageType.Success)
-                                {
-                                    return result;
-                                }
+                                return result;
                             }
-
-                            // Let RRF carry on duplicating its stack
-                            break;
                         }
+
+                        // Let RRF carry on duplicating its stack
+                        break;
                     }
                     throw new OperationCanceledException();
 
@@ -1081,7 +1077,9 @@ namespace DuetControlServer.Codes.Handlers
                     break;
 
                 // Select movement queue number
+                // Fork input reader
                 case 596:
+                case 606:
                     await Updater.WaitForFullUpdate(code.CancellationToken);      // This changes inputs[].active, so sync the OM here
                     break;
 
