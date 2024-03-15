@@ -234,6 +234,28 @@ namespace DuetControlServer.Model
                                                     Provider.Get.State.Status = MachineStatus.Updating;
                                                 }
                                             }
+
+                                            // move.axes requires special querying if it exceeds 9 items
+                                            if (keyName.GetString() == "move" && keyResult.TryGetProperty("axes", out JsonElement moveAxes) && moveAxes.GetArrayLength() >= 9)
+                                            {
+                                                int nextAxis = 0, axisOffset = 0;
+                                                do
+                                                {
+                                                    jsonData = await SPI.Interface.RequestObjectModel("move.axes", $"d99vnoa{nextAxis}");
+                                                    using JsonDocument moveAxesDocument = JsonDocument.Parse(jsonData);
+                                                    axisOffset = nextAxis;
+                                                    nextAxis = moveAxesDocument.RootElement.TryGetProperty("next", out JsonElement nextAxisValue) ? nextAxisValue.GetInt32() : 0;
+
+                                                    if (moveAxesDocument.RootElement.TryGetProperty("result", out JsonElement moveAxesResult))
+                                                    {
+                                                        using (await Provider.AccessReadWriteAsync())
+                                                        {
+                                                            Provider.Get.Move.Axes.UpdateFromJson(moveAxesResult, false, axisOffset, nextAxis == 0);
+                                                        }
+                                                    }
+                                                }
+                                                while (nextAxis != 0);
+                                            }
                                         }
                                         else
                                         {
