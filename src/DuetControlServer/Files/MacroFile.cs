@@ -62,6 +62,11 @@ namespace DuetControlServer.Files
         public bool IsDsfConfig { get; }
 
         /// <summary>
+        /// Indicates if the macro was ever started
+        /// </summary>
+        public bool WasStarted { get; private set; }
+
+        /// <summary>
         /// Indicates if the macro file has just started
         /// </summary>
         public bool JustStarted { get; set; }
@@ -166,7 +171,7 @@ namespace DuetControlServer.Files
         {
             if (!IsAborted)
             {
-                IsExecuting = true;
+                WasStarted = IsExecuting = true;
                 JustStarted = notifyFirmware;
                 Task.Run(Run);
             }
@@ -404,7 +409,7 @@ namespace DuetControlServer.Files
                 else
                 {
                     // No more codes to process, macro file has finished
-                    _logger.Debug("Finished codes from macro file {0}", FileName);
+                    _logger.Debug("{0}: Finished codes from macro file {1}", Channel, FileName);
                     break;
                 }
             }
@@ -416,7 +421,7 @@ namespace DuetControlServer.Files
                 IsExecuting = false;
                 if (!IsAborted)
                 {
-                    _logger.Info("Finished macro file {0}", FileName);
+                    _logger.Info("{0}: Finished macro file {1}", Channel, FileName);
                 }
 
                 // Resolve potential tasks waiting for the macro result

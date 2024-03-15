@@ -290,6 +290,11 @@ namespace DuetControlServer.SPI.Channel
         }
 
         /// <summary>
+        /// Block file macro calls if the state is being copied
+        /// </summary>
+        private static List<MacroFile> _macrosToStart = new();
+
+        /// <summary>
         /// Copy the state from another channel processor
         /// </summary>
         /// <param name="from">Source</param>
@@ -301,8 +306,6 @@ namespace DuetControlServer.SPI.Channel
                 throw new ArgumentException("Cannot copy state because the stack is not empty");
             }
 
-            List<MacroFile> macrosToStart = new();
-
             // Create macro/state copies but don't start the macros yet. Some may need to wait before they can start execution
             State baseItem = from.Stack.Last();
             foreach (State item in from.Stack.Reverse())
@@ -313,7 +316,7 @@ namespace DuetControlServer.SPI.Channel
                     {
                         MacroFile copy = new(macro, Channel);
                         Push(copy);
-                        macrosToStart.Add(copy);
+                        _macrosToStart.Add(copy);
                     }
                     else
                     {
@@ -322,12 +325,18 @@ namespace DuetControlServer.SPI.Channel
                     }
                 }
             }
+        }
 
-            // Start them once the order is correct
-            foreach (MacroFile file in macrosToStart)
+        /// <summary>
+        /// Start copied macros. This must happen later to avoid race conditions
+        /// </summary>
+        public static void StartCopiedMacros()
+        {
+            foreach (MacroFile file in _macrosToStart)
             {
                 file.Start(false);
             }
+            _macrosToStart.Clear();
         }
 
         /// <summary>
@@ -776,7 +785,7 @@ namespace DuetControlServer.SPI.Channel
                 return;
             }
 
-            // 4. Macro files (must come before any other code)
+            // 4. Macro files (must come before any other code unless the stack state is being cloned)
             if (CurrentState.File is MacroFile || CurrentState.MacroError)
             {
                 // Tell RRF as quickly as possible about the new macro being started
@@ -787,7 +796,7 @@ namespace DuetControlServer.SPI.Channel
                 }
 
                 // Check if the macro file has finished
-                if (CurrentState.File is MacroFile { IsExecuting: false } || CurrentState.MacroError)
+                if (CurrentState.File is MacroFile { WasStarted: true, IsExecuting: false } || CurrentState.MacroError)
                 {
                     if (!CurrentState.MacroCompleted && DataTransfer.WriteMacroCompleted(Channel, CurrentState.MacroError))
                     {

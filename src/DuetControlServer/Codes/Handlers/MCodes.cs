@@ -1077,9 +1077,13 @@ namespace DuetControlServer.Codes.Handlers
                     break;
 
                 // Select movement queue number
-                // Fork input reader
                 case 596:
+                    await Updater.WaitForFullUpdate(code.CancellationToken);      // This changes inputs[].active, so sync the OM here
+                    break;
+
+                // Fork input reader
                 case 606:
+                    SPI.Channel.Processor.StartCopiedMacros();
                     await Updater.WaitForFullUpdate(code.CancellationToken);      // This changes inputs[].active, so sync the OM here
                     break;
 
