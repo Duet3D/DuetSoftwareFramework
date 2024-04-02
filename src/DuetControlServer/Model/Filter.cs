@@ -1,10 +1,13 @@
 ﻿using DuetAPI.ObjectModel;
+using DuetAPI.Utility;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Xml;
 
 namespace DuetControlServer.Model
 {
@@ -410,9 +413,10 @@ namespace DuetControlServer.Model
                                 return true;
                             }
                         }
-                        else if (property.PropertyType.IsSubclassOf(typeof(ModelObject)) ||
-                                   typeof(IModelDictionary).IsAssignableFrom(property.PropertyType) ||
-                                   typeof(IList).IsAssignableFrom(property.PropertyType))
+                        else if (property.PropertyType == typeof(JsonElement) ||
+                                 property.PropertyType.IsSubclassOf(typeof(ModelObject)) ||
+                                 typeof(IModelDictionary).IsAssignableFrom(property.PropertyType) ||
+                                 typeof(IList).IsAssignableFrom(property.PropertyType))
                         {
                             // Property is somewhere deeper
                             object propertyValue = property.GetValue(model)!;
@@ -435,17 +439,47 @@ namespace DuetControlServer.Model
                     else if (dictItem is not null)
                     {
                         Type dictItemType = dictItem.GetType();
-                        if (dictItemType.IsSubclassOf(typeof(ModelObject)) || typeof(IList).IsAssignableFrom(dictItemType))
+                        if (dictItemType == typeof(JsonElement) || dictItemType.IsSubclassOf(typeof(ModelObject)) || typeof(IList).IsAssignableFrom(dictItemType))
                         {
                             // Property is somewhere deeper
                             return InternalGetSpecific(dictItem, partialFilter, findSbcProperty, hadSbcProperty, out result);
                         }
                     }
                 }
+                else if (partialModel is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Object && jsonElement.TryGetProperty(propertyName, out JsonElement jsonItem))
+                {
+                    if (partialFilter.Length == 0)
+                    {
+                        if (!findSbcProperty || hadSbcProperty)
+                        {
+                            // This is exactly the property we've been looking for
+                            result = jsonItem.ValueKind switch
+                            {
+                                JsonValueKind.String => jsonItem.GetString(),
+                                JsonValueKind.Number => jsonItem.TryGetInt32(out int intValue) ? intValue : jsonItem.GetDouble(),
+                                JsonValueKind.True => true,
+                                JsonValueKind.False => false,
+                                JsonValueKind.Object => jsonItem,
+                                JsonValueKind.Array => jsonItem,
+                                _ => null
+                            };
+                            return true;
+                        }
+                    }
+                    else
+                    {
+                        // Property is somewhere deeper
+                        return InternalGetSpecific(jsonItem, partialFilter, findSbcProperty, hadSbcProperty, out result);
+                    }
+                }
             }
             else if (partialFilter[0] is int itemIndex && (!findSbcProperty || hadSbcProperty))
             {
                 partialFilter = partialFilter.Skip(1).ToArray();
+                if (partialModel is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Array)
+                {
+                    partialModel = jsonElement.EnumerateArray().ToList();
+                }
                 if (partialModel is IList list)
                 {
                     if (itemIndex >= 0 && itemIndex < list.Count)
@@ -454,7 +488,23 @@ namespace DuetControlServer.Model
                         if (partialFilter.Length == 0)
                         {
                             // This is the item we've been looking for
-                            result = item;
+                            if (item is JsonElement jsonItem)
+                            {
+                                result = jsonItem.ValueKind switch
+                                {
+                                    JsonValueKind.String => jsonItem.GetString(),
+                                    JsonValueKind.Number => jsonItem.TryGetInt32(out int intValue) ? intValue : jsonItem.GetDouble(),
+                                    JsonValueKind.True => true,
+                                    JsonValueKind.False => false,
+                                    JsonValueKind.Object => jsonItem,
+                                    JsonValueKind.Array => jsonItem,
+                                    _ => null
+                                };
+                            }
+                            else
+                            {
+                                result = item;
+                            }
                             return true;
                         }
 
