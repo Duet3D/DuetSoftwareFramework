@@ -1,4 +1,5 @@
-﻿using DuetWebServer.Singletons;
+﻿using System.Linq;
+using DuetWebServer.Singletons;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,7 +36,16 @@ namespace DuetWebServer
                 .UseSystemd()
                 .ConfigureAppConfiguration((hostingContext, config) =>
                 {
-                    config.AddJsonFile(DefaultConfigFile, false, true);
+                    string configFile = DefaultConfigFile;
+                    for (int i = 0; i < args.Length - 1; i++)
+                    {
+                        if (args[i] == "--config")
+                        {
+                            configFile = args[i + 1];
+                            break;
+                        }
+                    }
+                    config.AddJsonFile(configFile, false, true);
                     config.AddCommandLine(args);
                 })
                 .ConfigureWebHostDefaults(webBuilder =>
