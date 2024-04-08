@@ -7,7 +7,6 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Web;
 using DuetAPI;
-using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetAPIClient;
@@ -121,7 +120,8 @@ namespace DuetWebServer.Controllers
             try
             {
                 using CommandConnection connection = await BuildConnection();
-                if (await connection.CheckPassword(password ?? string.Empty))
+                if ((_settings.OverrideWebPassword == null && await connection.CheckPassword(password ?? string.Empty)) ||
+                    (_settings.OverrideWebPassword != null && _settings.OverrideWebPassword == (password ?? string.Empty)))
                 {
                     int sessionId = await connection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, HttpContext.Connection.RemoteIpAddress!.ToString());
                     string sessionKey = sessionStorage.MakeSessionKey(sessionId, string.Empty, true);

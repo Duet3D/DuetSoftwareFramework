@@ -128,14 +128,15 @@ namespace DuetWebServer.Controllers
             try
             {
                 using CommandConnection connection = await BuildConnection();
-                if (await connection.CheckPassword(password ?? string.Empty))
+                if ((_settings.OverrideWebPassword == null && await connection.CheckPassword(password ?? string.Empty)) ||
+                    (_settings.OverrideWebPassword != null && _settings.OverrideWebPassword == (password ?? string.Empty)))
                 {
                     int sessionId = await connection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, HttpContext.Connection.RemoteIpAddress!.ToString());
                     _ = sessionStorage.MakeSessionKey(sessionId, HttpContext.Connection.RemoteIpAddress.ToString(), true);
 
                     // See RepRapFirmware/src/Platform/Platform.cpp -> Platform::GetBoardString()
                     ObjectModel model = await connection.GetObjectModel();
-                    string boardString = model.Boards.First(board => board.CanAddress == 0)?.ShortName switch
+                    string boardString = model.Boards.First(board => board.CanAddress is null or 0)?.ShortName switch
                     {
                         "Mini5plus" => "duet5lcunknown",
                         "MB6HC" => "duet3mb6hc100",

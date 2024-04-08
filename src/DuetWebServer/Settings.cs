@@ -13,6 +13,16 @@ namespace DuetWebServer
         public string DefaultWebDirectory { get; set; } = "/opt/dsf/sd/www";
 
         /// <summary>
+        /// Override web directory from directories.web with a custom path
+        /// </summary>
+        public string? OverrideWebDirectory { get; set; }
+
+        /// <summary>
+        /// Override configured machine password
+        /// </summary>
+        public string? OverrideWebPassword { get; set; }
+
+        /// <summary>
         /// Keep-alive interval for WebSocket connections (in s)
         /// </summary>
         public int KeepAliveInterval { get; set; } = 30;

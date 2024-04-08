@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Net.Http.Headers;
 using System;
@@ -92,9 +93,10 @@ namespace DuetWebServer
             // Use fallback middlware
             app.UseMiddleware(typeof(Middleware.FallbackMiddleware));
 
-            // Use static files from 0:/www if applicable
+            // Use static files if enabled
             if (_settings.UseStaticFiles)
             {
+                // Don't cache the index page but cache all other assets
                 app.UseStaticFiles(new StaticFileOptions
                 {
                     OnPrepareResponse = ctx =>
@@ -111,9 +113,22 @@ namespace DuetWebServer
                         }
                     }
                 });
+
+                // Provide files either using the directory provided by directories.web or from the override directory
+                IFileProvider fileProvider;
+                if (_settings.OverrideWebDirectory != null)
+                {
+                    fileProvider = new PhysicalFileProvider(_settings.OverrideWebDirectory);
+                }
+                else
+                {
+                    fileProvider = ActivatorUtilities.CreateInstance<FileProviders.DuetFileProvider>(serviceProvider);
+                }
+
+                // Configure file provider
                 app.UseFileServer(new FileServerOptions
                 {
-                    FileProvider = ActivatorUtilities.CreateInstance<FileProviders.DuetFileProvider>(serviceProvider)
+                    FileProvider = fileProvider
                 });
             }
         }
