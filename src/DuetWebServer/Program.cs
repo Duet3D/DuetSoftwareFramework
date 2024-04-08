@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using DuetWebServer.Singletons;
+﻿using DuetWebServer.Singletons;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
