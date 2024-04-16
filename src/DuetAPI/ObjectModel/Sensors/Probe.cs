@@ -140,7 +140,8 @@ namespace DuetAPI.ObjectModel
         private ModelCollection<float>? _scanCoefficients;
 
         /// <summary>
-        /// Fast and slow probing speeds (in mm/s)
+        /// Fast and slow probing speeds (in mm/s).
+        /// Scanning probes may have three speeds where the last one is the movement speed while probing heightmaps
         /// </summary>
         public ModelCollection<float> Speeds { get; } = new ModelCollection<float>() { 2F, 2F };
 
