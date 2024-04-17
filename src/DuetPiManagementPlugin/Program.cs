@@ -518,10 +518,7 @@ namespace DuetPiManagementPlugin
                                     else
                                     {
                                         // Perform upgrade
-                                        if (await Command.ExecQuery("/usr/bin/unattended-upgrade", string.Empty))
-                                        {
-                                            throw new Exception("Upgrade process return non-zero exit code");
-                                        }
+                                        await Command.ExecQuery("/usr/bin/unattended-upgrade", string.Empty);
                                     }
 
                                     // Done
