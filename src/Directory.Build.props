@@ -2,7 +2,7 @@
 	<PropertyGroup>
 		<Nullable>enable</Nullable>
 		<LangVersion>10</LangVersion>
-		<Version>3.5.0-rc.4+2</Version>
+		<Version>3.5.0</Version>
 		<Authors>Christian Hammacher</Authors>
 		<Company>Duet3D Ltd</Company>
 		<Copyright>Duet3D Ltd</Copyright>
