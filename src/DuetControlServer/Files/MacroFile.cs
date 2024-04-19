@@ -101,7 +101,14 @@ namespace DuetControlServer.Files
             try
             {
                 MacroFile macro = new(fileName, physicalFile, channel, startCode, sourceConnection);
-                _logger.Info("Starting macro file {0} on channel {1}", fileName, channel);
+                if (channel != CodeChannel.Daemon)
+                {
+                    _logger.Info("Starting macro file {0} on channel {1}", fileName, channel);
+                }
+                else
+                {
+                    _logger.Debug("Starting macro file {0} on channel {1}", fileName, channel);
+                }
                 return macro;
             }
             catch (FileNotFoundException)
@@ -421,7 +428,14 @@ namespace DuetControlServer.Files
                 IsExecuting = false;
                 if (!IsAborted)
                 {
-                    _logger.Info("{0}: Finished macro file {1}", Channel, FileName);
+                    if (Channel != CodeChannel.Daemon)
+                    {
+                        _logger.Info("{0}: Finished macro file {1}", Channel, FileName);
+                    }
+                    else
+                    {
+                        _logger.Debug("{0}: Finished macro file {1}", Channel, FileName);
+                    }
                 }
 
                 // Resolve potential tasks waiting for the macro result
