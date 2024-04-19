@@ -302,7 +302,7 @@ else {              // Character parameters are not supported yet, they are wrap
         }
         
         /// <summary>
-        /// Request the update of an object model field to an arbitrary value via a <see cref="Request.SetObjectModel"/> request
+        /// Request the update of an object model field to an arbitrary value via a <see cref="Request.GetObjectModel"/> request
         /// </summary>
         /// <param name="to">Destination</param>
         /// <param name="field">Path to the object model field</param>

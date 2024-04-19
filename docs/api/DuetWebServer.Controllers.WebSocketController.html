@@ -1,23 +1,21 @@
 ﻿<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
-  
+
   <head>
     <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Class WebSocketController
-   </title>
-    <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Class WebSocketController
-   ">
-    <meta name="generator" content="docfx 2.59.4.0">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class WebSocketController </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class WebSocketController ">
     
-    <link rel="shortcut icon" href="../favicon.ico">
-    <link rel="stylesheet" href="../styles/docfx.vendor.css">
-    <link rel="stylesheet" href="../styles/docfx.css">
-    <link rel="stylesheet" href="../styles/main.css">
-    <meta property="docfx:navrel" content="../toc">
-    <meta property="docfx:tocrel" content="toc">
+    <meta name="description" content="MVC controller for WebSocket requests">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.json">
+      <meta property="docfx:tocrel" content="toc.json">
     
     
     
@@ -25,7 +23,7 @@
   <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
-        
+
         <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
           <div class="container">
             <div class="navbar-header">
@@ -35,7 +33,7 @@
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
               </button>
-              
+
               <a class="navbar-brand" href="../index.html">
                 <img id="logo" class="svg" src="../logo.svg" alt="">
               </a>
@@ -46,7 +44,7 @@
                   <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
                 </div>
               </form>
-                
+
                 <ul class="nav level1 navbar-nav">
                       <li>
                           <a href="../api/DuetAPI.html" title="DuetAPI">DuetAPI</a>
@@ -60,10 +58,11 @@
                       <li>
                           <a href="../api/DuetWebServer.html" title="DuetWebServer">DuetWebServer</a>
                       </li>
-                </ul>    </div>
+                </ul>
+            </div>
           </div>
         </nav>
-        
+
         <div class="subnav navbar navbar-default">
           <div class="container hide-when-search" id="breadcrumb">
             <ul class="breadcrumb">
@@ -85,21 +84,37 @@
               </div>
               <div class="sidetoc">
                 <div class="toc" id="toc">
-                  
+
                   <ul class="nav level1">
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetAPI.html" title="DuetAPI" class="">DuetAPI</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetAPI.CodeChannel.html" title="CodeChannel" class="">CodeChannel</a>
                           </li>
-                        </ul>  </li>
+                          <li class="">
+                            <a href="DuetAPI.CodeParserException.html" title="CodeParserException" class="">CodeParserException</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.IncompatibleVersionException.html" title="IncompatibleVersionException" class="">IncompatibleVersionException</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.InternalServerException.html" title="InternalServerException" class="">InternalServerException</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.InvalidParameterTypeException.html" title="InvalidParameterTypeException" class="">InvalidParameterTypeException</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.MissingParameterException.html" title="MissingParameterException" class="">MissingParameterException</a>
+                          </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetAPI.Commands.html" title="DuetAPI.Commands" class="">DuetAPI.Commands</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetAPI.Commands.Acknowledge.html" title="Acknowledge" class="">Acknowledge</a>
@@ -136,9 +151,6 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.Commands.CodeParserBuffer.html" title="CodeParserBuffer" class="">CodeParserBuffer</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetAPI.Commands.CodeParserException.html" title="CodeParserException" class="">CodeParserException</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Commands.CodeType.html" title="CodeType" class="">CodeType</a>
@@ -257,11 +269,12 @@
                           <li class="">
                             <a href="DuetAPI.Commands.WriteMessage.html" title="WriteMessage" class="">WriteMessage</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetAPI.Connection.html" title="DuetAPI.Connection" class="">DuetAPI.Connection</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetAPI.Connection.ConnectionMode.html" title="ConnectionMode" class="">ConnectionMode</a>
@@ -270,19 +283,17 @@
                             <a href="DuetAPI.Connection.Defaults.html" title="Defaults" class="">Defaults</a>
                           </li>
                           <li class="">
-                            <a href="DuetAPI.Connection.IncompatibleVersionException.html" title="IncompatibleVersionException" class="">IncompatibleVersionException</a>
-                          </li>
-                          <li class="">
                             <a href="DuetAPI.Connection.InterceptionMode.html" title="InterceptionMode" class="">InterceptionMode</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Connection.SubscriptionMode.html" title="SubscriptionMode" class="">SubscriptionMode</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetAPI.Connection.InitMessages.html" title="DuetAPI.Connection.InitMessages" class="">DuetAPI.Connection.InitMessages</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetAPI.Connection.InitMessages.ClientInitMessage.html" title="ClientInitMessage" class="">ClientInitMessage</a>
@@ -305,11 +316,12 @@
                           <li class="">
                             <a href="DuetAPI.Connection.InitMessages.SubscribeInitMessage.html" title="SubscribeInitMessage" class="">SubscribeInitMessage</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetAPI.ObjectModel.html" title="DuetAPI.ObjectModel" class="">DuetAPI.ObjectModel</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Accelerometer.html" title="Accelerometer" class="">Accelerometer</a>
@@ -336,6 +348,9 @@
                             <a href="DuetAPI.ObjectModel.Board.html" title="Board" class="">Board</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.BoardClosedLoop.html" title="BoardClosedLoop" class="">BoardClosedLoop</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.BoardState.html" title="BoardState" class="">BoardState</a>
                           </li>
                           <li class="">
@@ -345,7 +360,13 @@
                             <a href="DuetAPI.ObjectModel.BuildObject.html" title="BuildObject" class="">BuildObject</a>
                           </li>
                           <li class="">
-                            <a href="DuetAPI.ObjectModel.ClosedLoop.html" title="ClosedLoop" class="">ClosedLoop</a>
+                            <a href="DuetAPI.ObjectModel.CPU.html" title="CPU" class="">CPU</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ClosedLoopCurrentFraction.html" title="ClosedLoopCurrentFraction" class="">ClosedLoopCurrentFraction</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ClosedLoopPositionError.html" title="ClosedLoopPositionError" class="">ClosedLoopPositionError</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Compatibility.html" title="Compatibility" class="">Compatibility</a>
@@ -355,6 +376,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.CurrentMove.html" title="CurrentMove" class="">CurrentMove</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.DSF.html" title="DSF" class="">DSF</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.DeltaKinematics.html" title="DeltaKinematics" class="">DeltaKinematics</a>
@@ -372,6 +396,18 @@
                             <a href="DuetAPI.ObjectModel.DirectDisplay.html" title="DirectDisplay" class="">DirectDisplay</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.DirectDisplayController.html" title="DirectDisplayController" class="">DirectDisplayController</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.DirectDisplayEncoder.html" title="DirectDisplayEncoder" class="">DirectDisplayEncoder</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.DirectDisplayScreen.html" title="DirectDisplayScreen" class="">DirectDisplayScreen</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.DirectDisplayScreenST7567.html" title="DirectDisplayScreenST7567" class="">DirectDisplayScreenST7567</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.Directories.html" title="Directories" class="">Directories</a>
                           </li>
                           <li class="">
@@ -384,7 +420,10 @@
                             <a href="DuetAPI.ObjectModel.Driver.html" title="Driver" class="">Driver</a>
                           </li>
                           <li class="">
-                            <a href="DuetAPI.ObjectModel.DriverSettings.html" title="DriverSettings" class="">DriverSettings</a>
+                            <a href="DuetAPI.ObjectModel.DriverClosedLoop.html" title="DriverClosedLoop" class="">DriverClosedLoop</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Duet3DFilamentMonitor.html" title="Duet3DFilamentMonitor" class="">Duet3DFilamentMonitor</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Endstop.html" title="Endstop" class="">Endstop</a>
@@ -406,6 +445,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.FilamentMonitor.html" title="FilamentMonitor" class="">FilamentMonitor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.FilamentMonitorEnableMode.html" title="FilamentMonitorEnableMode" class="">FilamentMonitorEnableMode</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.FilamentMonitorStatus.html" title="FilamentMonitorStatus" class="">FilamentMonitorStatus</a>
@@ -471,13 +513,13 @@
                             <a href="DuetAPI.ObjectModel.IModelObject.html" title="IModelObject" class="">IModelObject</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.InductiveSensor.html" title="InductiveSensor" class="">InductiveSensor</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.InputChannel.html" title="InputChannel" class="">InputChannel</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.InputChannelState.html" title="InputChannelState" class="">InputChannelState</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetAPI.ObjectModel.Inputs.html" title="Inputs" class="">Inputs</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.InputShaping.html" title="InputShaping" class="">InputShaping</a>
@@ -486,7 +528,16 @@
                             <a href="DuetAPI.ObjectModel.InputShapingType.html" title="InputShapingType" class="">InputShapingType</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.Inputs.html" title="Inputs" class="">Inputs</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.Job.html" title="Job" class="">Job</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.KeepoutZone.html" title="KeepoutZone" class="">KeepoutZone</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.KeepoutZoneCoordinates.html" title="KeepoutZoneCoordinates" class="">KeepoutZoneCoordinates</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Kinematics.html" title="Kinematics" class="">Kinematics</a>
@@ -510,6 +561,15 @@
                             <a href="DuetAPI.ObjectModel.Layer.html" title="Layer" class="">Layer</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.LedStrip.html" title="LedStrip" class="">LedStrip</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.LedStripType.html" title="LedStripType" class="">LedStripType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.LimitedResponseCountAttribute.html" title="LimitedResponseCountAttribute" class="">LimitedResponseCountAttribute</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.Limits.html" title="Limits" class="">Limits</a>
                           </li>
                           <li class="">
@@ -520,6 +580,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.MachineStatus.html" title="MachineStatus" class="">MachineStatus</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Memory.html" title="Memory" class="">Memory</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Message.html" title="Message" class="">Message</a>
@@ -543,10 +606,10 @@
                             <a href="DuetAPI.ObjectModel.ModelCollection-1.html" title="ModelCollection&lt;T&gt;" class="">ModelCollection&lt;T&gt;</a>
                           </li>
                           <li class="">
-                            <a href="DuetAPI.ObjectModel.ModelDictionary-1.html" title="ModelDictionary&lt;TValue&gt;" class="">ModelDictionary&lt;TValue&gt;</a>
+                            <a href="DuetAPI.ObjectModel.ModelDictionaryConverter.html" title="ModelDictionaryConverter" class="">ModelDictionaryConverter</a>
                           </li>
                           <li class="">
-                            <a href="DuetAPI.ObjectModel.ModelDictionaryConverter.html" title="ModelDictionaryConverter" class="">ModelDictionaryConverter</a>
+                            <a href="DuetAPI.ObjectModel.ModelDictionary-1.html" title="ModelDictionary&lt;TValue&gt;" class="">ModelDictionary&lt;TValue&gt;</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.ModelGrowingCollection-1.html" title="ModelGrowingCollection&lt;T&gt;" class="">ModelGrowingCollection&lt;T&gt;</a>
@@ -642,13 +705,10 @@
                             <a href="DuetAPI.ObjectModel.RotatingMagnetFilamentMonitorConfigured.html" title="RotatingMagnetFilamentMonitorConfigured" class="">RotatingMagnetFilamentMonitorConfigured</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.SBC.html" title="SBC" class="">SBC</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.SbcPropertyAttribute.html" title="SbcPropertyAttribute" class="">SbcPropertyAttribute</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetAPI.ObjectModel.Scanner.html" title="Scanner" class="">Scanner</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetAPI.ObjectModel.ScannerStatus.html" title="ScannerStatus" class="">ScannerStatus</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.ScaraKinematics.html" title="ScaraKinematics" class="">ScaraKinematics</a>
@@ -669,10 +729,13 @@
                             <a href="DuetAPI.ObjectModel.SpindleState.html" title="SpindleState" class="">SpindleState</a>
                           </li>
                           <li class="">
-                            <a href="DuetAPI.ObjectModel.StallDetectSettings.html" title="StallDetectSettings" class="">StallDetectSettings</a>
+                            <a href="DuetAPI.ObjectModel.StartupError.html" title="StartupError" class="">StartupError</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.State.html" title="State" class="">State</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.TemperatureError.html" title="TemperatureError" class="">TemperatureError</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.ThumbnailInfo.html" title="ThumbnailInfo" class="">ThumbnailInfo</a>
@@ -704,11 +767,12 @@
                           <li class="">
                             <a href="DuetAPI.ObjectModel.ZLeadscrewKinematics.html" title="ZLeadscrewKinematics" class="">ZLeadscrewKinematics</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetAPI.Utility.html" title="DuetAPI.Utility" class="">DuetAPI.Utility</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetAPI.Utility.DriverId.html" title="DriverId" class="">DriverId</a>
@@ -735,6 +799,9 @@
                             <a href="DuetAPI.Utility.JsonLowerCaseStringEnumConverter.html" title="JsonLowerCaseStringEnumConverter" class="">JsonLowerCaseStringEnumConverter</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Utility.JsonOptionalShortDateTimeConverter.html" title="JsonOptionalShortDateTimeConverter" class="">JsonOptionalShortDateTimeConverter</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter-1.html" title="JsonPolymorphicWriteOnlyConverter&lt;T&gt;" class="">JsonPolymorphicWriteOnlyConverter&lt;T&gt;</a>
                           </li>
                           <li class="">
@@ -752,11 +819,12 @@
                           <li class="">
                             <a href="DuetAPI.Utility.SbcPermissionsConverter.html" title="SbcPermissionsConverter" class="">SbcPermissionsConverter</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetAPIClient.html" title="DuetAPIClient" class="">DuetAPIClient</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetAPIClient.BaseCommandConnection.html" title="BaseCommandConnection" class="">BaseCommandConnection</a>
@@ -783,16 +851,14 @@
                             <a href="DuetAPIClient.InterceptConnection.html" title="InterceptConnection" class="">InterceptConnection</a>
                           </li>
                           <li class="">
-                            <a href="DuetAPIClient.InternalServerException.html" title="InternalServerException" class="">InternalServerException</a>
-                          </li>
-                          <li class="">
                             <a href="DuetAPIClient.SubscribeConnection.html" title="SubscribeConnection" class="">SubscribeConnection</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.html" title="DuetControlServer" class="">DuetControlServer</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.Program.html" title="Program" class="">Program</a>
@@ -800,29 +866,81 @@
                           <li class="">
                             <a href="DuetControlServer.Settings.html" title="Settings" class="">Settings</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.Codes.html" title="DuetControlServer.Codes" class="">DuetControlServer.Codes</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
-                            <a href="DuetControlServer.Codes.GCodes.html" title="GCodes" class="">GCodes</a>
+                            <a href="DuetControlServer.Codes.ChannelProcessor.html" title="ChannelProcessor" class="">ChannelProcessor</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.Codes.Keywords.html" title="Keywords" class="">Keywords</a>
+                            <a href="DuetControlServer.Codes.PipelineStage.html" title="PipelineStage" class="">PipelineStage</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.Codes.MCodes.html" title="MCodes" class="">MCodes</a>
+                            <a href="DuetControlServer.Codes.Processor.html" title="Processor" class="">Processor</a>
+                          </li>
+                        </ul>
+                    </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.Codes.Handlers.html" title="DuetControlServer.Codes.Handlers" class="">DuetControlServer.Codes.Handlers</a>
+
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Handlers.Functions.html" title="Functions" class="">Functions</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.Codes.TCodes.html" title="TCodes" class="">TCodes</a>
+                            <a href="DuetControlServer.Codes.Handlers.GCodes.html" title="GCodes" class="">GCodes</a>
                           </li>
-                        </ul>  </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Handlers.Keywords.html" title="Keywords" class="">Keywords</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Handlers.MCodes.html" title="MCodes" class="">MCodes</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Handlers.TCodes.html" title="TCodes" class="">TCodes</a>
+                          </li>
+                        </ul>
+                    </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.Codes.Pipelines.html" title="DuetControlServer.Codes.Pipelines" class="">DuetControlServer.Codes.Pipelines</a>
+
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Pipelines.Executed.html" title="Executed" class="">Executed</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Pipelines.Firmware.html" title="Firmware" class="">Firmware</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Pipelines.PipelineBase.html" title="PipelineBase" class="">PipelineBase</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Pipelines.PipelineStackItem.html" title="PipelineStackItem" class="">PipelineStackItem</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Pipelines.Post.html" title="Post" class="">Post</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Pipelines.Pre.html" title="Pre" class="">Pre</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Pipelines.ProcessInternally.html" title="ProcessInternally" class="">ProcessInternally</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Pipelines.Start.html" title="Start" class="">Start</a>
+                          </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.Commands.html" title="DuetControlServer.Commands" class="">DuetControlServer.Commands</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.Commands.AddHttpEndpoint.html" title="AddHttpEndpoint" class="">AddHttpEndpoint</a>
@@ -923,23 +1041,12 @@
                           <li class="">
                             <a href="DuetControlServer.Commands.WriteMessage.html" title="WriteMessage" class="">WriteMessage</a>
                           </li>
-                        </ul>  </li>
-                    <li class="">
-                      <span class="expand-stub"></span>
-                      <a href="DuetControlServer.FileExecution.html" title="DuetControlServer.FileExecution" class="">DuetControlServer.FileExecution</a>
-                        
-                        <ul class="nav level2">
-                          <li class="">
-                            <a href="DuetControlServer.FileExecution.Job.html" title="Job" class="">Job</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.FileExecution.Macro.html" title="Macro" class="">Macro</a>
-                          </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.Files.html" title="DuetControlServer.Files" class="">DuetControlServer.Files</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.Files.CodeBlock.html" title="CodeBlock" class="">CodeBlock</a>
@@ -956,11 +1063,18 @@
                           <li class="">
                             <a href="DuetControlServer.Files.InfoParser.html" title="InfoParser" class="">InfoParser</a>
                           </li>
-                        </ul>  </li>
+                          <li class="">
+                            <a href="DuetControlServer.Files.JobProcessor.html" title="JobProcessor" class="">JobProcessor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Files.MacroFile.html" title="MacroFile" class="">MacroFile</a>
+                          </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.Files.ImageProcessing.html" title="DuetControlServer.Files.ImageProcessing" class="">DuetControlServer.Files.ImageProcessing</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.Files.ImageProcessing.IconImageParser.html" title="IconImageParser" class="">IconImageParser</a>
@@ -971,11 +1085,12 @@
                           <li class="">
                             <a href="DuetControlServer.Files.ImageProcessing.ImageProcessingException.html" title="ImageProcessingException" class="">ImageProcessingException</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.IPC.html" title="DuetControlServer.IPC" class="">DuetControlServer.IPC</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.IPC.Connection.html" title="Connection" class="">Connection</a>
@@ -986,11 +1101,12 @@
                           <li class="">
                             <a href="DuetControlServer.IPC.Server.html" title="Server" class="">Server</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.IPC.Processors.html" title="DuetControlServer.IPC.Processors" class="">DuetControlServer.IPC.Processors</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.IPC.Processors.Base.html" title="Base" class="">Base</a>
@@ -1010,14 +1126,18 @@
                           <li class="">
                             <a href="DuetControlServer.IPC.Processors.PluginService.html" title="PluginService" class="">PluginService</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.Model.html" title="DuetControlServer.Model" class="">DuetControlServer.Model</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.Model.Expressions.html" title="Expressions" class="">Expressions</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Model.Expressions.CustomAsyncFunctionResolver.html" title="Expressions.CustomAsyncFunctionResolver" class="">Expressions.CustomAsyncFunctionResolver</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Model.Filter.html" title="Filter" class="">Filter</a>
@@ -1043,11 +1163,12 @@
                           <li class="">
                             <a href="DuetControlServer.Model.Updater.html" title="Updater" class="">Updater</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.SPI.html" title="DuetControlServer.SPI" class="">DuetControlServer.SPI</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.SPI.DataTransfer.html" title="DataTransfer" class="">DataTransfer</a>
@@ -1064,11 +1185,12 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.VariableRequest.html" title="VariableRequest" class="">VariableRequest</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.SPI.Channel.html" title="DuetControlServer.SPI.Channel" class="">DuetControlServer.SPI.Channel</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.SPI.Channel.LockRequest.html" title="LockRequest" class="">LockRequest</a>
@@ -1082,20 +1204,22 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Channel.State.html" title="State" class="">State</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.SPI.Communication.html" title="DuetControlServer.SPI.Communication" class="">DuetControlServer.SPI.Communication</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Consts.html" title="Consts" class="">Consts</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.SPI.Communication.FirmwareRequests.html" title="DuetControlServer.SPI.Communication.FirmwareRequests" class="">DuetControlServer.SPI.Communication.FirmwareRequests</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.FirmwareRequests.AbortFileHeader.html" title="AbortFileHeader" class="">AbortFileHeader</a>
@@ -1136,11 +1260,12 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.FirmwareRequests.SeekFileHeader.html" title="SeekFileHeader" class="">SeekFileHeader</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.SPI.Communication.SbcRequests.html" title="DuetControlServer.SPI.Communication.SbcRequests" class="">DuetControlServer.SPI.Communication.SbcRequests</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.SbcRequests.AssignFilamentHeader.html" title="AssignFilamentHeader" class="">AssignFilamentHeader</a>
@@ -1190,11 +1315,12 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.SbcRequests.SetVariableHeader.html" title="SetVariableHeader" class="">SetVariableHeader</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.SPI.Communication.Shared.html" title="DuetControlServer.SPI.Communication.Shared" class="">DuetControlServer.SPI.Communication.Shared</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html" title="CodeChannelHeader" class="">CodeChannelHeader</a>
@@ -1226,11 +1352,12 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.TransferResponse.html" title="TransferResponse" class="">TransferResponse</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.SPI.Serialization.html" title="DuetControlServer.SPI.Serialization" class="">DuetControlServer.SPI.Serialization</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.SPI.Serialization.Reader.html" title="Reader" class="">Reader</a>
@@ -1238,12 +1365,16 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Serialization.Writer.html" title="Writer" class="">Writer</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.Utility.html" title="DuetControlServer.Utility" class="">DuetControlServer.Utility</a>
-                        
+
                         <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.Utility.BuildDateTimeAttribute.html" title="BuildDateTimeAttribute" class="">BuildDateTimeAttribute</a>
+                          </li>
                           <li class="">
                             <a href="DuetControlServer.Utility.CRC16.html" title="CRC16" class="">CRC16</a>
                           </li>
@@ -1259,23 +1390,28 @@
                           <li class="">
                             <a href="DuetControlServer.Utility.PriorityThreadRunner.html" title="PriorityThreadRunner" class="">PriorityThreadRunner</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetWebServer.html" title="DuetWebServer" class="">DuetWebServer</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetWebServer.Program.html" title="Program" class="">Program</a>
                           </li>
                           <li class="">
+                            <a href="DuetWebServer.Settings.html" title="Settings" class="">Settings</a>
+                          </li>
+                          <li class="">
                             <a href="DuetWebServer.Startup.html" title="Startup" class="">Startup</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetWebServer.Authorization.html" title="DuetWebServer.Authorization" class="">DuetWebServer.Authorization</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetWebServer.Authorization.Policies.html" title="Policies" class="">Policies</a>
@@ -1286,32 +1422,38 @@
                           <li class="">
                             <a href="DuetWebServer.Authorization.SessionKeyAuthenticationSchemeOptions.html" title="SessionKeyAuthenticationSchemeOptions" class="">SessionKeyAuthenticationSchemeOptions</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetWebServer.Controllers.html" title="DuetWebServer.Controllers" class="">DuetWebServer.Controllers</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetWebServer.Controllers.MachineController.html" title="MachineController" class="">MachineController</a>
                           </li>
+                          <li class="">
+                            <a href="DuetWebServer.Controllers.RepRapFirmwareController.html" title="RepRapFirmwareController" class="">RepRapFirmwareController</a>
+                          </li>
                           <li class="active">
                             <a href="DuetWebServer.Controllers.WebSocketController.html" title="WebSocketController" class="active">WebSocketController</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetWebServer.FileProviders.html" title="DuetWebServer.FileProviders" class="">DuetWebServer.FileProviders</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetWebServer.FileProviders.DuetFileProvider.html" title="DuetFileProvider" class="">DuetFileProvider</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetWebServer.Middleware.html" title="DuetWebServer.Middleware" class="">DuetWebServer.Middleware</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetWebServer.Middleware.CustomEndpointMiddleware.html" title="CustomEndpointMiddleware" class="">CustomEndpointMiddleware</a>
@@ -1320,13 +1462,17 @@
                             <a href="DuetWebServer.Middleware.FallbackMiddleware.html" title="FallbackMiddleware" class="">FallbackMiddleware</a>
                           </li>
                           <li class="">
+                            <a href="DuetWebServer.Middleware.FixContentTypeMiddleware.html" title="FixContentTypeMiddleware" class="">FixContentTypeMiddleware</a>
+                          </li>
+                          <li class="">
                             <a href="DuetWebServer.Middleware.HttpEndpointConnection.html" title="HttpEndpointConnection" class="">HttpEndpointConnection</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetWebServer.Services.html" title="DuetWebServer.Services" class="">DuetWebServer.Services</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetWebServer.Services.ModelObserver.html" title="ModelObserver" class="">ModelObserver</a>
@@ -1334,11 +1480,12 @@
                           <li class="">
                             <a href="DuetWebServer.Services.SessionExpiry.html" title="SessionExpiry" class="">SessionExpiry</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetWebServer.Singletons.html" title="DuetWebServer.Singletons" class="">DuetWebServer.Singletons</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetWebServer.Singletons.IModelProvider.html" title="IModelProvider" class="">IModelProvider</a>
@@ -1355,8 +1502,20 @@
                           <li class="">
                             <a href="DuetWebServer.Singletons.SessionStorage.html" title="SessionStorage" class="">SessionStorage</a>
                           </li>
-                        </ul>  </li>
-                  </ul>        </div>
+                        </ul>
+                    </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetWebServer.Utility.html" title="DuetWebServer.Utility" class="">DuetWebServer.Utility</a>
+
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetWebServer.Utility.CRC32.html" title="CRC32" class="">CRC32</a>
+                          </li>
+                        </ul>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
@@ -1364,557 +1523,557 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="DuetWebServer.Controllers.WebSocketController">
-  
-  
-  <h1 id="DuetWebServer_Controllers_WebSocketController" data-uid="DuetWebServer.Controllers.WebSocketController" class="text-break">Class WebSocketController
-  </h1>
+
+
+
+  <h1 id="DuetWebServer_Controllers_WebSocketController" data-uid="DuetWebServer.Controllers.WebSocketController" class="text-break">Class WebSocketController</h1>
   <div class="markdown level0 summary"><p>MVC controller for WebSocket requests</p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
     <h5>Inheritance</h5>
-    <div class="level0"><span class="xref">System.Object</span></div>
-    <div class="level1"><span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase</span></div>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase">ControllerBase</a></div>
     <div class="level2"><span class="xref">WebSocketController</span></div>
   </div>
   <div class="inheritedMembers">
     <h5>Inherited Members</h5>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.StatusCode(System.Int32)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.statuscode#microsoft-aspnetcore-mvc-controllerbase-statuscode(system-int32)">ControllerBase.StatusCode(int)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.StatusCode(System.Int32, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.statuscode#microsoft-aspnetcore-mvc-controllerbase-statuscode(system-int32-system-object)">ControllerBase.StatusCode(int, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Content(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.content#microsoft-aspnetcore-mvc-controllerbase-content(system-string)">ControllerBase.Content(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Content(System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.content#microsoft-aspnetcore-mvc-controllerbase-content(system-string-system-string)">ControllerBase.Content(string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Content(System.String, System.String, System.Text.Encoding)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.content#microsoft-aspnetcore-mvc-controllerbase-content(system-string-system-string-system-text-encoding)">ControllerBase.Content(string, string, Encoding)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Content(System.String, Microsoft.Net.Http.Headers.MediaTypeHeaderValue)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.content#microsoft-aspnetcore-mvc-controllerbase-content(system-string-microsoft-net-http-headers-mediatypeheadervalue)">ControllerBase.Content(string, MediaTypeHeaderValue)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.NoContent()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.nocontent">ControllerBase.NoContent()</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Ok()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.ok#microsoft-aspnetcore-mvc-controllerbase-ok">ControllerBase.Ok()</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Ok(System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.ok#microsoft-aspnetcore-mvc-controllerbase-ok(system-object)">ControllerBase.Ok(object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Redirect(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirect">ControllerBase.Redirect(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectPermanent(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirectpermanent">ControllerBase.RedirectPermanent(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectPreserveMethod(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirectpreservemethod">ControllerBase.RedirectPreserveMethod(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectPermanentPreserveMethod(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirectpermanentpreservemethod">ControllerBase.RedirectPermanentPreserveMethod(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.LocalRedirect(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.localredirect">ControllerBase.LocalRedirect(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.LocalRedirectPermanent(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.localredirectpermanent">ControllerBase.LocalRedirectPermanent(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.LocalRedirectPreserveMethod(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.localredirectpreservemethod">ControllerBase.LocalRedirectPreserveMethod(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.LocalRedirectPermanentPreserveMethod(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.localredirectpermanentpreservemethod">ControllerBase.LocalRedirectPermanentPreserveMethod(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToAction()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoaction#microsoft-aspnetcore-mvc-controllerbase-redirecttoaction">ControllerBase.RedirectToAction()</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToAction(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoaction#microsoft-aspnetcore-mvc-controllerbase-redirecttoaction(system-string)">ControllerBase.RedirectToAction(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToAction(System.String, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoaction#microsoft-aspnetcore-mvc-controllerbase-redirecttoaction(system-string-system-object)">ControllerBase.RedirectToAction(string, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToAction(System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoaction#microsoft-aspnetcore-mvc-controllerbase-redirecttoaction(system-string-system-string)">ControllerBase.RedirectToAction(string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToAction(System.String, System.String, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoaction#microsoft-aspnetcore-mvc-controllerbase-redirecttoaction(system-string-system-string-system-object)">ControllerBase.RedirectToAction(string, string, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToAction(System.String, System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoaction#microsoft-aspnetcore-mvc-controllerbase-redirecttoaction(system-string-system-string-system-string)">ControllerBase.RedirectToAction(string, string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToAction(System.String, System.String, System.Object, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoaction#microsoft-aspnetcore-mvc-controllerbase-redirecttoaction(system-string-system-string-system-object-system-string)">ControllerBase.RedirectToAction(string, string, object, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToActionPreserveMethod(System.String, System.String, System.Object, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoactionpreservemethod">ControllerBase.RedirectToActionPreserveMethod(string, string, object, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToActionPermanent(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoactionpermanent#microsoft-aspnetcore-mvc-controllerbase-redirecttoactionpermanent(system-string)">ControllerBase.RedirectToActionPermanent(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToActionPermanent(System.String, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoactionpermanent#microsoft-aspnetcore-mvc-controllerbase-redirecttoactionpermanent(system-string-system-object)">ControllerBase.RedirectToActionPermanent(string, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToActionPermanent(System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoactionpermanent#microsoft-aspnetcore-mvc-controllerbase-redirecttoactionpermanent(system-string-system-string)">ControllerBase.RedirectToActionPermanent(string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToActionPermanent(System.String, System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoactionpermanent#microsoft-aspnetcore-mvc-controllerbase-redirecttoactionpermanent(system-string-system-string-system-string)">ControllerBase.RedirectToActionPermanent(string, string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToActionPermanent(System.String, System.String, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoactionpermanent#microsoft-aspnetcore-mvc-controllerbase-redirecttoactionpermanent(system-string-system-string-system-object)">ControllerBase.RedirectToActionPermanent(string, string, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToActionPermanent(System.String, System.String, System.Object, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoactionpermanent#microsoft-aspnetcore-mvc-controllerbase-redirecttoactionpermanent(system-string-system-string-system-object-system-string)">ControllerBase.RedirectToActionPermanent(string, string, object, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToActionPermanentPreserveMethod(System.String, System.String, System.Object, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoactionpermanentpreservemethod">ControllerBase.RedirectToActionPermanentPreserveMethod(string, string, object, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToRoute(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoroute#microsoft-aspnetcore-mvc-controllerbase-redirecttoroute(system-string)">ControllerBase.RedirectToRoute(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToRoute(System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoroute#microsoft-aspnetcore-mvc-controllerbase-redirecttoroute(system-object)">ControllerBase.RedirectToRoute(object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToRoute(System.String, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoroute#microsoft-aspnetcore-mvc-controllerbase-redirecttoroute(system-string-system-object)">ControllerBase.RedirectToRoute(string, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToRoute(System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoroute#microsoft-aspnetcore-mvc-controllerbase-redirecttoroute(system-string-system-string)">ControllerBase.RedirectToRoute(string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToRoute(System.String, System.Object, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoroute#microsoft-aspnetcore-mvc-controllerbase-redirecttoroute(system-string-system-object-system-string)">ControllerBase.RedirectToRoute(string, object, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToRoutePreserveMethod(System.String, System.Object, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoroutepreservemethod">ControllerBase.RedirectToRoutePreserveMethod(string, object, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToRoutePermanent(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoroutepermanent#microsoft-aspnetcore-mvc-controllerbase-redirecttoroutepermanent(system-string)">ControllerBase.RedirectToRoutePermanent(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToRoutePermanent(System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoroutepermanent#microsoft-aspnetcore-mvc-controllerbase-redirecttoroutepermanent(system-object)">ControllerBase.RedirectToRoutePermanent(object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToRoutePermanent(System.String, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoroutepermanent#microsoft-aspnetcore-mvc-controllerbase-redirecttoroutepermanent(system-string-system-object)">ControllerBase.RedirectToRoutePermanent(string, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToRoutePermanent(System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoroutepermanent#microsoft-aspnetcore-mvc-controllerbase-redirecttoroutepermanent(system-string-system-string)">ControllerBase.RedirectToRoutePermanent(string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToRoutePermanent(System.String, System.Object, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoroutepermanent#microsoft-aspnetcore-mvc-controllerbase-redirecttoroutepermanent(system-string-system-object-system-string)">ControllerBase.RedirectToRoutePermanent(string, object, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToRoutePermanentPreserveMethod(System.String, System.Object, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttoroutepermanentpreservemethod">ControllerBase.RedirectToRoutePermanentPreserveMethod(string, object, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToPage(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttopage#microsoft-aspnetcore-mvc-controllerbase-redirecttopage(system-string)">ControllerBase.RedirectToPage(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToPage(System.String, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttopage#microsoft-aspnetcore-mvc-controllerbase-redirecttopage(system-string-system-object)">ControllerBase.RedirectToPage(string, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToPage(System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttopage#microsoft-aspnetcore-mvc-controllerbase-redirecttopage(system-string-system-string)">ControllerBase.RedirectToPage(string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToPage(System.String, System.String, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttopage#microsoft-aspnetcore-mvc-controllerbase-redirecttopage(system-string-system-string-system-object)">ControllerBase.RedirectToPage(string, string, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToPage(System.String, System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttopage#microsoft-aspnetcore-mvc-controllerbase-redirecttopage(system-string-system-string-system-string)">ControllerBase.RedirectToPage(string, string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToPage(System.String, System.String, System.Object, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttopage#microsoft-aspnetcore-mvc-controllerbase-redirecttopage(system-string-system-string-system-object-system-string)">ControllerBase.RedirectToPage(string, string, object, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToPagePermanent(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttopagepermanent#microsoft-aspnetcore-mvc-controllerbase-redirecttopagepermanent(system-string)">ControllerBase.RedirectToPagePermanent(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToPagePermanent(System.String, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttopagepermanent#microsoft-aspnetcore-mvc-controllerbase-redirecttopagepermanent(system-string-system-object)">ControllerBase.RedirectToPagePermanent(string, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToPagePermanent(System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttopagepermanent#microsoft-aspnetcore-mvc-controllerbase-redirecttopagepermanent(system-string-system-string)">ControllerBase.RedirectToPagePermanent(string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToPagePermanent(System.String, System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttopagepermanent#microsoft-aspnetcore-mvc-controllerbase-redirecttopagepermanent(system-string-system-string-system-string)">ControllerBase.RedirectToPagePermanent(string, string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToPagePermanent(System.String, System.String, System.Object, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttopagepermanent#microsoft-aspnetcore-mvc-controllerbase-redirecttopagepermanent(system-string-system-string-system-object-system-string)">ControllerBase.RedirectToPagePermanent(string, string, object, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToPagePreserveMethod(System.String, System.String, System.Object, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttopagepreservemethod">ControllerBase.RedirectToPagePreserveMethod(string, string, object, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RedirectToPagePermanentPreserveMethod(System.String, System.String, System.Object, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.redirecttopagepermanentpreservemethod">ControllerBase.RedirectToPagePermanentPreserveMethod(string, string, object, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.Byte[], System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-byte()-system-string)">ControllerBase.File(byte[], string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.Byte[], System.String, System.Boolean)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-byte()-system-string-system-boolean)">ControllerBase.File(byte[], string, bool)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.Byte[], System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-byte()-system-string-system-string)">ControllerBase.File(byte[], string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.Byte[], System.String, System.String, System.Boolean)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-byte()-system-string-system-string-system-boolean)">ControllerBase.File(byte[], string, string, bool)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.Byte[], System.String, System.Nullable&lt;System.DateTimeOffset&gt;, Microsoft.Net.Http.Headers.EntityTagHeaderValue)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-byte()-system-string-system-nullable((system-datetimeoffset))-microsoft-net-http-headers-entitytagheadervalue)">ControllerBase.File(byte[], string, DateTimeOffset?, EntityTagHeaderValue)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.Byte[], System.String, System.Nullable&lt;System.DateTimeOffset&gt;, Microsoft.Net.Http.Headers.EntityTagHeaderValue, System.Boolean)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-byte()-system-string-system-nullable((system-datetimeoffset))-microsoft-net-http-headers-entitytagheadervalue-system-boolean)">ControllerBase.File(byte[], string, DateTimeOffset?, EntityTagHeaderValue, bool)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.Byte[], System.String, System.String, System.Nullable&lt;System.DateTimeOffset&gt;, Microsoft.Net.Http.Headers.EntityTagHeaderValue)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-byte()-system-string-system-string-system-nullable((system-datetimeoffset))-microsoft-net-http-headers-entitytagheadervalue)">ControllerBase.File(byte[], string, string, DateTimeOffset?, EntityTagHeaderValue)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.Byte[], System.String, System.String, System.Nullable&lt;System.DateTimeOffset&gt;, Microsoft.Net.Http.Headers.EntityTagHeaderValue, System.Boolean)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-byte()-system-string-system-string-system-nullable((system-datetimeoffset))-microsoft-net-http-headers-entitytagheadervalue-system-boolean)">ControllerBase.File(byte[], string, string, DateTimeOffset?, EntityTagHeaderValue, bool)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.IO.Stream, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-io-stream-system-string)">ControllerBase.File(Stream, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.IO.Stream, System.String, System.Boolean)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-io-stream-system-string-system-boolean)">ControllerBase.File(Stream, string, bool)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.IO.Stream, System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-io-stream-system-string-system-string)">ControllerBase.File(Stream, string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.IO.Stream, System.String, System.String, System.Boolean)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-io-stream-system-string-system-string-system-boolean)">ControllerBase.File(Stream, string, string, bool)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.IO.Stream, System.String, System.Nullable&lt;System.DateTimeOffset&gt;, Microsoft.Net.Http.Headers.EntityTagHeaderValue)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-io-stream-system-string-system-nullable((system-datetimeoffset))-microsoft-net-http-headers-entitytagheadervalue)">ControllerBase.File(Stream, string, DateTimeOffset?, EntityTagHeaderValue)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.IO.Stream, System.String, System.Nullable&lt;System.DateTimeOffset&gt;, Microsoft.Net.Http.Headers.EntityTagHeaderValue, System.Boolean)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-io-stream-system-string-system-nullable((system-datetimeoffset))-microsoft-net-http-headers-entitytagheadervalue-system-boolean)">ControllerBase.File(Stream, string, DateTimeOffset?, EntityTagHeaderValue, bool)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.IO.Stream, System.String, System.String, System.Nullable&lt;System.DateTimeOffset&gt;, Microsoft.Net.Http.Headers.EntityTagHeaderValue)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-io-stream-system-string-system-string-system-nullable((system-datetimeoffset))-microsoft-net-http-headers-entitytagheadervalue)">ControllerBase.File(Stream, string, string, DateTimeOffset?, EntityTagHeaderValue)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.IO.Stream, System.String, System.String, System.Nullable&lt;System.DateTimeOffset&gt;, Microsoft.Net.Http.Headers.EntityTagHeaderValue, System.Boolean)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-io-stream-system-string-system-string-system-nullable((system-datetimeoffset))-microsoft-net-http-headers-entitytagheadervalue-system-boolean)">ControllerBase.File(Stream, string, string, DateTimeOffset?, EntityTagHeaderValue, bool)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-string-system-string)">ControllerBase.File(string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.String, System.String, System.Boolean)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-string-system-string-system-boolean)">ControllerBase.File(string, string, bool)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.String, System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-string-system-string-system-string)">ControllerBase.File(string, string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.String, System.String, System.String, System.Boolean)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-string-system-string-system-string-system-boolean)">ControllerBase.File(string, string, string, bool)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.String, System.String, System.Nullable&lt;System.DateTimeOffset&gt;, Microsoft.Net.Http.Headers.EntityTagHeaderValue)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-string-system-string-system-nullable((system-datetimeoffset))-microsoft-net-http-headers-entitytagheadervalue)">ControllerBase.File(string, string, DateTimeOffset?, EntityTagHeaderValue)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.String, System.String, System.Nullable&lt;System.DateTimeOffset&gt;, Microsoft.Net.Http.Headers.EntityTagHeaderValue, System.Boolean)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-string-system-string-system-nullable((system-datetimeoffset))-microsoft-net-http-headers-entitytagheadervalue-system-boolean)">ControllerBase.File(string, string, DateTimeOffset?, EntityTagHeaderValue, bool)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.String, System.String, System.String, System.Nullable&lt;System.DateTimeOffset&gt;, Microsoft.Net.Http.Headers.EntityTagHeaderValue)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-string-system-string-system-string-system-nullable((system-datetimeoffset))-microsoft-net-http-headers-entitytagheadervalue)">ControllerBase.File(string, string, string, DateTimeOffset?, EntityTagHeaderValue)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.File(System.String, System.String, System.String, System.Nullable&lt;System.DateTimeOffset&gt;, Microsoft.Net.Http.Headers.EntityTagHeaderValue, System.Boolean)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.file#microsoft-aspnetcore-mvc-controllerbase-file(system-string-system-string-system-string-system-nullable((system-datetimeoffset))-microsoft-net-http-headers-entitytagheadervalue-system-boolean)">ControllerBase.File(string, string, string, DateTimeOffset?, EntityTagHeaderValue, bool)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.PhysicalFile(System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.physicalfile#microsoft-aspnetcore-mvc-controllerbase-physicalfile(system-string-system-string)">ControllerBase.PhysicalFile(string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.PhysicalFile(System.String, System.String, System.Boolean)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.physicalfile#microsoft-aspnetcore-mvc-controllerbase-physicalfile(system-string-system-string-system-boolean)">ControllerBase.PhysicalFile(string, string, bool)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.PhysicalFile(System.String, System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.physicalfile#microsoft-aspnetcore-mvc-controllerbase-physicalfile(system-string-system-string-system-string)">ControllerBase.PhysicalFile(string, string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.PhysicalFile(System.String, System.String, System.String, System.Boolean)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.physicalfile#microsoft-aspnetcore-mvc-controllerbase-physicalfile(system-string-system-string-system-string-system-boolean)">ControllerBase.PhysicalFile(string, string, string, bool)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.PhysicalFile(System.String, System.String, System.Nullable&lt;System.DateTimeOffset&gt;, Microsoft.Net.Http.Headers.EntityTagHeaderValue)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.physicalfile#microsoft-aspnetcore-mvc-controllerbase-physicalfile(system-string-system-string-system-nullable((system-datetimeoffset))-microsoft-net-http-headers-entitytagheadervalue)">ControllerBase.PhysicalFile(string, string, DateTimeOffset?, EntityTagHeaderValue)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.PhysicalFile(System.String, System.String, System.Nullable&lt;System.DateTimeOffset&gt;, Microsoft.Net.Http.Headers.EntityTagHeaderValue, System.Boolean)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.physicalfile#microsoft-aspnetcore-mvc-controllerbase-physicalfile(system-string-system-string-system-nullable((system-datetimeoffset))-microsoft-net-http-headers-entitytagheadervalue-system-boolean)">ControllerBase.PhysicalFile(string, string, DateTimeOffset?, EntityTagHeaderValue, bool)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.PhysicalFile(System.String, System.String, System.String, System.Nullable&lt;System.DateTimeOffset&gt;, Microsoft.Net.Http.Headers.EntityTagHeaderValue)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.physicalfile#microsoft-aspnetcore-mvc-controllerbase-physicalfile(system-string-system-string-system-string-system-nullable((system-datetimeoffset))-microsoft-net-http-headers-entitytagheadervalue)">ControllerBase.PhysicalFile(string, string, string, DateTimeOffset?, EntityTagHeaderValue)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.PhysicalFile(System.String, System.String, System.String, System.Nullable&lt;System.DateTimeOffset&gt;, Microsoft.Net.Http.Headers.EntityTagHeaderValue, System.Boolean)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.physicalfile#microsoft-aspnetcore-mvc-controllerbase-physicalfile(system-string-system-string-system-string-system-nullable((system-datetimeoffset))-microsoft-net-http-headers-entitytagheadervalue-system-boolean)">ControllerBase.PhysicalFile(string, string, string, DateTimeOffset?, EntityTagHeaderValue, bool)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Unauthorized()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.unauthorized#microsoft-aspnetcore-mvc-controllerbase-unauthorized">ControllerBase.Unauthorized()</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Unauthorized(System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.unauthorized#microsoft-aspnetcore-mvc-controllerbase-unauthorized(system-object)">ControllerBase.Unauthorized(object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.NotFound()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.notfound#microsoft-aspnetcore-mvc-controllerbase-notfound">ControllerBase.NotFound()</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.NotFound(System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.notfound#microsoft-aspnetcore-mvc-controllerbase-notfound(system-object)">ControllerBase.NotFound(object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.BadRequest()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.badrequest#microsoft-aspnetcore-mvc-controllerbase-badrequest">ControllerBase.BadRequest()</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.BadRequest(System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.badrequest#microsoft-aspnetcore-mvc-controllerbase-badrequest(system-object)">ControllerBase.BadRequest(object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.BadRequest(Microsoft.AspNetCore.Mvc.ModelBinding.ModelStateDictionary)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.badrequest#microsoft-aspnetcore-mvc-controllerbase-badrequest(microsoft-aspnetcore-mvc-modelbinding-modelstatedictionary)">ControllerBase.BadRequest(ModelStateDictionary)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.UnprocessableEntity()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.unprocessableentity#microsoft-aspnetcore-mvc-controllerbase-unprocessableentity">ControllerBase.UnprocessableEntity()</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.UnprocessableEntity(System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.unprocessableentity#microsoft-aspnetcore-mvc-controllerbase-unprocessableentity(system-object)">ControllerBase.UnprocessableEntity(object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.UnprocessableEntity(Microsoft.AspNetCore.Mvc.ModelBinding.ModelStateDictionary)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.unprocessableentity#microsoft-aspnetcore-mvc-controllerbase-unprocessableentity(microsoft-aspnetcore-mvc-modelbinding-modelstatedictionary)">ControllerBase.UnprocessableEntity(ModelStateDictionary)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Conflict()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.conflict#microsoft-aspnetcore-mvc-controllerbase-conflict">ControllerBase.Conflict()</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Conflict(System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.conflict#microsoft-aspnetcore-mvc-controllerbase-conflict(system-object)">ControllerBase.Conflict(object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Conflict(Microsoft.AspNetCore.Mvc.ModelBinding.ModelStateDictionary)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.conflict#microsoft-aspnetcore-mvc-controllerbase-conflict(microsoft-aspnetcore-mvc-modelbinding-modelstatedictionary)">ControllerBase.Conflict(ModelStateDictionary)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Problem(System.String, System.String, System.Nullable&lt;System.Int32&gt;, System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.problem">ControllerBase.Problem(string, string, int?, string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.ValidationProblem(Microsoft.AspNetCore.Mvc.ValidationProblemDetails)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.validationproblem#microsoft-aspnetcore-mvc-controllerbase-validationproblem(microsoft-aspnetcore-mvc-validationproblemdetails)">ControllerBase.ValidationProblem(ValidationProblemDetails)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.ValidationProblem(Microsoft.AspNetCore.Mvc.ModelBinding.ModelStateDictionary)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.validationproblem#microsoft-aspnetcore-mvc-controllerbase-validationproblem(microsoft-aspnetcore-mvc-modelbinding-modelstatedictionary)">ControllerBase.ValidationProblem(ModelStateDictionary)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.ValidationProblem()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.validationproblem#microsoft-aspnetcore-mvc-controllerbase-validationproblem">ControllerBase.ValidationProblem()</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.ValidationProblem(System.String, System.String, System.Nullable&lt;System.Int32&gt;, System.String, System.String, Microsoft.AspNetCore.Mvc.ModelBinding.ModelStateDictionary)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.validationproblem#microsoft-aspnetcore-mvc-controllerbase-validationproblem(system-string-system-string-system-nullable((system-int32))-system-string-system-string-microsoft-aspnetcore-mvc-modelbinding-modelstatedictionary)">ControllerBase.ValidationProblem(string, string, int?, string, string, ModelStateDictionary)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Created(System.String, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.created#microsoft-aspnetcore-mvc-controllerbase-created(system-string-system-object)">ControllerBase.Created(string, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Created(System.Uri, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.created#microsoft-aspnetcore-mvc-controllerbase-created(system-uri-system-object)">ControllerBase.Created(Uri, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.CreatedAtAction(System.String, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.createdataction#microsoft-aspnetcore-mvc-controllerbase-createdataction(system-string-system-object)">ControllerBase.CreatedAtAction(string, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.CreatedAtAction(System.String, System.Object, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.createdataction#microsoft-aspnetcore-mvc-controllerbase-createdataction(system-string-system-object-system-object)">ControllerBase.CreatedAtAction(string, object, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.CreatedAtAction(System.String, System.String, System.Object, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.createdataction#microsoft-aspnetcore-mvc-controllerbase-createdataction(system-string-system-string-system-object-system-object)">ControllerBase.CreatedAtAction(string, string, object, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.CreatedAtRoute(System.String, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.createdatroute#microsoft-aspnetcore-mvc-controllerbase-createdatroute(system-string-system-object)">ControllerBase.CreatedAtRoute(string, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.CreatedAtRoute(System.Object, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.createdatroute#microsoft-aspnetcore-mvc-controllerbase-createdatroute(system-object-system-object)">ControllerBase.CreatedAtRoute(object, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.CreatedAtRoute(System.String, System.Object, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.createdatroute#microsoft-aspnetcore-mvc-controllerbase-createdatroute(system-string-system-object-system-object)">ControllerBase.CreatedAtRoute(string, object, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Accepted()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.accepted#microsoft-aspnetcore-mvc-controllerbase-accepted">ControllerBase.Accepted()</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Accepted(System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.accepted#microsoft-aspnetcore-mvc-controllerbase-accepted(system-object)">ControllerBase.Accepted(object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Accepted(System.Uri)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.accepted#microsoft-aspnetcore-mvc-controllerbase-accepted(system-uri)">ControllerBase.Accepted(Uri)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Accepted(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.accepted#microsoft-aspnetcore-mvc-controllerbase-accepted(system-string)">ControllerBase.Accepted(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Accepted(System.String, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.accepted#microsoft-aspnetcore-mvc-controllerbase-accepted(system-string-system-object)">ControllerBase.Accepted(string, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Accepted(System.Uri, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.accepted#microsoft-aspnetcore-mvc-controllerbase-accepted(system-uri-system-object)">ControllerBase.Accepted(Uri, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.AcceptedAtAction(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.acceptedataction#microsoft-aspnetcore-mvc-controllerbase-acceptedataction(system-string)">ControllerBase.AcceptedAtAction(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.AcceptedAtAction(System.String, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.acceptedataction#microsoft-aspnetcore-mvc-controllerbase-acceptedataction(system-string-system-string)">ControllerBase.AcceptedAtAction(string, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.AcceptedAtAction(System.String, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.acceptedataction#microsoft-aspnetcore-mvc-controllerbase-acceptedataction(system-string-system-object)">ControllerBase.AcceptedAtAction(string, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.AcceptedAtAction(System.String, System.String, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.acceptedataction#microsoft-aspnetcore-mvc-controllerbase-acceptedataction(system-string-system-string-system-object)">ControllerBase.AcceptedAtAction(string, string, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.AcceptedAtAction(System.String, System.Object, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.acceptedataction#microsoft-aspnetcore-mvc-controllerbase-acceptedataction(system-string-system-object-system-object)">ControllerBase.AcceptedAtAction(string, object, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.AcceptedAtAction(System.String, System.String, System.Object, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.acceptedataction#microsoft-aspnetcore-mvc-controllerbase-acceptedataction(system-string-system-string-system-object-system-object)">ControllerBase.AcceptedAtAction(string, string, object, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.AcceptedAtRoute(System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.acceptedatroute#microsoft-aspnetcore-mvc-controllerbase-acceptedatroute(system-object)">ControllerBase.AcceptedAtRoute(object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.AcceptedAtRoute(System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.acceptedatroute#microsoft-aspnetcore-mvc-controllerbase-acceptedatroute(system-string)">ControllerBase.AcceptedAtRoute(string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.AcceptedAtRoute(System.String, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.acceptedatroute#microsoft-aspnetcore-mvc-controllerbase-acceptedatroute(system-string-system-object)">ControllerBase.AcceptedAtRoute(string, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.AcceptedAtRoute(System.Object, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.acceptedatroute#microsoft-aspnetcore-mvc-controllerbase-acceptedatroute(system-object-system-object)">ControllerBase.AcceptedAtRoute(object, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.AcceptedAtRoute(System.String, System.Object, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.acceptedatroute#microsoft-aspnetcore-mvc-controllerbase-acceptedatroute(system-string-system-object-system-object)">ControllerBase.AcceptedAtRoute(string, object, object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Challenge()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.challenge#microsoft-aspnetcore-mvc-controllerbase-challenge">ControllerBase.Challenge()</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Challenge(System.String[])</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.challenge#microsoft-aspnetcore-mvc-controllerbase-challenge(system-string())">ControllerBase.Challenge(params string[])</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Challenge(Microsoft.AspNetCore.Authentication.AuthenticationProperties)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.challenge#microsoft-aspnetcore-mvc-controllerbase-challenge(microsoft-aspnetcore-authentication-authenticationproperties)">ControllerBase.Challenge(AuthenticationProperties)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Challenge(Microsoft.AspNetCore.Authentication.AuthenticationProperties, System.String[])</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.challenge#microsoft-aspnetcore-mvc-controllerbase-challenge(microsoft-aspnetcore-authentication-authenticationproperties-system-string())">ControllerBase.Challenge(AuthenticationProperties, params string[])</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Forbid()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.forbid#microsoft-aspnetcore-mvc-controllerbase-forbid">ControllerBase.Forbid()</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Forbid(System.String[])</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.forbid#microsoft-aspnetcore-mvc-controllerbase-forbid(system-string())">ControllerBase.Forbid(params string[])</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Forbid(Microsoft.AspNetCore.Authentication.AuthenticationProperties)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.forbid#microsoft-aspnetcore-mvc-controllerbase-forbid(microsoft-aspnetcore-authentication-authenticationproperties)">ControllerBase.Forbid(AuthenticationProperties)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Forbid(Microsoft.AspNetCore.Authentication.AuthenticationProperties, System.String[])</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.forbid#microsoft-aspnetcore-mvc-controllerbase-forbid(microsoft-aspnetcore-authentication-authenticationproperties-system-string())">ControllerBase.Forbid(AuthenticationProperties, params string[])</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.SignIn(System.Security.Claims.ClaimsPrincipal)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.signin#microsoft-aspnetcore-mvc-controllerbase-signin(system-security-claims-claimsprincipal)">ControllerBase.SignIn(ClaimsPrincipal)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.SignIn(System.Security.Claims.ClaimsPrincipal, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.signin#microsoft-aspnetcore-mvc-controllerbase-signin(system-security-claims-claimsprincipal-system-string)">ControllerBase.SignIn(ClaimsPrincipal, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.SignIn(System.Security.Claims.ClaimsPrincipal, Microsoft.AspNetCore.Authentication.AuthenticationProperties)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.signin#microsoft-aspnetcore-mvc-controllerbase-signin(system-security-claims-claimsprincipal-microsoft-aspnetcore-authentication-authenticationproperties)">ControllerBase.SignIn(ClaimsPrincipal, AuthenticationProperties)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.SignIn(System.Security.Claims.ClaimsPrincipal, Microsoft.AspNetCore.Authentication.AuthenticationProperties, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.signin#microsoft-aspnetcore-mvc-controllerbase-signin(system-security-claims-claimsprincipal-microsoft-aspnetcore-authentication-authenticationproperties-system-string)">ControllerBase.SignIn(ClaimsPrincipal, AuthenticationProperties, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.SignOut()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.signout#microsoft-aspnetcore-mvc-controllerbase-signout">ControllerBase.SignOut()</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.SignOut(Microsoft.AspNetCore.Authentication.AuthenticationProperties)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.signout#microsoft-aspnetcore-mvc-controllerbase-signout(microsoft-aspnetcore-authentication-authenticationproperties)">ControllerBase.SignOut(AuthenticationProperties)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.SignOut(System.String[])</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.signout#microsoft-aspnetcore-mvc-controllerbase-signout(system-string())">ControllerBase.SignOut(params string[])</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.SignOut(Microsoft.AspNetCore.Authentication.AuthenticationProperties, System.String[])</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.signout#microsoft-aspnetcore-mvc-controllerbase-signout(microsoft-aspnetcore-authentication-authenticationproperties-system-string())">ControllerBase.SignOut(AuthenticationProperties, params string[])</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.TryUpdateModelAsync&lt;TModel&gt;(TModel)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.tryupdatemodelasync#microsoft-aspnetcore-mvc-controllerbase-tryupdatemodelasync-1(-0)">ControllerBase.TryUpdateModelAsync&lt;TModel&gt;(TModel)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.TryUpdateModelAsync&lt;TModel&gt;(TModel, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.tryupdatemodelasync#microsoft-aspnetcore-mvc-controllerbase-tryupdatemodelasync-1(-0-system-string)">ControllerBase.TryUpdateModelAsync&lt;TModel&gt;(TModel, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.TryUpdateModelAsync&lt;TModel&gt;(TModel, System.String, Microsoft.AspNetCore.Mvc.ModelBinding.IValueProvider)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.tryupdatemodelasync#microsoft-aspnetcore-mvc-controllerbase-tryupdatemodelasync-1(-0-system-string-microsoft-aspnetcore-mvc-modelbinding-ivalueprovider)">ControllerBase.TryUpdateModelAsync&lt;TModel&gt;(TModel, string, IValueProvider)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.TryUpdateModelAsync&lt;TModel&gt;(TModel, System.String, System.Linq.Expressions.Expression&lt;System.Func&lt;TModel, System.Object&gt;&gt;[])</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.tryupdatemodelasync#microsoft-aspnetcore-mvc-controllerbase-tryupdatemodelasync-1(-0-system-string-system-linq-expressions-expression((system-func((-0-system-object))))())">ControllerBase.TryUpdateModelAsync&lt;TModel&gt;(TModel, string, params Expression&lt;Func&lt;TModel, object&gt;&gt;[])</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.TryUpdateModelAsync&lt;TModel&gt;(TModel, System.String, System.Func&lt;Microsoft.AspNetCore.Mvc.ModelBinding.ModelMetadata, System.Boolean&gt;)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.tryupdatemodelasync#microsoft-aspnetcore-mvc-controllerbase-tryupdatemodelasync-1(-0-system-string-system-func((microsoft-aspnetcore-mvc-modelbinding-modelmetadata-system-boolean)))">ControllerBase.TryUpdateModelAsync&lt;TModel&gt;(TModel, string, Func&lt;ModelMetadata, bool&gt;)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.TryUpdateModelAsync&lt;TModel&gt;(TModel, System.String, Microsoft.AspNetCore.Mvc.ModelBinding.IValueProvider, System.Linq.Expressions.Expression&lt;System.Func&lt;TModel, System.Object&gt;&gt;[])</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.tryupdatemodelasync#microsoft-aspnetcore-mvc-controllerbase-tryupdatemodelasync-1(-0-system-string-microsoft-aspnetcore-mvc-modelbinding-ivalueprovider-system-linq-expressions-expression((system-func((-0-system-object))))())">ControllerBase.TryUpdateModelAsync&lt;TModel&gt;(TModel, string, IValueProvider, params Expression&lt;Func&lt;TModel, object&gt;&gt;[])</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.TryUpdateModelAsync&lt;TModel&gt;(TModel, System.String, Microsoft.AspNetCore.Mvc.ModelBinding.IValueProvider, System.Func&lt;Microsoft.AspNetCore.Mvc.ModelBinding.ModelMetadata, System.Boolean&gt;)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.tryupdatemodelasync#microsoft-aspnetcore-mvc-controllerbase-tryupdatemodelasync-1(-0-system-string-microsoft-aspnetcore-mvc-modelbinding-ivalueprovider-system-func((microsoft-aspnetcore-mvc-modelbinding-modelmetadata-system-boolean)))">ControllerBase.TryUpdateModelAsync&lt;TModel&gt;(TModel, string, IValueProvider, Func&lt;ModelMetadata, bool&gt;)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.TryUpdateModelAsync(System.Object, System.Type, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.tryupdatemodelasync#microsoft-aspnetcore-mvc-controllerbase-tryupdatemodelasync(system-object-system-type-system-string)">ControllerBase.TryUpdateModelAsync(object, Type, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.TryUpdateModelAsync(System.Object, System.Type, System.String, Microsoft.AspNetCore.Mvc.ModelBinding.IValueProvider, System.Func&lt;Microsoft.AspNetCore.Mvc.ModelBinding.ModelMetadata, System.Boolean&gt;)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.tryupdatemodelasync#microsoft-aspnetcore-mvc-controllerbase-tryupdatemodelasync(system-object-system-type-system-string-microsoft-aspnetcore-mvc-modelbinding-ivalueprovider-system-func((microsoft-aspnetcore-mvc-modelbinding-modelmetadata-system-boolean)))">ControllerBase.TryUpdateModelAsync(object, Type, string, IValueProvider, Func&lt;ModelMetadata, bool&gt;)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.TryValidateModel(System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.tryvalidatemodel#microsoft-aspnetcore-mvc-controllerbase-tryvalidatemodel(system-object)">ControllerBase.TryValidateModel(object)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.TryValidateModel(System.Object, System.String)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.tryvalidatemodel#microsoft-aspnetcore-mvc-controllerbase-tryvalidatemodel(system-object-system-string)">ControllerBase.TryValidateModel(object, string)</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.HttpContext</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.httpcontext">ControllerBase.HttpContext</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Request</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.request">ControllerBase.Request</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Response</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.response">ControllerBase.Response</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.RouteData</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.routedata">ControllerBase.RouteData</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.ModelState</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.modelstate">ControllerBase.ModelState</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.ControllerContext</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.controllercontext">ControllerBase.ControllerContext</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.MetadataProvider</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.metadataprovider">ControllerBase.MetadataProvider</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.ModelBinderFactory</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.modelbinderfactory">ControllerBase.ModelBinderFactory</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.Url</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.url">ControllerBase.Url</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.ObjectValidator</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.objectvalidator">ControllerBase.ObjectValidator</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.ProblemDetailsFactory</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.problemdetailsfactory">ControllerBase.ProblemDetailsFactory</a>
     </div>
     <div>
-      <span class="xref">Microsoft.AspNetCore.Mvc.ControllerBase.User</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.controllerbase.user">ControllerBase.User</a>
     </div>
     <div>
-      <span class="xref">System.Object.Equals(System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
     </div>
     <div>
-      <span class="xref">System.Object.Equals(System.Object, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
     </div>
     <div>
-      <span class="xref">System.Object.GetHashCode()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
     </div>
     <div>
-      <span class="xref">System.Object.GetType()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
     </div>
     <div>
-      <span class="xref">System.Object.MemberwiseClone()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
     </div>
     <div>
-      <span class="xref">System.Object.ReferenceEquals(System.Object, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
     </div>
     <div>
-      <span class="xref">System.Object.ToString()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
     </div>
   </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="DuetWebServer.Controllers.html">DuetWebServer.Controllers</a></h6>
+  <h6><strong>Namespace</strong>: <a class="xref" href="DuetWebServer.html">DuetWebServer</a>.<a class="xref" href="DuetWebServer.Controllers.html">Controllers</a></h6>
   <h6><strong>Assembly</strong>: DuetWebServer.dll</h6>
   <h5 id="DuetWebServer_Controllers_WebSocketController_syntax">Syntax</h5>
   <div class="codewrapper">
@@ -1923,18 +2082,18 @@
 public class WebSocketController : ControllerBase</code></pre>
   </div>
   <h3 id="constructors">Constructors
-  </h3>
+</h3>
   <a id="DuetWebServer_Controllers_WebSocketController__ctor_" data-uid="DuetWebServer.Controllers.WebSocketController.#ctor*"></a>
   <h4 id="DuetWebServer_Controllers_WebSocketController__ctor_Microsoft_Extensions_Configuration_IConfiguration_Microsoft_Extensions_Logging_ILogger_DuetWebServer_Controllers_WebSocketController__Microsoft_Extensions_Hosting_IHostApplicationLifetime_" data-uid="DuetWebServer.Controllers.WebSocketController.#ctor(Microsoft.Extensions.Configuration.IConfiguration,Microsoft.Extensions.Logging.ILogger{DuetWebServer.Controllers.WebSocketController},Microsoft.Extensions.Hosting.IHostApplicationLifetime)">WebSocketController(IConfiguration, ILogger&lt;WebSocketController&gt;, IHostApplicationLifetime)</h4>
   <div class="markdown level1 summary"><p>Constructor of a new WebSocket controller</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public WebSocketController(IConfiguration configuration, ILogger&lt;WebSocketController&gt; logger, IHostApplicationLifetime applicationLifetime)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1944,19 +2103,19 @@ public class WebSocketController : ControllerBase</code></pre>
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">Microsoft.Extensions.Configuration.IConfiguration</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.configuration.iconfiguration">IConfiguration</a></td>
         <td><span class="parametername">configuration</span></td>
         <td><p>Configuration of this application</p>
 </td>
       </tr>
       <tr>
-        <td><span class="xref">Microsoft.Extensions.Logging.ILogger</span>&lt;<a class="xref" href="DuetWebServer.Controllers.WebSocketController.html">WebSocketController</a>&gt;</td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger-1">ILogger</a>&lt;<a class="xref" href="DuetWebServer.Controllers.WebSocketController.html">WebSocketController</a>&gt;</td>
         <td><span class="parametername">logger</span></td>
         <td><p>Logger instance</p>
 </td>
       </tr>
       <tr>
-        <td><span class="xref">Microsoft.Extensions.Hosting.IHostApplicationLifetime</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.hosting.ihostapplicationlifetime">IHostApplicationLifetime</a></td>
         <td><span class="parametername">applicationLifetime</span></td>
         <td><p>Application lifecycle instance</p>
 </td>
@@ -1964,20 +2123,20 @@ public class WebSocketController : ControllerBase</code></pre>
     </tbody>
   </table>
   <h3 id="methods">Methods
-  </h3>
+</h3>
   <a id="DuetWebServer_Controllers_WebSocketController_Get_" data-uid="DuetWebServer.Controllers.WebSocketController.Get*"></a>
-  <h4 id="DuetWebServer_Controllers_WebSocketController_Get_System_String_DuetWebServer_Singletons_ISessionStorage_" data-uid="DuetWebServer.Controllers.WebSocketController.Get(System.String,DuetWebServer.Singletons.ISessionStorage)">Get(String, ISessionStorage)</h4>
+  <h4 id="DuetWebServer_Controllers_WebSocketController_Get_System_String_DuetWebServer_Singletons_ISessionStorage_" data-uid="DuetWebServer.Controllers.WebSocketController.Get(System.String,DuetWebServer.Singletons.ISessionStorage)">Get(string?, ISessionStorage)</h4>
   <div class="markdown level1 summary"><p>WS /machine?sessionKey=XXX
 Provide WebSocket for continuous model updates. This is primarily used to keep DWC up-to-date</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">[HttpGet]
-public async Task Get(string sessionKey, [FromServices] ISessionStorage sessionStorage)</code></pre>
+public Task Get(string? sessionKey, ISessionStorage sessionStorage)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1987,9 +2146,9 @@ public async Task Get(string sessionKey, [FromServices] ISessionStorage sessionS
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.String</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">sessionKey</span></td>
-        <td><p>Session key for authentication</p>
+        <td><p>Optional session key for authentication</p>
 </td>
       </tr>
       <tr>
@@ -2001,7 +2160,7 @@ public async Task Get(string sessionKey, [FromServices] ISessionStorage sessionS
     </tbody>
   </table>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2010,7 +2169,7 @@ public async Task Get(string sessionKey, [FromServices] ISessionStorage sessionS
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
         <td><p>HTTP status code:
 (101) WebSocket upgrade
 (400) Bad request
@@ -2022,73 +2181,21 @@ public async Task Get(string sessionKey, [FromServices] ISessionStorage sessionS
       </tr>
     </tbody>
   </table>
-  <a id="DuetWebServer_Controllers_WebSocketController_Process_" data-uid="DuetWebServer.Controllers.WebSocketController.Process*"></a>
-  <h4 id="DuetWebServer_Controllers_WebSocketController_Process_System_Net_WebSockets_WebSocket_System_String_" data-uid="DuetWebServer.Controllers.WebSocketController.Process(System.Net.WebSockets.WebSocket,System.String)">Process(WebSocket, String)</h4>
-  <div class="markdown level1 summary"><p>Deal with a newly opened WebSocket.
-A client may receive one of the WS codes:
-(1001) Endpoint unavailable
-(1003) Invalid command
-(1011) Internal error</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public async Task Process(WebSocket webSocket, string socketPath)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Net.WebSockets.WebSocket</span></td>
-        <td><span class="parametername">webSocket</span></td>
-        <td><p>WebSocket connection</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">System.String</span></td>
-        <td><span class="parametername">socketPath</span></td>
-        <td><p>API socket path</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
-        <td><p>Asynchronous task</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
 </article>
           </div>
-          
+
           <div class="hidden-sm col-md-2" role="complementary">
             <div class="sideaffix">
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
+                <h5>In this article</h5>
                 <div></div>
               </nav>
             </div>
           </div>
         </div>
       </div>
-      
+
       <footer>
         <div class="grad-bottom"></div>
         <div class="footer">
@@ -2096,14 +2203,14 @@ A client may receive one of the WS codes:
             <span class="pull-right">
               <a href="#top">Back to top</a>
             </span>
-            
-            <span>Generated by <strong>DocFX</strong></span>
+      
+      <span>Generated by <strong>DocFX</strong></span>
           </div>
         </div>
       </footer>
     </div>
-    
-    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
     <script type="text/javascript" src="../styles/docfx.js"></script>
     <script type="text/javascript" src="../styles/main.js"></script>
   </body>

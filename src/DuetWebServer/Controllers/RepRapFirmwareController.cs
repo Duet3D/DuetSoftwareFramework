@@ -465,9 +465,11 @@ namespace DuetWebServer.Controllers
         }
 
         /// <summary>
-        /// GET /rr_filelist?dir={directory}&first={first}
+        /// GET /rr_filelist?dir={directory}&amp;first={first}
         /// Retrieve file list
         /// </summary>
+        /// <param name="dir">Directory to list</param>
+        /// <param name="first">First file to list or -1 if unknown</param>
         /// <returns>
         /// HTTP status code:
         /// (200) JSON response
@@ -492,9 +494,12 @@ namespace DuetWebServer.Controllers
         }
 
         /// <summary>
-        /// GET /rr_files?dir={directory}&first={first}&flagDirs={flagDirs}
+        /// GET /rr_files?dir={directory}&amp;first={first}&amp;flagDirs={flagDirs}
         /// Retrieve files list
         /// </summary>
+        /// <param name="dir">Directory to list</param>
+        /// <param name="first">First file to list (defaults to 0)</param>
+        /// <param name="flagDirs">Whether directories should be flagged using an asterisk prefix</param>
         /// <returns>
         /// HTTP status code:
         /// (200) JSON response
@@ -518,7 +523,7 @@ namespace DuetWebServer.Controllers
         }
 
         /// <summary>
-        /// GET /rr_model?key={key}&flags={flags}
+        /// GET /rr_model?key={key}&amp;flags={flags}
         /// Retrieve object model information
         /// </summary>
         /// <returns>
@@ -849,7 +854,7 @@ namespace DuetWebServer.Controllers
         }
 
         /// <summary>
-        /// GET /rr_thumbnail?name={filename}&offset={offset}
+        /// GET /rr_thumbnail?name={filename}&amp;offset={offset}
         /// Get the thumbnail from a given filename
         /// </summary>
         /// <param name="filename">G-code file to read thumbnails from</param>

@@ -1,23 +1,21 @@
 ﻿<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
-  
+
   <head>
     <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Class Interface
-   </title>
-    <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Class Interface
-   ">
-    <meta name="generator" content="docfx 2.59.4.0">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class Interface </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class Interface ">
     
-    <link rel="shortcut icon" href="../favicon.ico">
-    <link rel="stylesheet" href="../styles/docfx.vendor.css">
-    <link rel="stylesheet" href="../styles/docfx.css">
-    <link rel="stylesheet" href="../styles/main.css">
-    <meta property="docfx:navrel" content="../toc">
-    <meta property="docfx:tocrel" content="toc">
+    <meta name="description" content="This class accesses RepRapFirmware via SPI and deals with general communication">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.json">
+      <meta property="docfx:tocrel" content="toc.json">
     
     
     
@@ -25,7 +23,7 @@
   <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
-        
+
         <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
           <div class="container">
             <div class="navbar-header">
@@ -35,7 +33,7 @@
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
               </button>
-              
+
               <a class="navbar-brand" href="../index.html">
                 <img id="logo" class="svg" src="../logo.svg" alt="">
               </a>
@@ -46,7 +44,7 @@
                   <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
                 </div>
               </form>
-                
+
                 <ul class="nav level1 navbar-nav">
                       <li>
                           <a href="../api/DuetAPI.html" title="DuetAPI">DuetAPI</a>
@@ -60,10 +58,11 @@
                       <li>
                           <a href="../api/DuetWebServer.html" title="DuetWebServer">DuetWebServer</a>
                       </li>
-                </ul>    </div>
+                </ul>
+            </div>
           </div>
         </nav>
-        
+
         <div class="subnav navbar navbar-default">
           <div class="container hide-when-search" id="breadcrumb">
             <ul class="breadcrumb">
@@ -85,21 +84,37 @@
               </div>
               <div class="sidetoc">
                 <div class="toc" id="toc">
-                  
+
                   <ul class="nav level1">
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetAPI.html" title="DuetAPI" class="">DuetAPI</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetAPI.CodeChannel.html" title="CodeChannel" class="">CodeChannel</a>
                           </li>
-                        </ul>  </li>
+                          <li class="">
+                            <a href="DuetAPI.CodeParserException.html" title="CodeParserException" class="">CodeParserException</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.IncompatibleVersionException.html" title="IncompatibleVersionException" class="">IncompatibleVersionException</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.InternalServerException.html" title="InternalServerException" class="">InternalServerException</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.InvalidParameterTypeException.html" title="InvalidParameterTypeException" class="">InvalidParameterTypeException</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.MissingParameterException.html" title="MissingParameterException" class="">MissingParameterException</a>
+                          </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetAPI.Commands.html" title="DuetAPI.Commands" class="">DuetAPI.Commands</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetAPI.Commands.Acknowledge.html" title="Acknowledge" class="">Acknowledge</a>
@@ -136,9 +151,6 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.Commands.CodeParserBuffer.html" title="CodeParserBuffer" class="">CodeParserBuffer</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetAPI.Commands.CodeParserException.html" title="CodeParserException" class="">CodeParserException</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Commands.CodeType.html" title="CodeType" class="">CodeType</a>
@@ -257,11 +269,12 @@
                           <li class="">
                             <a href="DuetAPI.Commands.WriteMessage.html" title="WriteMessage" class="">WriteMessage</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetAPI.Connection.html" title="DuetAPI.Connection" class="">DuetAPI.Connection</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetAPI.Connection.ConnectionMode.html" title="ConnectionMode" class="">ConnectionMode</a>
@@ -270,19 +283,17 @@
                             <a href="DuetAPI.Connection.Defaults.html" title="Defaults" class="">Defaults</a>
                           </li>
                           <li class="">
-                            <a href="DuetAPI.Connection.IncompatibleVersionException.html" title="IncompatibleVersionException" class="">IncompatibleVersionException</a>
-                          </li>
-                          <li class="">
                             <a href="DuetAPI.Connection.InterceptionMode.html" title="InterceptionMode" class="">InterceptionMode</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.Connection.SubscriptionMode.html" title="SubscriptionMode" class="">SubscriptionMode</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetAPI.Connection.InitMessages.html" title="DuetAPI.Connection.InitMessages" class="">DuetAPI.Connection.InitMessages</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetAPI.Connection.InitMessages.ClientInitMessage.html" title="ClientInitMessage" class="">ClientInitMessage</a>
@@ -305,11 +316,12 @@
                           <li class="">
                             <a href="DuetAPI.Connection.InitMessages.SubscribeInitMessage.html" title="SubscribeInitMessage" class="">SubscribeInitMessage</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetAPI.ObjectModel.html" title="DuetAPI.ObjectModel" class="">DuetAPI.ObjectModel</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Accelerometer.html" title="Accelerometer" class="">Accelerometer</a>
@@ -336,6 +348,9 @@
                             <a href="DuetAPI.ObjectModel.Board.html" title="Board" class="">Board</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.BoardClosedLoop.html" title="BoardClosedLoop" class="">BoardClosedLoop</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.BoardState.html" title="BoardState" class="">BoardState</a>
                           </li>
                           <li class="">
@@ -345,7 +360,13 @@
                             <a href="DuetAPI.ObjectModel.BuildObject.html" title="BuildObject" class="">BuildObject</a>
                           </li>
                           <li class="">
-                            <a href="DuetAPI.ObjectModel.ClosedLoop.html" title="ClosedLoop" class="">ClosedLoop</a>
+                            <a href="DuetAPI.ObjectModel.CPU.html" title="CPU" class="">CPU</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ClosedLoopCurrentFraction.html" title="ClosedLoopCurrentFraction" class="">ClosedLoopCurrentFraction</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.ClosedLoopPositionError.html" title="ClosedLoopPositionError" class="">ClosedLoopPositionError</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Compatibility.html" title="Compatibility" class="">Compatibility</a>
@@ -355,6 +376,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.CurrentMove.html" title="CurrentMove" class="">CurrentMove</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.DSF.html" title="DSF" class="">DSF</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.DeltaKinematics.html" title="DeltaKinematics" class="">DeltaKinematics</a>
@@ -372,6 +396,18 @@
                             <a href="DuetAPI.ObjectModel.DirectDisplay.html" title="DirectDisplay" class="">DirectDisplay</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.DirectDisplayController.html" title="DirectDisplayController" class="">DirectDisplayController</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.DirectDisplayEncoder.html" title="DirectDisplayEncoder" class="">DirectDisplayEncoder</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.DirectDisplayScreen.html" title="DirectDisplayScreen" class="">DirectDisplayScreen</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.DirectDisplayScreenST7567.html" title="DirectDisplayScreenST7567" class="">DirectDisplayScreenST7567</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.Directories.html" title="Directories" class="">Directories</a>
                           </li>
                           <li class="">
@@ -384,7 +420,10 @@
                             <a href="DuetAPI.ObjectModel.Driver.html" title="Driver" class="">Driver</a>
                           </li>
                           <li class="">
-                            <a href="DuetAPI.ObjectModel.DriverSettings.html" title="DriverSettings" class="">DriverSettings</a>
+                            <a href="DuetAPI.ObjectModel.DriverClosedLoop.html" title="DriverClosedLoop" class="">DriverClosedLoop</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Duet3DFilamentMonitor.html" title="Duet3DFilamentMonitor" class="">Duet3DFilamentMonitor</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Endstop.html" title="Endstop" class="">Endstop</a>
@@ -406,6 +445,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.FilamentMonitor.html" title="FilamentMonitor" class="">FilamentMonitor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.FilamentMonitorEnableMode.html" title="FilamentMonitorEnableMode" class="">FilamentMonitorEnableMode</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.FilamentMonitorStatus.html" title="FilamentMonitorStatus" class="">FilamentMonitorStatus</a>
@@ -471,13 +513,13 @@
                             <a href="DuetAPI.ObjectModel.IModelObject.html" title="IModelObject" class="">IModelObject</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.InductiveSensor.html" title="InductiveSensor" class="">InductiveSensor</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.InputChannel.html" title="InputChannel" class="">InputChannel</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.InputChannelState.html" title="InputChannelState" class="">InputChannelState</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetAPI.ObjectModel.Inputs.html" title="Inputs" class="">Inputs</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.InputShaping.html" title="InputShaping" class="">InputShaping</a>
@@ -486,7 +528,16 @@
                             <a href="DuetAPI.ObjectModel.InputShapingType.html" title="InputShapingType" class="">InputShapingType</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.Inputs.html" title="Inputs" class="">Inputs</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.Job.html" title="Job" class="">Job</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.KeepoutZone.html" title="KeepoutZone" class="">KeepoutZone</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.KeepoutZoneCoordinates.html" title="KeepoutZoneCoordinates" class="">KeepoutZoneCoordinates</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Kinematics.html" title="Kinematics" class="">Kinematics</a>
@@ -510,6 +561,15 @@
                             <a href="DuetAPI.ObjectModel.Layer.html" title="Layer" class="">Layer</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.LedStrip.html" title="LedStrip" class="">LedStrip</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.LedStripType.html" title="LedStripType" class="">LedStripType</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.LimitedResponseCountAttribute.html" title="LimitedResponseCountAttribute" class="">LimitedResponseCountAttribute</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.Limits.html" title="Limits" class="">Limits</a>
                           </li>
                           <li class="">
@@ -520,6 +580,9 @@
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.MachineStatus.html" title="MachineStatus" class="">MachineStatus</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.Memory.html" title="Memory" class="">Memory</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.Message.html" title="Message" class="">Message</a>
@@ -543,10 +606,10 @@
                             <a href="DuetAPI.ObjectModel.ModelCollection-1.html" title="ModelCollection&lt;T&gt;" class="">ModelCollection&lt;T&gt;</a>
                           </li>
                           <li class="">
-                            <a href="DuetAPI.ObjectModel.ModelDictionary-1.html" title="ModelDictionary&lt;TValue&gt;" class="">ModelDictionary&lt;TValue&gt;</a>
+                            <a href="DuetAPI.ObjectModel.ModelDictionaryConverter.html" title="ModelDictionaryConverter" class="">ModelDictionaryConverter</a>
                           </li>
                           <li class="">
-                            <a href="DuetAPI.ObjectModel.ModelDictionaryConverter.html" title="ModelDictionaryConverter" class="">ModelDictionaryConverter</a>
+                            <a href="DuetAPI.ObjectModel.ModelDictionary-1.html" title="ModelDictionary&lt;TValue&gt;" class="">ModelDictionary&lt;TValue&gt;</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.ModelGrowingCollection-1.html" title="ModelGrowingCollection&lt;T&gt;" class="">ModelGrowingCollection&lt;T&gt;</a>
@@ -642,13 +705,10 @@
                             <a href="DuetAPI.ObjectModel.RotatingMagnetFilamentMonitorConfigured.html" title="RotatingMagnetFilamentMonitorConfigured" class="">RotatingMagnetFilamentMonitorConfigured</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.ObjectModel.SBC.html" title="SBC" class="">SBC</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.ObjectModel.SbcPropertyAttribute.html" title="SbcPropertyAttribute" class="">SbcPropertyAttribute</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetAPI.ObjectModel.Scanner.html" title="Scanner" class="">Scanner</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetAPI.ObjectModel.ScannerStatus.html" title="ScannerStatus" class="">ScannerStatus</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.ScaraKinematics.html" title="ScaraKinematics" class="">ScaraKinematics</a>
@@ -669,10 +729,13 @@
                             <a href="DuetAPI.ObjectModel.SpindleState.html" title="SpindleState" class="">SpindleState</a>
                           </li>
                           <li class="">
-                            <a href="DuetAPI.ObjectModel.StallDetectSettings.html" title="StallDetectSettings" class="">StallDetectSettings</a>
+                            <a href="DuetAPI.ObjectModel.StartupError.html" title="StartupError" class="">StartupError</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.State.html" title="State" class="">State</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetAPI.ObjectModel.TemperatureError.html" title="TemperatureError" class="">TemperatureError</a>
                           </li>
                           <li class="">
                             <a href="DuetAPI.ObjectModel.ThumbnailInfo.html" title="ThumbnailInfo" class="">ThumbnailInfo</a>
@@ -704,11 +767,12 @@
                           <li class="">
                             <a href="DuetAPI.ObjectModel.ZLeadscrewKinematics.html" title="ZLeadscrewKinematics" class="">ZLeadscrewKinematics</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetAPI.Utility.html" title="DuetAPI.Utility" class="">DuetAPI.Utility</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetAPI.Utility.DriverId.html" title="DriverId" class="">DriverId</a>
@@ -735,6 +799,9 @@
                             <a href="DuetAPI.Utility.JsonLowerCaseStringEnumConverter.html" title="JsonLowerCaseStringEnumConverter" class="">JsonLowerCaseStringEnumConverter</a>
                           </li>
                           <li class="">
+                            <a href="DuetAPI.Utility.JsonOptionalShortDateTimeConverter.html" title="JsonOptionalShortDateTimeConverter" class="">JsonOptionalShortDateTimeConverter</a>
+                          </li>
+                          <li class="">
                             <a href="DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter-1.html" title="JsonPolymorphicWriteOnlyConverter&lt;T&gt;" class="">JsonPolymorphicWriteOnlyConverter&lt;T&gt;</a>
                           </li>
                           <li class="">
@@ -752,11 +819,12 @@
                           <li class="">
                             <a href="DuetAPI.Utility.SbcPermissionsConverter.html" title="SbcPermissionsConverter" class="">SbcPermissionsConverter</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetAPIClient.html" title="DuetAPIClient" class="">DuetAPIClient</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetAPIClient.BaseCommandConnection.html" title="BaseCommandConnection" class="">BaseCommandConnection</a>
@@ -783,16 +851,14 @@
                             <a href="DuetAPIClient.InterceptConnection.html" title="InterceptConnection" class="">InterceptConnection</a>
                           </li>
                           <li class="">
-                            <a href="DuetAPIClient.InternalServerException.html" title="InternalServerException" class="">InternalServerException</a>
-                          </li>
-                          <li class="">
                             <a href="DuetAPIClient.SubscribeConnection.html" title="SubscribeConnection" class="">SubscribeConnection</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.html" title="DuetControlServer" class="">DuetControlServer</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.Program.html" title="Program" class="">Program</a>
@@ -800,29 +866,81 @@
                           <li class="">
                             <a href="DuetControlServer.Settings.html" title="Settings" class="">Settings</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.Codes.html" title="DuetControlServer.Codes" class="">DuetControlServer.Codes</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
-                            <a href="DuetControlServer.Codes.GCodes.html" title="GCodes" class="">GCodes</a>
+                            <a href="DuetControlServer.Codes.ChannelProcessor.html" title="ChannelProcessor" class="">ChannelProcessor</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.Codes.Keywords.html" title="Keywords" class="">Keywords</a>
+                            <a href="DuetControlServer.Codes.PipelineStage.html" title="PipelineStage" class="">PipelineStage</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.Codes.MCodes.html" title="MCodes" class="">MCodes</a>
+                            <a href="DuetControlServer.Codes.Processor.html" title="Processor" class="">Processor</a>
+                          </li>
+                        </ul>
+                    </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.Codes.Handlers.html" title="DuetControlServer.Codes.Handlers" class="">DuetControlServer.Codes.Handlers</a>
+
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Handlers.Functions.html" title="Functions" class="">Functions</a>
                           </li>
                           <li class="">
-                            <a href="DuetControlServer.Codes.TCodes.html" title="TCodes" class="">TCodes</a>
+                            <a href="DuetControlServer.Codes.Handlers.GCodes.html" title="GCodes" class="">GCodes</a>
                           </li>
-                        </ul>  </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Handlers.Keywords.html" title="Keywords" class="">Keywords</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Handlers.MCodes.html" title="MCodes" class="">MCodes</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Handlers.TCodes.html" title="TCodes" class="">TCodes</a>
+                          </li>
+                        </ul>
+                    </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetControlServer.Codes.Pipelines.html" title="DuetControlServer.Codes.Pipelines" class="">DuetControlServer.Codes.Pipelines</a>
+
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Pipelines.Executed.html" title="Executed" class="">Executed</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Pipelines.Firmware.html" title="Firmware" class="">Firmware</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Pipelines.PipelineBase.html" title="PipelineBase" class="">PipelineBase</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Pipelines.PipelineStackItem.html" title="PipelineStackItem" class="">PipelineStackItem</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Pipelines.Post.html" title="Post" class="">Post</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Pipelines.Pre.html" title="Pre" class="">Pre</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Pipelines.ProcessInternally.html" title="ProcessInternally" class="">ProcessInternally</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Codes.Pipelines.Start.html" title="Start" class="">Start</a>
+                          </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.Commands.html" title="DuetControlServer.Commands" class="">DuetControlServer.Commands</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.Commands.AddHttpEndpoint.html" title="AddHttpEndpoint" class="">AddHttpEndpoint</a>
@@ -923,23 +1041,12 @@
                           <li class="">
                             <a href="DuetControlServer.Commands.WriteMessage.html" title="WriteMessage" class="">WriteMessage</a>
                           </li>
-                        </ul>  </li>
-                    <li class="">
-                      <span class="expand-stub"></span>
-                      <a href="DuetControlServer.FileExecution.html" title="DuetControlServer.FileExecution" class="">DuetControlServer.FileExecution</a>
-                        
-                        <ul class="nav level2">
-                          <li class="">
-                            <a href="DuetControlServer.FileExecution.Job.html" title="Job" class="">Job</a>
-                          </li>
-                          <li class="">
-                            <a href="DuetControlServer.FileExecution.Macro.html" title="Macro" class="">Macro</a>
-                          </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.Files.html" title="DuetControlServer.Files" class="">DuetControlServer.Files</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.Files.CodeBlock.html" title="CodeBlock" class="">CodeBlock</a>
@@ -956,11 +1063,18 @@
                           <li class="">
                             <a href="DuetControlServer.Files.InfoParser.html" title="InfoParser" class="">InfoParser</a>
                           </li>
-                        </ul>  </li>
+                          <li class="">
+                            <a href="DuetControlServer.Files.JobProcessor.html" title="JobProcessor" class="">JobProcessor</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Files.MacroFile.html" title="MacroFile" class="">MacroFile</a>
+                          </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.Files.ImageProcessing.html" title="DuetControlServer.Files.ImageProcessing" class="">DuetControlServer.Files.ImageProcessing</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.Files.ImageProcessing.IconImageParser.html" title="IconImageParser" class="">IconImageParser</a>
@@ -971,11 +1085,12 @@
                           <li class="">
                             <a href="DuetControlServer.Files.ImageProcessing.ImageProcessingException.html" title="ImageProcessingException" class="">ImageProcessingException</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.IPC.html" title="DuetControlServer.IPC" class="">DuetControlServer.IPC</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.IPC.Connection.html" title="Connection" class="">Connection</a>
@@ -986,11 +1101,12 @@
                           <li class="">
                             <a href="DuetControlServer.IPC.Server.html" title="Server" class="">Server</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.IPC.Processors.html" title="DuetControlServer.IPC.Processors" class="">DuetControlServer.IPC.Processors</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.IPC.Processors.Base.html" title="Base" class="">Base</a>
@@ -1010,14 +1126,18 @@
                           <li class="">
                             <a href="DuetControlServer.IPC.Processors.PluginService.html" title="PluginService" class="">PluginService</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.Model.html" title="DuetControlServer.Model" class="">DuetControlServer.Model</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.Model.Expressions.html" title="Expressions" class="">Expressions</a>
+                          </li>
+                          <li class="">
+                            <a href="DuetControlServer.Model.Expressions.CustomAsyncFunctionResolver.html" title="Expressions.CustomAsyncFunctionResolver" class="">Expressions.CustomAsyncFunctionResolver</a>
                           </li>
                           <li class="">
                             <a href="DuetControlServer.Model.Filter.html" title="Filter" class="">Filter</a>
@@ -1043,11 +1163,12 @@
                           <li class="">
                             <a href="DuetControlServer.Model.Updater.html" title="Updater" class="">Updater</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.SPI.html" title="DuetControlServer.SPI" class="">DuetControlServer.SPI</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.SPI.DataTransfer.html" title="DataTransfer" class="">DataTransfer</a>
@@ -1064,11 +1185,12 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.VariableRequest.html" title="VariableRequest" class="">VariableRequest</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.SPI.Channel.html" title="DuetControlServer.SPI.Channel" class="">DuetControlServer.SPI.Channel</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.SPI.Channel.LockRequest.html" title="LockRequest" class="">LockRequest</a>
@@ -1082,20 +1204,22 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Channel.State.html" title="State" class="">State</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.SPI.Communication.html" title="DuetControlServer.SPI.Communication" class="">DuetControlServer.SPI.Communication</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Consts.html" title="Consts" class="">Consts</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.SPI.Communication.FirmwareRequests.html" title="DuetControlServer.SPI.Communication.FirmwareRequests" class="">DuetControlServer.SPI.Communication.FirmwareRequests</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.FirmwareRequests.AbortFileHeader.html" title="AbortFileHeader" class="">AbortFileHeader</a>
@@ -1136,11 +1260,12 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.FirmwareRequests.SeekFileHeader.html" title="SeekFileHeader" class="">SeekFileHeader</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.SPI.Communication.SbcRequests.html" title="DuetControlServer.SPI.Communication.SbcRequests" class="">DuetControlServer.SPI.Communication.SbcRequests</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.SbcRequests.AssignFilamentHeader.html" title="AssignFilamentHeader" class="">AssignFilamentHeader</a>
@@ -1190,11 +1315,12 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.SbcRequests.SetVariableHeader.html" title="SetVariableHeader" class="">SetVariableHeader</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.SPI.Communication.Shared.html" title="DuetControlServer.SPI.Communication.Shared" class="">DuetControlServer.SPI.Communication.Shared</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html" title="CodeChannelHeader" class="">CodeChannelHeader</a>
@@ -1226,11 +1352,12 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Communication.Shared.TransferResponse.html" title="TransferResponse" class="">TransferResponse</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.SPI.Serialization.html" title="DuetControlServer.SPI.Serialization" class="">DuetControlServer.SPI.Serialization</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetControlServer.SPI.Serialization.Reader.html" title="Reader" class="">Reader</a>
@@ -1238,12 +1365,16 @@
                           <li class="">
                             <a href="DuetControlServer.SPI.Serialization.Writer.html" title="Writer" class="">Writer</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetControlServer.Utility.html" title="DuetControlServer.Utility" class="">DuetControlServer.Utility</a>
-                        
+
                         <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetControlServer.Utility.BuildDateTimeAttribute.html" title="BuildDateTimeAttribute" class="">BuildDateTimeAttribute</a>
+                          </li>
                           <li class="">
                             <a href="DuetControlServer.Utility.CRC16.html" title="CRC16" class="">CRC16</a>
                           </li>
@@ -1259,23 +1390,28 @@
                           <li class="">
                             <a href="DuetControlServer.Utility.PriorityThreadRunner.html" title="PriorityThreadRunner" class="">PriorityThreadRunner</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetWebServer.html" title="DuetWebServer" class="">DuetWebServer</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetWebServer.Program.html" title="Program" class="">Program</a>
                           </li>
                           <li class="">
+                            <a href="DuetWebServer.Settings.html" title="Settings" class="">Settings</a>
+                          </li>
+                          <li class="">
                             <a href="DuetWebServer.Startup.html" title="Startup" class="">Startup</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetWebServer.Authorization.html" title="DuetWebServer.Authorization" class="">DuetWebServer.Authorization</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetWebServer.Authorization.Policies.html" title="Policies" class="">Policies</a>
@@ -1286,32 +1422,38 @@
                           <li class="">
                             <a href="DuetWebServer.Authorization.SessionKeyAuthenticationSchemeOptions.html" title="SessionKeyAuthenticationSchemeOptions" class="">SessionKeyAuthenticationSchemeOptions</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetWebServer.Controllers.html" title="DuetWebServer.Controllers" class="">DuetWebServer.Controllers</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetWebServer.Controllers.MachineController.html" title="MachineController" class="">MachineController</a>
                           </li>
                           <li class="">
+                            <a href="DuetWebServer.Controllers.RepRapFirmwareController.html" title="RepRapFirmwareController" class="">RepRapFirmwareController</a>
+                          </li>
+                          <li class="">
                             <a href="DuetWebServer.Controllers.WebSocketController.html" title="WebSocketController" class="">WebSocketController</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetWebServer.FileProviders.html" title="DuetWebServer.FileProviders" class="">DuetWebServer.FileProviders</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetWebServer.FileProviders.DuetFileProvider.html" title="DuetFileProvider" class="">DuetFileProvider</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetWebServer.Middleware.html" title="DuetWebServer.Middleware" class="">DuetWebServer.Middleware</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetWebServer.Middleware.CustomEndpointMiddleware.html" title="CustomEndpointMiddleware" class="">CustomEndpointMiddleware</a>
@@ -1320,13 +1462,17 @@
                             <a href="DuetWebServer.Middleware.FallbackMiddleware.html" title="FallbackMiddleware" class="">FallbackMiddleware</a>
                           </li>
                           <li class="">
+                            <a href="DuetWebServer.Middleware.FixContentTypeMiddleware.html" title="FixContentTypeMiddleware" class="">FixContentTypeMiddleware</a>
+                          </li>
+                          <li class="">
                             <a href="DuetWebServer.Middleware.HttpEndpointConnection.html" title="HttpEndpointConnection" class="">HttpEndpointConnection</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetWebServer.Services.html" title="DuetWebServer.Services" class="">DuetWebServer.Services</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetWebServer.Services.ModelObserver.html" title="ModelObserver" class="">ModelObserver</a>
@@ -1334,11 +1480,12 @@
                           <li class="">
                             <a href="DuetWebServer.Services.SessionExpiry.html" title="SessionExpiry" class="">SessionExpiry</a>
                           </li>
-                        </ul>  </li>
+                        </ul>
+                    </li>
                     <li class="">
                       <span class="expand-stub"></span>
                       <a href="DuetWebServer.Singletons.html" title="DuetWebServer.Singletons" class="">DuetWebServer.Singletons</a>
-                        
+
                         <ul class="nav level2">
                           <li class="">
                             <a href="DuetWebServer.Singletons.IModelProvider.html" title="IModelProvider" class="">IModelProvider</a>
@@ -1355,8 +1502,20 @@
                           <li class="">
                             <a href="DuetWebServer.Singletons.SessionStorage.html" title="SessionStorage" class="">SessionStorage</a>
                           </li>
-                        </ul>  </li>
-                  </ul>        </div>
+                        </ul>
+                    </li>
+                    <li class="">
+                      <span class="expand-stub"></span>
+                      <a href="DuetWebServer.Utility.html" title="DuetWebServer.Utility" class="">DuetWebServer.Utility</a>
+
+                        <ul class="nav level2">
+                          <li class="">
+                            <a href="DuetWebServer.Utility.CRC32.html" title="CRC32" class="">CRC32</a>
+                          </li>
+                        </ul>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
@@ -1364,61 +1523,61 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="DuetControlServer.SPI.Interface">
-  
-  
-  <h1 id="DuetControlServer_SPI_Interface" data-uid="DuetControlServer.SPI.Interface" class="text-break">Class Interface
-  </h1>
+
+
+
+  <h1 id="DuetControlServer_SPI_Interface" data-uid="DuetControlServer.SPI.Interface" class="text-break">Class Interface</h1>
   <div class="markdown level0 summary"><p>This class accesses RepRapFirmware via SPI and deals with general communication</p>
 </div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
     <h5>Inheritance</h5>
-    <div class="level0"><span class="xref">System.Object</span></div>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
     <div class="level1"><span class="xref">Interface</span></div>
   </div>
   <div class="inheritedMembers">
     <h5>Inherited Members</h5>
     <div>
-      <span class="xref">System.Object.Equals(System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
     </div>
     <div>
-      <span class="xref">System.Object.Equals(System.Object, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
     </div>
     <div>
-      <span class="xref">System.Object.GetHashCode()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
     </div>
     <div>
-      <span class="xref">System.Object.GetType()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
     </div>
     <div>
-      <span class="xref">System.Object.MemberwiseClone()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
     </div>
     <div>
-      <span class="xref">System.Object.ReferenceEquals(System.Object, System.Object)</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
     </div>
     <div>
-      <span class="xref">System.Object.ToString()</span>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
     </div>
   </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="DuetControlServer.SPI.html">DuetControlServer.SPI</a></h6>
+  <h6><strong>Namespace</strong>: <a class="xref" href="DuetControlServer.html">DuetControlServer</a>.<a class="xref" href="DuetControlServer.SPI.html">SPI</a></h6>
   <h6><strong>Assembly</strong>: DuetControlServer.dll</h6>
   <h5 id="DuetControlServer_SPI_Interface_syntax">Syntax</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static class Interface</code></pre>
   </div>
   <h3 id="methods">Methods
-  </h3>
-  <a id="DuetControlServer_SPI_Interface_AbortAll_" data-uid="DuetControlServer.SPI.Interface.AbortAll*"></a>
-  <h4 id="DuetControlServer_SPI_Interface_AbortAll_DuetAPI_CodeChannel_" data-uid="DuetControlServer.SPI.Interface.AbortAll(DuetAPI.CodeChannel)">AbortAll(CodeChannel)</h4>
+</h3>
+  <a id="DuetControlServer_SPI_Interface_AbortAllAsync_" data-uid="DuetControlServer.SPI.Interface.AbortAllAsync*"></a>
+  <h4 id="DuetControlServer_SPI_Interface_AbortAllAsync_DuetAPI_CodeChannel_" data-uid="DuetControlServer.SPI.Interface.AbortAllAsync(DuetAPI.CodeChannel)">AbortAllAsync(CodeChannel)</h4>
   <div class="markdown level1 summary"><p>Abort all files in RRF on the given channel asynchronously</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static async Task AbortAll(CodeChannel channel)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task AbortAllAsync(CodeChannel channel)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1436,7 +1595,7 @@
     </tbody>
   </table>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1445,14 +1604,14 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
         <td><p>Asynchronous task</p>
 </td>
       </tr>
     </tbody>
   </table>
   <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1461,23 +1620,23 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.InvalidOperationException</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></td>
         <td><p>Not connected over SPI</p>
 </td>
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_SPI_Interface_Diagnostics_" data-uid="DuetControlServer.SPI.Interface.Diagnostics*"></a>
-  <h4 id="DuetControlServer_SPI_Interface_Diagnostics_System_Text_StringBuilder_" data-uid="DuetControlServer.SPI.Interface.Diagnostics(System.Text.StringBuilder)">Diagnostics(StringBuilder)</h4>
-  <div class="markdown level1 summary"><p>Print diagnostics of this class</p>
+  <a id="DuetControlServer_SPI_Interface_CopyStateAsync_" data-uid="DuetControlServer.SPI.Interface.CopyStateAsync*"></a>
+  <h4 id="DuetControlServer_SPI_Interface_CopyStateAsync_DuetAPI_CodeChannel_DuetAPI_CodeChannel_" data-uid="DuetControlServer.SPI.Interface.CopyStateAsync(DuetAPI.CodeChannel,DuetAPI.CodeChannel)">CopyStateAsync(CodeChannel, CodeChannel)</h4>
+  <div class="markdown level1 summary"><p>Copy the state from one channel processor to another</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static async Task Diagnostics(StringBuilder builder)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task CopyStateAsync(CodeChannel from, CodeChannel to)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1487,15 +1646,21 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Text.StringBuilder</span></td>
-        <td><span class="parametername">builder</span></td>
-        <td><p>String builder</p>
+        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
+        <td><span class="parametername">from</span></td>
+        <td><p>Source channel</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></td>
+        <td><span class="parametername">to</span></td>
+        <td><p>Target channel</p>
 </td>
       </tr>
     </tbody>
   </table>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1504,7 +1669,64 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.notimplementedexception">NotImplementedException</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <a id="DuetControlServer_SPI_Interface_Diagnostics_" data-uid="DuetControlServer.SPI.Interface.Diagnostics*"></a>
+  <h4 id="DuetControlServer_SPI_Interface_Diagnostics_System_Text_StringBuilder_" data-uid="DuetControlServer.SPI.Interface.Diagnostics(System.Text.StringBuilder)">Diagnostics(StringBuilder)</h4>
+  <div class="markdown level1 summary"><p>Print diagnostics of this class</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static Task Diagnostics(StringBuilder builder)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.stringbuilder">StringBuilder</a></td>
+        <td><span class="parametername">builder</span></td>
+        <td><p>String builder</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
         <td><p>Asynchronous task</p>
 </td>
       </tr>
@@ -1515,12 +1737,12 @@
   <div class="markdown level1 summary"><p>Request an immediate emergency stop</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static async Task EmergencyStop()</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task EmergencyStop()</code></pre>
   </div>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1529,23 +1751,23 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
         <td><p>Asynchronous task</p>
 </td>
       </tr>
     </tbody>
   </table>
   <a id="DuetControlServer_SPI_Interface_EvaluateExpression_" data-uid="DuetControlServer.SPI.Interface.EvaluateExpression*"></a>
-  <h4 id="DuetControlServer_SPI_Interface_EvaluateExpression_DuetAPI_CodeChannel_System_String_" data-uid="DuetControlServer.SPI.Interface.EvaluateExpression(DuetAPI.CodeChannel,System.String)">EvaluateExpression(CodeChannel, String)</h4>
+  <h4 id="DuetControlServer_SPI_Interface_EvaluateExpression_DuetAPI_CodeChannel_System_String_" data-uid="DuetControlServer.SPI.Interface.EvaluateExpression(DuetAPI.CodeChannel,System.String)">EvaluateExpression(CodeChannel, string)</h4>
   <div class="markdown level1 summary"><p>Evaluate an arbitrary expression</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static Task&lt;object&gt; EvaluateExpression(CodeChannel channel, string expression)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task&lt;object?&gt; EvaluateExpression(CodeChannel channel, string expression)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1561,7 +1783,7 @@
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.String</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">expression</span></td>
         <td><p>Expression to evaluate</p>
 </td>
@@ -1569,7 +1791,7 @@
     </tbody>
   </table>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1578,14 +1800,14 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Object</span>&gt;</td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>&gt;</td>
         <td><p>Result of the evaluated expression</p>
 </td>
       </tr>
     </tbody>
   </table>
   <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1594,38 +1816,38 @@
     </thead>
     <tbody>
       <tr>
-        <td><a class="xref" href="DuetAPI.Commands.CodeParserException.html">CodeParserException</a></td>
+        <td><a class="xref" href="DuetAPI.CodeParserException.html">CodeParserException</a></td>
         <td><p>Failed to evaluate expression</p>
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.InvalidOperationException</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></td>
         <td><p>Not connected over SPI</p>
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.NotSupportedException</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.notsupportedexception">NotSupportedException</a></td>
         <td><p>Incompatible firmware version</p>
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.ArgumentException</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></td>
         <td><p>Invalid parameter</p>
 </td>
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_SPI_Interface_Flush_" data-uid="DuetControlServer.SPI.Interface.Flush*"></a>
-  <h4 id="DuetControlServer_SPI_Interface_Flush_DuetAPI_CodeChannel_" data-uid="DuetControlServer.SPI.Interface.Flush(DuetAPI.CodeChannel)">Flush(CodeChannel)</h4>
-  <div class="markdown level1 summary"><p>Wait for all pending codes to finish</p>
+  <a id="DuetControlServer_SPI_Interface_FlushAsync_" data-uid="DuetControlServer.SPI.Interface.FlushAsync*"></a>
+  <h4 id="DuetControlServer_SPI_Interface_FlushAsync_DuetAPI_CodeChannel_System_Boolean_" data-uid="DuetControlServer.SPI.Interface.FlushAsync(DuetAPI.CodeChannel,System.Boolean)">FlushAsync(CodeChannel, bool)</h4>
+  <div class="markdown level1 summary"><p>Wait for all pending codes of the first or last stack item to finish</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static async Task&lt;bool&gt; Flush(CodeChannel channel)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task&lt;bool&gt; FlushAsync(CodeChannel channel, bool flushAll)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1640,10 +1862,16 @@
         <td><p>Code channel to wait for</p>
 </td>
       </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td><span class="parametername">flushAll</span></td>
+        <td><p>Flush everything</p>
+</td>
+      </tr>
     </tbody>
   </table>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1652,24 +1880,24 @@
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</td>
         <td><p>Whether the codes have been flushed successfully</p>
 </td>
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_SPI_Interface_Flush_" data-uid="DuetControlServer.SPI.Interface.Flush*"></a>
-  <h4 id="DuetControlServer_SPI_Interface_Flush_DuetControlServer_Commands_Code_System_Boolean_System_Boolean_" data-uid="DuetControlServer.SPI.Interface.Flush(DuetControlServer.Commands.Code,System.Boolean,System.Boolean)">Flush(Code, Boolean, Boolean)</h4>
+  <a id="DuetControlServer_SPI_Interface_FlushAsync_" data-uid="DuetControlServer.SPI.Interface.FlushAsync*"></a>
+  <h4 id="DuetControlServer_SPI_Interface_FlushAsync_DuetControlServer_Commands_Code_System_Boolean_System_Boolean_" data-uid="DuetControlServer.SPI.Interface.FlushAsync(DuetControlServer.Commands.Code,System.Boolean,System.Boolean)">FlushAsync(Code, bool, bool)</h4>
   <div class="markdown level1 summary"><p>Wait for all pending codes on the same stack level as the given code to finish.
 By default this replaces all expressions as well for convenient parsing by the code processors.</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static async Task&lt;bool&gt; Flush(Code code, bool evaluateExpressions = true, bool evaluateAll = true)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task&lt;bool&gt; FlushAsync(Code code, bool evaluateExpressions = true, bool evaluateAll = true)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1685,13 +1913,13 @@ By default this replaces all expressions as well for convenient parsing by the c
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.Boolean</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">evaluateExpressions</span></td>
         <td><p>Evaluate all expressions when pending codes have been flushed</p>
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.Boolean</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">evaluateAll</span></td>
         <td><p>Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</p>
 </td>
@@ -1699,7 +1927,7 @@ By default this replaces all expressions as well for convenient parsing by the c
     </tbody>
   </table>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1708,23 +1936,41 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Boolean</span>&gt;</td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</td>
         <td><p>Whether the codes have been flushed successfully</p>
 </td>
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_SPI_Interface_GetIdleChannel_" data-uid="DuetControlServer.SPI.Interface.GetIdleChannel*"></a>
-  <h4 id="DuetControlServer_SPI_Interface_GetIdleChannel" data-uid="DuetControlServer.SPI.Interface.GetIdleChannel">GetIdleChannel()</h4>
-  <div class="markdown level1 summary"><p>Get a channel that is currently idle in order to process a priority code</p>
+  <a id="DuetControlServer_SPI_Interface_FlushAsync_" data-uid="DuetControlServer.SPI.Interface.FlushAsync*"></a>
+  <h4 id="DuetControlServer_SPI_Interface_FlushAsync_DuetControlServer_Files_CodeFile_" data-uid="DuetControlServer.SPI.Interface.FlushAsync(DuetControlServer.Files.CodeFile)">FlushAsync(CodeFile)</h4>
+  <div class="markdown level1 summary"><p>Wait for all pending codes to finish</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static Task&lt;CodeChannel&gt; GetIdleChannel()</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task&lt;bool&gt; FlushAsync(CodeFile file)</code></pre>
   </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="DuetControlServer.Files.CodeFile.html">CodeFile</a></td>
+        <td><span class="parametername">file</span></td>
+        <td><p>Code file</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1733,8 +1979,8 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a>&gt;</td>
-        <td><p>Idle channel</p>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</td>
+        <td><p>Whether the codes have been flushed successfully</p>
 </td>
       </tr>
     </tbody>
@@ -1744,12 +1990,12 @@ By default this replaces all expressions as well for convenient parsing by the c
   <div class="markdown level1 summary"><p>Check if a code channel is waiting for acknowledgement</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static bool IsWaitingForAcknowledgment(CodeChannel channel)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1767,7 +2013,7 @@ By default this replaces all expressions as well for convenient parsing by the c
     </tbody>
   </table>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1776,23 +2022,23 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Boolean</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><p>Whether the channel is awaiting acknowledgement</p>
 </td>
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_SPI_Interface_LockMovementAndWaitForStandstill_" data-uid="DuetControlServer.SPI.Interface.LockMovementAndWaitForStandstill*"></a>
-  <h4 id="DuetControlServer_SPI_Interface_LockMovementAndWaitForStandstill_DuetAPI_CodeChannel_" data-uid="DuetControlServer.SPI.Interface.LockMovementAndWaitForStandstill(DuetAPI.CodeChannel)">LockMovementAndWaitForStandstill(CodeChannel)</h4>
-  <div class="markdown level1 summary"><p>Lock the move module and wait for standstill</p>
+  <a id="DuetControlServer_SPI_Interface_LockAllMovementSystemsAndWaitForStandstill_" data-uid="DuetControlServer.SPI.Interface.LockAllMovementSystemsAndWaitForStandstill*"></a>
+  <h4 id="DuetControlServer_SPI_Interface_LockAllMovementSystemsAndWaitForStandstill_DuetAPI_CodeChannel_" data-uid="DuetControlServer.SPI.Interface.LockAllMovementSystemsAndWaitForStandstill(DuetAPI.CodeChannel)">LockAllMovementSystemsAndWaitForStandstill(CodeChannel)</h4>
+  <div class="markdown level1 summary"><p>Lock all movement systems and wait for standstill</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static async Task&lt;IAsyncDisposable&gt; LockMovementAndWaitForStandstill(CodeChannel channel)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task&lt;IAsyncDisposable&gt; LockAllMovementSystemsAndWaitForStandstill(CodeChannel channel)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1810,7 +2056,7 @@ By default this replaces all expressions as well for convenient parsing by the c
     </tbody>
   </table>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1819,14 +2065,14 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.IAsyncDisposable</span>&gt;</td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a>&gt;</td>
         <td><p>Disposable lock object that releases the lock when disposed</p>
 </td>
       </tr>
     </tbody>
   </table>
   <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1835,87 +2081,28 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.InvalidOperationException</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></td>
         <td><p>Not connected over SPI</p>
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.OperationCanceledException</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></td>
         <td><p>Failed to get movement lock</p>
 </td>
       </tr>
     </tbody>
   </table>
-  <a id="DuetControlServer_SPI_Interface_ProcessCode_" data-uid="DuetControlServer.SPI.Interface.ProcessCode*"></a>
-  <h4 id="DuetControlServer_SPI_Interface_ProcessCode_DuetControlServer_Commands_Code_" data-uid="DuetControlServer.SPI.Interface.ProcessCode(DuetControlServer.Commands.Code)">ProcessCode(Code)</h4>
-  <div class="markdown level1 summary"><p>Enqueue a G/M/T-code for execution by RepRapFirmware</p>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static async Task ProcessCode(Code code)</code></pre>
-  </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="DuetControlServer.Commands.Code.html">Code</a></td>
-        <td><span class="parametername">code</span></td>
-        <td><p>Code to execute</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
-        <td><p>Asynchronous task</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-striped table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">System.InvalidOperationException</span></td>
-        <td><p>Not connected over SPI</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
   <a id="DuetControlServer_SPI_Interface_RequestObjectModel_" data-uid="DuetControlServer.SPI.Interface.RequestObjectModel*"></a>
-  <h4 id="DuetControlServer_SPI_Interface_RequestObjectModel_System_String_System_String_" data-uid="DuetControlServer.SPI.Interface.RequestObjectModel(System.String,System.String)">RequestObjectModel(String, String)</h4>
+  <h4 id="DuetControlServer_SPI_Interface_RequestObjectModel_System_String_System_String_" data-uid="DuetControlServer.SPI.Interface.RequestObjectModel(System.String,System.String)">RequestObjectModel(string, string)</h4>
   <div class="markdown level1 summary"><p>Request a specific update of the object model</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static Task&lt;byte[]&gt; RequestObjectModel(string key, string flags)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1925,13 +2112,13 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.String</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">key</span></td>
         <td><p>Key to request</p>
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.String</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">flags</span></td>
         <td><p>Object model flags</p>
 </td>
@@ -1939,7 +2126,7 @@ By default this replaces all expressions as well for convenient parsing by the c
     </tbody>
   </table>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1948,7 +2135,7 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Byte</span>[]&gt;</td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]&gt;</td>
         <td><p>Deserialized JSON document</p>
 </td>
       </tr>
@@ -1959,12 +2146,12 @@ By default this replaces all expressions as well for convenient parsing by the c
   <div class="markdown level1 summary"><p>Perform a firmware reset and wait for it to finish</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static async Task ResetFirmware()</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task ResetFirmware()</code></pre>
   </div>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -1973,7 +2160,7 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
         <td><p>Asynchronous task</p>
 </td>
       </tr>
@@ -1984,21 +2171,21 @@ By default this replaces all expressions as well for convenient parsing by the c
   <div class="markdown level1 summary"><p>Perform communication with the RepRapFirmware controller over SPI</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static void Run()</code></pre>
   </div>
   <a id="DuetControlServer_SPI_Interface_SendMessage_" data-uid="DuetControlServer.SPI.Interface.SendMessage*"></a>
-  <h4 id="DuetControlServer_SPI_Interface_SendMessage_DuetControlServer_SPI_Communication_Shared_MessageTypeFlags_System_String_" data-uid="DuetControlServer.SPI.Interface.SendMessage(DuetControlServer.SPI.Communication.Shared.MessageTypeFlags,System.String)">SendMessage(MessageTypeFlags, String)</h4>
+  <h4 id="DuetControlServer_SPI_Interface_SendMessage_DuetControlServer_SPI_Communication_Shared_MessageTypeFlags_System_String_" data-uid="DuetControlServer.SPI.Interface.SendMessage(DuetControlServer.SPI.Communication.Shared.MessageTypeFlags,System.String)">SendMessage(MessageTypeFlags, string)</h4>
   <div class="markdown level1 summary"><p>Send a message to the firmware</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static void SendMessage(MessageTypeFlags flags, string message)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2014,7 +2201,7 @@ By default this replaces all expressions as well for convenient parsing by the c
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.String</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">message</span></td>
         <td><p>Message content</p>
 </td>
@@ -2022,7 +2209,7 @@ By default this replaces all expressions as well for convenient parsing by the c
     </tbody>
   </table>
   <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2031,33 +2218,33 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.InvalidOperationException</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></td>
         <td><p>Incompatible firmware or not connected over SPI</p>
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.NotSupportedException</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.notsupportedexception">NotSupportedException</a></td>
         <td><p>Incompatible firmware version</p>
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.ArgumentException</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></td>
         <td><p>Invalid parameter</p>
 </td>
       </tr>
     </tbody>
   </table>
   <a id="DuetControlServer_SPI_Interface_SetMacroPausable_" data-uid="DuetControlServer.SPI.Interface.SetMacroPausable*"></a>
-  <h4 id="DuetControlServer_SPI_Interface_SetMacroPausable_DuetAPI_CodeChannel_System_Boolean_" data-uid="DuetControlServer.SPI.Interface.SetMacroPausable(DuetAPI.CodeChannel,System.Boolean)">SetMacroPausable(CodeChannel, Boolean)</h4>
+  <h4 id="DuetControlServer_SPI_Interface_SetMacroPausable_DuetAPI_CodeChannel_System_Boolean_" data-uid="DuetControlServer.SPI.Interface.SetMacroPausable(DuetAPI.CodeChannel,System.Boolean)">SetMacroPausable(CodeChannel, bool)</h4>
   <div class="markdown level1 summary"><p>Attempt to flag the currently executing macro file as (not) pausable</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static async Task SetMacroPausable(CodeChannel channel, bool isPausable)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task SetMacroPausable(CodeChannel channel, bool isPausable)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2073,7 +2260,7 @@ By default this replaces all expressions as well for convenient parsing by the c
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.Boolean</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">isPausable</span></td>
         <td><p>Whether or not the macro file is pausable</p>
 </td>
@@ -2081,7 +2268,7 @@ By default this replaces all expressions as well for convenient parsing by the c
     </tbody>
   </table>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2090,7 +2277,7 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
         <td><p>Asynchronous task</p>
 </td>
       </tr>
@@ -2101,12 +2288,12 @@ By default this replaces all expressions as well for convenient parsing by the c
   <div class="markdown level1 summary"><p>Update the print file info in the firmware</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static async Task SetPrintFileInfo()</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task SetPrintFileInfo()</code></pre>
   </div>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2115,14 +2302,14 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
         <td><p>Asynchronous task</p>
 </td>
       </tr>
     </tbody>
   </table>
   <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2131,23 +2318,23 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.InvalidOperationException</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></td>
         <td><p>Not connected over SPI</p>
 </td>
       </tr>
     </tbody>
   </table>
   <a id="DuetControlServer_SPI_Interface_SetVariable_" data-uid="DuetControlServer.SPI.Interface.SetVariable*"></a>
-  <h4 id="DuetControlServer_SPI_Interface_SetVariable_DuetAPI_CodeChannel_System_Boolean_System_String_System_String_" data-uid="DuetControlServer.SPI.Interface.SetVariable(DuetAPI.CodeChannel,System.Boolean,System.String,System.String)">SetVariable(CodeChannel, Boolean, String, String)</h4>
+  <h4 id="DuetControlServer_SPI_Interface_SetVariable_DuetAPI_CodeChannel_System_Boolean_System_String_System_String_" data-uid="DuetControlServer.SPI.Interface.SetVariable(DuetAPI.CodeChannel,System.Boolean,System.String,System.String)">SetVariable(CodeChannel, bool, string, string?)</h4>
   <div class="markdown level1 summary"><p>Set or delete a global or local variable</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static Task&lt;object&gt; SetVariable(CodeChannel channel, bool createVariable, string varName, string expression)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task&lt;object?&gt; SetVariable(CodeChannel channel, bool createVariable, string varName, string? expression)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2163,19 +2350,19 @@ By default this replaces all expressions as well for convenient parsing by the c
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.Boolean</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">createVariable</span></td>
         <td><p>Whether the variable shall be created</p>
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.String</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">varName</span></td>
         <td><p>Name of the variable</p>
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.String</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">expression</span></td>
         <td><p>Expression to evaluate</p>
 </td>
@@ -2183,7 +2370,7 @@ By default this replaces all expressions as well for convenient parsing by the c
     </tbody>
   </table>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2192,14 +2379,14 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span>&lt;<span class="xref">System.Object</span>&gt;</td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>&gt;</td>
         <td><p>Result of the evaluated expression</p>
 </td>
       </tr>
     </tbody>
   </table>
   <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2208,22 +2395,22 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><a class="xref" href="DuetAPI.Commands.CodeParserException.html">CodeParserException</a></td>
+        <td><a class="xref" href="DuetAPI.CodeParserException.html">CodeParserException</a></td>
         <td><p>Failed to assign or delete variable</p>
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.InvalidOperationException</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></td>
         <td><p>Not connected over SPI</p>
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.NotSupportedException</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.notsupportedexception">NotSupportedException</a></td>
         <td><p>Incompatible firmware version</p>
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.ArgumentException</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></td>
         <td><p>Invalid parameter</p>
 </td>
       </tr>
@@ -2234,12 +2421,12 @@ By default this replaces all expressions as well for convenient parsing by the c
   <div class="markdown level1 summary"><p>Called to shut down the SPI subsystem asynchronously</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static async Task ShutdownAsync()</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task ShutdownAsync()</code></pre>
   </div>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2248,7 +2435,7 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
         <td><p>Asynchronous task</p>
 </td>
       </tr>
@@ -2259,12 +2446,12 @@ By default this replaces all expressions as well for convenient parsing by the c
   <div class="markdown level1 summary"><p>Notify the firmware that the file print has been stopped</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static async Task StopPrint(PrintStoppedReason reason)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task StopPrint(PrintStoppedReason reason)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2282,7 +2469,7 @@ By default this replaces all expressions as well for convenient parsing by the c
     </tbody>
   </table>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2291,14 +2478,14 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
         <td><p>Asynchronous task</p>
 </td>
       </tr>
     </tbody>
   </table>
   <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2307,7 +2494,7 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.InvalidOperationException</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></td>
         <td><p>Not connected over SPI</p>
 </td>
       </tr>
@@ -2318,12 +2505,12 @@ By default this replaces all expressions as well for convenient parsing by the c
   <div class="markdown level1 summary"><p>Perform an update of the main firmware via IAP</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static async Task UpdateFirmware(Stream iapStream, Stream firmwareStream)</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task UpdateFirmware(Stream iapStream, Stream firmwareStream)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2333,13 +2520,13 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.IO.Stream</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a></td>
         <td><span class="parametername">iapStream</span></td>
         <td><p>IAP binary</p>
 </td>
       </tr>
       <tr>
-        <td><span class="xref">System.IO.Stream</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a></td>
         <td><span class="parametername">firmwareStream</span></td>
         <td><p>Firmware binary</p>
 </td>
@@ -2347,7 +2534,7 @@ By default this replaces all expressions as well for convenient parsing by the c
     </tbody>
   </table>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2356,14 +2543,14 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
         <td><p>Asynchronous task</p>
 </td>
       </tr>
     </tbody>
   </table>
   <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2372,7 +2559,7 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.InvalidOperationException</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></td>
         <td><p>Firmware is already being updated or not connected over SPI</p>
 </td>
       </tr>
@@ -2383,7 +2570,7 @@ By default this replaces all expressions as well for convenient parsing by the c
   <div class="markdown level1 summary"><p>Wait for potential firmware update to finish</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static void WaitForUpdate()</code></pre>
   </div>
@@ -2392,12 +2579,12 @@ By default this replaces all expressions as well for convenient parsing by the c
   <div class="markdown level1 summary"><p>Wait for potential firmware update to finish</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="decalaration">Declaration</h5>
+  <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public static async Task WaitForUpdateAsync()</code></pre>
+    <pre><code class="lang-csharp hljs">public static Task WaitForUpdateAsync()</code></pre>
   </div>
   <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-striped table-condensed">
+  <table class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>Type</th>
@@ -2406,26 +2593,27 @@ By default this replaces all expressions as well for convenient parsing by the c
     </thead>
     <tbody>
       <tr>
-        <td><span class="xref">System.Threading.Tasks.Task</span></td>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
         <td><p>Asynchronous task</p>
 </td>
       </tr>
     </tbody>
   </table>
+
 </article>
           </div>
-          
+
           <div class="hidden-sm col-md-2" role="complementary">
             <div class="sideaffix">
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In This Article</h5>
+                <h5>In this article</h5>
                 <div></div>
               </nav>
             </div>
           </div>
         </div>
       </div>
-      
+
       <footer>
         <div class="grad-bottom"></div>
         <div class="footer">
@@ -2433,14 +2621,14 @@ By default this replaces all expressions as well for convenient parsing by the c
             <span class="pull-right">
               <a href="#top">Back to top</a>
             </span>
-            
-            <span>Generated by <strong>DocFX</strong></span>
+      
+      <span>Generated by <strong>DocFX</strong></span>
           </div>
         </div>
       </footer>
     </div>
-    
-    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
     <script type="text/javascript" src="../styles/docfx.js"></script>
     <script type="text/javascript" src="../styles/main.js"></script>
   </body>
