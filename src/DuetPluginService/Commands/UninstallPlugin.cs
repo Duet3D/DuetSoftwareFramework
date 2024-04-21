@@ -111,8 +111,8 @@ namespace DuetPluginService.Commands
 
                         foreach (string sdFile in plugin.SdFiles)
                         {
-                            string file = Path.Combine(Settings.BaseDirectory, sdFile);
-                            if (File.Exists(file))
+                            string fileName = Path.Combine(Settings.BaseDirectory, sdFile);
+                            if (File.Exists(fileName) && !plugin.SbcConfigFiles.Any(file => fileName == Path.Combine(Settings.BaseDirectory, "sys", file) || fileName == Path.Combine(Settings.BaseDirectory, file)))
                             {
                                 if (Path.GetFileName(sdFile).Equals("daemon.g"))
                                 {
@@ -122,8 +122,8 @@ namespace DuetPluginService.Commands
                                 }
                                 else
                                 {
-                                    logger.Debug("Deleting file {0}", file);
-                                    File.Delete(file);
+                                    logger.Debug("Deleting file {0}", fileName);
+                                    File.Delete(fileName);
                                 }
                             }
                         }
