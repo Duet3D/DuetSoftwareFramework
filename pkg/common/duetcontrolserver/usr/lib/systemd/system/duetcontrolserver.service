@@ -13,6 +13,7 @@ Group=dsf
 UMask=0002
 CapabilityBoundingSet=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_SYS_TIME
 AmbientCapabilities=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_SYS_TIME
+MemorySwapMax=0
 
 [Install]
 WantedBy=sysinit.target
