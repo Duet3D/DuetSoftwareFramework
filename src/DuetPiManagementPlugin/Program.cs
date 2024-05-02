@@ -313,7 +313,9 @@ namespace DuetPiManagementPlugin
                             try
                             {
                                 int index = code.GetInt('I', 0);
-                                string result = await Interface.ManageGateway(index, code.GetIPAddress('P'), code.GetIPAddress('S'));
+                                _ = code.TryGetIPAddress('P', out IPAddress? gateway);
+                                _ = code.TryGetIPAddress('S', out IPAddress? dnsServer);
+                                string result = await Interface.ManageGateway(index, gateway, dnsServer);
                                 await Connection.ResolveCode(MessageType.Success, result, CancellationToken);
                             }
                             catch (Exception e)
