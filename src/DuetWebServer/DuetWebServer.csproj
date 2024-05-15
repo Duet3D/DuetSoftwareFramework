@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 	<PropertyGroup>
-		<Nullable>enable</Nullable>
-		<TargetFramework>net6.0</TargetFramework>
+		<TargetFramework>net8.0</TargetFramework>
+		<PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
 		<AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
 	</PropertyGroup>
 
@@ -19,19 +19,15 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
-		<PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="6.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="8.0.0" />
 		<PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
-		<PackageReference Include="System.Formats.Asn1" Version="6.0.0" />
+		<PackageReference Include="System.Formats.Asn1" Version="8.0.0" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\DuetAPIClient\DuetAPIClient.csproj" />
 		<ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
 		<ProjectReference Include="..\LinuxApi\LinuxApi.csproj" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<DotNetCliToolReference Include="DotnetPublishSsh" Version="0.1.0" />
 	</ItemGroup>
 </Project>

@@ -1,14 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<TargetFramework>net6.0</TargetFramework>
 		<OutputType>Exe</OutputType>
-		<TrimUnusedDependencies>true</TrimUnusedDependencies>
+		<TargetFramework>net8.0</TargetFramework>
 		<PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
 	</PropertyGroup>
-
-	<ItemGroup>
-		<DotNetCliToolReference Include="DotnetPublishSsh" Version="0.1.0" />
-	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\DuetAPIClient\DuetAPIClient.csproj" />

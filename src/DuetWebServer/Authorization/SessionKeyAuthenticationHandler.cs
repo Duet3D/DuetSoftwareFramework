@@ -46,8 +46,8 @@ namespace DuetWebServer.Authorization
         /// <param name="clock">System clock</param>
         /// <param name="configuration">Launch configuration</param>
         /// <param name="sessionStorage">Session storage singleton</param>
-        public SessionKeyAuthenticationHandler(IOptionsMonitor<SessionKeyAuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock, IConfiguration configuration, ISessionStorage sessionStorage)
-            : base(options, logger, encoder, clock)
+        public SessionKeyAuthenticationHandler(IOptionsMonitor<SessionKeyAuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, IConfiguration configuration, ISessionStorage sessionStorage)
+            : base(options, logger, encoder)
         {
             _settings = configuration.Get<Settings>();
             _sessionStorage = sessionStorage;
