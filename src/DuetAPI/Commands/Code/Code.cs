@@ -197,7 +197,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = param;
                     return true;
@@ -244,7 +244,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (float)param;
                     return true;
@@ -265,7 +265,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (float)param;
                     return true;
@@ -312,7 +312,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (int)param;
                     return true;
@@ -333,7 +333,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (int?)param;
                     return true;
@@ -380,7 +380,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (uint)param;
                     return true;
@@ -401,7 +401,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (uint)param;
                     return true;
@@ -448,7 +448,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (long)param;
                     return true;
@@ -469,7 +469,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (long)param;
                     return true;
@@ -516,7 +516,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (bool)param;
                     return true;
@@ -537,7 +537,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (bool)param;
                     return true;
@@ -595,7 +595,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (string)param;
                     return true;
@@ -642,7 +642,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (DriverId)param;
                     return true;
@@ -689,7 +689,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (IPAddress)param;
                     return true;
@@ -736,7 +736,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (float[])param;
                     return true;
@@ -783,7 +783,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (int[])param;
                     return true;
@@ -830,7 +830,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (uint[])param;
                     return true;
@@ -877,7 +877,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (long[])param;
                     return true;
@@ -924,7 +924,7 @@ namespace DuetAPI.Commands
         {
             foreach (CodeParameter param in Parameters)
             {
-                if (param.Letter == letter)
+                if (param.Letter == letter && !param.IsExpression)
                 {
                     parameter = (DriverId[])param;
                     return true;
