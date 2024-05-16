@@ -157,7 +157,7 @@ namespace DuetWebServer.Controllers
                         isEmulated = true,
                         sessionTimeout = 8000,
                         boardType = boardString
-                    }), "application/json");
+                    }, JsonHelper.DefaultJsonOptions), "application/json");
                 }
                 else
                 {
@@ -593,7 +593,7 @@ namespace DuetWebServer.Controllers
                             key,
                             flags,
                             result
-                        }), "application/json");
+                        }, JsonHelper.DefaultJsonOptions), "application/json");
                     }
 
                     // Otherwise pass it on
@@ -628,7 +628,7 @@ namespace DuetWebServer.Controllers
                         key,
                         flags,
                         result
-                    }), "application/json");
+                    }, JsonHelper.DefaultJsonOptions), "application/json");
                 }
                 else
                 {
@@ -907,7 +907,7 @@ namespace DuetWebServer.Controllers
                 string? data = null;
                 foreach (ThumbnailInfo item in info.Thumbnails)
                 {
-                    if (item.Offset >= offset && offset < item.Offset + item.Size)
+                    if (offset >= item.Offset && offset < item.Offset + item.Size)
                     {
                         // NB: This only works because base64 data consists only of ASCII characters
                         data = item.Data?[(int)(offset - item.Offset)..];
@@ -928,7 +928,7 @@ namespace DuetWebServer.Controllers
                     data,
                     next = 0,
                     err = 0
-                }), "application/json");
+                }, JsonHelper.DefaultJsonOptions), "application/json");
             }
             catch (Exception e)
             {
