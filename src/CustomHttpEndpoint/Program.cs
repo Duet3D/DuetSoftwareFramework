@@ -23,6 +23,11 @@ namespace CustomHttpEndpoint
         private static string? _cmd = null;
 
         /// <summary>
+        /// URI to relay the incoming request to
+        /// </summary>
+        private static string? _uri = null;
+
+        /// <summary>
         /// Command arguments for the binary to start
         /// </summary>
         private static string? _args = null;
@@ -67,6 +72,10 @@ namespace CustomHttpEndpoint
                 {
                     _cmd = arg;
                 }
+                else if (lastArg == "-u" || lastArg == "--uri")
+                {
+                    _uri = arg;
+                }
                 else if (lastArg == "-a" || lastArg == "--args")
                 {
                     _args = arg;
@@ -84,6 +93,7 @@ namespace CustomHttpEndpoint
                     Console.WriteLine("-n, --namespace <namespace>: Namespace to use (defaults to custom-http-endpoint)");
                     Console.WriteLine("-p, --path <path>: HTTP query path (defaults to demo)");
                     Console.WriteLine("-e, --exec <executable>: Command to execute when an HTTP query is received, stdout and stderr are returned as the response body");
+                    Console.WriteLine("-u, --uri <uri>: Tell the web server to relay the incoming request to another server specified by the URI");
                     Console.WriteLine("-a, --args <arguments>: Arguments for the executable command. Query values in % chars are replaced with query options (e.g. %myvalue%). Not applicable for WebSockets");
                     Console.WriteLine("-q, --quiet: Do not display info text");
                     Console.WriteLine("-h, --help: Displays this text");
@@ -238,39 +248,7 @@ namespace CustomHttpEndpoint
                 // Read the HTTP response from the client
                 ReceivedHttpRequest request = await requestConnection.ReadRequest();
 
-                if (string.IsNullOrWhiteSpace(_cmd))
-                {
-                    // Write this event to the console if possible
-                    if (!_quiet)
-                    {
-                        Console.WriteLine("Got new HTTP request from session {0}", request.SessionId);
-                    }
-
-                    // Only print a demo response in case no process is supposed to be started
-                    string response = $"This demo text has been returned from a third-party application.\n\nMethod: {_method}\nSession ID: {request.SessionId}";
-                    if (request.Headers.Count > 0)
-                    {
-                        response += "\n\nHeaders:";
-                        foreach (var kv in request.Headers)
-                        {
-                            response += $"\n{kv.Key} = {kv.Value}";
-                        }
-                    }
-                    if (request.Queries.Count > 0)
-                    {
-                        response += "\n\nQueries:";
-                        foreach (var kv in request.Queries)
-                        {
-                            response += $"\n{kv.Key} = {kv.Value}";
-                        }
-                    }
-                    if (!string.IsNullOrWhiteSpace(request.Body))
-                    {
-                        response += "\n\nBody:\n" + request.Body;
-                    }
-                    await requestConnection.SendResponse(200, response, HttpResponseType.PlainText);
-                }
-                else
+                if (!string.IsNullOrWhiteSpace(_cmd))
                 {
                     // Replace query values in the arguments
                     string args = _cmd;
@@ -306,6 +284,44 @@ namespace CustomHttpEndpoint
                         await requestConnection.SendResponse(501, "Failed to start process", HttpResponseType.StatusCode);
                     }
                 }
+                else if (!string.IsNullOrWhiteSpace(_uri))
+                {
+                    // Tell DWS to relay this request to another URI
+                    await requestConnection.SendResponse(200, _uri, HttpResponseType.URI);
+                }
+                else
+                {
+                    // Write this event to the console if possible
+                    if (!_quiet)
+                    {
+                        Console.WriteLine("Got new HTTP request from session {0}", request.SessionId);
+                    }
+
+                    // Only print a demo response in case no process is supposed to be started
+                    string response = $"This demo text has been returned from a third-party application.\n\nMethod: {_method}\nSession ID: {request.SessionId}";
+                    if (request.Headers.Count > 0)
+                    {
+                        response += "\n\nHeaders:";
+                        foreach (var kv in request.Headers)
+                        {
+                            response += $"\n{kv.Key} = {kv.Value}";
+                        }
+                    }
+                    if (request.Queries.Count > 0)
+                    {
+                        response += "\n\nQueries:";
+                        foreach (var kv in request.Queries)
+                        {
+                            response += $"\n{kv.Key} = {kv.Value}";
+                        }
+                    }
+                    if (!string.IsNullOrWhiteSpace(request.Body))
+                    {
+                        response += "\n\nBody:\n" + request.Body;
+                    }
+                    await requestConnection.SendResponse(200, response, HttpResponseType.PlainText);
+                }
+
             }
         }
 

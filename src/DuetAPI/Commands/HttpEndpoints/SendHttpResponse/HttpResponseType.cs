@@ -27,6 +27,11 @@ namespace DuetAPI.Commands
         /// <summary>
         /// File content. Response must hold the absolute path to the file to return
         /// </summary>
-        File
+        File,
+
+        /// <summary>
+        /// Send this request to another server (proxy). Response must hold the URI to send the request to
+        /// </summary>
+        URI
     }
 }

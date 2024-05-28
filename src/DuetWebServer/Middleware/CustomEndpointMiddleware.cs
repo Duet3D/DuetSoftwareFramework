@@ -6,7 +6,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net.Http;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -301,6 +305,38 @@ namespace DuetWebServer.Middleware
 
                 await using FileStream fs = new(httpResponse.Response, FileMode.Open, FileAccess.Read);
                 await fs.CopyToAsync(context.Response.Body);
+            }
+            else if (httpResponse.ResponseType == HttpResponseType.URI)
+            {
+                // Set up our own request
+                HttpRequestMessage requestMessage = new()
+                {
+                    Method = new HttpMethod(context.Request.Method),
+                    RequestUri = new Uri(httpResponse.Response)
+                };
+                requestMessage.Headers.Host = requestMessage.RequestUri.Host;
+                foreach (var header in context.Request.Headers)
+                {
+                    requestMessage.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
+                }
+                requestMessage.Content = new StringContent(body);
+
+                // Send it
+                using HttpClient client = new();
+                using HttpResponseMessage responseMessage = await client.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
+
+                // Send the response data back to the client
+                context.Response.StatusCode = (int)responseMessage.StatusCode;
+                foreach (var header in responseMessage.Headers)
+                {
+                    context.Response.Headers[header.Key] = header.Value.ToArray();
+                }
+                foreach (var header in responseMessage.Content.Headers)
+                {
+                    context.Response.Headers[header.Key] = header.Value.ToArray();
+                }
+                context.Response.Headers.Remove("transfer-encoding");
+                await responseMessage.Content.CopyToAsync(context.Response.Body);
             }
             else
             {
