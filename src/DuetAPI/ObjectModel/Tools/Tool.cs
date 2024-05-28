@@ -12,6 +12,7 @@
 
         /// <summary>
         /// Associated axes. At present only X and Y can be mapped per tool.
+        /// Note that each int[] array is actually a bitmap!
         /// </summary>
         /// <remarks>
         /// The order is the same as the visual axes, so by default the layout is
