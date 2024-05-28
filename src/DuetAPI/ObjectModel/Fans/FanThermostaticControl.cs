@@ -10,6 +10,9 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of heaters to monitor (indices)
         /// </summary>
+        /// <remarks>
+        /// This is a bitmap represented as an array
+        /// </remarks>
         [Obsolete("Use Sensors instead")]
         public ModelCollection<int> Heaters { get; } = new ModelCollection<int>();
         
@@ -36,6 +39,9 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of sensors to monitor (indices)
         /// </summary>
+        /// <remarks>
+        /// This is a bitmap represented as an array
+        /// </remarks>
         public ModelCollection<int> Sensors { get; } = new ModelCollection<int>();
     }
 }

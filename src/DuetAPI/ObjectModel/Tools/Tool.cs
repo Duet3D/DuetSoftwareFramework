@@ -12,7 +12,6 @@
 
         /// <summary>
         /// Associated axes. At present only X and Y can be mapped per tool.
-        /// Note that each int[] array is actually a bitmap!
         /// </summary>
         /// <remarks>
         /// The order is the same as the visual axes, so by default the layout is
@@ -20,7 +19,8 @@
         ///   [0],        // X
         ///   [1]         // Y
         /// ]
-        /// Make sure to set each item individually so the change events are called
+        /// Make sure to set each item individually so the change events are called.
+        /// Each item is a bitmap represented as an array
         /// </remarks>
         public ModelCollection<int[]> Axes { get; } = new ModelCollection<int[]>();
 
@@ -32,6 +32,9 @@
         /// <summary>
         /// List of associated fans (indices)
         /// </summary>
+        /// <remarks>
+        /// This is a bitmap represented as an array
+        /// </remarks>
         public ModelCollection<int> Fans { get; } = new ModelCollection<int>();
 
         /// <summary>
