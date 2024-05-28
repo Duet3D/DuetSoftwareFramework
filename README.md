@@ -169,6 +169,7 @@ Binary data transfers are not supported in any mode. If you need to transfer bin
 - `-n`, `--namespace`: Set namespace to use (defaults to custom-http-endpoint)
 - `-p`, `--path`: Set HTTP query path (defaults to demo)
 - `-e`, `--exec`: Set binary file to execute when an HTTP query is received. Stdout and stderr are returned as the response body once the program terminates
+- `-u`, `--uri <uri>`: Tell the web server to relay the incoming request to another server specified by the URI
 - `-a`, `--args`: Set arguments for the executable file. Query values in `%` characters are replaced with query options (e.g. `%myvalue%`). Not applicable for WebSockets
 - `-q`, `--quiet`: Do not display info text
 - `-h`, `--help`: Display all available command-line parameters
