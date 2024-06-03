@@ -179,7 +179,7 @@ Binary data transfers are not supported in any mode. If you need to transfer bin
 This DSF plugin provides various M-code extensions to mimic standalone compatibility using various M-codes.
 It is intended to be used with DuetPi because it requires various services to be installed first.
 
-See its dedicate [README.md](src/DuetPiManagementPlugin/README.md) for further details.
+See its dedicated [README.md](src/DuetPiManagementPlugin/README.md) for further details.
 
 #### Command-Line Options
 
