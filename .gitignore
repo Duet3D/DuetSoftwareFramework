@@ -276,3 +276,6 @@ src/DuetAPIClient/DuetAPIClient.xml
 src/DuetControlServer/DuetControlServer.xml
 src/DuetWebServer/DuetWebServer.xml
 src/LinuxApi/LinuxApi.xml
+
+# VSCode
+.vscode/*

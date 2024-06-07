@@ -1,5 +1,4 @@
 ﻿using DuetAPI.ObjectModel;
-using DuetAPI.Utility;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -7,7 +6,6 @@ using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Xml;
 
 namespace DuetControlServer.Model
 {

@@ -19,9 +19,6 @@ namespace DuetWebServer.Singletons
         /// </summary>
         public int ReplySeq { get; set; }
 
-        /// Sequence number for volume changes (analog to seqs.volumes)
-        public int VolumesSeq { get; set; }
-
         /// <summary>
         /// Path to the web directory
         /// </summary>
@@ -53,9 +50,6 @@ namespace DuetWebServer.Singletons
         /// Sequence number for generic messages (analog to seqs.reply)
         /// </summary>
         public int ReplySeq { get; set; }
-
-        /// Sequence number for volume changes (analog to seqs.volumes)
-        public int VolumesSeq { get; set; }
 
         /// <summary>
         /// Path to the web directory

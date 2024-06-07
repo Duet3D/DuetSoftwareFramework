@@ -3,6 +3,7 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -87,9 +88,9 @@ namespace DuetControlServer.Model
                 // Run another update cycle
                 using (await Provider.AccessReadWriteAsync())
                 {
-                    UpdateNetwork(networkInterfaces);
+                    await UpdateNetwork(networkInterfaces);
                     UpdateSbc();
-                    UpdateVolumes(drives);
+                    await UpdateVolumes(drives);
                     CleanMessages();
                 }
 
@@ -142,8 +143,12 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Update network interfaces
         /// </summary>
-        private static async void UpdateNetwork(System.Net.NetworkInformation.NetworkInterface[] networkInterfaces)
+        /// <returns>Asynchronous task</returns>
+        private static async Task UpdateNetwork(System.Net.NetworkInformation.NetworkInterface[] networkInterfaces)
         {
+            bool networkUpdated = false;
+            void InterfaceUpdated(object? sender, PropertyChangedEventArgs e) => networkUpdated = true;
+
             // DCS does not maintain the WiFi country code, so we need to cache it if was populated before
             string? wifiCountry = Provider.Get.Network.Interfaces.FirstOrDefault(iface => iface.WifiCountry != null)?.WifiCountry;
 
@@ -171,6 +176,7 @@ namespace DuetControlServer.Model
                         networkInterface = Provider.Get.Network.Interfaces[index];
                     }
                     index++;
+                    networkInterface.PropertyChanged += InterfaceUpdated;
 
                     // Update IPv4 configuration
                     string? macAddress = null;
@@ -295,12 +301,31 @@ namespace DuetControlServer.Model
                         networkInterface.Type = NetworkInterfaceType.LAN;
                         networkInterface.WifiCountry = null;
                     }
+                    networkInterface.PropertyChanged -= InterfaceUpdated;
                 }
             }
 
             for (int i = Provider.Get.Network.Interfaces.Count; i > index; i--)
             {
                 Provider.Get.Network.Interfaces.RemoveAt(i - 1);
+                networkUpdated = true;
+            }
+
+            if (networkUpdated && !Settings.NoSpi)
+            {
+                Code code = new()
+                {
+                    Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous,
+                    Channel = CodeChannel.Trigger,
+                    Type = CodeType.MCode,
+                    MajorNumber = 409,
+                    Parameters = new()
+                        {
+                            new('K', "network"),
+                            new('I', 1)
+                        }
+                };
+                await code.Execute();
             }
         }
 
@@ -372,8 +397,12 @@ namespace DuetControlServer.Model
         /// Volume 0 always represents the virtual SD card on DuetPi. The following code achieves this but it
         /// might need further adjustments to ensure this on every Linux distribution
         /// </remarks>
-        private static void UpdateVolumes(DriveInfo[] drives)
+        /// <returns>Asynchronous task</returns>
+        private static async Task UpdateVolumes(DriveInfo[] drives)
         {
+            bool volumesUpdated = false;
+            void VolumeUpdated(object? sender, PropertyChangedEventArgs e) => volumesUpdated = true;
+
             int index = 0;
             foreach (DriveInfo drive in drives)
             {
@@ -402,17 +431,38 @@ namespace DuetControlServer.Model
                     }
                     index++;
 
+                    volume.PropertyChanged += VolumeUpdated;
                     volume.Capacity = (drive.DriveType == DriveType.Network) ? null : totalSize;
                     volume.FreeSpace = (drive.DriveType == DriveType.Network) ? null : drive.AvailableFreeSpace;
                     volume.Mounted = drive.IsReady;
                     volume.PartitionSize = (drive.DriveType == DriveType.Network) ? null : totalSize;
                     volume.Path = drive.VolumeLabel;
+                    volume.PropertyChanged -= VolumeUpdated;
                 }
             }
 
             for (int i = Provider.Get.Volumes.Count; i > index; i--)
             {
                 Provider.Get.Volumes.RemoveAt(i - 1);
+                volumesUpdated = true;
+            }
+
+
+            if (volumesUpdated && !Settings.NoSpi)
+            {
+                Code code = new()
+                {
+                    Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous,
+                    Channel = CodeChannel.Trigger,
+                    Type = CodeType.MCode,
+                    MajorNumber = 409,
+                    Parameters = new()
+                        {
+                            new('K', "volumes"),
+                            new('I', 1)
+                        }
+                };
+                await code.Execute();
             }
         }
 

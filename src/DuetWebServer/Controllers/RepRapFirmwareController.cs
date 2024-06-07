@@ -565,7 +565,7 @@ namespace DuetWebServer.Controllers
                 {
                     // Get live values from RRF
                     using CommandConnection connection = await BuildConnection();
-                    string response = await connection.PerformSimpleCode($"M409 K\"{key}\" F\"{flags}\"");
+                    string response = await connection.PerformSimpleCode($"M409 F\"{flags}\"");
 
                     // Update sequence numbers where applicable
                     using JsonDocument jsonDoc = JsonDocument.Parse(response);
@@ -579,10 +579,6 @@ namespace DuetWebServer.Controllers
                                 if (seqs.ContainsKey("reply"))
                                 {
                                     seqs["reply"] = _modelProvider.ReplySeq;
-                                }
-                                if (seqs.ContainsKey("volumes"))
-                                {
-                                    seqs["volumes"] = _modelProvider.VolumesSeq;
                                 }
                             }
                             result["seqs"] = seqs;
@@ -599,7 +595,7 @@ namespace DuetWebServer.Controllers
                     // Otherwise pass it on
                     return Content(response, "application/json");
                 }
-                else if ((key is null || !key.Contains('[')) && (flags is null || !flags.Contains('f')))
+                else if ((key is null || !key.Contains('[')) && key?.StartsWith("seqs") != true && (flags is null || !flags.Contains('f')))
                 {
                     // If no live parameters are requested, return data from the main DSF object model
                     using SubscribeConnection connection = await BuildSubscribeConnection(key + ".**");

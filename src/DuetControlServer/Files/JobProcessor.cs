@@ -1,7 +1,6 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
-using DuetControlServer.Codes;
 using DuetControlServer.Model;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
 using DuetControlServer.SPI.Communication.Shared;

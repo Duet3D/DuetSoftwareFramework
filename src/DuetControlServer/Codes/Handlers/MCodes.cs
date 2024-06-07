@@ -512,18 +512,20 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Flag current macro file as (not) pausable
                 case 98:
-                    if (code.TryGetInt('R', out int rParam))
                     {
-                        if (await Processor.FlushAsync(code))
+                        if (code.TryGetInt('R', out int rParam))
                         {
-                            await SPI.Interface.SetMacroPausable(code.Channel, rParam == 1);
+                            if (await Processor.FlushAsync(code))
+                            {
+                                await SPI.Interface.SetMacroPausable(code.Channel, rParam == 1);
+                            }
+                            else
+                            {
+                                throw new OperationCanceledException();
+                            }
                         }
-                        else
-                        {
-                            throw new OperationCanceledException();
-                        }
+                        break;
                     }
-                    break;
 
                 // Emergency Stop
                 case 112:
@@ -560,6 +562,36 @@ namespace DuetControlServer.Codes.Handlers
                         return result;
                     }
                     break;
+
+                // Query object model
+                case 409:
+                    {
+                        if (code.TryGetInt('I', out int iVal) && iVal > 0)
+                        {
+                            return new Message(MessageType.Error, "M409 I1 is reserved for internal purposes only");
+                        }
+
+                        if (code.TryGetString('K', out string? key) && (!code.TryGetInt('R', out int rParam) || rParam == 0))
+                        {
+                            if (!key.TrimStart('#').StartsWith("network") && !key.TrimStart('#').StartsWith("volumes"))
+                            {
+                                // Only return query results for network and volume keys as part of M409
+                                break;
+                            }
+
+                            code.TryGetString('F', out string? flags);
+                            var queryResult = new {
+                                key,
+                                flags = flags ?? string.Empty,
+                                result = Filter.GetFiltered(new object[] { key })
+                            };
+                            return new Message(MessageType.Success, JsonSerializer.Serialize(queryResult, JsonHelper.DefaultJsonOptions));
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
 
                 // Create Directory on SD-Card
                 case 470:

@@ -120,8 +120,7 @@ namespace DuetWebServer.Services
                             "directories/www",
                             "messages/**",
                             "network/corsSite",
-                            "sbc/dsf/httpEndpoints/**",
-                            "volumes/**"
+                            "sbc/dsf/httpEndpoints/**"
                         }, _settings.SocketPath);
                         await commandConnection.Connect(_settings.SocketPath);
                         _logger.LogInformation("Connections to DuetControlServer established");
@@ -172,13 +171,6 @@ namespace DuetWebServer.Services
                                 lock (_modelProvider)
                                 {
                                     _modelProvider.ReplySeq += messagesElement.GetArrayLength();
-                                }
-                            }
-                            if (jsonPatch.RootElement.TryGetProperty("volumes", out _))
-                            {
-                                lock (_modelProvider)
-                                {
-                                    _modelProvider.VolumesSeq++;
                                 }
                             }
 
