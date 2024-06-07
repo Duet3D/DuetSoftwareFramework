@@ -1111,6 +1111,15 @@ namespace DuetControlServer.Codes.Handlers
                     await Updater.WaitForFullUpdate(code.CancellationToken);      // This may change inputs[].active, so sync the OM here
                     break;
 
+                // Query object model
+                case 409:
+                    if (code.HasParameter('I') && !string.IsNullOrWhiteSpace(code.Result.Content))
+                    {
+                        // Clear output of M409 K"..." I1 case an outdated firmware version is used with this DSF build
+                        code.Result.Content = string.Empty;
+                    }
+                    break;
+
                 // Select movement queue number
                 case 596:
                     _logger.Debug("Requesting full model update after M596");
