@@ -774,6 +774,7 @@ namespace DuetWebServer.Controllers
                 }
 
                 // Get fileinfo
+                #warning FIXME make sure the base directory defaults to 0:/gcodes
                 string resolvedPath = await connection.ResolvePath(name);
                 if (!System.IO.File.Exists(resolvedPath))
                 {
