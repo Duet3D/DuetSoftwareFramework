@@ -567,7 +567,7 @@ namespace DuetControlServer.SPI
             };
 
             Span<byte> span = _txBuffer.Value[_txPointer..].Span;
-            MemoryMarshal.Write(span, ref header);
+            MemoryMarshal.Write(span, header);
             _txPointer += Marshal.SizeOf<PacketHeader>();
         }
 
@@ -952,7 +952,7 @@ namespace DuetControlServer.SPI
                 crc16 = crc16
             };
             Span<byte> transferData = stackalloc byte[Marshal.SizeOf<Communication.SbcRequests.FlashVerify>()];
-            MemoryMarshal.Write(transferData, ref verifyRequest);
+            MemoryMarshal.Write(transferData, verifyRequest);
             WaitForTransfer();
             _spiDevice.TransferFullDuplex(transferData, transferData);
 
@@ -1367,16 +1367,16 @@ namespace DuetControlServer.SPI
             if (_txHeader.ProtocolVersion >= 4)
             {
                 _txHeader.ChecksumData32 = CRC32.Calculate(_txBuffer.Value[.._txPointer].Span);
-                MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
+                MemoryMarshal.Write(_txHeaderBuffer.Span, _txHeader);
                 _txHeader.ChecksumHeader32 = CRC32.Calculate(_txHeaderBuffer[..12].Span);
-                MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
+                MemoryMarshal.Write(_txHeaderBuffer.Span, _txHeader);
             }
             else
             {
                 _txHeader.ChecksumData16 = CRC16.Calculate(_txBuffer.Value[.._txPointer].Span);
-                MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
+                MemoryMarshal.Write(_txHeaderBuffer.Span, _txHeader);
                 _txHeader.ChecksumHeader16 = CRC16.Calculate(_txHeaderBuffer[..10].Span);
-                MemoryMarshal.Write(_txHeaderBuffer.Span, ref _txHeader);
+                MemoryMarshal.Write(_txHeaderBuffer.Span, _txHeader);
             }
         }
 
@@ -1562,7 +1562,7 @@ namespace DuetControlServer.SPI
         private static uint ExchangeResponse(uint response)
         {
             Span<byte> txResponseBuffer = stackalloc byte[sizeof(uint)], rxResponseBuffer = stackalloc byte[sizeof(uint)];
-            MemoryMarshal.Write(txResponseBuffer, ref response);
+            MemoryMarshal.Write(txResponseBuffer, response);
 
             WaitForTransfer();
             _spiDevice.TransferFullDuplex(txResponseBuffer, rxResponseBuffer);

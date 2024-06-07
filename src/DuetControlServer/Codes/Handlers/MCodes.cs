@@ -1097,6 +1097,11 @@ namespace DuetControlServer.Codes.Handlers
                     }
                     break;
 
+                // Pop
+                case 121:
+                    await Updater.WaitForFullUpdate(code.CancellationToken);        // This may change inputs[].active, so sync the OM here
+                    break;
+
                 // Diagnostics
                 case 122:
                     if (code.GetInt('B', 0) == 0 && code.GetInt('P', 0) == 0 && code.GetUnprecedentedString() != "DSF" && !string.IsNullOrEmpty(code.Result.Content))
@@ -1106,15 +1111,10 @@ namespace DuetControlServer.Codes.Handlers
                     }
                     break;
 
-                // Pop
-                case 121:
-                    await Updater.WaitForFullUpdate(code.CancellationToken);      // This may change inputs[].active, so sync the OM here
-                    break;
-
                 // Select movement queue number
                 case 596:
                     _logger.Debug("Requesting full model update after M596");
-                    await Updater.WaitForFullUpdate(code.CancellationToken);    // This changes inputs[].active, so sync the OM here
+                    await Updater.WaitForFullUpdate(code.CancellationToken);        // This changes inputs[].active, so sync the OM here
                     _logger.Debug("Requested full model update after M596");
                     break;
 

@@ -550,12 +550,7 @@ namespace DuetAPI.Commands
                                 result.KeywordArgument = string.Empty;
                                 inKeywordArgument = true;
                             }
-#warning do not permit duplicate parameters in v3.6
-#if false
                             else if (!result.HasParameter(letter))
-#else
-                            else
-#endif
                             {
                                 AddParameter(result, letter, value, false, unprecedentedParameter || isNumericParameter);
                             }
@@ -573,10 +568,7 @@ namespace DuetAPI.Commands
                                 letter = '@';
                             }
 
-#warning do not permit duplicate parameters in v3.6
-#if false
                             if (!result.HasParameter(letter))
-#endif
                             {
                                 if (wasExpression && (!value.StartsWith("{") || !value.EndsWith("}")))
                                 {
@@ -720,8 +712,7 @@ namespace DuetAPI.Commands
         /// <param name="isSingleParameter">Whether the parameter is definitely a single parameter</param>
         private static void AddParameter(Code code, char letter, string value, bool isQuoted, bool isSingleParameter)
         {
-#warning do not permit digit parameter letters in v3.6
-            if (letter != '@' && !char.IsLetterOrDigit(letter))
+            if (letter != '@' && !char.IsLetter(letter))
             {
                 throw new CodeParserException($"Illegal parameter letter '{letter}'");
             }
