@@ -560,12 +560,13 @@ namespace DuetWebServer.Controllers
                     }
                 }
 
-                // Update special "seqs" values in common live query result, retrieve partial DSF OM, or fall back to M409
-                if (string.IsNullOrWhiteSpace(key) && flags is not null && flags.Contains('f'))
+                using CommandConnection connection = await BuildConnection();
+                string response;
+
+                if (string.IsNullOrWhiteSpace(key) && flags?.Contains('f') == true)
                 {
-                    // Get live values from RRF
-                    using CommandConnection connection = await BuildConnection();
-                    string response = await connection.PerformSimpleCode($"M409 F\"{flags}\"");
+                    // Update special "seqs" values in common live query resul
+                    response = await connection.PerformSimpleCode($"M409 F\"{flags}\"");
 
                     // Update sequence numbers where applicable
                     using JsonDocument jsonDoc = JsonDocument.Parse(response);
@@ -591,48 +592,14 @@ namespace DuetWebServer.Controllers
                             result
                         }, JsonHelper.DefaultJsonOptions), "application/json");
                     }
-
-                    // Otherwise pass it on
-                    return Content(response, "application/json");
-                }
-                else if ((key is null || !key.Contains('[')) && key?.StartsWith("seqs") != true && (flags is null || !flags.Contains('f')))
-                {
-                    // If no live parameters are requested, return data from the main DSF object model
-                    using SubscribeConnection connection = await BuildSubscribeConnection(key + ".**");
-                    using JsonDocument queryResult = await connection.GetObjectModelPatch();
-
-                    // Get down to the requested depth
-                    JsonElement result = queryResult.RootElement;
-                    if (key is not null)
-                    {
-                        foreach (string depth in key.Split('.'))
-                        {
-                            if (result.ValueKind == JsonValueKind.Object)
-                            {
-                                foreach (var subItem in result.EnumerateObject())
-                                {
-                                    result = subItem.Value;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    // Return final result
-                    return Content(JsonSerializer.Serialize(new
-                    {
-                        key,
-                        flags,
-                        result
-                    }, JsonHelper.DefaultJsonOptions), "application/json");
                 }
                 else
                 {
-                    // Fall back to M409 for now. Note that it may return values which are not provided by DSF!
-                    using CommandConnection connection = await BuildConnection();
-                    string response = await connection.PerformSimpleCode($"M409 K\"{key}\" F\"{flags}\"");
-                    return Content(response, "application/json");
+                    // Fall back to M409
+                    response = await connection.PerformSimpleCode($"M409 K\"{key}\" F\"{flags}\"");
                 }
+
+                return Content(response, "application/json");
             }
             catch (Exception e)
             {

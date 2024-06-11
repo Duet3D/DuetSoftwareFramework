@@ -30,6 +30,20 @@ namespace UnitTests.Machine
         }
 
         [Test]
+        public void ParseSingleFilter()
+        {
+            string filters = "heat/heaters[*]/active";
+            object[][] parsedFilters = DuetControlServer.Model.Filter.ConvertFilters(filters);
+
+            ClassicAssert.AreEqual(1, parsedFilters.Length);
+
+            ClassicAssert.AreEqual("heat", parsedFilters[0][0]);
+            ClassicAssert.AreEqual("heaters", parsedFilters[0][1]);
+            ClassicAssert.AreEqual(-1, parsedFilters[0][2]);
+            ClassicAssert.AreEqual("active", parsedFilters[0][3]);
+        }
+
+        [Test]
         public void CheckFilters()
         {
             object[] pathA = new object[] { "sensors", new ItemPathNode("analog", 0, new object[3]) };

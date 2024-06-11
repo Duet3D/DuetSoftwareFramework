@@ -132,29 +132,45 @@ namespace DuetPiManagementPlugin
                     {
                         // Initialize SD card
                         case 21:
-                            if (code.TryGetString('P', out string? device))
                             {
-                                string? directory = code.GetOptionalString('S'), type = code.GetOptionalString('T'), options = code.GetOptionalString('O');
-                                try
+                                if (code.TryGetParameter('P', out CodeParameter? pParam))
                                 {
-                                    if (!string.IsNullOrEmpty(directory))
+                                    if (pParam.Type == typeof(string))
                                     {
-                                        directory = await Connection.ResolvePath(directory, CancellationToken);
+                                        string device = (string)pParam;
+                                        string? directory = code.GetOptionalString('S'), type = code.GetOptionalString('T'), options = code.GetOptionalString('O');
+                                        try
+                                        {
+                                            if (!string.IsNullOrEmpty(directory))
+                                            {
+                                                directory = await Connection.ResolvePath(directory, CancellationToken);
+                                            }
+                                            Message result = await Mount.MountShare(device, directory, type, options);
+                                            await Connection.ResolveCode(result, CancellationToken);
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            await Connection.ResolveCode(MessageType.Error, e.Message, CancellationToken);
+                                            Console.WriteLine(e);
+                                        }
                                     }
-                                    Message result = await Mount.MountShare(device, directory, type, options);
-                                    await Connection.ResolveCode(result, CancellationToken);
+                                    else if (pParam.Type == typeof(int))
+                                    {
+                                        // PanelDue wants to mount an already mounted volume, handle it
+                                        await Connection.ResolveCode(MessageType.Success, string.Empty, CancellationToken);
+                                    }
+                                    else
+                                    {
+                                        // Unsupported P parameter
+                                        await Connection.ResolveCode(MessageType.Error, "Unsupported P parameter", CancellationToken);
+                                    }
                                 }
-                                catch (Exception e)
+                                else
                                 {
-                                    await Connection.ResolveCode(MessageType.Error, e.Message, CancellationToken);
-                                    Console.WriteLine(e);
+                                    await Connection.IgnoreCode();
                                 }
+                                break;
                             }
-                            else
-                            {
-                                await Connection.IgnoreCode();
-                            }
-                            break;
 
                         // Release SD card
                         case 22:
