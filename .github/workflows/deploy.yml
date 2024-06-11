@@ -79,7 +79,7 @@ jobs:
 
       # Upload armhf packages to pkg.duet3d.com (main unstable feed)
       - name: Upload package files to the main unstable feed
-        if: startsWith(inputs.target, 'unstable')
+        if: startsWith(inputs.target, 'stable') || startsWith(inputs.target, 'unstable')
         uses: Creepios/sftp-action@v1.0.5
         with:
           host: pkg.duet3d.com
