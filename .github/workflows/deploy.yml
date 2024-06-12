@@ -64,6 +64,15 @@ jobs:
           localPath: ./pkg/out
           remotePath: /var/www/pkg/dists/dev/armv7
 
+      # Update package lists on dev feed
+      - name: Update package lists on dev feed
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: pkg.duet3d.com
+          username: ${{ secrets.PKG_SSH_USER }}
+          key: ${{ secrets.PKG_SSH_KEY }}
+          script: update-pkg-feed dev
+
       # Upload stable packages to stable feed
       - name: Upload stable packages to stable feed
         if: startsWith(inputs.target, 'stable')
@@ -128,14 +137,4 @@ jobs:
           privateKey: ${{ secrets.PKG_SSH_KEY }}
           localPath: ./pkg/out
           remotePath: /var/www/pkg/dists/{{ inputs.target }}/armv7
-
-      # Refresh package lists if the dev target is selected
-      - name: Refresh package lists
-        if: inputs.target == 'dev'
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: pkg.duet3d.com
-          username: ${{ secrets.PKG_SSH_USER }}
-          key: ${{ secrets.PKG_SSH_KEY }}
-          script: update-pkg-feed dev
 
