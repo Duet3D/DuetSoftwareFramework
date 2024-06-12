@@ -110,7 +110,7 @@ jobs:
           password: ${{ secrets.PKG_SSH_PASS }}
           privateKey: ${{ secrets.PKG_SSH_KEY }}
           localPath: ./pkg/out
-          remotePath: /var/www/pkg/dists/{{ inputs.target }}/armv7
+          remotePath: "/var/www/pkg/dists/{{ inputs.target }}/armv7"
 
       # Upload stable packages to specific unstable feed
       - name: Upload stable packages to specific unstable feed
@@ -123,7 +123,7 @@ jobs:
           password: ${{ secrets.PKG_SSH_PASS }}
           privateKey: ${{ secrets.PKG_SSH_KEY }}
           localPath: ./pkg/out
-          remotePath: /var/www/pkg/dists/un{{ inputs.target }}/armv7
+          remotePath: "/var/www/pkg/dists/un{{ inputs.target }}/armv7"
 
       # Upload unstable packages to specific unstable feed
       - name: Upload unstable packages to specific unstable feed
@@ -136,5 +136,5 @@ jobs:
           password: ${{ secrets.PKG_SSH_PASS }}
           privateKey: ${{ secrets.PKG_SSH_KEY }}
           localPath: ./pkg/out
-          remotePath: /var/www/pkg/dists/{{ inputs.target }}/armv7
+          remotePath: "/var/www/pkg/dists/{{ inputs.target }}/armv7"
 
