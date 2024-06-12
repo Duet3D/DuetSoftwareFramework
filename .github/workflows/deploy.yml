@@ -104,7 +104,7 @@ jobs:
           remotePath: /var/www/pkg/dists/{{ inputs.target }}/armv7
 
       # Upload stable packages to specific unstable feed
-      - name: Upload stable package files to specific unstable feed
+      - name: Upload stable packages to specific unstable feed
         if: startsWith(inputs.target, 'stable')
         uses: Creepios/sftp-action@v1.0.5
         with:
