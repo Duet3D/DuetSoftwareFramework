@@ -64,8 +64,8 @@ jobs:
           localPath: ./pkg/out
           remotePath: /var/www/pkg/dists/dev/armv7
 
-      # Upload packages to stable feed
-      - name: Upload package files to stable feed
+      # Upload stable packages to stable feed
+      - name: Upload stable packages to stable feed
         if: startsWith(inputs.target, 'stable')
         uses: Creepios/sftp-action@v1.0.5
         with:
@@ -77,8 +77,8 @@ jobs:
           localPath: ./pkg/out
           remotePath: /var/www/pkg/dists/stable/armv7
 
-      # Upload packages to unstable feed
-      - name: Upload package files to unstable feed
+      # Upload (un)stable packages to unstable feed
+      - name: Upload (un)stable packages to unstable feed
         if: startsWith(inputs.target, 'stable') || startsWith(inputs.target, 'unstable')
         uses: Creepios/sftp-action@v1.0.5
         with:
@@ -90,9 +90,9 @@ jobs:
           localPath: ./pkg/out
           remotePath: /var/www/pkg/dists/unstable/armv7
 
-      # Upload packages to stable-3.4 feed
-      - name: Upload package files to stable feed
-        if: startsWith(inputs.target, 'stable') && contains(github.ref, '3.4')
+      # Upload stable packages to specific stable feed
+      - name: Upload package files to specific stable feed
+        if: startsWith(inputs.target, 'stable')
         uses: Creepios/sftp-action@v1.0.5
         with:
           host: pkg.duet3d.com
@@ -101,11 +101,11 @@ jobs:
           password: ${{ secrets.PKG_SSH_PASS }}
           privateKey: ${{ secrets.PKG_SSH_KEY }}
           localPath: ./pkg/out
-          remotePath: /var/www/pkg/dists/stable-3.4/armv7
+          remotePath: /var/www/pkg/dists/{{ inputs.target }}/armv7
 
-      # Upload packages to unstable-3.4 feed
-      - name: Upload package files to stable feed
-        if: (startsWith(inputs.target, 'stable') || startsWith(inputs.target, 'unstable')) && contains(github.ref, '3.4')
+      # Upload stable packages to specific unstable feed
+      - name: Upload stable package files to specific unstable feed
+        if: startsWith(inputs.target, 'stable')
         uses: Creepios/sftp-action@v1.0.5
         with:
           host: pkg.duet3d.com
@@ -114,11 +114,11 @@ jobs:
           password: ${{ secrets.PKG_SSH_PASS }}
           privateKey: ${{ secrets.PKG_SSH_KEY }}
           localPath: ./pkg/out
-          remotePath: /var/www/pkg/dists/unstable-3.4/armv7
+          remotePath: /var/www/pkg/dists/un{{ inputs.target }}/armv7
 
-      # Upload packages to stable-3.5 feed
-      - name: Upload package files to stable feed
-        if: startsWith(inputs.target, 'stable') && contains(github.ref, '3.5')
+      # Upload unstable packages to specific unstable feed
+      - name: Upload unstable packages to specific unstable feed
+        if: startsWith(inputs.target, 'unstable')
         uses: Creepios/sftp-action@v1.0.5
         with:
           host: pkg.duet3d.com
@@ -127,46 +127,7 @@ jobs:
           password: ${{ secrets.PKG_SSH_PASS }}
           privateKey: ${{ secrets.PKG_SSH_KEY }}
           localPath: ./pkg/out
-          remotePath: /var/www/pkg/dists/stable-3.5/armv7
-
-      # Upload packages to unstable-3.5 feed
-      - name: Upload package files to stable feed
-        if: (startsWith(inputs.target, 'stable') || startsWith(inputs.target, 'unstable')) && contains(github.ref, '3.5')
-        uses: Creepios/sftp-action@v1.0.5
-        with:
-          host: pkg.duet3d.com
-          port: 22
-          username: ${{ secrets.PKG_SSH_USER }}
-          password: ${{ secrets.PKG_SSH_PASS }}
-          privateKey: ${{ secrets.PKG_SSH_KEY }}
-          localPath: ./pkg/out
-          remotePath: /var/www/pkg/dists/unstable-3.5/armv7
-
-      # Upload packages to stable-3.6 feed
-      - name: Upload package files to stable feed
-        if: startsWith(inputs.target, 'stable') && contains(github.ref, '3.6')
-        uses: Creepios/sftp-action@v1.0.5
-        with:
-          host: pkg.duet3d.com
-          port: 22
-          username: ${{ secrets.PKG_SSH_USER }}
-          password: ${{ secrets.PKG_SSH_PASS }}
-          privateKey: ${{ secrets.PKG_SSH_KEY }}
-          localPath: ./pkg/out
-          remotePath: /var/www/pkg/dists/stable-3.6/armv7
-
-      # Upload packages to unstable-3.6 feed
-      - name: Upload package files to stable feed
-        if: (startsWith(inputs.target, 'stable') || startsWith(inputs.target, 'unstable')) && contains(github.ref, '3.6')
-        uses: Creepios/sftp-action@v1.0.5
-        with:
-          host: pkg.duet3d.com
-          port: 22
-          username: ${{ secrets.PKG_SSH_USER }}
-          password: ${{ secrets.PKG_SSH_PASS }}
-          privateKey: ${{ secrets.PKG_SSH_KEY }}
-          localPath: ./pkg/out
-          remotePath: /var/www/pkg/dists/unstable-3.6/armv7
+          remotePath: /var/www/pkg/dists/{{ inputs.target }}/armv7
 
       # Refresh package lists if the dev target is selected
       - name: Refresh package lists
