@@ -122,7 +122,7 @@ namespace DuetControlServer.IPC
             try
             {
                 // Check if this connection is permitted
-                _logger.Debug("Got new UNIX connection via IPC#{0}, checking permissions...", connection.Id);
+                _logger.Debug("Got new connection IPC#{0}, checking permissions...", connection.Id);
                 if (await connection.AssignPermissions())
                 {
                     // Send server-side init message to the client

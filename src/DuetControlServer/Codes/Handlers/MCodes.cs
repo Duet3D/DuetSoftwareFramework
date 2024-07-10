@@ -5,6 +5,7 @@ using DuetAPI.Utility;
 using DuetControlServer.Files;
 using DuetControlServer.Model;
 using DuetControlServer.Utility;
+using NLog;
 using System;
 using System.Globalization;
 using System.IO;
@@ -526,6 +527,55 @@ namespace DuetControlServer.Codes.Handlers
                         }
                         break;
                     }
+                
+                // Set Debug Level
+                // We only support some options for M111 P-1:
+                // - S"<level>" sets the log level where the level corresponds to the available NLog log levels
+                // - Onnn can be used to turn on/off logging via generic messages (accessible then e.g. via web UI)
+                case 111:
+                    if (code.TryGetInt('P', out int pParam) && pParam == -1)
+                    {
+                        if (await Processor.FlushAsync(code))
+                        {
+                            bool seen = false;
+                            if (code.TryGetString('S', out string? levelString))
+                            {
+                                NLog.LogLevel level = NLog.LogLevel.FromString(levelString);
+                                foreach (var rule in LogManager.Configuration.LoggingRules)
+                                {
+                                    rule.SetLoggingLevels(level, NLog.LogLevel.Fatal);
+                                }
+                                Settings.LogLevel = level;
+                                seen = true;
+                            }
+                            if (code.TryGetBool('O', out bool oParam))
+                            {
+                                if (oParam)
+                                {
+                                    if (LogManager.Configuration.FindTargetByName("MessageLogTarget") == null)
+                                    {
+                                        // Only add this target once and don't allow higher log level than debug, else we may get recursion
+                                        MessageLogTarget logTarget = new();
+                                        LogManager.Configuration.AddTarget("MessageLogTarget", logTarget);
+                                        LogManager.Configuration.AddRule(Settings.LogLevel > NLog.LogLevel.Trace ? Settings.LogLevel : NLog.LogLevel.Debug, NLog.LogLevel.Fatal, logTarget);
+                                    }
+                                }
+                                else
+                                {
+                                    LogManager.Configuration.RemoveTarget("MessageLogTarget");
+                                }
+                                seen = true;
+                            }
+
+                            if (seen)
+                            {
+                                LogManager.ReconfigExistingLoggers();
+                                return new Message();
+                            }
+                            return new Message(MessageType.Success, $"Current DCS log level: {Settings.LogLevel}");
+                        }
+                    }
+                    break;
 
                 // Emergency Stop
                 case 112:
@@ -932,7 +982,7 @@ namespace DuetControlServer.Codes.Handlers
                         {
                             using (await Provider.AccessReadOnlyAsync())
                             {
-                                if (Provider.Get.State.LogLevel == LogLevel.Off)
+                                if (Provider.Get.State.LogLevel == DuetAPI.ObjectModel.LogLevel.Off)
                                 {
                                     return new Message(MessageType.Success, "Event logging is disabled");
                                 }
@@ -942,15 +992,15 @@ namespace DuetControlServer.Codes.Handlers
 
                         if (sParam > 0 && sParam < 4)
                         {
-                            LogLevel logLevel = sParam switch
+                            DuetAPI.ObjectModel.LogLevel logLevel = sParam switch
                             {
-                                1 => LogLevel.Warn,
-                                2 => LogLevel.Info,
-                                3 => LogLevel.Debug,
-                                _ => LogLevel.Off
+                                1 => DuetAPI.ObjectModel.LogLevel.Warn,
+                                2 => DuetAPI.ObjectModel.LogLevel.Info,
+                                3 => DuetAPI.ObjectModel.LogLevel.Debug,
+                                _ => DuetAPI.ObjectModel.LogLevel.Off
                             };
 
-                            string defaultLogFile = Logger.DefaultLogFile;
+                            string defaultLogFile = Utility.Logger.DefaultLogFile;
                             using (await Provider.AccessReadOnlyAsync())
                             {
                                 if (!string.IsNullOrEmpty(Provider.Get.State.LogFile))
@@ -959,11 +1009,11 @@ namespace DuetControlServer.Codes.Handlers
                                 }
                             }
 
-                            await Logger.StartAsync(code.GetString('P', defaultLogFile), logLevel);
+                            await Utility.Logger.StartAsync(code.GetString('P', defaultLogFile), logLevel);
                         }
                         else
                         {
-                            await Logger.StopAsync();
+                            await Utility.Logger.StopAsync();
                         }
                         return new Message();
                     }
@@ -971,7 +1021,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Update the firmware
                 case 997:
-                    if (code.GetIntArray('S', new[] { 0 }).Contains(0) && code.GetInt('B', 0) == 0)
+                    if (code.GetIntArray('S', [0]).Contains(0) && code.GetInt('B', 0) == 0)
                     {
                         if (await Processor.FlushAsync(code))
                         {
