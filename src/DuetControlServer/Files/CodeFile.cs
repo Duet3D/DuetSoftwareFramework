@@ -301,6 +301,7 @@ namespace DuetControlServer.Files
                                         await Codes.Processor.FlushAsync(this);
                                     }
 
+                                    Task varDeletionTask;
                                     using (await LockAsync())
                                     {
                                         Position = state.FilePosition ?? 0;
@@ -308,13 +309,14 @@ namespace DuetControlServer.Files
                                         state.ProcessBlock = true;
                                         state.ContinueLoop = false;
                                         state.Iterations++;
-                                        await DeleteLocalVariables(state);
+                                        varDeletionTask = DeleteLocalVariables(state);
                                         readAgain = true;
                                         if (!IsClosed)
                                         {
                                             _logger.Debug("Restarting {0} block, iterations = {1}", state.Keyword, state.Iterations);
                                         }
                                     }
+                                    await varDeletionTask;  // wait outside the code lock to avoid deadlocks
                                     break;
                                 }
                                 await EndCodeBlock();
@@ -534,6 +536,8 @@ namespace DuetControlServer.Files
         /// <returns>Asynchronous task</returns>
         private async Task EndCodeBlock()
         {
+            Task? varDeletionTask = null;
+
             using (await LockAsync())
             {
                 CodeBlock? codeBlock;
@@ -558,11 +562,16 @@ namespace DuetControlServer.Files
                     }
 
                     // Delete previously created local variables
-                    await DeleteLocalVariables(codeBlock);
+                    varDeletionTask = DeleteLocalVariables(codeBlock);
 
                     // End
                     _lastCodeBlock = codeBlock;
                 }
+            }
+
+            if (varDeletionTask is not null)
+            {
+                await varDeletionTask;
             }
         }
     }
