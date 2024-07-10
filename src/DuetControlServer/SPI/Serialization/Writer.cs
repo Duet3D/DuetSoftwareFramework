@@ -52,7 +52,7 @@ namespace DuetControlServer.SPI.Serialization
                 Length = (ushort)length,
                 ResendPacketId = 0
             };
-            MemoryMarshal.Write(to, ref header);
+            MemoryMarshal.Write(to, in header);
         }
         
         /// <summary>
@@ -94,14 +94,14 @@ namespace DuetControlServer.SPI.Serialization
                 header.Flags |= CodeFlags.EnforceAbsolutePosition;
             }
 
-            MemoryMarshal.Write(to, ref header);
+            MemoryMarshal.Write(to, in header);
             bytesWritten += Marshal.SizeOf<CodeHeader>();
 
             // Write line number
             if (DataTransfer.ProtocolVersion >= 2)
             {
                 int lineNumber = (int)(code.LineNumber ?? 0);
-                MemoryMarshal.Write(to[bytesWritten..], ref lineNumber);
+                MemoryMarshal.Write(to[bytesWritten..], in lineNumber);
                 bytesWritten += sizeof(int);
             }
 
@@ -117,7 +117,7 @@ namespace DuetControlServer.SPI.Serialization
                     IntValue = commentLength,
                     Type = DataType.String
                 };
-                MemoryMarshal.Write(to[bytesWritten..], ref binaryParam);
+                MemoryMarshal.Write(to[bytesWritten..], in binaryParam);
                 bytesWritten += Marshal.SizeOf<CodeParameter>();
 
                 Span<byte> asUnicode = Encoding.UTF8.GetBytes(comment[..commentLength]);
@@ -209,7 +209,7 @@ else {              // Character parameters are not supported yet, they are wrap
                         throw new ArgumentException("Unsupported type", parameter.Type?.Name);
                     }
 
-                    MemoryMarshal.Write(to[bytesWritten..], ref binaryParam);
+                    MemoryMarshal.Write(to[bytesWritten..], in binaryParam);
                     bytesWritten += Marshal.SizeOf<CodeParameter>();
                 }
 
@@ -221,7 +221,7 @@ else {              // Character parameters are not supported yet, they are wrap
                         foreach (int val in intArray)
                         {
                             int value = val;
-                            MemoryMarshal.Write(to[bytesWritten..], ref value);
+                            MemoryMarshal.Write(to[bytesWritten..], in value);
                             bytesWritten += sizeof(int);
                         }
                     }
@@ -230,7 +230,7 @@ else {              // Character parameters are not supported yet, they are wrap
                         foreach (uint val in uintArray)
                         {
                             uint value = val;
-                            MemoryMarshal.Write(to[bytesWritten..], ref value);
+                            MemoryMarshal.Write(to[bytesWritten..], in value);
                             bytesWritten += sizeof(uint);
                         }
                     }
@@ -239,7 +239,7 @@ else {              // Character parameters are not supported yet, they are wrap
                         foreach (DriverId val in driverIdArray)
                         {
                             uint value = val;
-                            MemoryMarshal.Write(to[bytesWritten..], ref value);
+                            MemoryMarshal.Write(to[bytesWritten..], in value);
                             bytesWritten += sizeof(uint);
                         }
                     }
@@ -248,7 +248,7 @@ else {              // Character parameters are not supported yet, they are wrap
                         foreach (float val in floatArray)
                         {
                             float value = val;
-                            MemoryMarshal.Write(to[bytesWritten..], ref value);
+                            MemoryMarshal.Write(to[bytesWritten..], in value);
                             bytesWritten += sizeof(float);
                         }
                     }
@@ -287,7 +287,7 @@ else {              // Character parameters are not supported yet, they are wrap
                 KeyLength = (ushort)unicodeKey.Length,
                 FlagsLength = (ushort)unicodeFlags.Length
             };
-            MemoryMarshal.Write(to, ref request);
+            MemoryMarshal.Write(to, in request);
             int bytesWritten = Marshal.SizeOf<GetObjectModelHeader>();
 
             // Write key
@@ -349,7 +349,7 @@ else {              // Character parameters are not supported yet, they are wrap
                 foreach (int val in intArray)
                 {
                     intValue = val;
-                    MemoryMarshal.Write(to[bytesWritten..], ref intValue);
+                    MemoryMarshal.Write(to[bytesWritten..], in intValue);
                     bytesWritten += sizeof(int);
                 }
             }
@@ -360,7 +360,7 @@ else {              // Character parameters are not supported yet, they are wrap
                 foreach (uint val in uintArray)
                 {
                     uintValue = val;
-                    MemoryMarshal.Write(to[bytesWritten..], ref uintValue);
+                    MemoryMarshal.Write(to[bytesWritten..], in uintValue);
                     bytesWritten += sizeof(uint);
                 }
             }
@@ -371,7 +371,7 @@ else {              // Character parameters are not supported yet, they are wrap
                 foreach (float val in floatArray)
                 {
                     floatValue = val;
-                    MemoryMarshal.Write(to[bytesWritten..], ref floatValue);
+                    MemoryMarshal.Write(to[bytesWritten..], in floatValue);
                     bytesWritten += sizeof(float);
                 }
             }
@@ -396,7 +396,7 @@ else {              // Character parameters are not supported yet, they are wrap
                 foreach (DriverId val in driverIdArray)
                 {
                     uintValue = val;
-                    MemoryMarshal.Write(to[bytesWritten..], ref uintValue);
+                    MemoryMarshal.Write(to[bytesWritten..], in uintValue);
                     bytesWritten += sizeof(uint);
                 }
             }
@@ -412,7 +412,7 @@ else {              // Character parameters are not supported yet, they are wrap
                 foreach (bool val in boolArray)
                 {
                     byte byteVal = Convert.ToByte(val);
-                    MemoryMarshal.Write(to[bytesWritten..], ref byteVal);
+                    MemoryMarshal.Write(to[bytesWritten..], in byteVal);
                     bytesWritten += sizeof(byte);
                 }
             }
@@ -427,7 +427,7 @@ else {              // Character parameters are not supported yet, they are wrap
             }
             
             // Write request and field name
-            MemoryMarshal.Write(to, ref request);
+            MemoryMarshal.Write(to, in request);
             unicodeField.CopyTo(to[setObjectModelHeaderLength..]);
             return bytesWritten;
         }
@@ -467,14 +467,14 @@ else {              // Character parameters are not supported yet, they are wrap
                 PrintTime = (uint)(info.PrintTime ?? 0),
                 SimulatedTime = (uint)(info.SimulatedTime ?? 0)
             };
-            MemoryMarshal.Write(to, ref header);
+            MemoryMarshal.Write(to, in header);
             int bytesWritten = Marshal.SizeOf<PrintStartedHeader>();
             
             // Write filaments
             foreach (float filament in info.Filament)
             {
                 float filamentUsage = filament;
-                MemoryMarshal.Write(to[bytesWritten..], ref filamentUsage);
+                MemoryMarshal.Write(to[bytesWritten..], in filamentUsage);
                 bytesWritten += sizeof(float);
             }
             
@@ -500,7 +500,7 @@ else {              // Character parameters are not supported yet, they are wrap
             {
                 Reason = reason
             };
-            MemoryMarshal.Write(to, ref header);
+            MemoryMarshal.Write(to, in header);
             return Marshal.SizeOf<PrintStoppedHeader>();
         }
 
@@ -518,7 +518,7 @@ else {              // Character parameters are not supported yet, they are wrap
                 Channel = channel,
                 Error = (byte)(error ? 1 : 0)
             };
-            MemoryMarshal.Write(to, ref header);
+            MemoryMarshal.Write(to, in header);
             return Marshal.SizeOf<MacroCompleteHeader>();
         }
 
@@ -534,7 +534,7 @@ else {              // Character parameters are not supported yet, they are wrap
             {
                 Channel = channel
             };
-            MemoryMarshal.Write(to, ref header);
+            MemoryMarshal.Write(to, in header);
             return Marshal.SizeOf<CodeChannelHeader>();
         }
 
@@ -559,7 +559,7 @@ else {              // Character parameters are not supported yet, they are wrap
                 Extruder = extruder,
                 FilamentLength = (uint)unicodeFilamentName.Length
             };
-            MemoryMarshal.Write(to, ref header);
+            MemoryMarshal.Write(to, in header);
             int bytesWritten = Marshal.SizeOf<AssignFilamentHeader>();
 
             // Write filament name
@@ -583,7 +583,7 @@ else {              // Character parameters are not supported yet, they are wrap
                 DataLength = data.Length,
                 FileLength = (uint)fileLength
             };
-            MemoryMarshal.Write(to, ref header);
+            MemoryMarshal.Write(to, in header);
             int bytesWritten = Marshal.SizeOf<FileChunkHeader>();
 
             // Write chunk
@@ -615,7 +615,7 @@ else {              // Character parameters are not supported yet, they are wrap
             {
                 Channel = channel
             };
-            MemoryMarshal.Write(to, ref header);
+            MemoryMarshal.Write(to, in header);
             int bytesWritten = Marshal.SizeOf<CodeChannelHeader>();
 
             // Write expression
@@ -639,7 +639,7 @@ else {              // Character parameters are not supported yet, they are wrap
             {
                 Length = (ushort)unicodeData.Length
             };
-            MemoryMarshal.Write(to, ref request);
+            MemoryMarshal.Write(to, in request);
             int bytesWritten = Marshal.SizeOf<StringHeader>();
 
             // Write data
@@ -665,7 +665,7 @@ else {              // Character parameters are not supported yet, they are wrap
                 MessageType = type,
                 Length = (ushort)unicodeMessage.Length
             };
-            MemoryMarshal.Write(to, ref request);
+            MemoryMarshal.Write(to, in request);
             int bytesWritten = Marshal.SizeOf<MessageHeader>();
 
             // Write data
@@ -705,7 +705,7 @@ else {              // Character parameters are not supported yet, they are wrap
                 VariableLength = (byte)unicodeVarName.Length,
                 ExpressionLength = (byte)unicodeExpression.Length
             };
-            MemoryMarshal.Write(to, ref request);
+            MemoryMarshal.Write(to, in request);
             int bytesWritten = Marshal.SizeOf<SetVariableHeader>();
 
             // Write variable name
@@ -739,7 +739,7 @@ else {              // Character parameters are not supported yet, they are wrap
                 Channel = channel,
                 VariableLength = (byte)unicodeVarName.Length
             };
-            MemoryMarshal.Write(to, ref request);
+            MemoryMarshal.Write(to, in request);
             int bytesWritten = Marshal.SizeOf<DeleteLocalVariableHeader>();
 
             // Write variable name
@@ -760,7 +760,7 @@ else {              // Character parameters are not supported yet, they are wrap
             {
                 Value = Convert.ToByte(value)
             };
-            MemoryMarshal.Write(to, ref header);
+            MemoryMarshal.Write(to, in header);
             return Marshal.SizeOf<BooleanHeader>();
         }
 
@@ -778,7 +778,7 @@ else {              // Character parameters are not supported yet, they are wrap
                 Handle = handle,
                 FileSize = (uint)fileSize
             };
-            MemoryMarshal.Write(to, ref header);
+            MemoryMarshal.Write(to, in header);
             return Marshal.SizeOf<OpenFileResult>();
         }
 
@@ -796,7 +796,7 @@ else {              // Character parameters are not supported yet, they are wrap
             {
                 BytesRead = bytesRead
             };
-            MemoryMarshal.Write(to, ref header);
+            MemoryMarshal.Write(to, in header);
             int bytesWritten = Marshal.SizeOf<FileDataHeader>();
 
             // Write content

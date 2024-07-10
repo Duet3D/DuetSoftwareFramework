@@ -1,5 +1,7 @@
 ﻿using System.Runtime.InteropServices;
 
+#pragma warning disable 649,8981
+
 [StructLayout(LayoutKind.Sequential)]
 
 /*

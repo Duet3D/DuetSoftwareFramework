@@ -24,7 +24,7 @@ namespace DuetWebServer
         /// Create a new Startup instance
         /// </summary>
         /// <param name="configuration">Launch configuration (see appsettings.json)</param>
-        public Startup(IConfiguration configuration) => _settings = configuration.Get<Settings>();
+        public Startup(IConfiguration configuration) => _settings = configuration.Get<Settings>() ?? new();
 
         /// <summary>
         /// Configure web services and add service to the container

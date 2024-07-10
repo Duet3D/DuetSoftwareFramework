@@ -29,7 +29,7 @@ namespace DuetWebServer.Services
         /// <param name="sessionStorage">Session storage</param>
         public SessionExpiry(IConfiguration configuration, ISessionStorage sessionStorage)
         {
-            _settings = configuration.Get<Settings>();
+            _settings = configuration.Get<Settings>() ?? new();
             _sessionStorage = sessionStorage;
         }
 

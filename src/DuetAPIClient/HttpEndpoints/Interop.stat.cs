@@ -2,6 +2,8 @@
 
 [StructLayout(LayoutKind.Sequential)]
 
+#pragma warning disable 8981
+
 /*
  * Structures for the extended file attribute retrieval system call (statx()).
  *

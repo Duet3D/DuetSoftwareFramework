@@ -102,7 +102,7 @@ namespace DuetWebServer.Controllers
         /// <param name="applicationLifetime">Application lifecycle instance</param>
         public WebSocketController(IConfiguration configuration, ILogger<WebSocketController> logger, IHostApplicationLifetime applicationLifetime)
         {
-            _settings = configuration.Get<Settings>();
+            _settings = configuration.Get<Settings>() ?? new();
             _logger = logger;
             _applicationLifetime = applicationLifetime;
         }

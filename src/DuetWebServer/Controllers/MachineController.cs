@@ -93,7 +93,7 @@ namespace DuetWebServer.Controllers
         /// <param name="applicationLifetime">Application lifecycle instance</param>
         public MachineController(IConfiguration configuration, ILogger<MachineController> logger, IHostApplicationLifetime applicationLifetime)
         {
-            _settings = configuration.Get<Settings>();
+            _settings = configuration.Get<Settings>() ?? new();
             _logger = logger;
             _applicationLifetime = applicationLifetime;
         }

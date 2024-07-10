@@ -183,7 +183,7 @@ namespace DuetWebServer.Singletons
                 {
                     if (item.Key == key)
                     {
-                        string access = item.Ticket.Principal.FindFirstValue("access");
+                        string? access = item.Ticket.Principal.FindFirstValue("access");
                         if ((readWrite && access == Policies.ReadWrite) || (!readWrite && (access == Policies.ReadOnly || access == Policies.ReadWrite)))
                         {
                             item.LastQueryTime = DateTime.Now;

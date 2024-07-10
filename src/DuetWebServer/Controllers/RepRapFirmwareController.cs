@@ -106,7 +106,7 @@ namespace DuetWebServer.Controllers
         /// <param name="modelProvider">Model provider</param>
         public RepRapFirmwareController(IConfiguration configuration, ILogger<RepRapFirmwareController> logger, IModelProvider modelProvider)
         {
-            _settings = configuration.Get<Settings>();
+            _settings = configuration.Get<Settings>() ?? new();
             _logger = logger;
             _modelProvider = modelProvider;
         }

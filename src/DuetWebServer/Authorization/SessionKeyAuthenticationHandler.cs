@@ -49,7 +49,7 @@ namespace DuetWebServer.Authorization
         public SessionKeyAuthenticationHandler(IOptionsMonitor<SessionKeyAuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, IConfiguration configuration, ISessionStorage sessionStorage)
             : base(options, logger, encoder)
         {
-            _settings = configuration.Get<Settings>();
+            _settings = configuration.Get<Settings>() ?? new();
             _sessionStorage = sessionStorage;
         }
 

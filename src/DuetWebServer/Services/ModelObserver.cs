@@ -96,7 +96,7 @@ namespace DuetWebServer.Services
         public ModelObserver(IConfiguration configuration, ILogger<ModelObserver> logger, IModelProvider modelProvider, ISessionStorage sessionStorage)
         {
             _logger = logger;
-            _settings = configuration.Get<Settings>();
+            _settings = configuration.Get<Settings>() ?? new();
             _modelProvider = modelProvider;
             _sessionStorage = sessionStorage;
         }
