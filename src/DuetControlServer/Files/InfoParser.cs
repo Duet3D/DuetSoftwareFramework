@@ -228,7 +228,7 @@ namespace DuetControlServer.Files
         /// </summary>
         /// <param name="stream">Stream</param>
         /// <param name="buffer">Internal buffer</param>
-        /// <param name="bufferPointer">Pointer to the next byte in the buffer</param>
+        /// <param name="readData">Data about the read progress while reading backwards</param>
         /// <returns>Whether another line could be read</returns>
         private static async ValueTask<bool> ReadLineFromEndAsync(Stream stream, byte[] buffer, ReadLineFromEndData readData)
         {

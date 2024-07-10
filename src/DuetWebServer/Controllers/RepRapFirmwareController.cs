@@ -62,7 +62,7 @@ namespace DuetWebServer.Controllers
         /// <summary>
         /// Log a warning
         /// </summary>
-        /// <param name="e">Exception</param>
+        /// <param name="exception">Exception</param>
         /// <param name="message">Message</param>
         /// <param name="memberName">Method calling this method</param>
         private void LogWarning(Exception? exception, string message, [CallerMemberName] string memberName = "")
@@ -83,7 +83,7 @@ namespace DuetWebServer.Controllers
         /// <summary>
         /// Log an error
         /// </summary>
-        /// <param name="e">Exception</param>
+        /// <param name="exception">Exception</param>
         /// <param name="message">Message</param>
         /// <param name="memberName">Method calling this method</param>
         private void LogError(Exception? exception, string message, [CallerMemberName] string memberName = "")
@@ -102,7 +102,6 @@ namespace DuetWebServer.Controllers
         /// </summary>
         /// <param name="configuration">Launch configuration</param>
         /// <param name="logger">Logger instance</param>
-        /// <param name="applicationLifetime">Application lifecycle instance</param>
         /// <param name="modelProvider">Model provider</param>
         public RepRapFirmwareController(IConfiguration configuration, ILogger<RepRapFirmwareController> logger, IModelProvider modelProvider)
         {
@@ -117,6 +116,7 @@ namespace DuetWebServer.Controllers
         /// The extra "time" parameter is currently ignored in SBC mode
         /// </summary>
         /// <param name="password">Password to check</param>
+        /// <param name="sessionStorage">Session storage singleton</param>
         /// <returns>
         /// HTTP status code:
         /// (200) JSON response
@@ -233,8 +233,7 @@ namespace DuetWebServer.Controllers
         /// GET /rr_gcode?gcode={gcode}
         /// Execute plain G/M/T-code(s) from the request body and return the G-code response when done.
         /// </summary>
-        /// <param name="sessionStorage">Session storage singleton</param>
-        /// <param name="async">Execute code asynchronously (don't wait for a code result)</param>
+        /// <param name="gcode">G-code(s) to execute</param>
         /// <returns>
         /// HTTP status code:
         /// (200) JSON response
@@ -304,6 +303,8 @@ namespace DuetWebServer.Controllers
         /// Upload a file from the HTTP body and create the subdirectories if necessary
         /// </summary>
         /// <param name="name">Destination of the file to upload</param>
+        /// <param name="time">Last modified time of the file</param>
+        /// <param name="crc32">CRC32 checksum of the file</param>
         /// <param name="sessionStorage">Session storage singleton</param>
         /// <returns>
         /// HTTP status code:
@@ -715,7 +716,7 @@ namespace DuetWebServer.Controllers
         /// Parse a given G-code file and return information about this job file as a JSON object.
         /// If name is omitted, info about the file being printed is returned.
         /// </summary>
-        /// <param name="filename">Optional G-code file to analyze</param>
+        /// <param name="name">Optional G-code file to analyze</param>
         /// <returns>
         /// HTTP status code:
         /// (200) JSON response
@@ -821,7 +822,7 @@ namespace DuetWebServer.Controllers
         /// GET /rr_thumbnail?name={filename}&amp;offset={offset}
         /// Get the thumbnail from a given filename
         /// </summary>
-        /// <param name="filename">G-code file to read thumbnails from</param>
+        /// <param name="name">G-code file to read thumbnails from</param>
         /// <param name="offset">Start offset of the thumbnail query</param>
         /// <returns>
         /// HTTP status code:

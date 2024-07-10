@@ -32,6 +32,7 @@ namespace DuetControlServer.SPI.Channel
         /// Constructor of this class
         /// </summary>
         /// <param name="stackItem">Corresponding state of the firmware stage on the code pipeline</param>
+        /// <param name="msActive">Whether the motion system is active or not</param>
         public State(PipelineStackItem stackItem, bool msActive)
         {
             _pipelineStackItem = stackItem;

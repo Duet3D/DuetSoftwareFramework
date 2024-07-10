@@ -86,7 +86,7 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Push a new state on the stack
         /// </summary>
-        /// <param name="macro">Optional macro</param>
+        /// <param name="file">Optional file being executed</param>
         /// <returns>New state</returns>
         public State Push(CodeFile? file = null)
         {

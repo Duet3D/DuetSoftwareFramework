@@ -43,7 +43,6 @@ namespace DuetWebServer.Authorization
         /// <param name="options">Options</param>
         /// <param name="logger">Logger instance</param>
         /// <param name="encoder">URL encoder</param>
-        /// <param name="clock">System clock</param>
         /// <param name="configuration">Launch configuration</param>
         /// <param name="sessionStorage">Session storage singleton</param>
         public SessionKeyAuthenticationHandler(IOptionsMonitor<SessionKeyAuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, IConfiguration configuration, ISessionStorage sessionStorage)

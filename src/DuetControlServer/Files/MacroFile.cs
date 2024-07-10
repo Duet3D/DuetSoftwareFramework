@@ -92,7 +92,7 @@ namespace DuetControlServer.Files
         /// <param name="fileName">Filename of the macro</param>
         /// <param name="physicalFile">Physical path of the macro</param>
         /// <param name="channel">Code requesting the macro</param>
-        /// <param name="startingCode">Code starting the macro file</param>
+        /// <param name="startCode">Code starting the macro file</param>
         /// <param name="sourceConnection">Original IPC connection requesting this macro file</param>
         /// <returns>Macro file or null if it could not be opened</returns>
 

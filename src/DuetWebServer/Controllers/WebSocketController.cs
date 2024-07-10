@@ -80,7 +80,7 @@ namespace DuetWebServer.Controllers
         /// <summary>
         /// Log an error
         /// </summary>
-        /// <param name="e">Exception</param>
+        /// <param name="exception">Exception</param>
         /// <param name="message">Message</param>
         /// <param name="memberName">Method calling this method</param>
         private void LogError(Exception? exception, string message, [CallerMemberName] string memberName = "")

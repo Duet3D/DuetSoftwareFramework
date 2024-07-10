@@ -498,8 +498,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Flag asynchronously that a start-up file is being executed. Must be called WITHOUT locking this instance first!
         /// </summary>
-        /// <param name="v"></param>
-        /// <returns></returns>
+        /// <param name="executing">Whether a start-up file is being executed or not</param>
         public static void SetExecutingConfig(bool executing)
         {
             if (executing)

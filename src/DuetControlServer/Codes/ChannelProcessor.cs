@@ -136,7 +136,6 @@ namespace DuetControlServer.Codes
         /// <summary>
         /// Check if all stages starting with a certain one are idle
         /// </summary>
-        /// <param name="firstStage">First stage to check</param>
         /// <param name="code">Optional code requesting the check</param>
         /// <returns>True if the pipeline is empty</returns>
         public bool IsIdle(Commands.Code? code = null)
@@ -154,7 +153,6 @@ namespace DuetControlServer.Codes
         /// <summary>
         /// Wait for all pending codes to finish
         /// </summary>
-        /// <param name="channel">Code channel to wait for</param>
         /// <param name="flushAll">Whether to flush all states</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
         public async Task<bool> FlushAsync(bool flushAll)
@@ -223,6 +221,7 @@ namespace DuetControlServer.Codes
         /// This should not be used unless the corresponding code channel is unbounded
         /// </summary>
         /// <param name="code">Code to enqueue</param>
+        /// <param name="stage">Stage level to enqueue it at</param>
         public void WriteCode(Commands.Code code, PipelineStage stage)
         {
             //Logger.Debug("Sending code {0} to stage {1}", code, stage);

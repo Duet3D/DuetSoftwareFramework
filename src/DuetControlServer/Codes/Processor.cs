@@ -67,8 +67,6 @@ namespace DuetControlServer.Codes
         /// Push a new state on the stack of a given pipeline. Only to be used by the SPI channel processor!
         /// </summary>
         /// <param name="channel">Code channel</param>
-        /// <param name="macro">Optional macro file</param>
-        /// <returns>Pipeline state</returns>
         internal static void Pop(CodeChannel channel) => _processors[(int)channel].Pop();
 
         /// <summary>
@@ -82,6 +80,7 @@ namespace DuetControlServer.Codes
         /// Wait for all pending codes to finish
         /// </summary>
         /// <param name="channel">Code channel to wait for</param>
+        /// <param name="flushAll">Flush all codes on all stack levels</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
         public static Task<bool> FlushAsync(CodeChannel channel, bool flushAll = false) => _processors[(int)channel].FlushAsync(flushAll);
 
@@ -223,7 +222,6 @@ namespace DuetControlServer.Codes
         /// Execute a given code on a given pipeline stage
         /// </summary>
         /// <param name="code">Code to enqueue</param>
-        /// <param name="stage">Stage level to enqueue it at</param>
         public static void CodeCompleted(Commands.Code code) => _processors[(int)code.Channel].WriteCode(code, PipelineStage.Executed);
     }
 }

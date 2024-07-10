@@ -61,7 +61,7 @@ namespace DuetWebServer.Controllers
         /// <summary>
         /// Log a warning
         /// </summary>
-        /// <param name="e">Exception</param>
+        /// <param name="exception">Exception</param>
         /// <param name="message">Message</param>
         /// <param name="memberName">Method calling this method</param>
         private void LogWarning(Exception? exception, string message, [CallerMemberName] string memberName = "")
@@ -424,6 +424,7 @@ namespace DuetWebServer.Controllers
         /// Upload a file from the HTTP body and create the subdirectories if necessary
         /// </summary>
         /// <param name="filename">Destination of the file to upload</param>
+        /// <param name="timeModified">Optional time indicating when the file was last modified</param>
         /// <param name="sessionStorage">Session storage singleton</param>
         /// <returns>
         /// HTTP status code:

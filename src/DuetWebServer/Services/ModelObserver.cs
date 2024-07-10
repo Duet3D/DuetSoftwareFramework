@@ -93,6 +93,7 @@ namespace DuetWebServer.Services
         /// <param name="configuration">App configuration</param>
         /// <param name="logger">Logger instance</param>
         /// <param name="modelProvider">Model provider singleton</param>
+        /// <param name="sessionStorage">Session storage singleton</param>
         public ModelObserver(IConfiguration configuration, ILogger<ModelObserver> logger, IModelProvider modelProvider, ISessionStorage sessionStorage)
         {
             _logger = logger;

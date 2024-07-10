@@ -22,6 +22,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Delegate for asynchronously resolving custom meta G-code fuctions
         /// </summary>
+        /// <param name="channel">Code channel where this function is requested</param>
         /// <param name="functionName">Name of the function</param>
         /// <param name="arguments">Function arguments</param>
         /// <returns>Result value</returns>
@@ -198,7 +199,6 @@ namespace DuetControlServer.Model
         /// Checks if the given expression string contains any SBC object model fields
         /// </summary>
         /// <param name="expression">Expression to check</param>
-        /// <param name="code">Code for providing potential exception details</param>
         /// <returns>Whether the expressions contains any SBC object model fields</returns>
         /// <exception cref="CodeParserException">Failed to parse expression</exception>
         private static bool ContainsSbcFields(string expression)
