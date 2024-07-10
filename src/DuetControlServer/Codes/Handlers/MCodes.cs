@@ -579,13 +579,49 @@ namespace DuetControlServer.Codes.Handlers
                                 break;
                             }
 
+                            // Retrieve filtered OM data. At present, flags are ignored
                             code.TryGetString('F', out string? flags);
-                            var queryResult = new {
-                                key,
-                                flags = flags ?? string.Empty,
-                                result = Filter.GetFiltered(new object[] { key })
-                            };
-                            return new Message(MessageType.Success, JsonSerializer.Serialize(queryResult, JsonHelper.DefaultJsonOptions));
+                            using JsonDocument queryResult = JsonSerializer.SerializeToDocument(Filter.GetFiltered(key + ".**"), JsonHelper.DefaultJsonOptions);
+
+                            // Get down to the requested depth
+                            JsonElement result = queryResult.RootElement;
+                            if (key is not null)
+                            {
+                                foreach (string depth in key.Split('.'))
+                                {
+                                    if (result.ValueKind == JsonValueKind.Object)
+                                    {
+                                        foreach (var subItem in result.EnumerateObject())
+                                        {
+                                            result = subItem.Value;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Generate final OM response
+                            object finalResult;
+                            if (result.ValueKind == JsonValueKind.Array)
+                            {
+                                finalResult = new
+                                {
+                                    key,
+                                    flags = flags ?? string.Empty,
+                                    result,
+                                    next = 0
+                                };
+                            }
+                            else
+                            {
+                                finalResult = new
+                                {
+                                    key,
+                                    flags = flags ?? string.Empty,
+                                    result
+                                };
+                            }
+                            return new Message(MessageType.Success, JsonSerializer.Serialize(finalResult, JsonHelper.DefaultJsonOptions));
                         }
                         else
                         {

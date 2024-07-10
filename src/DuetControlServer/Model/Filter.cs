@@ -163,6 +163,15 @@ namespace DuetControlServer.Model
         public static Dictionary<string, object?> GetFiltered(object[] filter) => (Dictionary<string, object?>?)InternalGetFiltered(Provider.Get, filter) ?? new Dictionary<string, object?>();
 
         /// <summary>
+        /// Get a partial object model with only fields that match the given filter
+        /// </summary>
+        /// <param name="filter">Filter string</param>
+        /// <returns>Dictionary holding the results or null if nothing could be found</returns>
+        /// <remarks>Make sure the model provider is locked in read-only mode before using this class</remarks>
+        /// <seealso cref="DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filter"/>
+        public static Dictionary<string, object?> GetFiltered(string filter) => (Dictionary<string, object?>?)InternalGetFiltered(Provider.Get, ConvertFilter(filter, false)) ?? new Dictionary<string, object?>();
+
+        /// <summary>
         /// Internal function to find a specific object in the object model
         /// </summary>
         /// <param name="partialModel">Partial object model</param>

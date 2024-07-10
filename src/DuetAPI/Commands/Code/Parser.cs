@@ -650,7 +650,7 @@ namespace DuetAPI.Commands
 
 
             // Check if this was the last code on the line
-            if (c == '\n')
+            if (c is '\n' or '\0')
             {
                 result.Flags |= CodeFlags.IsLastCode;
             }
