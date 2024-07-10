@@ -10,8 +10,8 @@ on:
         type: choice
         options:
         - dev
-        - unstable-3.5
-        - stable-3.5
+        - unstable-3.6
+        - stable-3.6
 
 jobs:
   build:
@@ -24,13 +24,13 @@ jobs:
       - name: Set up NodeJS
         uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 22
 
       # Install .NET environment
       - name: Set up .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: 6
+          dotnet-version: 8
 
       # Install required tools
       - name: Install dependencies
