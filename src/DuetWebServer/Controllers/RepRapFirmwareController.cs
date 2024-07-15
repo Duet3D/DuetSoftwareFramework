@@ -909,13 +909,6 @@ namespace DuetWebServer.Controllers
             return connection;
         }
 
-        private async Task<SubscribeConnection> BuildSubscribeConnection(string filter)
-        {
-            SubscribeConnection connection = new();
-            await connection.Connect(SubscriptionMode.Patch, new string[] { filter }, _settings.SocketPath);
-            return connection;
-        }
-
         private async Task<string> ResolvePath(string path)
         {
             using CommandConnection connection = await BuildConnection();
