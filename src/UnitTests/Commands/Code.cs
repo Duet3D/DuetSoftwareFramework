@@ -108,7 +108,7 @@ namespace UnitTests.Commands
 
                 ClassicAssert.AreEqual(1, code.Parameters.Count);
 
-                int[] steps = { 810, 810, 407, 407 };
+                int[] steps = [810, 810, 407, 407];
                 ClassicAssert.AreEqual(steps, code.GetIntArray('E')!);
             }
         }
@@ -344,7 +344,7 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual(CodeFlags.IsLastCode, code.Flags);
                 ClassicAssert.AreEqual(2, code.Parameters.Count);
                 ClassicAssert.AreEqual('P', code.Parameters[0].Letter);
-                DriverId[] driverIds = new DriverId[] { new(2), new(3), new(1, 4) };
+                DriverId[] driverIds = [new(2), new(3), new(1, 4)];
                 ClassicAssert.AreEqual(driverIds, (DriverId[])code.Parameters[0]);
                 ClassicAssert.AreEqual('S', code.Parameters[1].Letter);
                 ClassicAssert.AreEqual(22, (int)code.Parameters[1]);
@@ -810,7 +810,7 @@ namespace UnitTests.Commands
         public async Task ParseEchoWithQuote()
         {
             DuetControlServer.Commands.SimpleCode simpleCode = new() { Code = "echo \"M98 P\"\"revo/define-tool.g\"\" S\"" };
-            List<DuetControlServer.Commands.Code> codes = new();
+            List<DuetControlServer.Commands.Code> codes = [];
             await foreach (DuetControlServer.Commands.Code code in simpleCode.ParseAsync())
             {
                 codes.Add(code);
@@ -917,7 +917,7 @@ namespace UnitTests.Commands
         public async Task SimpleCodes()
         {
             DuetControlServer.Commands.SimpleCode simpleCode = new() { Code = "G91 G1 X5 Y2" };
-            List<DuetControlServer.Commands.Code> codes = new();
+            List<DuetControlServer.Commands.Code> codes = [];
             await foreach (DuetControlServer.Commands.Code code in simpleCode.ParseAsync())
             {
                 codes.Add(code);
@@ -941,7 +941,7 @@ namespace UnitTests.Commands
         public async Task SimpleCodesG53Line()
         {
             DuetControlServer.Commands.SimpleCode simpleCode = new() { Code = "G53 G1 X100 G0 Y200\nG1 Z50" };
-            List<DuetControlServer.Commands.Code> codes = new();
+            List<DuetControlServer.Commands.Code> codes = [];
             await foreach (DuetControlServer.Commands.Code code in simpleCode.ParseAsync())
             {
                 codes.Add(code);
@@ -971,7 +971,7 @@ namespace UnitTests.Commands
         public async Task SimpleCodesNL()
         {
             DuetControlServer.Commands.SimpleCode simpleCode = new() { Code = "G91\nG1 X5 Y2" };
-            List<DuetControlServer.Commands.Code> codes = new();
+            List<DuetControlServer.Commands.Code> codes = [];
             await foreach (DuetControlServer.Commands.Code code in simpleCode.ParseAsync())
             {
                 codes.Add(code);
@@ -995,7 +995,7 @@ namespace UnitTests.Commands
         public async Task SimpleCodesIndented()
         {
             DuetControlServer.Commands.SimpleCode simpleCode = new() { Code = "    G1 X5 Y5 G1 X10 Y10\nG1 X15 Y15" };
-            List<DuetControlServer.Commands.Code> codes = new();
+            List<DuetControlServer.Commands.Code> codes = [];
             await foreach (DuetControlServer.Commands.Code code in simpleCode.ParseAsync())
             {
                 codes.Add(code);

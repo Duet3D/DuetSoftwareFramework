@@ -56,7 +56,7 @@ namespace DuetAPI.Utility
         /// <returns>JSON file list</returns>
         public static string GetFiles(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1)
         {
-            List<string> files = new();
+            List<string> files = [];
 
             try
             {
@@ -118,7 +118,7 @@ namespace DuetAPI.Utility
         /// <returns>JSON list</returns>
         public static string GetFileList(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1)
         {
-            List<object> fileList = new();
+            List<object> fileList = [];
 
             try
             {

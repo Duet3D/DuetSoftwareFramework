@@ -55,9 +55,8 @@ namespace DuetControlServer
             // Performing an update implies a reduced log level
             if (args.Contains("-u") && !args.Contains("--update"))
             {
-                List<string> newArgs = new() { "--log-level", "error" };
-                newArgs.AddRange(args);
-                args = newArgs.ToArray();
+                List<string> newArgs = ["--log-level", "error", .. args];
+                args = [.. newArgs];
             }
             else
             {
@@ -106,7 +105,6 @@ namespace DuetControlServer
             try
             {
                 Codes.Handlers.Functions.Init();
-                Codes.Processor.Init();
                 Model.Provider.Init();
                 Model.Observer.Init();
                 _logger.Info("Environment initialized");

@@ -28,9 +28,9 @@ namespace DuetControlServer.IPC.Processors
         /// List of supported commands in this mode
         /// </summary>
         public static readonly Type[] SupportedCommands =
-        {
+        [
             typeof(Acknowledge)
-        };
+        ];
 
         /// <summary>
         /// Static constructor of this class
@@ -45,7 +45,7 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// List of active subscribers
         /// </summary>
-        private static readonly List<ModelSubscription> _subscriptions = new();
+        private static readonly List<ModelSubscription> _subscriptions = [];
 
         /// <summary>
         /// Check if there are any clients waiting for generic messages
@@ -92,7 +92,7 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// Dictionary of updated fields (in Patch mode)
         /// </summary>
-        private readonly Dictionary<string, object?> _patch = new();
+        private readonly Dictionary<string, object?> _patch = [];
 
         /// <summary>
         /// Memory stream holding the JSON patch in UTF-8 format
@@ -121,7 +121,7 @@ namespace DuetControlServer.IPC.Processors
 #pragma warning restore CS0618 // Type or member is obsolete
             else
             {
-                _filters = Array.Empty<object[]>();
+                _filters = [];
             }
 
             lock (_subscriptions)
@@ -155,7 +155,7 @@ namespace DuetControlServer.IPC.Processors
                     }
                     else
                     {
-                        Dictionary<string, object?> patchModel = new();
+                        Dictionary<string, object?> patchModel = [];
                         foreach (object[] filter in _filters)
                         {
                             Dictionary<string, object?> partialModel = Filter.GetFiltered(filter);
@@ -319,7 +319,7 @@ namespace DuetControlServer.IPC.Processors
                     }
                     else
                     {
-                        Dictionary<string, object?> newNode = new();
+                        Dictionary<string, object?> newNode = [];
                         currentDictionary.Add(pathString, newNode);
                         currentDictionary = newNode;
                     }
@@ -572,7 +572,7 @@ namespace DuetControlServer.IPC.Processors
         /// <param name="message"></param>
         private void RecordMessage(Message message)
         {
-            MachineModelPropertyChanged(new object[] { "messages" }, PropertyChangeType.GrowingCollection, new[] { message });
+            MachineModelPropertyChanged(["messages"], PropertyChangeType.GrowingCollection, new[] { message });
         }
 
         /// <summary>

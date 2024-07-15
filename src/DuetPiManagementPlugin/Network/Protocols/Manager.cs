@@ -14,7 +14,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
         /// <summary>
         /// Set of currently enabled network protocols
         /// </summary>
-        private static readonly HashSet<NetworkProtocol> _enabledProtocols = new();
+        private static readonly HashSet<NetworkProtocol> _enabledProtocols = [];
 
         /// <summary>
         /// Check if the given protocol is enabled

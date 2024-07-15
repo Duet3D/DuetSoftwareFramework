@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace DuetControlServer.Model
+﻿namespace DuetControlServer.Model
 {
     /// <summary>
     /// Main class for observing changes in the machine model
@@ -23,7 +21,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Initializes the observer to keep track of deep changes in the object model
         /// </summary>
-        public static void Init() => SubscribeToModelObject(Provider.Get, Array.Empty<object>());
+        public static void Init() => SubscribeToModelObject(Provider.Get, []);
 
         /// <summary>
         /// Add a new element to a property path

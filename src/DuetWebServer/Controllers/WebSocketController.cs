@@ -22,9 +22,12 @@ namespace DuetWebServer.Controllers
     /// <summary>
     /// MVC controller for WebSocket requests
     /// </summary>
+    /// <param name="configuration">Configuration of this application</param>
+    /// <param name="logger">Logger instance</param>
+    /// <param name="applicationLifetime">Application lifecycle instance</param>
     [ApiController]
     [Route("machine")]
-    public class WebSocketController : ControllerBase
+    public class WebSocketController(IConfiguration configuration, ILogger<WebSocketController> logger, IHostApplicationLifetime applicationLifetime) : ControllerBase
     {
         /// <summary>
         /// PONG response when a PING is received
@@ -39,14 +42,9 @@ namespace DuetWebServer.Controllers
         /// <summary>
         /// App settings
         /// </summary>
-        private readonly Settings _settings;
+        private readonly Settings _settings = configuration.Get<Settings>() ?? new();
 
         #region Logging
-        /// <summary>
-        /// Logger instance
-        /// </summary>
-        private readonly ILogger _logger;
-
         /// <summary>
         /// Log an information
         /// </summary>
@@ -54,7 +52,7 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogInformation(string message, [CallerMemberName] string memberName = "")
         {
-            _logger.LogInformation("[{method}] {message}", memberName, message);
+            logger.LogInformation("[{method}] {message}", memberName, message);
         }
 
         /// <summary>
@@ -64,7 +62,7 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogWarning(string message, [CallerMemberName] string memberName = "")
         {
-            _logger.LogWarning("[{method}] {message}", memberName, message);
+            logger.LogWarning("[{method}] {message}", memberName, message);
         }
 
         /// <summary>
@@ -74,7 +72,7 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogError(string message, [CallerMemberName] string memberName = "")
         {
-            _logger.LogError("[{method}] {message}", memberName, message);
+            logger.LogError("[{method}] {message}", memberName, message);
         }
 
         /// <summary>
@@ -85,27 +83,9 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogError(Exception? exception, string message, [CallerMemberName] string memberName = "")
         {
-            _logger.LogError(exception, "[{method}] {message}", memberName, message);
+            logger.LogError(exception, "[{method}] {message}", memberName, message);
         }
         #endregion
-
-        /// <summary>
-        /// Host application lifetime
-        /// </summary>
-        private readonly IHostApplicationLifetime _applicationLifetime;
-
-        /// <summary>
-        /// Constructor of a new WebSocket controller
-        /// </summary>
-        /// <param name="configuration">Configuration of this application</param>
-        /// <param name="logger">Logger instance</param>
-        /// <param name="applicationLifetime">Application lifecycle instance</param>
-        public WebSocketController(IConfiguration configuration, ILogger<WebSocketController> logger, IHostApplicationLifetime applicationLifetime)
-        {
-            _settings = configuration.Get<Settings>() ?? new();
-            _logger = logger;
-            _applicationLifetime = applicationLifetime;
-        }
 
         /// <summary>
         /// WS /machine?sessionKey=XXX
@@ -221,7 +201,7 @@ namespace DuetWebServer.Controllers
             try
             {
                 // Subscribe to object model updates targeting the HTTP code channel
-                await subscribeConnection.Connect(SubscriptionMode.Patch, CodeChannel.HTTP, Array.Empty<string>(), _settings.SocketPath);
+                await subscribeConnection.Connect(SubscriptionMode.Patch, CodeChannel.HTTP, [], _settings.SocketPath);
             }
             catch (Exception e)
             {
@@ -260,7 +240,7 @@ namespace DuetWebServer.Controllers
             LogInformation($"WebSocket connected from {ipAddress}:{port}");
 
             // Register this client and keep it up-to-date
-            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_applicationLifetime.ApplicationStopping);
+            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(applicationLifetime.ApplicationStopping);
             try
             {
                 // Fetch full model copy and send it over initially

@@ -22,7 +22,7 @@ namespace DuetPluginService
         /// List of supported commands in this mode
         /// </summary>
         public static readonly Type[] SupportedCommands =
-        {
+        [
             typeof(Commands.InstallPlugin),
             typeof(Commands.ReloadPlugin),
             typeof(Commands.StartPlugin),
@@ -30,7 +30,7 @@ namespace DuetPluginService
             typeof(Commands.UninstallPlugin),
             typeof(Commands.InstallSystemPackage),
             typeof(Commands.UninstallSystemPackage),
-        };
+        ];
 
         /// <summary>
         /// Create a new connection in plugin service mode

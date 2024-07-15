@@ -8,7 +8,7 @@
         /// <summary>
         /// Amplitudes of the input shaper
         /// </summary>
-        public ModelCollection<float> Amplitudes { get; } = new ModelCollection<float>();
+        public ModelCollection<float> Amplitudes { get; } = [];
 
         /// <summary>
         /// Damping factor
@@ -23,7 +23,7 @@
         /// <summary>
         /// Input shaper durations (in s)
         /// </summary>
-        public ModelCollection<float> Durations { get; } = new ModelCollection<float>();
+        public ModelCollection<float> Durations { get; } = [];
 
         /// <summary>
         /// Frequency (in Hz)

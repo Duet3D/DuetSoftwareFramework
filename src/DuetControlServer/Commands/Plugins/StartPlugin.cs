@@ -64,7 +64,7 @@ namespace DuetControlServer.Commands
         private async Task Start(string id, string? requiredBy = null)
         {
             bool rootPlugin;
-            List<string> dependencies = new();
+            List<string> dependencies = [];
             using (await Model.Provider.AccessReadOnlyAsync())
             {
                 if (Model.Provider.Get.Plugins.TryGetValue(Plugin, out Plugin plugin))

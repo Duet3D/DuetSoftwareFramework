@@ -8,7 +8,7 @@
         /// <summary>
         /// Axis coordinates of the restore point (in mm)
         /// </summary>
-        public ModelCollection<float> Coords { get; } = new ModelCollection<float>();
+        public ModelCollection<float> Coords { get; } = [];
 
         /// <summary>
         /// The virtual extruder position at the start of this move

@@ -11,12 +11,16 @@ namespace DuetControlServer.IPC.Processors
     /// Base class for connection interpreters
     /// </summary>
     /// <seealso cref="ConnectionMode"/>
-    public class Base
+    /// <remarks>
+    /// Base constructor for connection interpreters. Invoke this from any derived class
+    /// </remarks>
+    /// <param name="conn">Connection instance</param>
+    public class Base(Connection conn)
     {
         /// <summary>
         /// List of supported command types
         /// </summary>
-        private static readonly List<Type> SupportedCommands = new();
+        private static readonly List<Type> SupportedCommands = [];
 
         /// <summary>
         /// Add a list of supported commands
@@ -34,13 +38,7 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// Connection to the IPC client served by this processor
         /// </summary>
-        protected Connection Connection { get; }
-
-        /// <summary>
-        /// Base constructor for connection interpreters. Invoke this from any derived class
-        /// </summary>
-        /// <param name="conn">Connection instance</param>
-        public Base(Connection conn) => Connection = conn;
+        protected Connection Connection { get; } = conn;
 
         /// <summary>
         /// Worker method for a given connection.

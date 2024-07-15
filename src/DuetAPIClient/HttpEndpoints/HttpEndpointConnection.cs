@@ -12,29 +12,23 @@ namespace DuetAPIClient
     /// <summary>
     /// Connection class for dealing with requests received from a custom HTTP endpoint
     /// </summary>
-    public sealed class HttpEndpointConnection : IDisposable
+    /// <remarks>
+    /// Constructor for a new connection dealing with a single HTTP endpoint request
+    /// </remarks>
+    /// <param name="socket">Connection socket</param>
+    /// <param name="isWebSocket">Indicates if the HTTP endpoint is a WebSocket</param>
+    /// <remarks>DCS may create new connections and close them immediately again to check if the UNIX socket is still active</remarks>
+    public sealed class HttpEndpointConnection(Socket socket, bool isWebSocket) : IDisposable
     {
         /// <summary>
         /// Socket representing the current HTTP connection
         /// </summary>
-        private readonly Socket _socket;
+        private readonly Socket _socket = socket;
         
         /// <summary>
         /// Indicates if the connection is a WebSocket
         /// </summary>
-        private readonly bool _isWebSocket;
-
-        /// <summary>
-        /// Constructor for a new connection dealing with a single HTTP endpoint request
-        /// </summary>
-        /// <param name="socket">Connection socket</param>
-        /// <param name="isWebSocket">Indicates if the HTTP endpoint is a WebSocket</param>
-        /// <remarks>DCS may create new connections and close them immediately again to check if the UNIX socket is still active</remarks>
-        public HttpEndpointConnection(Socket socket, bool isWebSocket)
-        {
-            _socket = socket;
-            _isWebSocket = isWebSocket;
-        }
+        private readonly bool _isWebSocket = isWebSocket;
 
         /// <summary>
         /// Indicates if this instance has been disposed

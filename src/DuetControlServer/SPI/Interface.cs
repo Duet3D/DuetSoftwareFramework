@@ -31,17 +31,22 @@ namespace DuetControlServer.SPI
         private static int _bytesReserved, _bufferSpace;
 
         // Object model queries
-        private class PendingModelQuery
+        /// <summary>
+        /// Constructor of this struct
+        /// </summary>
+        /// <param name="key">Query key</param>
+        /// <param name="flags">Query flags</param>
+        private class PendingModelQuery(string key, string flags)
         {
             /// <summary>
             /// Key to query
             /// </summary>
-            public string Key;
+            public string Key = key;
 
             /// <summary>
             /// Flags to query
             /// </summary>
-            public string Flags;
+            public string Flags = flags;
 
             /// <summary>
             /// Whether the model query has been sent
@@ -52,24 +57,13 @@ namespace DuetControlServer.SPI
             /// Task to complete when the query has finished
             /// </summary>
             public TaskCompletionSource<byte[]> Tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-            /// <summary>
-            /// Constructor of this struct
-            /// </summary>
-            /// <param name="key">Query key</param>
-            /// <param name="flags">Query flags</param>
-            public PendingModelQuery(string key, string flags)
-            {
-                Key = key;
-                Flags = flags;
-            }
         }
         private static readonly Queue<PendingModelQuery> _pendingModelQueries = new();
         private static DateTime _lastQueryTime = DateTime.Now;
 
         // Expression evaluation and variable requests
-        private static readonly List<EvaluateExpressionRequest> _evaluateExpressionRequests = new();
-        private static readonly List<VariableRequest> _variableRequests = new();
+        private static readonly List<EvaluateExpressionRequest> _evaluateExpressionRequests = [];
+        private static readonly List<VariableRequest> _variableRequests = [];
 
         // Firmware updates
         private static readonly AsyncLock _firmwareUpdateLock = new();
@@ -89,7 +83,7 @@ namespace DuetControlServer.SPI
 
         // Miscellaneous requests
         private static readonly Queue<Tuple<MessageTypeFlags, string>> _messagesToSend = new();
-        private static readonly Dictionary<uint, FileStream> _openFiles = new();
+        private static readonly Dictionary<uint, FileStream> _openFiles = [];
         private static uint _openFileHandle = Consts.NoFileHandle;
 
         /// <summary>
@@ -432,19 +426,9 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Class representing an acquired movement lock
         /// </summary>
-        public class MovementLock : IAsyncDisposable
+        /// <param name="channel">Locked code channel</param>
+        public class MovementLock(CodeChannel channel) : IAsyncDisposable
         {
-            /// <summary>
-            /// Constructor of this class
-            /// </summary>
-            /// <param name="channel">Locked code channel</param>
-            public MovementLock(CodeChannel channel) => _channel = channel;
-
-            /// <summary>
-            /// Locked code channel
-            /// </summary>
-            private readonly CodeChannel _channel;
-
             /// <summary>
             /// Called when this instance is being disposed
             /// </summary>
@@ -452,7 +436,7 @@ namespace DuetControlServer.SPI
             public async ValueTask DisposeAsync()
             {
                 GC.SuppressFinalize(this);
-                await UnlockAll(_channel);
+                await UnlockAll(channel);
             }
         }
 
@@ -1274,7 +1258,7 @@ namespace DuetControlServer.SPI
                 Span<byte> buffer = stackalloc byte[maxLength];
                 int bytesRead = fs.Read(buffer);
 
-                DataTransfer.WriteFileChunk((bytesRead > 0) ? buffer[..bytesRead] : Span<byte>.Empty, fs.Length);
+                DataTransfer.WriteFileChunk((bytesRead > 0) ? buffer[..bytesRead] : [], fs.Length);
             }
             catch (Exception e)
             {
@@ -1515,12 +1499,12 @@ namespace DuetControlServer.SPI
                 int bytesRead = fs.Read(data);
 
                 // Send it back
-                DataTransfer.WriteFileReadResult((bytesRead > 0) ? data[..bytesRead] : Span<byte>.Empty, bytesRead);
+                DataTransfer.WriteFileReadResult((bytesRead > 0) ? data[..bytesRead] : [], bytesRead);
             }
             catch (Exception e)
             {
                 _logger.Error(e, "Failed to read {0} bytes from file #{1}", maxLength, handle);
-                DataTransfer.WriteFileReadResult(Span<byte>.Empty, -1);
+                DataTransfer.WriteFileReadResult([], -1);
             }
         }
 

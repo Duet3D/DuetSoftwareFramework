@@ -125,7 +125,7 @@ namespace DuetAPI.Commands
         /// List of parsed code parameters (see <see cref="CodeParameter"/> for further information)
         /// </summary>
         /// <seealso cref="CodeParameter"/>
-        public List<CodeParameter> Parameters { get; set; } = new List<CodeParameter>();
+        public List<CodeParameter> Parameters { get; set; } = [];
 
         /// <summary>
         /// Reset this instance

@@ -5,19 +5,17 @@ namespace DuetAPI.Utility
     /// <summary>
     /// Attribute to define the permissions of each command
     /// </summary>
+    /// <remarks>
+    /// Constructor for this attribute type
+    /// </remarks>
+    /// <param name="requiredPermissions"></param>
     [AttributeUsage(AttributeTargets.Class)]
-    public sealed class RequiredPermissionsAttribute : Attribute
+    public sealed class RequiredPermissionsAttribute(SbcPermissions requiredPermissions) : Attribute
     {
         /// <summary>
         /// Required permissions for the given command
         /// </summary>
-        private readonly SbcPermissions _requiredPermissions;
-
-        /// <summary>
-        /// Constructor for this attribute type
-        /// </summary>
-        /// <param name="requiredPermissions"></param>
-        public RequiredPermissionsAttribute(SbcPermissions requiredPermissions) => _requiredPermissions = requiredPermissions;
+        private readonly SbcPermissions _requiredPermissions = requiredPermissions;
 
         /// <summary>
         /// Check if the given permissions are sufficient

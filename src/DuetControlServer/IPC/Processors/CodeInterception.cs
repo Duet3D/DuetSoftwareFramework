@@ -27,11 +27,11 @@ namespace DuetControlServer.IPC.Processors
         /// In addition to these commands, commands of the <see cref="Command"/> interpreter are supported while a code is being intercepted
         /// </remarks>
         public static readonly Type[] SupportedCommands =
-        {
+        [
             typeof(Cancel),
             typeof(Ignore),
             typeof(Resolve)
-        };
+        ];
 
         /// <summary>
         /// Static constructor of this class
@@ -112,10 +112,10 @@ namespace DuetControlServer.IPC.Processors
         {
             InterceptInitMessage interceptInitMessage = (InterceptInitMessage)initMessage;
             _mode = interceptInitMessage.InterceptionMode;
-            _channels = (interceptInitMessage.Channels is not null) ? interceptInitMessage.Channels.ToArray() : Inputs.ValidChannels;
+            _channels = (interceptInitMessage.Channels is not null) ? [.. interceptInitMessage.Channels] : Inputs.ValidChannels;
             _autoFlush = interceptInitMessage.AutoFlush && (interceptInitMessage.Filters?.Count ?? 0) > 0;
             _autoEvaluateExpressions = _autoFlush && interceptInitMessage.AutoEvaluateExpressions;
-            _filters = interceptInitMessage.Filters ?? new List<string>();
+            _filters = interceptInitMessage.Filters ?? [];
             _priorityCodes = interceptInitMessage.PriorityCodes;
         }
 
@@ -329,7 +329,7 @@ namespace DuetControlServer.IPC.Processors
                 return false;
             }
 
-            List<CodeInterception> processors = new();
+            List<CodeInterception> processors = [];
             lock (_connections[type])
             {
                 processors.AddRange(_connections[type]);

@@ -11,17 +11,17 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Axis letters of this heightmap
         /// </summary>
-        public ModelCollection<char> Axes { get; } = new ModelCollection<char>() { 'X', 'Y' };
+        public ModelCollection<char> Axes { get; } = ['X', 'Y'];
 
         /// <summary>
         /// End coordinates of the heightmap
         /// </summary>
-        public ModelCollection<float> Maxs { get; } = new ModelCollection<float>() { -1F, -1F };
+        public ModelCollection<float> Maxs { get; } = [-1F, -1F];
 
         /// <summary>
         /// Start coordinates of the heightmap
         /// </summary>
-        public ModelCollection<float> Mins { get; } = new ModelCollection<float>() { 0F, 0F };
+        public ModelCollection<float> Mins { get; } = [0F, 0F];
 
         /// <summary>
         /// Probing radius for delta kinematics
@@ -36,6 +36,6 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Spacings between the coordinates
         /// </summary>
-        public ModelCollection<float> Spacings { get; } = new ModelCollection<float>() { 0F, 0F };
+        public ModelCollection<float> Spacings { get; } = [0F, 0F];
     }
 }

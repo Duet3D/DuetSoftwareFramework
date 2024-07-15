@@ -10,28 +10,14 @@ namespace DuetWebServer.Services
     /// <summary>
     /// Service to automatically remove expired sessions
     /// </summary>
-    public class SessionExpiry : BackgroundService
+    /// <param name="configuration">App configuration</param>
+    /// <param name="sessionStorage">Session storage</param>
+    public class SessionExpiry(IConfiguration configuration, ISessionStorage sessionStorage) : BackgroundService
     {
         /// <summary>
         /// App settings
         /// </summary>
-        private readonly Settings _settings;
-
-        /// <summary>
-        /// Session storage singleton
-        /// </summary>
-        private readonly ISessionStorage _sessionStorage;
-
-        /// <summary>
-        /// Constructor of this service class
-        /// </summary>
-        /// <param name="configuration">App configuration</param>
-        /// <param name="sessionStorage">Session storage</param>
-        public SessionExpiry(IConfiguration configuration, ISessionStorage sessionStorage)
-        {
-            _settings = configuration.Get<Settings>() ?? new();
-            _sessionStorage = sessionStorage;
-        }
+        private readonly Settings _settings = configuration.Get<Settings>() ?? new();
 
         /// <summary>
         /// Maintain active HTTP sessions once per second
@@ -43,14 +29,14 @@ namespace DuetWebServer.Services
             {
                 do
                 {
-                    _sessionStorage.MaintainSessions(TimeSpan.FromMilliseconds(_settings.SessionTimeout), _settings.SocketPath);
+                    sessionStorage.MaintainSessions(TimeSpan.FromMilliseconds(_settings.SessionTimeout), _settings.SocketPath);
                     await Task.Delay(1000, cancellationToken);
                 }
                 while (!cancellationToken.IsCancellationRequested);
             }
             catch (OperationCanceledException)
             {
-                // unhandled
+                // suppressed
             }
         }
     }

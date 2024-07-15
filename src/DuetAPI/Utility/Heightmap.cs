@@ -62,7 +62,7 @@ namespace DuetAPI.Utility
         /// <summary>
         /// Z coordinate of each probe point
         /// </summary>
-        public float[] ZCoordinates { get; set; } = Array.Empty<float>();
+        public float[] ZCoordinates { get; set; } = [];
 
         /// <summary>
         /// Load a new heightmap from the given CSV file

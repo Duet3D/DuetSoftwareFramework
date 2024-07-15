@@ -77,7 +77,7 @@ namespace DuetControlServer.IPC
             Program.CancellationToken.Register(_unixSocket.Close, false);
 
             // Start accepting incoming connections
-            List<Task> connectionTasks = new();
+            List<Task> connectionTasks = [];
             try
             {
                 do

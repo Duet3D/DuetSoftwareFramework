@@ -15,7 +15,7 @@ namespace DuetControlServer.IPC.Processors
         /// List of supported commands in this mode
         /// </summary>
         public static readonly Type[] SupportedCommands =
-        {
+        [
             typeof(GetFileInfo),
             typeof(ResolvePath),
             typeof(Code),
@@ -47,7 +47,7 @@ namespace DuetControlServer.IPC.Processors
             typeof(RemoveUserSession),
             typeof(InstallSystemPackage),
             typeof(UninstallSystemPackage)
-        };
+        ];
 
         /// <summary>
         /// Static constructor of this class

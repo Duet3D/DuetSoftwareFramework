@@ -17,13 +17,12 @@ namespace DuetAPIClient
     /// Base connection class for sending commands to the control server
     /// </summary>
     /// <seealso cref="ConnectionMode.Command"/>
-    public abstract class BaseCommandConnection : BaseConnection
+    /// <remarks>
+    /// Protected constructor for derived modes that can issue regular commands
+    /// </remarks>
+    /// <param name="mode">Connection type</param>
+    public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnection(mode)
     {
-        /// <summary>
-        /// Protected constructor for derived modes that can issue regular commands
-        /// </summary>
-        /// <param name="mode">Connection type</param>
-        protected BaseCommandConnection(ConnectionMode mode) : base(mode) { }
 
         /// <summary>
         /// Add a new third-party HTTP endpoint in the format /machine/{ns}/{path}
@@ -250,31 +249,18 @@ namespace DuetAPIClient
         /// <summary>
         /// Internal class representing an object model lock
         /// </summary>
-        private sealed class ObjectModelLock : IAsyncDisposable
+        /// <param name="connection">Connection that acquired the lock</param>
+        private sealed class ObjectModelLock(BaseCommandConnection connection) : IAsyncDisposable
         {
-            /// <summary>
-            /// Connection that locked the object model
-            /// </summary>
-            private readonly BaseCommandConnection _connection;
-
-            /// <summary>
-            /// Constructor of this class
-            /// </summary>
-            /// <param name="connection">Connection that acquired the lock</param>
-            public ObjectModelLock(BaseCommandConnection connection)
-            {
-                _connection = connection;
-            }
-
             /// <summary>
             /// Dispose the lock again
             /// </summary>
             /// <returns>Asynchronous task</returns>
             public async ValueTask DisposeAsync()
             {
-                if (_connection.IsConnected)
+                if (connection.IsConnected)
                 {
-                    await _connection.PerformCommand(new UnlockObjectModel(), default);
+                    await connection.PerformCommand(new UnlockObjectModel(), default);
                 }
             }
         }

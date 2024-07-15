@@ -3,6 +3,7 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.SPI.Communication.Shared;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -16,23 +17,14 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// List of different channels
         /// </summary>
-        private readonly Processor[] _channels = new Processor[Inputs.Total];
+        private readonly Processor[] _channels = Inputs.ValidChannels
+            .Select(channel => new Processor(channel))
+            .ToArray();
 
         /// <summary>
         /// Last channel that started processing stuff
         /// </summary>
         private CodeChannel _nextChannel = CodeChannel.HTTP;
-
-        /// <summary>
-        /// Constructor of the channel store
-        /// </summary>
-        public Manager()
-        {
-            for (int input = 0; input < Inputs.Total; input++)
-            {
-                _channels[input] = new Processor((CodeChannel)input);
-            }
-        }
 
         /// <summary>
         /// Print diagnostics of this class

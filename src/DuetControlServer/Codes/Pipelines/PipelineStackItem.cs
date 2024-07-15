@@ -11,7 +11,7 @@ namespace DuetControlServer.Codes.Pipelines
     /// Class representing an execution level on a given pipeline.
     /// This is the effective target for incoming codes
     /// </summary>
-    public class PipelineStackItem
+    public sealed class PipelineStackItem
     {
         /// <summary>
         /// Pipeline holding this stack item

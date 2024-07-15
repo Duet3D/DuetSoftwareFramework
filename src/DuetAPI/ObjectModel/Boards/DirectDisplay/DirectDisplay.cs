@@ -13,7 +13,7 @@
             get => _encoder;
             set => SetPropertyValue(ref _encoder, value);
         }
-        private DirectDisplayEncoder? _encoder = new DirectDisplayEncoder();
+        private DirectDisplayEncoder? _encoder = new();
 
         /// <summary>
         /// Screen information

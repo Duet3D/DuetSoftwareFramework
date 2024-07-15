@@ -80,7 +80,7 @@ namespace DuetControlServer.Commands
 
             // Parse the input string
             Message result = new();
-            List<Code> codes = new(), priorityCodes = new();
+            List<Code> codes = [], priorityCodes = [];
             try
             {
                 await foreach (Code code in ParseAsync())

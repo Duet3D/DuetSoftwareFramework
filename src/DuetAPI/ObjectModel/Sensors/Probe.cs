@@ -72,7 +72,7 @@ namespace DuetAPI.ObjectModel
         /// Dive heights of the probe.
         /// The first element is the regular dive height, the second element may be used by scanning Z-probes
         /// </summary>
-        public ModelCollection<float> DiveHeights { get; } = new ModelCollection<float>() { 0F, 0F };
+        public ModelCollection<float> DiveHeights { get; } = [0F, 0F];
 
         /// <summary>
         /// Indicates if the scanning probe is calibrated
@@ -117,7 +117,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// X+Y offsets (in mm)
         /// </summary>
-        public ModelCollection<float> Offsets { get; } = new ModelCollection<float>() { 0F, 0F };
+        public ModelCollection<float> Offsets { get; } = [0F, 0F];
 
         /// <summary>
         /// Recovery time (in s)
@@ -143,12 +143,12 @@ namespace DuetAPI.ObjectModel
         /// Fast and slow probing speeds (in mm/s).
         /// Scanning probes may have three speeds where the last one is the movement speed while probing heightmaps
         /// </summary>
-        public ModelCollection<float> Speeds { get; } = new ModelCollection<float>() { 2F, 2F };
+        public ModelCollection<float> Speeds { get; } = [2F, 2F];
 
         /// <summary>
         /// List of temperature coefficients
         /// </summary>
-        public ModelCollection<float> TemperatureCoefficients { get; } = new ModelCollection<float>() { 0F, 0F };
+        public ModelCollection<float> TemperatureCoefficients { get; } = [0F, 0F];
 
         /// <summary>
         /// Configured trigger threshold (0..1023)
@@ -204,6 +204,6 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Current analog values of the probe
         /// </summary>
-        public ModelCollection<int> Value { get; } = new ModelCollection<int>();
+        public ModelCollection<int> Value { get; } = [];
     }
 }

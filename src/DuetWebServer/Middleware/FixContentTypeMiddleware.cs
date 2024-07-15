@@ -7,38 +7,28 @@ namespace DuetWebServer.Middleware
     /// Middleware to fix incoming content types for code and upload request (PUT /machine/file/..., POST /machine/code, POST /rr_upload).
     /// Without this middleware, incorrect request content types cause the validation to fail and there are no discrete MVC attributes to fix this
     /// </summary>
-    public class FixContentTypeMiddleware
+    /// <param name="next">Next request delegate</param>
+    public class FixContentTypeMiddleware(RequestDelegate next)
     {
-        /// <summary>
-        /// Next request delegate to call
-        /// </summary>
-        private readonly RequestDelegate _next;
-
-        /// <summary>
-        /// Constructor of this middleware
-        /// </summary>
-        /// <param name="next">Next request delegate</param>
-        public FixContentTypeMiddleware(RequestDelegate next) => _next = next;
-
         /// <summary>
         /// /rr_upload request
         /// </summary>
-        private static PathString RrUploadRequest = new("/rr_upload");
+        private static readonly PathString RrUploadRequest = new("/rr_upload");
 
         /// <summary>
         /// /machine/code request
         /// </summary>
-        private static PathString MachineCodeRequest = new("/machine/code");
+        private static readonly PathString MachineCodeRequest = new("/machine/code");
 
         /// <summary>
         /// /machine/file request
         /// </summary>
-        private static PathString MachineFileRequest = new("/machine/file");
+        private static readonly PathString MachineFileRequest = new("/machine/file");
 
         /// <summary>
         /// /machine/file/move request
         /// </summary>
-        private static PathString MachineFileMoveRequest = new("/machine/file/move");
+        private static readonly PathString MachineFileMoveRequest = new("/machine/file/move");
 
         /// <summary>
         /// Called when a new HTTP request is received
@@ -62,7 +52,7 @@ namespace DuetWebServer.Middleware
             }
 
             // Call the next delegate/middleware in the pipeline
-            await _next(context);
+            await next(context);
         }
     }
 }

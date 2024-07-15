@@ -238,7 +238,7 @@ namespace DuetPiManagementPlugin
         /// <returns>Dictionary of profile name vs. SSID</returns>
         public static async Task<Dictionary<string, string>>GetWirelessProfiles()
         {
-            Dictionary<string, string> result = new();
+            Dictionary<string, string> result = [];
             if (Directory.Exists("/etc/NetworkManager/system-connections"))
             {
                 foreach (string file in Directory.EnumerateFiles("/etc/NetworkManager/system-connections"))

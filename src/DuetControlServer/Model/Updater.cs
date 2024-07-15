@@ -140,7 +140,7 @@ namespace DuetControlServer.Model
                 await Task.Delay(-1, Program.CancellationToken);
             }
 
-            byte[] jsonData = Array.Empty<byte>();
+            byte[] jsonData = [];
             do
             {
                 try
@@ -316,7 +316,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Filament usage at the time of the last layer change
         /// </summary>
-        private static List<float> _lastFilamentUsage = new();
+        private static List<float> _lastFilamentUsage = [];
 
         /// <summary>
         /// Last file position at the time of the last layer change
@@ -366,7 +366,7 @@ namespace DuetControlServer.Model
                 int numChangedLayers = (Provider.Get.Job.Layer.Value > _lastLayer) ? Math.Abs(Provider.Get.Job.Layer.Value - _lastLayer) : 1;
                 int printDuration = Provider.Get.Job.Duration.Value - (Provider.Get.Job.WarmUpDuration is not null ? Provider.Get.Job.WarmUpDuration.Value : 0);
                 float avgLayerDuration = (printDuration - _lastDuration) / numChangedLayers;
-                List<float> totalFilamentUsage = new(), avgFilamentUsage = new();
+                List<float> totalFilamentUsage = [], avgFilamentUsage = [];
                 long bytesPrinted = (Provider.Get.Job.FilePosition is not null) ? (Provider.Get.Job.FilePosition.Value - _lastFilePosition) : 0L;
                 float avgFractionPrinted = (Provider.Get.Job.File.Size > 0) ? (float)bytesPrinted / (Provider.Get.Job.File.Size * numChangedLayers) : 0F;
                 for (int i = 0; i < Provider.Get.Move.Extruders.Count; i++)

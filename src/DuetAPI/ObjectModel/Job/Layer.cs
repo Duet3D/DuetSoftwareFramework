@@ -18,7 +18,7 @@
         /// <summary>
         /// Actual amount of filament extruded during this layer (in mm)
         /// </summary>
-        public ModelCollection<float> Filament { get; } = new ModelCollection<float>();
+        public ModelCollection<float> Filament { get; } = [];
 
         /// <summary>
         /// Fraction of the file printed during this layer (0..1)
@@ -44,6 +44,6 @@
         /// Last heater temperatures (in C or null if unknown)
         /// </summary>
         /// <seealso cref="AnalogSensor.LastReading"/>
-        public ModelCollection<float?> Temperatures { get; } = new ModelCollection<float?>();
+        public ModelCollection<float?> Temperatures { get; } = [];
     }
 }

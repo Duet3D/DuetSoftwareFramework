@@ -167,7 +167,7 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Dictionary of codes vs. synchronization tasks
         /// </summary>
-        private static readonly Dictionary<Code, TaskCompletionSource<bool>> _syncRequests = new();
+        private static readonly Dictionary<Code, TaskCompletionSource<bool>> _syncRequests = [];
 
         /// <summary>
         /// Synchronize the File and File2 code streams, may only be called when a job is live

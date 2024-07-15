@@ -6,19 +6,10 @@ namespace DuetAPI.Commands
     /// <summary>
     /// Internal buffer for reading asynchronously from files
     /// </summary>
-    public sealed class CodeParserBuffer
+    /// <param name="bufferSize">How many bytes to buffer when reading from a file</param>
+    /// <param name="isFile">Indicates if line numbers and file positions are valid</param>
+    public sealed class CodeParserBuffer(int bufferSize, bool isFile)
     {
-        /// <summary>
-        /// Default constructor of this class
-        /// </summary>
-        /// <param name="bufferSize">How many bytes to buffer when reading from a file</param>
-        /// <param name="isFile">Indicates if line numbers and file positions are valid</param>
-        public CodeParserBuffer(int bufferSize, bool isFile)
-        {
-            Content = new byte[bufferSize];
-            IsFile = isFile;
-            LineNumber = isFile ? (long?)1 : null;
-        }
 
         /// <summary>
         /// Indicates if a NL was seen before
@@ -38,7 +29,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Buffer content
         /// </summary>
-        internal readonly byte[] Content;
+        internal readonly byte[] Content = new byte[bufferSize];
 
         /// <summary>
         /// Pointer in the buffer
@@ -63,12 +54,12 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Indicates if this buffer is used for reading from a file
         /// </summary>
-        internal bool IsFile;
+        internal bool IsFile = isFile;
 
         /// <summary>
         /// Current line number
         /// </summary>
-        public long? LineNumber;
+        public long? LineNumber = isFile ? (long?)1 : null;
 
         /// <summary>
         /// Last major G-code to repeat

@@ -31,7 +31,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Dictionary of custom meta G-code functions vs. async resolvers
         /// </summary>
-        public static Dictionary<string, CustomAsyncFunctionResolver> CustomFunctions { get; } = new();
+        public static Dictionary<string, CustomAsyncFunctionResolver> CustomFunctions { get; } = [];
 
         /// <summary>
         /// Try to get the last function from a string builder and if applicable a custom function handler
@@ -357,7 +357,7 @@ namespace DuetControlServer.Model
 
             if (code.Parameters.Any(parameter => parameter.IsExpression))
             {
-                List<CodeParameter> newParameters = new();
+                List<CodeParameter> newParameters = [];
                 foreach (CodeParameter parameter in code.Parameters)
                 {
                     if (parameter.IsExpression)
@@ -746,17 +746,17 @@ namespace DuetControlServer.Model
                             if (functionName == "exists")
                             {
                                 // There may be valid properties that are null, so we need a special check for exists()
-                                fnResult = await fn!(code.Channel, functionName, new object[] { subExpression });
+                                fnResult = await fn!(code.Channel, functionName, [subExpression]);
                             }
                             else
                             {
-                                List<object?> arguments = new();
+                                List<object?> arguments = [];
                                 foreach (string arg in SplitExpression(subExpression))
                                 {
                                     object? argValue = await getExpressionValue(arg);
                                     arguments.Add(argValue);
                                 }
-                                fnResult = await fn!(code.Channel, functionName, arguments.ToArray());
+                                fnResult = await fn!(code.Channel, functionName, [.. arguments]);
                             }
                             result.Append(ObjectToString(fnResult, wantsCount, true, code));
                         }

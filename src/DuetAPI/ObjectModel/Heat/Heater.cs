@@ -99,7 +99,7 @@
         /// <summary>
         /// Monitors of this heater
         /// </summary>
-        public ModelCollection<HeaterMonitor> Monitors { get; } = new ModelCollection<HeaterMonitor>();
+        public ModelCollection<HeaterMonitor> Monitors { get; } = [];
 
         /// <summary>
         /// Sensor number of this heater or -1 if not configured

@@ -273,7 +273,7 @@ namespace DuetControlServer.Codes.Pipelines
             await _stack.Peek().ProcessorTask;
 
             // Wait for the remaining states
-            List<Task> tasks = new();
+            List<Task> tasks = [];
             lock (_stack)
             {
                 foreach (PipelineStackItem stackItem in _stack)

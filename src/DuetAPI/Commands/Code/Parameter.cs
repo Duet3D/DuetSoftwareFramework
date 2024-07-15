@@ -71,7 +71,7 @@ namespace DuetAPI.Commands
             else if (isDriverId)
             {
                 // Value is a (list of) driver identifier(s)
-                List<DriverId> driverIds = new();
+                List<DriverId> driverIds = [];
 
                 foreach (string item in value.Split(':'))
                 {
@@ -560,15 +560,15 @@ namespace DuetAPI.Commands
             }
             if (codeParameter.ParsedValue is float floatValue)
             {
-                return new float[] { floatValue };
+                return [floatValue];
             }
             if (codeParameter.ParsedValue is int intValue)
             {
-                return new float[] { Convert.ToSingle(intValue) };
+                return [Convert.ToSingle(intValue)];
             }
             if (codeParameter.ParsedValue is uint uintValue)
             {
-                return new float[] { Convert.ToSingle(uintValue) };
+                return [Convert.ToSingle(uintValue)];
             }
             if (codeParameter.ParsedValue is int[] intArray)
             {
@@ -601,11 +601,11 @@ namespace DuetAPI.Commands
             }
             if (codeParameter.ParsedValue is int intValue)
             {
-                return new int[] { intValue };
+                return [intValue];
             }
             if (codeParameter.ParsedValue is float floatValue)
             {
-                return new int[] { Convert.ToInt32(floatValue) };
+                return [Convert.ToInt32(floatValue)];
             }
             if (codeParameter.ParsedValue is float[] floatArray)
             {
@@ -634,7 +634,7 @@ namespace DuetAPI.Commands
             }
             if (codeParameter.ParsedValue is uint uintValue)
             {
-                return new uint[] { uintValue };
+                return [uintValue];
             }
             if (codeParameter.ParsedValue is DriverId[] driverIdArray)
             {
@@ -642,11 +642,11 @@ namespace DuetAPI.Commands
             }
             if (codeParameter.ParsedValue is DriverId driverIdValue)
             {
-                return new uint[] { driverIdValue };
+                return [driverIdValue];
             }
             if (codeParameter.ParsedValue is int intValue && intValue >= 0)
             {
-                return new uint[] { Convert.ToUInt32(intValue) };
+                return [Convert.ToUInt32(intValue)];
             }
             if (codeParameter.ParsedValue is int[] intArray && intArray.All(value => value >= 0))
             {
@@ -654,7 +654,7 @@ namespace DuetAPI.Commands
             }
             if (codeParameter.ParsedValue is float floatValue && floatValue >= 0F)
             {
-                return new uint[] { Convert.ToUInt32(floatValue) };
+                return [Convert.ToUInt32(floatValue)];
             }
             if (codeParameter.ParsedValue is float[] floatArray && floatArray.All(value => value >= 0F))
             {
@@ -683,19 +683,19 @@ namespace DuetAPI.Commands
             }
             if (codeParameter.ParsedValue is long longValue)
             {
-                return new long[] { longValue };
+                return [longValue];
             }
             if (codeParameter.ParsedValue is int intValue)
             {
-                return new long[] { Convert.ToInt64(intValue) };
+                return [Convert.ToInt64(intValue)];
             }
             if (codeParameter.ParsedValue is uint uintValue)
             {
-                return new long[] { Convert.ToInt64(uintValue) };
+                return [Convert.ToInt64(uintValue)];
             }
             if (codeParameter.ParsedValue is float floatValue)
             {
-                return new long[] { Convert.ToInt64(floatValue) };
+                return [Convert.ToInt64(floatValue)];
             }
             if (codeParameter.ParsedValue is int[] intArray)
             {
@@ -731,7 +731,7 @@ namespace DuetAPI.Commands
             }
             if (codeParameter.ParsedValue is DriverId driverId)
             {
-                return new DriverId[] { driverId };
+                return [driverId];
             }
             if (codeParameter.ParsedValue is uint[] uintArray)
             {
@@ -739,7 +739,7 @@ namespace DuetAPI.Commands
             }
             if (codeParameter.ParsedValue is uint uintValue)
             {
-                return new DriverId[] { new DriverId(uintValue) };
+                return [new DriverId(uintValue)];
             }
             throw new InvalidParameterTypeException(codeParameter, typeof(DriverId[]));
         }

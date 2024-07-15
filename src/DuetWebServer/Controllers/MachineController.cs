@@ -22,22 +22,23 @@ namespace DuetWebServer.Controllers
     /// <summary>
     /// MVC Controller for /machine requests
     /// </summary>
+    /// <remarks>
+    /// Create a new controller instance
+    /// </remarks>
+    /// <param name="configuration">Launch configuration</param>
+    /// <param name="logger">Logger instance</param>
+    /// <param name="applicationLifetime">Application lifecycle instance</param>
     [ApiController]
     [Authorize(Policy = Authorization.Policies.ReadOnly)]
     [Route("[controller]")]
-    public class MachineController : ControllerBase
+    public class MachineController(IConfiguration configuration, ILogger<MachineController> logger, IHostApplicationLifetime applicationLifetime) : ControllerBase
     {
         /// <summary>
         /// App settings
         /// </summary>
-        private readonly Settings _settings;
+        private readonly Settings _settings = configuration.Get<Settings>() ?? new();
 
         #region Logging
-        /// <summary>
-        /// Logger instance
-        /// </summary>
-        private readonly ILogger _logger;
-
         /// <summary>
         /// Log an information
         /// </summary>
@@ -45,7 +46,7 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogInformation(string message, [CallerMemberName] string memberName = "")
         {
-            _logger.LogInformation("[{method}] {message}", memberName, message);
+            logger.LogInformation("[{method}] {message}", memberName, message);
         }
 
         /// <summary>
@@ -55,7 +56,7 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogWarning(string message, [CallerMemberName] string memberName = "")
         {
-            _logger.LogWarning("[{method}] {message}", memberName, message);
+            logger.LogWarning("[{method}] {message}", memberName, message);
         }
 
         /// <summary>
@@ -66,7 +67,7 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogWarning(Exception? exception, string message, [CallerMemberName] string memberName = "")
         {
-            _logger.LogWarning(exception, "[{method}] {message}", memberName, message);
+            logger.LogWarning(exception, "[{method}] {message}", memberName, message);
         }
 
         /// <summary>
@@ -76,27 +77,9 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogError(string message, [CallerMemberName] string memberName = "")
         {
-            _logger.LogError("[{method}] {message}", memberName, message);
+            logger.LogError("[{method}] {message}", memberName, message);
         }
         #endregion
-
-        /// <summary>
-        /// Host application lifetime
-        /// </summary>
-        private readonly IHostApplicationLifetime _applicationLifetime;
-
-        /// <summary>
-        /// Create a new controller instance
-        /// </summary>
-        /// <param name="configuration">Launch configuration</param>
-        /// <param name="logger">Logger instance</param>
-        /// <param name="applicationLifetime">Application lifecycle instance</param>
-        public MachineController(IConfiguration configuration, ILogger<MachineController> logger, IHostApplicationLifetime applicationLifetime)
-        {
-            _settings = configuration.Get<Settings>() ?? new();
-            _logger = logger;
-            _applicationLifetime = applicationLifetime;
-        }
 
         #region Authorization
         /// <summary>
@@ -1227,7 +1210,7 @@ namespace DuetWebServer.Controllers
                     try
                     {
                         using CommandConnection connection = await BuildConnection();
-                        await connection.InstallSystemPackage(packageFile, _applicationLifetime.ApplicationStopping);
+                        await connection.InstallSystemPackage(packageFile, applicationLifetime.ApplicationStopping);
                     }
                     catch (OperationCanceledException)
                     {

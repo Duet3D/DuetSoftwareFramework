@@ -8,14 +8,12 @@ namespace DuetControlServer.Codes.Pipelines
     /// <summary>
     /// Code stage where codes are processed internally (if possible)
     /// </summary>
-    public class ProcessInternally : PipelineBase
+    /// <remarks>
+    /// Constructor of this class
+    /// </remarks>
+    /// <param name="processor">Chnanel processor</param>
+    public class ProcessInternally(ChannelProcessor processor) : PipelineBase(PipelineStage.ProcessInternally, processor)
     {
-        /// <summary>
-        /// Constructor of this class
-        /// </summary>
-        /// <param name="processor">Chnanel processor</param>
-        public ProcessInternally(ChannelProcessor processor) : base(PipelineStage.ProcessInternally, processor) { }
-
         /// <summary>
         /// Try to process an incoming code
         /// </summary>

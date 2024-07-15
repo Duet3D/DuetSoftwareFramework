@@ -19,7 +19,7 @@ namespace DuetAPI.ObjectModel
         /// <remarks>
         /// The first item represents the main board
         /// </remarks>
-        public ModelCollection<Board> Boards { get; } = new ModelCollection<Board>();
+        public ModelCollection<Board> Boards { get; } = [];
 
         /// <summary>
         /// Information about the individual directories
@@ -33,7 +33,7 @@ namespace DuetAPI.ObjectModel
         /// List of configured fans
         /// </summary>
         /// <seealso cref="Fan"/>
-        public ModelCollection<Fan?> Fans { get; } = new ModelCollection<Fan?>();
+        public ModelCollection<Fan?> Fans { get; } = [];
 
         /// <summary>
         /// Dictionary of global variables vs JSON values
@@ -51,7 +51,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Information about every available G/M/T-code channel
         /// </summary>
-        public Inputs Inputs { get; } = new Inputs();
+        public Inputs Inputs { get; } = [];
 
         /// <summary>
         /// Information about the current job
@@ -62,7 +62,7 @@ namespace DuetAPI.ObjectModel
         /// List of configured LED strips
         /// </summary>
         /// <seealso cref="LedStrip"/>
-        public ModelCollection<LedStrip> LedStrips { get; } = new ModelCollection<LedStrip>();
+        public ModelCollection<LedStrip> LedStrips { get; } = [];
 
         /// <summary>
         /// Machine configuration limits
@@ -75,7 +75,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <seealso cref="Message"/>
         [SbcProperty(false)]
-        public ModelGrowingCollection<Message> Messages { get; } = new ModelGrowingCollection<Message>();
+        public ModelGrowingCollection<Message> Messages { get; } = [];
 
         /// <summary>
         /// Information about the move subsystem
@@ -118,7 +118,7 @@ namespace DuetAPI.ObjectModel
         /// List of configured CNC spindles
         /// </summary>
         /// <seealso cref="Spindle"/>
-        public ModelCollection<Spindle?> Spindles { get; } = new ModelCollection<Spindle?>();
+        public ModelCollection<Spindle?> Spindles { get; } = [];
         
         /// <summary>
         /// Information about the machine state
@@ -129,14 +129,14 @@ namespace DuetAPI.ObjectModel
         /// List of configured tools
         /// </summary>
         /// <seealso cref="Tool"/>
-        public ModelCollection<Tool?> Tools { get; } = new ModelCollection<Tool?>();
+        public ModelCollection<Tool?> Tools { get; } = [];
 
         /// <summary>
         /// List of available mass storages
         /// </summary>
         /// <seealso cref="Volume"/>
         [SbcProperty(true)]
-        public ModelCollection<Volume> Volumes { get; } = new ModelCollection<Volume>();
+        public ModelCollection<Volume> Volumes { get; } = [];
 
         /// <summary>
         /// Update a specific key of this instance from a given JSON element as provided by the firmware
@@ -260,35 +260,25 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Event arguments for the event to be called when deserialization fails
     /// </summary>
-    public sealed class DeserializationFailedEventArgs : EventArgs
+    /// <param name="type">Type that failed to be deserialized</param>
+    /// <param name="jsonValue">Data that failed to be deserialized</param>
+    /// <param name="e">Exception that caused the deserialization to fail</param>
+    public sealed class DeserializationFailedEventArgs(Type type, JsonElement jsonValue, Exception e) : EventArgs
     {
-        /// <summary>
-        /// Constructor of this class
-        /// </summary>
-        /// <param name="type">Type that failed to be deserialized</param>
-        /// <param name="jsonValue">Data that failed to be deserialized</param>
-        /// <param name="e">Exception that caused the deserialization to fail</param>
-        public DeserializationFailedEventArgs(Type type, JsonElement jsonValue, Exception e)
-        {
-            TargetType = type;
-            JsonValue = jsonValue;
-            Exception = e;
-        }
-
         /// <summary>
         /// Type that failed to be deserialized
         /// </summary>
-        public Type TargetType { get; private set; }
+        public Type TargetType { get; private set; } = type;
 
         /// <summary>
         /// Data that failed to be deserialized
         /// </summary>
-        public JsonElement JsonValue { get; private set; }
+        public JsonElement JsonValue { get; private set; } = jsonValue;
 
         /// <summary>
         /// Exception that caused the deserialization to fail
         /// </summary>
-        public Exception Exception { get; private set; }
+        public Exception Exception { get; private set; } = e;
     }
 
     /// <summary>

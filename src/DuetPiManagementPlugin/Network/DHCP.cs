@@ -43,12 +43,13 @@ namespace DuetPiManagementPlugin.Network
         /// <summary>
         /// Private class representing the IP address configuration as saved in the dhcpcd config
         /// </summary>
-        private sealed class IPConfig
+        /// <param name="iface">Interface name</param>
+        private sealed class IPConfig(string iface)
         {
             /// <summary>
             /// Name of the interface
             /// </summary>
-            public string Interface { get; set; }
+            public string Interface { get; set; } = iface;
 
             /// <summary>
             /// IP address
@@ -113,12 +114,6 @@ namespace DuetPiManagementPlugin.Network
             /// Set to true if the configuration is intended for AP mode
             /// </summary>
             public bool ForAP { get; set; }
-
-            /// <summary>
-            /// Constructor of this class
-            /// </summary>
-            /// <param name="iface">Interface name</param>
-            public IPConfig(string iface) => Interface = iface;
         }
 
         /// <summary>
@@ -127,7 +122,7 @@ namespace DuetPiManagementPlugin.Network
         /// <returns>List of configured profiles</returns>
         private static async Task<List<IPConfig>> ReadProfiles()
         {
-            List<IPConfig> result = new();
+            List<IPConfig> result = [];
 
             if (File.Exists("/etc/dhcpcd.conf"))
             {

@@ -16,7 +16,10 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Enumeration of valid code channels
         /// </summary>
-        public static readonly CodeChannel[] ValidChannels = Enum.GetValues(typeof(CodeChannel)).Cast<CodeChannel>().Where(channel => channel != CodeChannel.Unknown).ToArray();
+        public static readonly CodeChannel[] ValidChannels = Enum.GetValues(typeof(CodeChannel))
+            .Cast<CodeChannel>()
+            .Where(channel => channel != CodeChannel.Unknown)
+            .ToArray();
 
         /// <summary>
         /// Total number of supported input channel
@@ -24,15 +27,9 @@ namespace DuetAPI.ObjectModel
         public static readonly int Total = ValidChannels.Length;
 
         /// <summary>
-        /// Constructor of this class
+        /// Default constructor of this class
         /// </summary>
-        public Inputs() : base()
-        {
-            foreach (CodeChannel name in ValidChannels)
-            {
-                Add(new InputChannel() { Name = name });
-            }
-        }
+        public Inputs() : base(ValidChannels.Select(channel => new InputChannel() { Name = channel })) { }
 
         /// <summary>
         /// G/M/T-code channel for HTTP requests

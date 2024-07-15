@@ -68,14 +68,14 @@ namespace DuetAPI.Commands
 
             // Start parsing
             char letter = '\0', lastC, c = '\0';
-            List<byte> valueList = new();
+            List<byte> valueList = [];
             void addToValue(char c)
             {
                 valueList.Add((byte)c);
             }
             string getValue()
             {
-                return Encoding.UTF8.GetString(valueList.ToArray());
+                return Encoding.UTF8.GetString([.. valueList]);
             }
             void setValue(string v)
             {

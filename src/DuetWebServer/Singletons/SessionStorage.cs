@@ -105,25 +105,15 @@ namespace DuetWebServer.Singletons
     /// <summary>
     /// Storage singleton for internal HTTP sessions
     /// </summary>
-    public class SessionStorage : ISessionStorage
+    /// <param name="logger">Logger instance</param>
+    public class SessionStorage(ILogger<SessionStorage> logger) : ISessionStorage
     {
-        /// <summary>
-        /// Internal logger instance
-        /// </summary>
-        private readonly ILogger<SessionStorage> _logger;
-
-        /// <summary>
-        /// Constructor of the session storage singleton
-        /// </summary>
-        /// <param name="logger">Logger instance</param>
-        public SessionStorage(ILogger<SessionStorage> logger) => _logger = logger;
-
         /// <summary>
         /// Internal session wrapper around auth tickets
         /// </summary>
-        private sealed class Session
+        private sealed class Session(AuthenticationTicket ticket)
         {
-            public AuthenticationTicket Ticket { get; }
+            public AuthenticationTicket Ticket { get; } = ticket;
 
             public string Key => Ticket.Principal.FindFirst("key")!.Value;
 
@@ -160,14 +150,12 @@ namespace DuetWebServer.Singletons
                 }
                 return result;
             }
-
-            public Session(AuthenticationTicket ticket) => Ticket = ticket;
         }
 
         /// <summary>
         /// List of active sessions
         /// </summary>
-        private readonly List<Session> _sessions = new();
+        private readonly List<Session> _sessions = [];
 
         /// <summary>
         /// Check if the given session key provides the requested access to the given policy
@@ -208,17 +196,17 @@ namespace DuetWebServer.Singletons
             lock (_sessions)
             {
                 string sessionKey = Guid.NewGuid().ToString("N");
-                ClaimsIdentity identity = new(new[] {
+                ClaimsIdentity identity = new([
                     new Claim("access", readWrite ? Policies.ReadWrite : Policies.ReadOnly),
                     new Claim("key", sessionKey),
                     new Claim("sessionId", sessionId.ToString()),
                     new Claim("ipAddress", ipAddress)
-                }, nameof(SessionKeyAuthenticationHandler));
+                ], nameof(SessionKeyAuthenticationHandler));
                 AuthenticationTicket ticket = new(new ClaimsPrincipal(identity), SessionKeyAuthenticationHandler.SchemeName);
                 if (sessionId > 0)
                 {
                     _sessions.Add(new(ticket));
-                    _logger?.LogInformation("Session {0} added ({1})", sessionKey, readWrite ? "readWrite" : "readOnly");
+                    logger.LogInformation("Session {Session} added ({Permission})", sessionKey, readWrite ? "readWrite" : "readOnly");
                 }
                 return sessionKey;
             }
@@ -236,17 +224,17 @@ namespace DuetWebServer.Singletons
             lock (_sessions)
             {
                 string sessionKey = Guid.NewGuid().ToString("N");
-                ClaimsIdentity identity = new(new[] {
+                ClaimsIdentity identity = new([
                     new Claim("access", readWrite ? Policies.ReadWrite : Policies.ReadOnly),
                     new Claim("key", sessionKey),
                     new Claim("sessionId", sessionId.ToString()),
                     new Claim("ipAddress", ipAddress)
-                }, nameof(SessionKeyAuthenticationHandler));
+                ], nameof(SessionKeyAuthenticationHandler));
                 AuthenticationTicket ticket = new(new ClaimsPrincipal(identity), SessionKeyAuthenticationHandler.SchemeName);
                 if (sessionId > 0)
                 {
                     _sessions.Add(new(ticket));
-                    _logger?.LogInformation("Session {0} added ({1})", sessionKey, readWrite ? "readWrite" : "readOnly");
+                    logger.LogInformation("Session {Session} added ({Permission})", sessionKey, readWrite ? "readWrite" : "readOnly");
                 }
                 return ticket;
             }
@@ -327,7 +315,7 @@ namespace DuetWebServer.Singletons
                 {
                     if (item.Ticket.Principal == user)
                     {
-                        _logger?.LogInformation("Session {0} removed", user.FindFirstValue("key"));
+                        logger.LogInformation("Session {Session} removed", user.FindFirstValue("key"));
                         _sessions.Remove(item);
                         return item.SessionId;
                     }
@@ -353,12 +341,12 @@ namespace DuetWebServer.Singletons
                         if (webSocketConnected)
                         {
                             item.NumWebSocketsConnected++;
-                            _logger?.LogInformation("Session {0} registered a WebSocket connection", key);
+                            logger.LogInformation("Session {Session} registered a WebSocket connection", key);
                         }
                         else
                         {
                             item.NumWebSocketsConnected--;
-                            _logger?.LogInformation("Session {0} unregistered a WebSocket connection", key);
+                            logger.LogInformation("Session {Session} unregistered a WebSocket connection", key);
                         }
                     }
                 }
@@ -382,12 +370,12 @@ namespace DuetWebServer.Singletons
                         if (requestStarted)
                         {
                             item.NumRunningRequests++;
-                            _logger?.LogInformation("Session {0} started a long-running request", user.FindFirstValue("key"));
+                            logger.LogInformation("Session {Session} started a long-running request", user.FindFirstValue("key"));
                         }
                         else
                         {
                             item.NumRunningRequests--;
-                            _logger?.LogInformation("Session {0} finished a long-running request", user.FindFirstValue("key"));
+                            logger.LogInformation("Session {Session} finished a long-running request", user.FindFirstValue("key"));
                         }
                     }
                 }
@@ -410,7 +398,7 @@ namespace DuetWebServer.Singletons
                     {
                         // Session expired
                         _sessions.RemoveAt(i);
-                        _logger?.LogInformation("Session {0} expired", item.Key);
+                        logger.LogInformation("Session {Session} expired", item.Key);
 
                         // Attempt to remove it again from DCS
                         _ = Task.Run(async () => await UnregisterExpiredSession(item.SessionId, socketPath));
@@ -435,7 +423,7 @@ namespace DuetWebServer.Singletons
             }
             catch (Exception e)
             {
-                _logger.LogWarning(e, "Failed to unregister expired user session");
+                logger.LogWarning(e, "Failed to unregister expired user session");
             }
         }
 

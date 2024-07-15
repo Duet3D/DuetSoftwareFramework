@@ -5,7 +5,11 @@ namespace DuetControlServer.SPI.Channel
     /// <summary>
     /// Queued lock/unlock request
     /// </summary>
-    public class LockRequest
+    /// <remarks>
+    /// Creates a new queued lock/unlock request instance
+    /// </remarks>
+    /// <param name="isLockRequest">Whether the resource shall be locked</param>
+    public class LockRequest(bool isLockRequest)
     {
         /// <summary>
         /// Task completion source that completes when the lock request has been resolved
@@ -15,7 +19,7 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Indicates if this is a lock or unlock request
         /// </summary>
-        public bool IsLockRequest { get; }
+        public bool IsLockRequest { get; } = isLockRequest;
 
         /// <summary>
         /// Indicates if the lock request has been sent to the firmware
@@ -27,12 +31,6 @@ namespace DuetControlServer.SPI.Channel
         /// It returns false if the controller is reset or an emergency stop occurs
         /// </summary>
         public Task<bool> Task => _tcs.Task;
-
-        /// <summary>
-        /// Creates a new queued lock/unlock request instance
-        /// </summary>
-        /// <param name="isLockRequest">Whether the resource shall be locked</param>
-        public LockRequest(bool isLockRequest) => IsLockRequest = isLockRequest;
 
         /// <summary>
         /// Resolve the pending task with the given result

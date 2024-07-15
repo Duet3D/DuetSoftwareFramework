@@ -124,7 +124,7 @@
         /// </remarks>
         /// <seealso cref="Layer"/>
         [SbcProperty(false)]
-        public ModelCollection<Layer> Layers { get; } = new ModelCollection<Layer>();
+        public ModelCollection<Layer> Layers { get; } = [];
 
         /// <summary>
         /// Time elapsed since the last layer change (in s or null)

@@ -170,12 +170,12 @@ namespace DuetControlServer.Files.ImageProcessing
         /// <returns>[0]: Red, [1]: Green, [2]: Blue </returns>
         public static byte[] RGB2To3Bytes(int color)
         {
-            byte[] result = new byte[3];
-
-            result[0] = (byte)((color & 0xF800) >> 8);  // Red
-            result[1] = (byte)((color & 0x07E0) >> 3);  // Green
-            result[2] = (byte)((color & 0x001F) << 3);  // Blue
-
+            byte[] result =
+            [
+                (byte)((color & 0xF800) >> 8),  // Red
+                (byte)((color & 0x07E0) >> 3),  // Green
+                (byte)((color & 0x001F) << 3),  // Blue
+            ];
             return result;
         }
     }

@@ -15,15 +15,15 @@ namespace DuetControlServer.Codes.Pipelines
     public class Executed : PipelineBase
     {
         /// <summary>
+        /// The only state for this
+        /// </summary>
+        private readonly PipelineStackItem _stackItem;
+
+        /// <summary>
         /// Constructor of this class
         /// </summary>
         /// <param name="processor">Channel processor</param>
         public Executed(ChannelProcessor processor) : base(PipelineStage.Executed, processor) => _stackItem = _stack.Peek();
-
-        /// <summary>
-        /// The only state for this
-        /// </summary>
-        private readonly PipelineStackItem _stackItem;
 
         /// <summary>
         /// Process an incoming code
@@ -159,10 +159,7 @@ namespace DuetControlServer.Codes.Pipelines
         /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
         /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public override Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true)
-        {
-            return _stackItem.FlushAsync(code);
-        }
+        public override Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true) => _stackItem.FlushAsync(code);
 
         /// <summary>
         /// Execute a given code on this pipeline stage

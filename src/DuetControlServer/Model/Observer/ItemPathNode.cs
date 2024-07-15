@@ -9,35 +9,25 @@ namespace DuetControlServer.Model
     /// <remarks>
     /// This is necessary for the case of model items changing in a collection
     /// </remarks>
-    public class ItemPathNode
+    /// <param name="name">List name</param>
+    /// <param name="index">Index of the changed item</param>
+    /// <param name="list">Reference to the list</param>
+    public class ItemPathNode(string name, int index, IList list)
     {
         /// <summary>
         /// Name of the list
         /// </summary>
-        public readonly string Name;
+        public readonly string Name = name;
 
         /// <summary>
         /// Index of the item
         /// </summary>
-        public readonly int Index;
+        public readonly int Index = index;
 
         /// <summary>
         /// Internal list reference
         /// </summary>
-        public readonly IList List;
-
-        /// <summary>
-        /// Constructor of this class
-        /// </summary>
-        /// <param name="name">List name</param>
-        /// <param name="index">Index of the changed item</param>
-        /// <param name="list">Reference to the list</param>
-        public ItemPathNode(string name, int index, IList list)
-        {
-            Name = name;
-            Index = index;
-            List = list;
-        }
+        public readonly IList List = list;
 
         /// <summary>
         /// Check if this instance equals another

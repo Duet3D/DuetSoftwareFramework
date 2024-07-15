@@ -18,7 +18,11 @@ namespace DuetControlServer.IPC
     /// <summary>
     /// Wrapper around UNIX socket connections
     /// </summary>
-    public sealed class Connection : IDisposable
+    /// <remarks>
+    /// Constructor for new connections
+    /// </remarks>
+    /// <param name="socket">New UNIX socket</param>
+    public sealed class Connection(Socket socket) : IDisposable
     {
         /// <summary>
         /// Counter for new connections
@@ -33,7 +37,7 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Identifier of this connection
         /// </summary>
-        public int Id { get; }
+        public int Id { get; } = Interlocked.Increment(ref _idCounter);
 
         /// <summary>
         /// API version of the client
@@ -59,17 +63,7 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Socket holding the connection of the UNIX socket
         /// </summary>
-        public Socket UnixSocket { get; }
-
-        /// <summary>
-        /// Constructor for new connections
-        /// </summary>
-        /// <param name="socket">New UNIX socket</param>
-        public Connection(Socket socket)
-        {
-            UnixSocket = socket;
-            Id = Interlocked.Increment(ref _idCounter);
-        }
+        public Socket UnixSocket { get; } = socket;
 
         /// <summary>
         /// Get the peer credentials and assign the available permissions

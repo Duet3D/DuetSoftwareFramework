@@ -43,6 +43,6 @@
         /// <summary>
         /// List of detected build objects
         /// </summary>
-        public ModelCollection<BuildObject> Objects { get; } = new ModelCollection<BuildObject>();
+        public ModelCollection<BuildObject> Objects { get; } = [];
     }
 }

@@ -1,4 +1,3 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
@@ -7,6 +6,9 @@ using NLog.Targets;
 
 namespace DuetControlServer.Utility
 {
+    /// <summary>
+    /// NLog message log target used to optionally output DCS log messages as generic messages
+    /// </summary>
     [Target("MessageLogTarget")] 
     public sealed class MessageLogTarget : AsyncTaskTarget
     { 
@@ -17,7 +19,6 @@ namespace DuetControlServer.Utility
         {
             IncludeEventProperties = true; // Include LogEvent Properties by default
         }
- 
 
         /// <summary>
         /// Called to handle incoming log events

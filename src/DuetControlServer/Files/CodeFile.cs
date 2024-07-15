@@ -13,7 +13,10 @@ namespace DuetControlServer.Files
     /// <summary>
     /// Class to read G/M/T-codes from files
     /// </summary>
-    public class CodeFile : IDisposable
+    /// <param name="fileName">Name of the file to process or null if it is optional</param>
+    /// <param name="physicalFile">Physical path to the file</param>
+    /// <param name="channel">Channel to send the codes to</param>
+    public class CodeFile(string fileName, string physicalFile, CodeChannel channel) : IDisposable
     {
         /// <summary>
         /// Logger instance
@@ -40,7 +43,7 @@ namespace DuetControlServer.Files
         /// <summary>
         /// File being read from
         /// </summary>
-        private readonly FileStream _fileStream;
+        private readonly FileStream _fileStream = new(physicalFile, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
 
         /// <summary>
         /// Internal buffer used for reading from files
@@ -55,17 +58,17 @@ namespace DuetControlServer.Files
         /// <summary>
         /// File path to the file being executed
         /// </summary>
-        public string FileName { get; }
+        public string FileName { get; } = fileName;
 
         /// <summary>
         /// Physical file path to the file being executed
         /// </summary>
-        public string PhysicalFileName { get; }
+        public string PhysicalFileName { get; } = physicalFile;
 
         /// <summary>
         /// Channel to send the codes to
         /// </summary>
-        public CodeChannel Channel { get; }
+        public CodeChannel Channel { get; } = channel;
 
         /// <summary>
         /// Internal stack for conditional G-code execution
@@ -136,21 +139,6 @@ namespace DuetControlServer.Files
         /// Close this file
         /// </summary>
         public void Close() => _isClosed = true;
-
-        /// <summary>
-        /// Constructor of the base class for reading from a G-code file
-        /// </summary>
-        /// <param name="fileName">Name of the file to process or null if it is optional</param>
-        /// <param name="physicalFile">Physical path to the file</param>
-        /// <param name="channel">Channel to send the codes to</param>
-        public CodeFile(string fileName, string physicalFile, CodeChannel channel)
-        {
-            FileName = fileName;
-            PhysicalFileName = physicalFile;
-            Channel = channel;
-
-            _fileStream = new FileStream(physicalFile, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
-        }
 
         /// <summary>
         /// Copy constructor

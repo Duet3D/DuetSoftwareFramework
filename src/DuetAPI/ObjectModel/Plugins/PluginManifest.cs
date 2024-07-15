@@ -107,7 +107,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of general tags for search
         /// </summary>
-        public ModelCollection<string> Tags { get; } = new ModelCollection<string>();
+        public ModelCollection<string> Tags { get; } = [];
 
         /// <summary>
         /// Major/minor compatible DWC version
@@ -122,7 +122,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of DWC plugins this plugin depends on. Circular dependencies are not supported
         /// </summary>
-        public ModelCollection<string> DwcDependencies { get; } = new ModelCollection<string>();
+        public ModelCollection<string> DwcDependencies { get; } = [];
 
         /// <summary>
         /// Set to true if a SBC is absolutely required for this plugin
@@ -178,7 +178,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of other filenames in the dsf directory that should be executable
         /// </summary>
-        public ModelCollection<string> SbcExtraExecutables { get; } = new ModelCollection<string>();
+        public ModelCollection<string> SbcExtraExecutables { get; } = [];
 
         /// <summary>
         /// Automatically restart the SBC process when terminated
@@ -217,22 +217,22 @@ namespace DuetAPI.ObjectModel
         /// The file may be specified either relative to 0:/sys directory (e.g. motion.conf) or relative to the
         /// virtual SD directory (e.g. sys/motion.conf). Drive indices as in 0:/sys/motion.conf are not allowed!
         /// </remarks>
-        public ModelCollection<string> SbcConfigFiles { get; } = new ModelCollection<string>();
+        public ModelCollection<string> SbcConfigFiles { get; } = [];
 
         /// <summary>
         /// List of packages this plugin depends on (apt packages in the case of DuetPi)
         /// </summary>
-        public ModelCollection<string> SbcPackageDependencies { get; } = new ModelCollection<string>();
+        public ModelCollection<string> SbcPackageDependencies { get; } = [];
 
         /// <summary>
         /// List of Python packages this plugin depends on
         /// </summary>
-        public ModelCollection<string> SbcPythonDependencies { get; } = new ModelCollection<string>();
+        public ModelCollection<string> SbcPythonDependencies { get; } = [];
 
         /// <summary>
         /// List of SBC plugins this plugin depends on. Circular dependencies are not supported
         /// </summary>
-        public ModelCollection<string> SbcPluginDependencies { get; } = new ModelCollection<string>();
+        public ModelCollection<string> SbcPluginDependencies { get; } = [];
 
         /// <summary>
         /// Major/minor supported RRF version (optional)
@@ -261,8 +261,8 @@ namespace DuetAPI.ObjectModel
         {
             if (!string.IsNullOrWhiteSpace(required))
             {
-                string[] actualItems = actual.Split(new char[] { '.', '-', '+' });
-                string[] requiredItems = required.Split(new char[] { '.', '-', '+' });
+                string[] actualItems = actual.Split(['.', '-', '+']);
+                string[] requiredItems = required.Split(['.', '-', '+']);
                 for (int i = 0; i < Math.Min(actualItems.Length, requiredItems.Length); i++)
                 {
                     if (actualItems[i] != requiredItems[i])

@@ -44,7 +44,7 @@ namespace DuetWebServer.Singletons
         /// <summary>
         /// Dictionary of registered third-party paths vs third-party HTTP endpoints
         /// </summary>
-        public Dictionary<string, HttpEndpoint> Endpoints { get; } = new();
+        public Dictionary<string, HttpEndpoint> Endpoints { get; } = [];
 
         /// <summary>
         /// Sequence number for generic messages (analog to seqs.reply)

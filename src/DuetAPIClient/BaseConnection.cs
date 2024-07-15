@@ -15,23 +15,21 @@ namespace DuetAPIClient
     /// <summary>
     /// Base class for connections that access the control server via the Duet API using a UNIX socket
     /// </summary>
-    public abstract class BaseConnection : IDisposable
+    /// <remarks>
+    /// Create a new connection instance
+    /// </remarks>
+    /// <param name="mode">Mode of the new connection</param>
+    public abstract class BaseConnection(ConnectionMode mode) : IDisposable
     {
         /// <summary>
         /// Mode of this connection
         /// </summary>
-        private readonly ConnectionMode _connectionMode;
+        private readonly ConnectionMode _connectionMode = mode;
         
         /// <summary>
         /// Socket used for inter-process communication
         /// </summary>
         protected readonly Socket _unixSocket = new(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-
-        /// <summary>
-        /// Create a new connection instance
-        /// </summary>
-        /// <param name="mode">Mode of the new connection</param>
-        protected BaseConnection(ConnectionMode mode) => _connectionMode = mode;
 
         /// <summary>
         /// Finalizer of this class

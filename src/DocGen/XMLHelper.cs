@@ -21,7 +21,7 @@ namespace DocGen
         /// <summary>
         /// Dictionary holding member names vs. documentation content
         /// </summary>
-        private static readonly Dictionary<string, string> _loadedXmlDocumentation = new();
+        private static readonly Dictionary<string, string> _loadedXmlDocumentation = [];
 
         /// <summary>
         /// Initialize the XML documentation

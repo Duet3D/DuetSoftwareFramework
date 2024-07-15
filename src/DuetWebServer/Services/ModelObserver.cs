@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 using Microsoft.Net.Http.Headers;
 using System;
 using System.ComponentModel;
@@ -20,7 +21,11 @@ namespace DuetWebServer.Services
     /// <summary>
     /// Class used to observe the machine model
     /// </summary>
-    public sealed class ModelObserver : BackgroundService
+    /// <param name="configuration">App configuration</param>
+    /// <param name="logger">Logger instance</param>
+    /// <param name="modelProvider">Model provider singleton</param>
+    /// <param name="sessionStorage">Session storage singleton</param>
+    public sealed class ModelObserver(IConfiguration configuration, ILogger<ModelObserver> logger, IModelProvider modelProvider, ISessionStorage sessionStorage) : BackgroundService
     {
         /// <summary>
         /// Configured CORS policy for cross-origin requests
@@ -38,22 +43,7 @@ namespace DuetWebServer.Services
         /// <summary>
         /// App settings
         /// </summary>
-        private readonly Settings _settings;
-
-        /// <summary>
-        /// Logger instance
-        /// </summary>
-        private readonly ILogger _logger;
-
-        /// <summary>
-        /// Model provider singleton
-        /// </summary>
-        private readonly IModelProvider _modelProvider;
-
-        /// <summary>
-        /// Session sotrage singleton
-        /// </summary>
-        private readonly ISessionStorage _sessionStorage;
+        private readonly Settings _settings = configuration.Get<Settings>() ?? new();
 
         /// <summary>
         /// Check the origin of an incoming WebSocket request and set the status on error
@@ -64,10 +54,10 @@ namespace DuetWebServer.Services
         {
             if (httpContext.Request.Headers.ContainsKey(CorsConstants.Origin))
             {
-                if (httpContext.Request.Headers.ContainsKey(HeaderNames.Host) &&
+                if (httpContext.Request.Headers.TryGetValue(HeaderNames.Host, out StringValues hostValue) &&
                     Uri.TryCreate(httpContext.Request.Headers[CorsConstants.Origin], UriKind.Absolute, out Uri? uri) &&
-                    (string.Equals(uri.Host, httpContext.Request.Headers[HeaderNames.Host], StringComparison.InvariantCultureIgnoreCase) ||
-                     string.Equals($"{uri.Host}:{uri.Port}", httpContext.Request.Headers[HeaderNames.Host], StringComparison.InvariantCultureIgnoreCase)))
+                    (string.Equals(uri.Host, hostValue, StringComparison.InvariantCultureIgnoreCase) ||
+                     string.Equals($"{uri.Host}:{uri.Port}", hostValue, StringComparison.InvariantCultureIgnoreCase)))
                 {
                     // Origin matches Host, request is legit
                     return true;
@@ -88,21 +78,6 @@ namespace DuetWebServer.Services
         }
 
         /// <summary>
-        /// Constructor of this service class
-        /// </summary>
-        /// <param name="configuration">App configuration</param>
-        /// <param name="logger">Logger instance</param>
-        /// <param name="modelProvider">Model provider singleton</param>
-        /// <param name="sessionStorage">Session storage singleton</param>
-        public ModelObserver(IConfiguration configuration, ILogger<ModelObserver> logger, IModelProvider modelProvider, ISessionStorage sessionStorage)
-        {
-            _logger = logger;
-            _settings = configuration.Get<Settings>() ?? new();
-            _modelProvider = modelProvider;
-            _sessionStorage = sessionStorage;
-        }
-
-        /// <summary>
         /// Synchronize all registered endpoints and user sessions
         /// </summary>
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -117,14 +92,14 @@ namespace DuetWebServer.Services
                         // Establish connections to DCS
                         using SubscribeConnection subscribeConnection = new();
                         using CommandConnection commandConnection = new();
-                        await subscribeConnection.Connect(DuetAPI.Connection.SubscriptionMode.Patch, new string[] {
+                        await subscribeConnection.Connect(DuetAPI.Connection.SubscriptionMode.Patch, [
                             "directories/www",
                             "messages/**",
                             "network/corsSite",
                             "sbc/dsf/httpEndpoints/**"
-                        }, _settings.SocketPath);
-                        await commandConnection.Connect(_settings.SocketPath);
-                        _logger.LogInformation("Connections to DuetControlServer established");
+                        ], _settings.SocketPath, cancellationToken);
+                        await commandConnection.Connect(_settings.SocketPath, cancellationToken);
+                        logger.LogInformation("Connections to DuetControlServer established");
 
                         // Get the machine model and keep it up-to-date
                         model = await subscribeConnection.GetObjectModel(cancellationToken);
@@ -132,33 +107,33 @@ namespace DuetWebServer.Services
                         // Initialize CORS site
                         if (!string.IsNullOrEmpty(model.Network.CorsSite))
                         {
-                            _logger.LogInformation("Changing CORS policy to accept site '{corsSite}'", model.Network.CorsSite);
+                            logger.LogInformation("Changing CORS policy to accept site '{corsSite}'", model.Network.CorsSite);
                             CorsPolicy.Origins.Add(model.Network.CorsSite);
                         }
 
                         // Initialize HTTP endpoints
-                        lock (_modelProvider.Endpoints)
+                        lock (modelProvider.Endpoints)
                         {
-                            _modelProvider.Endpoints.Clear();
+                            modelProvider.Endpoints.Clear();
                             foreach (HttpEndpoint ep in model.SBC!.DSF.HttpEndpoints)
                             {
                                 string fullPath = (ep.Namespace == HttpEndpoint.RepRapFirmwareNamespace) ? $"{ep.EndpointType}/rr_{ep.Path}" : $"{ep.EndpointType}/machine/{ep.Namespace}/{ep.Path}";
-                                _modelProvider.Endpoints[fullPath] = ep;
-                                _logger.LogInformation("Registered HTTP endpoint {endpoint}", fullPath);
+                                modelProvider.Endpoints[fullPath] = ep;
+                                logger.LogInformation("Registered HTTP endpoint {endpoint}", fullPath);
                             }
                         }
 
                         // Keep track of the web directory
                         _commandConnection = commandConnection;
                         model.Directories.PropertyChanged += Directories_PropertyChanged;
-                        _modelProvider.WebDirectory = await commandConnection.ResolvePath(model.Directories.Web);
+                        modelProvider.WebDirectory = await commandConnection.ResolvePath(model.Directories.Web, cancellationToken);
 
                         do
                         {
                             // Cache incoming messages
                             foreach (Message message in model.Messages)
                             {
-                                _sessionStorage.CacheMessage(message.ToString());
+                                sessionStorage.CacheMessage(message.ToString());
                             }
                             model.Messages.Clear();
 
@@ -169,9 +144,9 @@ namespace DuetWebServer.Services
                             // Increment sequence numbers
                             if (jsonPatch.RootElement.TryGetProperty("messages", out JsonElement messagesElement))
                             {
-                                lock (_modelProvider)
+                                lock (modelProvider)
                                 {
-                                    _modelProvider.ReplySeq += messagesElement.GetArrayLength();
+                                    modelProvider.ReplySeq += messagesElement.GetArrayLength();
                                 }
                             }
 
@@ -181,28 +156,28 @@ namespace DuetWebServer.Services
                                 CorsPolicy.Origins.Clear();
                                 if (!string.IsNullOrEmpty(model.Network.CorsSite))
                                 {
-                                    _logger.LogInformation("Changing CORS policy to accept site '{corsSite}'", model.Network.CorsSite);
+                                    logger.LogInformation("Changing CORS policy to accept site '{corsSite}'", model.Network.CorsSite);
                                     CorsPolicy.Origins.Add(model.Network.CorsSite);
                                 }
                                 else
                                 {
-                                    _logger.LogInformation("Reset CORS policy");
+                                    logger.LogInformation("Reset CORS policy");
                                 }
                             }
 
                             // Check if the HTTP sessions have changed and rebuild them on demand
                             if (jsonPatch.RootElement.TryGetProperty("sbc", out _))
                             {
-                                _logger.LogInformation("New number of custom HTTP endpoints: {numEndpoints}", model.SBC!.DSF.HttpEndpoints.Count);
+                                logger.LogInformation("New number of custom HTTP endpoints: {numEndpoints}", model.SBC!.DSF.HttpEndpoints.Count);
 
-                                lock (_modelProvider.Endpoints)
+                                lock (modelProvider.Endpoints)
                                 {
-                                    _modelProvider.Endpoints.Clear();
+                                    modelProvider.Endpoints.Clear();
                                     foreach (HttpEndpoint ep in model.SBC!.DSF.HttpEndpoints)
                                     {
                                         string fullPath = $"{ep.EndpointType}/machine/{ep.Namespace}/{ep.Path}";
-                                        _modelProvider.Endpoints[fullPath] = ep;
-                                        _logger.LogInformation("Registered HTTP {endpoint} endpoint via /machine/{namespace}/{path}", ep.EndpointType, ep.Namespace, ep.Path);
+                                        modelProvider.Endpoints[fullPath] = ep;
+                                        logger.LogInformation("Registered HTTP {endpoint} endpoint via /machine/{namespace}/{path}", ep.EndpointType, ep.Namespace, ep.Path);
                                     }
                                 }
                             }
@@ -211,7 +186,7 @@ namespace DuetWebServer.Services
                     }
                     catch (Exception e) when (e is not OperationCanceledException)
                     {
-                        _logger.LogWarning(e, "Failed to synchronize machine model");
+                        logger.LogWarning(e, "Failed to synchronize machine model");
                         await Task.Delay(_settings.ModelRetryDelay, cancellationToken);
                     }
                 }
@@ -219,7 +194,7 @@ namespace DuetWebServer.Services
             }
             catch (OperationCanceledException)
             {
-                // unhandled
+                // suppressed
             }
         }
 
@@ -233,7 +208,7 @@ namespace DuetWebServer.Services
             if (e.PropertyName == nameof(Directories.Web))
             {
                 Directories directories = (Directories)sender!;
-                _modelProvider.WebDirectory = await _commandConnection!.ResolvePath(directories.Web);
+                modelProvider.WebDirectory = await _commandConnection!.ResolvePath(directories.Web);
             }
         }
     }

@@ -273,7 +273,7 @@ namespace DuetControlServer.SPI.Serialization
                         // Read an entire object from a JSON reader
                         Dictionary<string, object?> readObject(ref Utf8JsonReader reader)
                         {
-                            Dictionary<string, object?> result = new();
+                            Dictionary<string, object?> result = [];
                             string? propertyName = null;
                             while (reader.Read())
                             {
@@ -313,7 +313,7 @@ namespace DuetControlServer.SPI.Serialization
                         // Read an entire array from a JSON reader
                         object?[] readArray(ref Utf8JsonReader reader)
                         {
-                            List<object?> result = new();
+                            List<object?> result = [];
                             while (reader.Read())
                             {
                                 switch (reader.TokenType)
@@ -325,7 +325,7 @@ namespace DuetControlServer.SPI.Serialization
                                         result.Add(readArray(ref reader));
                                         break;
                                     case JsonTokenType.EndArray:
-                                        return result.ToArray();
+                                        return [.. result];
                                     case JsonTokenType.String:
                                         result.Add(reader.GetString());
                                         break;

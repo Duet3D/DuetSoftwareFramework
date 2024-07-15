@@ -32,7 +32,7 @@ namespace DuetAPIClient
         /// <summary>
         /// List of input channels where codes may be intercepted. If the list is empty, all available channels are used
         /// </summary>
-        public List<CodeChannel> Channels { get; set; } = new List<CodeChannel>();
+        public List<CodeChannel> Channels { get; set; } = [];
 
         /// <summary>
         /// Automatically flush the code channel before notifying the client in case a code filter is specified
@@ -55,7 +55,7 @@ namespace DuetAPIClient
         /// <remarks>
         /// This may only specify the code type and major/minor number (e.g. G1)
         /// </remarks>
-        public List<string> Filters { get; set; } = new List<string>();
+        public List<string> Filters { get; set; } = [];
 
         /// <summary>
         /// Defines if priority codes may be intercepted (e.g. M122 or M999)

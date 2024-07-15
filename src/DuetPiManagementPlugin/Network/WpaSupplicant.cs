@@ -53,7 +53,7 @@ namespace DuetPiManagementPlugin.Network
         /// <returns>List of configured SSIDs</returns>
         public static async Task<List<string>> GetSSIDs()
         {
-            List<string> ssids = new();
+            List<string> ssids = [];
             if (File.Exists("/etc/wpa_supplicant/wpa_supplicant.conf"))
             {
                 await using FileStream configStream = new("/etc/wpa_supplicant/wpa_supplicant.conf", FileMode.Open, FileAccess.Read);

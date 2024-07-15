@@ -91,10 +91,10 @@ namespace DuetControlServer.Commands
                         Flags = CodeFlags.Asynchronous,
                         Type = CodeType.MCode,
                         MajorNumber = 98,
-                        Parameters = new()
-                        {
+                        Parameters =
+                        [
                             new CodeParameter('P', FilePath.DsfConfigFile)
-                        }
+                        ]
                     };
                     await dsfConfigCode.Execute();
                 }

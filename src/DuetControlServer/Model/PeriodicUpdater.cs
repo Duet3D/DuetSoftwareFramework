@@ -28,7 +28,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// List of enabled protocols
         /// </summary>
-        private static readonly List<NetworkProtocol> _activeProtocols = new();
+        private static readonly List<NetworkProtocol> _activeProtocols = [];
 
         /// <summary>
         /// Check if the given protocol is enabled
@@ -104,11 +104,11 @@ namespace DuetControlServer.Model
                         Channel = CodeChannel.Trigger,
                         Type = CodeType.MCode,
                         MajorNumber = 905,
-                        Parameters = new()
-                        {
+                        Parameters =
+                        [
                             new('P', DateTime.Now.ToString("yyyy-MM-dd")),
                             new('S', DateTime.Now.ToString("HH:mm:ss"))
-                        }
+                        ]
                     };
                     await code.Execute();
                 }
@@ -124,10 +124,10 @@ namespace DuetControlServer.Model
                         Channel = CodeChannel.Trigger,
                         Type = CodeType.MCode,
                         MajorNumber = 550,
-                        Parameters = new()
-                        {
+                        Parameters =
+                        [
                             new('P', lastHostname)
-                        }
+                        ]
                     };
                     await code.Execute();
                 }
@@ -319,11 +319,11 @@ namespace DuetControlServer.Model
                     Channel = CodeChannel.Trigger,
                     Type = CodeType.MCode,
                     MajorNumber = 409,
-                    Parameters = new()
-                        {
+                    Parameters =
+                        [
                             new('K', "network"),
                             new('I', 1)
-                        }
+                        ]
                 };
                 await code.Execute();
             }
@@ -456,11 +456,11 @@ namespace DuetControlServer.Model
                     Channel = CodeChannel.Trigger,
                     Type = CodeType.MCode,
                     MajorNumber = 409,
-                    Parameters = new()
-                        {
+                    Parameters =
+                        [
                             new('K', "volumes"),
                             new('I', 1)
-                        }
+                        ]
                 };
                 await code.Execute();
             }

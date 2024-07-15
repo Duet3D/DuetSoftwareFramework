@@ -46,20 +46,20 @@ namespace UnitTests.Machine
         [Test]
         public void CheckFilters()
         {
-            object[] pathA = new object[] { "sensors", new ItemPathNode("analog", 0, new object[3]) };
-            object[] filterA = new object[] { "sensors", "analog", -1, "lastReading" };
+            object[] pathA = ["sensors", new ItemPathNode("analog", 0, new object[3])];
+            object[] filterA = ["sensors", "analog", -1, "lastReading"];
             ClassicAssert.IsTrue(DuetControlServer.Model.Filter.PathMatches(pathA, filterA));
 
-            object[] pathB = new object[] { "state", "currentTool" };
-            object[] filterB = new object[] { "state", "currentTool" };
+            object[] pathB = ["state", "currentTool"];
+            object[] filterB = ["state", "currentTool"];
             ClassicAssert.IsTrue(DuetControlServer.Model.Filter.PathMatches(pathB, filterB));
 
-            object[] pathC = new object[] { "state", "status" };
-            object[] filterC = new object[] { "state", "**" };
+            object[] pathC = ["state", "status"];
+            object[] filterC = ["state", "**"];
             ClassicAssert.IsTrue(DuetControlServer.Model.Filter.PathMatches(pathC, filterC));
 
-            object[] pathD = new object[] { "state", "status" };
-            object[] filterD = new object[] { "state" };
+            object[] pathD = ["state", "status"];
+            object[] filterD = ["state"];
             ClassicAssert.IsFalse(DuetControlServer.Model.Filter.PathMatches(pathD, filterD));
         }
 
@@ -67,7 +67,7 @@ namespace UnitTests.Machine
         public void CheckMultipleFilters()
         {
             object[][] filters = DuetControlServer.Model.Filter.ConvertFilters("directories/www|httpEndpoints/**|userSessions/**");
-            object[] otherPath = new object[] { new ItemPathNode("boards", 0, new object[1]), "mcuTemp", "current" };
+            object[] otherPath = [new ItemPathNode("boards", 0, new object[1]), "mcuTemp", "current"];
             foreach (object[] filter in filters)
             {
                 bool pathMatches = DuetControlServer.Model.Filter.PathMatches(otherPath, filter);
@@ -151,7 +151,7 @@ namespace UnitTests.Machine
             ClassicAssert.IsTrue(toolsKeyC[1] is DuetAPI.ObjectModel.Tool);
 
             // Merge A+B
-            Dictionary<string, object?> merged = new();
+            Dictionary<string, object?> merged = [];
             DuetControlServer.Model.Filter.MergeFiltered(merged, partialModelA);
             DuetControlServer.Model.Filter.MergeFiltered(merged, partialModelB);
             List<object?> mergedTools = (List<object?>)merged["tools"]!;

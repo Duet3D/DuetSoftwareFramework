@@ -31,11 +31,11 @@ namespace DuetPluginService
         /// <summary>
         /// List of plugins
         /// </summary>
-        public static List<Plugin> List { get; } = new List<Plugin>();
+        public static List<Plugin> List { get; } = [];
 
         /// <summary>
         /// Plugin names vs processes
         /// </summary>
-        public static Dictionary<string, Process> Processes { get; } = new Dictionary<string, Process>();
+        public static Dictionary<string, Process> Processes { get; } = [];
     }
 }

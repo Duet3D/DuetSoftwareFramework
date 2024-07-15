@@ -8,7 +8,6 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Web;
 using DuetAPI;
-using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetAPIClient;
@@ -23,22 +22,23 @@ namespace DuetWebServer.Controllers
     /// <summary>
     /// MVC Controller for /rr_ requests
     /// </summary>
+    /// <remarks>
+    /// Create a new controller instance
+    /// </remarks>
+    /// <param name="configuration">Launch configuration</param>
+    /// <param name="logger">Logger instance</param>
+    /// <param name="modelProvider">Model provider</param>
     [ApiController]
     [Authorize(Policy = Authorization.Policies.ReadOnly)]
     [Route("/")]
-    public class RepRapFirmwareController : ControllerBase
+    public class RepRapFirmwareController(IConfiguration configuration, ILogger<RepRapFirmwareController> logger, IModelProvider modelProvider) : ControllerBase
     {
         /// <summary>
         /// App settings
         /// </summary>
-        private readonly Settings _settings;
+        private readonly Settings _settings = configuration.Get<Settings>() ?? new();
 
         #region Logging
-        /// <summary>
-        /// Logger instance
-        /// </summary>
-        private readonly ILogger _logger;
-
         /// <summary>
         /// Log an information
         /// </summary>
@@ -46,7 +46,7 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogInformation(string message, [CallerMemberName] string memberName = "")
         {
-            _logger.LogInformation("[{method}] {message}", memberName, message);
+            logger.LogInformation("[{method}] {message}", memberName, message);
         }
 
         /// <summary>
@@ -56,7 +56,7 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogWarning(string message, [CallerMemberName] string memberName = "")
         {
-            _logger.LogWarning("[{method}] {message}", memberName, message);
+            logger.LogWarning("[{method}] {message}", memberName, message);
         }
 
         /// <summary>
@@ -67,7 +67,7 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogWarning(Exception? exception, string message, [CallerMemberName] string memberName = "")
         {
-            _logger.LogWarning(exception, "[{method}] {message}", memberName, message);
+            logger.LogWarning(exception, "[{method}] {message}", memberName, message);
         }
 
         /// <summary>
@@ -77,7 +77,7 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogError(string message, [CallerMemberName] string memberName = "")
         {
-            _logger.LogError("[{method}] {message}", memberName, message);
+            logger.LogError("[{method}] {message}", memberName, message);
         }
 
         /// <summary>
@@ -88,27 +88,9 @@ namespace DuetWebServer.Controllers
         /// <param name="memberName">Method calling this method</param>
         private void LogError(Exception? exception, string message, [CallerMemberName] string memberName = "")
         {
-            _logger.LogError(exception, "[{method}] {message}", memberName, message);
+            logger.LogError(exception, "[{method}] {message}", memberName, message);
         }
         #endregion
-
-        /// <summary>
-        /// Object model provider
-        /// </summary>
-        private readonly IModelProvider _modelProvider;
-
-        /// <summary>
-        /// Create a new controller instance
-        /// </summary>
-        /// <param name="configuration">Launch configuration</param>
-        /// <param name="logger">Logger instance</param>
-        /// <param name="modelProvider">Model provider</param>
-        public RepRapFirmwareController(IConfiguration configuration, ILogger<RepRapFirmwareController> logger, IModelProvider modelProvider)
-        {
-            _settings = configuration.Get<Settings>() ?? new();
-            _logger = logger;
-            _modelProvider = modelProvider;
-        }
 
         /// <summary>
         /// GET /rr_connect?password={password}
@@ -524,7 +506,7 @@ namespace DuetWebServer.Controllers
         }
 
         /// <summary>
-        /// GET /rr_model?key={key}&amp;flags={flags}
+        /// GET /rrmodel?key={key}&amp;flags={flags}
         /// Retrieve object model information
         /// </summary>
         /// <returns>
@@ -532,7 +514,7 @@ namespace DuetWebServer.Controllers
         /// (200) JSON response
         /// (503) Service Unavailable
         /// </returns>
-        [HttpGet("rr_model")]
+        [HttpGet("rrmodel")]
         public async Task<IActionResult> GetModel(string? key = "", string? flags = "")
         {
             try
@@ -544,7 +526,7 @@ namespace DuetWebServer.Controllers
                     {
                         if (!char.IsLetterOrDigit(c) && c != '.' && c != '[' && c != ']')
                         {
-                            LogWarning($"Invalid character in rr_model key parameter: '{c}'");
+                            LogWarning($"Invalid character in rrmodel key parameter: '{c}'");
                             return Content("{\"err\":1}", "application/json");
                         }
                     }
@@ -555,7 +537,7 @@ namespace DuetWebServer.Controllers
                     {
                         if (!char.IsLetterOrDigit(c))
                         {
-                            LogWarning($"Invalid character in rr_model flags parameter: '{c}'");
+                            LogWarning($"Invalid character in rrmodel flags parameter: '{c}'");
                             return Content("{\"err\":1}", "application/json");
                         }
                     }
@@ -576,11 +558,11 @@ namespace DuetWebServer.Controllers
                         Dictionary<string, object> result = JsonSerializer.Deserialize<Dictionary<string, object>>(resultElement.GetRawText())!;
                         {
                             Dictionary<string, object> seqs = JsonSerializer.Deserialize<Dictionary<string, object>>(seqsElement.GetRawText())!;
-                            lock (_modelProvider)
+                            lock (modelProvider)
                             {
                                 if (seqs.ContainsKey("reply"))
                                 {
-                                    seqs["reply"] = _modelProvider.ReplySeq;
+                                    seqs["reply"] = modelProvider.ReplySeq;
                                 }
                             }
                             result["seqs"] = seqs;
@@ -604,7 +586,7 @@ namespace DuetWebServer.Controllers
             }
             catch (Exception e)
             {
-                LogError(e, "Failed to handle rr_model request");
+                LogError(e, "Failed to handle rrmodel request");
             }
             return StatusCode(503);
         }
@@ -788,7 +770,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (info.Thumbnails.Count > 0)
                 {
-                    List<object> thumbnails = new();
+                    List<object> thumbnails = [];
                     foreach (ThumbnailInfo thumbnail in info.Thumbnails)
                     {
                         thumbnails.Add(new

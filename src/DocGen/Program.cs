@@ -208,17 +208,17 @@ async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property
             if (baseType == typeof(Inputs))
             {
                 // Inputs is a pseudo-list so it requires special treatment
-                relatedTypes = new Type[] { typeof(InputChannel) };
+                relatedTypes = [typeof(InputChannel)];
             }
             else if (baseType == typeof(Message))
             {
                 // Message is not inherited from ModelObject
-                relatedTypes = new Type[] { typeof(Message) };
+                relatedTypes = [typeof(Message)];
             }
             else if (baseType == typeof(Plugin))
             {
                 // Instead of this we could check for base classes as well but so far Plugin is an exception
-                relatedTypes = new Type[] { typeof(PluginManifest), typeof(Plugin) };
+                relatedTypes = [typeof(PluginManifest), typeof(Plugin)];
             }
             else
             {

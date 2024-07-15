@@ -14,7 +14,7 @@ namespace DuetAPI.ObjectModel
         /// This is a bitmap represented as an array
         /// </remarks>
         [Obsolete("Use Sensors instead")]
-        public ModelCollection<int> Heaters { get; } = new ModelCollection<int>();
+        public ModelCollection<int> Heaters { get; } = [];
         
         /// <summary>
         /// Upper temperature range required to turn on the fan (in C)
@@ -42,6 +42,6 @@ namespace DuetAPI.ObjectModel
         /// <remarks>
         /// This is a bitmap represented as an array
         /// </remarks>
-        public ModelCollection<int> Sensors { get; } = new ModelCollection<int>();
+        public ModelCollection<int> Sensors { get; } = [];
     }
 }

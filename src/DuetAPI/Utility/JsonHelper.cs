@@ -32,7 +32,7 @@ namespace DuetAPI.Utility
         {
             if (reader.TokenType == JsonTokenType.StartArray)
             {
-                List<Regex> regexList = new();
+                List<Regex> regexList = [];
 
                 string? pattern = null;
                 int optionsValue = 0;

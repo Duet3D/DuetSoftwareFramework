@@ -41,7 +41,7 @@ namespace DuetControlServer.Commands
 
                 // Stop all plugins
                 StringBuilder startedPlugins = new();
-                List<Task> stopTasks = new();
+                List<Task> stopTasks = [];
                 using (await Model.Provider.AccessReadOnlyAsync())
                 {
                     foreach (Plugin item in Model.Provider.Get.Plugins.Values)

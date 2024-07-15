@@ -128,7 +128,7 @@ namespace DuetControlServer.SPI.Serialization
             else
             {
                 // Write code parameters
-                List<object> extraParameters = new();
+                List<object> extraParameters = [];
                 foreach (var parameter in code.Parameters)
                 {
                     CodeParameter binaryParam = new()

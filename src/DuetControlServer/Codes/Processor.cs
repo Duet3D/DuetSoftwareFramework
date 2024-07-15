@@ -18,18 +18,9 @@ namespace DuetControlServer.Codes
         /// <summary>
         /// Processors per code channel
         /// </summary>
-        private static readonly ChannelProcessor[] _processors = new ChannelProcessor[Inputs.Total];
-
-        /// <summary>
-        /// Initialize this class
-        /// </summary>
-        public static void Init()
-        {
-            for (int input = 0; input < Inputs.Total; input++)
-            {
-                _processors[input] = new ChannelProcessor((CodeChannel)input);
-            }
-        }
+        private static readonly ChannelProcessor[] _processors = Inputs.ValidChannels
+            .Select(channel => new ChannelProcessor(channel))
+            .ToArray();
 
         /// <summary>
         /// Task representing the lifecycle of this class

@@ -198,7 +198,7 @@ namespace DuetControlServer.Utility
         public static async Task UpdateFirmware()
         {
             // Get the different firmware filenames
-            Dictionary<string, string?> firmwareVersions = new();
+            Dictionary<string, string?> firmwareVersions = [];
             using (await Model.Provider.AccessReadOnlyAsync())
             {
                 foreach (Board board in Model.Provider.Get.Boards)
@@ -226,7 +226,7 @@ namespace DuetControlServer.Utility
             }
 
             // Check which boards are not update to date
-            List<Board> outdatedBoards = new();
+            List<Board> outdatedBoards = [];
             using (await Model.Provider.AccessReadOnlyAsync())
             {
                 foreach (Board board in Model.Provider.Get.Boards)
@@ -262,7 +262,7 @@ namespace DuetControlServer.Utility
             }
 
             // Determine which boards are supposed to be updated
-            List<Board> boardsToUpdate = new();
+            List<Board> boardsToUpdate = [];
             if (Console.IsInputRedirected)
             {
                 // DCS does not start in update-only mode if Settings.AutoUpdateFirmware is false
@@ -322,10 +322,10 @@ namespace DuetControlServer.Utility
                             Channel = DuetAPI.CodeChannel.Trigger,
                             Type = CodeType.MCode,
                             MajorNumber = 997,
-                            Parameters = new()
-                            {
+                            Parameters =
+                            [
                                 new('B', board.CanAddress)
-                            }
+                            ]
                         };
                         Message result = await updateCode.Execute() ?? new Message();
 
@@ -426,7 +426,7 @@ namespace DuetControlServer.Utility
             }
 
             // Get the different firmware filenames
-            Dictionary<string, string?> firmwareVersions = new();
+            Dictionary<string, string?> firmwareVersions = [];
             foreach (Board board in objectModel.Boards)
             {
                 if (!string.IsNullOrEmpty(board.FirmwareFileName) && !firmwareVersions.ContainsKey(board.FirmwareFileName))
@@ -451,7 +451,7 @@ namespace DuetControlServer.Utility
             }
 
             // Check which boards are not update to date
-            List<Board> outdatedBoards = new();
+            List<Board> outdatedBoards = [];
             foreach (Board board in objectModel.Boards)
             {
                 if (!string.IsNullOrEmpty(board.FirmwareFileName) && firmwareVersions.TryGetValue(board.FirmwareFileName, out string? newVersion))
@@ -483,7 +483,7 @@ namespace DuetControlServer.Utility
             }
 
             // Determine which boards are supposed to be updated
-            List<Board> boardsToUpdate = new();
+            List<Board> boardsToUpdate = [];
             if (Console.IsInputRedirected)
             {
                 // DCS does not start in update-only mode if Settings.AutoUpdateFirmware is false
@@ -537,10 +537,10 @@ namespace DuetControlServer.Utility
                         {
                             Type = CodeType.MCode,
                             MajorNumber = 997,
-                            Parameters = new()
-                            {
+                            Parameters =
+                            [
                                 new('B', board.CanAddress)
-                            }
+                            ]
                         };
                         Message result = await commandConnection.PerformCode(updateCode);
 

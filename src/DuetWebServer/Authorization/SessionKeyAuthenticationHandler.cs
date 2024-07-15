@@ -20,7 +20,15 @@ namespace DuetWebServer.Authorization
     /// <summary>
     /// Authentication handler for session keys
     /// </summary>
-    public class SessionKeyAuthenticationHandler : AuthenticationHandler<SessionKeyAuthenticationSchemeOptions>
+    /// <remarks>
+    /// Create a new controller instance
+    /// </remarks>
+    /// <param name="options">Options</param>
+    /// <param name="logger">Logger instance</param>
+    /// <param name="encoder">URL encoder</param>
+    /// <param name="configuration">Launch configuration</param>
+    /// <param name="sessionStorage">Session storage singleton</param>
+    public class SessionKeyAuthenticationHandler(IOptionsMonitor<SessionKeyAuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, IConfiguration configuration, ISessionStorage sessionStorage) : AuthenticationHandler<SessionKeyAuthenticationSchemeOptions>(options, logger, encoder)
     {
         /// <summary>
         /// Name of this authentication scheme
@@ -30,27 +38,7 @@ namespace DuetWebServer.Authorization
         /// <summary>
         /// App settings
         /// </summary>
-        private readonly Settings _settings;
-
-        /// <summary>
-        /// Session storage singleton
-        /// </summary>
-        private readonly ISessionStorage _sessionStorage;
-
-        /// <summary>
-        /// Create a new controller instance
-        /// </summary>
-        /// <param name="options">Options</param>
-        /// <param name="logger">Logger instance</param>
-        /// <param name="encoder">URL encoder</param>
-        /// <param name="configuration">Launch configuration</param>
-        /// <param name="sessionStorage">Session storage singleton</param>
-        public SessionKeyAuthenticationHandler(IOptionsMonitor<SessionKeyAuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, IConfiguration configuration, ISessionStorage sessionStorage)
-            : base(options, logger, encoder)
-        {
-            _settings = configuration.Get<Settings>() ?? new();
-            _sessionStorage = sessionStorage;
-        }
+        private readonly Settings _settings = configuration.Get<Settings>() ?? new();
 
         /// <summary>
         /// Try to authenticate a request
@@ -64,7 +52,7 @@ namespace DuetWebServer.Authorization
                 {
                     if (sessionKey is not null)
                     {
-                        AuthenticationTicket? ticket = _sessionStorage.GetTicketFromKey(sessionKey);
+                        AuthenticationTicket? ticket = sessionStorage.GetTicketFromKey(sessionKey);
                         if (ticket is not null)
                         {
                             // Got a ticket, success!
@@ -77,7 +65,7 @@ namespace DuetWebServer.Authorization
             {
                 // Check for IP address authorization
                 string ipAddress = Context.Connection.RemoteIpAddress!.ToString();
-                AuthenticationTicket? ticket = _sessionStorage.GetTicketFromIpAddress(ipAddress);
+                AuthenticationTicket? ticket = sessionStorage.GetTicketFromIpAddress(ipAddress);
 
                 // Make a new session if no ticket could be found and no password is set
                 if (ticket is null)
@@ -89,7 +77,7 @@ namespace DuetWebServer.Authorization
                         {
                             // No password set - assign a new ticket so that replies are saved
                             int sessionId = await connection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, ipAddress);
-                            ticket = _sessionStorage.MakeSessionTicket(sessionId, ipAddress, true);
+                            ticket = sessionStorage.MakeSessionTicket(sessionId, ipAddress, true);
                         }
                     }
                     catch

@@ -42,7 +42,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Cached dictionary of derived types vs JSON property names vs property descriptors
         /// </summary>
-        private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _propertyInfos = new();
+        private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _propertyInfos = [];
 
         /// <summary>
         /// Static constructor that caches the JSON properties of each derived type
@@ -65,7 +65,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="type">Type to register</param>
         static protected void RegisterJsonType(Type type)
         {
-            Dictionary<string, PropertyInfo> jsonProperties = new();
+            Dictionary<string, PropertyInfo> jsonProperties = [];
             foreach (PropertyInfo property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
             {
                 if (!Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
@@ -201,7 +201,7 @@ namespace DuetAPI.ObjectModel
                 {
                     if (otherValue != myValue)
                     {
-                        diffs ??= new Dictionary<string, object?>();
+                        diffs ??= [];
                         diffs.Add(jsonProperty.Key, myValue);
                     }
                 }
@@ -210,13 +210,13 @@ namespace DuetAPI.ObjectModel
                     object? diff = ((IModelObject)myValue).FindDifferences((IModelObject)otherValue);
                     if (diff is not null)
                     {
-                        diffs ??= new Dictionary<string, object?>();
+                        diffs ??= [];
                         diffs.Add(jsonProperty.Key, diff);
                     }
                 }
                 else if (!myValue.Equals(otherValue))
                 {
-                    diffs ??= new Dictionary<string, object?>();
+                    diffs ??= [];
                     diffs.Add(jsonProperty.Key, myValue);
                 }
             }

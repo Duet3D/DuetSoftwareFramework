@@ -785,9 +785,9 @@ namespace DuetAPI.Commands
         {
             if (!parameter.IsExpression)
             {
-                List<DriverId> drivers = new();
+                List<DriverId> drivers = [];
 
-                string[] parameters = parameter.StringValue.Split(':') ?? Array.Empty<string>();
+                string[] parameters = parameter.StringValue.Split(':') ?? [];
                 foreach (string value in parameters)
                 {
                     try

@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 bool quiet = false, priorityCodes = false;
 CodeChannel[]? channels = null;
-string[]? filters = null, types = new string[] { "pre", "post", "executed" };
+string[]? filters = null, types = ["pre", "post", "executed"];
 
 // Parse the command line arguments
 string? lastArg = null, socketPath = Defaults.FullSocketPath;
@@ -115,12 +115,12 @@ try
         }
     }
 
-    Task[] tasks = new Task[]
-    {
+    Task[] tasks =
+    [
                     (preConnection is not null) ? PrintIncomingCodes(preConnection) : Task.CompletedTask,
                     (postConnection is not null) ? PrintIncomingCodes(postConnection) : Task.CompletedTask,
                     (executedConnection is not null) ? PrintIncomingCodes(executedConnection) : Task.CompletedTask
-    };
+    ];
 
     // Wait for all tasks to finish
     await Task.WhenAll(tasks);

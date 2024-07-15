@@ -163,7 +163,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Dictionary of the properties vs. sender type + JSON content that failed to be deserialized
         /// </summary>
-        private static readonly Dictionary<Type, Tuple<Type, JsonElement>> _deserializationErrors = new();
+        private static readonly Dictionary<Type, Tuple<Type, JsonElement>> _deserializationErrors = [];
 
         /// <summary>
         /// Event handler to be called when the deserialization of a property failed

@@ -31,7 +31,7 @@ namespace DuetPiManagementPlugin
         /// List of codes to intercept
         /// </summary>
         public static readonly string[] CodesToIntercept =
-        {
+        [
             "M21",      // Initialize SD card
             "M22",      // Release SD card
             "M540",     // Set MAC address
@@ -47,7 +47,7 @@ namespace DuetPiManagementPlugin
             "M589",     // Configure access point parameters
             "M997",     // Perform update
             "M999"      // Reboot or shutdown SBC (priority codes are not handled)
-        };
+        ];
 
         /// <summary>
         /// Connection used for intercepting codes

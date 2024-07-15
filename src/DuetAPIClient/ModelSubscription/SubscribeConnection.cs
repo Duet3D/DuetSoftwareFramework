@@ -49,7 +49,7 @@ namespace DuetAPIClient
         /// Filter expressions
         /// </summary>
         /// <seealso cref="SubscribeInitMessage.Filter"/>
-        public List<string> Filters { get; } = new List<string>();
+        public List<string> Filters { get; } = [];
 
         /// <summary>
         /// Establishes a connection to the given UNIX socket file

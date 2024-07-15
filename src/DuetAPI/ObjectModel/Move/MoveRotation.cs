@@ -18,6 +18,6 @@
         /// <summary>
         /// XY coordinates of the centre rotation
         /// </summary>
-        public ModelCollection<float> Centre { get; } = new ModelCollection<float>() { 0F, 0F };
+        public ModelCollection<float> Centre { get; } = [0F, 0F];
     }
 }

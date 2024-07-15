@@ -8,14 +8,9 @@ namespace DuetControlServer.Codes.Pipelines
     /// <summary>
     /// Initial pipeline element for codes being started
     /// </summary>
-    public class Start : PipelineBase
+    /// <param name="processor">Channel processor</param>
+    public class Start(ChannelProcessor processor) : PipelineBase(PipelineStage.Start, processor)
     {
-        /// <summary>
-        /// Constructor of this class
-        /// </summary>
-        /// <param name="processor">Channel processor</param>
-        public Start(ChannelProcessor processor) : base(PipelineStage.Start, processor) { }
-
         /// <summary>
         /// Counter for unbuffered codes
         /// </summary>

@@ -112,12 +112,12 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// Dictionary of keys vs sequence numbers
         /// </summary>
-        private readonly Dictionary<string, int> _seqs = new();
+        private readonly Dictionary<string, int> _seqs = [];
 
         /// <summary>
         /// Dictionary of running codes vs sequence numbers
         /// </summary>
-        private readonly Dictionary<TaskCompletionSource<string>, int> _runningCodes = new();
+        private readonly Dictionary<TaskCompletionSource<string>, int> _runningCodes = [];
 
         /// <summary>
         /// Reconnect to the board when the connection has been reset
@@ -238,7 +238,7 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// TCS to complete when the object model is up-to-date
         /// </summary>
-        private readonly List<TaskCompletionSource<object?>> _modelUpdateTcs = new();
+        private readonly List<TaskCompletionSource<object?>> _modelUpdateTcs = [];
 
         /// <summary>
         /// Wait for the object model to be up-to-date
@@ -491,7 +491,7 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// Filament usage at the time of the last layer change
         /// </summary>
-        private List<float> _lastFilamentUsage = new();
+        private List<float> _lastFilamentUsage = [];
 
         /// <summary>
         /// Last file position at the time of the last layer change
@@ -541,7 +541,7 @@ namespace DuetHttpClient.Connector
                 // Compute average stats per changed layer
                 int printDuration = Model.Job.Duration.Value - (Model.Job.WarmUpDuration is not null ? Model.Job.WarmUpDuration.Value : 0);
                 float avgLayerDuration = (printDuration - _lastDuration) / numChangedLayers;
-                List<float> totalFilamentUsage = new(), avgFilamentUsage = new();
+                List<float> totalFilamentUsage = [], avgFilamentUsage = [];
                 long bytesPrinted = (Model.Job.FilePosition is not null) ? (Model.Job.FilePosition.Value - _lastFilePosition) : 0L;
                 float avgFractionPrinted = (Model.Job.File.Size > 0) ? (float)bytesPrinted / (Model.Job.File.Size * numChangedLayers) : 0F;
                 for (int i = 0; i < Model.Move.Extruders.Count; i++)
@@ -1113,7 +1113,7 @@ namespace DuetHttpClient.Connector
         {
             //public string dir { get; set; }
             public int First { get; set; }
-            public List<FileItem> Files { get; set; } = new();
+            public List<FileItem> Files { get; set; } = [];
             public int Next { get; set; }
         }
 
@@ -1125,7 +1125,7 @@ namespace DuetHttpClient.Connector
         /// <returns>List of all files and directories</returns>
         public override async Task<IList<FileListItem>> GetFileList(string directory, CancellationToken cancellationToken = default)
         {
-            List<FileListItem> result = new();
+            List<FileListItem> result = [];
 
             int nextIndex = 0;
             do

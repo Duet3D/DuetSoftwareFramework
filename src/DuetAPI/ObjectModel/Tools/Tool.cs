@@ -8,7 +8,7 @@
         /// <summary>
         /// Active temperatures of the associated heaters (in C)
         /// </summary>
-        public ModelCollection<float> Active { get; } = new ModelCollection<float>();
+        public ModelCollection<float> Active { get; } = [];
 
         /// <summary>
         /// Associated axes. At present only X and Y can be mapped per tool.
@@ -22,12 +22,12 @@
         /// Make sure to set each item individually so the change events are called.
         /// Each item is a bitmap represented as an array
         /// </remarks>
-        public ModelCollection<int[]> Axes { get; } = new ModelCollection<int[]>();
+        public ModelCollection<int[]> Axes { get; } = [];
 
         /// <summary>
         /// Extruder drives of this tool
         /// </summary>
-        public ModelCollection<int> Extruders { get; } = new ModelCollection<int>();
+        public ModelCollection<int> Extruders { get; } = [];
 
         /// <summary>
         /// List of associated fans (indices)
@@ -35,12 +35,12 @@
         /// <remarks>
         /// This is a bitmap represented as an array
         /// </remarks>
-        public ModelCollection<int> Fans { get; } = new ModelCollection<int>();
+        public ModelCollection<int> Fans { get; } = [];
 
         /// <summary>
         /// Feedforward coefficients to apply to the mapped heaters during extrusions
         /// </summary>
-        public ModelCollection<float> FeedForward { get; } = new ModelCollection<float>();
+        public ModelCollection<float> FeedForward { get; } = [];
 
         /// <summary>
         /// Extruder drive index for resolving the tool filament (index or -1)
@@ -55,7 +55,7 @@
         /// <summary>
         /// List of associated heaters (indices)
         /// </summary>
-        public ModelCollection<int> Heaters { get; } = new ModelCollection<int>();
+        public ModelCollection<int> Heaters { get; } = [];
 
         /// <summary>
         /// True if the filament has been firmware-retracted
@@ -70,7 +70,7 @@
         /// <summary>
         /// Mix ratios of the associated extruder drives
         /// </summary>
-        public ModelCollection<float> Mix { get; } = new ModelCollection<float>();
+        public ModelCollection<float> Mix { get; } = [];
         
         /// <summary>
         /// Name of this tool
@@ -97,7 +97,7 @@
         /// This list is in the same order as <see cref="Move.Axes"/>
         /// </summary>
         /// <seealso cref="Axis"/>
-        public ModelCollection<float> Offsets { get; } = new ModelCollection<float>();
+        public ModelCollection<float> Offsets { get; } = [];
 
         /// <summary>
         /// Bitmap of the probed axis offsets
@@ -137,7 +137,7 @@
         /// <summary>
         /// Standby temperatures of the associated heaters (in C)
         /// </summary>
-        public ModelCollection<float> Standby { get; } = new ModelCollection<float>();
+        public ModelCollection<float> Standby { get; } = [];
 
         /// <summary>
         /// Current state of this tool

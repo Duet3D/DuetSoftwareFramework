@@ -151,7 +151,7 @@ namespace DuetHttpClient.Connector
         /// <summary>
         /// TCS to complete when the object model is up-to-date
         /// </summary>
-        private readonly List<TaskCompletionSource<object?>> _modelUpdateTCS = new();
+        private readonly List<TaskCompletionSource<object?>> _modelUpdateTCS = [];
 
         /// <summary>
         /// Wait for the object model to be up-to-date

@@ -12,7 +12,7 @@
         /// <remarks>
         /// Items may be -1 if unconfigured
         /// </remarks>
-        public ModelCollection<int> BedHeaters { get; } = new ModelCollection<int>();
+        public ModelCollection<int> BedHeaters { get; } = [];
         
         /// <summary>
         /// List of configured chamber heaters (indices)
@@ -21,7 +21,7 @@
         /// <remarks>
         /// Items may be -1 if unconfigured
         /// </remarks>
-        public ModelCollection<int> ChamberHeaters { get; } = new ModelCollection<int>();
+        public ModelCollection<int> ChamberHeaters { get; } = [];
         
         /// <summary>
         /// Minimum required temperature for extrusion moves (in C)
@@ -47,6 +47,6 @@
         /// List of configured heaters
         /// </summary>
         /// <seealso cref="Heater"/>
-        public ModelCollection<Heater?> Heaters { get; } = new ModelCollection<Heater?>();
+        public ModelCollection<Heater?> Heaters { get; } = [];
     }
 }

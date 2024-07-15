@@ -28,11 +28,11 @@
         /// <summary>
         /// X coordinates of the build object (in mm or null if not found)
         /// </summary>
-        public ModelCollection<float?> X { get; } = new ModelCollection<float?>();
+        public ModelCollection<float?> X { get; } = [];
 
         /// <summary>
         /// Y coordinates of the build object (in mm or null if not found)
         /// </summary>
-        public ModelCollection<float?> Y { get; } = new ModelCollection<float?>();
+        public ModelCollection<float?> Y { get; } = [];
     }
 }

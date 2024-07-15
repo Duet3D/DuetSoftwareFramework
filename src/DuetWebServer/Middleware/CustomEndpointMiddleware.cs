@@ -20,56 +20,18 @@ namespace DuetWebServer.Middleware
     /// <summary>
     /// Middleware providing with custom HTTP/WebSocket endpoints
     /// </summary>
-    public class CustomEndpointMiddleware
+    /// <param name="next">Next request delegate</param>
+    /// <param name="configuration">Application configuration</param>
+    /// <param name="logger">Logger instance</param>
+    /// <param name="applicationLifetime">Host application lifetime</param>
+    /// <param name="modelProvider">Object model provider</param>
+    /// <param name="sessionStorage">Session storage</param>
+    public class CustomEndpointMiddleware(RequestDelegate next, IConfiguration configuration, ILogger<CustomEndpointMiddleware> logger, IHostApplicationLifetime applicationLifetime, IModelProvider modelProvider, ISessionStorage sessionStorage)
     {
-        /// <summary>
-        /// Next request delegate to call
-        /// </summary>
-        private readonly RequestDelegate _next;
-
         /// <summary>
         /// App settings
         /// </summary>
-        private readonly Settings _settings;
-
-        /// <summary>
-        /// Logger instance
-        /// </summary>
-        private readonly ILogger _logger;
-
-        /// <summary>
-        /// Host application lifetime
-        /// </summary>
-        private readonly IHostApplicationLifetime _applicationLifetime;
-
-        /// <summary>
-        /// Object model provider
-        /// </summary>
-        private readonly IModelProvider _modelProvider;
-
-        /// <summary>
-        /// Session storage singleton
-        /// </summary>
-        private readonly ISessionStorage _sessionStorage;
-
-        /// <summary>
-        /// Constructor of this middleware
-        /// </summary>
-        /// <param name="next">Next request delegate</param>
-        /// <param name="configuration">Application configuration</param>
-        /// <param name="logger">Logger instance</param>
-        /// <param name="applicationLifetime">Host application lifetime</param>
-        /// <param name="modelProvider">Object model provider</param>
-        /// <param name="sessionStorage">Session storage</param>
-        public CustomEndpointMiddleware(RequestDelegate next, IConfiguration configuration, ILogger<CustomEndpointMiddleware> logger, IHostApplicationLifetime applicationLifetime, IModelProvider modelProvider, ISessionStorage sessionStorage)
-        {
-            _next = next;
-            _settings = configuration.Get<Settings>() ?? new();
-            _logger = logger;
-            _applicationLifetime = applicationLifetime;
-            _modelProvider = modelProvider;
-            _sessionStorage = sessionStorage;
-        }
+        private readonly Settings _settings = configuration.Get<Settings>() ?? new();
 
         /// <summary>
         /// Called when a new HTTP request is received
@@ -80,16 +42,16 @@ namespace DuetWebServer.Middleware
         {
             // Check if this endpoint is reserved for any route
             HttpEndpoint? httpEndpoint = null;
-            lock (_modelProvider.Endpoints)
+            lock (modelProvider.Endpoints)
             {
                 string method = context.WebSockets.IsWebSocketRequest ? "WebSocket" : context.Request.Method.ToString();
-                if (_modelProvider.Endpoints.TryGetValue($"{method}{context.Request.Path.Value}", out HttpEndpoint? ep))
+                if (modelProvider.Endpoints.TryGetValue($"{method}{context.Request.Path.Value}", out HttpEndpoint? ep))
                 {
                     httpEndpoint = ep;
                 }
                 else
                 {
-                    _logger.LogDebug("No endpoint found for {method} request via {path}", method, context.Request.Path.Value);
+                    logger.LogDebug("No endpoint found for {method} request via {path}", method, context.Request.Path.Value);
                 }
             }
 
@@ -109,7 +71,7 @@ namespace DuetWebServer.Middleware
                         {
                             if (sessionKey is not null)
                             {
-                                sessionId = _sessionStorage.GetSessionId(sessionKey);
+                                sessionId = sessionStorage.GetSessionId(sessionKey);
                                 if (sessionId != -1)
                                 {
                                     break;
@@ -122,7 +84,7 @@ namespace DuetWebServer.Middleware
                     {
                         using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
 
-                        using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_applicationLifetime.ApplicationStopping);
+                        using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(applicationLifetime.ApplicationStopping);
                         Task webSocketTask = ReadFromWebSocket(webSocket, endpointConnection, sessionId, cts.Token);
                         Task unixSocketTask = ReadFromUnixSocket(webSocket, endpointConnection, cts.Token);
 
@@ -138,7 +100,7 @@ namespace DuetWebServer.Middleware
                         {
                             if (sessionKey is not null)
                             {
-                                sessionId = _sessionStorage.GetSessionId(sessionKey);
+                                sessionId = sessionStorage.GetSessionId(sessionKey);
                                 if (sessionId != -1)
                                 {
                                     break;
@@ -153,7 +115,7 @@ namespace DuetWebServer.Middleware
             else
             {
                 // Call the next delegate/middleware in the pipeline
-                await _next(context);
+                await next(context);
             }
         }
 
@@ -211,13 +173,13 @@ namespace DuetWebServer.Middleware
                 SendHttpResponse response = await endpointConnection.GetHttpResponse(cancellationToken);
                 if (response.StatusCode >= 1000)
                 {
-                    _logger.LogDebug("Closing WebSocket with status code {statusCode} ({response})", response.StatusCode, response.Response);
+                    logger.LogDebug("Closing WebSocket with status code {statusCode} ({response})", response.StatusCode, response.Response);
                     await CloseConnection(webSocket, (WebSocketCloseStatus)response.StatusCode, response.Response);
                     break;
                 }
                 else
                 {
-                    _logger.LogDebug("Sending WebSocket data");
+                    logger.LogDebug("Sending WebSocket data");
                     await webSocket.SendAsync(Encoding.UTF8.GetBytes(response.Response), WebSocketMessageType.Text, true, cancellationToken);
                 }
             }

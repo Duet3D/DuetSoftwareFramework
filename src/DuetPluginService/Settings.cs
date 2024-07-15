@@ -312,7 +312,7 @@ namespace DuetPluginService
                     case JsonTokenType.StartArray:
                         if (property!.PropertyType == typeof(List<string>))
                         {
-                            List<string> list = new();
+                            List<string> list = [];
                             while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
                             {
                                 list.Add(reader.GetString()!);
@@ -330,7 +330,7 @@ namespace DuetPluginService
                         {
                             if (property.PropertyType == typeof(Dictionary<string, string>))
                             {
-                                Dictionary<string, string> dict = new();
+                                Dictionary<string, string> dict = [];
                                 while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
                                 {
                                     dict.Add(reader.GetString()!, reader.GetString()!);

@@ -719,7 +719,7 @@ namespace DuetControlServer.SPI
             WritePacket(Communication.SbcRequests.Request.GetObjectModel, sizeof(int));
 
             // Write data
-            byte[] configModuleRequest = new byte[] { 0, 0, 5, 0 };
+            byte[] configModuleRequest = [0, 0, 5, 0];
             configModuleRequest.CopyTo(GetWriteBuffer(configModuleRequest.Length));
 
             return true;

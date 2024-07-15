@@ -292,7 +292,7 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Block file macro calls if the state is being copied
         /// </summary>
-        private static List<MacroFile> _macrosToStart = new();
+        private static List<MacroFile> _macrosToStart = [];
 
         /// <summary>
         /// Copy the state from another channel processor
@@ -349,7 +349,7 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// List of buffered G/M/T-codes that are being processed by the firmware
         /// </summary>
-        public List<Code> BufferedCodes { get; } = new();
+        public List<Code> BufferedCodes { get; } = [];
 
         /// <summary>
         /// Occupied space for buffered codes in bytes

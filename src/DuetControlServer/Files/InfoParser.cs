@@ -194,7 +194,8 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Result for wrapping the buffer pointer because ref parameters are not supported for async functions
         /// </summary>
-        private class ReadLineFromEndData
+        /// <param name="filePosition">Current file position</param>
+        private class ReadLineFromEndData(long filePosition)
         {
             /// <summary>
             /// Read line
@@ -209,18 +210,12 @@ namespace DuetControlServer.Files
             /// <summary>
             /// Last file position
             /// </summary>
-            public long FilePosition;
+            public long FilePosition = filePosition;
 
             /// <summary>
             /// Buffer used for caching line data
             /// </summary>
             public byte[] LineBuffer = new byte[Settings.FileBufferSize];
-
-            /// <summary>
-            /// Constructor of this class
-            /// </summary>
-            /// <param name="filePosition">Current file position</param>
-            public ReadLineFromEndData(long filePosition) => FilePosition = filePosition;
         }
 
         /// <summary>

@@ -7,28 +7,19 @@ namespace DuetControlServer.SPI
     /// <summary>
     /// Internal storage class for expression evaluation requests
     /// </summary>
-    public class EvaluateExpressionRequest
+    /// <param name="channel">Where to evaluate the expression</param>
+    /// <param name="expression">Expression to evaluate</param>
+    public class EvaluateExpressionRequest(CodeChannel channel, string expression)
     {
-        /// <summary>
-        /// Constructor of this class
-        /// </summary>
-        /// <param name="channel">Where to evaluate the expression</param>
-        /// <param name="expression">Expression to evaluate</param>
-        public EvaluateExpressionRequest(CodeChannel channel, string expression)
-        {
-            Channel = channel;
-            Expression = expression;
-        }
-
         /// <summary>
         /// Where the expression is evaluated
         /// </summary>
-        public CodeChannel Channel { get; }
+        public CodeChannel Channel { get; } = channel;
 
         /// <summary>
         /// Expression to evaluate
         /// </summary>
-        public string Expression { get; }
+        public string Expression { get; } = expression;
 
         /// <summary>
         /// Whether the request has been sent to the firmware

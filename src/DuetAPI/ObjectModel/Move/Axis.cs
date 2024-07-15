@@ -10,12 +10,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of supported axis letters
         /// </summary>
-        public static readonly char[] Letters = new char[] {
+        public static readonly char[] Letters = [
             'X', 'Y', 'Z',
             'U', 'V', 'W',
             'A', 'B', 'C', 'D',
             'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'
-        };
+        ];
 
         /// <summary>
         /// Acceleration of this axis (in mm/s^2)
@@ -60,7 +60,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of the assigned drivers
         /// </summary>
-        public ModelCollection<DriverId> Drivers { get; } = new ModelCollection<DriverId>();
+        public ModelCollection<DriverId> Drivers { get; } = [];
 
         /// <summary>
         /// Whether or not the axis is homed
@@ -226,6 +226,6 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Offsets of this axis for each workplace (in mm)
         /// </summary>
-        public ModelCollection<float> WorkplaceOffsets { get; } = new ModelCollection<float>();
+        public ModelCollection<float> WorkplaceOffsets { get; } = [];
     }
 }

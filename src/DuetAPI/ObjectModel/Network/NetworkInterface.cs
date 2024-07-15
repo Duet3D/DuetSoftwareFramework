@@ -9,7 +9,7 @@
         /// List of active protocols
         /// </summary>
         [SbcProperty(false)]
-        public ModelCollection<NetworkProtocol> ActiveProtocols { get; } = new ModelCollection<NetworkProtocol>();
+        public ModelCollection<NetworkProtocol> ActiveProtocols { get; } = [];
 
         /// <summary>
         /// Actual IPv4 address of the network adapter or null if unknown

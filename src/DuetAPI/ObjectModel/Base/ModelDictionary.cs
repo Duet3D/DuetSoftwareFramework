@@ -15,19 +15,20 @@ namespace DuetAPI.ObjectModel
     /// <remarks>
     /// Key names are NOT converted to camel-case (unlike regular class properties)
     /// </remarks>
+    /// <param name="nullRemovesItems">Defines if setting items to null effectively removes them</param>
     [JsonConverter(typeof(ModelDictionaryConverter))]
-    public sealed class ModelDictionary<TValue> : IDictionary<string, TValue>, IModelDictionary
+    public sealed class ModelDictionary<TValue>(bool nullRemovesItems) : IDictionary<string, TValue>, IModelDictionary
     {
         /// <summary>
         /// Flags if keys can be removed again by setting their value to null
         /// </summary>
         [JsonIgnore]
-        public bool NullRemovesItems { get; }
+        public bool NullRemovesItems { get; } = nullRemovesItems;
 
         /// <summary>
         /// Internal storage for key/value pairs
         /// </summary>
-        private readonly Dictionary<string, TValue> _dictionary = new();
+        private readonly Dictionary<string, TValue> _dictionary = [];
 
         /// <summary>
         /// Event that is called when the entire directory is cleared. Only used if <see cref="NullRemovesItems"/> is false
@@ -43,12 +44,6 @@ namespace DuetAPI.ObjectModel
         /// Event that is called when a key is being changed
         /// </summary>
         public event PropertyChangingEventHandler? PropertyChanging;
-
-        /// <summary>
-        /// Constructor of this class
-        /// </summary>
-        /// <param name="nullRemovesItems">Defines if setting items to null effectively removes them</param>
-        public ModelDictionary(bool nullRemovesItems) => NullRemovesItems = nullRemovesItems;
 
         /// <summary>
         /// Get an element from the dictionary
@@ -346,7 +341,7 @@ namespace DuetAPI.ObjectModel
             {
                 if (!otherDictionary.TryGetValue(kv.Key, out TValue? otherItem) || !kv.Value!.Equals(otherItem))
                 {
-                    diffs ??= new Dictionary<string, TValue>();
+                    diffs ??= [];
                     diffs.Add(kv.Key, kv.Value);
                 }
             }
@@ -358,7 +353,7 @@ namespace DuetAPI.ObjectModel
                 {
                     if (!_dictionary.ContainsKey(key))
                     {
-                        diffs ??= new Dictionary<string, TValue>();
+                        diffs ??= [];
                         diffs.Add(key, default!);
                     }
                 }

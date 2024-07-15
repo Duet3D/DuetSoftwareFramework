@@ -18,7 +18,7 @@
         /// <summary>
         /// Last corrections (in mm)
         /// </summary>
-        public ModelCollection<float> LastCorrections { get; } = new ModelCollection<float>();
+        public ModelCollection<float> LastCorrections { get; } = [];
 
         /// <summary>
         /// Maximum Z correction (in mm)
@@ -43,11 +43,11 @@
         /// <summary>
         /// X positions of the leadscrews (in mm)
         /// </summary>
-        public ModelCollection<float> ScrewX { get; } = new ModelCollection<float>();
+        public ModelCollection<float> ScrewX { get; } = [];
 
         /// <summary>
         /// Y positions of the leadscrews (in mm)
         /// </summary>
-        public ModelCollection<float> ScrewY { get; } = new ModelCollection<float>();
+        public ModelCollection<float> ScrewY { get; } = [];
     }
 }

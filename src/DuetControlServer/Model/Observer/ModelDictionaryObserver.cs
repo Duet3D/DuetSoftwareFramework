@@ -28,7 +28,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Dictionary of model objects vs property change handlers
         /// </summary>
-        private static readonly Dictionary<IModelDictionary, PropertyChangedEventHandler> _dictionaryChangedHandlers = new();
+        private static readonly Dictionary<IModelDictionary, PropertyChangedEventHandler> _dictionaryChangedHandlers = [];
 
         /// <summary>
         /// Function to generate a property change handler
@@ -55,7 +55,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Dictionary of model objects vs property change handlers
         /// </summary>
-        private static readonly Dictionary<IModelDictionary, EventHandler> _dictionaryClearedHandlers = new();
+        private static readonly Dictionary<IModelDictionary, EventHandler> _dictionaryClearedHandlers = [];
 
         /// <summary>
         /// Function to generate a dictionary cleared change handler

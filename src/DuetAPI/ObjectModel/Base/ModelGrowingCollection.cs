@@ -79,7 +79,7 @@ namespace DuetAPI.ObjectModel
         /// <returns>Cloned list</returns>
         public object Clone()
         {
-            ModelGrowingCollection<T> clone = new();
+            ModelGrowingCollection<T> clone = [];
             foreach (T item in this)
             {
                 if (item is ICloneable cloneableItem)

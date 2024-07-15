@@ -15,7 +15,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Filament consumption per extruder drive (in mm)
         /// </summary>
-        public ModelCollection<float> Filament { get; } = new ModelCollection<float>();
+        public ModelCollection<float> Filament { get; } = [];
 
         /// <summary>
         /// The filename of the G-code file
@@ -112,7 +112,7 @@ namespace DuetAPI.ObjectModel
         /// Collection of thumbnails parsed from Gcode
         /// </summary>
         [SbcProperty(true)]
-        public ModelCollection<ThumbnailInfo> Thumbnails { get; } = new ModelCollection<ThumbnailInfo>();
+        public ModelCollection<ThumbnailInfo> Thumbnails { get; } = [];
     }
 
     /// <summary>

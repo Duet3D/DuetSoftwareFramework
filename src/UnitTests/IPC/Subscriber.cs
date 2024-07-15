@@ -12,10 +12,10 @@ namespace UnitTests.IPC
         [Test]
         public void GetPathNode()
         {
-            Dictionary<string, object?> root = new();
+            Dictionary<string, object?> root = [];
 
             // state.status
-            object[] pathA = new object[] { "state", "status" };
+            object[] pathA = ["state", "status"];
             object? resultA = DuetControlServer.IPC.Processors.ModelSubscription.GetPathNode(root, pathA);
 
             ClassicAssert.AreEqual(1, root.Count);
@@ -37,7 +37,7 @@ namespace UnitTests.IPC
             }
 
             // boards[0 of 2]/v12/current
-            object[] pathB = new object[] { new ItemPathNode("boards", 0, new object[] { new Board(), new Board() }), "v12", "current" };
+            object[] pathB = [new ItemPathNode("boards", 0, new object[] { new Board(), new Board() }), "v12", "current"];
             object? resultB = DuetControlServer.IPC.Processors.ModelSubscription.GetPathNode(root, pathB);
 
             ClassicAssert.AreEqual(2, root.Count);
@@ -87,7 +87,7 @@ namespace UnitTests.IPC
             }
 
             // move.axes[0 of 2].homed
-            object[] pathC = new object[] { "move", new ItemPathNode("axes", 0, new object[] { new Axis(), new Axis(), new Axis() }), "homed" };
+            object[] pathC = ["move", new ItemPathNode("axes", 0, new object[] { new Axis(), new Axis(), new Axis() }), "homed"];
             object? resultC = DuetControlServer.IPC.Processors.ModelSubscription.GetPathNode(root, pathC);
 
             ClassicAssert.AreEqual(3, root.Count);
@@ -142,7 +142,7 @@ namespace UnitTests.IPC
             }
 
             // tools[0 of 1]/retraction/length
-            object[] pathD = new object[] { new ItemPathNode("tools", 0, new object[] { new Tool() }), "retraction", "length" };
+            object[] pathD = [new ItemPathNode("tools", 0, new object[] { new Tool() }), "retraction", "length"];
             object? resultD = DuetControlServer.IPC.Processors.ModelSubscription.GetPathNode(root, pathD);
 
             ClassicAssert.AreEqual(4, root.Count);

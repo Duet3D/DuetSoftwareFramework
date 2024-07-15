@@ -8,14 +8,9 @@ namespace DuetControlServer.Codes.Pipelines
     /// <summary>
     /// Pipeline element for sending codes to code interceptors (post stage)
     /// </summary>
-    public class Post : PipelineBase
+    /// <param name="processor">Channel processor</param>
+    public class Post(ChannelProcessor processor) : PipelineBase(PipelineStage.Post, processor)
     {
-        /// <summary>
-        /// Constructor of this class
-        /// </summary>
-        /// <param name="processor">Channel processor</param>
-        public Post(ChannelProcessor processor) : base(PipelineStage.Post, processor) { }
-
         /// <summary>
         /// Process an incoming code
         /// </summary>

@@ -14,7 +14,7 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Dictionary of collections vs change handlers
         /// </summary>
-        private static readonly Dictionary<IModelCollection, NotifyCollectionChangedEventHandler> _collectionChangeHandlers = new();
+        private static readonly Dictionary<IModelCollection, NotifyCollectionChangedEventHandler> _collectionChangeHandlers = [];
 
         /// <summary>
         /// Function to generate an object collection change handler

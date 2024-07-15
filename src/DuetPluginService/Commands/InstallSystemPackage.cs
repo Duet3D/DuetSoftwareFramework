@@ -21,7 +21,7 @@ namespace DuetPluginService.Commands
         /// <summary>
         /// Magic value every ZIP file starts with
         /// </summary>
-        private static readonly byte[] ZipSignature = new byte[] { 0x50, 0x4B, 0x03, 0x04 };
+        private static readonly byte[] ZipSignature = [0x50, 0x4B, 0x03, 0x04];
 
         /// <summary>
         /// Check if the given file is a ZIP file

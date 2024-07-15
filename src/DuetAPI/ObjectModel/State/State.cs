@@ -75,7 +75,7 @@ namespace DuetAPI.ObjectModel
         /// List of general-purpose output ports
         /// </summary>
         /// <seealso cref="GpOutputPort"/>
-        public ModelCollection<GpOutputPort?> GpOut { get; } = new ModelCollection<GpOutputPort?>();
+        public ModelCollection<GpOutputPort?> GpOut { get; } = [];
 
         /// <summary>
         /// Laser PWM of the next commanded move (0..1) or null if not applicable
@@ -193,7 +193,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of restore points
         /// </summary>
-        public ModelCollection<RestorePoint> RestorePoints { get; } = new ModelCollection<RestorePoint>();
+        public ModelCollection<RestorePoint> RestorePoints { get; } = [];
 
         /// <summary>
         /// First error on start-up or null if there was none

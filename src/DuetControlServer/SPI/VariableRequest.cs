@@ -7,42 +7,31 @@ namespace DuetControlServer.SPI
     /// <summary>
     /// Internal storage class for variable requests
     /// </summary>
-    public class VariableRequest
+    /// <param name="channel">Where to evaluate the expression</param>
+    /// <param name="createVariable">Whether the variable is supposed to be created</param>
+    /// <param name="varName">Name of the variable</param>
+    /// <param name="expression">Expression to evaluate</param>
+    public class VariableRequest(CodeChannel channel, bool createVariable, string varName, string? expression)
     {
-        /// <summary>
-        /// Constructor of this class
-        /// </summary>
-        /// <param name="channel">Where to evaluate the expression</param>
-        /// <param name="createVariable">Whether the variable is supposed to be created</param>
-        /// <param name="varName">Name of the variable</param>
-        /// <param name="expression">Expression to evaluate</param>
-        public VariableRequest(CodeChannel channel, bool createVariable, string varName, string? expression)
-        {
-            Channel = channel;
-            CreateVariable = createVariable;
-            VariableName = varName;
-            Expression = expression;
-        }
-
         /// <summary>
         /// Where the expression is evaluated
         /// </summary>
-        public CodeChannel Channel { get; }
+        public CodeChannel Channel { get; } = channel;
 
         /// <summary>
         /// Whether the variable is supposed to be created
         /// </summary>
-        public bool CreateVariable { get; }
+        public bool CreateVariable { get; } = createVariable;
 
         /// <summary>
         /// Name of the variable
         /// </summary>
-        public string VariableName { get; }
+        public string VariableName { get; } = varName;
 
         /// <summary>
         /// Expression to set or null if the variable is supposed to be deleted
         /// </summary>
-        public string? Expression { get; }
+        public string? Expression { get; } = expression;
 
         /// <summary>
         /// Whether the request has been sent to the firmware

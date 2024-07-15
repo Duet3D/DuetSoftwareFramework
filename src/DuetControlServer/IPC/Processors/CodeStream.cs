@@ -24,9 +24,9 @@ namespace DuetControlServer.IPC.Processors
         /// This is not really used because this mode reads lines and no JSON objects
         /// </summary>
         public static readonly Type[] SupportedCommands =
-        {
+        [
             typeof(Code)
-        };
+        ];
 
         /// <summary>
         /// Logger instance
@@ -36,7 +36,7 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// List of active subscribers
         /// </summary>
-        private static readonly List<CodeStream> _streams = new();
+        private static readonly List<CodeStream> _streams = [];
 
         /// <summary>
         /// Check if there are any clients waiting for generic messages

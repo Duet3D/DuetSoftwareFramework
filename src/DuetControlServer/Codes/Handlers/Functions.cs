@@ -104,7 +104,7 @@ namespace DuetControlServer.Codes.Handlers
             int i = 0, tokenStart = 0;
             object? lastElement = null;
             StringBuilder lastToken = new();
-            List<object?> items = new();
+            List<object?> items = [];
             while (i <= firstLine.Length)
             {
                 char c = (i < firstLine.Length) ? firstLine[i] : '\0';
@@ -216,7 +216,7 @@ namespace DuetControlServer.Codes.Handlers
                     lastToken.Append(c);
                 }
             }
-            return (items.Count > 0) ? items.ToArray() : new object?[] { null };
+            return (items.Count > 0) ? [.. items] : new object?[] { null };
         }
     }
 }

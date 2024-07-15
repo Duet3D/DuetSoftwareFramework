@@ -94,7 +94,7 @@ namespace DuetPiManagementPlugin.Network
                 }
 
                 // Parser helpers
-                _networks = new();
+                _networks = [];
                 WifiNetwork? network = null;
 
                 int highestSupportedRate = 0;
@@ -125,7 +125,7 @@ namespace DuetPiManagementPlugin.Network
                         }
 
                         // Determine WPA protection type if applicable
-                        List<string> wpaProtection = new();
+                        List<string> wpaProtection = [];
                         if (wpa)
                         {
                             wpaProtection.Add("WPA");

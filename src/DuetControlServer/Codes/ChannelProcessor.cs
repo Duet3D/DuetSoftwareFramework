@@ -12,7 +12,7 @@ namespace DuetControlServer.Codes
     /// Every instance holds the code pipeline elements through which incoming G/M/T-codes are sent.
     /// Note that code files and events disrupting the code flow require their own stack level to maintain the correct order of code execution.
     /// </summary>
-    public class ChannelProcessor
+    public sealed class ChannelProcessor
     {
         /// <summary>
         /// Pipeline stages that support push/pop

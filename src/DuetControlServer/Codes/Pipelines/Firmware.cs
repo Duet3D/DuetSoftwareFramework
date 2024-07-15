@@ -9,14 +9,9 @@ namespace DuetControlServer.Codes.Pipelines
     /// This class is not used by the pipeline itself but indirectly from the SPI channel processor
     /// </summary>
     /// <seealso cref="SPI.Channel.Processor"/>
-    public class Firmware : PipelineBase
+    /// <param name="processor">Channel processor</param>
+    public class Firmware(ChannelProcessor processor) : PipelineBase(PipelineStage.Firmware, processor)
     {
-        /// <summary>
-        /// Constructor of this class
-        /// </summary>
-        /// <param name="processor">Channel processor</param>
-        public Firmware(ChannelProcessor processor) : base(PipelineStage.Firmware, processor) { }
-
         /// <summary>
         /// Wait for the pipeline stage to become idle
         /// </summary>
@@ -37,10 +32,7 @@ namespace DuetControlServer.Codes.Pipelines
         /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
         /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public override Task<bool> FlushAsync(Code code, bool evaluateExpressions = true, bool evaluateAll = true)
-        {
-            return SPI.Interface.FlushAsync(code, evaluateExpressions, evaluateAll);
-        }
+        public override Task<bool> FlushAsync(Code code, bool evaluateExpressions = true, bool evaluateAll = true) => SPI.Interface.FlushAsync(code, evaluateExpressions, evaluateAll);
 
         /// <summary>
         /// Process an incoming code

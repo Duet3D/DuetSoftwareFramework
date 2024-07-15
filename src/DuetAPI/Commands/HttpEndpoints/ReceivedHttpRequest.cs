@@ -17,12 +17,12 @@ namespace DuetAPI.Commands
         /// <summary>
         /// List of HTTP query pairs
         /// </summary>
-        public Dictionary<string, string> Queries { get; set; } = new Dictionary<string, string>();
+        public Dictionary<string, string> Queries { get; set; } = [];
 
         /// <summary>
         /// List of HTTP header pairs
         /// </summary>
-        public Dictionary<string, string> Headers { get; set; } = new Dictionary<string, string>();
+        public Dictionary<string, string> Headers { get; set; } = [];
 
         /// <summary>
         /// Type of the body content

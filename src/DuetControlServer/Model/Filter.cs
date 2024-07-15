@@ -12,12 +12,15 @@ namespace DuetControlServer.Model
     /// <summary>
     /// Provides filter functionality to get partial object model data
     /// </summary>
-    public static class Filter
+    public static partial class Filter
     {
+        [GeneratedRegex(@"(.*)\[([\d,*]+)\]")]
+        private static partial Regex _generateIndexRegex();
+
         /// <summary>
         /// Regular expression to extract name and index from a filter item
         /// </summary>
-        private static readonly Regex _indexRegex = new(@"(.*)\[([\d,*]+)\]");
+        private static readonly Regex _indexRegex = _generateIndexRegex();
 
         /// <summary>
         /// Convert delimited filter strings into an object array that can be used to traverse the object model
@@ -37,7 +40,7 @@ namespace DuetControlServer.Model
         /// <returns>Object array</returns>
         public static object[][] ConvertFilters(IEnumerable<string> filters)
         {
-            List<object[]> convertedFilters = new();
+            List<object[]> convertedFilters = [];
             foreach (string filter in filters)
             {
                 object[] convertedFilter = ConvertFilter(filter, false);
@@ -46,7 +49,7 @@ namespace DuetControlServer.Model
                     convertedFilters.Add(convertedFilter);
                 }
             }
-            return convertedFilters.ToArray();
+            return [.. convertedFilters];
         }
         /// <summary>
         /// Convert a filter string into an object array that can be used to traverse the object model
@@ -66,7 +69,7 @@ namespace DuetControlServer.Model
         /// <returns>Object array</returns>
         public static object[] ConvertFilter(string[] filter)
         {
-            List<object> filterItems = new();
+            List<object> filterItems = [];
             foreach (string filterItem in filter)
             {
                 Match match = _indexRegex.Match(filterItem);
@@ -89,7 +92,7 @@ namespace DuetControlServer.Model
                     filterItems.Add(filterItem);
                 }
             }
-            return filterItems.ToArray();
+            return [.. filterItems];
         }
 
         /// <summary>
@@ -160,7 +163,7 @@ namespace DuetControlServer.Model
         /// <returns>Dictionary holding the results or null if nothing could be found</returns>
         /// <remarks>Make sure the model provider is locked in read-only mode before using this class</remarks>
         /// <seealso cref="DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filter"/>
-        public static Dictionary<string, object?> GetFiltered(object[] filter) => (Dictionary<string, object?>?)InternalGetFiltered(Provider.Get, filter) ?? new Dictionary<string, object?>();
+        public static Dictionary<string, object?> GetFiltered(object[] filter) => (Dictionary<string, object?>?)InternalGetFiltered(Provider.Get, filter) ?? [];
 
         /// <summary>
         /// Get a partial object model with only fields that match the given filter
@@ -169,7 +172,7 @@ namespace DuetControlServer.Model
         /// <returns>Dictionary holding the results or null if nothing could be found</returns>
         /// <remarks>Make sure the model provider is locked in read-only mode before using this class</remarks>
         /// <seealso cref="DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filter"/>
-        public static Dictionary<string, object?> GetFiltered(string filter) => (Dictionary<string, object?>?)InternalGetFiltered(Provider.Get, ConvertFilter(filter, false)) ?? new Dictionary<string, object?>();
+        public static Dictionary<string, object?> GetFiltered(string filter) => (Dictionary<string, object?>?)InternalGetFiltered(Provider.Get, ConvertFilter(filter, false)) ?? [];
 
         /// <summary>
         /// Internal function to find a specific object in the object model
@@ -192,7 +195,7 @@ namespace DuetControlServer.Model
             {
                 if (partialModel is ModelObject model)
                 {
-                    Dictionary<string, object?> result = new();
+                    Dictionary<string, object?> result = [];
                     foreach (KeyValuePair<string, PropertyInfo> property in model.JsonProperties)
                     {
                         if (propertyName == "*" || property.Key == propertyName)

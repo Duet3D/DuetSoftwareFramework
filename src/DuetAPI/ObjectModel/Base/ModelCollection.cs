@@ -14,6 +14,23 @@ namespace DuetAPI.ObjectModel
     public class ModelCollection<T> : ObservableCollection<T>, IModelCollection
     {
         /// <summary>
+        /// Default constructor
+        /// </summary>
+        public ModelCollection() : base() { }
+
+        /// <summary>
+        /// Overloading constructor that takes items for initialization
+        /// </summary>
+        /// <param name="collection">Collection to use for items</param>
+        public ModelCollection(IEnumerable<T> collection) : base(collection) { }
+
+        /// <summary>
+        /// Overloading constructor that takes a list for initialization
+        /// </summary>
+        /// <param name="list">List to use for items</param>
+        public ModelCollection(List<T> list) : base(list) { }
+
+        /// <summary>
         /// Removes all items from the collection
         /// </summary>
         protected override void ClearItems()
@@ -130,7 +147,7 @@ namespace DuetAPI.ObjectModel
         /// <returns>Cloned list</returns>
         public object Clone()
         {
-            ModelCollection<T> clone = new();
+            ModelCollection<T> clone = [];
             foreach (T item in this)
             {
                 if (item is ICloneable cloneableItem)
