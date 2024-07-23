@@ -292,7 +292,7 @@ namespace DuetControlServer.SPI.Channel
         /// <summary>
         /// Block file macro calls if the state is being copied
         /// </summary>
-        private static List<MacroFile> _macrosToStart = [];
+        private static readonly List<MacroFile> _macrosToStart = [];
 
         /// <summary>
         /// Copy the state from another channel processor

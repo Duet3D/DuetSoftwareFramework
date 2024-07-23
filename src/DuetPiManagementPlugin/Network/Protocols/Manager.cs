@@ -70,7 +70,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
         /// <returns>Configuration message</returns>
         public static async Task<Message> ConfigureProtocols(int protocol, bool? enabled, bool secure, int port)
         {
-            Message codeResult;
+            StringBuilder builder = new();
             switch (protocol)
             {
                 // HTTP/HTTPS
@@ -78,15 +78,10 @@ namespace DuetPiManagementPlugin.Network.Protocols
                     // HTTP/HTTPS
                     if (enabled is not null || port > 0)
                     {
-                        codeResult = await HTTP.Configure(enabled, port, secure);
+                        return await HTTP.Configure(enabled, port, secure);
                     }
-                    else
-                    {
-                        StringBuilder builder = new();
-                        await HTTP.Report(builder);
-                        return new Message(MessageType.Success, builder.ToString().TrimEnd());
-                    }
-                    break;
+                    await HTTP.Report(builder);
+                    return new Message(MessageType.Success, builder.ToString().TrimEnd());
 
                 // FTP/SFTP
                 case 1:
@@ -95,30 +90,21 @@ namespace DuetPiManagementPlugin.Network.Protocols
                         // SFTP
                         if (enabled is not null || port > 0)
                         {
-                            codeResult = await SFTP.Configure(enabled, port);
+                            return await SFTP.Configure(enabled, port);
                         }
-                        else
-                        {
-                            StringBuilder builder = new();
-                            SFTP.Report(builder);
-                            return new Message(MessageType.Success, builder.ToString().TrimEnd());
-                        }
+                        SFTP.Report(builder);
+                        return new Message(MessageType.Success, builder.ToString().TrimEnd());
                     }
                     else
                     {
                         // FTP
                         if (enabled is not null || port > 0)
                         {
-                            codeResult = await FTP.Configure(enabled, port);
+                            return await FTP.Configure(enabled, port);
                         }
-                        else
-                        {
-                            StringBuilder builder = new();
-                            FTP.Report(builder);
-                            return new Message(MessageType.Success, builder.ToString().TrimEnd());
-                        }
+                        FTP.Report(builder);
+                        return new Message(MessageType.Success, builder.ToString().TrimEnd());
                     }
-                    break;
 
                 // Telnet/SSH
                 case 2:
@@ -127,37 +113,32 @@ namespace DuetPiManagementPlugin.Network.Protocols
                         // SSH
                         if (enabled is not null || port > 0)
                         {
-                            codeResult = await SSH.Configure(enabled, port);
+                            return await SSH.Configure(enabled, port);
                         }
-                        else
-                        {
-                            StringBuilder builder = new();
-                            SSH.Report(builder);
-                            return new Message(MessageType.Success, builder.ToString().TrimEnd());
-                        }
+                        SSH.Report(builder);
+                        return new Message(MessageType.Success, builder.ToString().TrimEnd());
                     }
                     else
                     {
                         // Telnet
                         if (enabled is not null || port > 0)
                         {
-                            codeResult = await Telnet.Configure(enabled, port);
+                            return await Telnet.Configure(enabled, port);
                         }
-                        else
-                        {
-                            StringBuilder builder = new();
-                            Telnet.Report(builder);
-                            return new Message(MessageType.Success, builder.ToString().TrimEnd());
-                        }
+                        Telnet.Report(builder);
+                        return new Message(MessageType.Success, builder.ToString().TrimEnd());
                     }
-                    break;
+
+                // Multicast is not supported (3)
+
+                // MQTT is handled by DuetControlServer
+                case 4:
+                    return new Message();
 
                 // Unknown protocol
                 default:
-                    codeResult = new Message(MessageType.Error, $"Unknown protocol number {protocol}");
-                    break;
+                    return new Message(MessageType.Error, $"Unknown protocol number {protocol}");
             }
-            return codeResult;
         }
 
         /// <summary>

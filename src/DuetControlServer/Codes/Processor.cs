@@ -94,10 +94,7 @@ namespace DuetControlServer.Codes
         /// <returns>Whether the codes have been flushed successfully</returns>
         public static async Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true, bool syncFileStreams = false, bool ifExecuting = true)
         {
-            if (code is null)
-            {
-                throw new ArgumentNullException(nameof(code));
-            }
+            ArgumentNullException.ThrowIfNull(code);
 
             // Wait for the pending codes on this channel to go
             if (!await _processors[(int)code.Channel].FlushAsync(code, evaluateExpressions, evaluateAll))

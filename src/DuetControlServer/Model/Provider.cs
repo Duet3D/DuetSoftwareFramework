@@ -18,7 +18,7 @@ namespace DuetControlServer.Model
     /// Make sure to access the machine model only when atomic operations are performed
     /// so that pending updates can be performed as quickly as possible.
     /// </summary>
-    public static class Provider
+    public static partial class Provider
     {
         /// <summary>
         /// Logger instance
@@ -209,6 +209,9 @@ namespace DuetControlServer.Model
             Get.Network.Name = Environment.MachineName;
         }
 
+        [GeneratedRegex(@"^Hardware\s*:\s*(\w+)", RegexOptions.IgnoreCase)]
+        private static partial Regex _hardwareRegex();
+
         /// <summary>
         /// Get the CPU hardware
         /// </summary>
@@ -217,7 +220,7 @@ namespace DuetControlServer.Model
         {
             try
             {
-                Regex hardwareRegex = new(@"^Hardware\s*:\s*(\w+)", RegexOptions.IgnoreCase);
+                Regex hardwareRegex = _hardwareRegex();
                 IEnumerable<string> procInfo = File.ReadLines("/proc/cpuinfo");
                 foreach (string line in procInfo)
                 {
@@ -235,6 +238,9 @@ namespace DuetControlServer.Model
             return null;
         }
 
+        [GeneratedRegex(@"^cpu\d", RegexOptions.IgnoreCase)]
+        private static partial Regex _cpuRegex();
+
         /// <summary>
         /// Get the number of processor cores/threads
         /// </summary>
@@ -243,7 +249,7 @@ namespace DuetControlServer.Model
         {
             try
             {
-                Regex cpuIndexRegex = new(@"^cpu\d", RegexOptions.IgnoreCase);
+                Regex cpuIndexRegex = _cpuRegex();
                 IEnumerable<string> procInfo = File.ReadLines("/proc/stat");
 
                 int numCores = 0;
@@ -290,6 +296,9 @@ namespace DuetControlServer.Model
             return null;
         }
 
+        [GeneratedRegex(@"^Model\s*:\s*(.+)", RegexOptions.IgnoreCase)]
+        private static partial Regex _modelRegex();
+
         /// <summary>
         /// Get the SBC model name
         /// </summary>
@@ -298,7 +307,7 @@ namespace DuetControlServer.Model
         {
             try
             {
-                Regex modelRegex = new(@"^Model\s*:\s*(.+)", RegexOptions.IgnoreCase);
+                Regex modelRegex = _modelRegex();
                 IEnumerable<string> procInfo = File.ReadLines("/proc/cpuinfo");
                 foreach (string line in procInfo)
                 {
@@ -316,6 +325,9 @@ namespace DuetControlServer.Model
             return null;
         }
 
+        [GeneratedRegex(@"^Serial\s*:\s*(\w+)", RegexOptions.IgnoreCase)]
+        private static partial Regex _serialRegex();
+
         /// <summary>
         /// Get the SBC serial
         /// </summary>
@@ -324,7 +336,7 @@ namespace DuetControlServer.Model
         {
             try
             {
-                Regex modelRegex = new(@"^Serial\s*:\s*(\w+)", RegexOptions.IgnoreCase);
+                Regex modelRegex = _serialRegex();
                 IEnumerable<string> procInfo = File.ReadLines("/proc/cpuinfo");
                 foreach (string line in procInfo)
                 {
@@ -362,6 +374,9 @@ namespace DuetControlServer.Model
             return null;
         }
 
+        [GeneratedRegex(@"^MemTotal:\s*(\d+)\s*(kB|KiB)", RegexOptions.IgnoreCase)]
+        private static partial Regex _memTotalRegex();
+
         /// <summary>
         /// Get the total memory of this SBC
         /// </summary>
@@ -372,7 +387,7 @@ namespace DuetControlServer.Model
             {
                 try
                 {
-                    Regex totalMemoryRegex = new(@"^MemTotal:\s*(\d+)( kB| KiB)", RegexOptions.IgnoreCase);
+                    Regex totalMemoryRegex = _memTotalRegex();
                     IEnumerable<string> memoryInfo = File.ReadAllLines("/proc/meminfo");
                     foreach (string line in memoryInfo)
                     {

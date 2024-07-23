@@ -20,7 +20,7 @@ namespace DuetPiManagementPlugin
     /// Main class of this program.
     /// Note it is tailored for DuetPi, so most of the file paths etc. are hard-coded (for now)
     /// </summary>
-    public static class Program
+    public static partial class Program
     {
         /// <summary>
         /// Version of this application
@@ -63,6 +63,9 @@ namespace DuetPiManagementPlugin
         /// Global cancellation token that is triggered when the program is supposed to terminate
         /// </summary>
         public static readonly CancellationToken CancellationToken = CancelSource.Token;
+
+        [GeneratedRegex(@"^(un)?stable(-\d+\.\d+)?$")]
+        private static partial Regex _pkgFeedVersionRegex();
 
         /// <summary>
         /// Entry point of this application
@@ -345,13 +348,18 @@ namespace DuetPiManagementPlugin
                         case 586:
                             try
                             {
-                                if (code.TryGetInt('P', out int protocol))
+                                if (code.MinorNumber == 4)
+                                {
+                                    // M586.4 is handled by DCS
+                                    await Connection.IgnoreCode();
+                                }
+                                else if (code.TryGetInt('P', out int protocol))
                                 {
                                     code.TryGetBool('S', out bool? enabled);
                                     Message result = await Network.Protocols.Manager.ConfigureProtocols(protocol, enabled, code.GetBool('T', false), code.GetInt('R', 0));
-                                    if (string.IsNullOrWhiteSpace(result.Content) && code.HasParameter('C'))
+                                    if (string.IsNullOrWhiteSpace(result.Content) && (protocol == 4 || code.HasParameter('C')))
                                     {
-                                        // Let DSF/RRF process the combined C parameter
+                                        // Let DSF/RRF process M586 P4 (MQTT) or the combined C parameter
                                         await Connection.IgnoreCode(CancellationToken);
                                     }
                                     else
@@ -485,7 +493,7 @@ namespace DuetPiManagementPlugin
                                 // Check if we need to change the package feed
                                 if (code.TryGetString('F', out string? packageFeed))
                                 {
-                                    if (!Regex.IsMatch(packageFeed, @"^(un)?stable(-\d+\.\d+)?$") && packageFeed != "dev")
+                                    if (!_pkgFeedVersionRegex().IsMatch(packageFeed) && packageFeed != "dev")
                                     {
                                         await Connection.ResolveCode(MessageType.Error, "Invalid package feed");
                                         break;

@@ -391,8 +391,15 @@ namespace DuetControlServer.Model
         /// </summary>
         private static readonly object _nullResult = new();
 
-        // Convert an object to a string value
-#warning This function cannot output empty arrays yet
+        /// <summary>
+        /// Convert an object to a string value
+        /// </summary>
+        /// <param name="obj">Object to convert</param>
+        /// <param name="wantsCount">Whether the count or length is requested</param>
+        /// <param name="encodeStrings">Whether strings are supposed to be encoded for further evaluation</param>
+        /// <param name="code">Code requesting the conversion</param>
+        /// <returns>Converted object</returns>
+        /// <exception cref="CodeParserException">Thrown on invalid request</exception>
         private static string ObjectToString(object? obj, bool wantsCount, bool encodeStrings, Code code)
         {
             static string encodeString(string value)
@@ -440,9 +447,16 @@ namespace DuetControlServer.Model
             {
                 return encodeStrings ? $"\"{dateTimeValue:s}\"" : dateTimeValue.ToString("s");
             }
-            if (wantsCount && obj is IList list)
+            if (obj is IList list)
             {
-                return list.Count.ToString();
+                if (wantsCount)
+                {
+                    return list.Count.ToString();
+                }
+                if (list.Count == 0)
+                {
+                    return "vector(0,0)";
+                }
             }
             if (obj is bool[] boolArray)
             {

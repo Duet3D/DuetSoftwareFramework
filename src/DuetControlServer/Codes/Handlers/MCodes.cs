@@ -533,6 +533,7 @@ namespace DuetControlServer.Codes.Handlers
                 // - S"<level>" sets the log level where the level corresponds to the available NLog log levels
                 // - Onnn can be used to turn on/off logging via generic messages (accessible then e.g. via web UI)
                 case 111:
+                {
                     if (code.TryGetInt('P', out int pParam) && pParam == -1)
                     {
                         if (await Processor.FlushAsync(code))
@@ -576,6 +577,7 @@ namespace DuetControlServer.Codes.Handlers
                         }
                     }
                     break;
+                }
 
                 // Emergency Stop
                 case 112:
@@ -602,6 +604,20 @@ namespace DuetControlServer.Codes.Handlers
                         return new Message();
                     }
                     throw new OperationCanceledException();
+
+                // Publish MQTT message
+                case 118:
+                {
+                    if (code.TryGetInt('L', out int lParam) && lParam == 6)
+                    {
+                        if (await Processor.FlushAsync(code))
+                        {
+                            return await MQTT.PublishAsync(code);
+                        }
+                        throw new OperationCanceledException();
+                    }
+                    break;
+                }
 
                 // Immediate DSF diagnostics
                 case 122:
@@ -871,6 +887,17 @@ namespace DuetControlServer.Codes.Handlers
                 case 586:
                     if (await Processor.FlushAsync(code))
                     {
+                        // Configure MQTT
+                        if (code.MinorNumber == 4)
+                        {
+                            return MQTT.Configure(code);
+                        }
+                        else if (code.TryGetInt('P', out int pParam) && pParam == 4)
+                        {
+                            return await MQTT.ConfigureProtocolAsync(code);
+                        }
+
+                        // Set CORS site
                         if (code.TryGetString('C', out string? corsSite))
                         {
                             using (await Provider.AccessReadWriteAsync())
@@ -880,6 +907,7 @@ namespace DuetControlServer.Codes.Handlers
                             return new Message();
                         }
 
+                        // Report CORS state
                         using (await Provider.AccessReadOnlyAsync())
                         {
                             if (string.IsNullOrEmpty(Provider.Get.Network.CorsSite))
@@ -909,7 +937,7 @@ namespace DuetControlServer.Codes.Handlers
                             // Try to fork the file and report an error if anything went wrong
                             using (await JobProcessor.LockAsync(code.CancellationToken))
                             {
-                                Message result = await JobProcessor.ForkAsync(code);
+                                Message result = await JobProcessor.ForkAsync();
                                 if (result.Type != MessageType.Success)
                                 {
                                     return result;

@@ -302,9 +302,8 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Fork the file being processed to execute concurrently
         /// </summary>
-        /// <param name="code">Code initiating the fork</param>
         /// <returns>Message result</returns>
-        public static async Task<Message> ForkAsync(Code code)
+        public static async Task<Message> ForkAsync()
         {
             if (_file is null)
             {
