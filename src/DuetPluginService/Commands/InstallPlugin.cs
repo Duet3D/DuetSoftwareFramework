@@ -56,12 +56,6 @@ namespace DuetPluginService.Commands
                     await InstallPackage(package);
                 }
 
-                foreach (string package in plugin.SbcPythonDependencies)
-                {
-                    _logger.Info("Installing Python package {0}", package);
-                    await InstallPythonPackage(package);
-                }
-
                 // Apply security profile for this plugin unless it gets root permissions anyway
                 if (!plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser))
                 {
@@ -241,6 +235,15 @@ namespace DuetPluginService.Commands
                 {
                     await JsonSerializer.SerializeAsync(manifestFile, plugin, JsonHelper.DefaultJsonOptions);
                 }
+
+                // Install Python packages. Because we're using a venv, this must happen after all other installation steps
+                if (plugin.SbcPythonDependencies.Count > 0)
+                {
+                    _logger.Debug("Installing Python dependencies");
+                    await InstallPythonPackages(plugin.Id);
+                }
+
+                // Done
                 _logger.Info("File installation complete");
             }
 
@@ -260,12 +263,7 @@ namespace DuetPluginService.Commands
         private static async Task<Plugin> ExtractManifest(ZipArchive zipArchive)
         {
             // Extract the plugin manifest
-            ZipArchiveEntry? manifestFile = zipArchive.GetEntry("plugin.json");
-            if (manifestFile is null)
-            {
-                throw new ArgumentException("plugin.json not found in the ZIP file");
-            }
-
+            ZipArchiveEntry? manifestFile = zipArchive.GetEntry("plugin.json") ?? throw new ArgumentException("plugin.json not found in the ZIP file");
             Plugin plugin = new();
             await using (Stream manifestStream = manifestFile.Open())
             {
@@ -327,12 +325,12 @@ namespace DuetPluginService.Commands
         /// <summary>
         /// Install a Python package
         /// </summary>
-        /// <param name="package">Name of the package to install</param>
-        private static async Task InstallPythonPackage(string package)
+        /// <param name="plugin">Plugin identifier</param>
+        private static async Task InstallPythonPackages(string plugin)
         {
-            if (!Program.IsRoot)
+            if (Program.IsRoot)
             {
-                throw new ArgumentException("Cannot install packages as regular user");
+                throw new ArgumentException("Cannot install Python packages as root");
             }
 
             using (await _packageLock.LockAsync(Program.CancellationToken))
@@ -340,7 +338,9 @@ namespace DuetPluginService.Commands
                 ProcessStartInfo startInfo = new()
                 {
                     FileName = Settings.InstallPythonPackageCommand,
-                    Arguments = Settings.InstallPythonPackageArguments.Replace("{package}", package)
+                    Arguments = Settings.InstallPythonPackageArguments
+                        .Replace("{manifestFile}", Path.Combine(Settings.PluginDirectory, plugin + ".json"))
+                        .Replace("{pluginPath}", Path.Combine(Settings.PluginDirectory, plugin))
                 };
                 foreach (var kv in Settings.InstallPackageEnvironment)
                 {
@@ -353,7 +353,7 @@ namespace DuetPluginService.Commands
                     await process.WaitForExitAsync(Program.CancellationToken);
                     if (process.ExitCode != 0)
                     {
-                        throw new ArgumentException($"Failed to install package {package}, package manager exited with code {process.ExitCode}");
+                        throw new ArgumentException($"Failed to install packages for plugin {plugin}, package manager exited with code {process.ExitCode}");
                     }
                 }
             }

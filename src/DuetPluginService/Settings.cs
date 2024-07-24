@@ -89,12 +89,12 @@ namespace DuetPluginService
         /// <summary>
         /// Command to install third-party Python packages
         /// </summary>
-        public static string InstallPythonPackageCommand { get; set; } = "/usr/bin/pip3";
+        public static string InstallPythonPackageCommand { get; set; } = "/opt/dsf/bin/pipInstall2.py";
 
         /// <summary>
         /// Command-line arguments to install third-party Python packages
         /// </summary>
-        public static string InstallPythonPackageArguments { get; set; } = "install {package}";
+        public static string InstallPythonPackageArguments { get; set; } = "-m {manifestFile} -p {pluginPath}";
 
         /// <summary>
         /// Environment variables for the installation command
