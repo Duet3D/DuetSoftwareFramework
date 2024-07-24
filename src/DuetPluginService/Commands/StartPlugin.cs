@@ -83,19 +83,18 @@ namespace DuetPluginService.Commands
                 // Start the plugin process
                 ProcessStartInfo startInfo = new()
                 {
-                    FileName = sbcExecutable,
-                    Arguments = plugin.SbcExecutableArguments,
+                    FileName = (plugin.SbcPythonDependencies.Count == 0) ? sbcExecutable : Settings.PythonLaunchCommand,
+                    Arguments = (plugin.SbcPythonDependencies.Count == 0) ? plugin.SbcExecutableArguments : Settings.PythonLaunchArguments
+                        .Replace("{pluginDir}", Path.Combine(Settings.PluginDirectory, plugin.Id))
+                        .Replace("{command}", sbcExecutable)
+                        .Replace("{args}", (plugin.SbcExecutableArguments ?? string.Empty).Replace("'", "\\'")),
                     WorkingDirectory = Path.GetDirectoryName(sbcExecutable),
                     RedirectStandardError = plugin.SbcOutputRedirected,
                     RedirectStandardOutput = plugin.SbcOutputRedirected
                 };
+                _logger.Info("Launching {0} {1}", startInfo.FileName, startInfo.Arguments);
 
-                Process? process = Process.Start(startInfo);
-                if (process is null)
-                {
-                    throw new IOException($"Failed to create process {sbcExecutable}");
-                }
-
+                Process? process = Process.Start(startInfo) ?? throw new IOException($"Failed to create process {sbcExecutable}");
                 DataReceivedEventHandler outputHandler = MakeOutputHandler(Plugin, MessageType.Success);
                 DataReceivedEventHandler errorHandler = MakeOutputHandler(Plugin, MessageType.Error);
                 if (plugin.SbcOutputRedirected)

@@ -125,6 +125,16 @@ namespace DuetPluginService
         public static string UninstallLocalPackageArguments { get; set; } = "-r {package}";
 
         /// <summary>
+        /// Command to launch Python plugin scripts that have a virtual environment
+        /// </summary>
+        public static string PythonLaunchCommand { get; set; } = "/bin/bash";
+
+        /// <summary>
+        /// Command-line arguments to invoke Python scripts with virtual environments
+        /// </summary>
+        public static string PythonLaunchArguments { get; set; } = "--rcfile {pluginDir}/venv/bin/activate -c \"{command} {args}\"";
+
+        /// <summary>
         /// Timeout in ms for SIGTERM requests. When it expires plugin processes are forcefully killed
         /// </summary>
         public static int StopTimeout { get; set; } = 4000;
