@@ -94,15 +94,15 @@ namespace DuetControlServer.Utility
                     return new Message(MessageType.Error, "MQTT client is already connected");
                 }
 
-                _factory ??= new MqttFactory();
-                var client = _factory.CreateMqttClient();
-
                 // Connect to the server
                 try
                 {
                     var options = _clientOptionsBuilder
                         .WithTcpServer(code.GetString('H'), code.GetInt('R', 1883))
                         .Build();
+
+                    _factory ??= new MqttFactory();
+                    var client = _factory.CreateMqttClient();
                     await client.ConnectAsync(options, code.CancellationToken);
                     _client = client;
                 }
