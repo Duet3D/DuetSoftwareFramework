@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace DuetControlServer.Utility
 {
+    /// <summary>
+    /// Static class holding functions for MQTT communication
+    /// </summary>
     public static class MQTT
     {
         private static MqttClientOptionsBuilder? _clientOptionsBuilder = null;
