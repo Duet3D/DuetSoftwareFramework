@@ -43,6 +43,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DocGen", "DocGen\DocGen.csp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetHttpClient", "DuetHttpClient\DuetHttpClient.csproj", "{B0EC5384-D88E-44AA-8CB1-79BB92369699}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SourceGenerators", "SourceGenerators\SourceGenerators.csproj", "{3F5FBCF1-D22D-4DBD-877C-F5A4BA7890AB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -116,6 +118,10 @@ Global
 		{B0EC5384-D88E-44AA-8CB1-79BB92369699}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B0EC5384-D88E-44AA-8CB1-79BB92369699}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B0EC5384-D88E-44AA-8CB1-79BB92369699}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F5FBCF1-D22D-4DBD-877C-F5A4BA7890AB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F5FBCF1-D22D-4DBD-877C-F5A4BA7890AB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F5FBCF1-D22D-4DBD-877C-F5A4BA7890AB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F5FBCF1-D22D-4DBD-877C-F5A4BA7890AB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -10,7 +10,7 @@ namespace DuetAPI.ObjectModel
     /// Representation of the Duet3D object model
     /// </summary>
     [JsonConverter(typeof(ObjectModelConverter))]
-    public class ObjectModel : ModelObject
+    public partial class ObjectModel : ModelObject
     {
         /// <summary>
         /// List of connected boards
@@ -162,56 +162,6 @@ namespace DuetAPI.ObjectModel
         /// <param name="jsonElement">Element to update this intance from</param>
         /// <returns>Whether the key could be updated</returns>
         public bool UpdateFromJson(string key, JsonElement jsonElement) => InternalUpdateFromJson(key, jsonElement, false);
-
-        /// <summary>
-        /// Update the whole or a specific key of this instance from a given JSON element
-        /// </summary>
-        /// <param name="key">Property name to update or null if the whole object model is supposed to be updated</param>
-        /// <param name="jsonElement">Element to update this intance from</param>
-        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
-        /// <param name="offset">Index offset (collection keys only)</param>
-        /// <param name="last">Whether this is the last update (collection keys only)</param>
-        /// <returns>Whether the key could be updated</returns>
-        private bool InternalUpdateFromJson(string? key, JsonElement jsonElement, bool ignoreSbcProperties, int offset = 0, bool last = true)
-        {
-            if (string.IsNullOrEmpty(key))
-            {
-                UpdateFromJson(jsonElement, ignoreSbcProperties);
-                return true;
-            }
-
-            if (JsonProperties.TryGetValue(key!, out PropertyInfo? property))
-            {
-                if (ignoreSbcProperties && Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
-                {
-                    // Skip this field if it must not be updated from RRF
-                    return true;
-                }
-
-                object? propertyValue = property.GetValue(this);
-                if (propertyValue is IModelCollection modelCollection)
-                {
-                    modelCollection.UpdateFromJson(jsonElement, ignoreSbcProperties, offset, last);
-                    return true;
-                }
-                if (propertyValue is IModelObject modelObject)
-                {
-                    modelObject.UpdateFromJson(jsonElement, ignoreSbcProperties);
-                    return true;
-                }
-
-#if VERIFY_OBJECT_MODEL
-                Console.WriteLine("[warn] Missing key type handler for {0}", key);
-            }
-            else
-            {
-                Console.WriteLine("[warn] Missing property: {0} = {1}", key, jsonElement.GetRawText());
-#endif
-            }
-
-            // Failed to find a property
-            return false;
-        }
 
         /// <summary>
         /// Convert this instance to a JSON text

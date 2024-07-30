@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DuetAPISrcGen": {
+      "commandName": "DebugRoslynComponent",
+      "targetProject": "..\\DuetAPI\\DuetAPI.csproj"
+    }
+  }
+}

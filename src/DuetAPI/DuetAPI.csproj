@@ -6,6 +6,9 @@
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<Description>Official API library for Duet Software Framework (Duet 3) by Duet3D</Description>
 		<PackageIcon>duet_teardrop_wifi_large.png</PackageIcon>
+
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>Generated</CompilerGeneratedFilesOutputPath>
 	</PropertyGroup>
 
 	<PropertyGroup>
@@ -27,4 +30,8 @@
 		</PackageReference>
 		<PackageReference Include="System.Text.Json" Version="8.0.4" />
 	</ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SourceGenerators\SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
 </Project>
