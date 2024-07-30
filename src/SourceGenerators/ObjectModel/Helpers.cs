@@ -1,4 +1,6 @@
-﻿using Microsoft.CodeAnalysis.CSharp.Syntax;
+﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,9 +10,9 @@ namespace SourceGenerators.ObjectModel
 {
     internal static class Helpers
     {
-        public static string GetJsonPropertyName(PropertyDeclarationSyntax pds)
+        public static string GetJsonPropertyName(this PropertyDeclarationSyntax propertySyntax)
         {
-            string name = pds.Identifier.ValueText;
+            string name = propertySyntax.Identifier.ValueText;
             if (name == "SBC")
             {
                 return "sbc";
@@ -18,14 +20,14 @@ namespace SourceGenerators.ObjectModel
             return char.ToLowerInvariant(name[0]) + name.Substring(1);
         }
 
-        public static bool IsSettable(PropertyDeclarationSyntax pds)
+        public static bool HasSetter(this PropertyDeclarationSyntax propertySyntax)
         {
-            return pds.AccessorList?.Accessors.Any(a => a.Keyword.ValueText == "set") ?? false;
+            return propertySyntax.AccessorList != null && propertySyntax.AccessorList.Accessors.Any(SyntaxKind.SetAccessorDeclaration);
         }
 
-        public static bool IsSbcProperty(PropertyDeclarationSyntax pds)
+        public static bool IsSbcProperty(this PropertyDeclarationSyntax propertySyntax)
         {
-            return pds.AttributeLists.Any(al => al.Attributes.Any(a => a.Name.ToString() == "SbcProperty"));
+            return propertySyntax.AttributeLists.Any(al => al.Attributes.Any(a => a.Name.ToString() == "SbcProperty"));
         }
     }
 }

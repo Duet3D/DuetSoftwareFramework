@@ -6,12 +6,21 @@
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<Description>Official API library for Duet Software Framework (Duet 3) by Duet3D</Description>
 		<PackageIcon>duet_teardrop_wifi_large.png</PackageIcon>
-
-    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
-    <CompilerGeneratedFilesOutputPath>Generated</CompilerGeneratedFilesOutputPath>
 	</PropertyGroup>
 
-	<PropertyGroup>
+  <PropertyGroup>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>Generated</CompilerGeneratedFilesOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SourceGenerators\SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+
+    <!-- Removing the generated files from compilation, adding them back as non-content files -->
+    <Compile Remove="$(CompilerGeneratedFilesOutputPath)/**/*.cs" />
+    <None Include="$(CompilerGeneratedFilesOutputPath)/**/*.cs" />
+  </ItemGroup>
+  
+  <PropertyGroup>
 		<DocumentationFile>DuetAPI.xml</DocumentationFile>
 		<PackageTags>Duet Duet3 DSF DuetSoftwareFramework</PackageTags>
 	</PropertyGroup>
@@ -30,8 +39,4 @@
 		</PackageReference>
 		<PackageReference Include="System.Text.Json" Version="8.0.4" />
 	</ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\SourceGenerators\SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-  </ItemGroup>
 </Project>

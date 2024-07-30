@@ -279,3 +279,6 @@ src/LinuxApi/LinuxApi.xml
 
 # VSCode
 .vscode/*
+
+# Source Generators
+src/DuetAPI/Generated
