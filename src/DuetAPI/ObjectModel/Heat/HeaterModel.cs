@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the way the heater heats up
     /// </summary>
-    public sealed class HeaterModel : ModelObject
+    public partial class HeaterModel : ModelObject
     {
         /// <summary>
         /// Cooling rate exponent

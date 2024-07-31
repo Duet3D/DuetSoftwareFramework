@@ -3,7 +3,7 @@
     /// <summary>
     /// Parameters describing input shaping
     /// </summary>
-    public sealed class InputShaping : ModelObject
+    public partial class InputShaping : ModelObject
     {
         /// <summary>
         /// Amplitudes of the input shaper

@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about hangprinter kinematics
     /// </summary>
-    public sealed class HangprinterKinematics : Kinematics
+    public partial class HangprinterKinematics : Kinematics
     {
 		/// <summary>
 		/// Anchor configurations for A, B, C, Dz

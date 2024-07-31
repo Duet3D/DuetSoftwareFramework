@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a layer from a file being printed
     /// </summary>
-    public sealed class Layer : ModelObject
+    public partial class Layer : ModelObject
     {
         /// <summary>
         /// Duration of the layer (in s)

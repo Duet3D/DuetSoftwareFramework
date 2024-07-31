@@ -326,7 +326,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="other">Other instance</param>
         /// <returns>Object differences or null if both instances are equal</returns>
-        public object? FindDifferences(IModelObject? other)
+        public object? FindDifferences(IStaticModelObject? other)
         {
             // Check the types
             if (other is not ModelDictionary<TValue> otherDictionary)
@@ -425,7 +425,7 @@ namespace DuetAPI.ObjectModel
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         /// <remarks>Accepts null as the JSON value to clear existing items</remarks>
-        public IModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public IStaticModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {

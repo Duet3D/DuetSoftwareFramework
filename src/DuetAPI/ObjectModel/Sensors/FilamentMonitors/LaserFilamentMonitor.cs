@@ -3,7 +3,7 @@
     /// <summary>
     /// Calibrated properties of a laser filament monitor
     /// </summary>
-    public sealed class LaserFilamentMonitorCalibrated : ModelObject
+    public partial class LaserFilamentMonitorCalibrated : ModelObject
     {
         /// <summary>
         /// Calibration factor of this sensor

@@ -3,7 +3,7 @@
     /// <summary>
     /// Delta kinematics
     /// </summary>
-    public sealed class DeltaKinematics : Kinematics
+    public partial class DeltaKinematics : Kinematics
     {
         /// <summary>
         /// Delta radius (in mm)

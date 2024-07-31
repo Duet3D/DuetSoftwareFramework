@@ -3,5 +3,5 @@
     /// <summary>
     /// Kinematics class for polar kinematics
     /// </summary>
-    public class PolarKinematics : Kinematics { }
+    public partial class PolarKinematics : Kinematics { }
 }

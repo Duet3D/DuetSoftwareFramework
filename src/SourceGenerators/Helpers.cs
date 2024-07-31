@@ -1,12 +1,9 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
-namespace SourceGenerators.ObjectModel
+namespace SourceGenerators
 {
     internal static class Helpers
     {
@@ -18,6 +15,23 @@ namespace SourceGenerators.ObjectModel
                 return "sbc";
             }
             return char.ToLowerInvariant(name[0]) + name.Substring(1);
+        }
+
+        public static string GetPropertyType(this PropertyDeclarationSyntax propertySyntax)
+        {
+            if (propertySyntax.Type is NullableTypeSyntax nts)
+            {
+                if (nts.ElementType is GenericNameSyntax gns)
+                {
+                    return gns.Identifier.ValueText;
+                }
+                return nts.ElementType.ToString();
+            }
+            else if (propertySyntax.Type is GenericNameSyntax gns)
+            {
+                return gns.Identifier.ValueText;
+            }
+            return propertySyntax.Type.ToString();
         }
 
         public static bool HasSetter(this PropertyDeclarationSyntax propertySyntax)

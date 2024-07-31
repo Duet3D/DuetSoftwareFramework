@@ -3,7 +3,7 @@
     /// <summary>
     /// This represents an accelerometer
     /// </summary>
-    public sealed class Accelerometer : ModelObject
+    public partial class Accelerometer : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Orientation of the accelerometer

@@ -74,12 +74,12 @@ namespace DuetAPI.ObjectModel
 
             // Update common items
             Type itemType = typeof(T);
-            if (typeof(IModelObject).IsAssignableFrom(itemType))
+            if (typeof(IStaticModelObject).IsAssignableFrom(itemType))
             {
                 for (int i = 0; i < Math.Min(Count, other.Count); i++)
                 {
-                    IModelObject myItem = (IModelObject)this[i]!;
-                    IModelObject otherItem = (IModelObject)other[i]!;
+                    IStaticModelObject myItem = (IStaticModelObject)this[i]!;
+                    IStaticModelObject otherItem = (IStaticModelObject)other[i]!;
                     if (myItem is null || otherItem is null)
                     {
                         this[i] = (T)otherItem!;
@@ -169,7 +169,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="other">Other instance</param>
         /// <returns>Object differences or null if both instances are equal</returns>
-        public object? FindDifferences(IModelObject other)
+        public object? FindDifferences(IStaticModelObject other)
         {
             // Check the types
             if (other is not ModelCollection<T> otherList)
@@ -182,13 +182,13 @@ namespace DuetAPI.ObjectModel
             // Compare the collections
             bool hadDiffs = (Count != otherList.Count);
             IList diffs = new object[Count];
-            if (typeof(IModelObject).IsAssignableFrom(itemType))
+            if (typeof(IStaticModelObject).IsAssignableFrom(itemType))
             {
                 for (int i = 0; i < Count; i++)
                 {
                     if (i < otherList.Count)
                     {
-                        IModelObject myItem = (IModelObject)this[i]!, otherItem = (IModelObject)otherList[i]!;
+                        IStaticModelObject myItem = (IStaticModelObject)this[i]!, otherItem = (IStaticModelObject)otherList[i]!;
                         if (otherItem is null || myItem is null || otherItem.GetType() != myItem.GetType())
                         {
                             hadDiffs = myItem != otherItem;
@@ -240,7 +240,7 @@ namespace DuetAPI.ObjectModel
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         /// <remarks>Accepts null as the JSON value to clear existing items</remarks>
-        public IModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public IStaticModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {
@@ -272,12 +272,12 @@ namespace DuetAPI.ObjectModel
             }
 
             Type itemType = typeof(T);
-            if (typeof(IModelObject).IsAssignableFrom(itemType))
+            if (typeof(IStaticModelObject).IsAssignableFrom(itemType))
             {
                 // Update model items
                 for (int i = offset; i < Math.Min(Count, offset + arrayLength); i++)
                 {
-                    IModelObject item = (IModelObject)this[i]!;
+                    IStaticModelObject item = (IStaticModelObject)this[i]!;
                     JsonElement jsonItem = jsonElement[i - offset];
                     if (jsonItem.ValueKind == JsonValueKind.Null)
                     {
@@ -288,7 +288,7 @@ namespace DuetAPI.ObjectModel
                     }
                     else
                     {
-                        item ??= (IModelObject)Activator.CreateInstance(itemType)!;
+                        item ??= (IStaticModelObject)Activator.CreateInstance(itemType)!;
                         T? updatedItem = (T?)item.UpdateFromJson(jsonItem, ignoreSbcProperties)!;
                         if (!ReferenceEquals(this[i], updatedItem))
                         {
@@ -307,7 +307,7 @@ namespace DuetAPI.ObjectModel
                     }
                     else
                     {
-                        IModelObject? newItem = (IModelObject?)Activator.CreateInstance(itemType)!;
+                        IStaticModelObject? newItem = (IStaticModelObject?)Activator.CreateInstance(itemType)!;
                         Add((T?)newItem.UpdateFromJson(jsonItem, ignoreSbcProperties)!);
                     }
                 }

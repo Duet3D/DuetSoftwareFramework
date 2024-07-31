@@ -7,7 +7,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Information about a third-party plugin
     /// </summary>
-    public class PluginManifest : ModelObject
+    public partial class PluginManifest : ModelObject
     {
         /// <summary>
         /// Identifier of this plugin. May consist of letters and digits only (max length 32 chars)

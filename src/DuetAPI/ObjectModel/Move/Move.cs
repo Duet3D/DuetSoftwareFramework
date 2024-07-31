@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the move subsystem
     /// </summary>
-    public sealed class Move : ModelObject
+    public partial class Move : ModelObject
     {
         /// <summary>
         /// List of the configured axes

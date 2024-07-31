@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Estimations about the times left
     /// </summary>
-    public sealed class TimesLeft : ModelObject
+    public partial class TimesLeft : ModelObject
     {
         /// <summary>
         /// Time left based on filament consumption (in s or null)

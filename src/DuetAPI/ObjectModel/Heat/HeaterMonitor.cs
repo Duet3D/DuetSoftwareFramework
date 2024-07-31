@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a heater monitor
     /// </summary>
-    public sealed class HeaterMonitor : ModelObject
+    public partial class HeaterMonitor : ModelObject
     {
         /// <summary>
         /// Action to perform when the trigger condition is met

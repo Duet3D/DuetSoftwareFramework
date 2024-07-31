@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the SBC's memory (RAM)
     /// </summary>
-    public class Memory : ModelObject
+    public partial class Memory : ModelObject
     {
         /// <summary>
         /// Available memory (in bytes)

@@ -163,7 +163,7 @@ namespace DuetControlServer.Model
             }
 
             Type? itemType = GetItemType(modelCollection.GetType());
-            if (itemType is not null && itemType.IsAssignableTo(typeof(IModelObject)))
+            if (itemType is not null && itemType.IsAssignableTo(typeof(IStaticModelObject)))
             {
                 IList list = (IList)modelCollection;
                 foreach (object listItem in list)

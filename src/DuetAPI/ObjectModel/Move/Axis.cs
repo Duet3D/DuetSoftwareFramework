@@ -5,7 +5,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Information about a configured axis
     /// </summary>
-    public sealed class Axis : ModelObject
+    public partial class Axis : ModelObject
     {
         /// <summary>
         /// List of supported axis letters

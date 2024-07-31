@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about core kinematics
     /// </summary>
-    public sealed class CoreKinematics : ZLeadscrewKinematics
+    public partial class CoreKinematics : ZLeadscrewKinematics
 	{
 		/// <summary>
 		/// Constructor of this class

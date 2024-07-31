@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the message box to show
     /// </summary>
-    public sealed class MessageBox : ModelObject
+    public partial class MessageBox : ModelObject
     {
         /// <summary>
         /// Bitmap of the axis movement controls to show (indices)

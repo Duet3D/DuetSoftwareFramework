@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the network subsystem
     /// </summary>
-    public sealed class Network : ModelObject
+    public partial class Network : ModelObject
     {
         /// <summary>
         /// Default name of the machine

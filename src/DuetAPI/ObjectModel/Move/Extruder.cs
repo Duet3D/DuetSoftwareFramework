@@ -5,7 +5,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Information about an extruder drive
     /// </summary>
-    public sealed class Extruder : ModelObject
+    public partial class Extruder : ModelObject
     {
         /// <summary>
         /// Acceleration of this extruder (in mm/s^2)

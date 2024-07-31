@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Information about a filament monitor
     /// </summary>
-    public class FilamentMonitor : ModelObject
+    public partial class FilamentMonitor : DynamicModelObject
     {
         /// <summary>
         /// Indicates if this filament monitor is enabled
@@ -72,7 +72,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
-        public override IModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public override IDynamicModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {

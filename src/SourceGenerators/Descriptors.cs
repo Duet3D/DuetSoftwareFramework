@@ -1,8 +1,8 @@
 ﻿using Microsoft.CodeAnalysis;
 
-namespace DuetAPISrcGen
+namespace SourceGenerators
 {
-    internal static class Warnings
+    internal static class Descriptors
     {
         public static readonly DiagnosticDescriptor MissingMainOMKeyHandler = new(id: "DOM001",
                                                                                   title: "Missing key handler in main OM prop",
@@ -10,6 +10,11 @@ namespace DuetAPISrcGen
                                                                                   category: "DOM",
                                                                                   DiagnosticSeverity.Warning,
                                                                                   isEnabledByDefault: true);
-
+        public static readonly DiagnosticDescriptor UnsupportedType = new(id: "DOM002",
+                                                                          title: "Unsupported type",
+                                                                          messageFormat: "Cannot generate setter for property {0} of class {1} because it is not supported",
+                                                                          category: "DOM",
+                                                                          DiagnosticSeverity.Error,
+                                                                          isEnabledByDefault: true);
     }
 }

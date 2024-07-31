@@ -101,7 +101,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="other">Other instance</param>
         /// <returns>Object differences or null if both instances are equal</returns>
-        public object? FindDifferences(IModelObject other)
+        public object? FindDifferences(IStaticModelObject other)
         {
             // Check the types
             Type? myType = GetType(), otherType = other?.GetType();
@@ -117,13 +117,13 @@ namespace DuetAPI.ObjectModel
 
             bool hadDiffs = (Count != otherList.Count);
             IList diffs = new object[Count];
-            if (typeof(IModelObject).IsAssignableFrom(itemType))
+            if (typeof(IStaticModelObject).IsAssignableFrom(itemType))
             {
                 for (int i = 0; i < Count; i++)
                 {
                     if (i < otherList.Count)
                     {
-                        IModelObject? myItem = (IModelObject?)this[i], otherItem = (IModelObject?)otherList[i];
+                        IStaticModelObject? myItem = (IStaticModelObject?)this[i], otherItem = (IStaticModelObject?)otherList[i];
                         if (otherItem is null || myItem is null || otherItem.GetType() != myItem.GetType())
                         {
                             hadDiffs = myItem != otherItem;
@@ -184,7 +184,7 @@ namespace DuetAPI.ObjectModel
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         /// <remarks>Accepts null as the JSON value to clear existing items</remarks>
-        public IModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public IStaticModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {

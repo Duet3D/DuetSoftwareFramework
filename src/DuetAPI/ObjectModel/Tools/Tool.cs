@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a configured tool
     /// </summary>
-    public sealed class Tool : ModelObject
+    public partial class Tool : ModelObject
     {
         /// <summary>
         /// Active temperatures of the associated heaters (in C)

@@ -3,7 +3,7 @@
     /// <summary>
     /// Details about a general-purpose input port
     /// </summary>
-    public sealed class GpInputPort : ModelObject
+    public partial class GpInputPort : ModelObject
     {
         /// <summary>
         /// Value of this port (0..1)

@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about sensors
     /// </summary>
-    public sealed class Sensors : ModelObject
+    public partial class Sensors : ModelObject
     {
         /// <summary>
         /// List of analog sensors

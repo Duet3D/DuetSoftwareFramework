@@ -5,7 +5,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Thermostatic parameters of a fan
     /// </summary>
-    public sealed class FanThermostaticControl : ModelObject
+    public partial class FanThermostaticControl : ModelObject
     {
         /// <summary>
         /// List of heaters to monitor (indices)

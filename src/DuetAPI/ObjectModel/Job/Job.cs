@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the current job
     /// </summary>
-    public sealed class Job : ModelObject
+    public partial class Job : ModelObject
     {
         /// <summary>
         /// Information about the current build or null if not available

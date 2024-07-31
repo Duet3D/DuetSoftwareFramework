@@ -3,7 +3,7 @@
     /// <summary>
     /// Nonlinear extrusion parameters (see M592)
     /// </summary>
-    public sealed class ExtruderNonlinear : ModelObject
+    public partial class ExtruderNonlinear : ModelObject
     {
         /// <summary>
         /// A coefficient in the extrusion formula

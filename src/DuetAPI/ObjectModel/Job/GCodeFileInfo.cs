@@ -10,7 +10,7 @@ namespace DuetAPI.ObjectModel
     /// Holds information about a G-code file
     /// </summary>
     [JsonConverter(typeof(GCodeFileInfoConverter))]
-    public sealed class GCodeFileInfo : ModelObject
+    public partial class GCodeFileInfo : ModelObject
     {
         /// <summary>
         /// Filament consumption per extruder drive (in mm)

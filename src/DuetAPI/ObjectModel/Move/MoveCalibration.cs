@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about configured calibration options
     /// </summary>
-    public sealed class MoveCalibration : ModelObject
+    public partial class MoveCalibration : ModelObject
     {
         /// <summary>
         /// Final calibration results (for Delta calibration)

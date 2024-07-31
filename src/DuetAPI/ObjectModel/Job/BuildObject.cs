@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a detected build object
     /// </summary>
-    public sealed class BuildObject : ModelObject
+    public partial class BuildObject : ModelObject
     {
         /// <summary>
         /// Indicates if this build object is cancelled

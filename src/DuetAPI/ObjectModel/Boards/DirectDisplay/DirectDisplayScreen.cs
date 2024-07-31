@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Standard direct-connect display screen
     /// </summary>
-    public class DirectDisplayScreen : ModelObject
+    public partial class DirectDisplayScreen : ModelObject, IDynamicModelObject
     {
         /// <summary>
         /// Number of colour bits
@@ -81,7 +81,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
-        public override IModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public IDynamicModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {
@@ -98,7 +98,7 @@ namespace DuetAPI.ObjectModel
                     return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
                 }
             }
-            return base.UpdateFromJson(jsonElement, ignoreSbcProperties);
+            return GeneratedUpdateFromJson(jsonElement, ignoreSbcProperties);
         }
     }
 }

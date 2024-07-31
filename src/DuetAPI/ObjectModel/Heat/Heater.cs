@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a heater
     /// </summary>
-    public sealed class Heater : ModelObject
+    public partial class Heater : ModelObject
     {
         /// <summary>
         /// Active temperature of the heater (in C)

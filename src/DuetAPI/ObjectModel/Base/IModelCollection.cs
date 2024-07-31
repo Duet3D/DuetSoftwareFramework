@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Interface that all object model collections must implement
     /// </summary>
-    public interface IModelCollection : IModelObject, INotifyCollectionChanged
+    public interface IModelCollection : IStaticModelObject, INotifyCollectionChanged
     {
         /// <summary>
         /// Update this collection from a given JSON array

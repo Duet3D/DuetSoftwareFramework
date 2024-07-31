@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the heat subsystem
     /// </summary>
-    public sealed class Heat : ModelObject
+    public partial class Heat : ModelObject
     {
         /// <summary>
         /// List of configured bed heaters (indices)

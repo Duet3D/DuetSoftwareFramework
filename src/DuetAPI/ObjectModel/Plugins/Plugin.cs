@@ -3,7 +3,7 @@
     /// <summary>
     /// Class representing a loaded plugin
     /// </summary>
-    public sealed class Plugin : PluginManifest
+    public partial class Plugin : PluginManifest
     {
         /// <summary>
         /// List of files for the DSF plugin

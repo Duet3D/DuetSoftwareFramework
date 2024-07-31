@@ -3,7 +3,7 @@
     /// <summary>
     /// Class holding details about orthogonoal axis compensation parameters
     /// </summary>
-    public sealed class Skew : ModelObject
+    public partial class Skew : ModelObject
     {
         /// <summary>
         /// Indicates if the TanXY value is used to compensate X when Y moves (else Y when X moves)

@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a CNC spindle
     /// </summary>
-    public sealed class Spindle : ModelObject
+    public partial class Spindle : ModelObject
     {
         /// <summary>
         /// Active RPM

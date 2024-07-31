@@ -3,7 +3,7 @@
     /// <summary>
     /// Calibrated properties of a rotating magnet filament monitor
     /// </summary>
-    public sealed class RotatingMagnetFilamentMonitorCalibrated : ModelObject
+    public partial class RotatingMagnetFilamentMonitorCalibrated : ModelObject
     {
         /// <summary>
         /// Extruded distance per revolution (in mm)

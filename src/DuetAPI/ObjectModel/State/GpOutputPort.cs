@@ -3,7 +3,7 @@
     /// <summary>
     /// Details about a general-purpose output port
     /// </summary>
-    public sealed class GpOutputPort : ModelObject
+    public partial class GpOutputPort : ModelObject
     {
         /// <summary>
         /// PWM frequency of this port (in Hz)

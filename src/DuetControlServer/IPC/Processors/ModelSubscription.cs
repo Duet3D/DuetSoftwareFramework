@@ -357,7 +357,7 @@ namespace DuetControlServer.IPC.Processors
                         {
                             currentList.Add(null);
                         }
-                        else if (pathNode.List[k] is IModelObject)
+                        else if (pathNode.List[k] is IStaticModelObject)
                         {
                             currentList.Add(new Dictionary<string, object?>());
                         }
@@ -462,7 +462,7 @@ namespace DuetControlServer.IPC.Processors
                                 {
                                     collection.Add(null);
                                 }
-                                else if (pathNode.List[k] is IModelObject)
+                                else if (pathNode.List[k] is IStaticModelObject)
                                 {
                                     collection.Add(new Dictionary<string, object?>());
                                 }

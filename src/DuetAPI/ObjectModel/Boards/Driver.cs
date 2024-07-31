@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a driver
     /// </summary>
-    public sealed class Driver : ModelObject
+    public partial class Driver : ModelObject
     {
         /// <summary>
         /// Closed-loop settings (if applicable)

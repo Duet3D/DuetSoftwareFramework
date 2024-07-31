@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a network interface
     /// </summary>
-    public sealed class NetworkInterface : ModelObject
+    public partial class NetworkInterface : ModelObject
     {
         /// <summary>
         /// List of active protocols

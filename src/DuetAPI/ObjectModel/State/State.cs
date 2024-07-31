@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Information about the machine state
     /// </summary>
-    public sealed class State : ModelObject
+    public partial class State : ModelObject
     {
         /// <summary>
         /// State of the ATX power pin (if controlled)

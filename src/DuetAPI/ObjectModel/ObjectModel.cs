@@ -164,6 +164,14 @@ namespace DuetAPI.ObjectModel
         public bool UpdateFromJson(string key, JsonElement jsonElement) => InternalUpdateFromJson(key, jsonElement, false);
 
         /// <summary>
+        /// Update a specific key of this instance from a given JSON reader
+        /// </summary>
+        /// <param name="key">Property name to update</param>
+        /// <param name="reader">JSON reader</param>
+        /// <returns>Whether the key could be updated</returns>
+        public bool UpdateFromJsonReader(string key, ref Utf8JsonReader reader) => InternalUpdateFromJsonReader(key, ref reader, false);
+
+        /// <summary>
         /// Convert this instance to a JSON text
         /// </summary>
         /// <returns>JSON object</returns>
