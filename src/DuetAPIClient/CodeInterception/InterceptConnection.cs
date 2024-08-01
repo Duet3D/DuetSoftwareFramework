@@ -203,5 +203,21 @@ namespace DuetAPIClient
         {
             return Send(new Resolve { Content = message.Content, Type = message.Type }, cancellationToken);
         }
+
+        /// <summary>
+        /// Rewrite the code being intercepted. This effectively modifies the code before it is processed further
+        /// </summary>
+        /// <param name="code">Updated code</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="Message"/>
+        /// <seealso cref="Resolve"/>
+        /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
+        public ValueTask RewriteCode(Code code, CancellationToken cancellationToken = default)
+        {
+            return Send(new Rewrite { Code = code }, cancellationToken);
+        }
     }
 }

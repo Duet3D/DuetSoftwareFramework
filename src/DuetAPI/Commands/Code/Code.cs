@@ -128,6 +128,26 @@ namespace DuetAPI.Commands
         public List<CodeParameter> Parameters { get; set; } = [];
 
         /// <summary>
+        /// Copy the properties of another code instance. This is used when a code is rewritten
+        /// </summary>
+        /// <param name="code"></param>
+        public void CopyFrom(Code code)
+        {
+            Type = code.Type;
+            LineNumber = code.LineNumber;
+            Indent = code.Indent;
+            Keyword = code.Keyword;
+            KeywordArgument = code.KeywordArgument;
+            MajorNumber = code.MajorNumber;
+            MinorNumber = code.MinorNumber;
+            Flags = code.Flags;
+            Comment = code.Comment;
+            FilePosition = code.FilePosition;
+            Length = code.Length;
+            Parameters = code.Parameters;
+        }
+
+        /// <summary>
         /// Reset this instance
         /// </summary>
         public virtual void Reset()
