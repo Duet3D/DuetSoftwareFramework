@@ -248,7 +248,6 @@ namespace DuetWebServer.Controllers
         /// </summary>
         /// <returns>Last G-code reply</returns>
         [HttpGet("rr_reply")]
-        [Authorize(Policy = Authorization.Policies.ReadWrite)]
         public IActionResult Reply([FromServices] ISessionStorage sessionStorage)
         {
             try
@@ -277,7 +276,6 @@ namespace DuetWebServer.Controllers
         /// (200) Error code result
         /// </returns>
         [HttpGet("rr_upload")]
-        [Authorize(Policy = Authorization.Policies.ReadOnly)]
         public IActionResult UploadResult() => Content("{\"err\":" + (_lastUploadSuccessful ? '0' : '1') + "}", "application/json");
 
         /// <summary>
@@ -506,7 +504,7 @@ namespace DuetWebServer.Controllers
         }
 
         /// <summary>
-        /// GET /rrmodel?key={key}&amp;flags={flags}
+        /// GET /rr_model?key={key}&amp;flags={flags}
         /// Retrieve object model information
         /// </summary>
         /// <returns>
@@ -514,7 +512,7 @@ namespace DuetWebServer.Controllers
         /// (200) JSON response
         /// (503) Service Unavailable
         /// </returns>
-        [HttpGet("rrmodel")]
+        [HttpGet("rr_model")]
         public async Task<IActionResult> GetModel(string? key = "", string? flags = "")
         {
             try
