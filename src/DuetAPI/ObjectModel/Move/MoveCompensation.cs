@@ -3,7 +3,7 @@
 	/// <summary>
 	/// Information about the configured compensation options
 	/// </summary>
-	public partial class MoveCompensation : ModelObject
+	public partial class MoveCompensation : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Effective height before the bed compensation is turned off (in mm) or null if not configured

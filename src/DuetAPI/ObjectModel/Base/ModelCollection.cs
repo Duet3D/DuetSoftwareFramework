@@ -11,7 +11,7 @@ namespace DuetAPI.ObjectModel
     /// Generic container for object model arrays
     /// </summary>
     /// <typeparam name="T">Item type</typeparam>
-    public class ModelCollection<T> : ObservableCollection<T>, IModelCollection
+    public class ModelCollection<T> : ObservableCollection<T?>, IModelCollection where T : new()
     {
         /// <summary>
         /// Default constructor
@@ -28,14 +28,14 @@ namespace DuetAPI.ObjectModel
         /// Overloading constructor that takes a list for initialization
         /// </summary>
         /// <param name="list">List to use for items</param>
-        public ModelCollection(List<T> list) : base(list) { }
+        public ModelCollection(List<T?> list) : base(list) { }
 
         /// <summary>
         /// Removes all items from the collection
         /// </summary>
         protected override void ClearItems()
         {
-            List<T> removed = new(this);
+            List<T?> removed = new(this);
             base.ClearItems();
             base.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed));
         }
@@ -53,6 +53,7 @@ namespace DuetAPI.ObjectModel
             }
         }
 
+#if false
         /// <summary>
         /// Assign the properties from another instance.
         /// This is required to update model properties which do not have a setter
@@ -231,6 +232,7 @@ namespace DuetAPI.ObjectModel
             }
             return hadDiffs ? diffs : null;
         }
+#endif
 
         /// <summary>
         /// Update this instance from a given JSON element
@@ -277,7 +279,7 @@ namespace DuetAPI.ObjectModel
                 // Update model items
                 for (int i = offset; i < Math.Min(Count, offset + arrayLength); i++)
                 {
-                    IStaticModelObject item = (IStaticModelObject)this[i]!;
+                    T? item = this[i];
                     JsonElement jsonItem = jsonElement[i - offset];
                     if (jsonItem.ValueKind == JsonValueKind.Null)
                     {
@@ -286,10 +288,56 @@ namespace DuetAPI.ObjectModel
                             this[i] = default!;
                         }
                     }
+                    else if (item == null)
+                    {
+                        item = new T();
+                        (item as IStaticModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties);
+                        this[i] = item;
+                    }
                     else
                     {
-                        item ??= (IStaticModelObject)Activator.CreateInstance(itemType)!;
-                        T? updatedItem = (T?)item.UpdateFromJson(jsonItem, ignoreSbcProperties)!;
+                       (item as IStaticModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties);
+                    }
+                }
+
+                // Add missing items
+                for (int i = Count; i < offset + arrayLength; i++)
+                {
+                    JsonElement jsonItem = jsonElement[i - offset];
+                    if (jsonItem.ValueKind == JsonValueKind.Null)
+                    {
+                        Add(default!);
+                    }
+                    else
+                    {
+                        T newItem = new();
+                        (newItem as IStaticModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties);
+                        Add(newItem);
+                    }
+                }
+            }
+            else if (typeof(IDynamicModelObject).IsAssignableFrom(itemType))
+            {
+                // Update model items
+                for (int i = offset; i < Math.Min(Count, offset + arrayLength); i++)
+                {
+                    T? item = this[i];
+                    JsonElement jsonItem = jsonElement[i - offset];
+                    if (jsonItem.ValueKind == JsonValueKind.Null)
+                    {
+                        if (this[i] is not null)
+                        {
+                            this[i] = default!;
+                        }
+                    }
+                    else if (item == null)
+                    {
+                        item = new T();
+                        this[i] = (T?)(item as IDynamicModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties);
+                    }
+                    else
+                    {
+                        T? updatedItem = (T?)(item as IDynamicModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties);
                         if (!ReferenceEquals(this[i], updatedItem))
                         {
                             this[i] = updatedItem;
@@ -307,8 +355,8 @@ namespace DuetAPI.ObjectModel
                     }
                     else
                     {
-                        IStaticModelObject? newItem = (IStaticModelObject?)Activator.CreateInstance(itemType)!;
-                        Add((T?)newItem.UpdateFromJson(jsonItem, ignoreSbcProperties)!);
+                        T newItem = new();
+                        Add((T?)(newItem as IDynamicModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties)!);
                     }
                 }
             }
@@ -406,5 +454,15 @@ namespace DuetAPI.ObjectModel
                 }
             }
         }
+        void IStaticModelObject.UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties) => UpdateFromJson(jsonElement, ignoreSbcProperties, 0, true);
+
+#if false
+        public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true)
+        {
+            // TODO
+        }
+
+        public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties) => UpdateFromJsonReader(ref reader, ignoreSbcProperties, 0, true);
+#endif
     }
 }

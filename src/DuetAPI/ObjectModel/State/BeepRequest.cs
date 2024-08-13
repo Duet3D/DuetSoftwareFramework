@@ -3,7 +3,7 @@
     /// <summary>
     /// Details about a requested beep
     /// </summary>
-    public partial class BeepRequest : ModelObject
+    public partial class BeepRequest : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Duration of the requested beep (in ms)

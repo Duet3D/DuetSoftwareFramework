@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a storage device
     /// </summary>
-    public partial class Volume : ModelObject
+    public partial class Volume : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Total capacity of the storage device (in bytes or null)

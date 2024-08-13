@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// Information about the configured probe grid (see M557)
     /// </summary>
     /// <seealso cref="Heightmap"/>
-    public partial class ProbeGrid : ModelObject
+    public partial class ProbeGrid : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Axis letters of this heightmap

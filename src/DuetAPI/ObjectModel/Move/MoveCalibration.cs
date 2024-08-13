@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about configured calibration options
     /// </summary>
-    public partial class MoveCalibration : ModelObject
+    public partial class MoveCalibration : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Final calibration results (for Delta calibration)

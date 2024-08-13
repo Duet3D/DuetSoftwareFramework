@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the move subsystem
     /// </summary>
-    public partial class Move : ModelObject
+    public partial class Move : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// List of the configured axes

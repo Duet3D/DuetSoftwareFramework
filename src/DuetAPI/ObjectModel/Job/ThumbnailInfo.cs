@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a thumbnail from a G-code file
     /// </summary>
-    public partial class ThumbnailInfo : ModelObject
+    public partial class ThumbnailInfo : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Base64-encoded thumbnail or null if invalid or not requested

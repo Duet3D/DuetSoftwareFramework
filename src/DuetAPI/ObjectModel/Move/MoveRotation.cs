@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about centre rotation as defined by G68
     /// </summary>
-    public partial class MoveRotation : ModelObject
+    public partial class MoveRotation : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Angle of the centre rotatation (in deg)

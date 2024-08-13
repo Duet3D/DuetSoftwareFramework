@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a layer from a file being printed
     /// </summary>
-    public partial class Layer : ModelObject
+    public partial class Layer : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Duration of the layer (in s)

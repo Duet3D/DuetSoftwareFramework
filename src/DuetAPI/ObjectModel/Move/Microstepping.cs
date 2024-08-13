@@ -3,7 +3,7 @@
     /// <summary>
     /// Microstepping configuration
     /// </summary>
-    public partial class Microstepping : ModelObject
+    public partial class Microstepping : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Indicates if the stepper driver uses interpolation

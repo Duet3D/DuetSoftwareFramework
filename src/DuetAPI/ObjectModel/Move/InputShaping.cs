@@ -1,14 +1,16 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System.Collections.ObjectModel;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Parameters describing input shaping
     /// </summary>
-    public partial class InputShaping : ModelObject
+    public partial class InputShaping : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Amplitudes of the input shaper
         /// </summary>
-        public ModelCollection<float> Amplitudes { get; } = [];
+        public ObservableCollection<float> Amplitudes { get; } = [];
 
         /// <summary>
         /// Damping factor
@@ -23,7 +25,7 @@
         /// <summary>
         /// Input shaper durations (in s)
         /// </summary>
-        public ModelCollection<float> Durations { get; } = [];
+        public ObservableCollection<float> Durations { get; } = [];
 
         /// <summary>
         /// Frequency (in Hz)

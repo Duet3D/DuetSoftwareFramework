@@ -3,7 +3,7 @@
     /// <summary>
     /// Details about the first error on start-up
     /// </summary>
-    public partial class StartupError : ModelObject
+    public partial class StartupError : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Filename of the macro where the error occurred

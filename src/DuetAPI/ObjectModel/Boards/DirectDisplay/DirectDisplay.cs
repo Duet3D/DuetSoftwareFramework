@@ -3,7 +3,7 @@
     /// <summary>
     /// Class providing information about a connected direct-connect display
     /// </summary>
-    public partial class DirectDisplay : DynamicModelObject
+    public partial class DirectDisplay : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Encoder of this screen or null if none

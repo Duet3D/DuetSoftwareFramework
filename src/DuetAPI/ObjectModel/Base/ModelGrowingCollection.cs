@@ -95,6 +95,7 @@ namespace DuetAPI.ObjectModel
             return clone;
         }
 
+#if false
         /// <summary>
         /// Create a dictionary or list of all the differences between this instance and another.
         /// This method outputs own property values that differ from the other instance
@@ -175,6 +176,7 @@ namespace DuetAPI.ObjectModel
             }
             return hadDiffs ? diffs : null;
         }
+#endif
 
         /// <summary>
         /// Update this instance from a given JSON element
@@ -217,5 +219,22 @@ namespace DuetAPI.ObjectModel
         {
             UpdateFromJson(jsonElement, ignoreSbcProperties);
         }
+
+        void IStaticModelObject.UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        {
+            throw new NotImplementedException();
+        }
+
+#if false
+        public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+        {
+            throw new NotImplementedException();
+        }
+#endif
     }
 }

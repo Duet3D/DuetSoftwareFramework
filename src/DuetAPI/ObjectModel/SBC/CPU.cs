@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the SBC's CPU
     /// </summary>
-    public partial class CPU : ModelObject
+    public partial class CPU : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Average CPU load (0..100%) or null if unknown

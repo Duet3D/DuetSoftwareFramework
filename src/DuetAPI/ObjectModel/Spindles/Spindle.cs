@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a CNC spindle
     /// </summary>
-    public partial class Spindle : ModelObject
+    public partial class Spindle : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Active RPM

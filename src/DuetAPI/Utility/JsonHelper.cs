@@ -112,10 +112,6 @@ namespace DuetAPI.Utility
         /// </summary>
         public static readonly JsonSerializerOptions DefaultJsonOptions = new()
         {
-            Converters = {
-                new JsonPolymorphicWriteOnlyConverter<Kinematics>(),
-                new JsonPolymorphicWriteOnlyConverter<FilamentMonitor>()
-            },
             DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,

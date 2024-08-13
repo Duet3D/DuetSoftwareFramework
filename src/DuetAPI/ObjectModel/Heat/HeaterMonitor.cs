@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a heater monitor
     /// </summary>
-    public partial class HeaterMonitor : ModelObject
+    public partial class HeaterMonitor : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Action to perform when the trigger condition is met

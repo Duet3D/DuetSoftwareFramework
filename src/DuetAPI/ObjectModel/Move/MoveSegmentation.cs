@@ -3,7 +3,7 @@
     /// <summary>
     /// Move segmentation parameters
     /// </summary>
-    public partial class MoveSegmentation : ModelObject
+    public partial class MoveSegmentation : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Number of segments per second

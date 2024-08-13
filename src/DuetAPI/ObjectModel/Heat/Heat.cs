@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the heat subsystem
     /// </summary>
-    public partial class Heat : ModelObject
+    public partial class Heat : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// List of configured bed heaters (indices)

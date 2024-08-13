@@ -5,7 +5,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Information about Duet Software Framework
     /// </summary>
-    public partial class DSF : ModelObject
+    public partial class DSF : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Datetime when DSF was built

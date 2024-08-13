@@ -26,14 +26,16 @@ namespace SourceGenerators.ObjectModel
                         // This one has its own generator
                         continue;
                     }
-                    /*if (cls != "Board")
+                    if (receiver.IncompleteModelObjectClasses.TryGetValue(cls, out Location? location))
                     {
-                        // debug
+                        context.ReportDiagnostic(Diagnostic.Create(Descriptors.IncompleteModelObjectClass, location, cls));
                         continue;
-                    }*/
+                    }
 
                     SourceText sourceText = SourceText.From($@"using System;
+using System.Linq;
 using System.Text.Json;
+using DuetAPI.Utility;
 
 #nullable enable
 
@@ -61,7 +63,7 @@ namespace DuetAPI.ObjectModel
         {
             List<PropertyDeclarationSyntax> properties = receiver.ModelObjectMembers[cls];
             List<MethodDeclarationSyntax> methods = receiver.ModelObjectMethods[cls];
-            bool isDynamic = receiver.DynamicModelObjectClasses.Contains(cls);
+            bool isDynamic = receiver.DynamicModelObjectClasses.Contains(cls), isInherited = receiver.InheritedClasses.Any(ic => ic.Key.Identifier.ValueText == cls);
 
             string GeneratePropertyUpdateCalls()
             {
@@ -136,13 +138,145 @@ namespace DuetAPI.ObjectModel
                             WriteSetOrUpdate();
                         }
                     }
+                    else if (propType is "ObservableCollection")
+                    {
+                        writer.WriteLine("int newCount = jsonProperty.Value.GetArrayLength();");
+                        // Update existing items
+                        writer.WriteLine($"for (int i = 0; i < Math.Min({prop.Identifier.ValueText}.Count, newCount); i++)");
+                        writer.WriteLine("{");
+                        writer.Indent++;
+                        string genericPropType = prop.GetGenericPropertyType();
+                        if (genericPropType.EndsWith("?"))
+                        {
+                            genericPropType = genericPropType.Substring(0, genericPropType.Length - 1);
+
+                            writer.WriteLine("if (jsonProperty.Value[i].ValueKind == JsonValueKind.Null)");
+                            writer.WriteLine("{");
+                            writer.Indent++;
+                            writer.WriteLine($"{prop.Identifier.ValueText}[i] = null;");
+                            writer.Indent--;
+                            writer.WriteLine("}");
+                            writer.Write("else ");
+                        }
+                        switch (genericPropType)
+                        {
+                            case "int":
+                                writer.WriteLine("int newIntValue = jsonProperty.Value[i].GetInt32();");
+                                writer.WriteLine($"if ({prop.Identifier.ValueText}[i] != newIntValue)");
+                                writer.WriteLine("{");
+                                writer.Indent++;
+                                writer.WriteLine($"{prop.Identifier.ValueText}[i] = newIntValue;");
+                                writer.Indent--;
+                                writer.WriteLine("}");
+                                break;
+                            case "string":
+                                writer.WriteLine("string newStringValue = jsonProperty.Value[i].GetString()!;");
+                                writer.WriteLine($"if ({prop.Identifier.ValueText}[i] != newStringValue)");
+                                writer.WriteLine("{");
+                                writer.Indent++;
+                                writer.WriteLine($"{prop.Identifier.ValueText}[i] = newStringValue;");
+                                writer.Indent--;
+                                writer.WriteLine("}");
+                                break;
+                            case "float":
+                                writer.WriteLine("float newFloatValue = jsonProperty.Value[i].GetSingle();");
+                                writer.WriteLine($"if ({prop.Identifier.ValueText}[i] != newFloatValue)");
+                                writer.WriteLine("{");
+                                writer.Indent++;
+                                writer.WriteLine($"{prop.Identifier.ValueText}[i] = newFloatValue;");
+                                writer.Indent--;
+                                writer.WriteLine("}");
+                                break;
+                            case "float[]":
+                                writer.WriteLine("float[] newFloatArrayValue = jsonProperty.Value[i].EnumerateArray().Select(e => e.GetSingle()).ToArray();");
+                                writer.WriteLine($"if (!newFloatArrayValue.SequenceEqual({prop.Identifier.ValueText}[i]))");
+                                writer.WriteLine("{");
+                                writer.Indent++;
+                                writer.WriteLine($"{prop.Identifier.ValueText}[i] = newFloatArrayValue;");
+                                writer.Indent--;
+                                writer.WriteLine("}");
+                                break;
+                            case "int[]":
+                                writer.WriteLine("int[] newIntArrayValue = jsonProperty.Value[i].EnumerateArray().Select(e => e.GetInt32()).ToArray();");
+                                writer.WriteLine($"if (!newIntArrayValue.SequenceEqual({prop.Identifier.ValueText}[i]))");
+                                writer.WriteLine("{");
+                                writer.Indent++;
+                                writer.WriteLine($"{prop.Identifier.ValueText}[i] = newIntArrayValue;");
+                                writer.Indent--;
+                                writer.WriteLine("}");
+                                break;
+                            default:
+                                context.ReportDiagnostic(Diagnostic.Create(Descriptors.UnsupportedType, prop.GetLocation(), jsonPropertyName, cls));
+                                break;
+                        }
+                        writer.Indent--;
+                        writer.WriteLine("}");
+
+                        // Add new items
+                        writer.WriteLine($"for (int i = {prop.Identifier.ValueText}.Count; i < newCount; i++)");
+                        writer.WriteLine("{");
+                        writer.Indent++;
+                        switch (genericPropType)
+                        {
+                            case "int":
+                                writer.WriteLine($"{prop.Identifier.ValueText}.Add(jsonProperty.Value[i].GetInt32());");
+                                break;
+                            case "string":
+                                writer.WriteLine($"{prop.Identifier.ValueText}.Add(jsonProperty.Value[i].GetString()!);");
+                                break;
+                            case "float":
+                                writer.WriteLine($"{prop.Identifier.ValueText}.Add(jsonProperty.Value[i].GetSingle());");
+                                break;
+                            case "float[]":
+                                writer.WriteLine($"{prop.Identifier.ValueText}.Add(jsonProperty.Value[i].EnumerateArray().Select(e => e.GetSingle()).ToArray());");
+                                break;
+                            case "int[]":
+                                writer.WriteLine($"{prop.Identifier.ValueText}.Add(jsonProperty.Value[i].EnumerateArray().Select(e => e.GetInt32()).ToArray());");
+                                break;
+                            default:
+                                context.ReportDiagnostic(Diagnostic.Create(Descriptors.UnsupportedType, prop.GetLocation(), jsonPropertyName, cls));
+                                break;
+                        }
+                        writer.Indent--;
+                        writer.WriteLine("}");
+
+                        // Remove excess items
+                        writer.WriteLine($"while ({prop.Identifier.ValueText}.Count > newCount)");
+                        writer.WriteLine("{");
+                        writer.Indent++;
+                        writer.WriteLine($"{prop.Identifier.ValueText}.RemoveAt({prop.Identifier.ValueText}.Count - 1);");
+                        writer.Indent--;
+                        writer.WriteLine("}");
+                    }
+                    else if (propType is "DriverId")
+                    {
+                        if (prop.Type is NullableTypeSyntax)
+                        {
+                            writer.WriteLine("if (jsonProperty.Value.ValueKind == JsonValueKind.Null)");
+                            writer.WriteLine("{");
+                            writer.Indent++;
+                            writer.WriteLine($"{prop.Identifier.ValueText} = null;");
+                            writer.Indent--;
+                            writer.WriteLine("}");
+                            writer.WriteLine("else");
+                            writer.WriteLine("{");
+                            writer.Indent++;
+                            writer.WriteLine($"{prop.Identifier.ValueText} = new DriverId(jsonProperty.Value.GetString()!);");
+                            writer.Indent--;
+                            writer.WriteLine("}");
+                        }
+                        else
+                        {
+                            writer.WriteLine($"{prop.Identifier.ValueText} = new DriverId(jsonProperty.Value.GetString()!);");
+                        }
+                    }
                     else if (propType is "string")
                     {
-                        writer.WriteLine($"{prop.Identifier.ValueText} = jsonProperty.Value.GetString();");
+                        writer.WriteLine($"{prop.Identifier.ValueText} = jsonProperty.Value.GetString()!;");
                     }
                     else if (propType is "char")
                     {
-                        writer.WriteLine($"{prop.Identifier.ValueText} = jsonProperty.Value.GetString()[0];");
+                        writer.WriteLine($"{prop.Identifier.ValueText} = jsonProperty.Value.GetString()![0];");
                     }
                     else if (propType is "int")
                     {
@@ -207,6 +341,36 @@ namespace DuetAPI.ObjectModel
                     else if (receiver.Enums.Contains(propType))
                     {
                         writer.WriteLine($"{prop.Identifier.ValueText} = JsonSerializer.Deserialize<{propType}>(jsonProperty.Value.GetRawText());");
+                    }
+                    else if (propType is "object")
+                    {
+                        writer.WriteLine("if (jsonProperty.Value.ValueKind == JsonValueKind.Null)");
+                        writer.WriteLine("{");
+                        writer.Indent++;
+                        writer.WriteLine($"{prop.Identifier.ValueText} = null;");
+                        writer.Indent--;
+                        writer.WriteLine("}");
+                        writer.WriteLine("else if (jsonProperty.Value.ValueKind == JsonValueKind.String)");
+                        writer.WriteLine("{");
+                        writer.Indent++;
+                        writer.WriteLine($"{prop.Identifier.ValueText} = jsonProperty.Value.GetString()!;");
+                        writer.Indent--;
+                        writer.WriteLine("}");
+                        writer.WriteLine("else if (jsonProperty.Value.ValueKind == JsonValueKind.Number)");
+                        writer.WriteLine("{");
+                        writer.Indent++;
+                        writer.WriteLine($"{prop.Identifier.ValueText} = jsonProperty.Value.GetInt32();");
+                        writer.Indent--;
+                        writer.WriteLine("}");
+                        writer.WriteLine("else");
+                        writer.WriteLine("{");
+                        writer.Indent++;
+                        writer.WriteLine($"{prop.Identifier.ValueText} = jsonProperty.Value.GetRawText();");
+                        writer.WriteLine("#if VERIFY_OBJECT_MODEL");
+                        writer.WriteLine($"Console.WriteLine($\"[warn] Unsupported object type {{jsonProperty.Value.ValueKind}} for property {jsonPropertyName} in {cls}\");");
+                        writer.WriteLine("#endif");
+                        writer.Indent--;
+                        writer.WriteLine("}");
                     }
                     else
                     {
@@ -317,7 +481,7 @@ namespace DuetAPI.ObjectModel
                     }
                     else if (propType is "string")
                     {
-                        writer.WriteLine($"{prop.Identifier.ValueText} = reader.GetString();");
+                        writer.WriteLine($"{prop.Identifier.ValueText} = reader.GetString()!;");
                     }
                     else if (propType is "char")
                     {
@@ -410,9 +574,9 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <remarks>This method is auto-generated</remarks>
         /// <param name=""jsonElement"">Element to update this intance from</param>
-        /// <param name=""ignoreSbcProperties"">Whether SBC properties are ignored</param>{(isDynamic ? "\n/// <returns>Updated instance</returns>" : "")}
+        /// <param name=""ignoreSbcProperties"">Whether SBC properties are ignored</param>{(isDynamic ? "\n        /// <returns>Updated instance</returns>" : "")}
         /// <exception cref=""JsonException"">Failed to deserialize data</exception>
-        public {(isDynamic ? "IDynamicModelObject?" : "void")} {(useGeneratedUpdateFromJson ? "Generated" : "")}UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public {((isInherited ? "new " : "") + (isDynamic ? "IDynamicModelObject?" : "void"))} {(useGeneratedUpdateFromJson ? "Generated" : "")}UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {{
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {{
@@ -428,16 +592,17 @@ namespace DuetAPI.ObjectModel
                     Console.WriteLine(""[warn] Missing property {{0}} = {{1}} in {cls}"", jsonProperty.Name, jsonProperty.Value.GetRawText());
                 }}
 #endif 
-            }}{(isDynamic ? "\nreturn this;" : "")}
-        }}
+            }}{(isDynamic ? "\n            return this;" : "")}
+        }}", Encoding.UTF8);
+#if false
         
         /// <summary>
         /// Update this instance from a given JSON reader
         /// </summary>
         /// <remarks>This method is auto-generated</remarks>
         /// <param name=""reader"">JSON reader</param>
-        /// <param name=""ignoreSbcProperties"">Whether SBC properties are ignored</param>{(isDynamic ? "\n/// <returns>Updated instance</returns>" : "")}
-        public {(isDynamic ? "IDynamicModelObject?" : "void")} {(useGeneratedUpdateFromJsonReader ? "Generated" : "")}UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+        /// <param name=""ignoreSbcProperties"">Whether SBC properties are ignored</param>{(isDynamic ? "\n        /// <returns>Updated instance</returns>" : "")}
+        public {((isInherited ? "new " : "") + (isDynamic ? "IDynamicModelObject?" : "void"))} {(useGeneratedUpdateFromJsonReader ? "Generated" : "")}UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
         {{
             if (reader.TokenType == JsonTokenType.Null)
             {{
@@ -459,14 +624,15 @@ namespace DuetAPI.ObjectModel
 #if VERIFY_OBJECT_MODEL
                             Console.WriteLine(""[warn] Missing property {{0}} in {cls}"", reader.GetString());
 #else
-                            reader.Skip();  // Skip property name
-#endif 
-                            reader.Skip();  // Skip JSON value
+                            reader.Skip();  // skip property name
+#endif
+                            reader.Skip();  // skip JSON value
                         }}
                         break;
                 }}
-            }}{(isDynamic ? "\nreturn this;" : "")}
+            }}{(isDynamic ? "\n            return this;" : "")}
         }}", Encoding.UTF8); 
+#endif
         }
     }
 }

@@ -234,21 +234,26 @@ namespace DuetAPI.ObjectModel
             return false;
         }}
 
-        /// <summary>
-        /// Update the whole or a specific key of this instance from a given JSON reader
-        /// </summary>
-        /// <remarks>This method is auto-generated</remarks>
-        /// <param name=""key"">Property name to update or null if the whole object model is supposed to be updated</param>
-        /// <param name=""reader"">JSON reader</param>
-        /// <param name=""ignoreSbcProperties"">Whether SBC properties are ignored</param>
-        /// <param name=""offset"">Index offset (collection keys only)</param>
-        /// <param name=""last"">Whether this is the last update (collection keys only)</param>
-        /// <returns>Whether the key could be updated</returns>
-        private bool GeneratedUpdateFromJsonReader(string? key, ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true)
+        {ModelObjectGenerator.GenerateModelObjectMemembers(context, receiver, "ObjectModel")}
+    }}
+}}", Encoding.UTF8);
+
+#if false
+                /// <summary>
+                /// Update the whole or a specific key of this instance from a given JSON reader
+                /// </summary>
+                /// <remarks>This method is auto-generated</remarks>
+                /// <param name=""key"">Property name to update or null if the whole object model is supposed to be updated</param>
+                /// <param name=""reader"">JSON reader</param>
+                /// <param name=""ignoreSbcProperties"">Whether SBC properties are ignored</param>
+                /// <param name=""offset"">Index offset (collection keys only)</param>
+                /// <param name=""last"">Whether this is the last update (collection keys only)</param>
+                /// <returns>Whether the key could be updated</returns>
+                private bool GeneratedUpdateFromJsonReader(string? key, ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true)
         {{
             if (key == null)
             {{
-                UpdateFromJsonReader(reader, ignoreSbcProperties);
+                UpdateFromJsonReader(ref reader, ignoreSbcProperties);
                 return true;
             }}
 
@@ -278,6 +283,7 @@ namespace DuetAPI.ObjectModel
         {ModelObjectGenerator.GenerateModelObjectMemembers(context, receiver, "ObjectModel")}
     }}
 }}", Encoding.UTF8);
+#endif
 
                 context.AddSource("ObjectModel.g.cs", sourceText);
             }

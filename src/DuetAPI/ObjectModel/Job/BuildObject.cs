@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a detected build object
     /// </summary>
-    public partial class BuildObject : ModelObject
+    public partial class BuildObject : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Indicates if this build object is cancelled

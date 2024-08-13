@@ -425,13 +425,8 @@ namespace DuetAPI.ObjectModel
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         /// <remarks>Accepts null as the JSON value to clear existing items</remarks>
-        public IStaticModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
-            if (jsonElement.ValueKind == JsonValueKind.Null)
-            {
-                return null;
-            }
-
             foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
             {
                 if (NullRemovesItems && jsonProperty.Value.ValueKind == JsonValueKind.Null)
@@ -461,8 +456,14 @@ namespace DuetAPI.ObjectModel
                     }
                 }
             }
-            return this;
         }
+
+#if false
+        public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+        {
+            throw new NotImplementedException();
+        }
+#endif
     }
 
     /// <summary>

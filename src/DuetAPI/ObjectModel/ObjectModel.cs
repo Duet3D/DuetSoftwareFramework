@@ -9,7 +9,6 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Representation of the Duet3D object model
     /// </summary>
-    [JsonConverter(typeof(ObjectModelConverter))]
     public partial class ObjectModel : ModelObject
     {
         /// <summary>
@@ -146,14 +145,14 @@ namespace DuetAPI.ObjectModel
         /// <param name="offset">Index offset</param>
         /// <param name="last">Whether this is the last update</param>
         /// <returns>Whether the key could be updated</returns>
-        public bool UpdateFromFirmwareJson(string? key, JsonElement jsonElement, int offset = 0, bool last = true) => InternalUpdateFromJson(key, jsonElement, true, offset, last);
+        public bool UpdateFromFirmwareJson(string? key, JsonElement jsonElement, int offset = 0, bool last = true) => GeneratedUpdateFromJson(key, jsonElement, true, offset, last);
 
         /// <summary>
         /// Update this instance from a given JSON element
         /// </summary>
         /// <param name="jsonElement">Element to update this intance from</param>
         /// <returns>Whether the key could be updated</returns>
-        public bool UpdateFromJson(JsonElement jsonElement) => InternalUpdateFromJson(null, jsonElement, false);
+        public bool UpdateFromJson(JsonElement jsonElement) => GeneratedUpdateFromJson(null, jsonElement, false);
 
         /// <summary>
         /// Update a specific key of this instance from a given JSON element
@@ -161,8 +160,9 @@ namespace DuetAPI.ObjectModel
         /// <param name="key">Property name to update</param>
         /// <param name="jsonElement">Element to update this intance from</param>
         /// <returns>Whether the key could be updated</returns>
-        public bool UpdateFromJson(string key, JsonElement jsonElement) => InternalUpdateFromJson(key, jsonElement, false);
+        public bool UpdateFromJson(string key, JsonElement jsonElement) => GeneratedUpdateFromJson(key, jsonElement, false);
 
+#if false
         /// <summary>
         /// Update a specific key of this instance from a given JSON reader
         /// </summary>
@@ -182,6 +182,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <returns></returns>
         public byte[] ToUtf8Json() => JsonSerializer.SerializeToUtf8Bytes(this, Utility.JsonHelper.DefaultJsonOptions);
+#endif
 
         /// <summary>
         /// Static event to be called when the deserialization of a property failed.
@@ -239,6 +240,7 @@ namespace DuetAPI.ObjectModel
         public Exception Exception { get; private set; } = e;
     }
 
+#if false
     /// <summary>
     /// Class used to convert model objects to and from JSON
     /// </summary>
@@ -260,7 +262,7 @@ namespace DuetAPI.ObjectModel
             }
 
             ObjectModel machineModel = new();
-            machineModel.UpdateFromJson(jsonDocument.RootElement, false);
+            machineModel.UpdateFromJson(jsonDocument.RootElement);
             return machineModel;
         }
 
@@ -288,4 +290,5 @@ namespace DuetAPI.ObjectModel
             }
         }
     }
+#endif
 }

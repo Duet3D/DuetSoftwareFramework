@@ -3,7 +3,7 @@
     /// <summary>
     /// Tilt correction parameters for Z leadscrew compensation
     /// </summary>
-    public partial class TiltCorrection : ModelObject
+    public partial class TiltCorrection : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Correction factor

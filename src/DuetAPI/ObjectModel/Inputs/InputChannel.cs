@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a G/M/T-code channel
     /// </summary>
-    public partial class InputChannel : ModelObject
+    public partial class InputChannel : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// True if the input is is in active mode i.e. executing commands for its assigned motion system,

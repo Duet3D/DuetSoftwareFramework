@@ -5,7 +5,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Information about a configured probe
     /// </summary>
-    public partial class Probe : ModelObject
+    public partial class Probe : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Linear coefficient for scanning probes

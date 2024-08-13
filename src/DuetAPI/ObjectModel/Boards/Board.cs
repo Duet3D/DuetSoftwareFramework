@@ -5,7 +5,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Information about a connected board
     /// </summary>
-    public partial class Board : ModelObject
+    public partial class Board : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Accelerometer of this board or null if unknown

@@ -3,7 +3,7 @@
     /// <summary>
     /// Calibrated properties of a rotating magnet filament monitor
     /// </summary>
-    public partial class RotatingMagnetFilamentMonitorCalibrated : ModelObject
+    public partial class RotatingMagnetFilamentMonitorCalibrated : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Extruded distance per revolution (in mm)
@@ -49,7 +49,7 @@
     /// <summary>
     /// Configured properties of a rotating magnet filament monitor
     /// </summary>
-    public class RotatingMagnetFilamentMonitorConfigured : ModelObject
+    public partial class RotatingMagnetFilamentMonitorConfigured : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Whether all moves and not only printing moves are supposed to be checked
@@ -105,7 +105,7 @@
     /// <summary>
     /// Information about a rotating magnet filament monitor
     /// </summary>
-    public class RotatingMagnetFilamentMonitor : Duet3DFilamentMonitor
+    public partial class RotatingMagnetFilamentMonitor : Duet3DFilamentMonitor
     {
         /// <summary>
         /// Constructor of this class

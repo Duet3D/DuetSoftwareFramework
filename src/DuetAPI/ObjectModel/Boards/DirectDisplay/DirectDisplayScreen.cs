@@ -90,7 +90,7 @@ namespace DuetAPI.ObjectModel
 
             if (jsonElement.TryGetProperty("type", out JsonElement nameProperty))
             {
-                DirectDisplayController? directDisplayController = (DirectDisplayController?)JsonSerializer.Deserialize(nameProperty.GetRawText()!, typeof(DirectDisplayController));
+                DirectDisplayController directDisplayController = JsonSerializer.Deserialize<DirectDisplayController>(nameProperty.GetString()!);
                 Type requiredType = GetDirectDisplayScreenType(directDisplayController);
                 if (GetType() != requiredType)
                 {
@@ -100,5 +100,34 @@ namespace DuetAPI.ObjectModel
             }
             return GeneratedUpdateFromJson(jsonElement, ignoreSbcProperties);
         }
+
+#if false
+        /// <summary>
+        /// Update this instance from a given JSON reader
+        /// </summary>
+        /// <param name="reader">JSON reader</param>
+        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+        /// <returns>Updated instance</returns>
+        /// <exception cref="JsonException">Failed to deserialize data</exception>
+
+        public IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+        {
+            Utf8JsonReader readerCopy = reader;
+            while (readerCopy.Read())
+            {
+                if (readerCopy.TokenType == JsonTokenType.PropertyName && reader.ValueTextEquals("type"u8))
+                {
+                    DirectDisplayController directDisplayController = JsonSerializer.Deserialize<DirectDisplayController>(readerCopy.GetString()!);
+                    Type requiredType = GetDirectDisplayScreenType(directDisplayController);
+                    if (GetType() != requiredType)
+                    {
+                        DirectDisplayScreen newInstance = (DirectDisplayScreen)Activator.CreateInstance(requiredType)!;
+                        return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                    }
+                }
+            }
+            return GeneratedUpdateFromJsonReader(ref reader, ignoreSbcProperties);
+        }
+#endif
     }
 }

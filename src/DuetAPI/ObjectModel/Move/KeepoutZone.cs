@@ -3,7 +3,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Coordinates of a keep-out zone
     /// </summary>
-    public partial class KeepoutZoneCoordinates : ModelObject
+    public partial class KeepoutZoneCoordinates : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Minimum axis coordinate
@@ -29,7 +29,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Information about a configured keep-out zone
     /// </summary>
-    public partial class KeepoutZone : ModelObject
+    public partial class KeepoutZone : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Indicates if this keep-out zone is enabled

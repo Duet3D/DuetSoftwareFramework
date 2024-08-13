@@ -24,8 +24,9 @@ namespace SourceGenerators
         /// <param name="context">Context</param>
         public void Execute(GeneratorExecutionContext context)
         {
-           ObjectModelGenerator.Execute(context);
-           ModelObjectGenerator.Execute(context);
+            (context.SyntaxReceiver as SourceGeneratorSyntaxReceiver)!.Prepare();
+            ObjectModelGenerator.Execute(context);
+            ModelObjectGenerator.Execute(context);
         }
     }
 }

@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the current build
     /// </summary>
-    public partial class Build : ModelObject
+    public partial class Build : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Index of the current object being printed or -1 if unknown

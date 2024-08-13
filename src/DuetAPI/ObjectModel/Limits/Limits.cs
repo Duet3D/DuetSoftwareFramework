@@ -3,7 +3,7 @@
     /// <summary>
     /// Machine configuration limits
     /// </summary>
-    public partial class Limits : ModelObject
+    public partial class Limits : ModelObject, IStaticModelObject
 	{
 		/// <summary>
 		/// Maximum number of axes or null if unknown

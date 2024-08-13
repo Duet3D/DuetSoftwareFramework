@@ -3,7 +3,7 @@
     /// <summary>
     /// Idle factor parameters for automatic motor current reduction
     /// </summary>
-    public partial class MotorsIdleControl : ModelObject
+    public partial class MotorsIdleControl : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Motor current reduction factor (0..1)

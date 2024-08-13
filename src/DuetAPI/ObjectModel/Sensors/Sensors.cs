@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about sensors
     /// </summary>
-    public partial class Sensors : ModelObject
+    public partial class Sensors : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// List of analog sensors

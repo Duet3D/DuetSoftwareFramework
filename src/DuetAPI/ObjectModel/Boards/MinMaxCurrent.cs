@@ -3,7 +3,7 @@
     /// <summary>
     /// Provides minimum, maximum and current values
     /// </summary>
-    public partial class MinMaxCurrent : ModelObject
+    public partial class MinMaxCurrent : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Current value

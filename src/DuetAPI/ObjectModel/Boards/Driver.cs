@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a driver
     /// </summary>
-    public partial class Driver : ModelObject
+    public partial class Driver : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Closed-loop settings (if applicable)

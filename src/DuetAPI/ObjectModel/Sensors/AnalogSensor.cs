@@ -3,7 +3,7 @@
     /// <summary>
     /// Representation of an analog sensor
     /// </summary>
-    public partial class AnalogSensor : ModelObject
+    public partial class AnalogSensor : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Beta value of this sensor (if applicable)

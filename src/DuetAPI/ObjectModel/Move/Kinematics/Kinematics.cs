@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Information about the configured geometry
     /// </summary>
-    public partial class Kinematics : DynamicModelObject
+    public partial class Kinematics : ModelObject, IDynamicModelObject
     {
         /// <summary>
         /// Name of the configured kinematics
@@ -53,7 +53,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
-        public override IStaticModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public IDynamicModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {
@@ -70,7 +70,12 @@ namespace DuetAPI.ObjectModel
                     return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
                 }
             }
-            return base.UpdateFromJson(jsonElement, ignoreSbcProperties);
+            return GeneratedUpdateFromJson(jsonElement, ignoreSbcProperties);
+        }
+
+        public IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+        {
+            throw new NotImplementedException();
         }
     }
 }

@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a configured LED strip
     /// </summary>
-    public partial class LedStrip : ModelObject
+    public partial class LedStrip : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Board address of the corresponding pin

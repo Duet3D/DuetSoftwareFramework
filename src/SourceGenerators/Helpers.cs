@@ -1,6 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System;
 using System.Linq;
 
 namespace SourceGenerators
@@ -32,6 +33,23 @@ namespace SourceGenerators
                 return gns.Identifier.ValueText;
             }
             return propertySyntax.Type.ToString();
+        }
+
+        public static string GetGenericPropertyType(this PropertyDeclarationSyntax propertySyntax)
+        {
+            if (propertySyntax.Type is NullableTypeSyntax nts)
+            {
+                if (nts.ElementType is GenericNameSyntax gns)
+                {
+                    return gns.TypeArgumentList.Arguments[0].ToString();
+                }
+                return nts.ElementType.ToString();
+            }
+            else if (propertySyntax.Type is GenericNameSyntax gns)
+            {
+                return gns.TypeArgumentList.Arguments[0].ToString();
+            }
+            throw new ArgumentException("Property is not a generic type");
         }
 
         public static bool HasSetter(this PropertyDeclarationSyntax propertySyntax)

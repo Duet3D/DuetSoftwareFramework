@@ -6,6 +6,7 @@
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<Description>Official API library for Duet Software Framework (Duet 3) by Duet3D</Description>
 		<PackageIcon>duet_teardrop_wifi_large.png</PackageIcon>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
 	</PropertyGroup>
 
   <PropertyGroup>

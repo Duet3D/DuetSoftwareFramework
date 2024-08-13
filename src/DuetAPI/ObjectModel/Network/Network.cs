@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the network subsystem
     /// </summary>
-    public partial class Network : ModelObject
+    public partial class Network : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Default name of the machine

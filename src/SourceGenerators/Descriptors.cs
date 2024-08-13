@@ -16,5 +16,12 @@ namespace SourceGenerators
                                                                           category: "DOM",
                                                                           DiagnosticSeverity.Error,
                                                                           isEnabledByDefault: true);
+        public static readonly DiagnosticDescriptor IncompleteModelObjectClass = new(id: "DOM003",
+                                                                                     title: "Incomplete model class",
+                                                                                     messageFormat: "Model class {0} lacks the IStaticModelObject or IDyanmicModelObject interfaces",
+                                                                                     category: "DOM",
+                                                                                     DiagnosticSeverity.Error,
+                                                                                     isEnabledByDefault: true);
+
     }
 }

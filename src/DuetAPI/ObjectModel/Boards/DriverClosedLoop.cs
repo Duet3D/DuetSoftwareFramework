@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the current fraction of the closed-loop configuration
     /// </summary>
-    public partial class ClosedLoopCurrentFraction : ModelObject
+    public partial class ClosedLoopCurrentFraction : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Average fraction
@@ -29,7 +29,7 @@
     /// <summary>
     /// Information about the current fraction of the closed-loop configuration
     /// </summary>
-    public partial class ClosedLoopPositionError : ModelObject
+    public partial class ClosedLoopPositionError : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Maximum position error
@@ -55,7 +55,7 @@
     /// <summary>
     /// This represents information about closed-loop tuning
     /// </summary>
-    public partial class DriverClosedLoop : ModelObject
+    public partial class DriverClosedLoop : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Current fraction

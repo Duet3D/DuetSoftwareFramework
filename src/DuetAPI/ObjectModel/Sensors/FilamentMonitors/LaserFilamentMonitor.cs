@@ -3,7 +3,7 @@
     /// <summary>
     /// Calibrated properties of a laser filament monitor
     /// </summary>
-    public partial class LaserFilamentMonitorCalibrated : ModelObject
+    public partial class LaserFilamentMonitorCalibrated : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Calibration factor of this sensor
@@ -59,7 +59,7 @@
     /// <summary>
     /// Configured properties of a laser filament monitor
     /// </summary>
-    public class LaserFilamentMonitorConfigured : ModelObject
+    public partial class LaserFilamentMonitorConfigured : ModelObject, IStaticModelObject
 	{
 		/// <summary>
 		/// Whether all moves and not only printing moves are supposed to be checked
@@ -105,7 +105,7 @@
 	/// <summary>
 	/// Information about a laser filament monitor
 	/// </summary>
-    public class LaserFilamentMonitor : Duet3DFilamentMonitor
+    public partial class LaserFilamentMonitor : Duet3DFilamentMonitor
     {
 		/// <summary>
 		/// Constructor of this class

@@ -3,7 +3,7 @@
     /// <summary>
     /// Details about the PID model of a heater
     /// </summary>
-    public partial class HeaterModelPID : ModelObject
+    public partial class HeaterModelPID : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Derivative value of the PID regulator

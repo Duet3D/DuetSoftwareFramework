@@ -3,7 +3,7 @@
     /// <summary>
     /// Tool retraction parameters
     /// </summary>
-    public partial class ToolRetraction : ModelObject
+    public partial class ToolRetraction : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Amount of additional filament to extrude when undoing a retraction (in mm)

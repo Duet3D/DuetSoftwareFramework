@@ -3,7 +3,7 @@
     /// <summary>
     /// Class holding information about a restore point
     /// </summary>
-    public partial class RestorePoint : ModelObject
+    public partial class RestorePoint : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Axis coordinates of the restore point (in mm)
