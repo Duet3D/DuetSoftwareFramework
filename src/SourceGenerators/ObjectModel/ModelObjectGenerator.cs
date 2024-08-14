@@ -63,7 +63,8 @@ namespace DuetAPI.ObjectModel
         {
             List<PropertyDeclarationSyntax> properties = receiver.ModelObjectMembers[cls];
             List<MethodDeclarationSyntax> methods = receiver.ModelObjectMethods[cls];
-            bool isDynamic = receiver.DynamicModelObjectClasses.Contains(cls), isInherited = receiver.InheritedClasses.Any(ic => ic.Key.Identifier.ValueText == cls);
+            bool isDynamic = receiver.DynamicModelObjectClasses.Contains(cls);
+            bool isInherited = receiver.InheritedClasses.Any(ic => ic.Key.Identifier.ValueText == cls), isInheritedFrom = receiver.InheritedClasses.Any(ic => ic.Value == cls);
 
             string GeneratePropertyUpdateCalls()
             {
@@ -576,7 +577,7 @@ namespace DuetAPI.ObjectModel
         /// <param name=""jsonElement"">Element to update this intance from</param>
         /// <param name=""ignoreSbcProperties"">Whether SBC properties are ignored</param>{(isDynamic ? "\n        /// <returns>Updated instance</returns>" : "")}
         /// <exception cref=""JsonException"">Failed to deserialize data</exception>
-        public {((isInherited ? "new " : "") + (isDynamic ? "IDynamicModelObject?" : "void"))} {(useGeneratedUpdateFromJson ? "Generated" : "")}UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public {((isInherited ? "override " : (isInheritedFrom ? "virtual " : "")) + (isDynamic ? "IDynamicModelObject?" : "void"))} {(useGeneratedUpdateFromJson ? "Generated" : "")}UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {{
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {{
