@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -14,7 +15,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Filament consumption per extruder drive (in mm)
         /// </summary>
-        public ModelCollection<float> Filament { get; } = [];
+        public ObservableCollection<float> Filament { get; } = [];
 
         /// <summary>
         /// The filename of the G-code file

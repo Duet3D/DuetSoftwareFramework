@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿#if false
+using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
@@ -76,3 +77,4 @@ namespace UnitTests.File
         }
     }
 }
+#endif

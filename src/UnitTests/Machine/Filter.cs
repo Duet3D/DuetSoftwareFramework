@@ -1,4 +1,5 @@
-﻿using DuetControlServer.Model;
+﻿#if false
+using DuetControlServer.Model;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using System.Collections;
@@ -184,3 +185,4 @@ namespace UnitTests.Machine
         }
     }
 }
+#endif

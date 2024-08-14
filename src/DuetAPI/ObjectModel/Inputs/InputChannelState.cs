@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
 	/// <summary>
 	/// State of a channel
 	/// </summary>
-	[JsonConverter(typeof(JsonCamelCaseStringEnumConverter))]
+	[JsonConverter(typeof(JsonCamelCaseStringEnumConverter<InputChannelState>))]
 	public enum InputChannelState
 	{
 		/// <summary>

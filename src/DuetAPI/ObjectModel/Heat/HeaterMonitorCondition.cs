@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Trigger condition for a heater monitor
     /// </summary>
-    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter))]
+    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<HeaterMonitorCondition>))]
     public enum HeaterMonitorCondition
     {
         /// <summary>

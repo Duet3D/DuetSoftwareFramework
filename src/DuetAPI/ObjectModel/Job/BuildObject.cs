@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System.Collections.ObjectModel;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about a detected build object
@@ -28,11 +30,11 @@
         /// <summary>
         /// X coordinates of the build object (in mm or null if not found)
         /// </summary>
-        public ModelCollection<float?> X { get; } = [];
+        public ObservableCollection<float?> X { get; } = [];
 
         /// <summary>
         /// Y coordinates of the build object (in mm or null if not found)
         /// </summary>
-        public ModelCollection<float?> Y { get; } = [];
+        public ObservableCollection<float?> Y { get; } = [];
     }
 }

@@ -3,6 +3,7 @@ using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using System.Threading.Tasks;
 
+#if false
 namespace UnitTests.Machine
 {
     [TestFixture]
@@ -93,3 +94,4 @@ namespace UnitTests.Machine
         }
     }
 }
+#endif

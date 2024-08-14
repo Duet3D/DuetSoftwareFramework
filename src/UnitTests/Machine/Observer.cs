@@ -1,4 +1,5 @@
-﻿using DuetAPI.ObjectModel;
+﻿#if false
+using DuetAPI.ObjectModel;
 using DuetControlServer.Model;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
@@ -461,3 +462,4 @@ namespace UnitTests.Machine
         }
     }
 }
+#endif

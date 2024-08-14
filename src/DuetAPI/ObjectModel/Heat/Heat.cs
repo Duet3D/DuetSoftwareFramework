@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System.Collections.ObjectModel;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about the heat subsystem
@@ -12,7 +14,7 @@
         /// <remarks>
         /// Items may be -1 if unconfigured
         /// </remarks>
-        public ModelCollection<int> BedHeaters { get; } = [];
+        public ObservableCollection<int> BedHeaters { get; } = [];
         
         /// <summary>
         /// List of configured chamber heaters (indices)
@@ -21,7 +23,7 @@
         /// <remarks>
         /// Items may be -1 if unconfigured
         /// </remarks>
-        public ModelCollection<int> ChamberHeaters { get; } = [];
+        public ObservableCollection<int> ChamberHeaters { get; } = [];
         
         /// <summary>
         /// Minimum required temperature for extrusion moves (in C)

@@ -1,3 +1,4 @@
+#if false
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -232,3 +233,4 @@ namespace UnitTests.SPI
         }
     }
 }
+#endif

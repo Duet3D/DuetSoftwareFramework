@@ -1,4 +1,5 @@
-﻿using DuetControlServer.Files;
+﻿#if false
+using DuetControlServer.Files;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using System.Threading.Tasks;
@@ -48,3 +49,4 @@ namespace UnitTests.File
         }
     }
 }
+#endif

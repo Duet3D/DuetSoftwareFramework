@@ -3,10 +3,10 @@ using System.Text.Json.Serialization;
 
 namespace DuetAPI.ObjectModel
 {
-    /// <summary>
-    /// Enumeration of possible network interface states
-    /// </summary>
-    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter))]
+	/// <summary>
+	/// Enumeration of possible network interface states
+	/// </summary>
+	[JsonConverter(typeof(JsonStringEnumConverter<NetworkState>))]
     public enum NetworkState
     {
 		/// <summary>

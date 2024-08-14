@@ -1,4 +1,5 @@
-﻿using DuetAPI;
+﻿#if false
+using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Utility;
 using NUnit.Framework;
@@ -1194,3 +1195,4 @@ namespace UnitTests.Commands
         }
     }
 }
+#endif

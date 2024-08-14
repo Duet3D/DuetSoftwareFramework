@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System.Collections.ObjectModel;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Tilt correction parameters for Z leadscrew compensation
@@ -18,7 +20,7 @@
         /// <summary>
         /// Last corrections (in mm)
         /// </summary>
-        public ModelCollection<float> LastCorrections { get; } = [];
+        public ObservableCollection<float> LastCorrections { get; } = [];
 
         /// <summary>
         /// Maximum Z correction (in mm)
@@ -43,11 +45,11 @@
         /// <summary>
         /// X positions of the leadscrews (in mm)
         /// </summary>
-        public ModelCollection<float> ScrewX { get; } = [];
+        public ObservableCollection<float> ScrewX { get; } = [];
 
         /// <summary>
         /// Y positions of the leadscrews (in mm)
         /// </summary>
-        public ModelCollection<float> ScrewY { get; } = [];
+        public ObservableCollection<float> ScrewY { get; } = [];
     }
 }

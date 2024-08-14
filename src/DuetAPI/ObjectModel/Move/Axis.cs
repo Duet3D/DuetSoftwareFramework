@@ -1,4 +1,5 @@
 ﻿using DuetAPI.Utility;
+using System.Collections.ObjectModel;
 
 namespace DuetAPI.ObjectModel
 {
@@ -226,6 +227,6 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Offsets of this axis for each workplace (in mm)
         /// </summary>
-        public ModelCollection<float> WorkplaceOffsets { get; } = [];
+        public ObservableCollection<float> WorkplaceOffsets { get; } = [];
     }
 }

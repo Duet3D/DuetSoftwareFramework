@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System.Collections.ObjectModel;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Class holding information about a restore point
@@ -8,7 +10,7 @@
         /// <summary>
         /// Axis coordinates of the restore point (in mm)
         /// </summary>
-        public ModelCollection<float> Coords { get; } = [];
+        public ObservableCollection<float> Coords { get; } = [];
 
         /// <summary>
         /// The virtual extruder position at the start of this move

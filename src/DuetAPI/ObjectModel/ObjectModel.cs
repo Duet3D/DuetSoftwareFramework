@@ -240,55 +240,9 @@ namespace DuetAPI.ObjectModel
         public Exception Exception { get; private set; } = e;
     }
 
-#if false
     /// <summary>
-    /// Class used to convert model objects to and from JSON
+    /// Use .NET's source generator for the object model
     /// </summary>
-    public class ObjectModelConverter : JsonConverter<ObjectModel>
-    {
-        /// <summary>
-        /// Read a machine model object from a JSON reader
-        /// </summary>
-        /// <param name="reader">JSON reader</param>
-        /// <param name="typeToConvert">Target type</param>
-        /// <param name="options">JSON options</param>
-        /// <returns>Machine model</returns>
-        public override ObjectModel? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            using JsonDocument jsonDocument = JsonDocument.ParseValue(ref reader);
-            if (jsonDocument.RootElement.ValueKind == JsonValueKind.Null)
-            {
-                return null;
-            }
-
-            ObjectModel machineModel = new();
-            machineModel.UpdateFromJson(jsonDocument.RootElement);
-            return machineModel;
-        }
-
-        /// <summary>
-        /// Write a machine model to a JSON writer
-        /// </summary>
-        /// <param name="writer">JSON writer</param>
-        /// <param name="value">Machine model</param>
-        /// <param name="options">JSON options</param>
-        public override void Write(Utf8JsonWriter writer, ObjectModel value, JsonSerializerOptions options)
-        {
-            if (value is null)
-            {
-                writer.WriteNullValue();
-            }
-            else
-            {
-                writer.WriteStartObject();
-                foreach (KeyValuePair<string, PropertyInfo> jsonProperty in value.JsonProperties)
-                {
-                    writer.WritePropertyName(jsonProperty.Key);
-                    JsonSerializer.Serialize(writer, jsonProperty.Value.GetValue(value), jsonProperty.Value.PropertyType, options);
-                }
-                writer.WriteEndObject();
-            }
-        }
-    }
-#endif
+    [JsonSerializable(typeof(ObjectModel))]
+    internal partial class ObjectModelContext : JsonSerializerContext { }
 }

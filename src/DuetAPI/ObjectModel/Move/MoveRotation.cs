@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System.Collections.ObjectModel;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about centre rotation as defined by G68
@@ -18,6 +20,6 @@
         /// <summary>
         /// XY coordinates of the centre rotation
         /// </summary>
-        public ModelCollection<float> Centre { get; } = [0F, 0F];
+        public ObservableCollection<float> Centre { get; } = [0F, 0F];
     }
 }

@@ -1,11 +1,12 @@
-﻿using System.Text.Json.Serialization;
+﻿using DuetAPI.Utility;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Defines what a user is allowed to do
     /// </summary>
-    [JsonConverter(typeof(Utility.JsonCamelCaseStringEnumConverter))]
+    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<AccessLevel>))]
     public enum AccessLevel
     {
         /// <summary>

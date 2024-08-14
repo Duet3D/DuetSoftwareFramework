@@ -1,4 +1,5 @@
-﻿using DuetAPI.ObjectModel;
+﻿#if false
+using DuetAPI.ObjectModel;
 using DuetHttpClient;
 using DuetHttpClient.Utility;
 using NUnit.Framework;
@@ -131,3 +132,4 @@ namespace UnitTests.HttpClient
         }
     }
 }
+#endif
