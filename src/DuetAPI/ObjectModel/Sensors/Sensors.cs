@@ -9,30 +9,30 @@
         /// List of analog sensors
         /// </summary>
         /// <seealso cref="AnalogSensor"/>
-        public ModelCollection<AnalogSensor?> Analog { get; } = [];
+        public StaticModelCollection<AnalogSensor?> Analog { get; } = [];
 
         /// <summary>
         /// List of configured endstops
         /// </summary>
         /// <seealso cref="Endstop"/>
-        public ModelCollection<Endstop?> Endstops { get; } = [];
+        public StaticModelCollection<Endstop?> Endstops { get; } = [];
 
         /// <summary>
         /// List of configured filament monitors
         /// </summary>
         /// <seealso cref="FilamentMonitor"/>
-        public ModelCollection<FilamentMonitor?> FilamentMonitors { get; } = [];
+        public DynamicModelCollection<FilamentMonitor?> FilamentMonitors { get; } = [];
 
         /// <summary>
         /// List of general-purpose input ports
         /// </summary>
         /// <seealso cref="GpInputPort"/>
-        public ModelCollection<GpInputPort?> GpIn { get; } = [];
+        public StaticModelCollection<GpInputPort?> GpIn { get; } = [];
 
         /// <summary>
         /// List of configured probes
         /// </summary>
         /// <seealso cref="Probe"/>
-        public ModelCollection<Probe?> Probes { get; } = [];
+        public StaticModelCollection<Probe?> Probes { get; } = [];
     }
 }

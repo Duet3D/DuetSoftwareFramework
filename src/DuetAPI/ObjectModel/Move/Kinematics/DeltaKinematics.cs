@@ -38,7 +38,7 @@
         /// <summary>
         /// Delta tower properties
         /// </summary>
-        public ModelCollection<DeltaTower> Towers { get; } = [];
+        public StaticModelCollection<DeltaTower> Towers { get; } = [];
 
         /// <summary>
         /// How much Z needs to be raised for each unit of movement in the +X direction

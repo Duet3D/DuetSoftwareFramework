@@ -1,10 +1,12 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
+using System;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Principal;
 using System.Text;
 
 namespace SourceGenerators.ObjectModel
@@ -86,61 +88,59 @@ namespace DuetAPI.ObjectModel
                     first = false;
 
                     // assignment
-                    if (propType is "ModelCollection" or "ModelGrowingCollection" or "ModelDictionary" ||
+                    if (propType is "DynamicModelCollection" or "StaticModelCollection" or "ModelGrowingCollection" or "ModelDictionary" ||
                         receiver.ModelCollectionMembers.ContainsKey(propType) || receiver.ModelObjectMembers.ContainsKey(propType))
                     {
-                        void WriteSetOrUpdate()
+                        bool isSbcProperty = Helpers.IsSbcProperty(prop);
+                        if (isSbcProperty)
                         {
-                            if (prop.Type is NullableTypeSyntax nts)
+                            writer.WriteLine("if (!ignoreSbcProperties)");
+                            writer.WriteLine("{");
+                            writer.Indent++;
+                        }
+
+                        if (prop.Type is NullableTypeSyntax nts)
+                        {
+                            writer.WriteLine("if (jsonProperty.Value.ValueKind == JsonValueKind.Null)");
+                            writer.WriteLine("{");
+                            writer.Indent++;
+                            writer.WriteLine($"{prop.Identifier.ValueText} = null;");
+                            writer.Indent--;
+                            writer.WriteLine("}");
+                            writer.WriteLine("else");
+                            writer.WriteLine("{");
+                            writer.Indent++;
+                            writer.WriteLine($"if ({prop.Identifier.ValueText} == null)");
+                            writer.WriteLine("{");
+                            writer.Indent++;
+                            writer.WriteLine($"{prop.Identifier.ValueText} = new {nts.ElementType}();");
+                            writer.Indent--;
+                            writer.WriteLine("}");
+                            if (receiver.DynamicModelObjectClasses.Contains(nts.ElementType.ToString()))
                             {
-                                writer.WriteLine("if (jsonProperty.Value.ValueKind == JsonValueKind.Null)");
-                                writer.WriteLine("{");
-                                writer.Indent++;
-                                writer.WriteLine($"{prop.Identifier.ValueText} = null;");
-                                writer.Indent--;
-                                writer.WriteLine("}");
-                                writer.WriteLine("else");
-                                writer.WriteLine("{");
-                                writer.Indent++;
-                                writer.WriteLine($"if ({prop.Identifier.ValueText} == null)");
-                                writer.WriteLine("{");
-                                writer.Indent++;
-                                writer.WriteLine($"{prop.Identifier.ValueText} = new {nts.ElementType}();");
-                                writer.Indent--;
-                                writer.WriteLine("}");
-                                if (receiver.DynamicModelObjectClasses.Contains(nts.ElementType.ToString()))
-                                {
-                                    writer.WriteLine($"{prop.Identifier.ValueText} = {prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);");
-                                }
-                                else
-                                {
-                                    writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);");
-                                }
-                                writer.Indent--;
-                                writer.WriteLine("}");
+                                writer.WriteLine($"{prop.Identifier.ValueText} = {prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);");
                             }
                             else
                             {
                                 writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);");
                             }
-                        }
-
-                        if (Helpers.IsSbcProperty(prop))
-                        {
-                            writer.WriteLine("if (!ignoreSbcProperties)");
-                            writer.WriteLine("{");
-                            writer.Indent++;
-                            WriteSetOrUpdate();
                             writer.Indent--;
                             writer.WriteLine("}");
                         }
                         else
                         {
-                            WriteSetOrUpdate();
+                            writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);");
+                        }
+
+                        if (isSbcProperty)
+                        {
+                            writer.Indent--;
+                            writer.WriteLine("}");
                         }
                     }
                     else if (propType is "ObservableCollection")
                     {
+                        // Starting condition in case this value is nullable
                         if (prop.Type is NullableTypeSyntax)
                         {
                             writer.WriteLine("if (jsonProperty.Value.ValueKind == JsonValueKind.Null)");
@@ -162,11 +162,36 @@ namespace DuetAPI.ObjectModel
                             genericPropType = genericPropType.Substring(0, genericPropType.Length - 1);
                         }
 
+                        bool isEnum = false;
+                        Tuple<string, string>? varNameAndItemGetter = genericPropType switch
+                        {
+                            "int" => new("newIntValue", "GetInt32()"),
+                            "string" => new("newStringValue", "GetString()!"),
+                            "char" => new("newCharValue", "GetString()[0]!"),
+                            "float" => new("newFloatValue", "GetSingle()"),
+                            "float[]" => new("newFloatArrayValue", "EnumerateArray().Select(e => e.GetSingle()).ToArray()"),
+                            "int[]" => new("newIntArrayValue", "EnumerateArray().Select(e => e.GetInt32()).ToArray()"),
+                            "DriverId" => new("newDriverIdValue", "GetString()!"),
+                            _ => null
+                        };
+                        if (varNameAndItemGetter == null && receiver.Enums.Contains(genericPropType))
+                        {
+                            isEnum = true;
+                            varNameAndItemGetter = new($"new{genericPropType}Value", "GetString()!");
+                        }
+                        if (varNameAndItemGetter == null)
+                        {
+                            context.ReportDiagnostic(Diagnostic.Create(Descriptors.UnsupportedType, prop.GetLocation(), jsonPropertyName, cls));
+                            continue;
+                        }
+
                         // Update existing items
                         writer.WriteLine("int newCount = jsonProperty.Value.GetArrayLength();");
                         writer.WriteLine($"for (int i = 0; i < Math.Min({prop.Identifier.ValueText}.Count, newCount); i++)");
                         writer.WriteLine("{");
                         writer.Indent++;
+
+                        // Starting condition in case this item value is nullable
                         if (isNullableItemType)
                         {
                             writer.WriteLine("if (jsonProperty.Value[i].ValueKind == JsonValueKind.Null)");
@@ -179,71 +204,35 @@ namespace DuetAPI.ObjectModel
                             writer.WriteLine("{");
                             writer.Indent++;
                         }
-                        switch (genericPropType)
+
+                        // Item assignment
+                        if (genericPropType == "DriverId")
                         {
-                            case "int":
-                                writer.WriteLine("int newIntValue = jsonProperty.Value[i].GetInt32();");
-                                writer.WriteLine($"if ({prop.Identifier.ValueText}[i] != newIntValue)");
-                                writer.WriteLine("{");
-                                writer.Indent++;
-                                writer.WriteLine($"{prop.Identifier.ValueText}[i] = newIntValue;");
-                                writer.Indent--;
-                                writer.WriteLine("}");
-                                break;
-                            case "string":
-                                writer.WriteLine("string newStringValue = jsonProperty.Value[i].GetString()!;");
-                                writer.WriteLine($"if ({prop.Identifier.ValueText}[i] != newStringValue)");
-                                writer.WriteLine("{");
-                                writer.Indent++;
-                                writer.WriteLine($"{prop.Identifier.ValueText}[i] = newStringValue;");
-                                writer.Indent--;
-                                writer.WriteLine("}");
-                                break;
-                            case "char":
-                                writer.WriteLine("char newCharValue = jsonProperty.Value[i].GetString()[0]!;");
-                                writer.WriteLine($"if ({prop.Identifier.ValueText}[i] != newCharValue)");
-                                writer.WriteLine("{");
-                                writer.Indent++;
-                                writer.WriteLine($"{prop.Identifier.ValueText}[i] = newCharValue;");
-                                writer.Indent--;
-                                writer.WriteLine("}");
-                                break;
-                            case "float":
-                                writer.WriteLine("float newFloatValue = jsonProperty.Value[i].GetSingle();");
-                                writer.WriteLine($"if ({prop.Identifier.ValueText}[i] != newFloatValue)");
-                                writer.WriteLine("{");
-                                writer.Indent++;
-                                writer.WriteLine($"{prop.Identifier.ValueText}[i] = newFloatValue;");
-                                writer.Indent--;
-                                writer.WriteLine("}");
-                                break;
-                            case "float[]":
-                                writer.WriteLine("float[] newFloatArrayValue = jsonProperty.Value[i].EnumerateArray().Select(e => e.GetSingle()).ToArray();");
-                                writer.WriteLine($"if (!newFloatArrayValue.SequenceEqual({prop.Identifier.ValueText}[i]))");
-                                writer.WriteLine("{");
-                                writer.Indent++;
-                                writer.WriteLine($"{prop.Identifier.ValueText}[i] = newFloatArrayValue;");
-                                writer.Indent--;
-                                writer.WriteLine("}");
-                                break;
-                            case "int[]":
-                                writer.WriteLine("int[] newIntArrayValue = jsonProperty.Value[i].EnumerateArray().Select(e => e.GetInt32()).ToArray();");
-                                writer.WriteLine($"if (!newIntArrayValue.SequenceEqual({prop.Identifier.ValueText}[i]))");
-                                writer.WriteLine("{");
-                                writer.Indent++;
-                                writer.WriteLine($"{prop.Identifier.ValueText}[i] = newIntArrayValue;");
-                                writer.Indent--;
-                                writer.WriteLine("}");
-                                break;
-                            default:
-                                context.ReportDiagnostic(Diagnostic.Create(Descriptors.UnsupportedType, prop.GetLocation(), jsonPropertyName, cls));
-                                break;
+                            writer.WriteLine($"DriverId newDriverIdValue = new DriverId(jsonProperty.Value[i].GetString()!);");
                         }
+                        else if (isEnum)
+                        {
+                            writer.WriteLine($"{genericPropType} new{genericPropType}Value = JsonSerializer.Deserialize<{genericPropType}>(jsonProperty.Value[i].GetRawText());");
+                        }
+                        else
+                        {
+                            writer.WriteLine($"{genericPropType} {varNameAndItemGetter!.Item1} = jsonProperty.Value[i].{varNameAndItemGetter.Item2};");
+                        }
+                        writer.WriteLine($"if ({prop.Identifier.ValueText}[i] != {varNameAndItemGetter.Item1})");
+                        writer.WriteLine("{");
+                        writer.Indent++;
+                        writer.WriteLine($"{prop.Identifier.ValueText}[i] = {varNameAndItemGetter.Item1};");
+                        writer.Indent--;
+                        writer.WriteLine("}");
+
+                        // Closing brace in case this item value is nullable
                         if (isNullableItemType)
                         {
                             writer.Indent--;
                             writer.WriteLine("}");
                         }
+
+                        // End of item assignment
                         writer.Indent--;
                         writer.WriteLine("}");
 
@@ -251,6 +240,8 @@ namespace DuetAPI.ObjectModel
                         writer.WriteLine($"for (int i = {prop.Identifier.ValueText}.Count; i < newCount; i++)");
                         writer.WriteLine("{");
                         writer.Indent++;
+
+                        // Starting condition in case this item value is nullable
                         if (isNullableItemType)
                         {
                             writer.WriteLine("if (jsonProperty.Value[i].ValueKind == JsonValueKind.Null)");
@@ -264,31 +255,28 @@ namespace DuetAPI.ObjectModel
                             writer.Indent++;
                         }
 
-                        string? itemGetter = genericPropType switch
+                        // Add item value
+                        if (genericPropType == "DriverId")
                         {
-                            "int" => "GetInt32()",
-                            "string" => "GetString()!",
-                            "char" => "GetString()[0]!",
-                            "float" => "GetSingle()",
-                            "float[]" => "EnumerateArray().Select(e => e.GetSingle()).ToArray()",
-                            "int[]" => "EnumerateArray().Select(e => e.GetInt32()).ToArray()",
-                            _ => null
-                        };
-
-                        if (itemGetter != null)
+                            writer.WriteLine($"{prop.Identifier.ValueText}.Add(new DriverId(jsonProperty.Value[i].GetString()!));");
+                        }
+                        else if (isEnum)
                         {
-                            writer.WriteLine($"{prop.Identifier.ValueText}.Add(jsonProperty.Value[i].{itemGetter});");
+                            writer.WriteLine($"{prop.Identifier.ValueText}.Add(JsonSerializer.Deserialize<{genericPropType}>(jsonProperty.Value[i].GetRawText()));");
                         }
                         else
                         {
-                            context.ReportDiagnostic(Diagnostic.Create(Descriptors.UnsupportedType, prop.GetLocation(), jsonPropertyName, cls));
+                            writer.WriteLine($"{prop.Identifier.ValueText}.Add(jsonProperty.Value[i].{varNameAndItemGetter.Item2});");
                         }
                         
+                        // Closing brace in case this item value is nullable
                         if (isNullableItemType)
                         {
                             writer.Indent--;
                             writer.WriteLine("}");
                         }
+
+                        // End of item add value
                         writer.Indent--;
                         writer.WriteLine("}");
 
@@ -439,7 +427,7 @@ namespace DuetAPI.ObjectModel
                     first = false;
 
                     // read call
-                    if (propType is "ModelCollection" or "ModelGrowingCollection" or "ModelDictionary" ||
+                    if (propType is "DynamicModelCollection" or "StaticModelCollection" or "ModelGrowingCollection" or "ModelDictionary" ||
                         receiver.ModelCollectionMembers.ContainsKey(propType) || receiver.ModelObjectMembers.ContainsKey(propType))
                     {
                         void WriteSetOrUpdate()
@@ -463,7 +451,7 @@ namespace DuetAPI.ObjectModel
                                 writer.WriteLine("}");
                                 if (receiver.DynamicModelObjectClasses.Contains(nts.ElementType.ToString()))
                                 {
-                                    if (propType is "ModelCollection" or "ModelGrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
+                                    if (propType is "DynamicModelCollection" or "StaticModelCollection" or "ModelGrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
                                     {
                                         writer.WriteLine($"{prop.Identifier.ValueText} = {prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, offset, last);");
                                     }
@@ -474,7 +462,7 @@ namespace DuetAPI.ObjectModel
                                 }
                                 else
                                 {
-                                    if (propType is "ModelCollection" or "ModelGrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
+                                    if (propType is "DynamicModelCollection" or "StaticModelCollection" or "ModelGrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
                                     {
                                         writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, offset, last);");
                                     }
@@ -486,7 +474,7 @@ namespace DuetAPI.ObjectModel
                                 writer.Indent--;
                                 writer.WriteLine("}");
                             }
-                            else if (propType is "ModelCollection" or "ModelGrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
+                            else if (propType is "DynamicModelCollection" or "StaticModelCollection" or "ModelGrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
                             {
                                 writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, offset, last);");
                             }

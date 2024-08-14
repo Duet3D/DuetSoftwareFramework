@@ -60,7 +60,7 @@ namespace SourceGenerators
                             IncompleteModelObjectClasses.Add(cds.Identifier.ValueText, cds.GetLocation());
                         }
                     }
-                    else if (cds.BaseList.Types.Any(type => type.Type is GenericNameSyntax gns && gns.Identifier.ValueText == "ModelCollection"))
+                    else if (cds.BaseList.Types.Any(type => type.Type is GenericNameSyntax gns && gns.Identifier.ValueText is "DynamicModelCollection" or "StaticModelCollection"))
                     {
                         var membersAndMethods = GetClassMembersAndMethods();
                         ModelCollectionMembers.Add(cds.Identifier.ValueText, membersAndMethods.Item1);

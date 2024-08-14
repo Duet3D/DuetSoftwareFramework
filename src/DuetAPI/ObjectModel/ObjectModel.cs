@@ -18,7 +18,7 @@ namespace DuetAPI.ObjectModel
         /// <remarks>
         /// The first item represents the main board
         /// </remarks>
-        public ModelCollection<Board> Boards { get; } = [];
+        public StaticModelCollection<Board> Boards { get; } = [];
 
         /// <summary>
         /// Information about the individual directories
@@ -32,7 +32,7 @@ namespace DuetAPI.ObjectModel
         /// List of configured fans
         /// </summary>
         /// <seealso cref="Fan"/>
-        public ModelCollection<Fan?> Fans { get; } = [];
+        public StaticModelCollection<Fan?> Fans { get; } = [];
 
         /// <summary>
         /// Dictionary of global variables vs JSON values
@@ -61,7 +61,7 @@ namespace DuetAPI.ObjectModel
         /// List of configured LED strips
         /// </summary>
         /// <seealso cref="LedStrip"/>
-        public ModelCollection<LedStrip> LedStrips { get; } = [];
+        public StaticModelCollection<LedStrip> LedStrips { get; } = [];
 
         /// <summary>
         /// Machine configuration limits
@@ -117,7 +117,7 @@ namespace DuetAPI.ObjectModel
         /// List of configured CNC spindles
         /// </summary>
         /// <seealso cref="Spindle"/>
-        public ModelCollection<Spindle?> Spindles { get; } = [];
+        public StaticModelCollection<Spindle?> Spindles { get; } = [];
         
         /// <summary>
         /// Information about the machine state
@@ -128,14 +128,14 @@ namespace DuetAPI.ObjectModel
         /// List of configured tools
         /// </summary>
         /// <seealso cref="Tool"/>
-        public ModelCollection<Tool?> Tools { get; } = [];
+        public StaticModelCollection<Tool?> Tools { get; } = [];
 
         /// <summary>
         /// List of available mass storages
         /// </summary>
         /// <seealso cref="Volume"/>
         [SbcProperty(true)]
-        public ModelCollection<Volume> Volumes { get; } = [];
+        public StaticModelCollection<Volume> Volumes { get; } = [];
 
         /// <summary>
         /// Update a specific key of this instance from a given JSON element as provided by the firmware

@@ -61,7 +61,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of the assigned drivers
         /// </summary>
-        public ModelCollection<DriverId> Drivers { get; } = [];
+        public ObservableCollection<DriverId> Drivers { get; } = [];
 
         /// <summary>
         /// Whether or not the axis is homed

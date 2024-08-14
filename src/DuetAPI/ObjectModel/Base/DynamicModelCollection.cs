@@ -8,27 +8,27 @@ using System.Text.Json;
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
-    /// Generic container for object model arrays
+    /// Generic container for model object arrays with dynamic items
     /// </summary>
     /// <typeparam name="T">Item type</typeparam>
-    public class ModelCollection<T> : ObservableCollection<T?>, IModelCollection where T : new()
+    public class DynamicModelCollection<T> : ObservableCollection<T?>, IModelCollection where T : IDynamicModelObject, new()
     {
         /// <summary>
         /// Default constructor
         /// </summary>
-        public ModelCollection() : base() { }
+        public DynamicModelCollection() : base() { }
 
         /// <summary>
         /// Overloading constructor that takes items for initialization
         /// </summary>
         /// <param name="collection">Collection to use for items</param>
-        public ModelCollection(IEnumerable<T> collection) : base(collection) { }
+        public DynamicModelCollection(IEnumerable<T> collection) : base(collection) { }
 
         /// <summary>
         /// Overloading constructor that takes a list for initialization
         /// </summary>
         /// <param name="list">List to use for items</param>
-        public ModelCollection(List<T?> list) : base(list) { }
+        public DynamicModelCollection(List<T?> list) : base(list) { }
 
         /// <summary>
         /// Removes all items from the collection
@@ -273,187 +273,56 @@ namespace DuetAPI.ObjectModel
                 }
             }
 
-            Type itemType = typeof(T);
-            if (typeof(IStaticModelObject).IsAssignableFrom(itemType))
+            // Update model items
+            for (int i = offset; i < Math.Min(Count, offset + arrayLength); i++)
             {
-                // Update model items
-                for (int i = offset; i < Math.Min(Count, offset + arrayLength); i++)
+                T? item = this[i];
+                JsonElement jsonItem = jsonElement[i - offset];
+                if (jsonItem.ValueKind == JsonValueKind.Null)
                 {
-                    T? item = this[i];
-                    JsonElement jsonItem = jsonElement[i - offset];
-                    if (jsonItem.ValueKind == JsonValueKind.Null)
+                    if (this[i] is not null)
                     {
-                        if (this[i] is not null)
-                        {
-                            this[i] = default!;
-                        }
-                    }
-                    else if (item == null)
-                    {
-                        item = new T();
-                        (item as IStaticModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties);
-                        this[i] = item;
-                    }
-                    else
-                    {
-                       (item as IStaticModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties);
+                        this[i] = default!;
                     }
                 }
-
-                // Add missing items
-                for (int i = Count; i < offset + arrayLength; i++)
+                else if (item == null)
                 {
-                    JsonElement jsonItem = jsonElement[i - offset];
-                    if (jsonItem.ValueKind == JsonValueKind.Null)
+                    item = new T();
+                    this[i] = (T?)(item as IDynamicModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties);
+                }
+                else
+                {
+                    T? updatedItem = (T?)(item as IDynamicModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties);
+                    if (!ReferenceEquals(this[i], updatedItem))
                     {
-                        Add(default!);
-                    }
-                    else
-                    {
-                        T newItem = new();
-                        (newItem as IStaticModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties);
-                        Add(newItem);
+                        this[i] = updatedItem;
                     }
                 }
             }
-            else if (typeof(IDynamicModelObject).IsAssignableFrom(itemType))
-            {
-                // Update model items
-                for (int i = offset; i < Math.Min(Count, offset + arrayLength); i++)
-                {
-                    T? item = this[i];
-                    JsonElement jsonItem = jsonElement[i - offset];
-                    if (jsonItem.ValueKind == JsonValueKind.Null)
-                    {
-                        if (this[i] is not null)
-                        {
-                            this[i] = default!;
-                        }
-                    }
-                    else if (item == null)
-                    {
-                        item = new T();
-                        this[i] = (T?)(item as IDynamicModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties);
-                    }
-                    else
-                    {
-                        T? updatedItem = (T?)(item as IDynamicModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties);
-                        if (!ReferenceEquals(this[i], updatedItem))
-                        {
-                            this[i] = updatedItem;
-                        }
-                    }
-                }
 
-                // Add missing items
-                for (int i = Count; i < offset + arrayLength; i++)
-                {
-                    JsonElement jsonItem = jsonElement[i - offset];
-                    if (jsonItem.ValueKind == JsonValueKind.Null)
-                    {
-                        Add(default!);
-                    }
-                    else
-                    {
-                        T newItem = new();
-                        Add((T?)(newItem as IDynamicModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties)!);
-                    }
-                }
-            }
-            else
+            // Add missing items
+            for (int i = Count; i < offset + arrayLength; i++)
             {
-                // Update items
-                for (int i = 0; i < Math.Min(Count, offset + arrayLength); i++)
+                JsonElement jsonItem = jsonElement[i - offset];
+                if (jsonItem.ValueKind == JsonValueKind.Null)
                 {
-                    JsonElement jsonItem = jsonElement[i - offset];
-                    if (jsonItem.ValueKind == JsonValueKind.Null)
-                    {
-                        if (this[i] is not null)
-                        {
-                            this[i] = default!;
-                        }
-                    }
-                    else if (itemType == typeof(bool) && jsonItem.ValueKind == JsonValueKind.Number)
-                    {
-                        try
-                        {
-                            bool itemValue = Convert.ToBoolean(jsonItem.GetInt32());
-                            if (!Equals(this[i], itemValue))
-                            {
-                                this[i] = (T)(object)itemValue;
-                            }
-                        }
-                        catch (FormatException e)
-                        {
-                            throw new JsonException($"Failed to deserialize item type bool from JSON {jsonItem.GetRawText()}", e);
-                        }
-                    }
-                    else
-                    {
-                        try
-                        {
-                            T itemValue = JsonSerializer.Deserialize<T>(jsonItem.GetRawText(), Utility.JsonHelper.DefaultJsonOptions)!;
-                            if (itemType.IsArray)
-                            {
-                                IList listItem = (IList)this[i]!, newItem = (IList)itemValue;
-                                if (listItem is null || listItem.Count != newItem.Count)
-                                {
-                                    this[i] = itemValue;
-                                }
-                                else
-                                {
-                                    for (int k = 0; k < listItem.Count; k++)
-                                    {
-                                        if (!Equals(listItem[k], newItem[k]))
-                                        {
-                                            this[i] = itemValue;
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                            else if (!Equals(this[i], itemValue))
-                            {
-                                this[i] = itemValue;
-                            }
-                        }
-                        catch (JsonException e) when (ObjectModel.DeserializationFailed(this, itemType, jsonItem.Clone(), e))
-                        {
-                            // suppressed
-                        }
-                    }
+                    Add(default!);
                 }
-
-                // Add missing items
-                for (int i = Count; i < offset + arrayLength; i++)
+                else
                 {
-                    JsonElement jsonItem = jsonElement[i - offset];
-                    if (itemType == typeof(bool) && jsonItem.ValueKind == JsonValueKind.Number)
-                    {
-                        try
-                        {
-                            Add((T)(object)Convert.ToBoolean(jsonItem.GetInt32()));
-                        }
-                        catch (FormatException e)
-                        {
-                            throw new JsonException($"Failed to deserialize item type bool from JSON {jsonItem.GetRawText()}", e);
-                        }
-                    }
-                    else
-                    {
-                        try
-                        {
-                            T newItem = JsonSerializer.Deserialize<T>(jsonItem.GetRawText(), Utility.JsonHelper.DefaultJsonOptions)!;
-                            Add(newItem);
-                        }
-                        catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), jsonItem.Clone(), e))
-                        {
-                            // suppressed
-                        }
-                    }
+                    T newItem = new();
+                    Add((T?)(newItem as IDynamicModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties)!);
                 }
             }
         }
+
+        /// <summary>
+        /// Update this instance from a given JSON element
+        /// </summary>
+        /// <param name="jsonElement">Element to update this intance from</param>
+        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+        /// <returns>Updated instance</returns>
+        /// <exception cref="JsonException">Failed to deserialize data</exception>
         void IStaticModelObject.UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties) => UpdateFromJson(jsonElement, ignoreSbcProperties, 0, true);
 
 #if false

@@ -229,7 +229,7 @@ namespace DuetControlServer.Model
                 if (partialModel is IList list && itemIndex >= -1 && itemIndex < list.Count)
                 {
                     bool isModelObjectList = false, isListList = false;
-                    if (partialModel.GetType().IsGenericType && partialModel.GetType().GetGenericTypeDefinition() == typeof(ModelCollection<>))
+                    if (partialModel.GetType().IsGenericType && partialModel.GetType().GetGenericTypeDefinition() == typeof(StaticModelCollection<>))
                     {
                         Type itemType = partialModel.GetType().GetGenericArguments()[0];
                         isModelObjectList = itemType.IsSubclassOf(typeof(ModelObject));

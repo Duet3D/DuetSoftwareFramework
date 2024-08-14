@@ -20,7 +20,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of registered third-party HTTP endpoints
         /// </summary>
-        public ModelCollection<HttpEndpoint> HttpEndpoints { get; } = [];
+        public StaticModelCollection<HttpEndpoint> HttpEndpoints { get; } = [];
 
         /// <summary>
         /// Indicates if the process is 64-bit
@@ -58,7 +58,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of user sessions
         /// </summary>
-        public ModelCollection<UserSession> UserSessions { get; } = [];
+        public StaticModelCollection<UserSession> UserSessions { get; } = [];
 
         /// <summary>
         /// Version of Duet Software Framework (provided by Duet Control Server)

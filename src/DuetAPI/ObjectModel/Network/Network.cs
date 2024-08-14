@@ -46,7 +46,7 @@
         /// </summary>
         /// <seealso cref="NetworkInterface"/>
         [SbcProperty(true)]
-        public ModelCollection<NetworkInterface> Interfaces { get; } = [];
+        public StaticModelCollection<NetworkInterface> Interfaces { get; } = [];
 
         /// <summary>
         /// Name of the machine

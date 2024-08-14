@@ -112,6 +112,6 @@ namespace DuetAPI.ObjectModel
         /// Collection of thumbnails parsed from Gcode
         /// </summary>
         [SbcProperty(true)]
-        public ModelCollection<ThumbnailInfo> Thumbnails { get; } = [];
+        public StaticModelCollection<ThumbnailInfo> Thumbnails { get; } = [];
     }
 }

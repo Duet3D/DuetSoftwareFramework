@@ -44,6 +44,6 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Minimum and maximum coordinates of this zone
         /// </summary>
-        public ModelCollection<KeepoutZoneCoordinates> Coords { get; } = [];
+        public StaticModelCollection<KeepoutZoneCoordinates> Coords { get; } = [];
     }
 }

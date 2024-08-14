@@ -49,6 +49,6 @@ namespace DuetAPI.ObjectModel
         /// List of configured heaters
         /// </summary>
         /// <seealso cref="Heater"/>
-        public ModelCollection<Heater?> Heaters { get; } = [];
+        public StaticModelCollection<Heater?> Heaters { get; } = [];
     }
 }

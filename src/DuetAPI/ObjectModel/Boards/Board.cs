@@ -60,12 +60,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Drivers of this board
         /// </summary>
-        public ModelCollection<Driver>? Drivers
+        public StaticModelCollection<Driver>? Drivers
         {
             get => _drivers;
             set => SetPropertyValue(ref _drivers, value);
         }
-        private ModelCollection<Driver>? _drivers;
+        private StaticModelCollection<Driver>? _drivers;
 
         /// <summary>
         /// Date of the firmware build
