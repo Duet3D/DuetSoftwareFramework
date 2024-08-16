@@ -18,6 +18,11 @@
         /// <summary>
         /// Screen information
         /// </summary>
-        public DirectDisplayScreen Screen { get; } = new DirectDisplayScreen();
+        public DirectDisplayScreen Screen
+        {
+            get => _screen;
+            set => SetPropertyValue(ref _screen, value);
+        }
+        private DirectDisplayScreen _screen = new();
     }
 }
