@@ -1,11 +1,15 @@
 ﻿using System;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
-    /// Information about a filament monitor
+    /// Base class for filament monitors
     /// </summary>
+    [JsonDerivedType(typeof(LaserFilamentMonitor))]
+    [JsonDerivedType(typeof(PulsedFilamentMonitor))]
+    [JsonDerivedType(typeof(RotatingMagnetFilamentMonitor))]
     public partial class FilamentMonitor : ModelObject, IDynamicModelObject
     {
         /// <summary>
@@ -50,26 +54,10 @@ namespace DuetAPI.ObjectModel
         private FilamentMonitorType _type = FilamentMonitorType.Unknown;
 
         /// <summary>
-        /// Figure out the required type for the given filament monitor type
-        /// </summary>
-        /// <param name="type">Filament monitor type</param>
-        /// <returns>Required type</returns>
-        private static Type GetFilamentMonitorType(FilamentMonitorType? type)
-        {
-            return type switch
-            {
-                FilamentMonitorType.Laser => typeof(LaserFilamentMonitor),
-                FilamentMonitorType.Pulsed => typeof(PulsedFilamentMonitor),
-                FilamentMonitorType.RotatingMagnet => typeof(RotatingMagnetFilamentMonitor),
-                _ => typeof(FilamentMonitor),
-            };
-        }
-
-        /// <summary>
         /// Update this instance from a given JSON element
         /// </summary>
-        /// <param name="jsonElement">Element to update this intance from</param>
-        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+        /// <param type="jsonElement">Element to update this intance from</param>
+        /// <param type="ignoreSbcProperties">Whether SBC properties are ignored</param>
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         public IDynamicModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
@@ -81,15 +69,96 @@ namespace DuetAPI.ObjectModel
 
             if (jsonElement.TryGetProperty("type", out JsonElement nameProperty))
             {
-                FilamentMonitorType? filamentMonitorType = (FilamentMonitorType?)JsonSerializer.Deserialize(nameProperty.GetRawText()!, typeof(FilamentMonitorType));
-                Type requiredType = GetFilamentMonitorType(filamentMonitorType);
-                if (GetType() != requiredType)
+                string? type = nameProperty.GetString();
+                if (type is "laser")
                 {
-                    FilamentMonitor newInstance = (FilamentMonitor)Activator.CreateInstance(requiredType)!;
+                    if (this is not LaserFilamentMonitor)
+                    {
+                        FilamentMonitor newInstance = new LaserFilamentMonitor();
+                        return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
+                    }
+                }
+                else if (type is "pulsed")
+                {
+                    if (this is not PulsedFilamentMonitor)
+                    {
+                        FilamentMonitor newInstance = new PulsedFilamentMonitor();
+                        return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
+                    }
+                }
+                else if (type is "rotatingMagnet")
+                {
+                    if (this is not RotatingMagnetFilamentMonitor)
+                    {
+                        FilamentMonitor newInstance = new RotatingMagnetFilamentMonitor();
+                        return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
+                    }
+                }
+                else if (this is LaserFilamentMonitor or PulsedFilamentMonitor or RotatingMagnetFilamentMonitor)
+                {
+                    FilamentMonitor newInstance = new();
                     return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
                 }
             }
             return GeneratedUpdateFromJson(jsonElement, ignoreSbcProperties);
         }
+
+
+        /// <summary>
+        /// Update this instance from a given JSON reader
+        /// </summary>
+        /// <param type="reader">JSON reader</param>
+        /// <param type="ignoreSbcProperties">Whether SBC properties are ignored</param>
+        /// <returns>Updated instance</returns>
+        /// <exception cref="JsonException">Failed to deserialize data</exception>
+        public IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+        {
+            Utf8JsonReader readerCopy = reader;
+            while (readerCopy.Read() && readerCopy.TokenType != JsonTokenType.EndObject)
+            {
+                if (readerCopy.TokenType == JsonTokenType.PropertyName)
+                {
+                    if (readerCopy.ValueTextEquals("type"u8) && readerCopy.Read())
+                    {
+                        string? type = readerCopy.GetString();
+                        if (type is "laser")
+                        {
+                            if (this is not LaserFilamentMonitor)
+                            {
+                                FilamentMonitor newInstance = new LaserFilamentMonitor();
+                                return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            }
+                        }
+                        else if (type is "pulsed")
+                        {
+                            if (this is not PulsedFilamentMonitor)
+                            {
+                                FilamentMonitor newInstance = new PulsedFilamentMonitor();
+                                return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            }
+                        }
+                        else if (type is "rotatingMagnet")
+                        {
+                            if (this is not RotatingMagnetFilamentMonitor)
+                            {
+                                FilamentMonitor newInstance = new RotatingMagnetFilamentMonitor();
+                                return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            }
+                        }
+                        else if (this is LaserFilamentMonitor or PulsedFilamentMonitor or RotatingMagnetFilamentMonitor)
+                        {
+                            FilamentMonitor newInstance = new();
+                            return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                        }
+                    }
+                    else
+                    {
+                        readerCopy.Skip();
+                    }
+                }
+            }
+            return GeneratedUpdateFromJsonReader(ref reader, ignoreSbcProperties);
+        }
+
     }
 }

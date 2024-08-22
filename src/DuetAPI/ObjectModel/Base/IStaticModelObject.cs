@@ -26,15 +26,12 @@ namespace DuetAPI.ObjectModel
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties);
 
-#if false
         /// <summary>
         /// Update this instance from a given JSON reader
         /// </summary>
         /// <param name="reader">JSON reader</param>
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
-        /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties);
-#endif
     }
 }

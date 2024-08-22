@@ -70,16 +70,13 @@ namespace DuetAPI.ObjectModel
         /// <param name="other">Message to append</param>
         public void Append(Message other)
         {
-            if (other is not null)
+            if (other.Type > Type)
             {
-                if (other.Type > Type)
-                {
-                    Type = other.Type;
-                }
-                if (!string.IsNullOrEmpty(other.Content))
-                {
-                    AppendLine(other.Content);
-                }
+                Type = other.Type;
+            }
+            if (!string.IsNullOrEmpty(other.Content))
+            {
+                AppendLine(other.Content);
             }
         }
 
@@ -106,12 +103,12 @@ namespace DuetAPI.ObjectModel
         /// <returns>RepRapFirmware-style message</returns>
         public override string ToString()
         {
-            switch (Type)
+            return Type switch
             {
-                case MessageType.Error: return "Error: " + Content;
-                case MessageType.Warning: return "Warning: " + Content;
-                default: return Content;
-            }
+                MessageType.Error => "Error: " + Content,
+                MessageType.Warning => "Warning: " + Content,
+                _ => Content
+            };
         }
     }
 }

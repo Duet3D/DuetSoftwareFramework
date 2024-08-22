@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
@@ -11,7 +10,7 @@ namespace DuetAPI.ObjectModel
     /// Generic container for model object arrays with static items
     /// </summary>
     /// <typeparam name="T">Item type</typeparam>
-    public class StaticModelCollection<T> : ObservableCollection<T?>, IModelCollection where T : IStaticModelObject, new()
+    public class StaticModelCollection<T> : ObservableCollection<T?>, IModelCollection where T : IStaticModelObject?, new()
     {
         /// <summary>
         /// Default constructor
@@ -285,15 +284,25 @@ namespace DuetAPI.ObjectModel
                         this[i] = default!;
                     }
                 }
-                else if (item == null)
-                {
-                    item = new T();
-                    (item as IStaticModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties);
-                    this[i] = item;
-                }
                 else
                 {
-                    (item as IStaticModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties);
+                    try
+                    {
+                        if (item == null)
+                        {
+                            item = new T();
+                            item.UpdateFromJson(jsonItem, ignoreSbcProperties);
+                            this[i] = item;
+                        }
+                        else
+                        {
+                            item.UpdateFromJson(jsonItem, ignoreSbcProperties);
+                        }
+                    }
+                    catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), jsonItem, e))
+                    {
+                        // suppressed
+                    }
                 }
             }
 
@@ -303,13 +312,20 @@ namespace DuetAPI.ObjectModel
                 JsonElement jsonItem = jsonElement[i - offset];
                 if (jsonItem.ValueKind == JsonValueKind.Null)
                 {
-                    Add(default!);
+                    Add(default);
                 }
                 else
                 {
-                    T newItem = new();
-                    (newItem as IStaticModelObject)!.UpdateFromJson(jsonItem, ignoreSbcProperties);
-                    Add(newItem);
+                    try
+                    {
+                        T newItem = new();
+                        newItem.UpdateFromJson(jsonItem, ignoreSbcProperties);
+                        Add(newItem);
+                    }
+                    catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), jsonItem, e))
+                    {
+                        // suppressed
+                    }
                 }
             }
         }
@@ -324,13 +340,77 @@ namespace DuetAPI.ObjectModel
 
         void IStaticModelObject.UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties) => UpdateFromJson(jsonElement, ignoreSbcProperties, 0, true);
 
-#if false
+        /// <summary>
+        /// Update this collection from a given JSON reader
+        /// </summary>
+        /// <param name="reader">JSON reader</param>
+        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+        /// <param name="offset">Index offset</param>
+        /// <param name="last">Whether this is the last update</param>
         public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true)
         {
-            // TODO
+            if (reader.TokenType != JsonTokenType.StartArray)
+            {
+                throw new JsonException("expected start of array");
+            }
+
+            // Update or add items
+            int i = offset;
+            while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+            {
+                if (reader.TokenType == JsonTokenType.StartObject)
+                {
+                    try
+                    {
+                        if (i >= Count)
+                        {
+                            T newItem = new();
+                            newItem.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            Add(newItem);
+                        }
+                        else
+                        {
+                            T? item = this[i];
+                            if (item == null)
+                            {
+                                item = new T();
+                                item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                                this[i] = item;
+                            }
+                            else
+                            {
+                                item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            }
+                        }
+                        i++;
+                    }
+                    catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), JsonElement.ParseValue(ref reader), e))
+                    {
+                        // suppressed
+                    }
+                }
+                else if (reader.TokenType == JsonTokenType.Null)
+                {
+                    Add(default);
+                    i++;
+                }
+            }
+
+            // Delete obsolete items when the last update has been processed
+            if (last)
+            {
+                while (Count > i)
+                {
+                    RemoveAt(Count - 1);
+                }
+            }
         }
 
+        /// <summary>
+        /// Update this collection from a given JSON reader
+        /// </summary>
+        /// <param name="reader">JSON reader</param>
+        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
         public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties) => UpdateFromJsonReader(ref reader, ignoreSbcProperties, 0, true);
-#endif
     }
 }

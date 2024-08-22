@@ -1,9 +1,4 @@
-﻿using DuetAPI;
-using NUnit.Framework;
-using NUnit.Framework.Legacy;
-using System.Threading.Tasks;
-
-#if false
+﻿#if false
 namespace UnitTests.Machine
 {
     [TestFixture]

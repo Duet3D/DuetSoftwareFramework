@@ -6,9 +6,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-namespace SourceGenerators.ObjectModel
+namespace DuetAPI.SourceGenerators.ObjectModel
 {
-    internal static class ObjectModelGenerator
+    internal static class Generator
     {
         /// <summary>
         /// Function to generate the additional ObjectModel source file
@@ -20,8 +20,8 @@ namespace SourceGenerators.ObjectModel
             {
                 string GeneratePropertyUpdateCalls()
                 {
-                    StringWriter stringWriter = new();
-                    IndentedTextWriter writer = new(stringWriter)
+                    using StringWriter stringWriter = new();
+                    using IndentedTextWriter writer = new(stringWriter)
                     {
                         Indent = 3
                     };
@@ -36,7 +36,7 @@ namespace SourceGenerators.ObjectModel
                         writer.Indent++;
 
                         // assignment
-                        if (propType is "DynamicModelCollection" or "StaticModelCollection" or "ModelGrowingCollection" or "ModelDictionary" ||
+                        if (propType is "DynamicModelCollection" or "StaticModelCollection" or "GrowingCollection" or "JsonModelDictionary" or "StaticModelDictionary" ||
                             receiver.ModelCollectionMembers.ContainsKey(propType) || receiver.ModelObjectMembers.ContainsKey(propType))
                         {
                             void WriteSetOrUpdate()
@@ -58,7 +58,7 @@ namespace SourceGenerators.ObjectModel
                                     writer.WriteLine($"{prop.Identifier.ValueText} = new {nts.ElementType}();");
                                     writer.Indent--;
                                     writer.WriteLine("}");
-                                    if (propType is "DynamicModelCollection" or "StaticModelCollection" or "ModelGrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
+                                    if (propType is "DynamicModelCollection" or "StaticModelCollection" or "GrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
                                     {
                                         writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonElement, ignoreSbcProperties, offset, last);");
                                     }
@@ -69,7 +69,7 @@ namespace SourceGenerators.ObjectModel
                                     writer.Indent--;
                                     writer.WriteLine("}");
                                 }
-                                else if (propType is "DynamicModelCollection" or "StaticModelCollection" or "ModelGrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
+                                else if (propType is "DynamicModelCollection" or "StaticModelCollection" or "GrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
                                 {
                                     writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonElement, ignoreSbcProperties, offset, last);");
                                 }
@@ -110,31 +110,31 @@ namespace SourceGenerators.ObjectModel
 
                 string WritePropertyReadCalls()
                 {
-                    StringWriter stringWriter = new();
-                    IndentedTextWriter writer = new(stringWriter)
+                    using StringWriter stringWriter = new();
+                    using IndentedTextWriter writer = new(stringWriter)
                     {
-                        Indent = 6
+                        Indent = 5
                     };
 
                     foreach (var prop in properties)
                     {
                         string jsonPropertyName = prop.GetJsonPropertyName(), propType = prop.GetPropertyType();
 
-                        // if (key == <propName>) {
+                        // if (reader.ValueTextEquals(<propName>u8)) {
                         writer.WriteLine($"if (reader.ValueTextEquals(\"{jsonPropertyName}\"u8))");
                         writer.WriteLine("{");
                         writer.Indent++;
-                        writer.WriteLine("reader.Skip();");
+                        writer.WriteLine("reader.Read();");
 
                         // read call
-                        if (propType is "DynamicModelCollection" or "StaticModelCollection" or "ModelGrowingCollection" or "ModelDictionary" ||
+                        if (propType is "DynamicModelCollection" or "StaticModelCollection" or "GrowingCollection" or "JsonModelDictionary" or "StaticModelDictionary" ||
                             receiver.ModelCollectionMembers.ContainsKey(propType) || receiver.ModelObjectMembers.ContainsKey(propType))
                         {
                             void WriteSetOrUpdate()
                             {
                                 if (prop.Type is NullableTypeSyntax nts)
                                 {
-                                    writer.WriteLine("if (jsonElement.ValueKind == JsonValueKind.Null)");
+                                    writer.WriteLine("if (reader.TokenType == JsonTokenType.Null)");
                                     writer.WriteLine("{");
                                     writer.Indent++;
                                     writer.WriteLine($"{prop.Identifier.ValueText} = null;");
@@ -149,7 +149,7 @@ namespace SourceGenerators.ObjectModel
                                     writer.WriteLine($"{prop.Identifier.ValueText} = new {nts.ElementType}();");
                                     writer.Indent--;
                                     writer.WriteLine("}");
-                                    if (propType is "DynamicModelCollection" or "StaticModelCollection" or "ModelGrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
+                                    if (propType is "DynamicModelCollection" or "StaticModelCollection" or "GrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
                                     {
                                         writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, offset, last);");
                                     }
@@ -160,7 +160,7 @@ namespace SourceGenerators.ObjectModel
                                     writer.Indent--;
                                     writer.WriteLine("}");
                                 }
-                                else if (propType is "DynamicModelCollection" or "StaticModelCollection" or "ModelGrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
+                                else if (propType is "DynamicModelCollection" or "StaticModelCollection" or "GrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
                                 {
                                     writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, offset, last);");
                                 }
@@ -179,6 +179,7 @@ namespace SourceGenerators.ObjectModel
                                 writer.WriteLine("return true;");
                                 writer.Indent--;
                                 writer.WriteLine("}");
+                                writer.WriteLine("reader.Skip();");
                                 writer.WriteLine("return false;");
                             }
                             else
@@ -234,57 +235,36 @@ namespace DuetAPI.ObjectModel
             return false;
         }}
 
-        {ModelObjectGenerator.GenerateModelObjectMemembers(context, receiver, "ObjectModel")}
-    }}
-}}", Encoding.UTF8);
-
-#if false
-                /// <summary>
-                /// Update the whole or a specific key of this instance from a given JSON reader
-                /// </summary>
-                /// <remarks>This method is auto-generated</remarks>
-                /// <param name=""key"">Property name to update or null if the whole object model is supposed to be updated</param>
-                /// <param name=""reader"">JSON reader</param>
-                /// <param name=""ignoreSbcProperties"">Whether SBC properties are ignored</param>
-                /// <param name=""offset"">Index offset (collection keys only)</param>
-                /// <param name=""last"">Whether this is the last update (collection keys only)</param>
-                /// <returns>Whether the key could be updated</returns>
-                private bool GeneratedUpdateFromJsonReader(string? key, ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true)
+        /// <summary>
+        /// Update this instance from a given JSON reader
+        /// </summary>
+        /// <remarks>This method is auto-generated</remarks>
+        /// <param name=""key"">Property name to update or null if the whole object model is supposed to be updated</param>
+        /// <param name=""reader"">JSON reader</param> /// <param name=""ignoreSbcProperties"">Whether SBC properties are ignored</param>
+        /// <param name=""offset"">Index offset (collection keys only)</param>
+        /// <param name=""last"">Whether this is the last update (collection keys only)</param>
+        /// <returns>Whether the key could be updated</returns>
+        private bool GeneratedUpdateFromJsonReader(string? key, ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true)
         {{
             if (key == null)
             {{
                 UpdateFromJsonReader(ref reader, ignoreSbcProperties);
-                return true;
-            }}
-
-            while (reader.Read())
-            {{
-                switch (reader.TokenType)
-                {{
-                    case JsonTokenType.PropertyName:
-                        {WritePropertyReadCalls()}
-                        else if (!reader.ValueTextEquals(""seqs""u8))
-                        {{
-#if VERIFY_OBJECT_MODEL
-                            Console.WriteLine(""[warn] Missing property {{0}} = {{1}} in ObjectModel"", reader.GetString());
-#else
-                            reader.Skip();  // Skip property name
-#endif
-                            reader.Skip();  // Skip JSON value
-                        }}
-                        break;
-                    case JsonTokenType.EndObject:
-                        return false;
+                    return true;
                 }}
-            }}
-            return false;
+
+                while (reader.Read())
+                {{
+                    if (reader.TokenType == JsonTokenType.PropertyName)
+                    {{
+                        {WritePropertyReadCalls()}
+                    }}
+                }}
+                return false;
         }}
 
-        {ModelObjectGenerator.GenerateModelObjectMemembers(context, receiver, "ObjectModel")}
+        {ModelObject.Generator.GenerateMethods(context, receiver, "ObjectModel")}
     }}
 }}", Encoding.UTF8);
-#endif
-
                 context.AddSource("ObjectModel.g.cs", sourceText);
             }
         }

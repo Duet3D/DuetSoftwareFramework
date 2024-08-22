@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
@@ -11,14 +10,14 @@ namespace DuetAPI.ObjectModel
     /// Generic list container to which items can be added or which can be cleared only
     /// </summary>
     /// <typeparam name="T">Item type</typeparam>
-    public class ModelGrowingCollection<T> : ObservableCollection<T>, IGrowingModelCollection
+    public class GrowingCollection<T> : ObservableCollection<T?>, IModelCollection where T : new()
     {
         /// <summary>
         /// Removes all items from the collection
         /// </summary>
         protected override void ClearItems()
         {
-            List<T> removed = new(this);
+            List<T?> removed = new(this);
             base.ClearItems();
             base.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed));
         }
@@ -58,8 +57,8 @@ namespace DuetAPI.ObjectModel
             ClearItems();
 
             // Add other items
-            ModelGrowingCollection<T> other = (ModelGrowingCollection<T>)from;
-            foreach (T item in other)
+            GrowingCollection<T> other = (GrowingCollection<T>)from;
+            foreach (T? item in other)
             {
                 if (item is ICloneable cloneableItem)
                 {
@@ -79,13 +78,12 @@ namespace DuetAPI.ObjectModel
         /// <returns>Cloned list</returns>
         public object Clone()
         {
-            ModelGrowingCollection<T> clone = [];
-            foreach (T item in this)
+            GrowingCollection<T> clone = [];
+            foreach (T? item in this)
             {
                 if (item is ICloneable cloneableItem)
                 {
-                    object clonedItem = cloneableItem.Clone();
-                    clone.Add((T)clonedItem);
+                    clone.Add((T)cloneableItem.Clone());
                 }
                 else
                 {
@@ -114,7 +112,7 @@ namespace DuetAPI.ObjectModel
 
             // Get the other instance
             Type itemType = typeof(T);
-            ModelGrowingCollection<T> otherList = (ModelGrowingCollection<T>)other!;
+            GrowingCollection<T> otherList = (GrowingCollection<T>)other!;
 
             bool hadDiffs = (Count != otherList.Count);
             IList diffs = new object[Count];
@@ -185,27 +183,19 @@ namespace DuetAPI.ObjectModel
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
-        /// <remarks>Accepts null as the JSON value to clear existing items</remarks>
-        public IStaticModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
-            if (jsonElement.ValueKind == JsonValueKind.Null)
-            {
-                return null;
-            }
-
-            foreach (JsonElement jsonItem in jsonElement.EnumerateArray())
+            foreach (JsonElement item in jsonElement.EnumerateArray())
             {
                 try
                 {
-                    T itemValue = JsonSerializer.Deserialize<T>(jsonItem.GetRawText(), Utility.JsonHelper.DefaultJsonOptions)!;
-                    Add(itemValue);
+                    Add(JsonSerializer.Deserialize<T>(item, Utility.JsonHelper.DefaultJsonOptions));
                 }
-                catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), jsonItem.Clone(), e))
+                catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), item, e))
                 {
                     // suppressed
                 }
             }
-            return this;
         }
 
         /// <summary>
@@ -215,26 +205,41 @@ namespace DuetAPI.ObjectModel
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
         /// <param name="offset">Index offset</param>
         /// <param name="last">Whether this is the last update</param>
-        public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties, int offset = 0, bool last = true)
-        {
-            UpdateFromJson(jsonElement, ignoreSbcProperties);
-        }
+        public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties, int offset = 0, bool last = true) => UpdateFromJson(jsonElement, ignoreSbcProperties);
 
-        void IStaticModelObject.UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
-        {
-            throw new NotImplementedException();
-        }
-
-#if false
+        /// <summary>
+        /// Update this collection from a given JSON reader
+        /// </summary>
+        /// <param name="reader">JSON reader</param>
+        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+        /// <param name="offset">Index offset</param>
+        /// <param name="last">Whether this is the last update</param>
         public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true)
         {
-            throw new NotImplementedException();
+            if (reader.TokenType != JsonTokenType.StartArray)
+            {
+                throw new JsonException("expected start of array");
+            }
+
+            while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+            {
+                try
+                {
+                    Add(JsonSerializer.Deserialize<T>(ref reader, Utility.JsonHelper.DefaultJsonOptions));
+                }
+                catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), JsonElement.ParseValue(ref reader), e))
+                {
+                    // suppressed
+                }
+            }
         }
 
-        public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
-        {
-            throw new NotImplementedException();
-        }
-#endif
+        /// <summary>
+        /// Update this instance from a given JSON reader
+        /// </summary>
+        /// <param name="reader">JSON reader</param>
+        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+        /// <exception cref="JsonException">Failed to deserialize data</exception>
+        public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties) => UpdateFromJsonReader(ref reader, ignoreSbcProperties, 0, true);
     }
 }

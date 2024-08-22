@@ -1,6 +1,4 @@
-﻿using System;
-using System.ComponentModel;
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace DuetAPI.ObjectModel
 {
@@ -36,7 +34,6 @@ namespace DuetAPI.ObjectModel
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         IDynamicModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties);
 
-#if false
         /// <summary>
         /// Update this instance from a given JSON reader
         /// </summary>
@@ -45,6 +42,5 @@ namespace DuetAPI.ObjectModel
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties);
-#endif
     }
 }

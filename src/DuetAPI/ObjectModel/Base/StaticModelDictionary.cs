@@ -16,8 +16,8 @@ namespace DuetAPI.ObjectModel
     /// Key names are NOT converted to camel-case (unlike regular class properties)
     /// </remarks>
     /// <param name="nullRemovesItems">Defines if setting items to null effectively removes them</param>
-    [JsonConverter(typeof(ModelDictionaryConverter))]
-    public sealed class ModelDictionary<TValue>(bool nullRemovesItems) : IDictionary<string, TValue>, IModelDictionary
+    [JsonConverter(typeof(StaticModelDictionaryConverter))]
+    public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems) : IDictionary<string, TValue>, IModelDictionary where TValue : IStaticModelObject, new()
     {
         /// <summary>
         /// Flags if keys can be removed again by setting their value to null
@@ -55,7 +55,7 @@ namespace DuetAPI.ObjectModel
         {
             if (NullRemovesItems)
             {
-                return _dictionary.TryGetValue(key, out TValue? result) ? result! : default;
+                return _dictionary.TryGetValue(key, out TValue? result) ? result : default;
             }
             return _dictionary[key];
         }
@@ -185,7 +185,7 @@ namespace DuetAPI.ObjectModel
         public void Assign(object from)
         {
             // Validate the types
-            if (from is not ModelDictionary<TValue> other)
+            if (from is not StaticModelDictionary<TValue> other)
             {
                 throw new ArgumentException("Types do not match", nameof(from));
             }
@@ -262,7 +262,7 @@ namespace DuetAPI.ObjectModel
         /// <returns></returns>
         public object Clone()
         {
-            ModelDictionary<TValue> clone = new(NullRemovesItems);
+            StaticModelDictionary<TValue> clone = new(NullRemovesItems);
             foreach (KeyValuePair<string, TValue> kv in _dictionary)
             {
                 if (kv.Value is ICloneable cloneableItem)
@@ -329,7 +329,7 @@ namespace DuetAPI.ObjectModel
         public object? FindDifferences(IStaticModelObject? other)
         {
             // Check the types
-            if (other is not ModelDictionary<TValue> otherDictionary)
+            if (other is not StaticModelDictionary<TValue> otherDictionary)
             {
                 // Types differ, return the entire instance
                 return this;
@@ -433,19 +433,13 @@ namespace DuetAPI.ObjectModel
                 {
                     Remove(jsonProperty.Name);
                 }
-                else if (typeof(TValue) == typeof(JsonElement))
-                {
-                    if (!TryGetValue(jsonProperty.Name, out TValue? value) || !value!.Equals(jsonProperty.Value))
-                    {
-                        this[jsonProperty.Name] = (TValue)(object)jsonProperty.Value.Clone();
-                    }
-                }
                 else
                 {
                     try
                     {
-                        TValue newValue = JsonSerializer.Deserialize<TValue>(jsonProperty.Value.GetRawText(), Utility.JsonHelper.DefaultJsonOptions)!;
-                        if (!TryGetValue(jsonProperty.Name, out TValue? value) || !value!.Equals(newValue))
+                        TValue newValue = new();
+                        newValue.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                        if (!TryGetValue(jsonProperty.Name, out TValue? value) || !ReferenceEquals(value, newValue))
                         {
                             this[jsonProperty.Name] = newValue;
                         }
@@ -458,18 +452,63 @@ namespace DuetAPI.ObjectModel
             }
         }
 
-#if false
+        /// <summary>
+        /// Update this instance from a given JSON reader
+        /// </summary>
+        /// <param name="reader">JSON reader</param>
+        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+        /// <exception cref="JsonException">Failed to deserialize data</exception>
         public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
         {
-            throw new NotImplementedException();
+            while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+            {
+                if (reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    string key = reader.GetString()!;
+                    reader.Skip();
+
+                    if (reader.TokenType == JsonTokenType.Null)
+                    {
+                        if (NullRemovesItems)
+                        {
+                            Remove(key);
+                        }
+                        else
+                        {
+                            this[key] = default;
+                        }
+                    }
+                    else if (TryGetValue(key, out TValue? item))
+                    {
+                        if (item is null)
+                        {
+                            if (reader.TokenType != JsonTokenType.Null)
+                            {
+                                item = new();
+                                item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                                this[key] = item;
+                            }
+                        }
+                        else
+                        {
+                            item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                        }
+                    }
+                    else
+                    {
+                        TValue newItem = new();
+                        newItem.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                        Add(key, newItem);
+                    }
+                }
+            }
         }
-#endif
     }
 
     /// <summary>
-    /// Converter factory class for <see cref="ModelDictionary{TValue}"/> types
+    /// Converter factory class for <see cref="StaticModelDictionary{TValue}"/> types
     /// </summary>
-    public sealed class ModelDictionaryConverter : JsonConverterFactory
+    public sealed class StaticModelDictionaryConverter : JsonConverterFactory
     {
         /// <summary>
         /// Checks if the given type can be converted from or to JSON
@@ -478,7 +517,7 @@ namespace DuetAPI.ObjectModel
         /// <returns></returns>
         public override bool CanConvert(Type typeToConvert)
         {
-            return typeToConvert.IsGenericType && typeof(ModelDictionary<>) == typeToConvert.GetGenericTypeDefinition();
+            return typeToConvert.IsGenericType && typeof(StaticModelDictionary<>) == typeToConvert.GetGenericTypeDefinition();
         }
 
         /// <summary>
@@ -495,7 +534,7 @@ namespace DuetAPI.ObjectModel
         }
 
         /// <summary>
-        /// Method to create a converter for a specific <see cref="ModelDictionary{TValue}"/> type
+        /// Method to create a converter for a specific <see cref="StaticModelDictionary{TValue}"/> type
         /// </summary>
         /// <typeparam name="T">Dictionary type</typeparam>
         /// <typeparam name="TValue">Value type</typeparam>
@@ -508,7 +547,7 @@ namespace DuetAPI.ObjectModel
             /// <returns>Whether the type can be converted</returns>
             public override bool CanConvert(Type typeToConvert)
             {
-                return typeToConvert.IsGenericType && typeof(ModelDictionary<>) == typeToConvert.GetGenericTypeDefinition();
+                return typeToConvert.IsGenericType && typeof(StaticModelDictionary<>) == typeToConvert.GetGenericTypeDefinition();
             }
 
             /// <summary>
@@ -520,6 +559,7 @@ namespace DuetAPI.ObjectModel
             /// <returns>Read value</returns>
             public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             {
+                // We don't have the information about the nullRemovesItems flag here
                 throw new NotSupportedException();
             }
 

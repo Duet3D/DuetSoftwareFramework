@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -40,7 +38,7 @@ namespace DuetAPI.ObjectModel
         /// <remarks>
         /// When DSF attempts to reconnect to RRF, this may be set to null to clear the contents
         /// </remarks>
-        public ModelDictionary<JsonElement> Global { get; } = new ModelDictionary<JsonElement>(false);
+        public JsonModelDictionary Global { get; } = new JsonModelDictionary(false);
 
         /// <summary>
         /// Information about the heat subsystem
@@ -74,7 +72,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <seealso cref="Message"/>
         [SbcProperty(false)]
-        public ModelGrowingCollection<Message> Messages { get; } = [];
+        public GrowingCollection<Message> Messages { get; } = [];
 
         /// <summary>
         /// Information about the move subsystem
@@ -94,7 +92,7 @@ namespace DuetAPI.ObjectModel
         /// Values in this dictionary cannot become null. If a value is changed to null, the corresponding item is deleted
         /// </remarks>
         [SbcProperty(false)]
-        public ModelDictionary<Plugin> Plugins { get; } = new ModelDictionary<Plugin>(true);
+        public StaticModelDictionary<Plugin> Plugins { get; } = new StaticModelDictionary<Plugin>(true);
 
         /// <summary>
         /// Information about the SBC which Duet Software Framework is running on.

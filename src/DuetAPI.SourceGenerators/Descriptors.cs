@@ -1,12 +1,12 @@
 ﻿using Microsoft.CodeAnalysis;
 
-namespace SourceGenerators
+namespace DuetAPI.SourceGenerators
 {
     internal static class Descriptors
     {
         public static readonly DiagnosticDescriptor MissingMainOMKeyHandler = new(id: "DOM001",
-                                                                                  title: "Missing key handler in main OM prop",
-                                                                                  messageFormat: "Missing key handler for main OM property {0} with type {1}",
+                                                                                  title: "Missing main object model key handler",
+                                                                                  messageFormat: "Missing main object model key handler for property {0} with type {1}",
                                                                                   category: "DOM",
                                                                                   DiagnosticSeverity.Warning,
                                                                                   isEnabledByDefault: true);

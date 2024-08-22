@@ -408,7 +408,7 @@ namespace UnitTests.Machine
         }
 
         [Test]
-        public void ObserveModelGrowingCollectiion()
+        public void ObserveGrowingCollectiion()
         {
             int numEvents = 0;
             object[]? recordedPath = null;

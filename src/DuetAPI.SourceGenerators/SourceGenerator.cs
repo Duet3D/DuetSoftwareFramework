@@ -1,13 +1,14 @@
 ﻿using Microsoft.CodeAnalysis;
-using SourceGenerators.ObjectModel;
+using DuetAPI.SourceGenerators.ObjectModel;
+using DuetAPI.SourceGenerators.ObjectModel.ModelObject;
 
-namespace SourceGenerators
+namespace DuetAPI.SourceGenerators
 {
     /// <summary>
     /// Main source code generator to generate fast assign/clone/JSON update calls for all the object model files
     /// </summary>
     [Generator]
-    public class SourceGenerators : ISourceGenerator
+    public class Generators : ISourceGenerator
     {
         /// <summary>
         /// Initialize the source generator
@@ -25,8 +26,8 @@ namespace SourceGenerators
         public void Execute(GeneratorExecutionContext context)
         {
             (context.SyntaxReceiver as SourceGeneratorSyntaxReceiver)!.Prepare();
-            ObjectModelGenerator.Execute(context);
-            ModelObjectGenerator.Execute(context);
+            ObjectModel.Generator.Execute(context);
+            ObjectModel.ModelObject.Generator.Execute(context);
         }
     }
 }

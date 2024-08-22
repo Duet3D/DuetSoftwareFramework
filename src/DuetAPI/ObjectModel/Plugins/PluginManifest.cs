@@ -1,7 +1,6 @@
 ﻿using DuetAPI.Utility;
 using System;
 using System.Collections.ObjectModel;
-using System.Text.Json;
 
 namespace DuetAPI.ObjectModel
 {
@@ -250,7 +249,7 @@ namespace DuetAPI.ObjectModel
         /// Before <see cref="Commands.SetPluginData"/> can be used, corresponding properties must be registered via this property first!
         /// </summary>
         /// <seealso cref="Commands.SetPluginData"/>
-        public ModelDictionary<JsonElement> Data { get; } = new ModelDictionary<JsonElement>(false);
+        public JsonModelDictionary Data { get; } = new JsonModelDictionary(false);
 
         /// <summary>
         /// Check if the given version satisfies a required version

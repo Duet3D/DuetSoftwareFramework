@@ -5,7 +5,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Enumeration of supported HTTP request types
     /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(JsonStringEnumConverter<HttpEndpointType>))]
     public enum HttpEndpointType
     {
         /// <summary>

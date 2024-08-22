@@ -14,7 +14,7 @@
     <CompilerGeneratedFilesOutputPath>Generated</CompilerGeneratedFilesOutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\SourceGenerators\SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\DuetAPI.SourceGenerators\DuetAPI.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 
     <!-- Removing the generated files from compilation, adding them back as non-content files -->
     <Compile Remove="$(CompilerGeneratedFilesOutputPath)/**/*.cs" />

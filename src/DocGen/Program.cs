@@ -121,7 +121,7 @@ async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property
         propertyName += JsonNamingPolicy.CamelCase.ConvertName(property.Name);
         if (typeof(IEnumerable).IsAssignableFrom(property.PropertyType) &&
             property.PropertyType != typeof(string) &&
-            (!property.PropertyType.IsGenericType || property.PropertyType.GetGenericTypeDefinition() != typeof(ModelDictionary<>)))
+            (!property.PropertyType.IsGenericType || property.PropertyType.GetGenericTypeDefinition() != typeof(JsonModelDictionary<>)))
         {
             propertyName += "[]";
         }
@@ -226,7 +226,7 @@ async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property
                 relatedTypes = apiTypes.Where(type => baseType.IsSubclassOf(typeof(ModelObject)) && baseType.IsAssignableFrom(type)).ToArray();
             }
 
-            if (property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(ModelDictionary<>))
+            if (property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(JsonModelDictionary<>))
             {
                 propertyName += @"\{\}";
             }

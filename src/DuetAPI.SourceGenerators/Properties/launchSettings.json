@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "SourceGenerators": {
+    "DuetAPI.SourceGenerators": {
       "commandName": "DebugRoslynComponent",
       "targetProject": "..\\DuetAPI\\DuetAPI.csproj"
     }
