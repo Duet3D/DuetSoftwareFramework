@@ -6,16 +6,14 @@ namespace DuetAPI.ObjectModel
     /// Static interface for object model classes that have properties.
     /// Classes that implement this interface may not change its instance on update
     /// </summary>
-    public interface IStaticModelObject // : IModelObject
+    public interface IStaticModelObject : IModelObject
     {
-#if false
         /// <summary>
         /// Assign the properties from another instance.
         /// This is required to update model properties which do not have a setter
         /// </summary>
         /// <param name="from">Other instance</param>
-        void Assign(object from);
-#endif
+        void Assign(IStaticModelObject from);
 
         /// <summary>
         /// Update this instance from a given JSON element

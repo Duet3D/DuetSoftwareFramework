@@ -44,7 +44,7 @@ namespace DuetAPI.ObjectModel
         /// This is required to update model properties which do not have a setter
         /// </summary>
         /// <param name="from">Other instance</param>
-        public void Assign(object from)
+        public void Assign(IStaticModelObject from)
         {
             // Validate the types
             Type myType = GetType();
@@ -92,89 +92,6 @@ namespace DuetAPI.ObjectModel
             }
             return clone;
         }
-
-#if false
-        /// <summary>
-        /// Create a dictionary or list of all the differences between this instance and another.
-        /// This method outputs own property values that differ from the other instance
-        /// </summary>
-        /// <param name="other">Other instance</param>
-        /// <returns>Object differences or null if both instances are equal</returns>
-        public object? FindDifferences(IStaticModelObject other)
-        {
-            // Check the types
-            Type? myType = GetType(), otherType = other?.GetType();
-            if (myType != otherType)
-            {
-                // Types differ, return the entire instance
-                return this;
-            }
-
-            // Get the other instance
-            Type itemType = typeof(T);
-            GrowingCollection<T> otherList = (GrowingCollection<T>)other!;
-
-            bool hadDiffs = (Count != otherList.Count);
-            IList diffs = new object[Count];
-            if (typeof(IStaticModelObject).IsAssignableFrom(itemType))
-            {
-                for (int i = 0; i < Count; i++)
-                {
-                    if (i < otherList.Count)
-                    {
-                        IStaticModelObject? myItem = (IStaticModelObject?)this[i], otherItem = (IStaticModelObject?)otherList[i];
-                        if (otherItem is null || myItem is null || otherItem.GetType() != myItem.GetType())
-                        {
-                            hadDiffs = myItem != otherItem;
-                            diffs[i] = myItem;
-                        }
-                        else
-                        {
-                            object? diff = myItem.FindDifferences(otherItem);
-                            if (diff is not null)
-                            {
-                                hadDiffs = true;
-                                diffs[i] = diff;
-                            }
-                            else
-                            {
-                                diffs[i] = new Dictionary<string, object?>();
-                            }
-                        }
-                    }
-                    else
-                    {
-                        diffs[i] = this[i];
-                    }
-                }
-            }
-            else
-            {
-                diffs = this;
-                if (!hadDiffs)
-                {
-                    for (int i = 0; i < Count; i++)
-                    {
-                        T item = this[i], otherItem = otherList[i];
-                        if (item is null)
-                        {
-                            if (otherItem is not null)
-                            {
-                                hadDiffs = true;
-                                break;
-                            }
-                        }
-                        else if (!item.Equals(otherItem))
-                        {
-                            hadDiffs = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            return hadDiffs ? diffs : null;
-        }
-#endif
 
         /// <summary>
         /// Update this instance from a given JSON element

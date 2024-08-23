@@ -66,6 +66,10 @@ namespace DuetAPI.ObjectModel
             {
                 Indent = 2
             };
+            writer.WriteLine(Assign.Generate(receiver, cls));
+            writer.WriteLine();
+            writer.WriteLine(Clone.Generate(receiver, cls));
+            writer.WriteLine();
             writer.WriteLine(UpdateFromJson.Generate(context, receiver, cls));
             writer.WriteLine();
             writer.WriteLine(UpdateFromJsonReader.Generate(context, receiver, cls));

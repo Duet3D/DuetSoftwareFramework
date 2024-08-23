@@ -6,24 +6,14 @@ namespace DuetAPI.ObjectModel
     /// Dynamic interface for object model classes that have properties.
     /// Classes that implement this interface may change its instance on update
     /// </summary>
-    public interface IDynamicModelObject //: IModelObject
+    public interface IDynamicModelObject : IModelObject
     {
-#if false
         /// <summary>
         /// Assign the properties from another instance.
         /// This is required to update model properties which do not have a setter
         /// </summary>
         /// <param name="from">Other instance</param>
-        IDynamicModelObject? Assign(object from);
-
-        /// <summary>
-        /// Create a dictionary or list of all the differences between this instance and another.
-        /// This method outputs own property values that differ from the other instance
-        /// </summary>
-        /// <param name="other">Other instance</param>
-        /// <returns>Object differences or null if both instances are equal</returns>
-        object? FindDifferences(IDynamicModelObject other);
-#endif
+        IDynamicModelObject? Assign(IDynamicModelObject from);
 
         /// <summary>
         /// Update this instance from a given JSON element

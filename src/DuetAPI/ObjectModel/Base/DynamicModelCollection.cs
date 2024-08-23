@@ -52,16 +52,15 @@ namespace DuetAPI.ObjectModel
             }
         }
 
-#if false
         /// <summary>
         /// Assign the properties from another instance.
         /// This is required to update model properties which do not have a setter
         /// </summary>
         /// <param name="from">Other instance</param>
-        public void Assign(object from)
+        public void Assign(IStaticModelObject from)
         {
             // Validate the types
-            if (from is not ModelCollection<T> other)
+            if (from is not DynamicModelCollection<T> other)
             {
                 throw new ArgumentException("Types do not match", nameof(from));
             }
@@ -73,63 +72,29 @@ namespace DuetAPI.ObjectModel
             }
 
             // Update common items
-            Type itemType = typeof(T);
-            if (typeof(IStaticModelObject).IsAssignableFrom(itemType))
+            for (int i = 0; i < Math.Min(Count, other.Count); i++)
             {
-                for (int i = 0; i < Math.Min(Count, other.Count); i++)
+                T? myItem = this[i], otherItem = other[i]!;
+                if (otherItem is null)
                 {
-                    IStaticModelObject myItem = (IStaticModelObject)this[i]!;
-                    IStaticModelObject otherItem = (IStaticModelObject)other[i]!;
-                    if (myItem is null || otherItem is null)
+                    if (myItem is not null)
                     {
-                        this[i] = (T)otherItem!;
+                        this[i] = default;
                     }
-                    else if (myItem.GetType() != otherItem.GetType())
+                }
+                else
+                {
+                    if (myItem is null || myItem.GetType() != otherItem.GetType())
                     {
                         this[i] = (T)otherItem.Clone();
                     }
                     else
                     {
-                        myItem.Assign(otherItem);
-                    }
-                }
-            }
-            else if (itemType.IsArray)
-            {
-                for (int i = 0; i < Math.Min(Count, other.Count); i++)
-                {
-                    if (this[i] is null || other[i] is null)
-                    {
-                        this[i] = other[i];
-                    }
-                    else
-                    {
-                        IList listItem = (IList)this[i]!, fromItem = (IList)other[i]!;
-                        if (listItem.Count != fromItem.Count)
+                        myItem = (T?)myItem.Assign(otherItem);
+                        if (!ReferenceEquals(myItem, otherItem))
                         {
-                            this[i] = other[i];
+                            this[i] = myItem;
                         }
-                        else
-                        {
-                            for (int k = 0; k < listItem.Count; k++)
-                            {
-                                if (!Equals(listItem[k], fromItem[k]))
-                                {
-                                    this[i] = other[i];
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            {
-                for (int i = 0; i < Math.Min(Count, other.Count); i++)
-                {
-                    if (!Equals(this[i], other[i]))
-                    {
-                        this[i] = other[i];
                     }
                 }
             }
@@ -137,7 +102,8 @@ namespace DuetAPI.ObjectModel
             // Add missing items
             for (int i = Count; i < other.Count; i++)
             {
-                Add(other[i]);
+                T? item = other[i];
+                Add(item is null ? default : (T)item.Clone());
             }
         }
 
@@ -147,91 +113,13 @@ namespace DuetAPI.ObjectModel
         /// <returns>Cloned list</returns>
         public object Clone()
         {
-            ModelCollection<T> clone = [];
-            foreach (T item in this)
+            DynamicModelCollection<T> clone = [];
+            foreach (T? item in this)
             {
-                if (item is ICloneable cloneableItem)
-                {
-                    object clonedItem = cloneableItem.Clone();
-                    clone.Add((T)clonedItem);
-                }
-                else
-                {
-                    clone.Add(item);
-                }
+                clone.Add(item is null ? default : (T)item.Clone());
             }
             return clone;
         }
-
-        /// <summary>
-        /// Create a dictionary or list of all the differences between this instance and another.
-        /// This method outputs own property values that differ from the other instance
-        /// </summary>
-        /// <param name="other">Other instance</param>
-        /// <returns>Object differences or null if both instances are equal</returns>
-        public object? FindDifferences(IStaticModelObject other)
-        {
-            // Check the types
-            if (other is not ModelCollection<T> otherList)
-            {
-                // Types differ, return the entire instance
-                return this;
-            }
-            Type itemType = typeof(T);
-
-            // Compare the collections
-            bool hadDiffs = (Count != otherList.Count);
-            IList diffs = new object[Count];
-            if (typeof(IStaticModelObject).IsAssignableFrom(itemType))
-            {
-                for (int i = 0; i < Count; i++)
-                {
-                    if (i < otherList.Count)
-                    {
-                        IStaticModelObject myItem = (IStaticModelObject)this[i]!, otherItem = (IStaticModelObject)otherList[i]!;
-                        if (otherItem is null || myItem is null || otherItem.GetType() != myItem.GetType())
-                        {
-                            hadDiffs = myItem != otherItem;
-                            diffs[i] = myItem;
-                        }
-                        else
-                        {
-                            object? diff = myItem.FindDifferences(otherItem);
-                            if (diff is not null)
-                            {
-                                hadDiffs = true;
-                                diffs[i] = diff;
-                            }
-                            else
-                            {
-                                diffs[i] = new Dictionary<string, object?>();
-                            }
-                        }
-                    }
-                    else
-                    {
-                        diffs[i] = this[i];
-                    }
-                }
-            }
-            else
-            {
-                diffs = this;
-                if (!hadDiffs)
-                {
-                    for (int i = 0; i < Count; i++)
-                    {
-                        if (!this[i]!.Equals(otherList[i]))
-                        {
-                            hadDiffs = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            return hadDiffs ? diffs : null;
-        }
-#endif
 
         /// <summary>
         /// Update this instance from a given JSON element

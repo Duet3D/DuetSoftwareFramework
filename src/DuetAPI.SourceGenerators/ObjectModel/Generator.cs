@@ -113,7 +113,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel
                     using StringWriter stringWriter = new();
                     using IndentedTextWriter writer = new(stringWriter)
                     {
-                        Indent = 5
+                        Indent = 3
                     };
 
                     foreach (var prop in properties)
@@ -121,10 +121,9 @@ namespace DuetAPI.SourceGenerators.ObjectModel
                         string jsonPropertyName = prop.GetJsonPropertyName(), propType = prop.GetPropertyType();
 
                         // if (reader.ValueTextEquals(<propName>u8)) {
-                        writer.WriteLine($"if (reader.ValueTextEquals(\"{jsonPropertyName}\"u8))");
+                        writer.WriteLine($"if (key == \"{jsonPropertyName}\")");
                         writer.WriteLine("{");
                         writer.Indent++;
-                        writer.WriteLine("reader.Read();");
 
                         // read call
                         if (propType is "DynamicModelCollection" or "StaticModelCollection" or "GrowingCollection" or "JsonModelDictionary" or "StaticModelDictionary" ||
@@ -249,17 +248,11 @@ namespace DuetAPI.ObjectModel
             if (key == null)
             {{
                 UpdateFromJsonReader(ref reader, ignoreSbcProperties);
-                    return true;
-                }}
+                return true;
+            }}
 
-                while (reader.Read())
-                {{
-                    if (reader.TokenType == JsonTokenType.PropertyName)
-                    {{
-                        {WritePropertyReadCalls()}
-                    }}
-                }}
-                return false;
+            {WritePropertyReadCalls()}
+            return false;
         }}
 
         {ModelObject.Generator.GenerateMethods(context, receiver, "ObjectModel")}

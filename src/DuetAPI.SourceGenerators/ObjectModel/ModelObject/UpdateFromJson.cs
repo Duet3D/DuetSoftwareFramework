@@ -414,7 +414,6 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
 
             // Check if we need to generate the UpdateFromJson(Reader) methods
             bool useGeneratedUpdateFromJson = methods.Any(mds => mds.Identifier.ValueText == "UpdateFromJson" && mds.ParameterList.Parameters.Count == 2 && mds.ParameterList.Parameters[0].Identifier.ValueText == "jsonElement" && mds.ParameterList.Parameters[1].Identifier.ValueText == "ignoreSbcProperties");
-            bool useGeneratedUpdateFromJsonReader = methods.Any(mds => mds.Identifier.ValueText == "UpdateFromJsonReader" && mds.ParameterList.Parameters.Count == 2 && mds.ParameterList.Parameters[0].Identifier.ValueText == "reader" && mds.ParameterList.Parameters[1].Identifier.ValueText == "ignoreSbcProperties");
 
             // Generate method
             return SourceText.From($@"/// <summary>

@@ -1,6 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
 using NUnit.Framework;
-using NUnit.Framework.Legacy;
 using System.IO;
 using System.Text.Json;
 
@@ -75,10 +74,34 @@ namespace UnitTests.Machine
             Assert.That(serializedModel, Is.EqualTo(File.ReadAllText(modelPath)));
         }
 
-
-#if false
         [Test]
-        public void Patch()
+        public void UpdateFromFirmware()
+        {
+            string modelPath = Path.Combine(Directory.GetCurrentDirectory(), "../../../Machine/JSON/stateKey.json");
+            string jsonText = System.IO.File.ReadAllText(modelPath);
+            using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
+
+            ObjectModel model = new();
+            bool success = model.UpdateFromFirmwareJson("state", parsedJson.RootElement);
+
+            Assert.That(success, Is.True);
+        }
+
+        [Test]
+        public void UpdateFromFirmwareReader()
+        {
+            string modelPath = Path.Combine(Directory.GetCurrentDirectory(), "../../../Machine/JSON/stateKey.json");
+            Utf8JsonReader reader = new(File.ReadAllBytes(modelPath));
+            reader.Read();
+
+            ObjectModel model = new();
+            bool success = model.UpdateFromFirmwareJsonReader("state", ref reader);
+
+            Assert.That(success, Is.True);
+        }
+
+        [Test]
+        public void UpdateFromOther()
         {
             ObjectModel modelToUpdate = new();
             modelToUpdate.Boards.Add(new Board
@@ -122,21 +145,35 @@ namespace UnitTests.Machine
             });
             updatedModel.State.Status = MachineStatus.Pausing;
 
-            string patch = updatedModel.MakeStringPatch(modelToUpdate);
-            TestContext.Out.Write(patch);
-
-            using JsonDocument jsonPatch = JsonDocument.Parse(patch);
+            byte[] json = updatedModel.ToUtf8Json();
+            using JsonDocument jsonPatch = JsonDocument.Parse(json);
             modelToUpdate.UpdateFromJson(jsonPatch.RootElement, false);
 
-            ClassicAssert.AreEqual("Yum", modelToUpdate.Boards[0].FirmwareName);
-            ClassicAssert.AreEqual(2, modelToUpdate.Heat.BedHeaters.Count);
-            ClassicAssert.AreEqual(90F, modelToUpdate.Heat.Heaters[0]?.Active);
-            ClassicAssert.AreEqual(21F, modelToUpdate.Heat.Heaters[0]?.Standby);
-            ClassicAssert.AreEqual(20F, modelToUpdate.Heat.Heaters[1]?.Standby);
-            ClassicAssert.AreEqual(1, modelToUpdate.Fans.Count);
-            ClassicAssert.AreEqual(0.5F, modelToUpdate.Fans[0]?.ActualValue);
-            ClassicAssert.AreEqual(0.75F, modelToUpdate.Fans[0]?.RequestedValue);
-            ClassicAssert.AreEqual(MachineStatus.Pausing, modelToUpdate.State.Status);
+            Assert.That(modelToUpdate.Boards[0].FirmwareName, Is.EqualTo("Yum"));
+            Assert.That(modelToUpdate.Heat.BedHeaters, Is.EquivalentTo(new int[] { 0, 1 }));
+            Assert.That(modelToUpdate.Heat.Heaters[0].Active, Is.EqualTo(90F));
+            Assert.That(modelToUpdate.Heat.Heaters[0].Standby, Is.EqualTo(21F));
+            Assert.That(modelToUpdate.Heat.Heaters[1].Standby, Is.EqualTo(20F));
+            Assert.That(modelToUpdate.Fans[0].ActualValue, Is.EqualTo(0.5F));
+            Assert.That(modelToUpdate.Fans[0].RequestedValue, Is.EqualTo(0.75F));
+            Assert.That(modelToUpdate.State.Status, Is.EqualTo(MachineStatus.Pausing));
+        }
+
+        [Test]
+        public void Patch()
+        {
+            string modelPath = Path.Combine(Directory.GetCurrentDirectory(), "../../../Machine/JSON/model.json");
+            string jsonText = System.IO.File.ReadAllText(modelPath);
+            using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
+            ObjectModel model = new();
+            model.UpdateFromJson(parsedJson.RootElement, false);
+
+            string patchPath = Path.Combine(Directory.GetCurrentDirectory(), "../../../Machine/JSON/patch.json");
+            string patchText = System.IO.File.ReadAllText(patchPath);
+            using JsonDocument patchJson = JsonDocument.Parse(patchText);
+            model.UpdateFromJson(patchJson.RootElement, false);
+
+            Assert.That(model.Boards[0].FirmwareName, Is.EqualTo("Test"));
         }
 
         [Test]
@@ -151,9 +188,10 @@ namespace UnitTests.Machine
 
             ObjectModel newModel = new();
             newModel.Assign(model);
+            TestLoadedModel(newModel);
 
             string serializedModel = newModel.ToString();
-            ClassicAssert.AreEqual(jsonText, serializedModel);
+            Assert.That(serializedModel, Is.EqualTo(jsonText));
         }
 
         [Test]
@@ -167,23 +205,10 @@ namespace UnitTests.Machine
             model.UpdateFromJson(parsedJson.RootElement, false);
 
             ObjectModel newModel = (ObjectModel)model.Clone();
+            TestLoadedModel(newModel);
 
             string serializedModel = newModel.ToString();
-            ClassicAssert.AreEqual(jsonText, serializedModel);
-        }
-#endif
-
-        [Test]
-        public void UpdateFromFirmware()
-        {
-            string modelPath = Path.Combine(Directory.GetCurrentDirectory(), "../../../Machine/JSON/stateKey.json");
-            string jsonText = System.IO.File.ReadAllText(modelPath);
-            using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
-
-            ObjectModel model = new();
-            bool success = model.UpdateFromFirmwareJson("state", parsedJson.RootElement);
-
-            ClassicAssert.IsTrue(success);
+            Assert.That(serializedModel, Is.EqualTo(jsonText));
         }
     }
 }

@@ -397,7 +397,6 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
             }
 
             // Check if we need to generate the UpdateFromJson(Reader) methods
-            bool useGeneratedUpdateFromJson = methods.Any(mds => mds.Identifier.ValueText == "UpdateFromJson" && mds.ParameterList.Parameters.Count == 2 && mds.ParameterList.Parameters[0].Identifier.ValueText == "jsonElement" && mds.ParameterList.Parameters[1].Identifier.ValueText == "ignoreSbcProperties");
             bool useGeneratedUpdateFromJsonReader = methods.Any(mds => mds.Identifier.ValueText == "UpdateFromJsonReader" && mds.ParameterList.Parameters.Count == 2 && mds.ParameterList.Parameters[0].Identifier.ValueText == "reader" && mds.ParameterList.Parameters[1].Identifier.ValueText == "ignoreSbcProperties");
 
             // Generate method
@@ -408,7 +407,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
         /// <param name=""reader"">Reader to update this intance from</param>
         /// <param name=""ignoreSbcProperties"">Whether SBC properties are ignored</param>{(isDynamic ? "\n        /// <returns>Updated instance</returns>" : "")}
         /// <exception cref=""JsonException"">Failed to deserialize data</exception>
-        public {(isInherited ? "override " : isInheritedFrom ? "virtual " : "") + (isDynamic ? "IDynamicModelObject?" : "void")} {(useGeneratedUpdateFromJson ? "Generated" : "")}UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+        public {(isInherited ? "override " : isInheritedFrom ? "virtual " : "") + (isDynamic ? "IDynamicModelObject?" : "void")} {(useGeneratedUpdateFromJsonReader ? "Generated" : "")}UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
         {{
             if (reader.TokenType != JsonTokenType.StartObject)
             {{

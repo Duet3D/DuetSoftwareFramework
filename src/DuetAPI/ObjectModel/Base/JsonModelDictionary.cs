@@ -182,7 +182,7 @@ namespace DuetAPI.ObjectModel
         /// Assign the properties from another instance
         /// </summary>
         /// <param name="from">Other instance</param>
-        public void Assign(object from)
+        public void Assign(IStaticModelObject from)
         {
             // Validate the types
             if (from is not JsonModelDictionary other)
@@ -304,48 +304,6 @@ namespace DuetAPI.ObjectModel
         /// <param name="item">Item to check</param>
         /// <returns>If the item exists in the dictionary</returns>
         public bool Contains(KeyValuePair<string, JsonElement?> item) => _dictionary.TryGetValue(item.Key, out JsonElement? value) && Equals(value, item.Value);
-
-        /// <summary>
-        /// Create a dictionary or list of all the differences between this instance and another.
-        /// This method outputs own property values that differ from the other instance
-        /// </summary>
-        /// <param name="other">Other instance</param>
-        /// <returns>Object differences or null if both instances are equal</returns>
-        public object? FindDifferences(IStaticModelObject? other)
-        {
-            // Check the types
-            if (other is not JsonModelDictionary otherDictionary)
-            {
-                // Types differ, return the entire instance
-                return this;
-            }
-
-            // Find the differences
-            Dictionary<string, JsonElement?>? diffs = null;
-            foreach (var kv in this)
-            {
-                if (!otherDictionary.TryGetValue(kv.Key, out JsonElement? otherItem) || !kv.Value!.Equals(otherItem))
-                {
-                    diffs ??= [];
-                    diffs.Add(kv.Key, kv.Value);
-                }
-            }
-
-            // Keep track of removed items (if applicable)
-            if (NullRemovesItems)
-            {
-                foreach (string key in otherDictionary.Keys)
-                {
-                    if (!_dictionary.ContainsKey(key))
-                    {
-                        diffs ??= [];
-                        diffs.Add(key, default!);
-                    }
-                }
-            }
-
-            return diffs;
-        }
 
         /// <summary>
         /// Get an enumerator

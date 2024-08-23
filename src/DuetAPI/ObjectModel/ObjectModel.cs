@@ -7,7 +7,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Representation of the Duet3D object model
     /// </summary>
-    public partial class ObjectModel : ModelObject
+    public partial class ObjectModel : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// List of connected boards
@@ -146,6 +146,16 @@ namespace DuetAPI.ObjectModel
         public bool UpdateFromFirmwareJson(string? key, JsonElement jsonElement, int offset = 0, bool last = true) => GeneratedUpdateFromJson(key, jsonElement, true, offset, last);
 
         /// <summary>
+        /// Update a specific key of this instance from a given JSON reader as provided by the firmware
+        /// </summary>
+        /// <param name="key">Property name to update</param>
+        /// <param name="reader">JSON reader</param>
+        /// <param name="offset">Index offset</param>
+        /// <param name="last">Whether this is the last update</param>
+        /// <returns>Whether the key could be updated</returns>
+        public bool UpdateFromFirmwareJsonReader(string? key, ref Utf8JsonReader reader, int offset = 0, bool last = true) => GeneratedUpdateFromJsonReader(key, ref reader, true, offset, last);
+
+        /// <summary>
         /// Update this instance from a given JSON element
         /// </summary>
         /// <param name="jsonElement">Element to update this intance from</param>
@@ -160,14 +170,13 @@ namespace DuetAPI.ObjectModel
         /// <returns>Whether the key could be updated</returns>
         public bool UpdateFromJson(string key, JsonElement jsonElement) => GeneratedUpdateFromJson(key, jsonElement, false);
 
-#if false
         /// <summary>
         /// Update a specific key of this instance from a given JSON reader
         /// </summary>
         /// <param name="key">Property name to update</param>
         /// <param name="reader">JSON reader</param>
         /// <returns>Whether the key could be updated</returns>
-        public bool UpdateFromJsonReader(string key, ref Utf8JsonReader reader) => InternalUpdateFromJsonReader(key, ref reader, false);
+        public bool UpdateFromJsonReader(string key, ref Utf8JsonReader reader) => GeneratedUpdateFromJsonReader(key, ref reader, false);
 
         /// <summary>
         /// Convert this instance to a JSON text
@@ -180,7 +189,6 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <returns></returns>
         public byte[] ToUtf8Json() => JsonSerializer.SerializeToUtf8Bytes(this, Utility.JsonHelper.DefaultJsonOptions);
-#endif
 
         /// <summary>
         /// Static event to be called when the deserialization of a property failed.
