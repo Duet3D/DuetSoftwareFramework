@@ -378,7 +378,7 @@ namespace DuetAPI.ObjectModel
                 }
                 else if (!TryGetValue(jsonProperty.Name, out JsonElement? value) || !value!.Equals(jsonProperty.Value))
                 {
-                    this[jsonProperty.Name] = jsonProperty.Value;
+                    this[jsonProperty.Name] = jsonProperty.Value.Clone();
                 }
             }
         }

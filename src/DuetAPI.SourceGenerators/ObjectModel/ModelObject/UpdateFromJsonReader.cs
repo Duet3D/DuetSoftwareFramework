@@ -423,8 +423,15 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                     {{
 #if VERIFY_OBJECT_MODEL
                         string propertyName = reader.GetString();
-                        JsonElement jsonProperty = JsonDocument.ParseValue(ref reader).RootElement;
-                        Console.WriteLine(""[warn] Missing property {{0}} = {{1}} in {cls}"", propertyName, jsonProperty.GetRawText());
+                        if (this is ObjectModel && propertyName == ""seqs"")
+                        {{
+                            reader.Skip();
+                        }}
+                        else
+                        {{
+                            JsonElement jsonProperty = JsonDocument.ParseValue(ref reader).RootElement;
+                            Console.WriteLine(""[warn] Missing property {{0}} = {{1}} in {cls}"", propertyName, jsonProperty.GetRawText());
+                        }}
 #else
                         reader.Skip();
 #endif 
