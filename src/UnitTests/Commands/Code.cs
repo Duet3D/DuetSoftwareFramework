@@ -1,5 +1,4 @@
-﻿#if false
-using DuetAPI;
+﻿using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Utility;
 using NUnit.Framework;
@@ -124,7 +123,7 @@ namespace UnitTests.Commands
                 ClassicAssert.IsNull(code.MinorNumber);
                 ClassicAssert.AreEqual(1, code.Parameters.Count);
                 ClassicAssert.AreEqual('P', code.Parameters[0].Letter);
-                ClassicAssert.AreEqual("config.g", (string?)code.Parameters[0]);
+                ClassicAssert.AreEqual("config.g", (string)code.Parameters[0]);
             }
         }
 
@@ -140,7 +139,7 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual('P', code.Parameters[0].Letter);
                 ClassicAssert.AreEqual(1, (int)code.Parameters[0]);
                 ClassicAssert.AreEqual('C', code.Parameters[1].Letter);
-                ClassicAssert.AreEqual("Fancy \" Fan", (string?)code.Parameters[1]);
+                ClassicAssert.AreEqual("Fancy \" Fan", (string)code.Parameters[1]);
                 ClassicAssert.AreEqual('H', code.Parameters[2].Letter);
                 ClassicAssert.AreEqual(-1, (int)code.Parameters[2]);
                 ClassicAssert.AreEqual('S', code.Parameters[3].Letter);
@@ -160,7 +159,7 @@ namespace UnitTests.Commands
                 ClassicAssert.IsNull(code.MinorNumber);
                 ClassicAssert.AreEqual(1, code.Parameters.Count);
                 ClassicAssert.AreEqual('@', code.Parameters[0].Letter);
-                ClassicAssert.AreEqual(string.Empty, (string?)code.Parameters[0]);
+                ClassicAssert.AreEqual(string.Empty, (string)code.Parameters[0]);
             }
         }
 
@@ -174,7 +173,7 @@ namespace UnitTests.Commands
                 ClassicAssert.IsNull(code.MinorNumber);
                 ClassicAssert.AreEqual(1, code.Parameters.Count);
                 ClassicAssert.AreEqual('@', code.Parameters[0].Letter);
-                ClassicAssert.AreEqual("DSF", (string?)code.Parameters[0]);
+                ClassicAssert.AreEqual("DSF", (string)code.Parameters[0]);
             }
         }
 
@@ -228,7 +227,7 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual(302, code.MajorNumber);
                 ClassicAssert.AreEqual(2, code.Parameters.Count);
                 ClassicAssert.AreEqual('D', code.Parameters[0].Letter);
-                ClassicAssert.AreEqual("dummy", (string?)code.Parameters[0]);
+                ClassicAssert.AreEqual("dummy", (string)code.Parameters[0]);
                 ClassicAssert.AreEqual('P', code.Parameters[1].Letter);
                 ClassicAssert.AreEqual(1, (int)code.Parameters[1]);
             }
@@ -306,7 +305,7 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual('S', code.Parameters[1].Letter);
                 ClassicAssert.AreEqual(1, (int)code.Parameters[1]);
                 ClassicAssert.AreEqual('P', code.Parameters[2].Letter);
-                ClassicAssert.AreEqual("io1.in", (string?)code.Parameters[2]);
+                ClassicAssert.AreEqual("io1.in", (string)code.Parameters[2]);
                 ClassicAssert.AreEqual("comment", code.Comment);
             }
         }
@@ -322,15 +321,15 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual(CodeFlags.IsLastCode, code.Flags);
                 ClassicAssert.AreEqual(5, code.Parameters.Count);
                 ClassicAssert.AreEqual('S', code.Parameters[0].Letter);
-                ClassicAssert.AreEqual("TestAp", (string?)code.Parameters[0]);
+                ClassicAssert.AreEqual("TestAp", (string)code.Parameters[0]);
                 ClassicAssert.AreEqual('P', code.Parameters[1].Letter);
-                ClassicAssert.AreEqual("Some pass", (string?)code.Parameters[1]);
+                ClassicAssert.AreEqual("Some pass", (string)code.Parameters[1]);
                 ClassicAssert.AreEqual('I', code.Parameters[2].Letter);
-                ClassicAssert.AreEqual(IPAddress.Parse("192.168.1.123"), (IPAddress?)code.Parameters[2]);
+                ClassicAssert.AreEqual(IPAddress.Parse("192.168.1.123"), (IPAddress)code.Parameters[2]);
                 ClassicAssert.AreEqual('J', code.Parameters[3].Letter);
-                ClassicAssert.AreEqual(IPAddress.Parse("192.168.1.254"), (IPAddress?)code.Parameters[3]);
+                ClassicAssert.AreEqual(IPAddress.Parse("192.168.1.254"), (IPAddress)code.Parameters[3]);
                 ClassicAssert.AreEqual('K', code.Parameters[4].Letter);
-                ClassicAssert.AreEqual(IPAddress.Parse("255.255.255.0"), (IPAddress?)code.Parameters[4]);
+                ClassicAssert.AreEqual(IPAddress.Parse("255.255.255.0"), (IPAddress)code.Parameters[4]);
             }
         }
 
@@ -365,7 +364,7 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual('P', code.Parameters[0].Letter);
                 ClassicAssert.AreEqual(4, (int)code.Parameters[0]);
                 ClassicAssert.AreEqual('S', code.Parameters[1].Letter);
-                ClassicAssert.AreEqual("foo", (string?)code.Parameters[1]);
+                ClassicAssert.AreEqual("foo", (string)code.Parameters[1]);
                 ClassicAssert.AreEqual("T3 P4 S\"foo\"", code.ToString());
             }
         }
@@ -433,7 +432,7 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual(3, code.Parameters.Count);
                 ClassicAssert.AreEqual('E', code.Parameters[0].Letter);
                 ClassicAssert.IsTrue(code.Parameters[0].IsExpression);
-                ClassicAssert.AreEqual("{123:{456}}", (string?)code.Parameters[0]);
+                ClassicAssert.AreEqual("{123:{456}}", (string)code.Parameters[0]);
                 ClassicAssert.AreEqual('f', code.Parameters[1].Letter);
                 ClassicAssert.AreEqual(new DriverId(7, 8), (DriverId)code.Parameters[1]);
                 ClassicAssert.AreEqual('g', code.Parameters[2].Letter);
@@ -448,7 +447,7 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual(1, code.Parameters.Count);
                 ClassicAssert.AreEqual('E', code.Parameters[0].Letter);
                 ClassicAssert.IsTrue(code.Parameters[0].IsExpression);
-                ClassicAssert.AreEqual("{{123}:{456}:789}", (string?)code.Parameters[0]);
+                ClassicAssert.AreEqual("{{123}:{456}:789}", (string)code.Parameters[0]);
             }
 
             foreach (DuetAPI.Commands.Code code in Parse("M584 E{123}:{456}:{789}"))
@@ -459,7 +458,7 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual(1, code.Parameters.Count);
                 ClassicAssert.AreEqual('E', code.Parameters[0].Letter);
                 ClassicAssert.IsTrue(code.Parameters[0].IsExpression);
-                ClassicAssert.AreEqual("{123}:{456}:{789}", (string?)code.Parameters[0]);
+                ClassicAssert.AreEqual("{123}:{456}:{789}", (string)code.Parameters[0]);
             }
 
             foreach (DuetAPI.Commands.Code code in Parse("M92 E{123,456}"))
@@ -470,7 +469,7 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual(1, code.Parameters.Count);
                 ClassicAssert.AreEqual('E', code.Parameters[0].Letter);
                 ClassicAssert.IsTrue(code.Parameters[0].IsExpression);
-                ClassicAssert.AreEqual("{123,456}", (string?)code.Parameters[0]);
+                ClassicAssert.AreEqual("{123,456}", (string)code.Parameters[0]);
             }
 
         }
@@ -526,10 +525,10 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual(2, code.Parameters.Count);
                 ClassicAssert.IsTrue(code.Parameters[0].IsExpression);
                 ClassicAssert.AreEqual('X', code.Parameters[0].Letter);
-                ClassicAssert.AreEqual("{machine.axes[0].maximum - 10}", (string?)code.Parameters[0]);
+                ClassicAssert.AreEqual("{machine.axes[0].maximum - 10}", (string)code.Parameters[0]);
                 ClassicAssert.IsTrue(code.Parameters[1].IsExpression);
                 ClassicAssert.AreEqual('Y', code.Parameters[1].Letter);
-                ClassicAssert.AreEqual("{machine.axes[1].maximum - 10}", (string?)code.Parameters[1]);
+                ClassicAssert.AreEqual("{machine.axes[1].maximum - 10}", (string)code.Parameters[1]);
             }
         }
 
@@ -544,7 +543,7 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual(1, code.Parameters.Count);
                 ClassicAssert.AreEqual('@', code.Parameters[0].Letter);
                 ClassicAssert.AreEqual(true, code.Parameters[0].IsExpression);
-                ClassicAssert.AreEqual("{my.test.value}", (string?)code.Parameters[0]);
+                ClassicAssert.AreEqual("{my.test.value}", (string)code.Parameters[0]);
             }
         }
 
@@ -559,7 +558,7 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual(1, code.Parameters.Count);
                 ClassicAssert.AreEqual('@', code.Parameters[0].Letter);
                 ClassicAssert.IsFalse(code.Parameters[0].IsExpression);
-                ClassicAssert.AreEqual("Hello world!", (string?)code.Parameters[0]);
+                ClassicAssert.AreEqual("Hello world!", (string)code.Parameters[0]);
                 ClassicAssert.AreEqual("comment", code.Comment);
             }
         }
@@ -575,7 +574,7 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual(1, code.Parameters.Count);
                 ClassicAssert.AreEqual('P', code.Parameters[0].Letter);
                 ClassicAssert.IsFalse(code.Parameters[0].IsExpression);
-                ClassicAssert.AreEqual("💡 - LEDs on", (string?)code.Parameters[0]);
+                ClassicAssert.AreEqual("💡 - LEDs on", (string)code.Parameters[0]);
             }
         }
 
@@ -590,7 +589,7 @@ namespace UnitTests.Commands
                 ClassicAssert.AreEqual(1, code.Parameters.Count);
                 ClassicAssert.AreEqual('@', code.Parameters[0].Letter);
                 ClassicAssert.IsTrue(code.Parameters[0].IsExpression);
-                ClassicAssert.AreEqual("{ \"Axis \" ^ ( move.axes[0].letter ) ^ \" not homed. Please wait while all axes are homed\" }", (string?)code.Parameters[0]);
+                ClassicAssert.AreEqual("{ \"Axis \" ^ ( move.axes[0].letter ) ^ \" not homed. Please wait while all axes are homed\" }", (string)code.Parameters[0]);
             }
         }
 
@@ -845,7 +844,7 @@ namespace UnitTests.Commands
                 ClassicAssert.IsNull(code.MinorNumber);
                 ClassicAssert.AreEqual(2, code.Parameters.Count);
                 ClassicAssert.AreEqual('T', code.Parameters[0].Letter);
-                ClassicAssert.AreEqual("{my.expression}", (string?)code.Parameters[0]);
+                ClassicAssert.AreEqual("{my.expression}", (string)code.Parameters[0]);
                 ClassicAssert.AreEqual('P', code.Parameters[1].Letter);
                 ClassicAssert.AreEqual(0, (int)code.Parameters[1]);
             }
@@ -1195,4 +1194,3 @@ namespace UnitTests.Commands
         }
     }
 }
-#endif

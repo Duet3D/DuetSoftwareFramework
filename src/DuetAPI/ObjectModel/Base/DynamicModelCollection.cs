@@ -10,7 +10,7 @@ namespace DuetAPI.ObjectModel
     /// Generic container for model object arrays with dynamic items
     /// </summary>
     /// <typeparam name="T">Item type</typeparam>
-    public class DynamicModelCollection<T> : ObservableCollection<T?>, IModelCollection where T : IDynamicModelObject?, new()
+    public class DynamicModelCollection<T> : ObservableCollection<T>, IModelCollection where T : IDynamicModelObject?, new()
     {
         /// <summary>
         /// Default constructor
@@ -27,7 +27,7 @@ namespace DuetAPI.ObjectModel
         /// Overloading constructor that takes a list for initialization
         /// </summary>
         /// <param name="list">List to use for items</param>
-        public DynamicModelCollection(List<T?> list) : base(list) { }
+        public DynamicModelCollection(List<T> list) : base(list) { }
 
         /// <summary>
         /// Removes all items from the collection
@@ -79,7 +79,7 @@ namespace DuetAPI.ObjectModel
                 {
                     if (myItem is not null)
                     {
-                        this[i] = default;
+                        this[i] = default!;
                     }
                 }
                 else
@@ -93,7 +93,7 @@ namespace DuetAPI.ObjectModel
                         myItem = (T?)myItem.Assign(otherItem);
                         if (!ReferenceEquals(myItem, otherItem))
                         {
-                            this[i] = myItem;
+                            this[i] = myItem!;
                         }
                     }
                 }
@@ -103,7 +103,7 @@ namespace DuetAPI.ObjectModel
             for (int i = Count; i < other.Count; i++)
             {
                 T? item = other[i];
-                Add(item is null ? default : (T)item.Clone());
+                Add(item is null ? default! : (T)item.Clone());
             }
         }
 
@@ -116,7 +116,7 @@ namespace DuetAPI.ObjectModel
             DynamicModelCollection<T> clone = [];
             foreach (T? item in this)
             {
-                clone.Add(item is null ? default : (T)item.Clone());
+                clone.Add(item is null ? default! : (T)item.Clone());
             }
             return clone;
         }
@@ -169,7 +169,7 @@ namespace DuetAPI.ObjectModel
                 {
                     if (this[i] is not null)
                     {
-                        this[i] = default;
+                        this[i] = default!;
                     }
                 }
                 else
@@ -179,14 +179,14 @@ namespace DuetAPI.ObjectModel
                         if (item == null)
                         {
                             item = new T();
-                            this[i] = (T?)item.UpdateFromJson(jsonItem, ignoreSbcProperties);
+                            this[i] = (T)item.UpdateFromJson(jsonItem, ignoreSbcProperties)!;
                         }
                         else
                         {
                             T? updatedItem = (T?)item.UpdateFromJson(jsonItem, ignoreSbcProperties);
                             if (!ReferenceEquals(this[i], updatedItem))
                             {
-                                this[i] = updatedItem;
+                                this[i] = updatedItem!;
                             }
                         }
                     }
@@ -203,12 +203,12 @@ namespace DuetAPI.ObjectModel
                 JsonElement jsonItem = jsonElement[i - offset];
                 if (jsonItem.ValueKind == JsonValueKind.Null)
                 {
-                    Add(default);
+                    Add(default!);
                 }
                 else
                 {
                     T newItem = new();
-                    Add((T?)newItem.UpdateFromJson(jsonItem, ignoreSbcProperties));
+                    Add((T)newItem.UpdateFromJson(jsonItem, ignoreSbcProperties)!);
                 }
             }
         }
@@ -277,7 +277,7 @@ namespace DuetAPI.ObjectModel
                 }
                 else if (reader.TokenType == JsonTokenType.Null)
                 {
-                    Add(default);
+                    Add(default!);
                     i++;
                 }
             }

@@ -1,4 +1,6 @@
-﻿using System;
+﻿using DuetAPI.ObjectModel;
+using System;
+using System.Text.Json;
 
 namespace DuetControlServer.Model
 {
@@ -16,6 +18,10 @@ namespace DuetControlServer.Model
         {
             for (Type? type = collectionType; type is not null; type = type.BaseType)
             {
+                if (type == typeof(JsonModelDictionary))
+                {
+                    return typeof(JsonElement);
+                }
                 if (type.IsGenericType)
                 {
                     return type.GetGenericArguments()[0];

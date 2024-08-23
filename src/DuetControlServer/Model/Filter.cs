@@ -196,27 +196,27 @@ namespace DuetControlServer.Model
                 if (partialModel is ModelObject model)
                 {
                     Dictionary<string, object?> result = [];
-                    foreach (KeyValuePair<string, PropertyInfo> property in model.JsonProperties)
+                    foreach (PropertyInfo property in model.GetType().GetProperties(BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance))
                     {
-                        if (propertyName == "*" || property.Key == propertyName)
+                        string jsonPropertyName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
+                        if (propertyName == "*" || propertyName == jsonPropertyName)
                         {
                             if (partialFilter.Length == 0 ||
                                 (partialFilter.Length == 1 && partialFilter[0] is "**"))
                             {
                                 // This is a property we've been looking for
-                                result.Add(property.Key, property.Value.GetValue(model));
+                                result.Add(jsonPropertyName, property.GetValue(model));
                                 continue;
                             }
 
-                            if (property.Value.PropertyType.IsSubclassOf(typeof(ModelObject)) ||
-                                typeof(IList).IsAssignableFrom(property.Value.PropertyType))
+                            if (property.PropertyType.IsSubclassOf(typeof(ModelObject)) || typeof(IList).IsAssignableFrom(property.PropertyType))
                             {
                                 // Property is somewhere deeper
-                                object propertyValue = property.Value.GetValue(model)!;
+                                object propertyValue = property.GetValue(model)!;
                                 object? subResult = InternalGetFiltered(propertyValue, partialFilter);
                                 if (subResult is not null)
                                 {
-                                    result.Add(property.Key, subResult);
+                                    result.Add(jsonPropertyName, subResult);
                                 }
                             }
                         }
@@ -407,7 +407,8 @@ namespace DuetControlServer.Model
                 partialFilter = partialFilter.Skip(1).ToArray();
                 if (partialModel is ModelObject model)
                 {
-                    if (model.JsonProperties.TryGetValue(propertyName, out PropertyInfo? property))
+                    PropertyInfo? property = model.GetType().GetProperty(propertyName, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
+                    if (property is not null)
                     {
                         if (findSbcProperty && Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
                         {

@@ -268,7 +268,8 @@ namespace DuetControlServer.Model
 
             foreach (string pathItem in expression.Split('.', '['))
             {
-                if (model.JsonProperties.TryGetValue(pathItem, out PropertyInfo? property))
+                PropertyInfo? property = model.GetType().GetProperty(pathItem, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
+                if (property is not null)
                 {
                     if (Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
                     {

@@ -132,7 +132,7 @@ namespace DuetControlServer.Model
         /// <param name="path">Path of the subscription</param>
         private static void SubscribeToModelCollection(IModelCollection modelCollection, string collectionName, object[] path)
         {
-            NotifyCollectionChangedEventHandler changeHandler = (modelCollection is IGrowingModelCollection) ? GrowingCollectionChanged(AddToPath(path, collectionName)) : CollectionChanged(collectionName, path);
+            NotifyCollectionChangedEventHandler changeHandler = (modelCollection.GetType().IsGenericType && modelCollection.GetType().GetGenericTypeDefinition() == typeof(GrowingCollection<>)) ? GrowingCollectionChanged(AddToPath(path, collectionName)) : CollectionChanged(collectionName, path);
             modelCollection.CollectionChanged += changeHandler;
             _collectionChangeHandlers[modelCollection] = changeHandler;
 

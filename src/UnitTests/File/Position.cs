@@ -1,5 +1,4 @@
-﻿#if false
-using DuetAPI.Commands;
+﻿using DuetAPI.Commands;
 using DuetControlServer.Files;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
@@ -45,4 +44,3 @@ namespace UnitTests.File
         }
     }
 }
-#endif

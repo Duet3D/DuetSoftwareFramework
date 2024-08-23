@@ -41,7 +41,7 @@ namespace UnitTests.Machine
         public void UpdateFromJson()
         {
             string modelPath = Path.Combine(Directory.GetCurrentDirectory(), "../../../Machine/JSON/model.json");
-            string jsonText = File.ReadAllText(modelPath);
+            string jsonText = System.IO.File.ReadAllText(modelPath);
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
             ObjectModel model = new();
@@ -60,7 +60,7 @@ namespace UnitTests.Machine
         public void UpdateFromJsonReader()
         {
             string modelPath = Path.Combine(Directory.GetCurrentDirectory(), "../../../Machine/JSON/model.json");
-            Utf8JsonReader reader = new(File.ReadAllBytes(modelPath));
+            Utf8JsonReader reader = new(System.IO.File.ReadAllBytes(modelPath));
             reader.Read();
 
             ObjectModel model = new();
@@ -71,7 +71,7 @@ namespace UnitTests.Machine
 
             // Serialize OM again and make sure it matches the saved state
             string serializedModel = JsonSerializer.Serialize(model, DuetAPI.Utility.JsonHelper.DefaultJsonOptions);
-            Assert.That(serializedModel, Is.EqualTo(File.ReadAllText(modelPath)));
+            Assert.That(serializedModel, Is.EqualTo(System.IO.File.ReadAllText(modelPath)));
         }
 
         [Test]
@@ -91,7 +91,7 @@ namespace UnitTests.Machine
         public void UpdateFromFirmwareReader()
         {
             string modelPath = Path.Combine(Directory.GetCurrentDirectory(), "../../../Machine/JSON/stateKey.json");
-            Utf8JsonReader reader = new(File.ReadAllBytes(modelPath));
+            Utf8JsonReader reader = new(System.IO.File.ReadAllBytes(modelPath));
             reader.Read();
 
             ObjectModel model = new();
@@ -99,6 +99,8 @@ namespace UnitTests.Machine
 
             Assert.That(success, Is.True);
         }
+
+        private static readonly int[] expectedBedHeaters = [0, 1];
 
         [Test]
         public void UpdateFromOther()
@@ -150,7 +152,7 @@ namespace UnitTests.Machine
             modelToUpdate.UpdateFromJson(jsonPatch.RootElement, false);
 
             Assert.That(modelToUpdate.Boards[0].FirmwareName, Is.EqualTo("Yum"));
-            Assert.That(modelToUpdate.Heat.BedHeaters, Is.EquivalentTo(new int[] { 0, 1 }));
+            Assert.That(modelToUpdate.Heat.BedHeaters, Is.EquivalentTo(expectedBedHeaters));
             Assert.That(modelToUpdate.Heat.Heaters[0].Active, Is.EqualTo(90F));
             Assert.That(modelToUpdate.Heat.Heaters[0].Standby, Is.EqualTo(21F));
             Assert.That(modelToUpdate.Heat.Heaters[1].Standby, Is.EqualTo(20F));

@@ -260,7 +260,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
         /// <param name=""from"">Other instance</param>{(isDynamic ? "\n        /// <returns>Updated instance</returns>" : "")}
         public {(isInherited ? "override " : isInheritedFrom ? "virtual " : "") + (isDynamic ? "IDynamicModelObject?" : "void")} Assign({(isDynamic ? "IDynamicModelObject" : "IStaticModelObject")} from)
         {{
-            if (from?.GetType() != GetType())
+            if (from.GetType() != GetType())
             {{
                 {(isDynamic ? $"return ({cls})from.Clone();" : "throw new ArgumentNullException(nameof(from));")}
             }}

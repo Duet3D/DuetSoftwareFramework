@@ -1,5 +1,4 @@
-﻿#if false
-using DuetAPI.ObjectModel;
+﻿using DuetAPI.ObjectModel;
 using DuetHttpClient;
 using DuetHttpClient.Utility;
 using NUnit.Framework;
@@ -17,7 +16,7 @@ namespace UnitTests.HttpClient
     [TestFixture]
     public class Session
     {
-        private DuetHttpSession? session;
+        private DuetHttpSession session;
 
         [OneTimeSetUp]
         public async Task Connect()
@@ -27,7 +26,7 @@ namespace UnitTests.HttpClient
 
             // This has to be changed depending on the test setup.
             // The IP address must be either a Duet (standalone mode) or a SBC running DSF (SBC mode)
-            session = await DuetHttpSession.ConnectAsync(new("http://ender6.fritz.box"));
+            session = await DuetHttpSession.ConnectAsync(new("http://ender3pro.fritz.box"));
         }
 
         [Test]
@@ -132,4 +131,3 @@ namespace UnitTests.HttpClient
         }
     }
 }
-#endif

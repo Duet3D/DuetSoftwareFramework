@@ -220,12 +220,12 @@ namespace DuetControlServer.IPC
                     item.Value.ValueKind == JsonValueKind.True)
                 {
                     // Response OK
-                    return jsonDocument.ToObject<BaseResponse>(JsonHelper.DefaultJsonOptions)!;
+                    return JsonSerializer.Deserialize<BaseResponse>(jsonDocument, JsonHelper.DefaultJsonOptions)!;
                 }
             }
 
             // Error
-            return jsonDocument.ToObject<ErrorResponse>(JsonHelper.DefaultJsonOptions)!;
+            return JsonSerializer.Deserialize<ErrorResponse>(jsonDocument, JsonHelper.DefaultJsonOptions)!;
         }
 
         /// <summary>
@@ -311,7 +311,7 @@ namespace DuetControlServer.IPC
                     }
 
                     // Perform final deserialization and assign source identifier to this command
-                    BaseCommand command = (BaseCommand)jsonDocument.RootElement.ToObject(commandType, JsonHelper.DefaultJsonOptions)!;
+                    BaseCommand command = (BaseCommand)JsonSerializer.Deserialize(jsonDocument, commandType, JsonHelper.DefaultJsonOptions)!;
                     if (command is Commands.IConnectionCommand commandWithSourceConnection)
                     {
                         commandWithSourceConnection.Connection = this;

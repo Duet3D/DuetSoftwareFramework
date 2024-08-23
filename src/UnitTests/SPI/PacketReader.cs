@@ -1,4 +1,3 @@
-#if false
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -198,7 +197,7 @@ namespace UnitTests.SPI
         {
             Span<byte> blob = GetBlob("evaluationResult.bin");
 
-            int bytesRead = Reader.ReadEvaluationResult(blob, out string expression, out object? result);
+            int bytesRead = Reader.ReadEvaluationResult(blob, out string expression, out object result);
             ClassicAssert.AreEqual(32, bytesRead);
 
             // Header
@@ -233,4 +232,3 @@ namespace UnitTests.SPI
         }
     }
 }
-#endif

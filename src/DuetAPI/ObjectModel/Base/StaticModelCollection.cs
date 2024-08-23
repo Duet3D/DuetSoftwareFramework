@@ -10,7 +10,7 @@ namespace DuetAPI.ObjectModel
     /// Generic container for model object arrays with static items
     /// </summary>
     /// <typeparam name="T">Item type</typeparam>
-    public class StaticModelCollection<T> : ObservableCollection<T?>, IModelCollection where T : IStaticModelObject?, new()
+    public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollection where T : IStaticModelObject?, new()
     {
         /// <summary>
         /// Default constructor
@@ -27,7 +27,7 @@ namespace DuetAPI.ObjectModel
         /// Overloading constructor that takes a list for initialization
         /// </summary>
         /// <param name="list">List to use for items</param>
-        public StaticModelCollection(List<T?> list) : base(list) { }
+        public StaticModelCollection(List<T> list) : base(list) { }
 
         /// <summary>
         /// Removes all items from the collection
@@ -79,7 +79,7 @@ namespace DuetAPI.ObjectModel
                 {
                     if (myItem is not null)
                     {
-                        this[i] = default;
+                        this[i] = default!;
                     }
                 }
                 else
@@ -99,7 +99,7 @@ namespace DuetAPI.ObjectModel
             for (int i = Count; i < other.Count; i++)
             {
                 T? item = other[i];
-                Add(item is null ? default : (T)item.Clone());
+                Add(item is null ? default! : (T)item.Clone());
             }
         }
 
@@ -112,7 +112,7 @@ namespace DuetAPI.ObjectModel
             StaticModelCollection<T> clone = [];
             foreach (T? item in this)
             {
-                clone.Add(item is null ? default : (T)item.Clone());
+                clone.Add(item is null ? default! : (T)item.Clone());
             }
             return clone;
         }
@@ -196,7 +196,7 @@ namespace DuetAPI.ObjectModel
                 JsonElement jsonItem = jsonElement[i - offset];
                 if (jsonItem.ValueKind == JsonValueKind.Null)
                 {
-                    Add(default);
+                    Add(default!);
                 }
                 else
                 {
@@ -275,7 +275,7 @@ namespace DuetAPI.ObjectModel
                 }
                 else if (reader.TokenType == JsonTokenType.Null)
                 {
-                    Add(default);
+                    Add(default!);
                     i++;
                 }
             }
