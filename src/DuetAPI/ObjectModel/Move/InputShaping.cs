@@ -23,6 +23,11 @@ namespace DuetAPI.ObjectModel
         private float _damping = 0.1F;
 
         /// <summary>
+        /// Input shaper delays (in s)
+        /// </summary>
+        public ObservableCollection<float> Delays { get; } = [];
+
+        /// <summary>
         /// Input shaper durations (in s)
         /// </summary>
         public ObservableCollection<float> Durations { get; } = [];
