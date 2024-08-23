@@ -18,7 +18,7 @@ namespace DuetControlServer.Model
     /// <summary>
     /// Static class that updates the machine model in certain intervals
     /// </summary>
-    public static class PeriodicUpdater
+    public static partial class PeriodicUpdater
     {
         /// <summary>
         /// Logger instance
@@ -329,13 +329,20 @@ namespace DuetControlServer.Model
             }
         }
 
+
+        [GeneratedRegex(@"^cpu\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)")]
+        private static partial Regex _cpuRegex();
+
+        [GeneratedRegex(@"^MemAvailable:\s*(\d+)( kB| KiB)", RegexOptions.IgnoreCase)]
+        private static partial Regex _availableMemoryRegex();
+
         /// <summary>
         /// Update SBC data key
         /// </summary>
         public static void UpdateSbc()
         {
-            Regex cpuRegex = new(@"^cpu\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)");
-            Regex availableMemoryRegex = new(@"^MemAvailable:\s*(\d+)( kB| KiB)", RegexOptions.IgnoreCase);
+            Regex cpuRegex = _cpuRegex();
+            Regex availableMemoryRegex = _availableMemoryRegex();
             try
             {
                 // Compute average CPU load

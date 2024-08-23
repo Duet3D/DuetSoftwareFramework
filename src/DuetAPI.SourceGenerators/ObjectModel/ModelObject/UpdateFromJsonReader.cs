@@ -419,12 +419,16 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                 if (reader.TokenType == JsonTokenType.PropertyName)
                 {{
                     {GeneratePropertyReadCalls()}
-#if VERIFY_OBJECT_MODEL
                     {(properties.Count > 0 ? "else" : "// no properties")}
                     {{
-                        Console.WriteLine(""[warn] Missing property {{0}} = {{1}} in {cls}"", jsonProperty.Name, jsonProperty.Value.GetRawText());
-                    }}
+#if VERIFY_OBJECT_MODEL
+                        string propertyName = reader.GetString();
+                        JsonElement jsonProperty = JsonDocument.ParseValue(ref reader).RootElement;
+                        Console.WriteLine(""[warn] Missing property {{0}} = {{1}} in {cls}"", propertyName, jsonProperty.GetRawText());
+#else
+                        reader.Skip();
 #endif 
+                    }}
                 }}
             }}{(isDynamic ? "\n            return this;" : "")}
         }}", Encoding.UTF8);

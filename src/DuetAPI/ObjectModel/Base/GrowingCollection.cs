@@ -10,7 +10,7 @@ namespace DuetAPI.ObjectModel
     /// Generic list container to which items can be added or which can be cleared only
     /// </summary>
     /// <typeparam name="T">Item type</typeparam>
-    public class GrowingCollection<T> : ObservableCollection<T?>, IModelCollection where T : new()
+    public class GrowingCollection<T> : ObservableCollection<T>, IModelCollection where T : new()
     {
         /// <summary>
         /// Removes all items from the collection
@@ -106,7 +106,7 @@ namespace DuetAPI.ObjectModel
             {
                 try
                 {
-                    Add(JsonSerializer.Deserialize<T>(item, Utility.JsonHelper.DefaultJsonOptions));
+                    Add(JsonSerializer.Deserialize<T>(item, Utility.JsonHelper.DefaultJsonOptions)!);
                 }
                 catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), item, e))
                 {
@@ -142,7 +142,7 @@ namespace DuetAPI.ObjectModel
             {
                 try
                 {
-                    Add(JsonSerializer.Deserialize<T>(ref reader, Utility.JsonHelper.DefaultJsonOptions));
+                    Add(JsonSerializer.Deserialize<T>(ref reader, Utility.JsonHelper.DefaultJsonOptions)!);
                 }
                 catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), JsonElement.ParseValue(ref reader), e))
                 {
