@@ -180,6 +180,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="other">Other instance</param>
         /// <returns>Object differences or null if both instances are equal</returns>
+        [Obsolete("will be removed in v3.6")]
         public object? FindDifferences(IModelObject other)
         {
             // Check the types
@@ -228,6 +229,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="old">Old object state</param>
         /// <returns>JSON patch</returns>
+        [Obsolete("will be removed in v3.6")]
         public byte[] MakeUtf8Patch(ModelObject old)
         {
             object? diffs = FindDifferences(old);
@@ -239,6 +241,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="old">Old object state</param>
         /// <returns>JSON patch</returns>
+        [Obsolete("will be removed in v3.6")]
         public string MakeStringPatch(ModelObject old)
         {
             object? diffs = FindDifferences(old);
