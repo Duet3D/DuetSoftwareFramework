@@ -223,6 +223,11 @@ namespace DuetAPI.ObjectModel
             }}
 
             {GeneratePropertyUpdateCalls()}
+            if (key == ""move.axes"")
+            {{
+                Move.Axes.UpdateFromJson(jsonElement, ignoreSbcProperties, offset, last);
+                return true;
+            }}
 
 #if VERIFY_OBJECT_MODEL
             if (key != ""seqs"")
@@ -252,6 +257,11 @@ namespace DuetAPI.ObjectModel
             }}
 
             {WritePropertyReadCalls()}
+            if (key == ""move.axes"")
+            {{
+                Move.Axes.UpdateFromJsonReader(ref reader, ignoreSbcProperties, offset, last);
+                return true;
+            }}
             return false;
         }}
 
