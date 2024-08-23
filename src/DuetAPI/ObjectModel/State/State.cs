@@ -219,12 +219,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Shorthand for inputs[state.thisInput].active
         /// </summary>
-        public bool ThisActive
+        public bool? ThisActive
         {
             get => _thisActive;
             set => SetPropertyValue(ref _thisActive, value);
         }
-        private bool _thisActive = true;
+        private bool? _thisActive = true;
 
         /// <summary>
         /// Index of the current G-code input channel (see <see cref="ObjectModel.Inputs"/>)
