@@ -10,6 +10,8 @@ namespace DuetAPI.SourceGenerators
     {
         public List<string> Enums { get; } = [];
 
+        public Dictionary<string, string> EnumContexts { get; } = [];
+
         public Dictionary<string, List<PropertyDeclarationSyntax>> ModelObjectMembers { get; } = [];
 
         public Dictionary<string, List<MethodDeclarationSyntax>> ModelObjectMethods { get; } = [];
@@ -64,6 +66,35 @@ namespace DuetAPI.SourceGenerators
                     {
                         var membersAndMethods = GetClassMembersAndMethods();
                         ModelCollectionMembers.Add(cds.Identifier.ValueText, membersAndMethods.Item1);
+                    }
+                    else if (cds.BaseList.Types.Any(type => type.Type is IdentifierNameSyntax ins && ins.Identifier.ValueText == "JsonSerializerContext"))
+                    {
+                        AttributeSyntax? jsonSerializableAttribute = null;
+                        foreach (var als in cds.AttributeLists)
+                        {
+                            foreach (var a in als.Attributes)
+                            {
+                                if (a.Name.ToString() == "JsonSerializable" && a.ArgumentList != null)
+                                {
+                                    foreach (var arg in a.ArgumentList.Arguments)
+                                    {
+                                        if (arg.Expression is TypeOfExpressionSyntax tos)
+                                        {
+                                            if (tos.Type.ToString() == "SbcPermissions")
+                                            {
+                                                EnumContexts.Add("SbcPermissions", "Utility." + cds.Identifier.ValueText);
+                                            }
+                                            else
+                                            {
+                                                EnumContexts.Add(tos.Type.ToString(), cds.Identifier.ValueText);
+                                            }
+                                            break;
+                                        }
+                                    }
+                                    jsonSerializableAttribute = a;
+                                }
+                            }
+                        }
                     }
                     else if (cds.BaseList.Types.Any() && !InheritedClasses.ContainsKey(cds))
                     {

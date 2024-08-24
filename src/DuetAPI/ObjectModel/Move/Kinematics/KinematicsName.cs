@@ -168,4 +168,10 @@ namespace DuetAPI.ObjectModel
             }
         }
     }
+
+    /// <summary>
+    /// Context for KinematicsName serialization
+    /// </summary>
+    [JsonSerializable(typeof(KinematicsName))]
+    public partial class KinematicsNameContext : JsonSerializerContext { }
 }

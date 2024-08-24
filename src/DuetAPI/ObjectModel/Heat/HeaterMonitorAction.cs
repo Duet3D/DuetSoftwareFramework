@@ -1,8 +1,11 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System.Text.Json.Serialization;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Action to take when a heater monitor is triggered
     /// </summary>
+    [JsonConverter(typeof(JsonNumberEnumConverter<HeaterMonitorAction>))]
     public enum HeaterMonitorAction : int
     {
         /// <summary>
@@ -25,4 +28,10 @@
         /// </summary>
         ShutDown = 3
     }
+
+    /// <summary>
+    /// Context for HeaterMonitorAction serialization
+    /// </summary>
+    [JsonSerializable(typeof(HeaterMonitorAction))]
+    public partial class HeaterMonitorActionContext : JsonSerializerContext { }
 }

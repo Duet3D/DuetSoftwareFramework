@@ -23,4 +23,10 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         ILI9488
     }
+
+    /// <summary>
+    /// Context for DirectDisplayController serialization
+    /// </summary>
+    [JsonSerializable(typeof(DirectDisplayController))]
+    public partial class DirectDisplayControllerContext : JsonSerializerContext { }
 }

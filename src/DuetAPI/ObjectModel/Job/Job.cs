@@ -118,7 +118,7 @@
         /// Information about the past layers
         /// </summary>
         /// <remarks>
-        /// In previous API versions this was a <see cref="GrowingCollection{T}"/> but it has been changed to <see cref="StaticModelCollection{T}"/> to
+        /// In previous API versions this was a <see cref="MessageCollection"/> but it has been changed to <see cref="StaticModelCollection{T}"/> to
         /// allow past layers to be modified again when needed. Note that previous plugins subscribing to this property will not receive any more
         /// updates about this property to avoid memory leaks
         /// </remarks>

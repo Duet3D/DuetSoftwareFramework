@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System.Text.Json.Serialization;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Enumeration of supported filament sensors
@@ -20,4 +22,10 @@
         /// </summary>
         AlwaysEnabled = 2
     }
+
+    /// <summary>
+    /// Context for FilamentMonitorEnableMode serialization
+    /// </summary>
+    [JsonSerializable(typeof(FilamentMonitorEnableMode))]
+    public partial class FilamentMonitorEnableModeContext : JsonSerializerContext { }
 }

@@ -8,3 +8,4 @@ Rule ID | Category | Severity | Notes
 DOM001 | DOM | Warning | Warnings
 DOM002 | DOM | Error | Warnings
 DOM003 | DOM | Error | Descriptors
+DOM004 | DOM | Error | Descriptors

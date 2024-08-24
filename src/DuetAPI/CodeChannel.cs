@@ -87,4 +87,10 @@ namespace DuetAPI
         /// </summary>
         Unknown = 14
     }
+
+    /// <summary>
+    /// Context for CodeChannel serialization
+    /// </summary>
+    [JsonSerializable(typeof(CodeChannel))]
+    public partial class CodeChannelContext : JsonSerializerContext { }
 }

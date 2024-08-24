@@ -407,7 +407,7 @@ namespace UnitTests.Machine
         }
 
         [Test]
-        public void ObserveGrowingCollectiion()
+        public void ObserveMessageCollectiion()
         {
             int numEvents = 0;
             object[] recordedPath = null;
@@ -431,7 +431,7 @@ namespace UnitTests.Machine
 
             ClassicAssert.AreEqual(1, numEvents);
             ClassicAssert.AreEqual(new object[] { "messages" }, recordedPath);
-            ClassicAssert.AreEqual(PropertyChangeType.GrowingCollection, recordedChangeType);
+            ClassicAssert.AreEqual(PropertyChangeType.MessageCollection, recordedChangeType);
             if (recordedValue is IList list)
             {
                 ClassicAssert.AreSame(msg, list[0]);
@@ -452,7 +452,7 @@ namespace UnitTests.Machine
             Provider.Get.Messages.Clear();
 
             ClassicAssert.AreEqual(1, numEvents);
-            ClassicAssert.AreEqual(PropertyChangeType.GrowingCollection, recordedChangeType);
+            ClassicAssert.AreEqual(PropertyChangeType.MessageCollection, recordedChangeType);
             ClassicAssert.AreEqual(new object[] { "messages" }, recordedPath);
             ClassicAssert.AreEqual(null, recordedValue);
 

@@ -221,4 +221,10 @@ namespace DuetAPI.Utility
             writer.WriteEndArray();
         }
     }
+
+    /// <summary>
+    /// Context for SbcPermissions serialization
+    /// </summary>
+    [JsonSerializable(typeof(SbcPermissions))]
+    public partial class SbcPermissionsContext : JsonSerializerContext { }
 }

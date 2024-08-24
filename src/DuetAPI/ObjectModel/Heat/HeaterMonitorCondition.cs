@@ -24,4 +24,10 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         TooLow
     }
+
+    /// <summary>
+    /// Context for HeaterMonitorCondition serialization
+    /// </summary>
+    [JsonSerializable(typeof(HeaterMonitorCondition))]
+    public partial class HeaterMonitorConditionContext : JsonSerializerContext { }
 }

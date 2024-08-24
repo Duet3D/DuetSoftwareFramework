@@ -36,7 +36,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel
                         writer.Indent++;
 
                         // assignment
-                        if (propType is "DynamicModelCollection" or "StaticModelCollection" or "GrowingCollection" or "JsonModelDictionary" or "StaticModelDictionary" ||
+                        if (propType is "DynamicModelCollection" or "StaticModelCollection" or "MessageCollection" or "JsonModelDictionary" or "StaticModelDictionary" ||
                             receiver.ModelCollectionMembers.ContainsKey(propType) || receiver.ModelObjectMembers.ContainsKey(propType))
                         {
                             void WriteSetOrUpdate()
@@ -58,7 +58,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel
                                     writer.WriteLine($"{prop.Identifier.ValueText} = new {nts.ElementType}();");
                                     writer.Indent--;
                                     writer.WriteLine("}");
-                                    if (propType is "DynamicModelCollection" or "StaticModelCollection" or "GrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
+                                    if (propType is "DynamicModelCollection" or "StaticModelCollection" or "MessageCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
                                     {
                                         writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonElement, ignoreSbcProperties, offset, last);");
                                     }
@@ -69,7 +69,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel
                                     writer.Indent--;
                                     writer.WriteLine("}");
                                 }
-                                else if (propType is "DynamicModelCollection" or "StaticModelCollection" or "GrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
+                                else if (propType is "DynamicModelCollection" or "StaticModelCollection" or "MessageCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
                                 {
                                     writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonElement, ignoreSbcProperties, offset, last);");
                                 }
@@ -126,7 +126,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel
                         writer.Indent++;
 
                         // read call
-                        if (propType is "DynamicModelCollection" or "StaticModelCollection" or "GrowingCollection" or "JsonModelDictionary" or "StaticModelDictionary" ||
+                        if (propType is "DynamicModelCollection" or "StaticModelCollection" or "MessageCollection" or "JsonModelDictionary" or "StaticModelDictionary" ||
                             receiver.ModelCollectionMembers.ContainsKey(propType) || receiver.ModelObjectMembers.ContainsKey(propType))
                         {
                             void WriteSetOrUpdate()
@@ -148,7 +148,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel
                                     writer.WriteLine($"{prop.Identifier.ValueText} = new {nts.ElementType}();");
                                     writer.Indent--;
                                     writer.WriteLine("}");
-                                    if (propType is "DynamicModelCollection" or "StaticModelCollection" or "GrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
+                                    if (propType is "DynamicModelCollection" or "StaticModelCollection" or "MessageCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
                                     {
                                         writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, offset, last);");
                                     }
@@ -159,7 +159,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel
                                     writer.Indent--;
                                     writer.WriteLine("}");
                                 }
-                                else if (propType is "DynamicModelCollection" or "StaticModelCollection" or "GrowingCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
+                                else if (propType is "DynamicModelCollection" or "StaticModelCollection" or "MessageCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
                                 {
                                     writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, offset, last);");
                                 }

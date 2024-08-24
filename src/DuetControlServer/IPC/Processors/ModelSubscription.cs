@@ -482,7 +482,7 @@ namespace DuetControlServer.IPC.Processors
                             }
                             break;
 
-                        case PropertyChangeType.GrowingCollection:
+                        case PropertyChangeType.MessageCollection:
                             // Add new items or clear list
                             if (node is Dictionary<string, object?> parent)
                             {
@@ -506,32 +506,32 @@ namespace DuetControlServer.IPC.Processors
                                     }
                                 }
 
-                                IList growingCollection;
+                                IList messageCollection;
                                 if (parent.TryGetValue(collectionName, out object? obj))
                                 {
-                                    growingCollection = (IList)obj!;
+                                    messageCollection = (IList)obj!;
                                 }
                                 else
                                 {
-                                    growingCollection = new List<object?>();
-                                    parent.Add(collectionName, growingCollection);
+                                    messageCollection = new List<object?>();
+                                    parent.Add(collectionName, messageCollection);
                                 }
 
                                 if (value is not null)
                                 {
                                     foreach (object newItem in (IList)value)
                                     {
-                                        growingCollection.Add(newItem);
+                                        messageCollection.Add(newItem);
                                     }
                                 }
                                 else
                                 {
-                                    growingCollection.Clear();
+                                    messageCollection.Clear();
                                 }
                             }
                             else
                             {
-                                throw new ArgumentException($"Invalid growing collection parent type {node.GetType().Name}");
+                                throw new ArgumentException($"Invalid message collection parent type {node.GetType().Name}");
                             }
                             break;
                     }
@@ -572,7 +572,7 @@ namespace DuetControlServer.IPC.Processors
         /// <param name="message"></param>
         private void RecordMessage(Message message)
         {
-            MachineModelPropertyChanged(["messages"], PropertyChangeType.GrowingCollection, new[] { message });
+            MachineModelPropertyChanged(["messages"], PropertyChangeType.MessageCollection, new[] { message });
         }
 
         /// <summary>

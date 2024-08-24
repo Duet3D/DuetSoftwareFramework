@@ -7,17 +7,16 @@ using System.Text.Json;
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
-    /// Generic list container to which items can be added or which can be cleared only
+    /// Generic list container to which messages can only be added or cleared
     /// </summary>
-    /// <typeparam name="T">Item type</typeparam>
-    public class GrowingCollection<T> : ObservableCollection<T>, IModelCollection where T : new()
+    public class MessageCollection : ObservableCollection<Message>, IModelCollection
     {
         /// <summary>
         /// Removes all items from the collection
         /// </summary>
         protected override void ClearItems()
         {
-            List<T?> removed = new(this);
+            List<Message> removed = new(this);
             base.ClearItems();
             base.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed));
         }
@@ -47,8 +46,7 @@ namespace DuetAPI.ObjectModel
         public void Assign(IStaticModelObject from)
         {
             // Validate the types
-            Type myType = GetType();
-            if (from?.GetType() != myType)
+            if (from is not MessageCollection other)
             {
                 throw new ArgumentException("Types do not match", nameof(from));
             }
@@ -57,18 +55,9 @@ namespace DuetAPI.ObjectModel
             ClearItems();
 
             // Add other items
-            GrowingCollection<T> other = (GrowingCollection<T>)from;
-            foreach (T? item in other)
+            foreach (Message item in other)
             {
-                if (item is ICloneable cloneableItem)
-                {
-                    object clonedItem = cloneableItem.Clone();
-                    Add((T)clonedItem);
-                }
-                else
-                {
-                    Add(item);
-                }
+                Add((Message)item.Clone());
             }
         }
 
@@ -78,20 +67,15 @@ namespace DuetAPI.ObjectModel
         /// <returns>Cloned list</returns>
         public object Clone()
         {
-            GrowingCollection<T> clone = [];
-            foreach (T? item in this)
+            MessageCollection clone = [];
+            foreach (Message item in this)
             {
-                if (item is ICloneable cloneableItem)
-                {
-                    clone.Add((T)cloneableItem.Clone());
-                }
-                else
-                {
-                    clone.Add(item);
-                }
+                clone.Add((Message)item.Clone());
             }
             return clone;
         }
+
+        private static readonly MessageContext _messageContext = new(Utility.JsonHelper.DefaultJsonOptions);
 
         /// <summary>
         /// Update this instance from a given JSON element
@@ -106,9 +90,9 @@ namespace DuetAPI.ObjectModel
             {
                 try
                 {
-                    Add(JsonSerializer.Deserialize<T>(item, Utility.JsonHelper.DefaultJsonOptions)!);
+                    Add((Message)JsonSerializer.Deserialize(item, typeof(Message), _messageContext)!);
                 }
-                catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), item, e))
+                catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(Message), item, e))
                 {
                     // suppressed
                 }
@@ -142,9 +126,9 @@ namespace DuetAPI.ObjectModel
             {
                 try
                 {
-                    Add(JsonSerializer.Deserialize<T>(ref reader, Utility.JsonHelper.DefaultJsonOptions)!);
+                    Add((Message)JsonSerializer.Deserialize(ref reader, typeof(Message), _messageContext)!);
                 }
-                catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), JsonElement.ParseValue(ref reader), e))
+                catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(Message), JsonElement.ParseValue(ref reader), e))
                 {
                     // suppressed
                 }

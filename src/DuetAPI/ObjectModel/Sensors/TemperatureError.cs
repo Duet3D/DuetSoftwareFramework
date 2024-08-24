@@ -104,4 +104,10 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         UnknownError
     }
+
+    /// <summary>
+    /// Context for TemperatureError serialization
+    /// </summary>
+    [JsonSerializable(typeof(TemperatureError))]
+    public partial class TemperatureErrorContext : JsonSerializerContext { }
 }

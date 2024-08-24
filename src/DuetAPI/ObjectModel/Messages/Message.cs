@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Generic container for messages
     /// </summary>
-    public sealed class Message
+    public sealed class Message : ICloneable
     {
         /// <summary>
         /// Create a new message
@@ -55,7 +55,11 @@ namespace DuetAPI.ObjectModel
                 }
                 else
                 {
+#if NET6_0_OR_GREATER
+                    if (!Content.EndsWith('\n'))
+#else
                     if (!Content.EndsWith("\n"))
+#endif
                     {
                         Content += '\n';
                     }
@@ -110,5 +114,24 @@ namespace DuetAPI.ObjectModel
                 _ => Content
             };
         }
+
+        /// <summary>
+        /// Create a clone of this message
+        /// </summary>
+        /// <returns>Clone</returns>
+        public object Clone()
+        {
+            return new Message(Type, Content)
+            {
+                Time = Time
+            };
+        }
     }
+
+
+    /// <summary>
+    /// Use .NET's source generator for the object model
+    /// </summary>
+    [JsonSerializable(typeof(Message))]
+    public partial class MessageContext : JsonSerializerContext { }
 }

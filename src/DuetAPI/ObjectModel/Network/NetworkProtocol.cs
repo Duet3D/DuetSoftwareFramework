@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Supported network protocols
     /// </summary>
-    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
+    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<NetworkProtocol>))]
     public enum NetworkProtocol
     {
         /// <summary>
@@ -39,4 +39,10 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         SSH
     }
+
+    /// <summary>
+    /// Context for NetworkProtocol serialization
+    /// </summary>
+    [JsonSerializable(typeof(NetworkProtocol))]
+    public partial class NetworkProtocolContext : JsonSerializerContext { }
 }

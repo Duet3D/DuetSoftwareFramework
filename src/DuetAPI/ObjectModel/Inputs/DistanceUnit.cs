@@ -55,4 +55,10 @@ namespace DuetAPI.ObjectModel
             writer.WriteStringValue((value == DistanceUnit.MM) ? "mm" : "in");
         }
     }
+
+    /// <summary>
+    /// Context for DistanceUnit serialization
+    /// </summary>
+    [JsonSerializable(typeof(DistanceUnit))]
+    public partial class DistanceUnitContext : JsonSerializerContext { }
 }

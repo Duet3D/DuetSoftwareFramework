@@ -29,4 +29,10 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         Off
     }
+
+    /// <summary>
+    /// Context for LogLevel serialization
+    /// </summary>
+    [JsonSerializable(typeof(LogLevel))]
+    public partial class LogLevelContext : JsonSerializerContext { }
 }

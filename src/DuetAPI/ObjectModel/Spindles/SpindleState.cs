@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Possible state of a spindle
     /// </summary>
-    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
+    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<SpindleState>))]
     public enum SpindleState
     {
         /// <summary>
@@ -29,4 +29,10 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         Reverse
     }
+
+    /// <summary>
+    /// Context for SpindleState serialization
+    /// </summary>
+    [JsonSerializable(typeof(SpindleState))]
+    public partial class SpindleStateContext : JsonSerializerContext { }
 }

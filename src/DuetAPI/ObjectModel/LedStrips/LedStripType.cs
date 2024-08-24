@@ -23,4 +23,10 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         NeoPixel_RGBW
     }
+
+    /// <summary>
+    /// Context for LedStripType serialization
+    /// </summary>
+    [JsonSerializable(typeof(LedStripType))]
+    public partial class LedStripTypeContext : JsonSerializerContext { }
 }

@@ -79,4 +79,10 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         Idle
     }
+
+    /// <summary>
+    /// Context for MachineStatus serialization
+    /// </summary>
+    [JsonSerializable(typeof(MachineStatus))]
+    public partial class MachineStatusContext : JsonSerializerContext { }
 }

@@ -1,5 +1,5 @@
-﻿using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using System;
 using System.CodeDom.Compiler;
@@ -58,7 +58,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                     }
 
                     // assignment
-                    if (propType is "DynamicModelCollection" or "StaticModelCollection" or "GrowingCollection" or "JsonModelDictionary" or "StaticModelDictionary" ||
+                    if (propType is "DynamicModelCollection" or "StaticModelCollection" or "MessageCollection" or "JsonModelDictionary" or "StaticModelDictionary" ||
                         receiver.ModelCollectionMembers.ContainsKey(propType) || receiver.ModelObjectMembers.ContainsKey(propType))
                     {
                         if (prop.Type is NullableTypeSyntax nts)
@@ -184,7 +184,14 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                         }
                         else if (isEnum)
                         {
-                            writer.WriteLine($"{genericPropType} new{genericPropType}Value = JsonSerializer.Deserialize<{genericPropType}>(jsonProperty.Value[i].GetRawText());");
+                            if (receiver.EnumContexts.TryGetValue(genericPropType, out string? contextName))
+                            {
+                                writer.WriteLine($"{genericPropType} new{genericPropType}Value = ({genericPropType})JsonSerializer.Deserialize(jsonProperty.Value[i].GetRawText(), typeof({genericPropType}), {contextName}.Default)!;");
+                            }
+                            else
+                            {
+                                context.ReportDiagnostic(Diagnostic.Create(Descriptors.MissingEnumJsonContext, prop.GetLocation(), jsonPropertyName, cls));
+                            }
                         }
                         else
                         {
@@ -234,7 +241,14 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                         }
                         else if (isEnum)
                         {
-                            writer.WriteLine($"{prop.Identifier.ValueText}.Add(JsonSerializer.Deserialize<{genericPropType}>(jsonProperty.Value[i].GetRawText()));");
+                            if (receiver.EnumContexts.TryGetValue(genericPropType, out string? contextName))
+                            {
+                                writer.WriteLine($"{prop.Identifier.ValueText}.Add(({genericPropType})JsonSerializer.Deserialize(jsonProperty.Value[i].GetRawText(), typeof({genericPropType}), {contextName}.Default)!);");
+                            }
+                            else
+                            {
+                                context.ReportDiagnostic(Diagnostic.Create(Descriptors.MissingEnumJsonContext, prop.GetLocation(), jsonPropertyName, cls));
+                            }
                         }
                         else
                         {
@@ -343,13 +357,20 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                             }
                             else if (receiver.Enums.Contains(propType))
                             {
-                                if (prop.Type is NullableTypeSyntax)
+                                if (receiver.EnumContexts.TryGetValue(propType, out string? contextName))
                                 {
-                                    writer.WriteLine($"{prop.Identifier.ValueText} = (jsonProperty.Value.ValueKind == JsonValueKind.Null) ? null : JsonSerializer.Deserialize<{propType}>(jsonProperty.Value.GetRawText());");
+                                    if (prop.Type is NullableTypeSyntax)
+                                    {
+                                        writer.WriteLine($"{prop.Identifier.ValueText} = (jsonProperty.Value.ValueKind == JsonValueKind.Null) ? null : ({propType})JsonSerializer.Deserialize(jsonProperty.Value.GetRawText(), typeof({propType}), {contextName}.Default)!;");
+                                    }
+                                    else
+                                    {
+                                        writer.WriteLine($"{prop.Identifier.ValueText} = ({propType})JsonSerializer.Deserialize(jsonProperty.Value.GetRawText(), typeof({propType}), {contextName}.Default)!;");
+                                    }
                                 }
                                 else
                                 {
-                                    writer.WriteLine($"{prop.Identifier.ValueText} = JsonSerializer.Deserialize<{propType}>(jsonProperty.Value.GetRawText());");
+                                    context.ReportDiagnostic(Diagnostic.Create(Descriptors.MissingEnumJsonContext, prop.GetLocation(), jsonPropertyName, cls));
                                 }
                             }
                             else if (propType is "object")

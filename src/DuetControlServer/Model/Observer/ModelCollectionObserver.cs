@@ -105,21 +105,21 @@ namespace DuetControlServer.Model
         }
 
         /// <summary>
-        /// Function to generate a growing collection change handler
+        /// Function to generate a message collection change handler
         /// </summary>
-        /// <param name="path">Path to the growing collection</param>
+        /// <param name="path">Path to the message collection</param>
         /// <returns>Change handler</returns>
-        private static NotifyCollectionChangedEventHandler GrowingCollectionChanged(params object[] path)
+        private static NotifyCollectionChangedEventHandler MessageCollectionChanged(params object[] path)
         {
             return (_, e) =>
             {
                 if (e.Action == NotifyCollectionChangedAction.Add)
                 {
-                    OnPropertyPathChanged?.Invoke(path, PropertyChangeType.GrowingCollection, e.NewItems);
+                    OnPropertyPathChanged?.Invoke(path, PropertyChangeType.MessageCollection, e.NewItems);
                 }
                 else if (e.Action == NotifyCollectionChangedAction.Remove && e.OldStartingIndex == -1)
                 {
-                    OnPropertyPathChanged?.Invoke(path, PropertyChangeType.GrowingCollection, null);
+                    OnPropertyPathChanged?.Invoke(path, PropertyChangeType.MessageCollection, null);
                 }
             };
         }
@@ -132,7 +132,7 @@ namespace DuetControlServer.Model
         /// <param name="path">Path of the subscription</param>
         private static void SubscribeToModelCollection(IModelCollection modelCollection, string collectionName, object[] path)
         {
-            NotifyCollectionChangedEventHandler changeHandler = (modelCollection.GetType().IsGenericType && modelCollection.GetType().GetGenericTypeDefinition() == typeof(GrowingCollection<>)) ? GrowingCollectionChanged(AddToPath(path, collectionName)) : CollectionChanged(collectionName, path);
+            NotifyCollectionChangedEventHandler changeHandler = modelCollection.GetType() == typeof(MessageCollection) ? MessageCollectionChanged(AddToPath(path, collectionName)) : CollectionChanged(collectionName, path);
             modelCollection.CollectionChanged += changeHandler;
             _collectionChangeHandlers[modelCollection] = changeHandler;
 

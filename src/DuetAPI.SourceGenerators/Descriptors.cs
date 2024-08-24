@@ -22,6 +22,11 @@ namespace DuetAPI.SourceGenerators
                                                                                      category: "DOM",
                                                                                      DiagnosticSeverity.Error,
                                                                                      isEnabledByDefault: true);
-
+        public static readonly DiagnosticDescriptor MissingEnumJsonContext = new(id: "DOM004",
+                                                                                 title: "Missing JsonSerializerContext for enum",
+                                                                                 messageFormat: "Enum used by property {0} in class {1} lacks a JSON serializer context",
+                                                                                 category: "DOM",
+                                                                                 DiagnosticSeverity.Error,
+                                                                                 isEnabledByDefault: true);
     }
 }

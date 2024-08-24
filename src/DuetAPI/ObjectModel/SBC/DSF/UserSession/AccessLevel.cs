@@ -19,4 +19,10 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         ReadWrite
     }
+
+    /// <summary>
+    /// Context for AccessLevel serialization
+    /// </summary>
+    [JsonSerializable(typeof(AccessLevel))]
+    public partial class AccessLevelContext : JsonSerializerContext { }
 }

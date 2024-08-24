@@ -72,7 +72,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <seealso cref="Message"/>
         [SbcProperty(false)]
-        public GrowingCollection<Message> Messages { get; } = [];
+        public MessageCollection Messages { get; } = [];
 
         /// <summary>
         /// Information about the move subsystem
@@ -179,16 +179,21 @@ namespace DuetAPI.ObjectModel
         public bool UpdateFromJsonReader(string key, ref Utf8JsonReader reader) => GeneratedUpdateFromJsonReader(key, ref reader, false);
 
         /// <summary>
+        /// JSON serializer context used by the following two functions
+        /// </summary>
+        private static readonly JsonSerializerContext _jsonSerializerContext = new ObjectModelContext(Utility.JsonHelper.DefaultJsonOptions);
+
+        /// <summary>
         /// Convert this instance to a JSON text
         /// </summary>
         /// <returns>JSON object</returns>
-        public override string ToString() => JsonSerializer.Serialize(this, Utility.JsonHelper.DefaultJsonOptions);
+        public override string ToString() => JsonSerializer.Serialize(this, typeof(ObjectModel), _jsonSerializerContext);
 
         /// <summary>
         /// Serialize this instance to a UTF-8 string
         /// </summary>
         /// <returns></returns>
-        public byte[] ToUtf8Json() => JsonSerializer.SerializeToUtf8Bytes(this, Utility.JsonHelper.DefaultJsonOptions);
+        public byte[] ToUtf8Json() => JsonSerializer.SerializeToUtf8Bytes(this, typeof(ObjectModel), _jsonSerializerContext);
 
         /// <summary>
         /// Static event to be called when the deserialization of a property failed.
@@ -250,5 +255,5 @@ namespace DuetAPI.ObjectModel
     /// Use .NET's source generator for the object model
     /// </summary>
     [JsonSerializable(typeof(ObjectModel))]
-    internal partial class ObjectModelContext : JsonSerializerContext { }
+    public partial class ObjectModelContext : JsonSerializerContext { }
 }

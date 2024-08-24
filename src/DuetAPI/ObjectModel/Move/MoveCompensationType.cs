@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Supported compensation types
     /// </summary>
-    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
+    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<MoveCompensationType>))]
 	public enum MoveCompensationType
 	{
 		/// <summary>
@@ -19,4 +19,10 @@ namespace DuetAPI.ObjectModel
 		/// </summary>
 		Mesh
 	}
+
+    /// <summary>
+    /// Context for MoveCompensationType serialization
+    /// </summary>
+    [JsonSerializable(typeof(MoveCompensationType))]
+    public partial class MoveCompensationTypeContext : JsonSerializerContext { }
 }

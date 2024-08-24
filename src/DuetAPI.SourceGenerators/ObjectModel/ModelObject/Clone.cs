@@ -40,7 +40,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                 {
                     string jsonPropertyName = prop.GetJsonPropertyName(), propType = prop.GetPropertyType();
 
-                    if (propType is "DynamicModelCollection" or "StaticModelCollection" or "GrowingCollection" or "JsonModelDictionary" or "StaticModelDictionary" ||
+                    if (propType is "DynamicModelCollection" or "StaticModelCollection" or "MessageCollection" or "JsonModelDictionary" or "StaticModelDictionary" ||
                         receiver.ModelCollectionMembers.ContainsKey(propType) || receiver.ModelObjectMembers.ContainsKey(propType))
                     {
                         bool isNullable = prop.Type is NullableTypeSyntax nts;

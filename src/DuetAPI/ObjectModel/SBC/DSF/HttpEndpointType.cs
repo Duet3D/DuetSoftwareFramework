@@ -48,4 +48,10 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         WebSocket
     }
+
+    /// <summary>
+    /// Context for HttpEndpointType serialization
+    /// </summary>
+    [JsonSerializable(typeof(HttpEndpointType))]
+    public partial class HttpEndpointTypeContext : JsonSerializerContext { }
 }

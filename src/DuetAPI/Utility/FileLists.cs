@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -13,39 +11,6 @@ namespace DuetAPI.Utility
     public static class FileLists
     {
         /// <summary>
-        /// Make a filelist container for M20
-        /// </summary>
-        /// <param name="items">Items to include</param>
-        /// <param name="directory">RRF directory</param>
-        /// <param name="startAt">First item</param>
-        /// <param name="finished">True if the file list is complete</param>
-        /// <returns>JSON file list object</returns>
-        private static string MakeFileListContainer(IList items, string directory, int startAt, bool finished)
-        {
-            Dictionary<string, object> jsonContainer = new()
-            {
-                ["dir"] = directory,
-                ["first"] = Math.Max(startAt, 0),
-                ["files"] = items,
-                ["next"] = finished ? 0 : items.Count,
-                ["err"] = 0
-            };
-            return JsonSerializer.Serialize(jsonContainer, JsonHelper.DefaultJsonOptions);
-        }
-
-        /// <summary>
-        /// Get an estimate how big the UTF8-encoded file list will be in bytes
-        /// </summary>
-        /// <param name="items">Items to include</param>
-        /// <param name="directory">RRF directory</param>
-        /// <param name="startAt">First item</param>
-        /// <returns>Size of the UTF8-encoded file list in bytes</returns>
-        private static int GetFileListSize(IList items, string directory, int startAt)
-        {
-            return Encoding.UTF8.GetByteCount(MakeFileListContainer(items, directory, startAt, false));
-        }
-
-        /// <summary>
         /// Get a /rr_files or M20 files response
         /// </summary>
         /// <param name="directory">RRF path to the directory</param>
@@ -54,13 +19,25 @@ namespace DuetAPI.Utility
         /// <param name="flagDirs">Prefix directories with an asterisk</param>
         /// <param name="maxSize">Maximum size of the file list in bytes or -1 if unset</param>
         /// <returns>JSON file list</returns>
-        public static string GetFiles(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1)
+        public static byte[] GetFiles(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1)
         {
-            List<string> files = [];
+            using MemoryStream fileList = new();
+            using Utf8JsonWriter writer = new(new MemoryStream());
+
+            writer.WriteStartObject();
+            writer.WriteString("dir", directory);
+            writer.WriteNumber("first", Math.Max(startAt, 0));
+            writer.WriteStartArray("files");
+
+            int numItems = 0;
+            int GetNextFileListSize(string nextItemToAdd)
+            {
+                writer.Flush();
+                return (int)writer.BytesCommitted + Encoding.UTF8.GetByteCount($@",""{nextItemToAdd}""],\""next\"":{numItems},""err"":0}}");
+            }
 
             try
             {
-                int numItems = 0;
 
                 // List directories
                 foreach (string dir in Directory.EnumerateDirectories(physicalDirectory))
@@ -68,13 +45,21 @@ namespace DuetAPI.Utility
                     if (startAt < 0 || numItems++ >= startAt)
                     {
                         string name = Path.GetFileName(dir);
-                        files.Add(flagDirs ? "*" + name : name);
+                        name = flagDirs ? "*" + name : name;
 
-                        if (maxSize > 0 && GetFileListSize(files, directory, Math.Min(startAt, numItems)) > maxSize)
+                        // Check if we're about to exceed the maximum size and stop if that is the case
+                        if (maxSize > 0 && GetNextFileListSize(name) > maxSize)
                         {
-                            files.RemoveAt(files.Count - 1);
-                            return MakeFileListContainer(files, directory, Math.Min(startAt, numItems - 1), false);
+                            writer.WriteEndArray();
+                            writer.WriteNumber("next", numItems - 1);
+                            writer.WriteNumber("err", 0);
+                            writer.WriteEndObject();
+                            writer.Flush();
+                            return fileList.ToArray();
                         }
+
+                        // Write the next item
+                        writer.WriteStringValue(name);
                     }
                 }
 
@@ -84,25 +69,37 @@ namespace DuetAPI.Utility
                     if (startAt < 0 || numItems++ >= startAt)
                     {
                         string name = Path.GetFileName(file);
-                        files.Add(name);
 
-                        if (maxSize > 0 && GetFileListSize(files, directory, Math.Min(startAt, numItems)) > maxSize)
+                        // Check if we're about to exceed the maximum size and stop if that is the case
+                        if (maxSize > 0 && GetNextFileListSize(name) > maxSize)
                         {
-                            files.RemoveAt(files.Count - 1);
-                            return MakeFileListContainer(files, directory, Math.Min(startAt, numItems - 1), false);
+                            writer.WriteEndArray();
+                            writer.WriteNumber("next", numItems - 1);
+                            writer.WriteNumber("err", 0);
+                            writer.WriteEndObject();
+                            writer.Flush();
+                            return fileList.ToArray();
                         }
+
+                        // Write the next item
+                        writer.WriteStringValue(name);
                     }
                 }
 
                 // Return items encapsulated in a body
-                return MakeFileListContainer(files, directory, Math.Min(startAt, numItems), true);
+                writer.WriteEndArray();
+                writer.WriteNumber("next", 0);
+                writer.WriteNumber("err", 0);
+                writer.WriteEndObject();
+                writer.Flush();
+                return fileList.ToArray();
             }
             catch
             {
                 if (startAt < 0)
                 {
                     // Something went wrong...
-                    return "{\"err\":2}";
+                    return Encoding.UTF8.GetBytes("{\"err\":2}");
                 }
                 throw;
             }
@@ -116,31 +113,68 @@ namespace DuetAPI.Utility
         /// <param name="startAt">First file index to return. Set startAt to -1 to omit error handling and the JSON object container</param>
         /// <param name="maxSize">Maximum size of the file list in bytes or -1 if unset</param>
         /// <returns>JSON list</returns>
-        public static string GetFileList(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1)
+        public static byte[] GetFileList(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1)
         {
-            List<object> fileList = [];
+            using MemoryStream fileList = new();
+            using Utf8JsonWriter writer = new(new MemoryStream());
+
+            // Write body only if a partial list is requested
+            if (startAt >= 0)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("dir", directory);
+                writer.WriteNumber("first", Math.Max(startAt, 0));
+                writer.WriteStartArray("files");
+            }
+            else
+            {
+                writer.WriteStartArray();
+            }
+
+            int numItems = 0;
+            int GetNextDirectorySize(string nextItemToAdd, DateTime lastWriteTime)
+            {
+                writer.Flush();
+                return (int)writer.BytesCommitted + Encoding.UTF8.GetByteCount($@",{{""type"":""x"",""name"":""{nextItemToAdd}"",""date"":""{lastWriteTime:s}""}}],\""next\"":{numItems},""err"":0}}");
+            }
+            int GetNextFileSize(string nextItemToAdd, long size, DateTime lastWriteTime)
+            {
+                writer.Flush();
+                return (int)writer.BytesCommitted + Encoding.UTF8.GetByteCount($@",{{""type"":""x"",""name"":""{nextItemToAdd}"",""size"":{size},""date"":""{lastWriteTime:s}""}}],\""next\"":{numItems},""err"":0}}");
+            }
 
             try
             {
-                int numItems = 0;
-
                 // List directories
                 foreach (string dir in Directory.EnumerateDirectories(physicalDirectory))
                 {
                     if (startAt < 0 || numItems++ >= startAt)
                     {
                         DirectoryInfo info = new(dir);
-                        fileList.Add(new { type = 'd', name = info.Name, date = info.LastWriteTime });
 
-                        if (maxSize > 0 && GetFileListSize(fileList, directory, startAt) > maxSize)
+                        // Check if we're about to exceed the maximum size and stop if that is the case
+                        if (maxSize > 0 && GetNextDirectorySize(info.Name, info.LastWriteTime) > maxSize)
                         {
-                            fileList.RemoveAt(fileList.Count - 1);
                             if (startAt >= 0)
                             {
-                                return MakeFileListContainer(fileList, directory, Math.Min(startAt, numItems - 1), false);
+                                writer.WriteEndArray();
+                                writer.WriteNumber("next", Math.Min(startAt, numItems - 1));
+                                writer.WriteNumber("err", 0);
+                                writer.WriteEndObject();
+                                writer.Flush();
+                                return fileList.ToArray();
                             }
-                            return JsonSerializer.Serialize(fileList, JsonHelper.DefaultJsonOptions);
+                            writer.WriteEndArray();
+                            writer.Flush();
+                            return fileList.ToArray();
                         }
+
+                        // Write the next item
+                        writer.WriteStartObject();
+                        writer.WriteString("type", "d");
+                        writer.WriteString("name", info.Name);
+                        writer.WriteString("date", info.LastWriteTime.ToString("s"));
+                        writer.WriteEndObject();
                     }
                 }
 
@@ -150,24 +184,43 @@ namespace DuetAPI.Utility
                     if (startAt < 0 || numItems++ >= startAt)
                     {
                         FileInfo info = new(file);
-                        fileList.Add(new { type = 'f', name = info.Name, size = info.Length, date = info.LastWriteTime });
 
-                        if (maxSize > 0 && GetFileListSize(fileList, directory, startAt) > maxSize)
+                        // Check if we're about to exceed the maximum size and stop if that is the case
+                        if (maxSize > 0 && GetNextFileSize(info.Name, info.Length, info.LastWriteTime) > maxSize)
                         {
-                            fileList.RemoveAt(fileList.Count - 1);
                             if (startAt >= 0)
                             {
-                                return MakeFileListContainer(fileList, directory, Math.Min(startAt, numItems - 1), false);
+                                writer.WriteEndArray();
+                                writer.WriteNumber("next", Math.Min(startAt, numItems - 1));
+                                writer.WriteNumber("err", 0);
+                                writer.WriteEndObject();
+                                writer.Flush();
+                                return fileList.ToArray();
                             }
-                            return JsonSerializer.Serialize(fileList, JsonHelper.DefaultJsonOptions);
+                            writer.WriteEndArray();
+                            writer.Flush();
+                            return fileList.ToArray();
                         }
+
+                        // Write the next item
+                        writer.WriteStartObject();
+                        writer.WriteString("type", "f");
+                        writer.WriteString("name", info.Name);
+                        writer.WriteNumber("size", info.Length);
+                        writer.WriteString("date", info.LastWriteTime.ToString("s"));
+                        writer.WriteEndObject();
                     }
                 }
+                writer.WriteEndArray();
 
                 if (startAt >= 0)
                 {
                     // Return items encapsulated in a body
-                    return MakeFileListContainer(fileList, directory, Math.Min(startAt, numItems), true);
+                    writer.WriteNumber("next", 0);
+                    writer.WriteNumber("err", 0);
+                    writer.WriteEndObject();
+                    writer.Flush();
+                    return fileList.ToArray();
                 }
             }
             catch
@@ -175,13 +228,14 @@ namespace DuetAPI.Utility
                 if (startAt >= 0)
                 {
                     // Something went wrong...
-                    return "{\"err\":2}";
+                    return Encoding.UTF8.GetBytes("{\"err\":2}");
                 }
                 throw;
             }
 
             // Return items without body
-            return JsonSerializer.Serialize(fileList, JsonHelper.DefaultJsonOptions);
+            writer.Flush();
+            return fileList.ToArray();
         }
     }
 }
