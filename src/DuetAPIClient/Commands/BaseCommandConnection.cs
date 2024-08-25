@@ -512,11 +512,30 @@ namespace DuetAPIClient
         /// <exception cref="UnauthorizedAccessException">Insufficient permissions to modify other plugin data</exception>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
         /// <seealso cref="SbcPermissions.ManagePlugins"/>
+        [Obsolete("Deprecated in favour of new overload which takes a JsonElement argument")]
         public Task SetPluginData(string key, object value, string? plugin = null, CancellationToken cancellationToken = default)
         {
             byte[] jsonData = JsonSerializer.SerializeToUtf8Bytes(value);
             using JsonDocument jsonDocument = JsonDocument.Parse(jsonData);
             return PerformCommand(new SetPluginData { Plugin = plugin, Key = key, Value = jsonDocument.RootElement }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Set custom plugin data in the object model
+        /// </summary>
+        /// <param name="key">Key to set</param>
+        /// <param name="value">Value to set</param>
+        /// <param name="plugin">Identifier of the plugin to update (optional)</param>
+        /// <param name="cancellationToken"></param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <exception cref="UnauthorizedAccessException">Insufficient permissions to modify other plugin data</exception>
+        /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        /// <seealso cref="SbcPermissions.ManagePlugins"/>
+        public Task SetPluginData(string key, JsonElement value, string? plugin = null, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new SetPluginData { Plugin = plugin, Key = key, Value = value }, cancellationToken);
         }
 
         /// <summary>
