@@ -114,8 +114,7 @@ namespace DuetAPI.Utility
             DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
             PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            PropertyNameCaseInsensitive = true
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
 
 #if NETSTANDARD2_1_OR_GREATER || NET6_0_OR_GREATER

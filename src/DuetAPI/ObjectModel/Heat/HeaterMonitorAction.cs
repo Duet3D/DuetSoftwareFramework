@@ -28,10 +28,4 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         ShutDown = 3
     }
-
-    /// <summary>
-    /// Context for HeaterMonitorAction serialization
-    /// </summary>
-    [JsonSerializable(typeof(HeaterMonitorAction))]
-    public partial class HeaterMonitorActionContext : JsonSerializerContext { }
 }

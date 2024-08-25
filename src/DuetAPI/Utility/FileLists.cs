@@ -18,8 +18,8 @@ namespace DuetAPI.Utility
         /// <param name="startAt">First item to send</param>
         /// <param name="flagDirs">Prefix directories with an asterisk</param>
         /// <param name="maxSize">Maximum size of the file list in bytes or -1 if unset</param>
-        /// <returns>JSON file list</returns>
-        public static byte[] GetFiles(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1)
+        /// <returns>UTF8-encoded JSON file list</returns>
+        public static byte[] GetFilesUtf8(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1)
         {
             using MemoryStream fileList = new();
             using Utf8JsonWriter writer = new(new MemoryStream());
@@ -106,14 +106,28 @@ namespace DuetAPI.Utility
         }
 
         /// <summary>
+        /// Get a /rr_files or M20 files response
+        /// </summary>
+        /// <param name="directory">RRF path to the directory</param>
+        /// <param name="physicalDirectory">Physical directory</param>
+        /// <param name="startAt">First item to send</param>
+        /// <param name="flagDirs">Prefix directories with an asterisk</param>
+        /// <param name="maxSize">Maximum size of the file list in bytes or -1 if unset</param>
+        /// <returns>JSON file list</returns>
+        public static string GetFiles(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1)
+        {
+            return Encoding.UTF8.GetString(GetFilesUtf8(directory, physicalDirectory, startAt, flagDirs, maxSize));
+        }
+
+        /// <summary>
         /// Get a /rr_filelist or M20 files response
         /// </summary>
         /// <param name="directory">RRF path to the directory</param>
         /// <param name="physicalDirectory">Physical directory</param>
         /// <param name="startAt">First file index to return. Set startAt to -1 to omit error handling and the JSON object container</param>
         /// <param name="maxSize">Maximum size of the file list in bytes or -1 if unset</param>
-        /// <returns>JSON list</returns>
-        public static byte[] GetFileList(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1)
+        /// <returns>UTF8-encoded JSON list</returns>
+        public static byte[] GetFileListUtf8(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1)
         {
             using MemoryStream fileList = new();
             using Utf8JsonWriter writer = new(new MemoryStream());
@@ -236,6 +250,19 @@ namespace DuetAPI.Utility
             // Return items without body
             writer.Flush();
             return fileList.ToArray();
+        }
+
+        /// <summary>
+        /// Get a /rr_filelist or M20 files response
+        /// </summary>
+        /// <param name="directory">RRF path to the directory</param>
+        /// <param name="physicalDirectory">Physical directory</param>
+        /// <param name="startAt">First file index to return. Set startAt to -1 to omit error handling and the JSON object container</param>
+        /// <param name="maxSize">Maximum size of the file list in bytes or -1 if unset</param>
+        /// <returns>JSON list</returns>
+        public static string GetFileList(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1)
+        {
+            return Encoding.UTF8.GetString(GetFileListUtf8(directory, physicalDirectory, startAt, maxSize));
         }
     }
 }

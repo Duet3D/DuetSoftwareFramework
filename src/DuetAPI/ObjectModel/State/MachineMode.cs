@@ -23,10 +23,4 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         Laser
     }
-
-    /// <summary>
-    /// Context for MachineMode serialization
-    /// </summary>
-    [JsonSerializable(typeof(MachineMode))]
-    public partial class MachineModeContext : JsonSerializerContext { }
 }

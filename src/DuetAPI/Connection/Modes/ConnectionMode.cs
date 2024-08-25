@@ -5,7 +5,7 @@ namespace DuetAPI.Connection
     /// <summary>
     /// Supported connection types for client connections
     /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(JsonStringEnumConverter<ConnectionMode>))]
     public enum ConnectionMode
     {
         /// <summary>

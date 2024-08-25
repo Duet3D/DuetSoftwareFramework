@@ -1,6 +1,4 @@
-﻿using System.Text.Json.Serialization;
-
-namespace DuetAPI.ObjectModel
+﻿namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Supported modes of displaying a message box
@@ -47,10 +45,4 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         StringInput = 7
     }
-
-    /// <summary>
-    /// Context for MessageBoxMode serialization
-    /// </summary>
-    [JsonSerializable(typeof(MessageBoxMode))]
-    public partial class MessageBoxModeContext : JsonSerializerContext { }
 }

@@ -34,10 +34,4 @@ namespace DuetAPI.ObjectModel
 		/// </summary>
 		Reading
 	}
-
-    /// <summary>
-    /// Context for InputChannelState serialization
-    /// </summary>
-    [JsonSerializable(typeof(InputChannelState))]
-    public partial class InputChannelStateContext : JsonSerializerContext { }
 }

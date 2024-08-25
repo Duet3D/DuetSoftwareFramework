@@ -59,10 +59,4 @@ namespace DuetAPI.ObjectModel
 		/// </summary>
 		Idle
 	}
-
-    /// <summary>
-    /// Context for NetworkState serialization
-    /// </summary>
-    [JsonSerializable(typeof(NetworkState))]
-    public partial class NetworkStateContext : JsonSerializerContext { }
 }

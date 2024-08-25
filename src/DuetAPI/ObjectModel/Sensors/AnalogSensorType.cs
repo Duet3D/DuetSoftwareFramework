@@ -209,10 +209,4 @@ namespace DuetAPI.ObjectModel
             }
         }
     }
-
-    /// <summary>
-    /// Context for AnalogSensorType serialization
-    /// </summary>
-    [JsonSerializable(typeof(AnalogSensorType))]
-    public partial class AnalogSensorTypeContext : JsonSerializerContext { }
 }

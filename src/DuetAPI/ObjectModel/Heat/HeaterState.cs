@@ -39,10 +39,4 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         Offline
     }
-
-    /// <summary>
-    /// Context for HeaterState serialization
-    /// </summary>
-    [JsonSerializable(typeof(HeaterState))]
-    public partial class HeaterStateContext : JsonSerializerContext { }
 }

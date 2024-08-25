@@ -49,10 +49,4 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         Custom
     }
-
-    /// <summary>
-    /// Context for InputShapingType serialization
-    /// </summary>
-    [JsonSerializable(typeof(InputShapingType))]
-    public partial class InputShapingTypeContext : JsonSerializerContext { }
 }

@@ -29,10 +29,4 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         Reverse
     }
-
-    /// <summary>
-    /// Context for SpindleState serialization
-    /// </summary>
-    [JsonSerializable(typeof(SpindleState))]
-    public partial class SpindleStateContext : JsonSerializerContext { }
 }

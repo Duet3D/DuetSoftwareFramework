@@ -127,11 +127,4 @@ namespace DuetAPI.ObjectModel
             };
         }
     }
-
-
-    /// <summary>
-    /// Use .NET's source generator for the object model
-    /// </summary>
-    [JsonSerializable(typeof(Message))]
-    public partial class MessageContext : JsonSerializerContext { }
 }

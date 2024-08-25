@@ -6,7 +6,7 @@ namespace DuetAPI.Connection
     /// Type of the intercepting connection
     /// </summary>
     /// <seealso cref="InitMessages.InterceptInitMessage"/>
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(JsonStringEnumConverter<InterceptionMode>))]
     public enum InterceptionMode
     {
         /// <summary>

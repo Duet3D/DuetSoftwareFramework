@@ -24,10 +24,4 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         QOI
     }
-
-    /// <summary>
-    /// Context for ThumbnailInfoFormat serialization
-    /// </summary>
-    [JsonSerializable(typeof(ThumbnailInfoFormat))]
-    public partial class ThumbnailInfoFormatContext : JsonSerializerContext { }
 }

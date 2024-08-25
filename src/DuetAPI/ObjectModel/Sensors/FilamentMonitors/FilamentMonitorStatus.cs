@@ -44,10 +44,4 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         SensorError
     }
-
-    /// <summary>
-    /// Context for FilamentMonitorStatus serialization
-    /// </summary>
-    [JsonSerializable(typeof(FilamentMonitorStatus))]
-    public partial class FilamentMonitorStatusContext : JsonSerializerContext { }
 }

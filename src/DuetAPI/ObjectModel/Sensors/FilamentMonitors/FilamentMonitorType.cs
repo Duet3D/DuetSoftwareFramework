@@ -34,10 +34,4 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         Unknown
     }
-
-    /// <summary>
-    /// Context for FilamentMonitorType serialization
-    /// </summary>
-    [JsonSerializable(typeof(FilamentMonitorType))]
-    public partial class FilamentMonitorTypeContext : JsonSerializerContext { }
 }

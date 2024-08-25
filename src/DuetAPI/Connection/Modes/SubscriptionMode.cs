@@ -6,7 +6,7 @@ namespace DuetAPI.Connection
     /// Type of the model subscription
     /// </summary>
     /// <seealso cref="InitMessages.SubscribeInitMessage"/>
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(JsonStringEnumConverter<SubscriptionMode>))]
     public enum SubscriptionMode
     {
         /// <summary>

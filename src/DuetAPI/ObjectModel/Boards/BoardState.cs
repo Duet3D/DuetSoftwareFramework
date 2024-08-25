@@ -34,10 +34,4 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         Running
     }
-
-    /// <summary>
-    /// Context for BoardState serialization
-    /// </summary>
-    [JsonSerializable(typeof(BoardState))]
-    public partial class BoardStateContext : JsonSerializerContext { }
 }

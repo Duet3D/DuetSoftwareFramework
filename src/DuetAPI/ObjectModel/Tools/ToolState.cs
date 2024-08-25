@@ -24,10 +24,4 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         Standby
     }
-
-    /// <summary>
-    /// Context for ToolState serialization
-    /// </summary>
-    [JsonSerializable(typeof(ToolState))]
-    public partial class ToolStateContext : JsonSerializerContext { }
 }

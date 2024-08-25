@@ -1,6 +1,4 @@
-﻿using System.Text.Json.Serialization;
-
-namespace DuetAPI.ObjectModel
+﻿namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Supported probe types
@@ -65,10 +63,4 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         ZMotorStall = 10
     }
-
-    /// <summary>
-    /// Context for ProbeType serialization
-    /// </summary>
-    [JsonSerializable(typeof(ProbeType))]
-    public partial class ProbeTypeContext : JsonSerializerContext { }
 }

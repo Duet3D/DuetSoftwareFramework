@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.Commands
 {
@@ -6,6 +7,7 @@ namespace DuetAPI.Commands
     /// Code bits to classify G/M/T-codes
     /// </summary>
     [Flags]
+    [JsonConverter(typeof(JsonNumberEnumConverter<CodeFlags>))]
     public enum CodeFlags : int
     {
         /// <summary>

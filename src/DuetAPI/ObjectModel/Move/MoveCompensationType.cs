@@ -19,10 +19,4 @@ namespace DuetAPI.ObjectModel
 		/// </summary>
 		Mesh
 	}
-
-    /// <summary>
-    /// Context for MoveCompensationType serialization
-    /// </summary>
-    [JsonSerializable(typeof(MoveCompensationType))]
-    public partial class MoveCompensationTypeContext : JsonSerializerContext { }
 }

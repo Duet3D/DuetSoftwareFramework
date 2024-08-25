@@ -43,10 +43,4 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         NanoDLP
     }
-
-    /// <summary>
-    /// Context for Compatibility serialization
-    /// </summary>
-    [JsonSerializable(typeof(Compatibility))]
-    public partial class CompatibilityContext : JsonSerializerContext { }
 }

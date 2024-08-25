@@ -34,10 +34,4 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         Unknown
     }
-
-    /// <summary>
-    /// Context for EndstopType serialization
-    /// </summary>
-    [JsonSerializable(typeof(EndstopType))]
-    public partial class EndstopTypeContext : JsonSerializerContext { }
 }

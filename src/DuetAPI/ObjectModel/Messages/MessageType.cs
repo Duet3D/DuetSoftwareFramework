@@ -1,8 +1,11 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System.Text.Json.Serialization;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Type of a generic message
     /// </summary>
+    [JsonConverter(typeof(JsonNumberEnumConverter<MessageType>))]
     public enum MessageType : int
     {
         /// <summary>

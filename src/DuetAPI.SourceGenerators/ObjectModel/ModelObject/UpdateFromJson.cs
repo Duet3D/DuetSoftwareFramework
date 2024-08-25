@@ -184,14 +184,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                         }
                         else if (isEnum)
                         {
-                            if (receiver.EnumContexts.TryGetValue(genericPropType, out string? contextName))
-                            {
-                                writer.WriteLine($"{genericPropType} new{genericPropType}Value = ({genericPropType})JsonSerializer.Deserialize(jsonProperty.Value[i].GetRawText(), typeof({genericPropType}), {contextName}.Default)!;");
-                            }
-                            else
-                            {
-                                context.ReportDiagnostic(Diagnostic.Create(Descriptors.MissingEnumJsonContext, prop.GetLocation(), jsonPropertyName, cls));
-                            }
+                            writer.WriteLine($"{genericPropType} new{genericPropType}Value = JsonSerializer.Deserialize(jsonProperty.Value[i].GetRawText(), ObjectModelContext.Default.{genericPropType})!;");
                         }
                         else
                         {
@@ -241,14 +234,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                         }
                         else if (isEnum)
                         {
-                            if (receiver.EnumContexts.TryGetValue(genericPropType, out string? contextName))
-                            {
-                                writer.WriteLine($"{prop.Identifier.ValueText}.Add(({genericPropType})JsonSerializer.Deserialize(jsonProperty.Value[i].GetRawText(), typeof({genericPropType}), {contextName}.Default)!);");
-                            }
-                            else
-                            {
-                                context.ReportDiagnostic(Diagnostic.Create(Descriptors.MissingEnumJsonContext, prop.GetLocation(), jsonPropertyName, cls));
-                            }
+                            writer.WriteLine($"{prop.Identifier.ValueText}.Add(JsonSerializer.Deserialize(jsonProperty.Value[i].GetRawText(), ObjectModelContext.Default.{genericPropType})!);");
                         }
                         else
                         {
@@ -357,20 +343,13 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                             }
                             else if (receiver.Enums.Contains(propType))
                             {
-                                if (receiver.EnumContexts.TryGetValue(propType, out string? contextName))
+                                if (prop.Type is NullableTypeSyntax)
                                 {
-                                    if (prop.Type is NullableTypeSyntax)
-                                    {
-                                        writer.WriteLine($"{prop.Identifier.ValueText} = (jsonProperty.Value.ValueKind == JsonValueKind.Null) ? null : ({propType})JsonSerializer.Deserialize(jsonProperty.Value.GetRawText(), typeof({propType}), {contextName}.Default)!;");
-                                    }
-                                    else
-                                    {
-                                        writer.WriteLine($"{prop.Identifier.ValueText} = ({propType})JsonSerializer.Deserialize(jsonProperty.Value.GetRawText(), typeof({propType}), {contextName}.Default)!;");
-                                    }
+                                    writer.WriteLine($"{prop.Identifier.ValueText} = (jsonProperty.Value.ValueKind == JsonValueKind.Null) ? null : JsonSerializer.Deserialize(jsonProperty.Value.GetRawText(), ObjectModelContext.Default.{propType})!;");
                                 }
                                 else
                                 {
-                                    context.ReportDiagnostic(Diagnostic.Create(Descriptors.MissingEnumJsonContext, prop.GetLocation(), jsonPropertyName, cls));
+                                    writer.WriteLine($"{prop.Identifier.ValueText} = JsonSerializer.Deserialize(jsonProperty.Value.GetRawText(), ObjectModelContext.Default.{propType})!;");
                                 }
                             }
                             else if (propType is "object")

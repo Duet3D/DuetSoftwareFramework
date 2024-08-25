@@ -179,21 +179,16 @@ namespace DuetAPI.ObjectModel
         public bool UpdateFromJsonReader(string key, ref Utf8JsonReader reader) => GeneratedUpdateFromJsonReader(key, ref reader, false);
 
         /// <summary>
-        /// JSON serializer context used by the following two functions
-        /// </summary>
-        private static readonly JsonSerializerContext _jsonSerializerContext = new ObjectModelContext(Utility.JsonHelper.DefaultJsonOptions);
-
-        /// <summary>
         /// Convert this instance to a JSON text
         /// </summary>
         /// <returns>JSON object</returns>
-        public override string ToString() => JsonSerializer.Serialize(this, typeof(ObjectModel), _jsonSerializerContext);
+        public override string ToString() => JsonSerializer.Serialize(this, typeof(ObjectModel), ObjectModelContext.Default);
 
         /// <summary>
         /// Serialize this instance to a UTF-8 string
         /// </summary>
         /// <returns></returns>
-        public byte[] ToUtf8Json() => JsonSerializer.SerializeToUtf8Bytes(this, typeof(ObjectModel), _jsonSerializerContext);
+        public byte[] ToUtf8Json() => JsonSerializer.SerializeToUtf8Bytes(this, typeof(ObjectModel), ObjectModelContext.Default);
 
         /// <summary>
         /// Static event to be called when the deserialization of a property failed.
@@ -252,8 +247,9 @@ namespace DuetAPI.ObjectModel
     }
 
     /// <summary>
-    /// Use .NET's source generator for the object model
+    /// Context for JSON handling of the main object model classes
     /// </summary>
     [JsonSerializable(typeof(ObjectModel))]
+    [JsonSourceGenerationOptions(DictionaryKeyPolicy = JsonKnownNamingPolicy.CamelCase, PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
     public partial class ObjectModelContext : JsonSerializerContext { }
 }

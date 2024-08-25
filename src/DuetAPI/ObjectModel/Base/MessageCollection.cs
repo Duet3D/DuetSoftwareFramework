@@ -75,8 +75,6 @@ namespace DuetAPI.ObjectModel
             return clone;
         }
 
-        private static readonly MessageContext _messageContext = new(Utility.JsonHelper.DefaultJsonOptions);
-
         /// <summary>
         /// Update this instance from a given JSON element
         /// </summary>
@@ -90,7 +88,7 @@ namespace DuetAPI.ObjectModel
             {
                 try
                 {
-                    Add((Message)JsonSerializer.Deserialize(item, typeof(Message), _messageContext)!);
+                    Add(JsonSerializer.Deserialize(item, ObjectModelContext.Default.Message)!);
                 }
                 catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(Message), item, e))
                 {
@@ -126,7 +124,7 @@ namespace DuetAPI.ObjectModel
             {
                 try
                 {
-                    Add((Message)JsonSerializer.Deserialize(ref reader, typeof(Message), _messageContext)!);
+                    Add(JsonSerializer.Deserialize(ref reader, ObjectModelContext.Default.Message)!);
                 }
                 catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(Message), JsonElement.ParseValue(ref reader), e))
                 {

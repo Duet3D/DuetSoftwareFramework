@@ -1,5 +1,4 @@
-﻿using DuetAPI.Utility;
-using System;
+﻿using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -8,7 +7,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Supported types of network interfaces
     /// </summary>
-    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<NetworkInterfaceType>))]
+    [JsonConverter(typeof(HttpResponseTypeConverter))]
     public enum NetworkInterfaceType
     {
         /// <summary>
@@ -69,10 +68,4 @@ namespace DuetAPI.ObjectModel
             });
         }
     }
-
-    /// <summary>
-    /// Context for NetworkInterfaceType serialization
-    /// </summary>
-    [JsonSerializable(typeof(NetworkInterfaceType))]
-    public partial class NetworkInterfaceTypeContext : JsonSerializerContext { }
 }

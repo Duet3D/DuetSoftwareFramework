@@ -90,10 +90,4 @@ namespace DuetAPI.Commands
             });
         }
     }
-
-    /// <summary>
-    /// Context for HttpResponseType serialization
-    /// </summary>
-    [JsonSerializable(typeof(HttpResponseType))]
-    public partial class HttpResponseTypeContext : JsonSerializerContext { }
 }

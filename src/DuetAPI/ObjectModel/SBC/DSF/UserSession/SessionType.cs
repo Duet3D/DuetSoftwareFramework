@@ -24,10 +24,4 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         Telnet
     }
-
-    /// <summary>
-    /// Context for SessionType serialization
-    /// </summary>
-    [JsonSerializable(typeof(SessionType))]
-    public partial class SessionTypeContext : JsonSerializerContext { }
 }

@@ -752,7 +752,7 @@ namespace DuetWebServer.Controllers
                     LogWarning($"Could not find directory {directory} (resolved to {resolvedPath})");
                     return NotFound(HttpUtility.UrlPathEncode(directory));
                 }
-                return Content(FileLists.GetFileList(directory ?? string.Empty, resolvedPath), "application/json");
+                return File(FileLists.GetFileListUtf8(directory ?? string.Empty, resolvedPath), "application/json");
             }
             catch (Exception e)
             {
