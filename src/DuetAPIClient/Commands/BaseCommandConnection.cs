@@ -334,10 +334,26 @@ namespace DuetAPIClient
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        [Obsolete("Deprecated in favor of PatchObjectModel which takes a JsonElement instead of an object")]
         public async Task PatchObjectModel(string key, object patch, CancellationToken cancellationToken = default)
         {
             using JsonDocument jsonDocument = JsonDocument.Parse(JsonSerializer.SerializeToUtf8Bytes(patch, JsonHelper.DefaultJsonOptions));
             await PerformCommand(new PatchObjectModel() { Key = key, Patch = jsonDocument.RootElement }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Apply a full patch to the object model. Use with care!
+        /// </summary>
+        /// <param name="key">Key to update</param>
+        /// <param name="patch">Patch to apply</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        public async Task PatchObjectModel(string key, JsonElement patch, CancellationToken cancellationToken = default)
+        {
+            await PerformCommand(new PatchObjectModel() { Key = key, Patch = patch }, cancellationToken);
         }
 
         /// <summary>
