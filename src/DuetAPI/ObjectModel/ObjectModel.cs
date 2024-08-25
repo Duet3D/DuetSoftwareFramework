@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace DuetAPI.ObjectModel
 {
@@ -245,11 +244,4 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         public Exception Exception { get; private set; } = e;
     }
-
-    /// <summary>
-    /// Context for JSON handling of the main object model classes
-    /// </summary>
-    [JsonSerializable(typeof(ObjectModel))]
-    [JsonSourceGenerationOptions(DictionaryKeyPolicy = JsonKnownNamingPolicy.CamelCase, PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
-    public partial class ObjectModelContext : JsonSerializerContext { }
 }

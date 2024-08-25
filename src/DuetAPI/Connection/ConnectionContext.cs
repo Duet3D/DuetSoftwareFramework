@@ -1,4 +1,6 @@
 ﻿using DuetAPI.Connection.InitMessages;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace DuetAPI.Connection
@@ -13,5 +15,13 @@ namespace DuetAPI.Connection
     [JsonSerializable(typeof(ServerInitMessage))]
     [JsonSerializable(typeof(SubscribeInitMessage))]
     [JsonSourceGenerationOptions(DictionaryKeyPolicy = JsonKnownNamingPolicy.CamelCase, PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
-    public partial class ConnectionContext : JsonSerializerContext { }
+    public sealed partial class ConnectionContext : JsonSerializerContext
+    {
+        static ConnectionContext() => Default = new ConnectionContext(CreateJsonSerializerOptions(Default));
+
+        private static JsonSerializerOptions CreateJsonSerializerOptions(ConnectionContext defaultContext) => new(defaultContext.GeneratedSerializerOptions!)
+        {
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        };
+    }
 }

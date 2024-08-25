@@ -1,4 +1,6 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.Commands
 {
@@ -44,5 +46,13 @@ namespace DuetAPI.Commands
     [JsonSerializable(typeof(AddUserSession))]
     [JsonSerializable(typeof(RemoveUserSession))]
     [JsonSourceGenerationOptions(DictionaryKeyPolicy = JsonKnownNamingPolicy.CamelCase, PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
-    public partial class CommandContext : JsonSerializerContext { }
+    public sealed partial class CommandContext : JsonSerializerContext
+    {
+        static CommandContext() => Default = new CommandContext(CreateJsonSerializerOptions(Default));
+
+        private static JsonSerializerOptions CreateJsonSerializerOptions(CommandContext defaultContext) => new(defaultContext.GeneratedSerializerOptions!)
+        {
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        };
+    }
 }
