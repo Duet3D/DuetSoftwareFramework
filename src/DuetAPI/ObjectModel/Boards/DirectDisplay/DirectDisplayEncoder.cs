@@ -3,7 +3,7 @@
     /// <summary>
     /// Class providing information about a connected display encoder
     /// </summary>
-    public sealed class DirectDisplayEncoder : ModelObject
+    public partial class DirectDisplayEncoder : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Number of pulses per click of the rotary encoder

@@ -81,7 +81,7 @@ namespace DuetPluginService
                     }
 
                     // Perform final deserialization and assign source identifier to this command
-                    return (BaseCommand)jsonDocument.RootElement.ToObject(commandType, JsonHelper.DefaultJsonOptions)!;
+                    return (BaseCommand)JsonSerializer.Deserialize(jsonDocument, commandType, JsonHelper.DefaultJsonOptions)!;
                 }
             }
             throw new ArgumentException("Command type not found");

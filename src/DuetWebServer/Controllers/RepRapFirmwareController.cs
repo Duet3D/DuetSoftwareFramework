@@ -465,7 +465,7 @@ namespace DuetWebServer.Controllers
                     return Content("{\"err\":1}");
                 }
                 string resolvedPath = await ResolvePath(dir);
-                return Content(FileLists.GetFileList(dir, resolvedPath, first), "application/json");
+                return File(FileLists.GetFileListUtf8(dir, resolvedPath, first), "application/json");
             }
             catch (Exception e)
             {

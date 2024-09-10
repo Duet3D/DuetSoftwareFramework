@@ -5,7 +5,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Enumeration of possible direct-connect display controllers
     /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(JsonStringEnumConverter<DirectDisplayController>))]
     public enum DirectDisplayController
     {
         /// <summary>

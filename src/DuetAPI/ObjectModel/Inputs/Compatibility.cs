@@ -5,7 +5,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Compatibility level for emulation
     /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(JsonStringEnumConverter<Compatibility>))]
     public enum Compatibility
     {
         /// <summary>

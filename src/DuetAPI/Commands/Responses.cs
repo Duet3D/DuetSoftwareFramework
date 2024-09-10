@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.Commands
 {
@@ -13,6 +14,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Indicates if the command could complete without a runtime error
         /// </summary>
+        [JsonPropertyOrder(-1)]
         public bool Success { get; set; } = true;
     }
 

@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Possible states of the firmware
     /// </summary>
-    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter))]
+    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<MachineStatus>))]
     public enum MachineStatus
     {
         /// <summary>

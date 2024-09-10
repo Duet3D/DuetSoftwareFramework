@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a DDA ring
     /// </summary>
-    public sealed class MoveQueueItem : ModelObject
+    public partial class MoveQueueItem : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// The minimum idle time before we should start a move (in s)

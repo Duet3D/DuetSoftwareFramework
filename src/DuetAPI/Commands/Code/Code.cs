@@ -65,7 +65,7 @@ namespace DuetAPI.Commands
         /// Check if this code is from a file channel
         /// </summary>
         [JsonIgnore]
-        public bool IsFromFileChannel { get => Channel == CodeChannel.File || Channel == CodeChannel.File2; }
+        public bool IsFromFileChannel { get => Channel is CodeChannel.File or CodeChannel.File2; }
 
         /// <summary>
         /// Line number of this code

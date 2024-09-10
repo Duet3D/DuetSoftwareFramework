@@ -16,8 +16,7 @@ namespace DuetAPI.ObjectModel
     /// Key names are NOT converted to camel-case (unlike regular class properties)
     /// </remarks>
     /// <param name="nullRemovesItems">Defines if setting items to null effectively removes them</param>
-    [JsonConverter(typeof(ModelDictionaryConverter))]
-    public sealed class ModelDictionary<TValue>(bool nullRemovesItems) : IDictionary<string, TValue>, IModelDictionary
+    public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems) : IDictionary<string, TValue>, IModelDictionary where TValue : IStaticModelObject, new()
     {
         /// <summary>
         /// Flags if keys can be removed again by setting their value to null
@@ -55,7 +54,7 @@ namespace DuetAPI.ObjectModel
         {
             if (NullRemovesItems)
             {
-                return _dictionary.TryGetValue(key, out TValue? result) ? result! : default;
+                return _dictionary.TryGetValue(key, out TValue? result) ? result : default;
             }
             return _dictionary[key];
         }
@@ -182,10 +181,10 @@ namespace DuetAPI.ObjectModel
         /// Assign the properties from another instance
         /// </summary>
         /// <param name="from">Other instance</param>
-        public void Assign(object from)
+        public void Assign(IStaticModelObject from)
         {
             // Validate the types
-            if (from is not ModelDictionary<TValue> other)
+            if (from is not StaticModelDictionary<TValue> other)
             {
                 throw new ArgumentException("Types do not match", nameof(from));
             }
@@ -262,7 +261,7 @@ namespace DuetAPI.ObjectModel
         /// <returns></returns>
         public object Clone()
         {
-            ModelDictionary<TValue> clone = new(NullRemovesItems);
+            StaticModelDictionary<TValue> clone = new(NullRemovesItems);
             foreach (KeyValuePair<string, TValue> kv in _dictionary)
             {
                 if (kv.Value is ICloneable cloneableItem)
@@ -319,48 +318,6 @@ namespace DuetAPI.ObjectModel
         /// <param name="item">Item to check</param>
         /// <returns>If the item exists in the dictionary</returns>
         public bool Contains(KeyValuePair<string, TValue> item) => _dictionary.TryGetValue(item.Key, out TValue? value) && Equals(value, item.Value);
-
-        /// <summary>
-        /// Create a dictionary or list of all the differences between this instance and another.
-        /// This method outputs own property values that differ from the other instance
-        /// </summary>
-        /// <param name="other">Other instance</param>
-        /// <returns>Object differences or null if both instances are equal</returns>
-        public object? FindDifferences(IModelObject? other)
-        {
-            // Check the types
-            if (other is not ModelDictionary<TValue> otherDictionary)
-            {
-                // Types differ, return the entire instance
-                return this;
-            }
-
-            // Find the differences
-            Dictionary<string, TValue>? diffs = null;
-            foreach (var kv in this)
-            {
-                if (!otherDictionary.TryGetValue(kv.Key, out TValue? otherItem) || !kv.Value!.Equals(otherItem))
-                {
-                    diffs ??= [];
-                    diffs.Add(kv.Key, kv.Value);
-                }
-            }
-
-            // Keep track of removed items (if applicable)
-            if (NullRemovesItems)
-            {
-                foreach (string key in otherDictionary.Keys)
-                {
-                    if (!_dictionary.ContainsKey(key))
-                    {
-                        diffs ??= [];
-                        diffs.Add(key, default!);
-                    }
-                }
-            }
-
-            return diffs;
-        }
 
         /// <summary>
         /// Get an enumerator
@@ -425,34 +382,30 @@ namespace DuetAPI.ObjectModel
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         /// <remarks>Accepts null as the JSON value to clear existing items</remarks>
-        public IModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
-            if (jsonElement.ValueKind == JsonValueKind.Null)
-            {
-                return null;
-            }
-
             foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
             {
                 if (NullRemovesItems && jsonProperty.Value.ValueKind == JsonValueKind.Null)
                 {
                     Remove(jsonProperty.Name);
                 }
-                else if (typeof(TValue) == typeof(JsonElement))
-                {
-                    if (!TryGetValue(jsonProperty.Name, out TValue? value) || !value!.Equals(jsonProperty.Value))
-                    {
-                        this[jsonProperty.Name] = (TValue)(object)jsonProperty.Value.Clone();
-                    }
-                }
-                else
+                else if (TryGetValue(jsonProperty.Name, out TValue? item))
                 {
                     try
                     {
-                        TValue newValue = JsonSerializer.Deserialize<TValue>(jsonProperty.Value.GetRawText(), Utility.JsonHelper.DefaultJsonOptions)!;
-                        if (!TryGetValue(jsonProperty.Name, out TValue? value) || !value!.Equals(newValue))
+                        if (item is null)
                         {
-                            this[jsonProperty.Name] = newValue;
+                            if (jsonProperty.Value.ValueKind != JsonValueKind.Null)
+                            {
+                                item = new();
+                                item.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                                this[jsonProperty.Name] = item;
+                            }
+                        }
+                        else
+                        {
+                            item.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
                         }
                     }
                     catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
@@ -460,83 +413,71 @@ namespace DuetAPI.ObjectModel
                         // suppressed
                     }
                 }
-            }
-            return this;
-        }
-    }
-
-    /// <summary>
-    /// Converter factory class for <see cref="ModelDictionary{TValue}"/> types
-    /// </summary>
-    public sealed class ModelDictionaryConverter : JsonConverterFactory
-    {
-        /// <summary>
-        /// Checks if the given type can be converted from or to JSON
-        /// </summary>
-        /// <param name="typeToConvert"></param>
-        /// <returns></returns>
-        public override bool CanConvert(Type typeToConvert)
-        {
-            return typeToConvert.IsGenericType && typeof(ModelDictionary<>) == typeToConvert.GetGenericTypeDefinition();
-        }
-
-        /// <summary>
-        /// Creates a converter for the given type
-        /// </summary>
-        /// <param name="type">Target type</param>
-        /// <param name="options">Conversion options</param>
-        /// <returns>Converter instance</returns>
-        public override JsonConverter CreateConverter(Type type, JsonSerializerOptions options)
-        {
-            Type itemType = type.GetGenericArguments().First();
-            Type converterType = typeof(ModelDictionaryConverterInner<,>).MakeGenericType(type, itemType);
-            return (JsonConverter)Activator.CreateInstance(converterType)!;
-        }
-
-        /// <summary>
-        /// Method to create a converter for a specific <see cref="ModelDictionary{TValue}"/> type
-        /// </summary>
-        /// <typeparam name="T">Dictionary type</typeparam>
-        /// <typeparam name="TValue">Value type</typeparam>
-        private sealed class ModelDictionaryConverterInner<T, TValue> : JsonConverter<T> where T : IDictionary<string, TValue>
-        {
-            /// <summary>
-            /// Checks if the given type can be converted
-            /// </summary>
-            /// <param name="typeToConvert">Type to convert</param>
-            /// <returns>Whether the type can be converted</returns>
-            public override bool CanConvert(Type typeToConvert)
-            {
-                return typeToConvert.IsGenericType && typeof(ModelDictionary<>) == typeToConvert.GetGenericTypeDefinition();
-            }
-
-            /// <summary>
-            /// Read from JSON
-            /// </summary>
-            /// <param name="reader">JSON reader</param>
-            /// <param name="typeToConvert">Type to convert</param>
-            /// <param name="options">Read options</param>
-            /// <returns>Read value</returns>
-            public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-            {
-                throw new NotSupportedException();
-            }
-
-            /// <summary>
-            /// Write a CodeParameter to JSON
-            /// </summary>
-            /// <param name="writer">JSON writer</param>
-            /// <param name="value">Value to serialize</param>
-            /// <param name="options">Write options</param>
-            public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
-            {
-                writer.WriteStartObject();
-                foreach (var kv in value)
+                else
                 {
-                    writer.WritePropertyName(kv.Key);
-                    JsonSerializer.Serialize(writer, kv.Value, options);
+                    try
+                    {
+                        TValue newValue = new();
+                        newValue.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                        Add(jsonProperty.Name, newValue);
+                    }
+                    catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
+                    {
+                        // suppressed
+                    }
                 }
-                writer.WriteEndObject();
+            }
+        }
+
+        /// <summary>
+        /// Update this instance from a given JSON reader
+        /// </summary>
+        /// <param name="reader">JSON reader</param>
+        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+        /// <exception cref="JsonException">Failed to deserialize data</exception>
+        public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+        {
+            while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+            {
+                if (reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    string key = reader.GetString()!;
+                    reader.Skip();
+
+                    if (reader.TokenType == JsonTokenType.Null)
+                    {
+                        if (NullRemovesItems)
+                        {
+                            Remove(key);
+                        }
+                        else
+                        {
+                            this[key] = default;
+                        }
+                    }
+                    else if (TryGetValue(key, out TValue? item))
+                    {
+                        if (item is null)
+                        {
+                            if (reader.TokenType != JsonTokenType.Null)
+                            {
+                                item = new();
+                                item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                                this[key] = item;
+                            }
+                        }
+                        else
+                        {
+                            item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                        }
+                    }
+                    else
+                    {
+                        TValue newItem = new();
+                        newItem.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                        Add(key, newItem);
+                    }
+                }
             }
         }
     }

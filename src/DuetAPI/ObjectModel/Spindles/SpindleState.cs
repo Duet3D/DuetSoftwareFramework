@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Possible state of a spindle
     /// </summary>
-    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
+    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<SpindleState>))]
     public enum SpindleState
     {
         /// <summary>

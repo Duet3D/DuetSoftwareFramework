@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the configured directories
     /// </summary>
-    public sealed class Directories : ModelObject
+    public partial class Directories : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Path to the filaments directory

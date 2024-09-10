@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Information about the machine state
     /// </summary>
-    public sealed class State : ModelObject
+    public partial class State : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// State of the ATX power pin (if controlled)
@@ -75,7 +75,7 @@ namespace DuetAPI.ObjectModel
         /// List of general-purpose output ports
         /// </summary>
         /// <seealso cref="GpOutputPort"/>
-        public ModelCollection<GpOutputPort?> GpOut { get; } = [];
+        public StaticModelCollection<GpOutputPort?> GpOut { get; } = [];
 
         /// <summary>
         /// Laser PWM of the next commanded move (0..1) or null if not applicable
@@ -193,7 +193,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of restore points
         /// </summary>
-        public ModelCollection<RestorePoint> RestorePoints { get; } = [];
+        public StaticModelCollection<RestorePoint> RestorePoints { get; } = [];
 
         /// <summary>
         /// First error on start-up or null if there was none
@@ -219,12 +219,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Shorthand for inputs[state.thisInput].active
         /// </summary>
-        public bool ThisActive
+        public bool? ThisActive
         {
             get => _thisActive;
             set => SetPropertyValue(ref _thisActive, value);
         }
-        private bool _thisActive = true;
+        private bool? _thisActive;
 
         /// <summary>
         /// Index of the current G-code input channel (see <see cref="ObjectModel.Inputs"/>)

@@ -59,7 +59,11 @@ namespace DuetAPIClient
         /// <seealso cref="SbcPermissions.ManageUserSessions"/>
         public Task<int> AddUserSession(AccessLevel access, SessionType type, string? origin = null, CancellationToken cancellationToken = default)
         {
+#if NET6_0_OR_GREATER
+            origin ??= Environment.ProcessId.ToString();
+#else
             origin ??= Process.GetCurrentProcess().Id.ToString();
+#endif
             return PerformCommand<int>(new AddUserSession { AccessLevel = access, SessionType = type, Origin = origin }, cancellationToken);
         }
 
@@ -303,27 +307,9 @@ namespace DuetAPIClient
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-        [Obsolete("Deprecated in favor of PatchObjectModel")]
-        public async Task PatchMachineModel(string key, object patch, CancellationToken cancellationToken = default)
+        public async Task PatchObjectModel(string key, JsonElement patch, CancellationToken cancellationToken = default)
         {
-            using JsonDocument jsonDocument = JsonDocument.Parse(JsonSerializer.SerializeToUtf8Bytes(patch, JsonHelper.DefaultJsonOptions));
-            await PerformCommand(new PatchObjectModel() { Key = key, Patch = jsonDocument.RootElement }, cancellationToken);
-        }
-
-        /// <summary>
-        /// Apply a full patch to the object model. Use with care!
-        /// </summary>
-        /// <param name="key">Key to update</param>
-        /// <param name="patch">Patch to apply</param>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Asynchronous task</returns>
-        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
-        /// <exception cref="SocketException">Command could not be processed</exception>
-        /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-        public async Task PatchObjectModel(string key, object patch, CancellationToken cancellationToken = default)
-        {
-            using JsonDocument jsonDocument = JsonDocument.Parse(JsonSerializer.SerializeToUtf8Bytes(patch, JsonHelper.DefaultJsonOptions));
-            await PerformCommand(new PatchObjectModel() { Key = key, Patch = jsonDocument.RootElement }, cancellationToken);
+            await PerformCommand(new PatchObjectModel() { Key = key, Patch = patch }, cancellationToken);
         }
 
         /// <summary>
@@ -482,11 +468,9 @@ namespace DuetAPIClient
         /// <exception cref="UnauthorizedAccessException">Insufficient permissions to modify other plugin data</exception>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
         /// <seealso cref="SbcPermissions.ManagePlugins"/>
-        public Task SetPluginData(string key, object value, string? plugin = null, CancellationToken cancellationToken = default)
+        public Task SetPluginData(string key, JsonElement value, string? plugin = null, CancellationToken cancellationToken = default)
         {
-            byte[] jsonData = JsonSerializer.SerializeToUtf8Bytes(value);
-            using JsonDocument jsonDocument = JsonDocument.Parse(jsonData);
-            return PerformCommand(new SetPluginData { Plugin = plugin, Key = key, Value = jsonDocument.RootElement }, cancellationToken);
+            return PerformCommand(new SetPluginData { Plugin = plugin, Key = key, Value = value }, cancellationToken);
         }
 
         /// <summary>

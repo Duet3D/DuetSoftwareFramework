@@ -1,9 +1,11 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System.Collections.ObjectModel;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about centre rotation as defined by G68
     /// </summary>
-    public sealed class MoveRotation : ModelObject
+    public partial class MoveRotation : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Angle of the centre rotatation (in deg)
@@ -18,6 +20,6 @@
         /// <summary>
         /// XY coordinates of the centre rotation
         /// </summary>
-        public ModelCollection<float> Centre { get; } = [0F, 0F];
+        public ObservableCollection<float> Centre { get; } = [0F, 0F];
     }
 }

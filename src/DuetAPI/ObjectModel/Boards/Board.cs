@@ -5,7 +5,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Information about a connected board
     /// </summary>
-    public sealed class Board : ModelObject
+    public partial class Board : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Accelerometer of this board or null if unknown
@@ -60,12 +60,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Drivers of this board
         /// </summary>
-        public ModelCollection<Driver>? Drivers
+        public StaticModelCollection<Driver>? Drivers
         {
             get => _drivers;
             set => SetPropertyValue(ref _drivers, value);
         }
-        private ModelCollection<Driver>? _drivers;
+        private StaticModelCollection<Driver>? _drivers;
 
         /// <summary>
         /// Date of the firmware build
@@ -176,12 +176,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Minimum, maximum, and current temperatures of the MCU or null if unknown
         /// </summary>
-        public MinMaxCurrent<float>? McuTemp
+        public MinMaxCurrent? McuTemp
         {
             get => _mcuTemp;
             set => SetPropertyValue(ref _mcuTemp, value);
         }
-        private MinMaxCurrent<float>? _mcuTemp;
+        private MinMaxCurrent? _mcuTemp;
 
         /// <summary>
         /// Full name of the board
@@ -246,22 +246,22 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Minimum, maximum, and current voltages on the 12V rail or null if unknown
         /// </summary>
-        public MinMaxCurrent<float>? V12
+        public MinMaxCurrent? V12
         {
             get => _v12;
             set => SetPropertyValue(ref _v12, value);
         }
-        private MinMaxCurrent<float>? _v12;
+        private MinMaxCurrent? _v12;
 
         /// <summary>
         /// Minimum, maximum, and current voltages on the input rail or null if unknown
         /// </summary>
-        public MinMaxCurrent<float>? VIn
+        public MinMaxCurrent? VIn
         {
             get => _vIn;
             set => SetPropertyValue(ref _vIn, value);
         }
-        private MinMaxCurrent<float>? _vIn;
+        private MinMaxCurrent? _vIn;
 
         /// <summary>
         /// Filename of the on-board WiFi chip or null if not present

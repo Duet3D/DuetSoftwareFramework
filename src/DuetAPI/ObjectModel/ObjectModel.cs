@@ -1,16 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Representation of the Duet3D object model
     /// </summary>
-    [JsonConverter(typeof(ObjectModelConverter))]
-    public partial class ObjectModel : ModelObject
+    public partial class ObjectModel : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// List of connected boards
@@ -19,7 +15,7 @@ namespace DuetAPI.ObjectModel
         /// <remarks>
         /// The first item represents the main board
         /// </remarks>
-        public ModelCollection<Board> Boards { get; } = [];
+        public StaticModelCollection<Board> Boards { get; } = [];
 
         /// <summary>
         /// Information about the individual directories
@@ -33,7 +29,7 @@ namespace DuetAPI.ObjectModel
         /// List of configured fans
         /// </summary>
         /// <seealso cref="Fan"/>
-        public ModelCollection<Fan?> Fans { get; } = [];
+        public StaticModelCollection<Fan?> Fans { get; } = [];
 
         /// <summary>
         /// Dictionary of global variables vs JSON values
@@ -41,7 +37,7 @@ namespace DuetAPI.ObjectModel
         /// <remarks>
         /// When DSF attempts to reconnect to RRF, this may be set to null to clear the contents
         /// </remarks>
-        public ModelDictionary<JsonElement> Global { get; } = new ModelDictionary<JsonElement>(false);
+        public JsonModelDictionary Global { get; } = new JsonModelDictionary(false);
 
         /// <summary>
         /// Information about the heat subsystem
@@ -62,7 +58,7 @@ namespace DuetAPI.ObjectModel
         /// List of configured LED strips
         /// </summary>
         /// <seealso cref="LedStrip"/>
-        public ModelCollection<LedStrip> LedStrips { get; } = [];
+        public StaticModelCollection<LedStrip> LedStrips { get; } = [];
 
         /// <summary>
         /// Machine configuration limits
@@ -75,7 +71,7 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <seealso cref="Message"/>
         [SbcProperty(false)]
-        public ModelGrowingCollection<Message> Messages { get; } = [];
+        public MessageCollection Messages { get; } = [];
 
         /// <summary>
         /// Information about the move subsystem
@@ -95,7 +91,7 @@ namespace DuetAPI.ObjectModel
         /// Values in this dictionary cannot become null. If a value is changed to null, the corresponding item is deleted
         /// </remarks>
         [SbcProperty(false)]
-        public ModelDictionary<Plugin> Plugins { get; } = new ModelDictionary<Plugin>(true);
+        public StaticModelDictionary<Plugin> Plugins { get; } = new StaticModelDictionary<Plugin>(true);
 
         /// <summary>
         /// Information about the SBC which Duet Software Framework is running on.
@@ -118,7 +114,7 @@ namespace DuetAPI.ObjectModel
         /// List of configured CNC spindles
         /// </summary>
         /// <seealso cref="Spindle"/>
-        public ModelCollection<Spindle?> Spindles { get; } = [];
+        public StaticModelCollection<Spindle?> Spindles { get; } = [];
         
         /// <summary>
         /// Information about the machine state
@@ -129,14 +125,14 @@ namespace DuetAPI.ObjectModel
         /// List of configured tools
         /// </summary>
         /// <seealso cref="Tool"/>
-        public ModelCollection<Tool?> Tools { get; } = [];
+        public StaticModelCollection<Tool?> Tools { get; } = [];
 
         /// <summary>
         /// List of available mass storages
         /// </summary>
         /// <seealso cref="Volume"/>
         [SbcProperty(true)]
-        public ModelCollection<Volume> Volumes { get; } = [];
+        public StaticModelCollection<Volume> Volumes { get; } = [];
 
         /// <summary>
         /// Update a specific key of this instance from a given JSON element as provided by the firmware
@@ -146,14 +142,24 @@ namespace DuetAPI.ObjectModel
         /// <param name="offset">Index offset</param>
         /// <param name="last">Whether this is the last update</param>
         /// <returns>Whether the key could be updated</returns>
-        public bool UpdateFromFirmwareJson(string? key, JsonElement jsonElement, int offset = 0, bool last = true) => InternalUpdateFromJson(key, jsonElement, true, offset, last);
+        public bool UpdateFromFirmwareJson(string? key, JsonElement jsonElement, int offset = 0, bool last = true) => GeneratedUpdateFromJson(key, jsonElement, true, offset, last);
+
+        /// <summary>
+        /// Update a specific key of this instance from a given JSON reader as provided by the firmware
+        /// </summary>
+        /// <param name="key">Property name to update</param>
+        /// <param name="reader">JSON reader</param>
+        /// <param name="offset">Index offset</param>
+        /// <param name="last">Whether this is the last update</param>
+        /// <returns>Whether the key could be updated</returns>
+        public bool UpdateFromFirmwareJsonReader(string? key, ref Utf8JsonReader reader, int offset = 0, bool last = true) => GeneratedUpdateFromJsonReader(key, ref reader, true, offset, last);
 
         /// <summary>
         /// Update this instance from a given JSON element
         /// </summary>
         /// <param name="jsonElement">Element to update this intance from</param>
         /// <returns>Whether the key could be updated</returns>
-        public bool UpdateFromJson(JsonElement jsonElement) => InternalUpdateFromJson(null, jsonElement, false);
+        public bool UpdateFromJson(JsonElement jsonElement) => GeneratedUpdateFromJson(null, jsonElement, false);
 
         /// <summary>
         /// Update a specific key of this instance from a given JSON element
@@ -161,19 +167,27 @@ namespace DuetAPI.ObjectModel
         /// <param name="key">Property name to update</param>
         /// <param name="jsonElement">Element to update this intance from</param>
         /// <returns>Whether the key could be updated</returns>
-        public bool UpdateFromJson(string key, JsonElement jsonElement) => InternalUpdateFromJson(key, jsonElement, false);
+        public bool UpdateFromJson(string key, JsonElement jsonElement) => GeneratedUpdateFromJson(key, jsonElement, false);
+
+        /// <summary>
+        /// Update a specific key of this instance from a given JSON reader
+        /// </summary>
+        /// <param name="key">Property name to update</param>
+        /// <param name="reader">JSON reader</param>
+        /// <returns>Whether the key could be updated</returns>
+        public bool UpdateFromJsonReader(string key, ref Utf8JsonReader reader) => GeneratedUpdateFromJsonReader(key, ref reader, false);
 
         /// <summary>
         /// Convert this instance to a JSON text
         /// </summary>
         /// <returns>JSON object</returns>
-        public override string ToString() => JsonSerializer.Serialize(this, Utility.JsonHelper.DefaultJsonOptions);
+        public override string ToString() => JsonSerializer.Serialize(this, typeof(ObjectModel), ObjectModelContext.Default);
 
         /// <summary>
         /// Serialize this instance to a UTF-8 string
         /// </summary>
         /// <returns></returns>
-        public byte[] ToUtf8Json() => JsonSerializer.SerializeToUtf8Bytes(this, Utility.JsonHelper.DefaultJsonOptions);
+        public byte[] ToUtf8Json() => JsonSerializer.SerializeToUtf8Bytes(this, typeof(ObjectModel), ObjectModelContext.Default);
 
         /// <summary>
         /// Static event to be called when the deserialization of a property failed.
@@ -229,55 +243,5 @@ namespace DuetAPI.ObjectModel
         /// Exception that caused the deserialization to fail
         /// </summary>
         public Exception Exception { get; private set; } = e;
-    }
-
-    /// <summary>
-    /// Class used to convert model objects to and from JSON
-    /// </summary>
-    public class ObjectModelConverter : JsonConverter<ObjectModel>
-    {
-        /// <summary>
-        /// Read a machine model object from a JSON reader
-        /// </summary>
-        /// <param name="reader">JSON reader</param>
-        /// <param name="typeToConvert">Target type</param>
-        /// <param name="options">JSON options</param>
-        /// <returns>Machine model</returns>
-        public override ObjectModel? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            using JsonDocument jsonDocument = JsonDocument.ParseValue(ref reader);
-            if (jsonDocument.RootElement.ValueKind == JsonValueKind.Null)
-            {
-                return null;
-            }
-
-            ObjectModel machineModel = new();
-            machineModel.UpdateFromJson(jsonDocument.RootElement, false);
-            return machineModel;
-        }
-
-        /// <summary>
-        /// Write a machine model to a JSON writer
-        /// </summary>
-        /// <param name="writer">JSON writer</param>
-        /// <param name="value">Machine model</param>
-        /// <param name="options">JSON options</param>
-        public override void Write(Utf8JsonWriter writer, ObjectModel value, JsonSerializerOptions options)
-        {
-            if (value is null)
-            {
-                writer.WriteNullValue();
-            }
-            else
-            {
-                writer.WriteStartObject();
-                foreach (KeyValuePair<string, PropertyInfo> jsonProperty in value.JsonProperties)
-                {
-                    writer.WritePropertyName(jsonProperty.Key);
-                    JsonSerializer.Serialize(writer, jsonProperty.Value.GetValue(value), jsonProperty.Value.PropertyType, options);
-                }
-                writer.WriteEndObject();
-            }
-        }
     }
 }

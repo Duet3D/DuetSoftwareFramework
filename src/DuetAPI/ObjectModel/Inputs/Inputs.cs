@@ -11,7 +11,7 @@ namespace DuetAPI.ObjectModel
     /// <remarks>
     /// During runtime some elements may be replaced with null if they are not available
     /// </remarks>
-    public sealed class Inputs : ModelCollection<InputChannel?>
+    public partial class Inputs : StaticModelCollection<InputChannel?>
     {
         /// <summary>
         /// Enumeration of valid code channels

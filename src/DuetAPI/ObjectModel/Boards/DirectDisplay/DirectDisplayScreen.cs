@@ -1,12 +1,13 @@
-﻿using System;
-using System.Text.Json;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Standard direct-connect display screen
     /// </summary>
-    public class DirectDisplayScreen : ModelObject
+    [JsonDerivedType(typeof(DirectDisplayScreenST7567))]
+    public partial class DirectDisplayScreen : ModelObject, IDynamicModelObject
     {
         /// <summary>
         /// Number of colour bits
@@ -59,46 +60,76 @@ namespace DuetAPI.ObjectModel
         private int _width = 128;
 
         /// <summary>
-        /// Figure out the required type for the given direct display screen
-        /// </summary>
-        /// <param name="controller">Display controller type</param>
-        /// <returns>Required type</returns>
-        private static Type GetDirectDisplayScreenType(DirectDisplayController? controller)
-        {
-            return controller switch
-            {
-                DirectDisplayController.ST7920 => typeof(DirectDisplayScreen),
-                DirectDisplayController.ST7567 => typeof(DirectDisplayScreenST7567),
-                DirectDisplayController.ILI9488 => typeof(DirectDisplayScreen),
-                _ => typeof(DirectDisplayScreen)
-            };
-        }
-
-        /// <summary>
         /// Update this instance from a given JSON element
         /// </summary>
         /// <param name="jsonElement">Element to update this intance from</param>
         /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
         /// <returns>Updated instance</returns>
         /// <exception cref="JsonException">Failed to deserialize data</exception>
-        public override IModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public IDynamicModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {
                 return null;
             }
 
-            if (jsonElement.TryGetProperty("type", out JsonElement nameProperty))
+            if (jsonElement.TryGetProperty("type", out JsonElement typeProperty))
             {
-                DirectDisplayController? directDisplayController = (DirectDisplayController?)JsonSerializer.Deserialize(nameProperty.GetRawText()!, typeof(DirectDisplayController));
-                Type requiredType = GetDirectDisplayScreenType(directDisplayController);
-                if (GetType() != requiredType)
+                if (typeProperty.GetString() == "ST7567")
                 {
-                    DirectDisplayScreen newInstance = (DirectDisplayScreen)Activator.CreateInstance(requiredType)!;
+                    if (this is not DirectDisplayScreenST7567)
+                    {
+                        DirectDisplayScreenST7567 newInstance = new();
+                        return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
+                    }
+                }
+                else if (this is DirectDisplayScreenST7567)
+                {
+                    DirectDisplayScreen newInstance = new();
                     return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
                 }
             }
-            return base.UpdateFromJson(jsonElement, ignoreSbcProperties);
+            return GeneratedUpdateFromJson(jsonElement, ignoreSbcProperties);
+        }
+
+        /// <summary>
+        /// Update this instance from a given JSON reader
+        /// </summary>
+        /// <param name="reader">JSON reader</param>
+        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+        /// <returns>Updated instance</returns>
+        /// <exception cref="JsonException">Failed to deserialize data</exception>
+
+        public IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+        {
+            Utf8JsonReader readerCopy = reader;
+            while (readerCopy.Read() && readerCopy.TokenType != JsonTokenType.EndObject)
+            {
+                if (readerCopy.TokenType == JsonTokenType.PropertyName)
+                {
+                    if (readerCopy.ValueTextEquals("type"u8) && readerCopy.Read())
+                    {
+                        if (readerCopy.GetString() == "ST7567")
+                        {
+                            if (this is not DirectDisplayScreenST7567)
+                            {
+                                DirectDisplayScreenST7567 newInstance = new();
+                                return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            }
+                        }
+                        else if (this is DirectDisplayScreenST7567)
+                        {
+                            DirectDisplayScreen newInstance = new();
+                            return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                        }
+                    }
+                    else
+                    {
+                        readerCopy.Skip();
+                    }
+                }
+            }
+            return GeneratedUpdateFromJsonReader(ref reader, ignoreSbcProperties);
         }
     }
 }

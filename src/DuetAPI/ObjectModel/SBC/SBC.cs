@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Information about the SBC in SBC mode
     /// </summary>
-    public class SBC : ModelObject
+    public partial class SBC : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Indicates if AppArmor support is enabled

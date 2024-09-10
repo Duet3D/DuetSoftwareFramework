@@ -7,7 +7,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Interface for model dictionaries
     /// </summary>
-    public interface IModelDictionary : IModelObject, IDictionary, INotifyPropertyChanged, INotifyPropertyChanging
+    public interface IModelDictionary : IStaticModelObject, IDictionary, INotifyPropertyChanged, INotifyPropertyChanging
     {
         /// <summary>
         /// Event that is called when the entire directory is cleared

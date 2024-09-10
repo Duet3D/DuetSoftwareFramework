@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Result codes returned by temperature sensor drivers
     /// </summary>
-    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter))]
+    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<TemperatureError>))]
     public enum TemperatureError
     {
         /// <summary>

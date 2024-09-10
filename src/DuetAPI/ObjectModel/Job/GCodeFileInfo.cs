@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Text.Json;
+using System.Collections.ObjectModel;
 using System.Text.Json.Serialization;
 
 namespace DuetAPI.ObjectModel
@@ -9,13 +7,12 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Holds information about a G-code file
     /// </summary>
-    [JsonConverter(typeof(GCodeFileInfoConverter))]
-    public sealed class GCodeFileInfo : ModelObject
+    public partial class GCodeFileInfo : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Filament consumption per extruder drive (in mm)
         /// </summary>
-        public ModelCollection<float> Filament { get; } = [];
+        public ObservableCollection<float> Filament { get; } = [];
 
         /// <summary>
         /// The filename of the G-code file
@@ -112,56 +109,6 @@ namespace DuetAPI.ObjectModel
         /// Collection of thumbnails parsed from Gcode
         /// </summary>
         [SbcProperty(true)]
-        public ModelCollection<ThumbnailInfo> Thumbnails { get; } = [];
-    }
-
-    /// <summary>
-    /// Class used to convert G-code file info to and from JSON
-    /// </summary>
-    public class GCodeFileInfoConverter : JsonConverter<GCodeFileInfo>
-    {
-        /// <summary>
-        /// Read a parsed file info object from a JSON reader
-        /// </summary>
-        /// <param name="reader">JSON reader</param>
-        /// <param name="typeToConvert">Target type</param>
-        /// <param name="options">JSON options</param>
-        /// <returns>Parsed file info object</returns>
-        public override GCodeFileInfo? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            using JsonDocument jsonDocument = JsonDocument.ParseValue(ref reader);
-            if (jsonDocument.RootElement.ValueKind == JsonValueKind.Null)
-            {
-                return null;
-            }
-
-            GCodeFileInfo parsedFileInfo = new();
-            parsedFileInfo.UpdateFromJson(jsonDocument.RootElement, false);
-            return parsedFileInfo;
-        }
-
-        /// <summary>
-        /// Write a parsed file info object to a JSON writer
-        /// </summary>
-        /// <param name="writer">JSON writer</param>
-        /// <param name="value">Machine model</param>
-        /// <param name="options">JSON options</param>
-        public override void Write(Utf8JsonWriter writer, GCodeFileInfo value, JsonSerializerOptions options)
-        {
-            if (value is null)
-            {
-                writer.WriteNullValue();
-            }
-            else
-            {
-                writer.WriteStartObject();
-                foreach (KeyValuePair<string, PropertyInfo> jsonProperty in value.JsonProperties)
-                {
-                    writer.WritePropertyName(jsonProperty.Key);
-                    JsonSerializer.Serialize(writer, jsonProperty.Value.GetValue(value), jsonProperty.Value.PropertyType, options);
-                }
-                writer.WriteEndObject();
-            }
-        }
+        public StaticModelCollection<ThumbnailInfo> Thumbnails { get; } = [];
     }
 }

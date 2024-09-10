@@ -1,14 +1,16 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System.Collections.ObjectModel;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about hangprinter kinematics
     /// </summary>
-    public sealed class HangprinterKinematics : Kinematics
+    public partial class HangprinterKinematics : Kinematics
     {
 		/// <summary>
 		/// Anchor configurations for A, B, C, Dz
 		/// </summary>
-		public ModelCollection<float[]> Anchors { get; } = [
+		public ObservableCollection<float[]> Anchors { get; } = [
 			[0F, -2000F, -100F],
 			[2000F,  1000F, -100F],
 			[-2000F,  1000F, -100F],

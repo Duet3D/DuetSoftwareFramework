@@ -169,12 +169,7 @@ namespace DuetAPIClient
         {
             await Send(command, cancellationToken);
             
-            BaseResponse? response = await ReceiveResponse<T>(cancellationToken);
-            if (response is null)
-            {
-                throw new InvalidCastException("Cannot convert null to expected response type");
-            }
-
+            BaseResponse? response = await ReceiveResponse<T>(cancellationToken) ?? throw new InvalidCastException("Cannot convert null to expected response type");
             if (response.Success)
             {
                 return ((Response<T>)response).Result;
@@ -218,12 +213,12 @@ namespace DuetAPIClient
                     property.Value.ValueKind == JsonValueKind.True)
                 {
                     // Response OK
-                    return jsonDocument.ToObject<BaseResponse>(JsonHelper.DefaultJsonOptions)!;
+                    return JsonSerializer.Deserialize<BaseResponse>(jsonDocument, JsonHelper.DefaultJsonOptions)!;
                 }
             }
 
             // Error
-            return jsonDocument.ToObject<ErrorResponse>(JsonHelper.DefaultJsonOptions)!;
+            return JsonSerializer.Deserialize<ErrorResponse>(jsonDocument, JsonHelper.DefaultJsonOptions)!;
         }
 
         /// <summary>
@@ -243,12 +238,12 @@ namespace DuetAPIClient
                     property.Value.ValueKind == JsonValueKind.True)
                 {
                     // Response OK
-                    return jsonDocument.ToObject<Response<T>>(JsonHelper.DefaultJsonOptions);
+                    return JsonSerializer.Deserialize<Response<T>>(jsonDocument, JsonHelper.DefaultJsonOptions);
                 }
             }
 
             // Error
-            return jsonDocument.ToObject<ErrorResponse>(JsonHelper.DefaultJsonOptions);
+            return JsonSerializer.Deserialize<ErrorResponse>(jsonDocument, JsonHelper.DefaultJsonOptions);
         }
 
         /// <summary>

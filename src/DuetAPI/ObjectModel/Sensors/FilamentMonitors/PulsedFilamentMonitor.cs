@@ -3,7 +3,7 @@
     /// <summary>
     /// Calibrated properties of a pulsed filament monitor
     /// </summary>
-    public sealed class PulsedFilamentMonitorCalibrated : ModelObject
+    public partial class PulsedFilamentMonitorCalibrated : ModelObject, IStaticModelObject
 	{
 		/// <summary>
 		/// Extruded distance per pulse (in mm)
@@ -49,7 +49,7 @@
 	/// <summary>
 	/// Configured properties of a pulsed filament monitor
 	/// </summary>
-	public class PulsedFilamentMonitorConfigured : ModelObject
+	public partial class PulsedFilamentMonitorConfigured : ModelObject, IStaticModelObject
 	{
 		/// <summary>
 		/// Extruded distance per pulse (in mm)
@@ -95,7 +95,7 @@
 	/// <summary>
 	/// Information about a pulsed filament monitor
 	/// </summary>
-    public class PulsedFilamentMonitor : FilamentMonitor
+    public partial class PulsedFilamentMonitor : FilamentMonitor
     {
 		/// <summary>
 		/// Constructor of this class

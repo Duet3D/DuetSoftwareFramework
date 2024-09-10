@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// States of a tool
     /// </summary>
-    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
+    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<ToolState>))]
     public enum ToolState
     {
         /// <summary>

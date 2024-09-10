@@ -18,9 +18,9 @@
         Collection,
 
         /// <summary>
-        /// Growing collection has changed
+        /// Message collection has changed
         /// </summary>
         /// <remarks>If value is null, the list has been cleared, else only the added items are passed</remarks>
-        GrowingCollection
+        MessageCollection
     }
 }

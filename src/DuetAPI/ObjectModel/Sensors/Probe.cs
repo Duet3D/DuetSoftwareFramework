@@ -1,11 +1,12 @@
 ﻿using System;
+using System.Collections.ObjectModel;
 
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about a configured probe
     /// </summary>
-    public sealed class Probe : ModelObject
+    public partial class Probe : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Linear coefficient for scanning probes
@@ -72,7 +73,7 @@ namespace DuetAPI.ObjectModel
         /// Dive heights of the probe.
         /// The first element is the regular dive height, the second element may be used by scanning Z-probes
         /// </summary>
-        public ModelCollection<float> DiveHeights { get; } = [0F, 0F];
+        public ObservableCollection<float> DiveHeights { get; } = [0F, 0F];
 
         /// <summary>
         /// Indicates if the scanning probe is calibrated
@@ -117,7 +118,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// X+Y offsets (in mm)
         /// </summary>
-        public ModelCollection<float> Offsets { get; } = [0F, 0F];
+        public ObservableCollection<float> Offsets { get; } = [0F, 0F];
 
         /// <summary>
         /// Recovery time (in s)
@@ -132,23 +133,23 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Coefficients for the scanning Z-probe (4 elements, if applicable)
         /// </summary>
-        public ModelCollection<float>? ScanCoefficients
+        public ObservableCollection<float>? ScanCoefficients
         {
             get => _scanCoefficients;
             set => SetPropertyValue(ref _scanCoefficients, value);
         }
-        private ModelCollection<float>? _scanCoefficients;
+        private ObservableCollection<float>? _scanCoefficients;
 
         /// <summary>
         /// Fast and slow probing speeds (in mm/s).
         /// Scanning probes may have three speeds where the last one is the movement speed while probing heightmaps
         /// </summary>
-        public ModelCollection<float> Speeds { get; } = [2F, 2F];
+        public ObservableCollection<float> Speeds { get; } = [2F, 2F];
 
         /// <summary>
         /// List of temperature coefficients
         /// </summary>
-        public ModelCollection<float> TemperatureCoefficients { get; } = [0F, 0F];
+        public ObservableCollection<float> TemperatureCoefficients { get; } = [0F, 0F];
 
         /// <summary>
         /// Configured trigger threshold (0..1023)
@@ -204,6 +205,6 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Current analog values of the probe
         /// </summary>
-        public ModelCollection<int> Value { get; } = [];
+        public ObservableCollection<int> Value { get; } = [];
     }
 }

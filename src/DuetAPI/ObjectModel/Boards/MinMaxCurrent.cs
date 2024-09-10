@@ -1,49 +1,38 @@
-﻿using System.Diagnostics.CodeAnalysis;
-
-namespace DuetAPI.ObjectModel
+﻿namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Provides minimum, maximum and current values
     /// </summary>
-    /// <typeparam name="T">ValueType of each property</typeparam>
-    public sealed class MinMaxCurrent<T> : ModelObject where T : notnull
+    public partial class MinMaxCurrent : ModelObject, IStaticModelObject
     {
-        /// <summary>
-        /// Static constructor, required for derived ModelObject types with generic arguments
-        /// </summary>
-        static MinMaxCurrent()
-        {
-            RegisterJsonType(typeof(MinMaxCurrent<T>));
-        }
-
         /// <summary>
         /// Current value
         /// </summary>
-        public T Current
+        public float Current
         {
             get => _current;
 			set => SetPropertyValue(ref _current, value);
         }
-        [AllowNull] private T _current;
+        private float _current;
 
         /// <summary>
         /// Minimum value
         /// </summary>
-        public T Min
+        public float Min
         {
             get => _min;
 			set => SetPropertyValue(ref _min, value);
         }
-        [AllowNull] private T _min;
+        private float _min;
 
         /// <summary>
         /// Maximum value
         /// </summary>
-        public T Max
+        public float Max
         {
             get => _max;
 			set => SetPropertyValue(ref _max, value);
         }
-        [AllowNull] private T _max;
+        private float _max;
     }
 }

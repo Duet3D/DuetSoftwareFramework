@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the current move
     /// </summary>
-    public sealed class CurrentMove : ModelObject
+    public partial class CurrentMove : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Acceleration of the current move (in mm/s^2)

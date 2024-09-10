@@ -3,14 +3,14 @@
     /// <summary>
     /// Information about the move subsystem
     /// </summary>
-    public sealed class Move : ModelObject
+    public partial class Move : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// List of the configured axes
         /// </summary>
         /// <seealso cref="Axis"/>
         [LimitedResponseCount(9)]
-        public ModelCollection<Axis> Axes { get; } = [];
+        public StaticModelCollection<Axis> Axes { get; } = [];
 
         /// <summary>
         /// Backlash distance multiplier
@@ -41,7 +41,7 @@
         /// List of configured extruders
         /// </summary>
         /// <seealso cref="Extruder"/>
-        public ModelCollection<Extruder> Extruders { get; } = [];
+        public StaticModelCollection<Extruder> Extruders { get; } = [];
         
         /// <summary>
         /// Idle current reduction parameters
@@ -51,7 +51,7 @@
         /// <summary>
         /// List of configured keep-out zones
         /// </summary>
-        public ModelCollection<KeepoutZone> Keepout { get; } = [];
+        public StaticModelCollection<KeepoutZone> Keepout { get; } = [];
 
         /// <summary>
         /// Configured kinematics options
@@ -96,7 +96,7 @@
         /// <summary>
         /// List of move queue items (DDA rings)
         /// </summary>
-        public ModelCollection<MoveQueueItem> Queue { get; } = [];
+        public StaticModelCollection<MoveQueueItem> Queue { get; } = [];
 
         /// <summary>
         /// Parameters for centre rotation

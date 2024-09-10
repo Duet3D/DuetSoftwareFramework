@@ -1,9 +1,11 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System.Collections.ObjectModel;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about a layer from a file being printed
     /// </summary>
-    public sealed class Layer : ModelObject
+    public partial class Layer : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Duration of the layer (in s)
@@ -18,7 +20,7 @@
         /// <summary>
         /// Actual amount of filament extruded during this layer (in mm)
         /// </summary>
-        public ModelCollection<float> Filament { get; } = [];
+        public ObservableCollection<float> Filament { get; } = [];
 
         /// <summary>
         /// Fraction of the file printed during this layer (0..1)
@@ -44,6 +46,6 @@
         /// Last heater temperatures (in C or null if unknown)
         /// </summary>
         /// <seealso cref="AnalogSensor.LastReading"/>
-        public ModelCollection<float?> Temperatures { get; } = [];
+        public ObservableCollection<float?> Temperatures { get; } = [];
     }
 }

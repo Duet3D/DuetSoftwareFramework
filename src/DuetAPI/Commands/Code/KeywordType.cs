@@ -1,8 +1,11 @@
-﻿namespace DuetAPI.Commands
+﻿using System.Text.Json.Serialization;
+
+namespace DuetAPI.Commands
 {
     /// <summary>
     /// Enumeration of conditional G-code keywords
     /// </summary>
+    [JsonConverter(typeof(JsonNumberEnumConverter<KeywordType>))]
     public enum KeywordType : byte
     {
         /// <summary>

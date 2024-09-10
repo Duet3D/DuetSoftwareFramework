@@ -1,11 +1,12 @@
-﻿using System.Text.Json.Serialization;
+﻿using DuetAPI.Utility;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Types of user sessions
     /// </summary>
-    [JsonConverter(typeof(Utility.JsonCamelCaseStringEnumConverter))]
+    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<SessionType>))]
     public enum SessionType
     {
         /// <summary>

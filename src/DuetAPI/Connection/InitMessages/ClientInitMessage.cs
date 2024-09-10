@@ -1,9 +1,16 @@
+using System.Text.Json.Serialization;
+
 namespace DuetAPI.Connection.InitMessages
 {
     /// <summary>
     /// An instance of this class is sent from the client to the server as a response to the <see cref="ServerInitMessage"/>.
     /// It allows a client to select the connection mode (<see cref="ConnectionMode"/>).
     /// </summary>
+    [JsonDerivedType(typeof(CodeStreamInitMessage))]
+    [JsonDerivedType(typeof(CommandInitMessage))]
+    [JsonDerivedType(typeof(InterceptInitMessage))]
+    [JsonDerivedType(typeof(PluginServiceInitMessage))]
+    [JsonDerivedType(typeof(SubscribeInitMessage))]
     public class ClientInitMessage
     {
         /// <summary>

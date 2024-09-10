@@ -5,7 +5,7 @@
     /// </summary>
     /// <seealso cref="Commands.AddHttpEndpoint"/>
     /// <seealso cref="Commands.RemoveHttpEndpoint"/>
-    public sealed class HttpEndpoint : ModelObject
+    public partial class HttpEndpoint : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Namespace prefix used for RepRapFirmware HTTP requests

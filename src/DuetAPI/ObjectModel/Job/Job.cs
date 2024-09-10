@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the current job
     /// </summary>
-    public sealed class Job : ModelObject
+    public partial class Job : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Information about the current build or null if not available
@@ -118,13 +118,13 @@
         /// Information about the past layers
         /// </summary>
         /// <remarks>
-        /// In previous API versions this was a <see cref="ModelGrowingCollection{T}"/> but it has been changed to <see cref="ModelCollection{T}"/> to
+        /// In previous API versions this was a <see cref="MessageCollection"/> but it has been changed to <see cref="StaticModelCollection{T}"/> to
         /// allow past layers to be modified again when needed. Note that previous plugins subscribing to this property will not receive any more
         /// updates about this property to avoid memory leaks
         /// </remarks>
         /// <seealso cref="Layer"/>
         [SbcProperty(false)]
-        public ModelCollection<Layer> Layers { get; } = [];
+        public StaticModelCollection<Layer> Layers { get; } = [];
 
         /// <summary>
         /// Time elapsed since the last layer change (in s or null)

@@ -3,7 +3,7 @@
     /// <summary>
     /// Delta tower properties
     /// </summary>
-    public sealed class DeltaTower : ModelObject
+    public partial class DeltaTower : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Tower position corrections (in degrees)

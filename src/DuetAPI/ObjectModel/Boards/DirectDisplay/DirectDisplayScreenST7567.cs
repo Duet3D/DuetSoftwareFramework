@@ -3,7 +3,7 @@
     /// <summary>
     /// Direct-connected display screen with a ST7567 controller
     /// </summary>
-    public sealed class DirectDisplayScreenST7567 : DirectDisplayScreen
+    public partial class DirectDisplayScreenST7567 : DirectDisplayScreen
     {
         /// <summary>
         /// Configured contrast

@@ -27,6 +27,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Documentation", "Documentat
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{D9770827-53C5-4FBA-B4F1-2950C7C411DA}"
 	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
 		Directory.Build.props = Directory.Build.props
 		..\README.md = ..\README.md
 	EndProjectSection
@@ -43,7 +44,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DocGen", "DocGen\DocGen.csp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetHttpClient", "DuetHttpClient\DuetHttpClient.csproj", "{B0EC5384-D88E-44AA-8CB1-79BB92369699}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SourceGenerators", "SourceGenerators\SourceGenerators.csproj", "{3F5FBCF1-D22D-4DBD-877C-F5A4BA7890AB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetAPI.SourceGenerators", "DuetAPI.SourceGenerators\DuetAPI.SourceGenerators.csproj", "{3F5FBCF1-D22D-4DBD-877C-F5A4BA7890AB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

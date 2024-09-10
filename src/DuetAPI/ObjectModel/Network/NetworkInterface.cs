@@ -1,15 +1,17 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System.Collections.ObjectModel;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about a network interface
     /// </summary>
-    public sealed class NetworkInterface : ModelObject
+    public partial class NetworkInterface : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// List of active protocols
         /// </summary>
         [SbcProperty(false)]
-        public ModelCollection<NetworkProtocol> ActiveProtocols { get; } = [];
+        public ObservableCollection<NetworkProtocol> ActiveProtocols { get; } = [];
 
         /// <summary>
         /// Actual IPv4 address of the network adapter or null if unknown

@@ -8,7 +8,7 @@ namespace DuetAPI.Utility
     /// Class representing a driver identifier
     /// </summary>
     [JsonConverter(typeof(DriverIdJsonConverter))]
-    public sealed class DriverId
+    public sealed class DriverId : ICloneable
     {
         /// <summary>
         /// Default constructor of this class
@@ -123,6 +123,20 @@ namespace DuetAPI.Utility
         /// <param name="obj">Other instance</param>
         /// <returns>Whether this and the other instance are equal</returns>
         public override bool Equals(object? obj) => obj is DriverId other && Board == other.Board && Port == other.Port;
+
+        /// <summary>
+        /// Create a clome of this instance
+        /// </summary>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        public object Clone()
+        {
+            return new DriverId()
+            {
+                Board = Board,
+                Port = Port
+            };
+        }
     }
 
     /// <summary>

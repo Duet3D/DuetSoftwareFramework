@@ -343,12 +343,12 @@ namespace DuetPiManagementPlugin
                         if (psk is null)
                         {
                             // Delete WiFi profile
-                            result.AppendLine(await Command.Execute("nmcli", $"-c no -t connection delete {kv.Key}"));
+                            result.AppendLine(await Command.Execute("nmcli", $"-c no -t connection delete \"{kv.Key}\""));
                         }
                         else
                         {
                             // Update PSK
-                            result.AppendLine(await Command.Execute("nmcli", $"-c no -t connection modify {kv.Key} 802-11-wireless-security.psk \"{psk}\""));
+                            result.AppendLine(await Command.Execute("nmcli", $"-c no -t connection modify \"{kv.Key}\" 802-11-wireless-security.psk \"{psk}\""));
                         }
 
                         profileUpdated = true;
@@ -361,11 +361,11 @@ namespace DuetPiManagementPlugin
                 {
                     if (string.IsNullOrWhiteSpace(psk))
                     {
-                        result.AppendLine(await Command.Execute("nmcli", $"-c no -t connection device wifi connect {ssid}"));
+                        result.AppendLine(await Command.Execute("nmcli", $"-c no -t connection device wifi connect \"{ssid}\""));
                     }
                     else
                     {
-                        result.AppendLine(await Command.Execute("nmcli", $"-c no -t device wifi connect {ssid} password \"{psk}\""));
+                        result.AppendLine(await Command.Execute("nmcli", $"-c no -t device wifi connect \"{ssid}\" password \"{psk}\""));
                     }
                 }
             }

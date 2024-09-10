@@ -21,10 +21,10 @@ namespace UnitTests.Machine
         public void ObserveProperty()
         {
             int numEvents = 0;
-            object[]? recordedPath = null;
+            object[] recordedPath = null;
             PropertyChangeType recordedChangeType = PropertyChangeType.Property;
-            object? recordedValue = null;
-            void onPropertyChanged(object[] path, PropertyChangeType changeType, object? value)
+            object recordedValue = null;
+            void onPropertyChanged(object[] path, PropertyChangeType changeType, object value)
             {
                 numEvents++;
                 recordedChangeType = changeType;
@@ -133,10 +133,10 @@ namespace UnitTests.Machine
         public void ObserveModelProperty()
         {
             int numEvents = 0;
-            object[]? recordedPath = null;
+            object[] recordedPath = null;
             PropertyChangeType recordedChangeType = PropertyChangeType.Property;
-            object? recordedValue = null;
-            void onPropertyChanged(object[] path, PropertyChangeType changeType, object? value)
+            object recordedValue = null;
+            void onPropertyChanged(object[] path, PropertyChangeType changeType, object value)
             {
                 numEvents++;
                 recordedChangeType = changeType;
@@ -164,10 +164,10 @@ namespace UnitTests.Machine
         public void ObserveModelDictionary()
         {
             int numEvents = 0;
-            object[]? recordedPath = null;
+            object[] recordedPath = null;
             PropertyChangeType recordedChangeType = PropertyChangeType.Property;
-            object? recordedValue = null;
-            void onPropertyChanged(object[] path, PropertyChangeType changeType, object? value)
+            object recordedValue = null;
+            void onPropertyChanged(object[] path, PropertyChangeType changeType, object value)
             {
                 numEvents++;
                 recordedChangeType = changeType;
@@ -222,10 +222,10 @@ namespace UnitTests.Machine
         public void ObserveModelObjectDictionary()
         {
             int numEvents = 0;
-            object[]? recordedPath = null;
+            object[] recordedPath = null;
             PropertyChangeType recordedChangeType = PropertyChangeType.Property;
-            object? recordedValue = null;
-            void onPropertyChanged(object[] path, PropertyChangeType changeType, object? value)
+            object recordedValue = null;
+            void onPropertyChanged(object[] path, PropertyChangeType changeType, object value)
             {
                 numEvents++;
                 recordedChangeType = changeType;
@@ -271,9 +271,9 @@ namespace UnitTests.Machine
         {
             int numEvents = 0;
             PropertyChangeType recordedChangeType = PropertyChangeType.Property;
-            object[]? recordedPath = null;
-            object? recordedValue = null;
-            void onPropertyChanged(object[] path, PropertyChangeType changeType, object? value)
+            object[] recordedPath = null;
+            object recordedValue = null;
+            void onPropertyChanged(object[] path, PropertyChangeType changeType, object value)
             {
                 numEvents++;
                 recordedChangeType = changeType;
@@ -407,13 +407,13 @@ namespace UnitTests.Machine
         }
 
         [Test]
-        public void ObserveModelGrowingCollectiion()
+        public void ObserveMessageCollectiion()
         {
             int numEvents = 0;
-            object[]? recordedPath = null;
+            object[] recordedPath = null;
             PropertyChangeType recordedChangeType = PropertyChangeType.Property;
-            object? recordedValue = null;
-            void onPropertyChanged(object[] path, PropertyChangeType changeType, object? value)
+            object recordedValue = null;
+            void onPropertyChanged(object[] path, PropertyChangeType changeType, object value)
             {
                 numEvents++;
                 recordedChangeType = changeType;
@@ -431,7 +431,7 @@ namespace UnitTests.Machine
 
             ClassicAssert.AreEqual(1, numEvents);
             ClassicAssert.AreEqual(new object[] { "messages" }, recordedPath);
-            ClassicAssert.AreEqual(PropertyChangeType.GrowingCollection, recordedChangeType);
+            ClassicAssert.AreEqual(PropertyChangeType.MessageCollection, recordedChangeType);
             if (recordedValue is IList list)
             {
                 ClassicAssert.AreSame(msg, list[0]);
@@ -452,7 +452,7 @@ namespace UnitTests.Machine
             Provider.Get.Messages.Clear();
 
             ClassicAssert.AreEqual(1, numEvents);
-            ClassicAssert.AreEqual(PropertyChangeType.GrowingCollection, recordedChangeType);
+            ClassicAssert.AreEqual(PropertyChangeType.MessageCollection, recordedChangeType);
             ClassicAssert.AreEqual(new object[] { "messages" }, recordedPath);
             ClassicAssert.AreEqual(null, recordedValue);
 

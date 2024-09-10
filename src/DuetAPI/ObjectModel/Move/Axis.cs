@@ -1,11 +1,12 @@
 ﻿using DuetAPI.Utility;
+using System.Collections.ObjectModel;
 
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about a configured axis
     /// </summary>
-    public sealed class Axis : ModelObject
+    public partial class Axis : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// List of supported axis letters
@@ -60,7 +61,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of the assigned drivers
         /// </summary>
-        public ModelCollection<DriverId> Drivers { get; } = [];
+        public ObservableCollection<DriverId> Drivers { get; } = [];
 
         /// <summary>
         /// Whether or not the axis is homed
@@ -226,6 +227,6 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Offsets of this axis for each workplace (in mm)
         /// </summary>
-        public ModelCollection<float> WorkplaceOffsets { get; } = [];
+        public ObservableCollection<float> WorkplaceOffsets { get; } = [];
     }
 }

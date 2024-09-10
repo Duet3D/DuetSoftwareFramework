@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about an endstop
     /// </summary>
-    public sealed class Endstop : ModelObject
+    public partial class Endstop : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Whether this endstop is at the high end of the axis

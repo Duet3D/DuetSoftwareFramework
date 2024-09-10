@@ -128,6 +128,127 @@ namespace DuetControlServer.Model
             }
         }
 
+        private static byte[] _jsonData = [];
+
+        private static string _requestedKey = string.Empty;
+
+        private static bool _keyUpdated = false;
+
+        private static List<string> _updatedKeys = [];
+
+        private static async Task RequestModel(string key, string flags)
+        {
+            _requestedKey = key;
+            _jsonData = await SPI.Interface.RequestObjectModel(key, flags);
+        }
+
+        private static int UpdateModel(int offset = 0, bool last = true)
+        {
+            int next = 0;
+
+            Utf8JsonReader reader = new(_jsonData);
+            while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+            {
+                if (reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    if (reader.ValueTextEquals("result"u8) && reader.Read())
+                    {
+                        if (_requestedKey is "" or "seqs")
+                        {
+                            _updatedKeys.Clear();
+
+                            // Update sequence numbers if applicable
+                            Utf8JsonReader readerCopy = reader;
+                            if (_requestedKey != "seqs")
+                            {
+                                // Jump to start of seqs key. This isn't necessary if "seqs" was explicitly requested
+                                while (readerCopy.Read() && readerCopy.TokenType != JsonTokenType.EndObject)
+                                {
+                                    if (readerCopy.TokenType == JsonTokenType.PropertyName)
+                                    {
+                                        string propertyName = readerCopy.GetString()!;
+                                        if (propertyName == "seqs")
+                                        {
+                                            readerCopy.Read();
+                                            break;
+                                        }
+                                        else
+                                        {
+                                            readerCopy.Skip();
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Process numeric sequence numbers
+                            while (readerCopy.Read() && readerCopy.TokenType != JsonTokenType.EndObject)
+                            {
+                                if (readerCopy.TokenType == JsonTokenType.PropertyName)
+                                {
+                                    string seqKey = readerCopy.GetString()!;
+                                    if (readerCopy.Read() && readerCopy.TokenType == JsonTokenType.Number)
+                                    {
+                                        int seq = readerCopy.GetInt32();
+                                        if (!_lastSeqs.TryGetValue(seqKey, out int lastSeq) || lastSeq != seq)
+                                        {
+                                            _updatedKeys.Add(seqKey);
+                                            _lastSeqs[seqKey] = seq;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        readerCopy.Skip();
+                                    }
+                                }
+                            }
+                        }
+                        else if (_requestedKey == "move")
+                        {
+                            // Check if move.axes needs an extra query
+                            Utf8JsonReader readerCopy = reader;
+                            while (readerCopy.Read() && readerCopy.TokenType != JsonTokenType.EndObject)
+                            {
+                                if (readerCopy.TokenType == JsonTokenType.PropertyName)
+                                {
+                                    string propertyName = readerCopy.GetString()!;
+                                    if (propertyName == "axes")
+                                    {
+                                        int axisCount = 0;
+                                        while (readerCopy.Read() && readerCopy.TokenType != JsonTokenType.EndArray)
+                                        {
+                                            if (readerCopy.TokenType == JsonTokenType.StartObject)
+                                            {
+                                                axisCount++;
+                                            }
+                                        }
+
+                                        if (axisCount >= 9)
+                                        {
+                                            _updatedKeys.Add("move.axes");
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Update object model
+                        _keyUpdated = Provider.Get.UpdateFromFirmwareJsonReader(_requestedKey, ref reader, offset, last);
+                    }
+                    else if (reader.ValueTextEquals("next") && reader.Read())
+                    {
+                        next = reader.GetInt32();
+                    }
+                    else
+                    {
+                        reader.Skip();
+                    }
+                }
+            }
+
+            return next;
+        }
+
         /// <summary>
         /// Process status updates in the background
         /// </summary>
@@ -140,7 +261,6 @@ namespace DuetControlServer.Model
                 await Task.Delay(-1, Program.CancellationToken);
             }
 
-            byte[] jsonData = [];
             do
             {
                 try
@@ -154,138 +274,80 @@ namespace DuetControlServer.Model
                     {
                         if (_lastSeqs.IsEmpty)
                         {
-                            jsonData = await SPI.Interface.RequestObjectModel("limits", "d99vno");
-                            using JsonDocument limitsDocument = JsonDocument.Parse(jsonData);
-                            if (limitsDocument.RootElement.TryGetProperty("key", out JsonElement limitsKey) && limitsKey.GetString()!.Equals("limits", StringComparison.InvariantCultureIgnoreCase) &&
-                                limitsDocument.RootElement.TryGetProperty("result", out JsonElement limitsResult))
+                            await RequestModel("limits", "d99vno");
+                            using (await Provider.AccessReadWriteAsync())
                             {
-                                using (await Provider.AccessReadWriteAsync())
+                                UpdateModel();
+                                if (_keyUpdated)
                                 {
-                                    Provider.Get.UpdateFromFirmwareJson("limits", limitsResult);
                                     _logger.Debug("Updated key limits");
                                 }
-                            }
-                            else
-                            {
-                                _logger.Warn("Received invalid object model limits response without key and/or result field(s)");
                             }
                         }
                     }
 
                     // Request the next status update
-                    jsonData = await SPI.Interface.RequestObjectModel(string.Empty, "d99fno");
-                    using JsonDocument statusDocument = JsonDocument.Parse(jsonData);
-                    if (statusDocument.RootElement.TryGetProperty("key", out JsonElement statusKey) &&
-                        statusDocument.RootElement.TryGetProperty("result", out JsonElement statusResult))
+                    await RequestModel(string.Empty, "d99fno");
+
+                    // Update frequently changing properties
+                    using (await Provider.AccessReadWriteAsync())
                     {
-                        // Update frequently changing properties
-                        using (await Provider.AccessReadWriteAsync())
+                        UpdateModel();
+                        if (Provider.IsUpdating && Provider.Get.State.Status != MachineStatus.Updating)
                         {
-                            Provider.Get.UpdateFromFirmwareJson(string.Empty, statusResult);
-                            if (Provider.IsUpdating && Provider.Get.State.Status != MachineStatus.Updating)
-                            {
-                                Provider.Get.State.Status = MachineStatus.Updating;
-                            }
-                            UpdateLayers();
+                            Provider.Get.State.Status = MachineStatus.Updating;
                         }
+                        UpdateLayers();
+                    }
 
-                        // Update object model keys depending on the sequence numbers
-                        foreach (JsonProperty seqProperty in statusResult.GetProperty("seqs").EnumerateObject())
+                    // Update changed object model keys
+                    foreach (string key in _updatedKeys)
+                    {
+                        if (key != "reply" && (!Settings.UpdateOnly || key is "boards" or "directories" or "state"))
                         {
-                            if (seqProperty.Name != "reply" && seqProperty.Value.ValueKind == JsonValueKind.Number &&
-                                (!Settings.UpdateOnly || seqProperty.Name is "boards" or "directories" or "state"))
+                            _logger.Debug(() => $"Requesting update of key {key}, new seq {_lastSeqs[key]}");
+
+                            int next = 0;
+                            do
                             {
-                                int newSeq = seqProperty.Value.GetInt32();
-                                if (!_lastSeqs.TryGetValue(seqProperty.Name, out int lastSeq) || lastSeq != newSeq)
+                                await RequestModel(key, (next == 0) ? "d99vno" : $"d99vnoa{next}");
+
+                                int offset = next;
+                                using (await Provider.AccessReadWriteAsync())
                                 {
-                                    _logger.Debug("Requesting update of key {0}, seq {1} -> {2}", seqProperty.Name, lastSeq, newSeq);
-
-                                    int next = 0;
-                                    do
+                                    next = UpdateModel(offset, next == 0);
+                                    if (_keyUpdated)
                                     {
-                                        // Request the next model chunk
-                                        jsonData = await SPI.Interface.RequestObjectModel(seqProperty.Name, (next == 0) ? "d99vno" : $"d99vnoa{next}");
-                                        using JsonDocument keyDocument = JsonDocument.Parse(jsonData);
-                                        int offset = next;
-                                        next = keyDocument.RootElement.TryGetProperty("next", out JsonElement nextValue) ? nextValue.GetInt32() : 0;
-
-                                        if (keyDocument.RootElement.TryGetProperty("key", out JsonElement keyName) &&
-                                            keyDocument.RootElement.TryGetProperty("result", out JsonElement keyResult))
-                                        {
-                                            _lastSeqs[seqProperty.Name] = newSeq;
-                                            using (await Provider.AccessReadWriteAsync())
-                                            {
-                                                if (Provider.Get.UpdateFromFirmwareJson(keyName.GetString(), keyResult, offset, next == 0))
-                                                {
-                                                    _logger.Debug("Updated key {0}{1}", keyName.GetString(), (offset + next != 0) ? $" starting from {offset}, next {next}" : string.Empty);
-                                                    if (_logger.IsTraceEnabled)
-                                                    {
-                                                        _logger.Trace("Key JSON: {0}", keyResult.ToString());
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    _logger.Warn($"Invalid key {keyName.GetString()} in the object model");
-                                                    break;
-                                                }
-
-                                                if (Provider.IsUpdating && Provider.Get.State.Status != MachineStatus.Updating)
-                                                {
-                                                    Provider.Get.State.Status = MachineStatus.Updating;
-                                                }
-                                            }
-
-                                            // move.axes requires special querying if it exceeds 9 items
-                                            if (keyName.GetString() == "move" && keyResult.TryGetProperty("axes", out JsonElement moveAxes) && moveAxes.GetArrayLength() >= 9)
-                                            {
-                                                int nextAxis = moveAxes.GetArrayLength(), axisOffset = 0;
-                                                do
-                                                {
-                                                    jsonData = await SPI.Interface.RequestObjectModel("move.axes", $"d99vnoa{nextAxis}");
-                                                    using JsonDocument moveAxesDocument = JsonDocument.Parse(jsonData);
-                                                    axisOffset = nextAxis;
-                                                    nextAxis = moveAxesDocument.RootElement.TryGetProperty("next", out JsonElement nextAxisValue) ? nextAxisValue.GetInt32() : 0;
-
-                                                    if (moveAxesDocument.RootElement.TryGetProperty("result", out JsonElement moveAxesResult))
-                                                    {
-                                                        using (await Provider.AccessReadWriteAsync())
-                                                        {
-                                                            Provider.Get.Move.Axes.UpdateFromJson(moveAxesResult, false, axisOffset, nextAxis == 0);
-                                                        }
-                                                    }
-                                                }
-                                                while (nextAxis != 0);
-                                            }
-                                        }
-                                        else
-                                        {
-                                            _logger.Warn("Received invalid object model key response without key and/or result field(s)");
-                                            break;
-                                        }
+                                        _logger.Debug("Updated key {0}{1}", key, (offset + next != 0) ? $" starting from {offset}, next {next}" : string.Empty);
                                     }
-                                    while (next != 0);
+                                    else
+                                    {
+                                        _logger.Warn($"Invalid key {key} in the object model");
+                                        break;
+                                    }
+
+                                    if (Provider.IsUpdating && Provider.Get.State.Status != MachineStatus.Updating)
+                                    {
+                                        Provider.Get.State.Status = MachineStatus.Updating;
+                                    }
                                 }
-                            }
-                        }
-
-                        // Object model is now up-to-date, notify waiting clients
-                        (_waitForConditionA ? _updateConditionB : _updateConditionA).NotifyAll();
-
-                        // Check if the firmware is supposed to be updated
-                        if (Settings.UpdateOnly && !_updatingFirmware)
-                        {
-                            _updatingFirmware = true;
-                            _ = Task.Run(Utility.Firmware.UpdateFirmware);
+                            } while (next != 0);
                         }
                     }
-                    else
+
+                    // Object model is now up-to-date, notify waiting clients
+                    (_waitForConditionA ? _updateConditionB : _updateConditionA).NotifyAll();
+
+                    // Check if the firmware is supposed to be updated
+                    if (Settings.UpdateOnly && !_updatingFirmware)
                     {
-                        _logger.Warn("Received invalid object model response without key and/or result field(s)");
+                        _updatingFirmware = true;
+                        _ = Task.Run(Utility.Firmware.UpdateFirmware);
                     }
                 }
                 catch (InvalidOperationException e)
                 {
-                    _logger.Error(e, "Failed to merge JSON due to internal error: {0}", Encoding.UTF8.GetString(jsonData));
+                    _logger.Error(e, "Failed to merge JSON due to internal error: {0}", Encoding.UTF8.GetString(_jsonData));
                 }
                 catch (OperationCanceledException)
                 {

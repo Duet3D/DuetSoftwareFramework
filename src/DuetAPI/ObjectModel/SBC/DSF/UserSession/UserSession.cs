@@ -3,7 +3,7 @@
     /// <summary>
     /// Class representing a user session
     /// </summary>
-    public sealed class UserSession : ModelObject
+    public partial class UserSession : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Access level of this session

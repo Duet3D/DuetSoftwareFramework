@@ -1,4 +1,5 @@
 ﻿using DuetAPI.Utility;
+using System.Collections.ObjectModel;
 
 namespace DuetAPI.ObjectModel
 {
@@ -6,22 +7,22 @@ namespace DuetAPI.ObjectModel
     /// Information about the configured probe grid (see M557)
     /// </summary>
     /// <seealso cref="Heightmap"/>
-    public sealed class ProbeGrid : ModelObject
+    public partial class ProbeGrid : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Axis letters of this heightmap
         /// </summary>
-        public ModelCollection<char> Axes { get; } = ['X', 'Y'];
+        public ObservableCollection<char> Axes { get; } = ['X', 'Y'];
 
         /// <summary>
         /// End coordinates of the heightmap
         /// </summary>
-        public ModelCollection<float> Maxs { get; } = [-1F, -1F];
+        public ObservableCollection<float> Maxs { get; } = [-1F, -1F];
 
         /// <summary>
         /// Start coordinates of the heightmap
         /// </summary>
-        public ModelCollection<float> Mins { get; } = [0F, 0F];
+        public ObservableCollection<float> Mins { get; } = [0F, 0F];
 
         /// <summary>
         /// Probing radius for delta kinematics
@@ -36,6 +37,6 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Spacings between the coordinates
         /// </summary>
-        public ModelCollection<float> Spacings { get; } = [0F, 0F];
+        public ObservableCollection<float> Spacings { get; } = [0F, 0F];
     }
 }

@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Enumeration of supported filament sensors
     /// </summary>
-    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter))]
+    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<FilamentMonitorType>))]
     public enum FilamentMonitorType
     {
         /// <summary>

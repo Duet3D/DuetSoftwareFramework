@@ -3,7 +3,7 @@
     /// <summary>
     /// Calibration or mesh grid results
     /// </summary>
-    public sealed class MoveDeviations : ModelObject
+    public partial class MoveDeviations : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// RMS deviation (in mm)

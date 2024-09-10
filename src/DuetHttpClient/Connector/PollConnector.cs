@@ -546,11 +546,12 @@ namespace DuetHttpClient.Connector
                 float avgFractionPrinted = (Model.Job.File.Size > 0) ? (float)bytesPrinted / (Model.Job.File.Size * numChangedLayers) : 0F;
                 for (int i = 0; i < Model.Move.Extruders.Count; i++)
                 {
-                    if (Model.Move.Extruders[i] is not null)
+                    Extruder? extruder = Model.Move.Extruders[i];
+                    if (extruder is not null)
                     {
                         float lastFilamentUsage = (i < _lastFilamentUsage.Count) ? _lastFilamentUsage[i] : 0F;
-                        totalFilamentUsage.Add(Model.Move.Extruders[i].RawPosition);
-                        avgFilamentUsage.Add((Model.Move.Extruders[i].RawPosition - lastFilamentUsage) / numChangedLayers);
+                        totalFilamentUsage.Add(extruder.RawPosition);
+                        avgFilamentUsage.Add((extruder.RawPosition - lastFilamentUsage) / numChangedLayers);
                     }
                 }
                 float currentHeight = 0F;

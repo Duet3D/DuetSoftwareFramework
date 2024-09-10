@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about a heater
     /// </summary>
-    public sealed class Heater : ModelObject
+    public partial class Heater : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Active temperature of the heater (in C)
@@ -99,7 +99,7 @@
         /// <summary>
         /// Monitors of this heater
         /// </summary>
-        public ModelCollection<HeaterMonitor> Monitors { get; } = [];
+        public StaticModelCollection<HeaterMonitor> Monitors { get; } = [];
 
         /// <summary>
         /// Sensor number of this heater or -1 if not configured

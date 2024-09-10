@@ -1,11 +1,12 @@
 ﻿using System;
+using System.Collections.ObjectModel;
 
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Thermostatic parameters of a fan
     /// </summary>
-    public sealed class FanThermostaticControl : ModelObject
+    public partial class FanThermostaticControl : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// List of heaters to monitor (indices)
@@ -14,7 +15,7 @@ namespace DuetAPI.ObjectModel
         /// This is a bitmap represented as an array
         /// </remarks>
         [Obsolete("Use Sensors instead")]
-        public ModelCollection<int> Heaters { get; } = [];
+        public ObservableCollection<int> Heaters { get; } = [];
         
         /// <summary>
         /// Upper temperature range required to turn on the fan (in C)
@@ -42,6 +43,6 @@ namespace DuetAPI.ObjectModel
         /// <remarks>
         /// This is a bitmap represented as an array
         /// </remarks>
-        public ModelCollection<int> Sensors { get; } = [];
+        public ObservableCollection<int> Sensors { get; } = [];
     }
 }

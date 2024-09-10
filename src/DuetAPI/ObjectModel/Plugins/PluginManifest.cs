@@ -1,13 +1,13 @@
 ﻿using DuetAPI.Utility;
 using System;
-using System.Text.Json;
+using System.Collections.ObjectModel;
 
 namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Information about a third-party plugin
     /// </summary>
-    public class PluginManifest : ModelObject
+    public partial class PluginManifest : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Identifier of this plugin. May consist of letters and digits only (max length 32 chars)
@@ -107,7 +107,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of general tags for search
         /// </summary>
-        public ModelCollection<string> Tags { get; } = [];
+        public ObservableCollection<string> Tags { get; } = [];
 
         /// <summary>
         /// Major/minor compatible DWC version
@@ -122,7 +122,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of DWC plugins this plugin depends on. Circular dependencies are not supported
         /// </summary>
-        public ModelCollection<string> DwcDependencies { get; } = [];
+        public ObservableCollection<string> DwcDependencies { get; } = [];
 
         /// <summary>
         /// Set to true if a SBC is absolutely required for this plugin
@@ -178,7 +178,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// List of other filenames in the dsf directory that should be executable
         /// </summary>
-        public ModelCollection<string> SbcExtraExecutables { get; } = [];
+        public ObservableCollection<string> SbcExtraExecutables { get; } = [];
 
         /// <summary>
         /// Automatically restart the SBC process when terminated
@@ -217,22 +217,22 @@ namespace DuetAPI.ObjectModel
         /// The file may be specified either relative to 0:/sys directory (e.g. motion.conf) or relative to the
         /// virtual SD directory (e.g. sys/motion.conf). Drive indices as in 0:/sys/motion.conf are not allowed!
         /// </remarks>
-        public ModelCollection<string> SbcConfigFiles { get; } = [];
+        public ObservableCollection<string> SbcConfigFiles { get; } = [];
 
         /// <summary>
         /// List of packages this plugin depends on (apt packages in the case of DuetPi)
         /// </summary>
-        public ModelCollection<string> SbcPackageDependencies { get; } = [];
+        public ObservableCollection<string> SbcPackageDependencies { get; } = [];
 
         /// <summary>
         /// List of Python packages this plugin depends on
         /// </summary>
-        public ModelCollection<string> SbcPythonDependencies { get; } = [];
+        public ObservableCollection<string> SbcPythonDependencies { get; } = [];
 
         /// <summary>
         /// List of SBC plugins this plugin depends on. Circular dependencies are not supported
         /// </summary>
-        public ModelCollection<string> SbcPluginDependencies { get; } = [];
+        public ObservableCollection<string> SbcPluginDependencies { get; } = [];
 
         /// <summary>
         /// Major/minor supported RRF version (optional)
@@ -249,7 +249,7 @@ namespace DuetAPI.ObjectModel
         /// Before <see cref="Commands.SetPluginData"/> can be used, corresponding properties must be registered via this property first!
         /// </summary>
         /// <seealso cref="Commands.SetPluginData"/>
-        public ModelDictionary<JsonElement> Data { get; } = new ModelDictionary<JsonElement>(false);
+        public JsonModelDictionary Data { get; } = new JsonModelDictionary(false);
 
         /// <summary>
         /// Check if the given version satisfies a required version

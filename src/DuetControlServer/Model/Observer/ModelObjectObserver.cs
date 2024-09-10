@@ -1,5 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Reflection;
 using System.Text.Json;
@@ -81,6 +82,10 @@ namespace DuetControlServer.Model
                 {
                     SubscribeToModelDictionary(dictionaryValue, AddToPath(path, propertyName));
                 }
+                else if (value?.GetType().IsGenericType == true && value.GetType().GetGenericTypeDefinition() == typeof(ObservableCollection<>))
+                {
+                    SubscribeToObservableCollection((dynamic)value, propertyName, path);
+                }
 
                 hasVariableModelObjects |= property.PropertyType.IsAssignableTo(typeof(ModelObject)) && (property.SetMethod is not null);
             }
@@ -132,6 +137,10 @@ namespace DuetControlServer.Model
                 else if (value is IModelDictionary dictionaryValue)
                 {
                     UnsubscribeFromModelDictionary(dictionaryValue);
+                }
+                else if (value?.GetType().IsGenericType == true && value.GetType().GetGenericTypeDefinition() == typeof(ObservableCollection<>))
+                {
+                    UnsubscribeFromObservableCollection((dynamic)value);
                 }
 
                 hasVariableModelObjects |= property.PropertyType.IsAssignableTo(typeof(ModelObject)) && (property.SetMethod is not null);

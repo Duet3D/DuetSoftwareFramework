@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel
     /// <summary>
     /// Image formats for parsed thumbnails
     /// </summary>
-    [JsonConverter(typeof(JsonLowerCaseStringEnumConverter))]
+    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<ThumbnailInfoFormat>))]
     public enum ThumbnailInfoFormat
     {
         /// <summary>

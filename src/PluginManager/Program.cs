@@ -267,7 +267,7 @@ namespace PluginManager
                         }
                         catch (JsonException)
                         {
-                            await connection.SetPluginData(key, value, pluginName);
+                            Console.Error.WriteLine("Invalid JSON data");
                         }
                         WriteLine("Plugin data set");
                     }

@@ -9,7 +9,7 @@ namespace DuetAPI
     /// The indices of this enum are tightly coupled with RepRapFirmware.
     /// Make sure to update this enum accordingly whenever changes are made to it!
     /// </remarks>
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(JsonStringEnumConverter<CodeChannel>))]
     public enum CodeChannel : byte
     {
         /// <summary>

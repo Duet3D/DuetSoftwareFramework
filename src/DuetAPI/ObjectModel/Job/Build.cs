@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the current build
     /// </summary>
-    public sealed class Build : ModelObject
+    public partial class Build : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Index of the current object being printed or -1 if unknown
@@ -43,6 +43,6 @@
         /// <summary>
         /// List of detected build objects
         /// </summary>
-        public ModelCollection<BuildObject> Objects { get; } = [];
+        public StaticModelCollection<BuildObject> Objects { get; } = [];
     }
 }

@@ -3,7 +3,7 @@
     /// <summary>
     /// Base class for Duet3D filament monitors
     /// </summary>
-    public class Duet3DFilamentMonitor : FilamentMonitor
+    public partial class Duet3DFilamentMonitor : FilamentMonitor
     {
 
         /// <summary>

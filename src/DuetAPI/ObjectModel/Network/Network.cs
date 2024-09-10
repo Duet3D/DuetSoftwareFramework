@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about the network subsystem
     /// </summary>
-    public sealed class Network : ModelObject
+    public partial class Network : ModelObject, IStaticModelObject
     {
         /// <summary>
         /// Default name of the machine
@@ -46,7 +46,7 @@
         /// </summary>
         /// <seealso cref="NetworkInterface"/>
         [SbcProperty(true)]
-        public ModelCollection<NetworkInterface> Interfaces { get; } = [];
+        public StaticModelCollection<NetworkInterface> Interfaces { get; } = [];
 
         /// <summary>
         /// Name of the machine
