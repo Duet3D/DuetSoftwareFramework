@@ -90,7 +90,7 @@ namespace DuetControlServer.Model
                 {
                     await UpdateNetwork(networkInterfaces);
                     UpdateSbc();
-                    await UpdateVolumes(drives);
+                    UpdateVolumes(drives);
                     CleanMessages();
                 }
 
@@ -320,12 +320,12 @@ namespace DuetControlServer.Model
                     Type = CodeType.MCode,
                     MajorNumber = 409,
                     Parameters = new()
-                        {
-                            new('K', "network"),
-                            new('I', 1)
-                        }
+                    {
+                        new('K', "network"),
+                        new('I', 1)
+                    }
                 };
-                await code.Execute();
+                _ = code.Execute();
             }
         }
 
@@ -397,8 +397,7 @@ namespace DuetControlServer.Model
         /// Volume 0 always represents the virtual SD card on DuetPi. The following code achieves this but it
         /// might need further adjustments to ensure this on every Linux distribution
         /// </remarks>
-        /// <returns>Asynchronous task</returns>
-        private static async Task UpdateVolumes(DriveInfo[] drives)
+        private static void UpdateVolumes(DriveInfo[] drives)
         {
             bool volumesUpdated = false;
             void VolumeUpdated(object? sender, PropertyChangedEventArgs e) => volumesUpdated = true;
@@ -447,7 +446,6 @@ namespace DuetControlServer.Model
                 volumesUpdated = true;
             }
 
-
             if (volumesUpdated && !Settings.NoSpi)
             {
                 Code code = new()
@@ -457,12 +455,12 @@ namespace DuetControlServer.Model
                     Type = CodeType.MCode,
                     MajorNumber = 409,
                     Parameters = new()
-                        {
-                            new('K', "volumes"),
-                            new('I', 1)
-                        }
+                    {
+                        new('K', "volumes"),
+                        new('I', 1)
+                    }
                 };
-                await code.Execute();
+                _ = code.Execute();
             }
         }
 
