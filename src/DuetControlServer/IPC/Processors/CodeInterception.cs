@@ -30,7 +30,8 @@ namespace DuetControlServer.IPC.Processors
         [
             typeof(Cancel),
             typeof(Ignore),
-            typeof(Resolve)
+            typeof(Resolve),
+            typeof(Rewrite)
         ];
 
         /// <summary>
@@ -294,6 +295,12 @@ namespace DuetControlServer.IPC.Processors
                             {
                                 code.Result = new Message(resolveCommand.Type, resolveCommand.Content);
                                 return true;
+                            }
+
+                            // Code is rewritten
+                            if (_interceptionResult is Rewrite rewriteCommand)
+                            {
+                                code.CopyFrom(rewriteCommand.Code);
                             }
 
                             // Code is ignored. Don't do anything

@@ -30,7 +30,7 @@ namespace DuetWebServer.Services
         /// <summary>
         /// Configured CORS policy for cross-origin requests
         /// </summary>
-        public static readonly CorsPolicy CorsPolicy = (new CorsPolicyBuilder())
+        public static readonly CorsPolicy CorsPolicy = new CorsPolicyBuilder()
             .AllowAnyHeader()
             .AllowAnyMethod()
             .Build();

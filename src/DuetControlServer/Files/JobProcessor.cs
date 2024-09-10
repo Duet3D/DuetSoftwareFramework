@@ -435,11 +435,11 @@ namespace DuetControlServer.Files
                     {
                         try
                         {
-                            // Keep the next file position up-to-date in case we need to pause or fork this macro file
-                            currentFilePosition = code.FilePosition ?? 0L;
-
                             // Logging of regular messages is done by the code itself, no need to take care of it here
                             await code.Task;
+
+                            // Keep track of the file position
+                            currentFilePosition = (code.FilePosition ?? 0L) + (code.Length ?? 0L);
                         }
                         catch (OperationCanceledException)
                         {
