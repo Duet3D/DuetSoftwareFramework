@@ -22,7 +22,7 @@ namespace DuetAPI.Utility
         public static byte[] GetFilesUtf8(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1)
         {
             using MemoryStream fileList = new();
-            using Utf8JsonWriter writer = new(new MemoryStream());
+            using Utf8JsonWriter writer = new(fileList);
 
             writer.WriteStartObject();
             writer.WriteString("dir", directory);
@@ -130,7 +130,7 @@ namespace DuetAPI.Utility
         public static byte[] GetFileListUtf8(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1)
         {
             using MemoryStream fileList = new();
-            using Utf8JsonWriter writer = new(new MemoryStream());
+            using Utf8JsonWriter writer = new(fileList);
 
             // Write body only if a partial list is requested
             if (startAt >= 0)

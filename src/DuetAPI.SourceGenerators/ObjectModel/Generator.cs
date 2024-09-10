@@ -179,7 +179,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel
                                 writer.Indent--;
                                 writer.WriteLine("}");
                                 writer.WriteLine("reader.Skip();");
-                                writer.WriteLine("return false;");
+                                writer.WriteLine("return true;");
                             }
                             else
                             {

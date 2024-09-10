@@ -370,15 +370,22 @@ namespace DuetAPI.ObjectModel
         /// <remarks>Accepts null as the JSON value to clear existing items</remarks>
         public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
         {
-            foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
+            if (jsonElement.ValueKind == JsonValueKind.Null)
             {
-                if (NullRemovesItems && jsonProperty.Value.ValueKind == JsonValueKind.Null)
+                Clear();
+            }
+            else
+            {
+                foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
                 {
-                    Remove(jsonProperty.Name);
-                }
-                else if (!TryGetValue(jsonProperty.Name, out JsonElement? value) || !value!.Equals(jsonProperty.Value))
-                {
-                    this[jsonProperty.Name] = jsonProperty.Value.Clone();
+                    if (NullRemovesItems && jsonProperty.Value.ValueKind == JsonValueKind.Null)
+                    {
+                        Remove(jsonProperty.Name);
+                    }
+                    else if (!TryGetValue(jsonProperty.Name, out JsonElement? value) || !value!.Equals(jsonProperty.Value))
+                    {
+                        this[jsonProperty.Name] = jsonProperty.Value.Clone();
+                    }
                 }
             }
         }
@@ -391,27 +398,26 @@ namespace DuetAPI.ObjectModel
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
         {
-            if (reader.TokenType == JsonTokenType.Null && NullRemovesItems)
+            if (reader.TokenType == JsonTokenType.Null)
             {
                 Clear();
             }
             else if (reader.TokenType == JsonTokenType.StartObject)
             {
-                List<string> readKeys = [];
                 while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
                 {
                     if (reader.TokenType == JsonTokenType.PropertyName)
                     {
                         string key = reader.GetString()!;
-                        readKeys.Add(key);
-                        Add(key, JsonElement.ParseValue(ref reader));
-                    }
-                }
-                foreach (string key in Keys.ToArray())
-                {
-                    if (!readKeys.Contains(key))
-                    {
-                        Remove(key);
+                        JsonElement value = JsonElement.ParseValue(ref reader);
+                        if (NullRemovesItems && value.ValueKind == JsonValueKind.Null)
+                        {
+                            Remove(key);
+                        }
+                        else if (!TryGetValue(key, out JsonElement? existingValue) || !existingValue!.Equals(value))
+                        {
+                            this[key] = value;
+                        }
                     }
                 }
             }

@@ -26,7 +26,7 @@ namespace UnitTests.HttpClient
 
             // This has to be changed depending on the test setup.
             // The IP address must be either a Duet (standalone mode) or a SBC running DSF (SBC mode)
-            session = await DuetHttpSession.ConnectAsync(new("http://ender3pro.fritz.box"));
+            session = await DuetHttpSession.ConnectAsync(new("http://ender6.fritz.box"));
         }
 
         [Test]

@@ -390,16 +390,36 @@ namespace DuetAPI.ObjectModel
                 {
                     Remove(jsonProperty.Name);
                 }
+                else if (TryGetValue(jsonProperty.Name, out TValue? item))
+                {
+                    try
+                    {
+                        if (item is null)
+                        {
+                            if (jsonProperty.Value.ValueKind != JsonValueKind.Null)
+                            {
+                                item = new();
+                                item.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                                this[jsonProperty.Name] = item;
+                            }
+                        }
+                        else
+                        {
+                            item.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                        }
+                    }
+                    catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
+                    {
+                        // suppressed
+                    }
+                }
                 else
                 {
                     try
                     {
                         TValue newValue = new();
                         newValue.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
-                        if (!TryGetValue(jsonProperty.Name, out TValue? value) || !ReferenceEquals(value, newValue))
-                        {
-                            this[jsonProperty.Name] = newValue;
-                        }
+                        Add(jsonProperty.Name, newValue);
                     }
                     catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
                     {
