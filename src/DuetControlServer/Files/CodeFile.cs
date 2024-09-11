@@ -141,6 +141,7 @@ namespace DuetControlServer.Files
         /// Constructor of the base class for reading from a G-code file
         /// </summary>
         /// <param name="fileName">Name of the file to process or null if it is optional</param>
+        /// <param name="physicalFile">Physical path to the file</param>
         /// <param name="channel">Channel to send the codes to</param>
         public CodeFile(string fileName, string physicalFile, CodeChannel channel)
         {
