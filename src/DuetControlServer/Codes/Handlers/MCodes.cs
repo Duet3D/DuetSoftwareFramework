@@ -6,7 +6,6 @@ using DuetControlServer.Files;
 using DuetControlServer.Model;
 using DuetControlServer.Utility;
 using System;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -869,58 +868,6 @@ namespace DuetControlServer.Codes.Handlers
 
                         // Let RRF carry on
                         break;
-                    }
-                    throw new OperationCanceledException();
-
-                // Set current RTC date and time
-                case 905:
-                    if (await Processor.FlushAsync(code))
-                    {
-                        bool seen = false;
-
-                        if (code.TryGetString('P', out string? dayString))
-                        {
-                            if (DateTime.TryParseExact(dayString, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date))
-                            {
-                                await System.Diagnostics.Process.Start("timedatectl", $"set-time {date:yyyy-MM-dd}").WaitForExitAsync(Program.CancellationToken);
-                                seen = true;
-                            }
-                            else
-                            {
-                                return new Message(MessageType.Error, "Invalid date format");
-                            }
-                        }
-
-                        if (code.TryGetString('S', out string? timeString))
-                        {
-                            if (DateTime.TryParseExact(timeString, "HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime time))
-                            {
-                                await System.Diagnostics.Process.Start("timedatectl", $"set-time {time:HH:mm:ss}").WaitForExitAsync(Program.CancellationToken);
-                                seen = true;
-                            }
-                            else
-                            {
-                                return new Message(MessageType.Error, "Invalid time format");
-                            }
-                        }
-
-                        if (code.TryGetString('T', out string? timezone))
-                        {
-                            if (File.Exists($"/usr/share/zoneinfo/{timezone}"))
-                            {
-                                await System.Diagnostics.Process.Start("timedatectl", $"set-timezone {timezone}").WaitForExitAsync(Program.CancellationToken);
-                                seen = true;
-                            }
-                            else
-                            {
-                                return new Message(MessageType.Error, "Invalid time zone");
-                            }
-                        }
-
-                        if (!seen)
-                        {
-                            return new Message(MessageType.Success, $"Current date and time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                        }
                     }
                     throw new OperationCanceledException();
 
