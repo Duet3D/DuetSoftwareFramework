@@ -495,7 +495,7 @@ namespace DuetControlServer.Files
                             // Adjust the file position
                             long newFilePosition = _pausePosition ?? currentFilePosition;
                             await SetFilePosition(file.Channel == CodeChannel.File ? 0 : 1, newFilePosition);
-                            _logger.Info("Job on {0} has been paused at byte {1}, reason {2}", file.Channel, newFilePosition, _pauseReason);
+                            _logger.Info("Job on {0} has been paused at byte {1}, reason {2}", file.Channel, (_pausePosition == null) ? $"{newFilePosition} (no fpos from firmware)" : newFilePosition.ToString(), _pauseReason);
 
                             // Wait for the print to be resumed
                             IsProcessing = false;
