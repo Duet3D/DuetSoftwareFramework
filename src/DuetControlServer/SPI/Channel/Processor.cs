@@ -984,6 +984,8 @@ namespace DuetControlServer.SPI.Channel
                 {
                     BytesBuffered += pendingCode.BinarySize;
                     BufferedCodes.Add(pendingCode);
+#warning DEBUG
+                    _logger.Info("Sending {0}, fpos = {1}", pendingCode.ToString() + (pendingCode.Flags.HasFlag(CodeFlags.IsFromMacro) ? "  (from macro)" : ""), pendingCode.FilePosition != null ? pendingCode.FilePosition.ToString() : "(none)");
                     _logger.Debug("Sent {0}, remaining space {1}, needed {2}", pendingCode, Settings.MaxBufferSpacePerChannel - BytesBuffered, pendingCode.BinarySize);
                     return true;
                 }
