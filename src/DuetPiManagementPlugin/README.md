@@ -15,6 +15,7 @@ This plugin provides system management functions using regular RepRapFirmware M-
 - `M587` Add WiFi host network to remembered list, or list remembered networks
 - `M588` Forget WiFi host network
 - `M589` Configure access point parameters
+- `M905` Set current RTC date and time
 - `M999 B-1` Reboot SBC
 - `M999 B-1 P"OFF"` Shut down SBC
 

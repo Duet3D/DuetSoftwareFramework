@@ -6,6 +6,7 @@ using DuetAPIClient;
 using DuetPiManagementPlugin.Network;
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Reflection;
@@ -45,6 +46,7 @@ namespace DuetPiManagementPlugin
             "M587.2",   // List WiFi scan results
             "M588",     // Forget WiFi host network
             "M589",     // Configure access point parameters
+            "M905",     // Set current RTC date and time
             "M997",     // Perform update
             "M999"      // Reboot or shutdown SBC (priority codes are not handled)
         ];
@@ -478,6 +480,65 @@ namespace DuetPiManagementPlugin
                                 // Set up hostapd configuration
                                 Message configResult = await AccessPoint.Configure(code.GetString('S'), code.GetString('P'), code.GetIPAddress('I', IPAddress.Any), code.GetInt('C', 6));
                                 await Connection.ResolveCode(configResult, CancellationToken);
+                            }
+                            catch (Exception e)
+                            {
+                                await Connection.ResolveCode(MessageType.Error, $"Failed to perform action: {e.Message}", CancellationToken);
+                                Console.WriteLine(e);
+                            }
+                            break;
+
+                        // Set current RTC date and time
+                        case 905:
+                            try
+                            {
+                                bool seen = false;
+
+                                if (code.TryGetString('P', out string? dayString))
+                                {
+                                    if (DateTime.TryParseExact(dayString, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date))
+                                    {
+                                        await Process.Start("timedatectl", $"set-time {date:yyyy-MM-dd}").WaitForExitAsync(CancellationToken);
+                                        seen = true;
+                                    }
+                                    else
+                                    {
+                                        await Connection.ResolveCode(MessageType.Error, "Invalid date format");
+                                    }
+                                }
+
+                                if (code.TryGetString('S', out string? timeString))
+                                {
+                                    if (DateTime.TryParseExact(timeString, "HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime time))
+                                    {
+                                        await Process.Start("timedatectl", $"set-time {time:HH:mm:ss}").WaitForExitAsync(CancellationToken);
+                                        seen = true;
+                                    }
+                                    else
+                                    {
+                                        await Connection.ResolveCode(MessageType.Error, "Invalid time format");
+                                        break;
+                                    }
+                                }
+
+                                if (code.TryGetString('T', out string? timezone))
+                                {
+                                    if (File.Exists($"/usr/share/zoneinfo/{timezone}"))
+                                    {
+                                        await Process.Start("timedatectl", $"set-timezone {timezone}").WaitForExitAsync(CancellationToken);
+                                        seen = true;
+                                    }
+                                    else
+                                    {
+                                        await Connection.ResolveCode(MessageType.Error, "Invalid time zone");
+                                        break;
+                                    }
+                                }
+
+                                if (!seen)
+                                {
+                                    await Connection.ResolveCode(MessageType.Success, $"Current date and time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                                }
                             }
                             catch (Exception e)
                             {
