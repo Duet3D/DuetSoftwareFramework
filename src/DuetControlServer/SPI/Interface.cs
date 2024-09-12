@@ -1182,9 +1182,8 @@ namespace DuetControlServer.SPI
         /// <returns>Asynchronous task</returns>
         private static void HandlePrintPaused()
         {
-#warning DEBUG
             DataTransfer.ReadPrintPaused(out uint filePosition, out PrintPausedReason pauseReason);
-            _logger.Info("Received print pause notification for file position {0}, reason {1}", (filePosition == Consts.NoFilePosition) ? "(none)" : filePosition.ToString(), pauseReason);
+            _logger.Debug("Received print pause notification for file position {0}, reason {1}", (filePosition == Consts.NoFilePosition) ? "(none)" : filePosition.ToString(), pauseReason);
 
             // Update the object model
             using (Model.Provider.AccessReadWrite())
@@ -1197,7 +1196,6 @@ namespace DuetControlServer.SPI
             {
                 // Do NOT supply a file position if this is a pause request initiated from G-code because that would lead to an endless loop
                 bool filePositionValid = (filePosition != Consts.NoFilePosition) && (pauseReason != PrintPausedReason.GCode) && (pauseReason != PrintPausedReason.FilamentChange);
-                _logger.Info("=> fpos valid? {0}", filePositionValid);
                 JobProcessor.Pause(filePositionValid ? filePosition : null, pauseReason);
             }
 

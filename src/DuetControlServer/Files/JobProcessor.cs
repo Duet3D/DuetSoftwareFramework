@@ -668,8 +668,6 @@ namespace DuetControlServer.Files
         {
             if (IsFileSelected && !IsProcessing)
             {
-#warning DEBUG
-                _logger.Info("Resuming file print at position {0}", _file!.Position);
                 IsPaused = false;
                 _resume.NotifyAll();
             }
