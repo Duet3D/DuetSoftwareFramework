@@ -79,6 +79,8 @@ namespace DuetControlServer.Model
         {
             TimeSpan measuredDelay = TimeSpan.Zero;
             string lastHostname = Environment.MachineName;
+            bool updateNetworkSeq, updateVolumesSeq;
+
             do
             {
                 // Prefetch the network and volume devices because this can take quite a while (> 1.5s)
@@ -88,9 +90,9 @@ namespace DuetControlServer.Model
                 // Run another update cycle
                 using (await Provider.AccessReadWriteAsync())
                 {
-                    await UpdateNetwork(networkInterfaces);
+                    updateNetworkSeq = await UpdateNetwork(networkInterfaces);
                     UpdateSbc();
-                    UpdateVolumes(drives);
+                    updateVolumesSeq = UpdateVolumes(drives);
                     CleanMessages();
                 }
 
@@ -132,6 +134,44 @@ namespace DuetControlServer.Model
                     await code.Execute();
                 }
 
+                // Check if the network key has been updated
+                if (!Settings.NoSpi)
+                {
+                    if (updateNetworkSeq)
+                    {
+                        Code code = new()
+                        {
+                            Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous,
+                            Channel = CodeChannel.Trigger,
+                            Type = CodeType.MCode,
+                            MajorNumber = 409,
+                            Parameters =
+                            [
+                                new('K', "network"),
+                                new('I', 1)
+                            ]
+                        };
+                        await code.Execute();
+                    }
+
+                    if (updateVolumesSeq)
+                    {
+                        Code code = new()
+                        {
+                            Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous,
+                            Channel = CodeChannel.Trigger,
+                            Type = CodeType.MCode,
+                            MajorNumber = 409,
+                            Parameters =
+                            [
+                                new('K', "volumes"),
+                                new('I', 1)
+                            ]
+                        };
+                        await code.Execute();
+                    }
+                }
+
                 // Wait for next scheduled update check
                 DateTime lastUpdateTime = DateTime.Now;
                 await Task.Delay(Settings.HostUpdateInterval, Program.CancellationToken);
@@ -143,8 +183,8 @@ namespace DuetControlServer.Model
         /// <summary>
         /// Update network interfaces
         /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private static async Task UpdateNetwork(System.Net.NetworkInformation.NetworkInterface[] networkInterfaces)
+        /// <returns>Whether the network key has been changed</returns>
+        private static async Task<bool> UpdateNetwork(System.Net.NetworkInformation.NetworkInterface[] networkInterfaces)
         {
             bool networkUpdated = false;
             void InterfaceUpdated(object? sender, PropertyChangedEventArgs e) => networkUpdated = true;
@@ -311,24 +351,8 @@ namespace DuetControlServer.Model
                 networkUpdated = true;
             }
 
-            if (networkUpdated && !Settings.NoSpi)
-            {
-                Code code = new()
-                {
-                    Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous,
-                    Channel = CodeChannel.Trigger,
-                    Type = CodeType.MCode,
-                    MajorNumber = 409,
-                    Parameters =
-                    [
-                        new('K', "network"),
-                        new('I', 1)
-                    ]
-                };
-                _ = code.Execute();
-            }
+            return networkUpdated;
         }
-
 
         [GeneratedRegex(@"^cpu\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)")]
         private static partial Regex _cpuRegex();
@@ -404,7 +428,8 @@ namespace DuetControlServer.Model
         /// Volume 0 always represents the virtual SD card on DuetPi. The following code achieves this but it
         /// might need further adjustments to ensure this on every Linux distribution
         /// </remarks>
-        private static void UpdateVolumes(DriveInfo[] drives)
+        /// <returns>Asynchronous task</returns>
+        private static bool UpdateVolumes(DriveInfo[] drives)
         {
             bool volumesUpdated = false;
             void VolumeUpdated(object? sender, PropertyChangedEventArgs e) => volumesUpdated = true;
@@ -453,22 +478,7 @@ namespace DuetControlServer.Model
                 volumesUpdated = true;
             }
 
-            if (volumesUpdated && !Settings.NoSpi)
-            {
-                Code code = new()
-                {
-                    Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous,
-                    Channel = CodeChannel.Trigger,
-                    Type = CodeType.MCode,
-                    MajorNumber = 409,
-                    Parameters =
-                    [
-                        new('K', "volumes"),
-                        new('I', 1)
-                    ]
-                };
-                _ = code.Execute();
-            }
+            return volumesUpdated;
         }
 
         /// <summary>
