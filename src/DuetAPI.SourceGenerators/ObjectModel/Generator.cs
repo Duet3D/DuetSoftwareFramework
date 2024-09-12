@@ -250,7 +250,7 @@ namespace DuetAPI.ObjectModel
         /// <returns>Whether the key could be updated</returns>
         private bool GeneratedUpdateFromJsonReader(string? key, ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true)
         {{
-            if (key == null)
+            if (string.IsNullOrEmpty(key))
             {{
                 UpdateFromJsonReader(ref reader, ignoreSbcProperties);
                 return true;
