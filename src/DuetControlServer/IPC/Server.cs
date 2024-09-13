@@ -2,12 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
-using System.Text.Json;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
-using DuetAPI.Utility;
 using DuetControlServer.IPC.Processors;
 
 namespace DuetControlServer.IPC
@@ -126,7 +124,7 @@ namespace DuetControlServer.IPC
                 if (await connection.AssignPermissions())
                 {
                     // Send server-side init message to the client
-                    await connection.Send(new ServerInitMessage { Id = connection.Id });
+                    await connection.SendInitMessage(new ServerInitMessage { Id = connection.Id });
 
                     // Read client-side init message and switch mode
                     Base? processor = await GetConnectionProcessor(connection);
@@ -146,7 +144,7 @@ namespace DuetControlServer.IPC
                 else
                 {
                     _logger.Warn("IPC#{0}: Terminating connection due to insufficient permissions", connection.Id);
-                    await connection.Send(new UnauthorizedAccessException("Insufficient permissions"));
+                    await connection.SendException(new UnauthorizedAccessException("Insufficient permissions"));
                 }
             }
             catch (Exception e)
@@ -176,8 +174,7 @@ namespace DuetControlServer.IPC
             try
             {
                 // Read the init message from the client
-                string response = await conn.ReceivePlainJson();
-                ClientInitMessage initMessage = JsonSerializer.Deserialize<ClientInitMessage>(response, JsonHelper.DefaultJsonOptions)!;
+                ClientInitMessage initMessage = await conn.ReceiveInitMessage();
                 conn.ApiVersion = initMessage.Version;
 
                 // Check the version number
@@ -201,7 +198,6 @@ namespace DuetControlServer.IPC
                         {
                             throw new UnauthorizedAccessException("Insufficient permissions");
                         }
-                        initMessage = JsonSerializer.Deserialize<CommandInitMessage>(response, JsonHelper.DefaultJsonOptions)!;
                         return new Command(conn);
 
                     case ConnectionMode.Intercept:
@@ -209,7 +205,6 @@ namespace DuetControlServer.IPC
                         {
                             throw new UnauthorizedAccessException("Insufficient permissions");
                         }
-                        initMessage = JsonSerializer.Deserialize<InterceptInitMessage>(response, JsonHelper.DefaultJsonOptions)!;
                         return new CodeInterception(conn, initMessage);
 
                     case ConnectionMode.Subscribe:
@@ -217,7 +212,6 @@ namespace DuetControlServer.IPC
                         {
                             throw new UnauthorizedAccessException("Insufficient permissions");
                         }
-                        initMessage = JsonSerializer.Deserialize<SubscribeInitMessage>(response, JsonHelper.DefaultJsonOptions)!;
                         return new ModelSubscription(conn, initMessage);
 
                     case ConnectionMode.CodeStream:
@@ -225,11 +219,9 @@ namespace DuetControlServer.IPC
                         {
                             throw new UnauthorizedAccessException("Insufficient permissions");
                         }
-                        initMessage = JsonSerializer.Deserialize<CodeStreamInitMessage>(response, JsonHelper.DefaultJsonOptions)!;
                         return new CodeStream(conn, initMessage);
 
                     case ConnectionMode.PluginService:
-                        initMessage = JsonSerializer.Deserialize<PluginServiceInitMessage>(response, JsonHelper.DefaultJsonOptions)!;
                         return new PluginService(conn);
 
                     default:

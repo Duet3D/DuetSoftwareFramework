@@ -44,12 +44,12 @@ namespace DuetControlServer.IPC.Processors
         /// <summary>
         /// Queue of pending service commands vs tasks
         /// </summary>
-        private static readonly Queue<Tuple<object, TaskCompletionSource>> _pendingCommands = new();
+        private static readonly Queue<Tuple<BaseCommand, TaskCompletionSource>> _pendingCommands = new();
 
         /// <summary>
         /// Queue of pending service commands vs tasks
         /// </summary>
-        private static readonly Queue<Tuple<object, TaskCompletionSource>> _pendingRootCommands = new();
+        private static readonly Queue<Tuple<BaseCommand, TaskCompletionSource>> _pendingRootCommands = new();
 
         /// <summary>
         /// Perform a command via the plugin service
@@ -57,7 +57,7 @@ namespace DuetControlServer.IPC.Processors
         /// <param name="command">Command to perform</param>
         /// <param name="asRoot">Send it to the service running as root</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task PerformCommand(object command, bool asRoot)
+        public static async Task PerformCommand(BaseCommand command, bool asRoot)
         {
             TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
             using (await (asRoot ? _rootMonitor : _monitor).EnterAsync(Program.CancellationToken))
@@ -66,7 +66,7 @@ namespace DuetControlServer.IPC.Processors
                 {
                     if (_rootServiceConnected)
                     {
-                        _pendingRootCommands.Enqueue(new Tuple<object, TaskCompletionSource>(command, tcs));
+                        _pendingRootCommands.Enqueue(new Tuple<BaseCommand, TaskCompletionSource>(command, tcs));
                         _rootMonitor.Pulse();
                     }
                     else
@@ -78,7 +78,7 @@ namespace DuetControlServer.IPC.Processors
                 {
                     if (_serviceConnected)
                     {
-                        _pendingCommands.Enqueue(new Tuple<object, TaskCompletionSource>(command, tcs));
+                        _pendingCommands.Enqueue(new Tuple<BaseCommand, TaskCompletionSource>(command, tcs));
                         _monitor.Pulse();
                     }
                     else
@@ -140,13 +140,13 @@ namespace DuetControlServer.IPC.Processors
             }
 
             // Process incoming requests
-            Queue<Tuple<object, TaskCompletionSource>> pendingCommands = Connection.IsRoot ? _pendingRootCommands : _pendingCommands;
+            Queue<Tuple<BaseCommand, TaskCompletionSource>> pendingCommands = Connection.IsRoot ? _pendingRootCommands : _pendingCommands;
             try
             {
                 do
                 {
                     // Wait for the next request and read it
-                    Tuple<object, TaskCompletionSource>? request;
+                    Tuple<BaseCommand, TaskCompletionSource>? request;
                     try
                     {
                         using (await monitor.EnterAsync(Program.CancellationToken))
@@ -169,7 +169,7 @@ namespace DuetControlServer.IPC.Processors
                     // Send it over to the plugin service. Exception logging should take place in the command processor
                     try
                     {
-                        await Connection.Send(request.Item1);
+                        await Connection.SendCommand(request.Item1);
                         BaseResponse response = await Connection.ReceiveResponse();
                         if (response is ErrorResponse errorResponse)
                         {
@@ -232,7 +232,7 @@ namespace DuetControlServer.IPC.Processors
                     }
 
                     // Invalidate pending requests
-                    while (pendingCommands.TryDequeue(out Tuple<object, TaskCompletionSource>? request))
+                    while (pendingCommands.TryDequeue(out Tuple<BaseCommand, TaskCompletionSource>? request))
                     {
                         request.Item2.SetCanceled();
                     }

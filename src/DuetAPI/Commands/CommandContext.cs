@@ -45,6 +45,8 @@ namespace DuetAPI.Commands
     [JsonSerializable(typeof(UninstallPlugin))]
     [JsonSerializable(typeof(AddUserSession))]
     [JsonSerializable(typeof(RemoveUserSession))]
+    [JsonSerializable(typeof(BaseResponse))]
+    [JsonSerializable(typeof(ErrorResponse))]
     [JsonSourceGenerationOptions(DictionaryKeyPolicy = JsonKnownNamingPolicy.CamelCase, PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
     public sealed partial class CommandContext : JsonSerializerContext
     {

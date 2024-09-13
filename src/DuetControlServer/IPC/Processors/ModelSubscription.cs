@@ -173,7 +173,7 @@ namespace DuetControlServer.IPC.Processors
                     if (jsonData is not null)
                     {
                         // Send new JSON data
-                        await Connection.Send(jsonData);
+                        await Connection.SendRawData(jsonData);
                         jsonData = null;
 
                         // Wait for an acknowledgement from the client

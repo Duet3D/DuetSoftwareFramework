@@ -11,7 +11,7 @@ namespace DuetAPI.Connection.InitMessages
     [JsonDerivedType(typeof(InterceptInitMessage))]
     [JsonDerivedType(typeof(PluginServiceInitMessage))]
     [JsonDerivedType(typeof(SubscribeInitMessage))]
-    public class ClientInitMessage
+    public class ClientInitMessage : InitMessage
     {
         /// <summary>
         /// Desired mode of the new connection

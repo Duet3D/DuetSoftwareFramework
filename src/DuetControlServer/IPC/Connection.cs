@@ -8,6 +8,8 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
+using DuetAPI.Connection;
+using DuetAPI.Connection.InitMessages;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.IPC.Processors;
@@ -185,7 +187,7 @@ namespace DuetControlServer.IPC
         /// <returns>JsonDocument for deserialization</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Connection has been closed</exception>
-        public async ValueTask<JsonDocument> ReceiveJson()
+        public async ValueTask<JsonDocument> ReceiveJsonDocument()
         {
             do
             {
@@ -213,38 +215,122 @@ namespace DuetControlServer.IPC
         /// <exception cref="SocketException">Connection has been closed</exception>
         public async ValueTask<BaseResponse> ReceiveResponse()
         {
-            using JsonDocument jsonDocument = await ReceiveJson();
-            foreach (var item in jsonDocument.RootElement.EnumerateObject())
+            do
             {
-                if (item.Name.Equals(nameof(BaseResponse.Success), StringComparison.InvariantCultureIgnoreCase) &&
-                    item.Value.ValueKind == JsonValueKind.True)
+                try
                 {
-                    // Response OK
-                    return JsonSerializer.Deserialize<BaseResponse>(jsonDocument, JsonHelper.DefaultJsonOptions)!;
+                    using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
+                    _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(jsonStream.GetBuffer())}");
+
+                    BaseResponse DeserializeResponse()
+                    {
+                        Span<byte> jsonSpan = jsonStream.GetBuffer();
+                        Utf8JsonReader reader = new(jsonSpan);
+                        if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+                        {
+                            throw new ArgumentException("Received malformed JSON");
+                        }
+                        while (reader.Read())
+                        {
+                            if (reader.TokenType == JsonTokenType.PropertyName)
+                            {
+                                if (reader.ValueTextEquals("success"u8) && reader.Read())
+                                {
+                                    if (reader.TokenType == JsonTokenType.True)
+                                    {
+                                        return JsonSerializer.Deserialize(jsonSpan, ConnectionContext.Default.BaseResponse)!;
+                                    }
+                                    else if (reader.TokenType == JsonTokenType.False)
+                                    {
+                                        return JsonSerializer.Deserialize(jsonSpan, ConnectionContext.Default.ErrorResponse)!;
+                                    }
+                                    else
+                                    {
+                                        throw new ArgumentException("Success must be a boolean");
+                                    }
+                                }
+                                else
+                                {
+                                    reader.Skip();
+                                }
+                            }
+                            else
+                            {
+                                reader.Skip();
+                            }
+                        }
+                        throw new ArgumentException("Missing success key");
+                    }
+
+                    return DeserializeResponse();
+                }
+                catch (JsonException e)
+                {
+                    _logger.Error(e, "IPC#{0}: Received malformed JSON", Id);
+                    await SendResponse(e);
                 }
             }
-
-            // Error
-            return JsonSerializer.Deserialize<ErrorResponse>(jsonDocument, JsonHelper.DefaultJsonOptions)!;
+            while (true);
         }
 
         /// <summary>
-        /// Read a plain JSON object as a string from the socket
+        /// Read a client init message from the socket
         /// </summary>
-        /// <returns>JsonDocument for deserialization</returns>
+        /// <returns>Client init message</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Connection has been closed</exception>
-        public async ValueTask<string> ReceivePlainJson()
+        public async ValueTask<ClientInitMessage> ReceiveInitMessage()
         {
             do
             {
                 try
                 {
-                    await using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
-                    _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
+                    using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
+                    _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(jsonStream.GetBuffer())}");
 
-                    using StreamReader reader = new(jsonStream);
-                    return await reader.ReadToEndAsync();
+                    ClientInitMessage DeserializeInitMessage()
+                    {
+                        Span<byte> jsonSpan = jsonStream.GetBuffer();
+                        Utf8JsonReader reader = new(jsonSpan);
+                        if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+                        {
+                            throw new ArgumentException("Received malformed JSON");
+                        }
+                        while (reader.Read())
+                        {
+                            if (reader.TokenType == JsonTokenType.PropertyName)
+                            {
+                                if (reader.ValueTextEquals("mode"u8) && reader.Read())
+                                {
+                                    if (reader.TokenType != JsonTokenType.String)
+                                    {
+                                        throw new ArgumentException("Mode must be a string");
+                                    }
+
+                                    return JsonSerializer.Deserialize(ref reader, ConnectionContext.Default.ConnectionMode) switch
+                                    {
+                                        ConnectionMode.Command => JsonSerializer.Deserialize(jsonSpan, ConnectionContext.Default.CommandInitMessage)!,
+                                        ConnectionMode.Intercept => JsonSerializer.Deserialize(jsonSpan, ConnectionContext.Default.InterceptInitMessage)!,
+                                        ConnectionMode.Subscribe => JsonSerializer.Deserialize(jsonSpan, ConnectionContext.Default.SubscribeInitMessage)!,
+                                        ConnectionMode.CodeStream => JsonSerializer.Deserialize(jsonSpan, ConnectionContext.Default.CodeStreamInitMessage)!,
+                                        ConnectionMode.PluginService => JsonSerializer.Deserialize(jsonSpan, ConnectionContext.Default.PluginServiceInitMessage)!,
+                                        _ => throw new ArgumentException("Invalid connection mode")
+                                    };
+                                }
+                                else
+                                {
+                                    reader.Skip();
+                                }
+                            }
+                            else
+                            {
+                                reader.Skip();
+                            }
+                        }
+                        throw new ArgumentException("Missing connection mode");
+                    }
+
+                    return DeserializeInitMessage();
                 }
                 catch (JsonException e)
                 {
@@ -275,78 +361,146 @@ namespace DuetControlServer.IPC
         /// <exception cref="SocketException">Connection has been closed</exception>
         public async ValueTask<BaseCommand> ReceiveCommand()
         {
-            using JsonDocument jsonDocument = await ReceiveJson();
-            foreach (JsonProperty item in jsonDocument.RootElement.EnumerateObject())
+            using MemoryStream receivedJson = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
+            _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(receivedJson.ToArray())}");
+
+            BaseCommand DeserializeCommand()
             {
-                if (item.Name.Equals(nameof(BaseCommand.Command), StringComparison.InvariantCultureIgnoreCase))
+                Span<byte> receivedJsonSpan = receivedJson.GetBuffer();
+                Utf8JsonReader reader = new(receivedJsonSpan);
+
+                if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
                 {
-                    // Make sure the received command is a string
-                    if (item.Value.ValueKind != JsonValueKind.String)
-                    {
-                        throw new ArgumentException("Command type must be a string");
-                    }
+                    throw new ArgumentException("Received malformed JSON");
+                }
 
-                    // Map it in case we need to retain backwards-compatibility
-                    string? commandName = item.Value.GetString();
-                    if (ApiVersion <= 8 && _legacyCommandMapping.TryGetValue(commandName?.ToLowerInvariant() ?? string.Empty, out string? newCommandName))
+                while (reader.Read())
+                {
+                    if (reader.TokenType == JsonTokenType.PropertyName)
                     {
-                        commandName = newCommandName;
-                    }
+                        if (reader.ValueTextEquals("command"u8) && reader.Read())
+                        {
+                            // Make sure the received command is a string
+                            if (reader.TokenType != JsonTokenType.String)
+                            {
+                                throw new ArgumentException("Command type must be a string");
+                            }
 
-                    // Check if the received command is valid
-                    Type? commandType = Base.GetCommandType(commandName!);
-                    if (!typeof(BaseCommand).IsAssignableFrom(commandType))
-                    {
-                        throw new ArgumentException($"Unsupported command {commandName}");
-                    }
+                            // Map it in case we need to retain backwards-compatibility
+                            string commandName = reader.GetString()!;
+                            if (ApiVersion <= 8 && _legacyCommandMapping.TryGetValue(commandName?.ToLowerInvariant() ?? string.Empty, out string? newCommandName))
+                            {
+                                commandName = newCommandName;
+                            }
 
-                    // Log this
-                    if (commandType == typeof(Acknowledge))
-                    {
-                        _logger.Trace("IPC#{0}: Received command {1}", Id, item.Value.GetString());
+                            // Check if the received command is valid
+                            Type? commandType = Base.GetCommandType(commandName!);
+                            if (!typeof(BaseCommand).IsAssignableFrom(commandType))
+                            {
+                                throw new ArgumentException($"Unsupported command {commandName}");
+                            }
+
+                            // Log this
+                            if (commandType == typeof(Acknowledge))
+                            {
+                                _logger.Trace("IPC#{0}: Received command {1}", Id, commandName);
+                            }
+                            else
+                            {
+                                _logger.Debug("IPC#{0}: Received command {1}", Id, commandName);
+                            }
+
+                            // Perform final deserialization and assign source identifier to this command
+                            BaseCommand command = (BaseCommand)JsonSerializer.Deserialize(receivedJsonSpan, commandType, CommandContext.Default)!;
+                            if (command is Commands.IConnectionCommand commandWithSourceConnection)
+                            {
+                                commandWithSourceConnection.Connection = this;
+                            }
+                            return command;
+                        }
                     }
                     else
                     {
-                        _logger.Debug("IPC#{0}: Received command {1}", Id, item.Value.GetString());
+                        reader.Skip();
                     }
-
-                    // Perform final deserialization and assign source identifier to this command
-                    BaseCommand command = (BaseCommand)JsonSerializer.Deserialize(jsonDocument, commandType, JsonHelper.DefaultJsonOptions)!;
-                    if (command is Commands.IConnectionCommand commandWithSourceConnection)
-                    {
-                        commandWithSourceConnection.Connection = this;
-                    }
-                    return command;
                 }
+                throw new ArgumentException("Command type not found");
             }
-            throw new ArgumentException("Command type not found");
+
+            return DeserializeCommand();
+        }
+
+        private static readonly byte[] _successResponse = Encoding.UTF8.GetBytes("{\"success\":true}");
+
+        /// <summary>
+        /// Send a success response to the client
+        /// </summary>
+        /// <param name="result">Object to send</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="SocketException">Message could not be sent</exception>
+        public async Task SendResponse(object? result = null)
+        {
+            if (result == null)
+            {
+                _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(_successResponse)}");
+                await UnixSocket.SendAsync(_successResponse, SocketFlags.None);
+            }
+            else
+            {
+                using MemoryStream ms = new();
+                using (Utf8JsonWriter writer = new(ms))
+                {
+                    writer.WriteStartObject();
+                    writer.WriteBoolean("success", true);
+                    writer.WritePropertyName("result");
+                    writer.WriteRawValue(JsonSerializer.SerializeToUtf8Bytes(result), true);
+                    writer.WriteEndObject();
+                }
+                await UnixSocket.SendAsync(ms.ToArray());
+            }
         }
 
         /// <summary>
-        /// Send a response to the client. The given object is send either in an empty, error, or standard response body
+        /// Send an exception to the client. The given object is send either in an empty, error, or standard response body
         /// </summary>
         /// <param name="obj">Object to send</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="SocketException">Message could not be sent</exception>
-        public Task SendResponse(object? obj = null)
+        public Task SendException(Exception e)
         {
-            if (obj is null)
+            if (e is AggregateException ae)
             {
-                return Send(new BaseResponse());
+                e = ae.InnerException!;
             }
-            
-            if (obj is Exception e)
-            {
-                if (e is AggregateException ae)
-                {
-                    e = ae.InnerException!;
-                }
-                ErrorResponse errorResponse = new(e);
-                return Send(errorResponse);
-            }
+            byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(new ErrorResponse(e), CommandContext.Default.ErrorResponse);
+            _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(toSend)}");
+            return UnixSocket.SendAsync(toSend, SocketFlags.None);
+        }
 
-            Response<object> response = new(obj);
-            return Send(response);
+        /// <summary>
+        /// Send a command to the client
+        /// </summary>
+        /// <param name="command">Command to send</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="SocketException">Message could not be sent</exception>
+        public Task SendCommand(BaseCommand command)
+        {
+            byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(command, command.GetType(), CommandContext.Default);
+            _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(toSend)}");
+            return UnixSocket.SendAsync(toSend, SocketFlags.None);
+        }
+
+        /// <summary>
+        /// Send a raw data to the client
+        /// </summary>
+        /// <param name="obj">Object to send</param>
+        /// <returns>Asynchronous task</returns>
+        /// <typeparam name="T">Object type</typeparam>
+        /// <exception cref="SocketException">Message could not be sent</exception>
+        public Task SendRawData(byte[] data)
+        {
+            _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(data)}");
+            return UnixSocket.SendAsync(data, SocketFlags.None);
         }
 
         /// <summary>
@@ -356,22 +510,9 @@ namespace DuetControlServer.IPC
         /// <returns>Asynchronous task</returns>
         /// <typeparam name="T">Object type</typeparam>
         /// <exception cref="SocketException">Message could not be sent</exception>
-        public Task Send<T>(T obj)
+        public Task SendInitMessage(DuetAPI.Connection.InitMessages.InitMessage obj)
         {
-            byte[] toSend = (obj is byte[] byteArray) ? byteArray : JsonSerializer.SerializeToUtf8Bytes(obj, JsonHelper.DefaultJsonOptions);
-            _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(toSend)}");
-            return UnixSocket.SendAsync(toSend, SocketFlags.None);
-        }
-
-        /// <summary>
-        /// Send a JSON object to the client
-        /// </summary>
-        /// <param name="obj">Object to send</param>
-        /// <returns>Asynchronous task</returns>
-        /// <exception cref="SocketException">Message could not be sent</exception>
-        public Task Send(object obj)
-        {
-            byte[] toSend = (obj is byte[] byteArray) ? byteArray : JsonSerializer.SerializeToUtf8Bytes(obj, obj.GetType(), JsonHelper.DefaultJsonOptions);
+            byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(obj, obj.GetType(), DuetAPI.Connection.ConnectionContext.Default);
             _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(toSend)}");
             return UnixSocket.SendAsync(toSend, SocketFlags.None);
         }
