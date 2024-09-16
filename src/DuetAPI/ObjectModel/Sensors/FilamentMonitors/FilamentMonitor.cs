@@ -127,7 +127,6 @@ namespace DuetAPI.ObjectModel
             {
                 if (readerCopy.TokenType == JsonTokenType.PropertyName)
                 {
-                    string propName = readerCopy.GetString();
                     if (readerCopy.ValueTextEquals("type"u8) && readerCopy.Read())
                     {
                         string? type = readerCopy.GetString();
