@@ -118,12 +118,12 @@
 		/// <summary>
 		/// Calibrated properties of this filament monitor
 		/// </summary>
-		public LaserFilamentMonitorCalibrated Calibrated
+		public LaserFilamentMonitorCalibrated? Calibrated
 		{
 			get => _calibrated;
 			set => SetPropertyValue(ref _calibrated, value);
 		}
-		private LaserFilamentMonitorCalibrated _calibrated = new();
+		private LaserFilamentMonitorCalibrated? _calibrated;
 
 		/// <summary>
 		/// Configured properties of this filament monitor

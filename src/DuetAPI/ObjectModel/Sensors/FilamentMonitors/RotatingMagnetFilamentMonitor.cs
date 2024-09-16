@@ -118,12 +118,12 @@
         /// <summary>
         /// Calibrated properties of this filament monitor
         /// </summary>
-        public RotatingMagnetFilamentMonitorCalibrated Calibrated
+        public RotatingMagnetFilamentMonitorCalibrated? Calibrated
         {
             get => _calibrated;
             set => SetPropertyValue(ref _calibrated, value);
         }
-        private RotatingMagnetFilamentMonitorCalibrated _calibrated = new();
+        private RotatingMagnetFilamentMonitorCalibrated? _calibrated;
 
         /// <summary>
         /// Configured properties of this filament monitor
