@@ -108,12 +108,12 @@
 		/// <summary>
 		/// Calibrated properties of this filament monitor
 		/// </summary>
-		public PulsedFilamentMonitorCalibrated Calibrated
+		public PulsedFilamentMonitorCalibrated? Calibrated
 		{
 			get => _calibrated;
 			set => SetPropertyValue(ref _calibrated, value);
 		}
-		private PulsedFilamentMonitorCalibrated _calibrated = new();
+		private PulsedFilamentMonitorCalibrated? _calibrated;
 
 		/// <summary>
 		/// Configured properties of this filament monitor

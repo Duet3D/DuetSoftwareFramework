@@ -247,7 +247,7 @@ namespace DuetAPI.ObjectModel
                         if (i >= Count)
                         {
                             T newItem = new();
-                            newItem.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            newItem = (T)newItem.UpdateFromJsonReader(ref reader, ignoreSbcProperties)!;
                             Add(newItem);
                         }
                         else
@@ -256,13 +256,13 @@ namespace DuetAPI.ObjectModel
                             if (item == null)
                             {
                                 item = new T();
-                                item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                                item = (T)item.UpdateFromJsonReader(ref reader, ignoreSbcProperties)!;
                                 this[i] = item;
                             }
                             else
                             {
                                 T? newItem = (T?)item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
-                                if (Equals(item, newItem))
+                                if (!ReferenceEquals(item, newItem))
                                 {
                                     this[i] = item;
                                 }

@@ -113,11 +113,21 @@ namespace DuetAPI.ObjectModel
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         public IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
         {
+            if (reader.TokenType == JsonTokenType.Null)
+            {
+                return null;
+            }
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                throw new JsonException("expected start of object");
+            }
+
             Utf8JsonReader readerCopy = reader;
             while (readerCopy.Read() && readerCopy.TokenType != JsonTokenType.EndObject)
             {
                 if (readerCopy.TokenType == JsonTokenType.PropertyName)
                 {
+                    string propName = readerCopy.GetString();
                     if (readerCopy.ValueTextEquals("type"u8) && readerCopy.Read())
                     {
                         string? type = readerCopy.GetString();
@@ -151,14 +161,13 @@ namespace DuetAPI.ObjectModel
                             return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
                         }
                     }
-                    else
-                    {
-                        readerCopy.Skip();
-                    }
+                }
+                else if (readerCopy.TokenType == JsonTokenType.StartObject)
+                {
+                    readerCopy.Skip();
                 }
             }
             return GeneratedUpdateFromJsonReader(ref reader, ignoreSbcProperties);
         }
-
     }
 }

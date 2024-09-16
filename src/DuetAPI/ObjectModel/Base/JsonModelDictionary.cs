@@ -421,6 +421,10 @@ namespace DuetAPI.ObjectModel
                     }
                 }
             }
+            else
+            {
+                throw new JsonException("expected null or start of object");
+            }
         }
     }
 

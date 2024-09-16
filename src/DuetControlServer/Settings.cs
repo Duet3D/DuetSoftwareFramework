@@ -499,17 +499,10 @@ namespace DuetControlServer
                         property = typeof(Settings).GetProperty(propertyName, BindingFlags.Static | BindingFlags.Public | BindingFlags.IgnoreCase);
                         if (property is null || Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
                         {
-                            // Skip non-existent and ignored properties
                             if (reader.Read())
                             {
-                                if (reader.TokenType == JsonTokenType.StartArray)
-                                {
-                                    while (reader.Read() && reader.TokenType != JsonTokenType.EndArray) { }
-                                }
-                                else if (reader.TokenType == JsonTokenType.StartObject)
-                                {
-                                    while (reader.Read() && reader.TokenType != JsonTokenType.EndObject) { }
-                                }
+                                // Skip non-existent and ignored properties
+                                reader.Skip();
                             }
                         }
                         break;

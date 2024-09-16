@@ -102,6 +102,15 @@ namespace DuetAPI.ObjectModel
 
         public IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
         {
+            if (reader.TokenType == JsonTokenType.Null)
+            {
+                return null;
+            }
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                throw new JsonException("expected start of object");
+            }
+
             Utf8JsonReader readerCopy = reader;
             while (readerCopy.Read() && readerCopy.TokenType != JsonTokenType.EndObject)
             {

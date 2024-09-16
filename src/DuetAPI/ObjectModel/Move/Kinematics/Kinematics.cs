@@ -112,6 +112,10 @@ namespace DuetAPI.ObjectModel
             {
                 return null;
             }
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                throw new JsonException("expected start of object");
+            }
 
             Utf8JsonReader readerCopy = reader;
             while (readerCopy.Read() && readerCopy.TokenType != JsonTokenType.EndObject)
@@ -171,6 +175,10 @@ namespace DuetAPI.ObjectModel
                     {
                         readerCopy.Skip();
                     }
+                }
+                else if (readerCopy.TokenType == JsonTokenType.StartObject)
+                {
+                    readerCopy.Skip();
                 }
             }
             return GeneratedUpdateFromJsonReader(ref reader, ignoreSbcProperties);

@@ -220,7 +220,7 @@ namespace DuetControlServer.IPC
                 try
                 {
                     using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
-                    _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(jsonStream.GetBuffer())}");
+                    _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
 
                     BaseResponse DeserializeResponse()
                     {
@@ -228,9 +228,9 @@ namespace DuetControlServer.IPC
                         Utf8JsonReader reader = new(jsonSpan);
                         if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
                         {
-                            throw new ArgumentException("Received malformed JSON");
+                            throw new ArgumentException("expected start of object");
                         }
-                        while (reader.Read())
+                        while (reader.TokenType != JsonTokenType.EndObject && reader.Read())
                         {
                             if (reader.TokenType == JsonTokenType.PropertyName)
                             {
@@ -238,15 +238,15 @@ namespace DuetControlServer.IPC
                                 {
                                     if (reader.TokenType == JsonTokenType.True)
                                     {
-                                        return JsonSerializer.Deserialize(jsonSpan, ConnectionContext.Default.BaseResponse)!;
+                                        return JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.BaseResponse)!;
                                     }
                                     else if (reader.TokenType == JsonTokenType.False)
                                     {
-                                        return JsonSerializer.Deserialize(jsonSpan, ConnectionContext.Default.ErrorResponse)!;
+                                        return JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.ErrorResponse)!;
                                     }
                                     else
                                     {
-                                        throw new ArgumentException("Success must be a boolean");
+                                        throw new ArgumentException("success must be a boolean");
                                     }
                                 }
                                 else
@@ -259,7 +259,7 @@ namespace DuetControlServer.IPC
                                 reader.Skip();
                             }
                         }
-                        throw new ArgumentException("Missing success key");
+                        throw new ArgumentException("missing success key");
                     }
 
                     return DeserializeResponse();
@@ -294,9 +294,9 @@ namespace DuetControlServer.IPC
                         Utf8JsonReader reader = new(jsonSpan);
                         if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
                         {
-                            throw new ArgumentException("Received malformed JSON");
+                            throw new ArgumentException("expected start of object");
                         }
-                        while (reader.Read())
+                        while (reader.TokenType != JsonTokenType.EndObject && reader.Read())
                         {
                             if (reader.TokenType == JsonTokenType.PropertyName)
                             {
@@ -304,7 +304,7 @@ namespace DuetControlServer.IPC
                                 {
                                     if (reader.TokenType != JsonTokenType.String)
                                     {
-                                        throw new ArgumentException("Mode must be a string");
+                                        throw new ArgumentException("mode must be a string");
                                     }
 
                                     return JsonSerializer.Deserialize(ref reader, ConnectionContext.Default.ConnectionMode) switch
@@ -327,7 +327,7 @@ namespace DuetControlServer.IPC
                                 reader.Skip();
                             }
                         }
-                        throw new ArgumentException("Missing connection mode");
+                        throw new ArgumentException("missing connection mode");
                     }
 
                     return DeserializeInitMessage();
@@ -366,15 +366,15 @@ namespace DuetControlServer.IPC
 
             BaseCommand DeserializeCommand()
             {
-                Span<byte> receivedJsonSpan = receivedJson.GetBuffer();
-                Utf8JsonReader reader = new(receivedJsonSpan);
+                Span<byte> jsonSpan = receivedJson.GetBuffer();
+                Utf8JsonReader reader = new(jsonSpan);
 
                 if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
                 {
                     throw new ArgumentException("Received malformed JSON");
                 }
 
-                while (reader.Read())
+                while (reader.TokenType != JsonTokenType.EndObject && reader.Read())
                 {
                     if (reader.TokenType == JsonTokenType.PropertyName)
                     {
@@ -383,7 +383,7 @@ namespace DuetControlServer.IPC
                             // Make sure the received command is a string
                             if (reader.TokenType != JsonTokenType.String)
                             {
-                                throw new ArgumentException("Command type must be a string");
+                                throw new ArgumentException("command must be a string");
                             }
 
                             // Map it in case we need to retain backwards-compatibility
@@ -397,7 +397,7 @@ namespace DuetControlServer.IPC
                             Type? commandType = Base.GetCommandType(commandName!);
                             if (!typeof(BaseCommand).IsAssignableFrom(commandType))
                             {
-                                throw new ArgumentException($"Unsupported command {commandName}");
+                                throw new ArgumentException($"unsupported command {commandName}");
                             }
 
                             // Log this
@@ -411,7 +411,7 @@ namespace DuetControlServer.IPC
                             }
 
                             // Perform final deserialization and assign source identifier to this command
-                            BaseCommand command = (BaseCommand)JsonSerializer.Deserialize(receivedJsonSpan, commandType, CommandContext.Default)!;
+                            BaseCommand command = (BaseCommand)JsonSerializer.Deserialize(jsonSpan, commandType, CommandContext.Default)!;
                             if (command is Commands.IConnectionCommand commandWithSourceConnection)
                             {
                                 commandWithSourceConnection.Connection = this;
@@ -424,7 +424,7 @@ namespace DuetControlServer.IPC
                         reader.Skip();
                     }
                 }
-                throw new ArgumentException("Command type not found");
+                throw new ArgumentException("command type not found");
             }
 
             return DeserializeCommand();

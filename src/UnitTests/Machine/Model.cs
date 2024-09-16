@@ -33,8 +33,8 @@ namespace UnitTests.Machine
             Assert.That(((CoreKinematics)model.Move.Kinematics).Name, Is.EqualTo(KinematicsName.Cartesian));
 
             // Test polymorphic ModelObject in collection
-            Assert.That(model.Sensors.FilamentMonitors[0], Is.TypeOf<FilamentMonitor>());
-            Assert.That(model.Sensors.FilamentMonitors[0].Type, Is.EqualTo(FilamentMonitorType.Simple));
+            Assert.That(model.Sensors.FilamentMonitors[0], Is.TypeOf<RotatingMagnetFilamentMonitor>());
+            Assert.That(model.Sensors.FilamentMonitors[0].Type, Is.EqualTo(FilamentMonitorType.RotatingMagnet));
         }
 
         [Test]
