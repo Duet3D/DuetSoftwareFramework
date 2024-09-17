@@ -562,7 +562,7 @@ namespace DuetPiManagementPlugin
 
                                 if (seen)
                                 {
-                                    await Connection.ResolveCode(MessageType.Success, string.Empty);
+                                    await Connection.IgnoreCode();      // RRF needs to see M905 as well
                                 }
                                 else
                                 {
