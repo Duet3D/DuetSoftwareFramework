@@ -47,7 +47,7 @@ namespace DuetControlServer.Commands
     [JsonSerializable(typeof(RemoveUserSession))]
     [JsonSerializable(typeof(DuetAPI.Commands.BaseResponse))]
     [JsonSerializable(typeof(DuetAPI.Commands.ErrorResponse))]
-    [JsonSourceGenerationOptions(DictionaryKeyPolicy = JsonKnownNamingPolicy.CamelCase, PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+    [JsonSourceGenerationOptions(PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
     public sealed partial class CommandContext : JsonSerializerContext
     {
         static CommandContext() => Default = new CommandContext(CreateJsonSerializerOptions(Default));

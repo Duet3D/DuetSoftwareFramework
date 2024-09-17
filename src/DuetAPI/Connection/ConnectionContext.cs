@@ -14,7 +14,7 @@ namespace DuetAPI.Connection
     [JsonSerializable(typeof(PluginServiceInitMessage))]
     [JsonSerializable(typeof(ServerInitMessage))]
     [JsonSerializable(typeof(SubscribeInitMessage))]
-    [JsonSourceGenerationOptions(DictionaryKeyPolicy = JsonKnownNamingPolicy.CamelCase, PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+    [JsonSourceGenerationOptions(PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
     public sealed partial class ConnectionContext : JsonSerializerContext
     {
         static ConnectionContext() => Default = new ConnectionContext(CreateJsonSerializerOptions(Default));

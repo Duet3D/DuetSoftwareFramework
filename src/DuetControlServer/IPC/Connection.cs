@@ -238,11 +238,11 @@ namespace DuetControlServer.IPC
                                 {
                                     if (reader.TokenType == JsonTokenType.True)
                                     {
-                                        return JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.BaseResponse)!;
+                                        return JsonSerializer.Deserialize(jsonSpan, Commands.CommandContext.Default.BaseResponse)!;
                                     }
                                     else if (reader.TokenType == JsonTokenType.False)
                                     {
-                                        return JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.ErrorResponse)!;
+                                        return JsonSerializer.Deserialize(jsonSpan, Commands.CommandContext.Default.ErrorResponse)!;
                                     }
                                     else
                                     {
@@ -453,7 +453,7 @@ namespace DuetControlServer.IPC
                     writer.WriteStartObject();
                     writer.WriteBoolean("success", true);
                     writer.WritePropertyName("result");
-                    writer.WriteRawValue(JsonSerializer.SerializeToUtf8Bytes(result), true);
+                    writer.WriteRawValue(JsonSerializer.SerializeToUtf8Bytes(result, JsonHelper.DefaultJsonOptions), true);
                     writer.WriteEndObject();
                 }
                 await UnixSocket.SendAsync(ms.ToArray());
@@ -472,7 +472,7 @@ namespace DuetControlServer.IPC
             {
                 e = ae.InnerException!;
             }
-            byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(new ErrorResponse(e), CommandContext.Default.ErrorResponse);
+            byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(new ErrorResponse(e), Commands.CommandContext.Default.ErrorResponse);
             _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(toSend)}");
             return UnixSocket.SendAsync(toSend, SocketFlags.None);
         }
@@ -485,7 +485,7 @@ namespace DuetControlServer.IPC
         /// <exception cref="SocketException">Message could not be sent</exception>
         public Task SendCommand(BaseCommand command)
         {
-            byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(command, command.GetType(), CommandContext.Default);
+            byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(command, command.GetType(), Commands.CommandContext.Default);
             _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(toSend)}");
             return UnixSocket.SendAsync(toSend, SocketFlags.None);
         }
@@ -510,7 +510,7 @@ namespace DuetControlServer.IPC
         /// <exception cref="SocketException">Message could not be sent</exception>
         public Task SendInitMessage(InitMessage msg)
         {
-            byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(msg, msg.GetType(), DuetAPI.Connection.ConnectionContext.Default);
+            byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(msg, msg.GetType(), ConnectionContext.Default);
             _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(toSend)}");
             return UnixSocket.SendAsync(toSend, SocketFlags.None);
         }

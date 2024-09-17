@@ -111,7 +111,6 @@ namespace DuetAPI.Utility
         /// </summary>
         public static readonly JsonSerializerOptions DefaultJsonOptions = new()
         {
-            DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
             PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
