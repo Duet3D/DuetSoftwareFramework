@@ -2269,6 +2269,12 @@ references:
   commentId: F:DuetAPI.Commands.HttpResponseType.StatusCode
   fullName: DuetAPI.Commands.HttpResponseType.StatusCode
   nameWithType: HttpResponseType.StatusCode
+- uid: DuetAPI.Commands.HttpResponseType.URI
+  name: URI
+  href: api/DuetAPI.Commands.HttpResponseType.html#DuetAPI_Commands_HttpResponseType_URI
+  commentId: F:DuetAPI.Commands.HttpResponseType.URI
+  fullName: DuetAPI.Commands.HttpResponseType.URI
+  nameWithType: HttpResponseType.URI
 - uid: DuetAPI.Commands.Ignore
   name: Ignore
   href: api/DuetAPI.Commands.Ignore.html
@@ -16982,6 +16988,15 @@ references:
   fullName.vb: DuetAPIClient.BaseCommandConnection.PatchObjectModel(String, Object, System.Threading.CancellationToken)
   nameWithType: BaseCommandConnection.PatchObjectModel(string, object, CancellationToken)
   nameWithType.vb: BaseCommandConnection.PatchObjectModel(String, Object, CancellationToken)
+- uid: DuetAPIClient.BaseCommandConnection.PatchObjectModel(System.String,System.Text.Json.JsonElement,System.Threading.CancellationToken)
+  name: PatchObjectModel(string, JsonElement, CancellationToken)
+  href: api/DuetAPIClient.BaseCommandConnection.html#DuetAPIClient_BaseCommandConnection_PatchObjectModel_System_String_System_Text_Json_JsonElement_System_Threading_CancellationToken_
+  commentId: M:DuetAPIClient.BaseCommandConnection.PatchObjectModel(System.String,System.Text.Json.JsonElement,System.Threading.CancellationToken)
+  name.vb: PatchObjectModel(String, JsonElement, CancellationToken)
+  fullName: DuetAPIClient.BaseCommandConnection.PatchObjectModel(string, System.Text.Json.JsonElement, System.Threading.CancellationToken)
+  fullName.vb: DuetAPIClient.BaseCommandConnection.PatchObjectModel(String, System.Text.Json.JsonElement, System.Threading.CancellationToken)
+  nameWithType: BaseCommandConnection.PatchObjectModel(string, JsonElement, CancellationToken)
+  nameWithType.vb: BaseCommandConnection.PatchObjectModel(String, JsonElement, CancellationToken)
 - uid: DuetAPIClient.BaseCommandConnection.PatchObjectModel*
   name: PatchObjectModel
   href: api/DuetAPIClient.BaseCommandConnection.html#DuetAPIClient_BaseCommandConnection_PatchObjectModel_
@@ -17132,6 +17147,15 @@ references:
   fullName.vb: DuetAPIClient.BaseCommandConnection.SetPluginData(String, Object, String, System.Threading.CancellationToken)
   nameWithType: BaseCommandConnection.SetPluginData(string, object, string?, CancellationToken)
   nameWithType.vb: BaseCommandConnection.SetPluginData(String, Object, String, CancellationToken)
+- uid: DuetAPIClient.BaseCommandConnection.SetPluginData(System.String,System.Text.Json.JsonElement,System.String,System.Threading.CancellationToken)
+  name: SetPluginData(string, JsonElement, string?, CancellationToken)
+  href: api/DuetAPIClient.BaseCommandConnection.html#DuetAPIClient_BaseCommandConnection_SetPluginData_System_String_System_Text_Json_JsonElement_System_String_System_Threading_CancellationToken_
+  commentId: M:DuetAPIClient.BaseCommandConnection.SetPluginData(System.String,System.Text.Json.JsonElement,System.String,System.Threading.CancellationToken)
+  name.vb: SetPluginData(String, JsonElement, String, CancellationToken)
+  fullName: DuetAPIClient.BaseCommandConnection.SetPluginData(string, System.Text.Json.JsonElement, string?, System.Threading.CancellationToken)
+  fullName.vb: DuetAPIClient.BaseCommandConnection.SetPluginData(String, System.Text.Json.JsonElement, String, System.Threading.CancellationToken)
+  nameWithType: BaseCommandConnection.SetPluginData(string, JsonElement, string?, CancellationToken)
+  nameWithType.vb: BaseCommandConnection.SetPluginData(String, JsonElement, String, CancellationToken)
 - uid: DuetAPIClient.BaseCommandConnection.SetPluginData*
   name: SetPluginData
   href: api/DuetAPIClient.BaseCommandConnection.html#DuetAPIClient_BaseCommandConnection_SetPluginData_
@@ -22576,6 +22600,15 @@ references:
   fullName.vb: DuetControlServer.Model.Filter.GetFiltered(Object())
   nameWithType: Filter.GetFiltered(object[])
   nameWithType.vb: Filter.GetFiltered(Object())
+- uid: DuetControlServer.Model.Filter.GetFiltered(System.String)
+  name: GetFiltered(string)
+  href: api/DuetControlServer.Model.Filter.html#DuetControlServer_Model_Filter_GetFiltered_System_String_
+  commentId: M:DuetControlServer.Model.Filter.GetFiltered(System.String)
+  name.vb: GetFiltered(String)
+  fullName: DuetControlServer.Model.Filter.GetFiltered(string)
+  fullName.vb: DuetControlServer.Model.Filter.GetFiltered(String)
+  nameWithType: Filter.GetFiltered(string)
+  nameWithType.vb: Filter.GetFiltered(String)
 - uid: DuetControlServer.Model.Filter.GetFiltered*
   name: GetFiltered
   href: api/DuetControlServer.Model.Filter.html#DuetControlServer_Model_Filter_GetFiltered_
@@ -30314,19 +30347,6 @@ references:
   isSpec: "True"
   fullName: DuetWebServer.Singletons.IModelProvider.ReplySeq
   nameWithType: IModelProvider.ReplySeq
-- uid: DuetWebServer.Singletons.IModelProvider.VolumesSeq
-  name: VolumesSeq
-  href: api/DuetWebServer.Singletons.IModelProvider.html#DuetWebServer_Singletons_IModelProvider_VolumesSeq
-  commentId: P:DuetWebServer.Singletons.IModelProvider.VolumesSeq
-  fullName: DuetWebServer.Singletons.IModelProvider.VolumesSeq
-  nameWithType: IModelProvider.VolumesSeq
-- uid: DuetWebServer.Singletons.IModelProvider.VolumesSeq*
-  name: VolumesSeq
-  href: api/DuetWebServer.Singletons.IModelProvider.html#DuetWebServer_Singletons_IModelProvider_VolumesSeq_
-  commentId: Overload:DuetWebServer.Singletons.IModelProvider.VolumesSeq
-  isSpec: "True"
-  fullName: DuetWebServer.Singletons.IModelProvider.VolumesSeq
-  nameWithType: IModelProvider.VolumesSeq
 - uid: DuetWebServer.Singletons.IModelProvider.WebDirectory
   name: WebDirectory
   href: api/DuetWebServer.Singletons.IModelProvider.html#DuetWebServer_Singletons_IModelProvider_WebDirectory
@@ -30595,19 +30615,6 @@ references:
   isSpec: "True"
   fullName: DuetWebServer.Singletons.ModelProvider.ReplySeq
   nameWithType: ModelProvider.ReplySeq
-- uid: DuetWebServer.Singletons.ModelProvider.VolumesSeq
-  name: VolumesSeq
-  href: api/DuetWebServer.Singletons.ModelProvider.html#DuetWebServer_Singletons_ModelProvider_VolumesSeq
-  commentId: P:DuetWebServer.Singletons.ModelProvider.VolumesSeq
-  fullName: DuetWebServer.Singletons.ModelProvider.VolumesSeq
-  nameWithType: ModelProvider.VolumesSeq
-- uid: DuetWebServer.Singletons.ModelProvider.VolumesSeq*
-  name: VolumesSeq
-  href: api/DuetWebServer.Singletons.ModelProvider.html#DuetWebServer_Singletons_ModelProvider_VolumesSeq_
-  commentId: Overload:DuetWebServer.Singletons.ModelProvider.VolumesSeq
-  isSpec: "True"
-  fullName: DuetWebServer.Singletons.ModelProvider.VolumesSeq
-  nameWithType: ModelProvider.VolumesSeq
 - uid: DuetWebServer.Singletons.ModelProvider.WebDirectory
   name: WebDirectory
   href: api/DuetWebServer.Singletons.ModelProvider.html#DuetWebServer_Singletons_ModelProvider_WebDirectory

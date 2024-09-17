@@ -1795,6 +1795,56 @@
   <div class="seealso">
       <div><a class="xref" href="DuetAPI.Connection.InitMessages.SubscribeInitMessage.html#DuetAPI_Connection_InitMessages_SubscribeInitMessage_Filter">Filter</a></div>
   </div>
+  <a id="DuetControlServer_Model_Filter_GetFiltered_" data-uid="DuetControlServer.Model.Filter.GetFiltered*"></a>
+  <h4 id="DuetControlServer_Model_Filter_GetFiltered_System_String_" data-uid="DuetControlServer.Model.Filter.GetFiltered(System.String)">GetFiltered(string)</h4>
+  <div class="markdown level1 summary"><p>Get a partial object model with only fields that match the given filter</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static Dictionary&lt;string, object?&gt; GetFiltered(string filter)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">filter</span></td>
+        <td><p>Filter string</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2">Dictionary</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>&gt;</td>
+        <td><p>Dictionary holding the results or null if nothing could be found</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 id="DuetControlServer_Model_Filter_GetFiltered_System_String__remarks">Remarks</h5>
+  <div class="markdown level1 remarks"><p>Make sure the model provider is locked in read-only mode before using this class</p>
+</div>
+  <h5 id="DuetControlServer_Model_Filter_GetFiltered_System_String__seealso">See Also</h5>
+  <div class="seealso">
+      <div><a class="xref" href="DuetAPI.Connection.InitMessages.SubscribeInitMessage.html#DuetAPI_Connection_InitMessages_SubscribeInitMessage_Filter">Filter</a></div>
+  </div>
   <a id="DuetControlServer_Model_Filter_GetSpecific_" data-uid="DuetControlServer.Model.Filter.GetSpecific*"></a>
   <h4 id="DuetControlServer_Model_Filter_GetSpecific_System_String_System_Boolean_System_Object__" data-uid="DuetControlServer.Model.Filter.GetSpecific(System.String,System.Boolean,System.Object@)">GetSpecific(string, bool, out object?)</h4>
   <div class="markdown level1 summary"><p>Find a specific object in the object model (wildcards are not supported)</p>

@@ -2967,7 +2967,8 @@ public Task PatchMachineModel(string key, object patch, CancellationToken cancel
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public Task PatchObjectModel(string key, object patch, CancellationToken cancellationToken = default)</code></pre>
+    <pre><code class="lang-csharp hljs">[Obsolete(&quot;Deprecated in favor of PatchObjectModel which takes a JsonElement instead of an object&quot;)]
+public Task PatchObjectModel(string key, object patch, CancellationToken cancellationToken = default)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-condensed">
@@ -3037,6 +3038,86 @@ public Task PatchMachineModel(string key, object patch, CancellationToken cancel
     </tbody>
   </table>
   <h5 id="DuetAPIClient_BaseCommandConnection_PatchObjectModel_System_String_System_Object_System_Threading_CancellationToken__seealso">See Also</h5>
+  <div class="seealso">
+      <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ObjectModelReadWrite">ObjectModelReadWrite</a></div>
+  </div>
+  <a id="DuetAPIClient_BaseCommandConnection_PatchObjectModel_" data-uid="DuetAPIClient.BaseCommandConnection.PatchObjectModel*"></a>
+  <h4 id="DuetAPIClient_BaseCommandConnection_PatchObjectModel_System_String_System_Text_Json_JsonElement_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.PatchObjectModel(System.String,System.Text.Json.JsonElement,System.Threading.CancellationToken)">PatchObjectModel(string, JsonElement, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Apply a full patch to the object model. Use with care!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task PatchObjectModel(string key, JsonElement patch, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">key</span></td>
+        <td><p>Key to update</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonelement">JsonElement</a></td>
+        <td><span class="parametername">patch</span></td>
+        <td><p>Patch to apply</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td><p>Optional cancellation token</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
+        <td><p>Asynchronous task</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></td>
+        <td><p>Operation has been cancelled</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.sockets.socketexception">SocketException</a></td>
+        <td><p>Command could not be processed</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 id="DuetAPIClient_BaseCommandConnection_PatchObjectModel_System_String_System_Text_Json_JsonElement_System_Threading_CancellationToken__seealso">See Also</h5>
   <div class="seealso">
       <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ObjectModelReadWrite">ObjectModelReadWrite</a></div>
   </div>
@@ -3780,7 +3861,8 @@ public Task&lt;bool&gt; SetMachineModel(string path, string value, CancellationT
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public Task SetPluginData(string key, object value, string? plugin = null, CancellationToken cancellationToken = default)</code></pre>
+    <pre><code class="lang-csharp hljs">[Obsolete(&quot;Deprecated in favour of new overload which takes a JsonElement argument&quot;)]
+public Task SetPluginData(string key, object value, string? plugin = null, CancellationToken cancellationToken = default)</code></pre>
   </div>
   <h5 class="parameters">Parameters</h5>
   <table class="table table-bordered table-condensed">
@@ -3860,6 +3942,97 @@ public Task&lt;bool&gt; SetMachineModel(string path, string value, CancellationT
     </tbody>
   </table>
   <h5 id="DuetAPIClient_BaseCommandConnection_SetPluginData_System_String_System_Object_System_String_System_Threading_CancellationToken__seealso">See Also</h5>
+  <div class="seealso">
+      <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ObjectModelReadWrite">ObjectModelReadWrite</a></div>
+      <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ManagePlugins">ManagePlugins</a></div>
+  </div>
+  <a id="DuetAPIClient_BaseCommandConnection_SetPluginData_" data-uid="DuetAPIClient.BaseCommandConnection.SetPluginData*"></a>
+  <h4 id="DuetAPIClient_BaseCommandConnection_SetPluginData_System_String_System_Text_Json_JsonElement_System_String_System_Threading_CancellationToken_" data-uid="DuetAPIClient.BaseCommandConnection.SetPluginData(System.String,System.Text.Json.JsonElement,System.String,System.Threading.CancellationToken)">SetPluginData(string, JsonElement, string?, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Set custom plugin data in the object model</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task SetPluginData(string key, JsonElement value, string? plugin = null, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">key</span></td>
+        <td><p>Key to set</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonelement">JsonElement</a></td>
+        <td><span class="parametername">value</span></td>
+        <td><p>Value to set</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">plugin</span></td>
+        <td><p>Identifier of the plugin to update (optional)</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
+        <td><p>Asynchronous task</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></td>
+        <td><p>Operation has been cancelled</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.sockets.socketexception">SocketException</a></td>
+        <td><p>Command could not be processed</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.unauthorizedaccessexception">UnauthorizedAccessException</a></td>
+        <td><p>Insufficient permissions to modify other plugin data</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 id="DuetAPIClient_BaseCommandConnection_SetPluginData_System_String_System_Text_Json_JsonElement_System_String_System_Threading_CancellationToken__seealso">See Also</h5>
   <div class="seealso">
       <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ObjectModelReadWrite">ObjectModelReadWrite</a></div>
       <div><a class="xref" href="DuetAPI.Utility.SbcPermissions.html#DuetAPI_Utility_SbcPermissions_ManagePlugins">ManagePlugins</a></div>
