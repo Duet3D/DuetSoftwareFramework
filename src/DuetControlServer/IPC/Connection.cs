@@ -224,7 +224,7 @@ namespace DuetControlServer.IPC
 
                     BaseResponse DeserializeResponse()
                     {
-                        Span<byte> jsonSpan = jsonStream.GetBuffer();
+                        Span<byte> jsonSpan = jsonStream.ToArray();
                         Utf8JsonReader reader = new(jsonSpan);
                         if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
                         {
@@ -286,11 +286,11 @@ namespace DuetControlServer.IPC
                 try
                 {
                     using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
-                    _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(jsonStream.GetBuffer())}");
+                    _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
 
                     ClientInitMessage DeserializeInitMessage()
                     {
-                        Span<byte> jsonSpan = jsonStream.GetBuffer();
+                        Span<byte> jsonSpan = jsonStream.ToArray();
                         Utf8JsonReader reader = new(jsonSpan);
                         if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
                         {
@@ -366,7 +366,7 @@ namespace DuetControlServer.IPC
 
             BaseCommand DeserializeCommand()
             {
-                Span<byte> jsonSpan = receivedJson.GetBuffer();
+                Span<byte> jsonSpan = receivedJson.ToArray();
                 Utf8JsonReader reader = new(jsonSpan);
 
                 if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
@@ -411,7 +411,7 @@ namespace DuetControlServer.IPC
                             }
 
                             // Perform final deserialization and assign source identifier to this command
-                            BaseCommand command = (BaseCommand)JsonSerializer.Deserialize(jsonSpan, commandType, CommandContext.Default)!;
+                            BaseCommand command = (BaseCommand)JsonSerializer.Deserialize(jsonSpan, commandType, Commands.CommandContext.Default)!;
                             if (command is Commands.IConnectionCommand commandWithSourceConnection)
                             {
                                 commandWithSourceConnection.Connection = this;
@@ -463,7 +463,7 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Send an exception to the client. The given object is send either in an empty, error, or standard response body
         /// </summary>
-        /// <param name="obj">Object to send</param>
+        /// <param name="e">Exception to send</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="SocketException">Message could not be sent</exception>
         public Task SendException(Exception e)
@@ -491,11 +491,10 @@ namespace DuetControlServer.IPC
         }
 
         /// <summary>
-        /// Send a raw data to the client
+        /// Send raw data to the client
         /// </summary>
-        /// <param name="obj">Object to send</param>
+        /// <param name="data">Data to send</param>
         /// <returns>Asynchronous task</returns>
-        /// <typeparam name="T">Object type</typeparam>
         /// <exception cref="SocketException">Message could not be sent</exception>
         public Task SendRawData(byte[] data)
         {
@@ -504,15 +503,14 @@ namespace DuetControlServer.IPC
         }
 
         /// <summary>
-        /// Send a JSON object to the client
+        /// Send an init message to the client
         /// </summary>
-        /// <param name="obj">Object to send</param>
+        /// <param name="msg">Message to send</param>
         /// <returns>Asynchronous task</returns>
-        /// <typeparam name="T">Object type</typeparam>
         /// <exception cref="SocketException">Message could not be sent</exception>
-        public Task SendInitMessage(DuetAPI.Connection.InitMessages.InitMessage obj)
+        public Task SendInitMessage(InitMessage msg)
         {
-            byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(obj, obj.GetType(), DuetAPI.Connection.ConnectionContext.Default);
+            byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(msg, msg.GetType(), DuetAPI.Connection.ConnectionContext.Default);
             _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(toSend)}");
             return UnixSocket.SendAsync(toSend, SocketFlags.None);
         }
