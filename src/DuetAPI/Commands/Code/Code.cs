@@ -553,7 +553,7 @@ namespace DuetAPI.Commands
         /// <param name="parameter">Parameter if found, else null</param>
         /// <returns>True if the requested parameter could be found</returns>
         /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-        public bool TryGetBool(char letter, out bool? parameter)
+        public bool TryGetBool(char letter, [NotNullWhen(true)] out bool? parameter)
         {
             foreach (CodeParameter param in Parameters)
             {

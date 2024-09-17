@@ -494,16 +494,30 @@ namespace DuetPiManagementPlugin
                             {
                                 bool seen = false;
 
+                                if (code.TryGetBool('A', out bool? useNTP))
+                                {
+                                    if (!await Command.ExecQuery("timedatectl", $"set-ntp {(useNTP.Value ? "true" : "false")}"))
+                                    {
+                                        await Connection.ResolveCode(MessageType.Error, "Failed to set NTP");
+                                        break;
+                                    }
+                                    seen = true;
+                                }
+
                                 if (code.TryGetString('P', out string? dayString))
                                 {
                                     if (DateTime.TryParseExact(dayString, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date))
                                     {
-                                        await Process.Start("timedatectl", $"set-time {date:yyyy-MM-dd}").WaitForExitAsync(CancellationToken);
-                                        seen = true;
+                                        if (!await Command.ExecQuery("timedatectl", $"set-time {date:yyyy-MM-dd}"))
+                                        {
+                                            await Connection.ResolveCode(MessageType.Error, "Failed to set date (NTP enabled?)");
+                                            break;
+                                        }
                                     }
                                     else
                                     {
                                         await Connection.ResolveCode(MessageType.Error, "Invalid date format");
+                                        break;
                                     }
                                 }
 
@@ -511,7 +525,11 @@ namespace DuetPiManagementPlugin
                                 {
                                     if (DateTime.TryParseExact(timeString, "HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime time))
                                     {
-                                        await Process.Start("timedatectl", $"set-time {time:HH:mm:ss}").WaitForExitAsync(CancellationToken);
+                                        if (!await Command.ExecQuery("timedatectl", $"set-time {time:HH:mm:ss}"))
+                                        {
+                                            await Connection.ResolveCode(MessageType.Error, "Failed to set time (NYP enabled?)");
+                                            break;
+                                        }
                                         seen = true;
                                     }
                                     else
@@ -535,7 +553,11 @@ namespace DuetPiManagementPlugin
                                     }
                                 }
 
-                                if (!seen)
+                                if (seen)
+                                {
+                                    await Connection.ResolveCode(MessageType.Success, string.Empty);
+                                }
+                                else
                                 {
                                     await Connection.ResolveCode(MessageType.Success, $"Current date and time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                                 }
