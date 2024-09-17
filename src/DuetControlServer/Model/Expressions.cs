@@ -495,6 +495,7 @@ namespace DuetControlServer.Model
         /// <param name="onlySbcFields">Whether to replace only SBC fields</param>
         /// <returns>Replaced expression(s)</returns>
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
+        /// <exception cref="OperationCanceledException">Code was cancelled</exception>
         public static async Task<object?> EvaluateExpressionRaw(Code code, string expression, bool onlySbcFields)
         {
             int i = 0;
@@ -714,7 +715,17 @@ namespace DuetControlServer.Model
                 {
                     return (evaluatedSubExpression != _nullResult) ? evaluatedSubExpression : null;
                 }
-                return await SPI.Interface.EvaluateExpression(code.Channel, subExpression);
+
+                // Don't return exceptions from cancelled codes
+                code.CancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    return await SPI.Interface.EvaluateExpression(code.Channel, subExpression);
+                }
+                catch (CodeParserException) when (code.CancellationToken.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException();
+                }
             }
 
             // Eat a sub-expression and evaluate SBC-only properties + custom functions where applicable
@@ -866,7 +877,17 @@ namespace DuetControlServer.Model
             {
                 return expressionContent;
             }
-            return await SPI.Interface.EvaluateExpression(code.Channel, expressionContent);
+
+            // Don't return exceptions from cancelled codes
+            code.CancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                return await SPI.Interface.EvaluateExpression(code.Channel, expressionContent);
+            }
+            catch (CodeParserException) when (code.CancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException();
+            }
         }
 
         /// <summary>
@@ -878,6 +899,7 @@ namespace DuetControlServer.Model
         /// <param name="encodeResult">Whether the final result shall be encoded</param>
         /// <returns>Replaced expression(s)</returns>
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
+        /// <exception cref="OperationCanceledException">Code was cancelled</exception>
         public static async Task<string> EvaluateExpression(Code code, string expression, bool onlySbcFields, bool encodeResult)
         {
             object? result = await EvaluateExpressionRaw(code, expression, onlySbcFields);
