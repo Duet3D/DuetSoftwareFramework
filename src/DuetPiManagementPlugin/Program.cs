@@ -124,6 +124,13 @@ namespace DuetPiManagementPlugin
                 try
                 {
                     code = await Connection.ReceiveCode(CancellationToken);
+
+                    // Don't process system codes that need to go straight to the firmware
+                    if (code.Flags.HasFlag(CodeFlags.IsInternallyProcessed))
+                    {
+                        await Connection.IgnoreCode();
+                        continue;
+                    }
                 }
                 catch (Exception e) when (e is OperationCanceledException)
                 {
