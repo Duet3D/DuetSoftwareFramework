@@ -1,4 +1,5 @@
-﻿using DuetAPI.Commands;
+﻿using DuetAPI;
+using DuetAPI.Commands;
 using DuetAPI.Connection;
 using System;
 using System.Threading.Tasks;
@@ -31,6 +32,12 @@ namespace DuetControlServer.Codes.Pipelines
                 }
                 catch (Exception e)
                 {
+                    if (e is CodeParserException && code.CancellationToken.IsCancellationRequested)
+                    {
+                        // We may get here when a code is cancelled while an evaluation request is being processed
+                        e = new OperationCanceledException();
+                    }
+
                     if (e is not OperationCanceledException)
                     {
                         Processor.Logger.Error(e, "Failed to execute code {0} on internal processing stage", code);

@@ -1286,8 +1286,8 @@ namespace DuetControlServer.SPI.Channel
             // Invalidate pending requests
             InvalidateRegular();
 
-            // Clear pausable macros
-            while (CurrentState.File is MacroFile { IsPausable: true })
+            // Clear macros. When we get here, RRF has done the same
+            while (CurrentState.File is MacroFile)
             {
                 Pop();
             }
