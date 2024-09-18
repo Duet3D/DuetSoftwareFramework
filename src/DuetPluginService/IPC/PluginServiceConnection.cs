@@ -61,7 +61,7 @@ namespace DuetPluginService
         /// <exception cref="SocketException">Connection has been closed</exception>
         public async ValueTask<BaseCommand> ReceiveCommand()
         {
-            using JsonDocument jsonDocument = await ReceiveJson(Program.CancellationToken);
+            using JsonDocument jsonDocument = await ReceiveJsonDocument(Program.CancellationToken);
             foreach (JsonProperty item in jsonDocument.RootElement.EnumerateObject())
             {
                 if (item.Name.Equals(nameof(BaseCommand.Command), StringComparison.InvariantCultureIgnoreCase))

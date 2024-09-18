@@ -261,7 +261,6 @@ namespace DuetControlServer.IPC
                         }
                         throw new ArgumentException("missing success key");
                     }
-
                     return DeserializeResponse();
                 }
                 catch (JsonException e)

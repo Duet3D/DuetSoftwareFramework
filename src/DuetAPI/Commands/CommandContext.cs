@@ -7,6 +7,7 @@ namespace DuetAPI.Commands
     /// <summary>
     /// Context for JSON handling of IPC commands
     /// </summary>
+    // Supported command types
     [JsonSerializable(typeof(Code))]
     [JsonSerializable(typeof(Cancel))]
     [JsonSerializable(typeof(Ignore))]
@@ -45,8 +46,14 @@ namespace DuetAPI.Commands
     [JsonSerializable(typeof(UninstallPlugin))]
     [JsonSerializable(typeof(AddUserSession))]
     [JsonSerializable(typeof(RemoveUserSession))]
+    // Generic responses
     [JsonSerializable(typeof(BaseResponse))]
     [JsonSerializable(typeof(ErrorResponse))]
+    // Specific command results
+    [JsonSerializable(typeof(bool))]
+    [JsonSerializable(typeof(int))]
+    [JsonSerializable(typeof(string))]
+    [JsonSerializable(typeof(JsonElement))]
     [JsonSourceGenerationOptions(PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
     public sealed partial class CommandContext : JsonSerializerContext
     {

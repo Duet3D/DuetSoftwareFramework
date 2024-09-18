@@ -263,19 +263,19 @@ namespace DuetPiManagementPlugin.Network
                     return new Message(MessageType.Success, "{\"err\":1}");
                 }
 
-                return new Message(MessageType.Success, JsonSerializer.Serialize(new
+                return new Message(MessageType.Success, JsonSerializer.Serialize(new WifiScanResult()
                 {
-                    networkScanResults = _networks.Select(network => new
+                    NetworkScanResults = _networks.Select(network => new WifiScanResultItem()
                     {
-                        ssid = network.Name,
-                        chan = network.Channel,
-                        rssi = network.Rssi,
-                        phymode = network.PhyMode,
-                        auth = network.Auth,
-                        mac = network.MacAddress
+                        SSID = network.Name,
+                        Chan = network.Channel,
+                        RSSI = network.Rssi,
+                        Phymode = network.PhyMode,
+                        Auth = network.Auth,
+                        MAC = network.MacAddress
                     }).ToArray(),
-                    err = 0
-                }));
+                    Err = 0
+                }, JsonContext.Default.WifiScanResult));
             }
 
             if (_scanning)

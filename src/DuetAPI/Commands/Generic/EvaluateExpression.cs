@@ -1,4 +1,5 @@
-﻿using DuetAPI.Utility;
+﻿using System.Text.Json;
+using DuetAPI.Utility;
 
 namespace DuetAPI.Commands
 {
@@ -6,7 +7,7 @@ namespace DuetAPI.Commands
     /// Evaluate an arbitrary expression on the given channel
     /// </summary>
     [RequiredPermissions(SbcPermissions.CommandExecution)]
-    public class EvaluateExpression : Command<object?>
+    public class EvaluateExpression : Command<JsonElement>
     {
         /// <summary>
         /// Code channel where the expression is evaluated
