@@ -61,7 +61,7 @@ namespace DuetHttpClient.Connector
             uint? sessionKey = null;
             using (HttpClient client = new() { Timeout = options.Timeout })
             {
-                using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, "rr_connect?password={HttpUtility.UrlPathEncode(password)}&time={DateTime.Now:s}"), cancellationToken);
+                using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"rr_connect?password={HttpUtility.UrlPathEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken);
                 response.EnsureSuccessStatusCode();
 
 #if NET6_0_OR_GREATER
