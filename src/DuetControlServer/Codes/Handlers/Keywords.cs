@@ -22,10 +22,11 @@ namespace DuetControlServer.Codes.Handlers
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
         /// <summary>
-        /// Process a T-code that should be interpreted by the control server
+        /// Process a non-branching meta G-code statement
         /// </summary>
         /// <param name="code">Code to process</param>
-        /// <returns>Result of the code if the code completed, else null</returns>
+        /// <returns>Result of the code if the code completed</returns>
+        /// <exception cref="OperationCanceledException">The code was cancelled</exception></exception>
         public static async Task<Message> Process(Code code)
         {
             if (code.KeywordArgument is null)
