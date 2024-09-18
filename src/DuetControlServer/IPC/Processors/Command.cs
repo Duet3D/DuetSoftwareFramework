@@ -124,7 +124,7 @@ namespace DuetControlServer.IPC.Processors
                             _logger.Error(e, "IPC#{0}: Failed to receive command", Connection.Id);
                         }
                     }
-                    await Connection.SendResponse(e);
+                    await Connection.SendException(e);
                 }
             }
             while (!Program.CancellationToken.IsCancellationRequested);
