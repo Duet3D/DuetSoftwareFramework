@@ -11,7 +11,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
     /// <summary>
     /// Protocol management for HTTP/HTTPS
     /// </summary>
-    public static class HTTP
+    public static partial class HTTP
     {
         /// <summary>
         /// Configured HTTP port
@@ -24,28 +24,6 @@ namespace DuetPiManagementPlugin.Network.Protocols
         private static int _httpsPort = 443;
 
         /// <summary>
-        /// Internal representation of the ASP.NET JSON config
-        /// </summary>
-        private sealed class AspNetConfig
-        {
-            public sealed class KestrelConfig
-            {
-                public sealed class EndpointsConfig
-                {
-                    public sealed class HttpConfig
-                    {
-                        public string? Url { get; set; }
-                    }
-
-                    public HttpConfig Http { get; set; } = new HttpConfig();
-                    public HttpConfig Https { get; set; } = new HttpConfig();
-                }
-                public EndpointsConfig Endpoints { get; set; } = new EndpointsConfig();
-            }
-            public KestrelConfig Kestrel { get; set; } = new KestrelConfig();
-        }
-
-        /// <summary>
         /// Initialize the protocol configuration
         /// </summary>
         /// <returns>Asynchronous task</returns>
@@ -53,10 +31,10 @@ namespace DuetPiManagementPlugin.Network.Protocols
         {
             if (File.Exists("/opt/dsf/conf/http.json"))
             {
-                AspNetConfig config;
+                AspNetConfig? config;
                 await using (FileStream configStream = new("/opt/dsf/conf/http.json", FileMode.Open, FileAccess.Read))
                 {
-                    config = (await JsonSerializer.DeserializeAsync<AspNetConfig>(configStream, cancellationToken: Program.CancellationToken))!;
+                    config = await JsonSerializer.DeserializeAsync(configStream, JsonContext.Default.AspNetConfig);
                 }
 
                 bool dwsEnabled = await Command.ExecQuery("systemctl", "is-enabled -q duetwebserver.service");

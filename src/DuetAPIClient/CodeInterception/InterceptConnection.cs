@@ -133,7 +133,7 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.CodeInterceptionRead"/>
         /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
-        public ValueTask<Code> ReceiveCode(CancellationToken cancellationToken = default) => Receive<Code>(cancellationToken);
+        public ValueTask<Code> ReceiveCode(CancellationToken cancellationToken = default) => ReceiveCommand<Code>(cancellationToken);
 
         /// <summary>
         /// When intercepting a code wait for all previous codes of the given channel to finish
@@ -157,7 +157,7 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="Cancel"/>
         /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
-        public ValueTask CancelCode(CancellationToken cancellationToken = default) => Send(new Cancel(), cancellationToken);
+        public ValueTask CancelCode(CancellationToken cancellationToken = default) => SendCommand(new Cancel(), cancellationToken);
 
         /// <summary>
         /// Instruct the control server to ignore the last received code (in intercepting mode)
@@ -169,7 +169,7 @@ namespace DuetAPIClient
         /// <seealso cref="Ignore"/>
         /// <seealso cref="SbcPermissions.CodeInterceptionRead"/>
         /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
-        public ValueTask IgnoreCode(CancellationToken cancellationToken = default) => Send(new Ignore(), cancellationToken);
+        public ValueTask IgnoreCode(CancellationToken cancellationToken = default) => SendCommand(new Ignore(), cancellationToken);
 
         /// <summary>
         /// Instruct the control server to resolve the last received code with the given message details (in intercepting mode)
@@ -185,7 +185,7 @@ namespace DuetAPIClient
         /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
         public ValueTask ResolveCode(MessageType type, string content, CancellationToken cancellationToken = default)
         {
-            return Send(new Resolve { Content = content, Type = type }, cancellationToken);
+            return SendCommand(new Resolve { Content = content, Type = type }, cancellationToken);
         }
 
         /// <summary>
@@ -201,7 +201,7 @@ namespace DuetAPIClient
         /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
         public ValueTask ResolveCode(Message message, CancellationToken cancellationToken = default)
         {
-            return Send(new Resolve { Content = message.Content, Type = message.Type }, cancellationToken);
+            return SendCommand(new Resolve { Content = message.Content, Type = message.Type }, cancellationToken);
         }
 
         /// <summary>
@@ -217,7 +217,7 @@ namespace DuetAPIClient
         /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
         public ValueTask RewriteCode(Code code, CancellationToken cancellationToken = default)
         {
-            return Send(new Rewrite { Code = code }, cancellationToken);
+            return SendCommand(new Rewrite { Code = code }, cancellationToken);
         }
     }
 }

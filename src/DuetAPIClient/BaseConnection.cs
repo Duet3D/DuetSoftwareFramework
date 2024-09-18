@@ -8,6 +8,7 @@ using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
+using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 
 namespace DuetAPIClient
@@ -94,12 +95,12 @@ namespace DuetAPIClient
 
             // Read the server init message
             ServerInitMessage ownMessage = new();
-            ServerInitMessage serverMessage = await Receive<ServerInitMessage>(cancellationToken);
+            ServerInitMessage serverMessage = await ReceiveInitMessage(cancellationToken);
             Id = serverMessage.Id;
 
             // Switch mode
             initMessage.Version = Defaults.ProtocolVersion;
-            await Send(initMessage, cancellationToken);
+            await SendInitMessage(initMessage, cancellationToken);
 
             // Check the result
             BaseResponse response = await ReceiveResponse(cancellationToken);
@@ -141,7 +142,7 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Connection has been closed</exception>
         protected async Task PerformCommand(BaseCommand command, CancellationToken cancellationToken)
         {
-            await Send(command, cancellationToken);
+            await SendCommand(command, cancellationToken);
 
             BaseResponse? response = await ReceiveResponse(cancellationToken);
             if (response is not null && !response.Success)
@@ -167,20 +168,80 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Connection has been closed</exception>
         protected async Task<T> PerformCommand<T>(BaseCommand command, CancellationToken cancellationToken)
         {
-            await Send(command, cancellationToken);
-            
-            BaseResponse? response = await ReceiveResponse<T>(cancellationToken) ?? throw new InvalidCastException("Cannot convert null to expected response type");
-            if (response.Success)
-            {
-                return ((Response<T>)response).Result;
-            }
+            await SendCommand(command, cancellationToken);
 
-            ErrorResponse errorResponse = (ErrorResponse)response;
-            if (errorResponse.ErrorType == nameof(TaskCanceledException))
+            using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
+            //Console.Write($"IN {Encoding.UTF8.GetString(jsonStream.ToArray())}");
+
+            T DeserializeResponse()
             {
-                throw new TaskCanceledException(errorResponse.ErrorMessage);
+                Span<byte> jsonSpan = jsonStream.ToArray();
+                Utf8JsonReader reader = new(jsonSpan), resultReader = reader;
+                bool isSuccess = false, resultSeen = false;
+
+                T FinalDeserialize(ref Utf8JsonReader reader)
+                {
+                    #if NET9_0_OR_GREATER
+                    #warning FIXME use JsonTypeInfoResolver.Combine here
+                    #endif
+                    return (typeof(T) == typeof(ObjectModel) || typeof(T) == typeof(Message) || typeof(T) == typeof(GCodeFileInfo)) ?
+                        (T)JsonSerializer.Deserialize(ref reader, typeof(T), ObjectModelContext.Default)! :
+                        (T)JsonSerializer.Deserialize(ref reader, typeof(T), CommandContext.Default)!;
+                }
+
+                if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+                {
+                    throw new ArgumentException("expected start of object");
+                }
+                while (reader.TokenType != JsonTokenType.EndObject && reader.Read())
+                {
+                    if (reader.TokenType == JsonTokenType.PropertyName)
+                    {
+                        if (reader.ValueTextEquals("success"u8) && reader.Read())
+                        {
+                            if (reader.TokenType == JsonTokenType.True)
+                            {
+                                if (resultSeen)
+                                {
+                                    return FinalDeserialize(ref resultReader);
+                                }
+                                isSuccess = true;
+                            }
+                            else if (reader.TokenType == JsonTokenType.False)
+                            {
+                                ErrorResponse errorResponse = JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.ErrorResponse)!;
+                                throw new InternalServerException(command.Command, errorResponse.ErrorType, errorResponse.ErrorMessage);
+                            }
+                            else
+                            {
+                                throw new ArgumentException("success must be a boolean");
+                            }
+                        }
+                        else if (reader.ValueTextEquals("result"u8) && reader.Read())
+                        {
+                            if (isSuccess)
+                            {
+                                return FinalDeserialize(ref reader);
+                            }
+                            else
+                            {
+                                resultSeen = true;
+                                resultReader = reader;
+                            }
+                        }
+                        else
+                        {
+                            reader.Skip();
+                        }
+                    }
+                    else
+                    {
+                        reader.Skip();
+                    }
+                }
+                throw new ArgumentException("missing success key");
             }
-            throw new InternalServerException(command.Command, errorResponse.ErrorType, errorResponse.ErrorMessage);
+            return DeserializeResponse();
         }
 
         /// <summary>
@@ -191,10 +252,11 @@ namespace DuetAPIClient
         /// <returns>Received object</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Connection has been closed</exception>
-        protected async ValueTask<T> Receive<T>(CancellationToken cancellationToken)
+        protected async ValueTask<T> ReceiveCommand<T>(CancellationToken cancellationToken) where T : BaseCommand
         {
-            await using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
-            return (await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions, cancellationToken))!;
+            using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
+            //Console.Write($"IN {Encoding.UTF8.GetString(jsonStream.ToArray())}");
+            return (T)JsonSerializer.Deserialize(jsonStream.ToArray(), typeof(T), CommandContext.Default)!;
         }
 
         /// <summary>
@@ -206,70 +268,106 @@ namespace DuetAPIClient
         /// <exception cref="SocketException">Connection has been closed</exception>
         private async ValueTask<BaseResponse> ReceiveResponse(CancellationToken cancellationToken)
         {
-            using JsonDocument jsonDocument = await ReceiveJson(cancellationToken);
-            foreach (JsonProperty property in jsonDocument.RootElement.EnumerateObject())
+            using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
+            //Console.Write($"IN {Encoding.UTF8.GetString(jsonStream.ToArray())}");
+
+            BaseResponse DeserializeResponse()
             {
-                if (property.Name.Equals(nameof(BaseResponse.Success), StringComparison.InvariantCultureIgnoreCase) &&
-                    property.Value.ValueKind == JsonValueKind.True)
+                Span<byte> jsonSpan = jsonStream.ToArray();
+                Utf8JsonReader reader = new(jsonSpan);
+                if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
                 {
-                    // Response OK
-                    return JsonSerializer.Deserialize<BaseResponse>(jsonDocument, JsonHelper.DefaultJsonOptions)!;
+                    throw new ArgumentException("expected start of object");
                 }
+                while (reader.TokenType != JsonTokenType.EndObject && reader.Read())
+                {
+                    if (reader.TokenType == JsonTokenType.PropertyName)
+                    {
+                        if (reader.ValueTextEquals("success"u8) && reader.Read())
+                        {
+                            if (reader.TokenType == JsonTokenType.True)
+                            {
+                                return JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.BaseResponse)!;
+                            }
+                            else if (reader.TokenType == JsonTokenType.False)
+                            {
+                                return JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.ErrorResponse)!;
+                            }
+                            else
+                            {
+                                throw new ArgumentException("success must be a boolean");
+                            }
+                        }
+                        else
+                        {
+                            reader.Skip();
+                        }
+                    }
+                    else
+                    {
+                        reader.Skip();
+                    }
+                }
+                throw new ArgumentException("missing success key");
             }
 
-            // Error
-            return JsonSerializer.Deserialize<ErrorResponse>(jsonDocument, JsonHelper.DefaultJsonOptions)!;
+            return DeserializeResponse();
         }
 
         /// <summary>
-        /// Receive a response from the server
-        /// </summary>
-        /// <typeparam name="T">Response type</typeparam>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Deserialized response</returns>
-        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
-        /// <exception cref="SocketException">Connection has been closed</exception>
-        private async ValueTask<BaseResponse?> ReceiveResponse<T>(CancellationToken cancellationToken)
-        {
-            using JsonDocument jsonDocument = await ReceiveJson(cancellationToken);
-            foreach (JsonProperty property in jsonDocument.RootElement.EnumerateObject())
-            {
-                if (property.Name.Equals(nameof(BaseResponse.Success), StringComparison.InvariantCultureIgnoreCase) &&
-                    property.Value.ValueKind == JsonValueKind.True)
-                {
-                    // Response OK
-                    return JsonSerializer.Deserialize<Response<T>>(jsonDocument, JsonHelper.DefaultJsonOptions);
-                }
-            }
-
-            // Error
-            return JsonSerializer.Deserialize<ErrorResponse>(jsonDocument, JsonHelper.DefaultJsonOptions);
-        }
-
-        /// <summary>
-        /// Receive partially deserialized object from the server
+        /// Receive plain JSON document
         /// </summary>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Partially deserialized data</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Connection has been closed</exception>
-        protected async ValueTask<JsonDocument> ReceiveJson(CancellationToken cancellationToken)
+        protected async ValueTask<JsonDocument> ReceiveJsonDocument(CancellationToken cancellationToken)
         {
             await using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
             return await JsonDocument.ParseAsync(json, cancellationToken: cancellationToken);
         }
 
         /// <summary>
-        /// Serialize an arbitrary object into JSON and send it to the server plus NL
+        /// Receive init message from the server
         /// </summary>
-        /// <param name="obj">Object to send</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Deserialized response</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Connection has been closed</exception>
+        private async ValueTask<ServerInitMessage> ReceiveInitMessage(CancellationToken cancellationToken)
+        {
+            using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
+            //Console.Write($"IN {Encoding.UTF8.GetString(jsonStream.ToArray())}");
+            return JsonSerializer.Deserialize(jsonStream.ToArray(), ConnectionContext.Default.ServerInitMessage)!;
+        }
+
+        /// <summary>
+        /// Serialize an init message and send it to the server
+        /// </summary>
+        /// <param name="message">Message to send</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Message could not be processed</exception>
-        protected async ValueTask Send(object obj, CancellationToken cancellationToken)
+        protected async ValueTask SendInitMessage(InitMessage message, CancellationToken cancellationToken)
         {
-            byte[] jsonToWrite = JsonSerializer.SerializeToUtf8Bytes(obj, obj.GetType(), JsonHelper.DefaultJsonOptions);
+            byte[] jsonToWrite = JsonSerializer.SerializeToUtf8Bytes(message, message.GetType(), ConnectionContext.Default);
+            //Console.Write($"OUT {Encoding.UTF8.GetString(jsonToWrite)}");
+            await _unixSocket.SendAsync(jsonToWrite, SocketFlags.None, cancellationToken);
+            //Console.WriteLine(" OK");
+        }
+
+        /// <summary>
+        /// Serialize a command and send it to the server
+        /// </summary>
+        /// <param name="command">Command to send</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Message could not be processed</exception>
+        protected async ValueTask SendCommand(BaseCommand command, CancellationToken cancellationToken)
+        {
+            byte[] jsonToWrite = JsonSerializer.SerializeToUtf8Bytes(command, command.GetType(), CommandContext.Default);
             //Console.Write($"OUT {Encoding.UTF8.GetString(jsonToWrite)}");
             await _unixSocket.SendAsync(jsonToWrite, SocketFlags.None, cancellationToken);
             //Console.WriteLine(" OK");

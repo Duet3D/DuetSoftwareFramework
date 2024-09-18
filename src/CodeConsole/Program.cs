@@ -79,7 +79,7 @@ if (codeToExecute is null)
             }
             else if (input.StartsWith("eval ", StringComparison.InvariantCultureIgnoreCase))
             {
-                JsonElement result = await connection.EvaluateExpression<JsonElement>(input[5..].Trim());
+                JsonElement result = await connection.EvaluateExpression(input[5..].Trim());
                 Console.WriteLine("Evaluation result: {0}", result.GetRawText());
             }
             else

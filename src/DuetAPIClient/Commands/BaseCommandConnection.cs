@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -88,15 +89,14 @@ namespace DuetAPIClient
         /// <param name="expression">Expression to evaluate</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Evaluation result</returns>
-        /// <typeparam name="T">Type of the evaluation result</typeparam>
         /// <exception cref="InvalidOperationException">Requested code channel is disabled</exception>
         /// <exception cref="JsonException">Expected and returned data type do not match</exception>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.CommandExecution"/>
-        public Task<T> EvaluateExpression<T>(string expression, CodeChannel channel = CodeChannel.SBC, CancellationToken cancellationToken = default)
+        public Task<JsonElement> EvaluateExpression(string expression, CodeChannel channel = CodeChannel.SBC, CancellationToken cancellationToken = default)
         {
-            return PerformCommand<T>(new EvaluateExpression { Channel = channel, Expression = expression }, cancellationToken);
+            return PerformCommand<JsonElement>(new EvaluateExpression { Channel = channel, Expression = expression }, cancellationToken);
         }
 
         /// <summary>
@@ -187,7 +187,7 @@ namespace DuetAPIClient
         [Obsolete("Deprecated in favor of GetSerializedObjectModel")]
         public async ValueTask<MemoryStream> GetSerializedMachineModel(CancellationToken cancellationToken = default)
         {
-            await Send(new GetObjectModel(), cancellationToken);
+            await SendCommand(new GetObjectModel(), cancellationToken);
             return await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
         }
 
@@ -202,8 +202,9 @@ namespace DuetAPIClient
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
         public async Task<string> GetSerializedObjectModel(CancellationToken cancellationToken = default)
         {
-            JsonElement jsonDocument = await PerformCommand<JsonElement>(new GetObjectModel(), cancellationToken);
-            return jsonDocument.GetRawText();
+            await SendCommand(new GetObjectModel(), cancellationToken);
+            using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
+            return Encoding.UTF8.GetString(jsonStream.ToArray());
         }
 
         /// <summary>

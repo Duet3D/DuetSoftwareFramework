@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -12,7 +13,7 @@ namespace DuetControlServer.Commands
         /// Evaluate an arbitrary expression
         /// </summary>
         /// <returns>Evaluation result</returns>
-        public override async Task<object?> Execute()
+        public override async Task<JsonElement> Execute()
         {
             // Check if the corresponding code channel has been disabled
             using (await Model.Provider.AccessReadOnlyAsync())
@@ -24,7 +25,8 @@ namespace DuetControlServer.Commands
             }
 
             // Attempt to evaluate the expression internally and pass it on to RRF otherwise
-            return await Model.Expressions.EvaluateExpressionRaw(new Code() { Channel = Channel }, Expression, false);
+            object? result = await Model.Expressions.EvaluateExpressionRaw(new Code() { Channel = Channel }, Expression, false);
+            return JsonSerializer.SerializeToElement(result);
         }
     }
 }
