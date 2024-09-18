@@ -238,11 +238,11 @@ namespace DuetControlServer.IPC
                                 {
                                     if (reader.TokenType == JsonTokenType.True)
                                     {
-                                        return JsonSerializer.Deserialize(jsonSpan, Commands.CommandContext.Default.BaseResponse)!;
+                                        return JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.BaseResponse)!;
                                     }
                                     else if (reader.TokenType == JsonTokenType.False)
                                     {
-                                        return JsonSerializer.Deserialize(jsonSpan, Commands.CommandContext.Default.ErrorResponse)!;
+                                        return JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.ErrorResponse)!;
                                     }
                                     else
                                     {
@@ -472,7 +472,7 @@ namespace DuetControlServer.IPC
             {
                 e = ae.InnerException!;
             }
-            byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(new ErrorResponse(e), Commands.CommandContext.Default.ErrorResponse);
+            byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(new ErrorResponse(e), CommandContext.Default.ErrorResponse);
             _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(toSend)}");
             return UnixSocket.SendAsync(toSend, SocketFlags.None);
         }
@@ -481,11 +481,28 @@ namespace DuetControlServer.IPC
         /// Send a command to the client
         /// </summary>
         /// <param name="command">Command to send</param>
+        /// <typeparam name="T">Base type of the command</typeparam>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="SocketException">Message could not be sent</exception>
         public Task SendCommand(BaseCommand command)
         {
-            byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(command, command.GetType(), Commands.CommandContext.Default);
+            // Get base type for serialization
+            Type baseType;
+            if (command is Commands.Code)
+            {
+                baseType = typeof(Code);
+            }
+            else
+            {
+                baseType = command.GetType();
+                while (baseType.Assembly.GetName().Name != nameof(DuetAPI))
+                {
+                    baseType = baseType.BaseType!;
+                }
+            }
+
+            // Serialize and send the command
+            byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(command, baseType, CommandContext.Default);
             _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(toSend)}");
             return UnixSocket.SendAsync(toSend, SocketFlags.None);
         }

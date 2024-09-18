@@ -1,4 +1,5 @@
-﻿using DuetControlServer.Files;
+﻿using DuetAPI.Commands;
+using DuetControlServer.Files;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using System.Threading.Tasks;

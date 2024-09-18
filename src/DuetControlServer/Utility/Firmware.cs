@@ -213,10 +213,10 @@ namespace DuetControlServer.Utility
             // Get the available firmware versions
             foreach (string firmwareFile in firmwareVersions.Keys)
             {
-                string firmwareFilename = await Files.FilePath.ToPhysicalAsync(firmwareFile, Files.FileDirectory.Firmware);
+                string firmwareFilename = await Files.FilePath.ToPhysicalAsync(firmwareFile, FileDirectory.Firmware);
                 if (!File.Exists(firmwareFilename))
                 {
-                    firmwareFilename = await Files.FilePath.ToPhysicalAsync(firmwareFile, Files.FileDirectory.System);
+                    firmwareFilename = await Files.FilePath.ToPhysicalAsync(firmwareFile, FileDirectory.System);
                 }
 
                 if (File.Exists(firmwareFilename))

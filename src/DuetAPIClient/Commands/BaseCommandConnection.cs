@@ -426,6 +426,22 @@ namespace DuetAPIClient
         }
 
         /// <summary>
+        /// Resolve a RepRapFirmware-style file path to a real file path
+        /// </summary>
+        /// <param name="path">File path to resolve</param>
+        /// <param name="baseDirectory">Base directory to resolve the path relative to</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Resolved file path</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="SbcPermissions.CommandExecution"/>
+        /// <seealso cref="SbcPermissions.FileSystemAccess"/>
+        public Task<string> ResolvePath(string path, FileDirectory baseDirectory, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand<string>(new ResolvePath { Path = path, BaseDirectory = baseDirectory }, cancellationToken);
+        }
+
+        /// <summary>
         /// Set a given property to a certain value. Make sure to lock the object model before calling this
         /// </summary>
         /// <param name="path">Path to the property</param>

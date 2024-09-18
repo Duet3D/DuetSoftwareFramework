@@ -164,8 +164,7 @@ namespace DuetControlServer.IPC.Processors
                         try
                         {
                             // Send it to the client
-                            DuetAPI.Commands.Code codeBeingIntercepted = _codeBeingIntercepted!;
-                            await Connection.SendCommand(codeBeingIntercepted);
+                            await Connection.SendCommand(_codeBeingIntercepted!);
 
                             // Keep processing incoming commands until a final action for the code has been received
                             do

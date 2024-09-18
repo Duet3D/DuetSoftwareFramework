@@ -12,6 +12,6 @@ namespace DuetControlServer.Commands
         /// Resolve the given RepRapFirmware-style filename to an absolute path
         /// </summary>
         /// <returns>Absolute file path</returns>
-        public override Task<string> Execute() => FilePath.ToPhysicalAsync(Path);
+        public override Task<string> Execute() => (BaseDirectory != null) ? FilePath.ToPhysicalAsync(Path, BaseDirectory.Value) : FilePath.ToPhysicalAsync(Path);
     }
 }

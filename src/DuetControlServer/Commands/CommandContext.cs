@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 namespace DuetControlServer.Commands
 {
     /// <summary>
-    /// Context for JSON handling of IPC commands
+    /// Context for JSON handling of incoming IPC commands
     /// </summary>
     [JsonSerializable(typeof(Code))]
     [JsonSerializable(typeof(DuetAPI.Commands.Cancel))]
@@ -45,8 +45,6 @@ namespace DuetControlServer.Commands
     [JsonSerializable(typeof(UninstallPlugin))]
     [JsonSerializable(typeof(AddUserSession))]
     [JsonSerializable(typeof(RemoveUserSession))]
-    [JsonSerializable(typeof(DuetAPI.Commands.BaseResponse))]
-    [JsonSerializable(typeof(DuetAPI.Commands.ErrorResponse))]
     [JsonSourceGenerationOptions(PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
     public sealed partial class CommandContext : JsonSerializerContext
     {

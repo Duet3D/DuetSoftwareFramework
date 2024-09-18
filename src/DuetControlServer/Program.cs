@@ -250,7 +250,7 @@ namespace DuetControlServer
                 }
 
                 // Execute runonce.g after config.g if it is present
-                string runOnceFile = await FilePath.ToPhysicalAsync(FilePath.RunOnceFile, FileDirectory.System);
+                string runOnceFile = await FilePath.ToPhysicalAsync(FilePath.RunOnceFile, DuetAPI.Commands.FileDirectory.System);
                 if (File.Exists(runOnceFile))
                 {
                     do

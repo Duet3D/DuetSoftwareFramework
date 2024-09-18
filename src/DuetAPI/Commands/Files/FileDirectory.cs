@@ -1,8 +1,11 @@
-﻿namespace DuetControlServer.Files
+﻿using System.Text.Json.Serialization;
+
+namespace DuetAPI.Commands
 {
     /// <summary>
-    /// Shortcut for ToPhysicalAsync() to avoid multiple nested locks
+    /// Base file directory for lookups
     /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<FileDirectory>))]
     public enum FileDirectory
     {
         /// <summary>
