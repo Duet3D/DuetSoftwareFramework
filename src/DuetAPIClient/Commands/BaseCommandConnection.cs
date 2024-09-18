@@ -81,6 +81,9 @@ namespace DuetAPIClient
         /// <summary>
         /// Evaluate an arbitrary expression
         /// </summary>
+        /// <remarks>
+        /// This method's signature is going to change in v3.6: Due to AOT compatibility this method will return a JsonElement instead of a generic object.
+        /// </remarks>
         /// <param name="channel">Context of the evaluation</param>
         /// <param name="expression">Expression to evaluate</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
