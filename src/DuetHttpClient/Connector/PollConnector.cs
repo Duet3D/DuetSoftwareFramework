@@ -1,6 +1,5 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
-using DuetAPI.Utility;
 using DuetHttpClient.Exceptions;
 using DuetHttpClient.Utility;
 using System;
@@ -20,30 +19,12 @@ namespace DuetHttpClient.Connector
     /// <summary>
     /// HTTP connector for standalone mode (which requires polling)
     /// </summary>
-    internal class PollConnector : BaseConnector
+    internal partial class PollConnector : BaseConnector
     {
         /// <summary>
         /// Minimum HTTP API level to support this
         /// </summary>
         private const int MinApiLevel = 1;
-
-        /// <summary>
-        /// Generic reply to report if an error occurred
-        /// </summary>
-        public class ErrResponse
-        {
-            public int Err { get; set; }
-        }
-
-        /// <summary>
-        /// Reply for a rr_connect request
-        /// </summary>
-        private class ConnectResponse : ErrResponse
-        {
-            public bool IsEmulated { get; set; }
-            public int ApiLevel { get; set; }
-            public uint? SessionKey { get; set; }
-        }
 
         /// <summary>
         /// Establish a HTTP connection to a Duet board running in standalone mode
@@ -69,7 +50,7 @@ namespace DuetHttpClient.Connector
 #else
                 using Stream responseStream = await response.Content.ReadAsStreamAsync();
 #endif
-                ConnectResponse connectResponse = (await JsonSerializer.DeserializeAsync<ConnectResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!;
+                Responses.PollConnectResponse connectResponse = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.PollConnectResponse, cancellationToken))!;
                 sessionKey = connectResponse.Err switch
                 {
                     0 => connectResponse.SessionKey,
@@ -147,7 +128,7 @@ namespace DuetHttpClient.Connector
 #else
             using Stream responseStream = await response.Content.ReadAsStreamAsync();
 #endif
-            ConnectResponse connectResponse = (await JsonSerializer.DeserializeAsync<ConnectResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!;
+            Responses.PollConnectResponse connectResponse = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.PollConnectResponse, cancellationToken))!;
             _sessionKey = connectResponse.Err switch
             {
                 0 => connectResponse.SessionKey,
@@ -658,14 +639,6 @@ namespace DuetHttpClient.Connector
         }
 
         /// <summary>
-        /// Response to a G-code request
-        /// </summary>
-        private class GcodeReply
-        {
-            public int Buff { get; set; }
-        }
-
-        /// <summary>
         /// Send a G/M/T-code and return the G-code reply
         /// </summary>
         /// <param name="code">Code to send</param>
@@ -739,7 +712,7 @@ namespace DuetHttpClient.Connector
                         using (Stream responseStream = await response.Content.ReadAsStreamAsync())
 #endif
                         {
-                            GcodeReply responseObj = (await JsonSerializer.DeserializeAsync<GcodeReply>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!;
+                            Responses.GcodeReply responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.GcodeReply, cancellationToken))!;
                             if (responseObj.Buff == 0)
                             {
                                 throw new ArgumentException("G-code buffer is full");
@@ -907,7 +880,7 @@ namespace DuetHttpClient.Connector
 #else
             using Stream responseStream = await response.Content.ReadAsStreamAsync();
 #endif
-            ErrResponse responseObj = (await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!;
+            Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken))!;
             if (responseObj.Err != 0)
             {
                 throw new HttpRequestException($"rr_upload returned err {responseObj.Err}");
@@ -936,7 +909,7 @@ namespace DuetHttpClient.Connector
 #else
                         using Stream responseStream = await response.Content.ReadAsStreamAsync();
 #endif
-                        ErrResponse responseObj = (await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!;
+                        Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken))!;
                         if (responseObj.Err == 0)
                         {
                             return;
@@ -993,7 +966,7 @@ namespace DuetHttpClient.Connector
 #else
                         using Stream responseStream = await response.Content.ReadAsStreamAsync();
 #endif
-                        ErrResponse responseObj = (await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!;
+                        Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken))!;
                         if (responseObj.Err == 0)
                         {
                             return;
@@ -1048,7 +1021,7 @@ namespace DuetHttpClient.Connector
 #else
                         using Stream responseStream = await response.Content.ReadAsStreamAsync();
 #endif
-                        ErrResponse responseObj = (await JsonSerializer.DeserializeAsync<ErrResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!;
+                        Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken))!;
                         if (responseObj.Err == 0)
                         {
                             return;
@@ -1097,28 +1070,6 @@ namespace DuetHttpClient.Connector
         }
 
         /// <summary>
-        /// Internal class for filelist items
-        /// </summary>
-        private class FileItem
-        {
-            public char Type { get; set; }
-            public string Name { get; set; } = string.Empty;
-            public long Size { get; set; }
-            public DateTime Date { get; set; }
-        }
-
-        /// <summary>
-        /// Internal class for filelists
-        /// </summary>
-        private class FileListResponse : ErrResponse
-        {
-            //public string dir { get; set; }
-            public int First { get; set; }
-            public List<FileItem> Files { get; set; } = [];
-            public int Next { get; set; }
-        }
-
-        /// <summary>
         /// Enumerate all files and directories in the given directory
         /// </summary>
         /// <param name="directory">Directory to query</param>
@@ -1146,10 +1097,10 @@ namespace DuetHttpClient.Connector
 #else
                             using Stream responseStream = await response.Content.ReadAsStreamAsync();
 #endif
-                            FileListResponse responseObj = (await JsonSerializer.DeserializeAsync<FileListResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!;
+                            Responses.FileListResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.FileListResponse, cancellationToken))!;
                             if (responseObj.Err == 0)
                             {
-                                foreach (FileItem item in responseObj.Files)
+                                foreach (Responses.FileItem item in responseObj.Files)
                                 {
                                     result.Add(new FileListItem()
                                     {

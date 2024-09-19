@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace DuetPiManagementPlugin.Network
 {
     /// <summary>

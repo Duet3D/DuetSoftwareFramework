@@ -5,6 +5,7 @@
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<Description>Official remote HTTP API client for Duet3D boards (supports standalone and SBC mode)</Description>
 		<PackageIcon>duet_teardrop_wifi_large.png</PackageIcon>
+		<IsTrimmable>true</IsTrimmable>
 	</PropertyGroup>
 
 	<ItemGroup>

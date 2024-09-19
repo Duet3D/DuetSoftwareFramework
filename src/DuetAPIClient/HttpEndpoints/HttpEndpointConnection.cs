@@ -67,9 +67,10 @@ namespace DuetAPIClient
         /// <returns>Received HTTP request data</returns>
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Connection has been closed</exception>
-        public Task<ReceivedHttpRequest> ReadRequest(CancellationToken cancellationToken = default)
+        public async Task<ReceivedHttpRequest> ReadRequest(CancellationToken cancellationToken = default)
         {
-            return Receive<ReceivedHttpRequest>(cancellationToken);
+            await using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_socket, cancellationToken);
+            return (await JsonSerializer.DeserializeAsync(json, CommandContext.Default.ReceivedHttpRequest, cancellationToken))!;
         }
 
         /// <summary>
@@ -93,7 +94,8 @@ namespace DuetAPIClient
                     Response = response,
                     ResponseType = responseType
                 };
-                await Send(httpResponse, cancellationToken);
+                byte[] jsonToWrite = JsonSerializer.SerializeToUtf8Bytes(httpResponse, CommandContext.Default.SendHttpResponse);
+                await _socket.SendAsync(jsonToWrite, SocketFlags.None, cancellationToken);
             }
             finally
             {
@@ -103,34 +105,6 @@ namespace DuetAPIClient
                     Close();
                 }
             }
-        }
-
-        /// <summary>
-        /// Receive a deserialized object
-        /// </summary>
-        /// <typeparam name="T">OBject type</typeparam>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Deserialized object</returns>
-        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
-        /// <exception cref="SocketException">Connection has been closed</exception>
-        private async Task<T> Receive<T>(CancellationToken cancellationToken)
-        {
-            await using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_socket, cancellationToken);
-            return (await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions, cancellationToken))!;
-        }
-
-        /// <summary>
-        /// Send an arbitrary object
-        /// </summary>
-        /// <param name="obj">Object to send as JSON</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Asynchronous task</returns>
-        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
-        /// <exception cref="SocketException">Connection has been closed</exception>
-        private async Task Send(object obj, CancellationToken cancellationToken)
-        {
-            byte[] jsonToWrite = JsonSerializer.SerializeToUtf8Bytes(obj, obj.GetType(), JsonHelper.DefaultJsonOptions);
-            await _socket.SendAsync(jsonToWrite, SocketFlags.None, cancellationToken);
         }
     }
 }

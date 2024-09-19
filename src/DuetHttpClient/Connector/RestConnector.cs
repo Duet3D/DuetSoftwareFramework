@@ -1,5 +1,4 @@
 ﻿using DuetAPI.ObjectModel;
-using DuetAPI.Utility;
 using DuetHttpClient.Exceptions;
 using DuetHttpClient.Utility;
 using System;
@@ -23,17 +22,6 @@ namespace DuetHttpClient.Connector
     internal class RestConnector : BaseConnector
     {
         /// <summary>
-        /// Response from a connect request
-        /// </summary>
-        private class ConnectResponse
-        {
-            /// <summary>
-            /// Session key
-            /// </summary>
-            public string SessionKey { get; set; } = string.Empty;
-        }
-
-        /// <summary>
         /// Establish a HTTP connection to a Duet board running in SBC mode
         /// </summary>
         /// <param name="baseUri">Base URI for the remote board</param>
@@ -55,7 +43,7 @@ namespace DuetHttpClient.Connector
 #else
                 using Stream responseStream = await response.Content.ReadAsStreamAsync();
 #endif
-                ConnectResponse responseObj = (await JsonSerializer.DeserializeAsync<ConnectResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!;
+                Responses.RestConnectResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.RestConnectResponse, cancellationToken))!;
                 return new RestConnector(baseUri, options, responseObj.SessionKey);
             }
 
@@ -116,7 +104,7 @@ namespace DuetHttpClient.Connector
 #else
                 using Stream responseStream = await response.Content.ReadAsStreamAsync();
 #endif
-                ConnectResponse responseObj = (await JsonSerializer.DeserializeAsync<ConnectResponse>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!;
+                Responses.RestConnectResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.RestConnectResponse, cancellationToken))!;
 
                 _sessionKey = responseObj.SessionKey;
                 HttpClient.DefaultRequestHeaders.Add("X-Session-Key", responseObj.SessionKey);
@@ -641,17 +629,6 @@ namespace DuetHttpClient.Connector
         }
 
         /// <summary>
-        /// Class representing a file item
-        /// </summary>
-        private class FileNode
-        {
-            public DateTime Date { get; set; }
-            public string Name { get; set; } = string.Empty;
-            public long Size { get; set; }
-            public char Type { get; set; }
-        }
-
-        /// <summary>
         /// Enumerate all files and directories in the given directory
         /// </summary>
         /// <param name="directory">Directory to query</param>
@@ -673,7 +650,7 @@ namespace DuetHttpClient.Connector
 #else
                         using Stream responseStream = await response.Content.ReadAsStreamAsync();
 #endif
-                        return (await JsonSerializer.DeserializeAsync<List<FileNode>>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!
+                        return (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.FileNodeArray, cancellationToken))!
                             .Select(item => new FileListItem()
                             {
                                 Filename = item.Name,
@@ -730,7 +707,7 @@ namespace DuetHttpClient.Connector
 #else
                         Stream responseStream = await response.Content.ReadAsStreamAsync();
 #endif
-                        return (await JsonSerializer.DeserializeAsync<GCodeFileInfo>(responseStream, JsonHelper.DefaultJsonOptions, cancellationToken))!;
+                        return (await JsonSerializer.DeserializeAsync(responseStream, ObjectModelContext.Default.GCodeFileInfo, cancellationToken))!;
                     }
 
                     if (response.StatusCode == HttpStatusCode.NotFound)

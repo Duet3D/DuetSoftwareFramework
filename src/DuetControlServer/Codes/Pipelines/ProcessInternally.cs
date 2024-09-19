@@ -1,5 +1,4 @@
-﻿using DuetAPI;
-using DuetAPI.Commands;
+﻿using DuetAPI.Commands;
 using DuetAPI.Connection;
 using System;
 using System.Threading.Tasks;
