@@ -565,62 +565,70 @@ namespace DuetControlServer.Files
                         await secondFileTask;
                     }
 
-                    // Deal with the print result
+                    // Get the last print result
+                    bool isCancelled, isAborted, isSimulating;
+                    string physicalFileName;
                     using (await LockAsync())
                     {
-                        if (IsCancelled)
+                        isCancelled = IsCancelled;
+                        isAborted = IsAborted;
+                        isSimulating = IsSimulating;
+                        physicalFileName = _file.PhysicalFileName;
+                    }
+
+                    // Notify RRF
+                    if (isCancelled)
+                    {
+                        // Prints are cancelled by M0/M1/M2 which is processed by RRF
+                        _logger.Info("Cancelled job file");
+                    }
+                    else if (isAborted)
+                    {
+                        await SPI.Interface.StopPrint(PrintStoppedReason.Abort);
+                        _logger.Info("Aborted job file");
+                    }
+                    else
+                    {
+                        await SPI.Interface.StopPrint(PrintStoppedReason.NormalCompletion);
+                        _logger.Info("Finished job file");
+                    }
+
+                    // Update special fields that are not available in RRF
+                    using (await Provider.AccessReadWriteAsync())
+                    {
+                        Provider.Get.Job.LastFileAborted = isAborted;
+                        Provider.Get.Job.LastFileCancelled = isCancelled;
+                        Provider.Get.Job.LastFileSimulated = isSimulating;
+                    }
+
+                    // Update the last simulated time
+                    if (isSimulating && !isAborted && !isCancelled)
+                    {
+                        // Wait for the simulation time to be available
+                        int? lastDuration = null;
+                        int upTime = 0;
+                        while (!Program.CancellationToken.IsCancellationRequested)
                         {
-                            // Prints are cancelled by M0/M1/M2 which is processed by RRF
-                            _logger.Info("Cancelled job file");
+                            await Updater.WaitForFullUpdate();
+                            using (await Provider.AccessReadOnlyAsync())
+                            {
+                                if (Provider.Get.State.UpTime < upTime || Provider.Get.Job.LastDuration is not null)
+                                {
+                                    lastDuration = Provider.Get.Job.LastDuration;
+                                    break;
+                                }
+                                upTime = Provider.Get.State.UpTime;
+                            }
                         }
-                        else if (IsAborted)
+
+                        // Try to update the last simulated time
+                        if (lastDuration > 0)
                         {
-                            await SPI.Interface.StopPrint(PrintStoppedReason.Abort);
-                            _logger.Info("Aborted job file");
+                            await InfoParser.UpdateSimulatedTime(physicalFileName, lastDuration.Value);
                         }
                         else
                         {
-                            await SPI.Interface.StopPrint(PrintStoppedReason.NormalCompletion);
-                            _logger.Info("Finished job file");
-                        }
-
-                        // Update special fields that are not available in RRF
-                        using (await Provider.AccessReadWriteAsync())
-                        {
-                            Provider.Get.Job.LastFileAborted = IsAborted;
-                            Provider.Get.Job.LastFileCancelled = IsCancelled;
-                            Provider.Get.Job.LastFileSimulated = IsSimulating;
-                        }
-
-                        // Update the last simulated time
-                        if (IsSimulating && !IsAborted && !IsCancelled)
-                        {
-                            // Wait for the simulation time to be available
-                            int? lastDuration = null;
-                            int upTime = 0;
-                            while (!Program.CancellationToken.IsCancellationRequested)
-                            {
-                                await Updater.WaitForFullUpdate();
-                                using (await Provider.AccessReadOnlyAsync())
-                                {
-                                    if (Provider.Get.State.UpTime < upTime || Provider.Get.Job.LastDuration is not null)
-                                    {
-                                        lastDuration = Provider.Get.Job.LastDuration;
-                                        break;
-                                    }
-                                    upTime = Provider.Get.State.UpTime;
-                                }
-                            }
-
-                            // Try to update the last simulated time
-                            if (lastDuration > 0)
-                            {
-                                await InfoParser.UpdateSimulatedTime(_file.PhysicalFileName, lastDuration.Value);
-                            }
-                            else
-                            {
-                                _logger.Warn("Failed to update simulation time because it was not set in the object model");
-                            }
+                            _logger.Warn("Failed to update simulation time because it was not set in the object model");
                         }
                     }
                 }
