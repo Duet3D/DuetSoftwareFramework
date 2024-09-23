@@ -47,6 +47,16 @@
         private int? _minPercentage;
 
         /// <summary>
+        /// Position of the sensor (in mm)
+        /// </summary>
+        public int Position
+        {
+            get => _position;
+            set => SetPropertyValue(ref _position, value);
+        }
+        private int _position;
+
+        /// <summary>
         /// Total extrusion commanded (in mm)
         /// </summary>
         public float TotalExtrusion
