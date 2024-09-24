@@ -524,7 +524,7 @@ namespace DuetWebServer.Controllers
                     {
                         if (!char.IsLetterOrDigit(c) && c != '.' && c != '[' && c != ']')
                         {
-                            LogWarning($"Invalid character in rrmodel key parameter: '{c}'");
+                            LogWarning($"Invalid character in rr_model key parameter: '{c}'");
                             return Content("{\"err\":1}", "application/json");
                         }
                     }
@@ -535,7 +535,7 @@ namespace DuetWebServer.Controllers
                     {
                         if (!char.IsLetterOrDigit(c))
                         {
-                            LogWarning($"Invalid character in rrmodel flags parameter: '{c}'");
+                            LogWarning($"Invalid character in rr_model flags parameter: '{c}'");
                             return Content("{\"err\":1}", "application/json");
                         }
                     }
@@ -584,7 +584,7 @@ namespace DuetWebServer.Controllers
             }
             catch (Exception e)
             {
-                LogError(e, "Failed to handle rrmodel request");
+                LogError(e, "Failed to handle rr_model request");
             }
             return StatusCode(503);
         }
