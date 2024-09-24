@@ -74,7 +74,9 @@ namespace UnitTests.Machine
             });
             updatedModel.State.Status = MachineStatus.Pausing;
 
+#pragma warning disable CS0618 // Type or member is obsolete
             string patch = updatedModel.MakeStringPatch(modelToUpdate);
+#pragma warning restore CS0618 // Type or member is obsolete
             TestContext.Out.Write(patch);
 
             using JsonDocument jsonPatch = JsonDocument.Parse(patch);

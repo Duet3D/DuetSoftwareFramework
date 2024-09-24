@@ -690,12 +690,7 @@ namespace DuetAPI.Commands
                                 result.KeywordArgument = string.Empty;
                                 inKeywordArgument = true;
                             }
-#warning do not permit duplicate parameters in v3.6
-#if false
-                            else if (!result.HasParameter(letter))
-#else
                             else
-#endif
                             {
                                 AddParameter(result, letter, value, false, buffer.MayRepeatCode || unprecedentedParameter || isNumericParameter);
                             }
@@ -713,18 +708,11 @@ namespace DuetAPI.Commands
                                 letter = '@';
                             }
 
-#warning do not permit duplicate parameters in v3.6
-#if false
-                            if (!result.HasParameter(letter))
-#endif
+                            if (wasExpression && (!value.StartsWith("{") || !value.EndsWith("}")))
                             {
-                                if (wasExpression && (!value.StartsWith("{") || !value.EndsWith("}")))
-                                {
-                                    value = '{' + value.Trim() + '}';
-                                }
-                                AddParameter(result, letter, value, wasQuoted, unprecedentedParameter || isNumericParameter || wasExpression);
+                                value = '{' + value.Trim() + '}';
                             }
-                            // Ignore duplicate parameters
+                            AddParameter(result, letter, value, wasQuoted, unprecedentedParameter || isNumericParameter || wasExpression);
                         }
 
                         letter = '\0';

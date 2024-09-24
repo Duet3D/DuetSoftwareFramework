@@ -392,7 +392,6 @@ namespace DuetControlServer.Model
         private static readonly object _nullResult = new();
 
         // Convert an object to a string value
-#warning This function cannot output empty arrays yet
         private static string ObjectToString(object? obj, bool wantsCount, bool encodeStrings, Code code)
         {
             static string encodeString(string value)
@@ -440,9 +439,16 @@ namespace DuetControlServer.Model
             {
                 return encodeStrings ? $"\"{dateTimeValue:s}\"" : dateTimeValue.ToString("s");
             }
-            if (wantsCount && obj is IList list)
+            if (obj is IList list)
             {
-                return list.Count.ToString();
+                if (wantsCount)
+                {
+                    return list.Count.ToString();
+                }
+                if (list.Count == 0)
+                {
+                    return "vector(0,0)";
+                }
             }
             if (obj is bool[] boolArray)
             {

@@ -267,7 +267,9 @@ namespace PluginManager
                         }
                         catch (JsonException)
                         {
+#pragma warning disable CS0618 // Type or member is obsolete
                             await connection.SetPluginData(key, value, pluginName);
+#pragma warning restore CS0618 // Type or member is obsolete
                         }
                         WriteLine("Plugin data set");
                     }

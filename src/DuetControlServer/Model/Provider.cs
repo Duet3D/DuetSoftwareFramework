@@ -105,10 +105,7 @@ namespace DuetControlServer.Model
                     _lock.Dispose();
 
                     // Stop the deadlock detection task if applicable
-                    if (!Program.CancellationToken.IsCancellationRequested)
-                    {
-                        _releaseCts?.Cancel();
-                    }
+                    _releaseCts?.Cancel();
                 }
             }
         }
