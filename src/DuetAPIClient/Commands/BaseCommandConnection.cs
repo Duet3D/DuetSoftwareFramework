@@ -187,8 +187,11 @@ namespace DuetAPIClient
         [Obsolete("Deprecated in favor of GetSerializedObjectModel")]
         public async ValueTask<MemoryStream> GetSerializedMachineModel(CancellationToken cancellationToken = default)
         {
-            await Send(new GetObjectModel(), cancellationToken);
-            return await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
+            JsonElement jsonDocument = await PerformCommand<JsonElement>(new GetObjectModel(), cancellationToken);
+            MemoryStream result = new();
+            using Utf8JsonWriter writer = new(result);
+            jsonDocument.WriteTo(writer);
+            return result;
         }
 
         /// <summary>
