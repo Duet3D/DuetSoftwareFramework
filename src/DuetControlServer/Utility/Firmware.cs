@@ -533,7 +533,7 @@ namespace DuetControlServer.Utility
                     try
                     {
                         // Start the update process
-                        Commands.Code updateCode = new()
+                        Code updateCode = new()
                         {
                             Type = CodeType.MCode,
                             MajorNumber = 997,
@@ -575,7 +575,7 @@ namespace DuetControlServer.Utility
                 Console.Write("Updating firmware on mainboard... ");
                 try
                 {
-                    Commands.Code updateCode = new()
+                    Code updateCode = new()
                     {
                         Type = CodeType.MCode,
                         MajorNumber = 997
@@ -595,7 +595,7 @@ namespace DuetControlServer.Utility
                 Console.Write("Resetting mainboard... ");
                 try
                 {
-                    Commands.Code updateCode = new()
+                    Code updateCode = new()
                     {
                         Type = CodeType.MCode,
                         MajorNumber = 999
