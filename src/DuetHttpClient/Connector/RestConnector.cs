@@ -703,11 +703,19 @@ namespace DuetHttpClient.Connector
                     if (response.IsSuccessStatusCode)
                     {
 #if NET6_0_OR_GREATER
-                        Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                        byte[] responseData = await response.Content.ReadAsByteArrayAsync(cancellationToken);
 #else
-                        Stream responseStream = await response.Content.ReadAsStreamAsync();
+                        byte[] responseData = await response.Content.ReadAsByteArrayAsync();
 #endif
-                        return (await JsonSerializer.DeserializeAsync(responseStream, ObjectModelContext.Default.GCodeFileInfo, cancellationToken))!;
+
+                        GCodeFileInfo Deserialize()
+                        {
+                            Utf8JsonReader reader = new(responseData);
+                            GCodeFileInfo fileInfo = new();
+                            fileInfo.UpdateFromJsonReader(ref reader, false);
+                            return fileInfo;
+                        }
+                        return Deserialize();
                     }
 
                     if (response.StatusCode == HttpStatusCode.NotFound)

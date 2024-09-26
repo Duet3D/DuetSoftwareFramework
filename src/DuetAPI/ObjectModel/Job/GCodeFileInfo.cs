@@ -10,6 +10,12 @@ namespace DuetAPI.ObjectModel
     public partial class GCodeFileInfo : ModelObject, IStaticModelObject
     {
         /// <summary>
+        /// User-defined key-value pairs
+        /// </summary>
+        [SbcProperty(false)]
+        public JsonModelDictionary CustomInfo { get; } = new JsonModelDictionary(false);
+
+        /// <summary>
         /// Filament consumption per extruder drive (in mm)
         /// </summary>
         public ObservableCollection<float> Filament { get; } = [];

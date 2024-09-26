@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Text.Json;
+using System.Text.Unicode;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -156,7 +157,15 @@ namespace DuetAPIClient
                 await SendCommand(new Acknowledge(), cancellationToken);
             }
             using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
-            return JsonSerializer.Deserialize(jsonStream.ToArray(), ObjectModelContext.Default.ObjectModel)!;
+
+            ObjectModel Deserialize() {
+                Utf8JsonReader reader = new(jsonStream.ToArray());
+
+                ObjectModel model = new();
+                model.UpdateFromJsonReader(ref reader, false);
+                return model;
+            }
+            return Deserialize();
         }
 
         /// <summary>

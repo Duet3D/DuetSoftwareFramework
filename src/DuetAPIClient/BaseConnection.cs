@@ -184,9 +184,25 @@ namespace DuetAPIClient
                     #if NET9_0_OR_GREATER
                     #warning FIXME use JsonTypeInfoResolver.Combine here
                     #endif
-                    return (typeof(T) == typeof(ObjectModel) || typeof(T) == typeof(Message) || typeof(T) == typeof(GCodeFileInfo)) ?
-                        (T)JsonSerializer.Deserialize(ref reader, typeof(T), ObjectModelContext.Default)! :
-                        (T)JsonSerializer.Deserialize(ref reader, typeof(T), CommandContext.Default)!;
+
+                    if (typeof(T) == typeof(ObjectModel))
+                    {
+                        ObjectModel model = new();
+                        model.UpdateFromJsonReader(ref reader, false);
+                        return (T)(object)model;
+                    }
+                    else if (typeof(T) == typeof(GCodeFileInfo))
+                    {
+                        GCodeFileInfo fileInfo = new();
+                        fileInfo.UpdateFromJsonReader(ref reader, false);
+                        return (T)(object)fileInfo;
+                    }
+                    else 
+                    {
+                        return (typeof(T) == typeof(Message)) ?
+                            (T)JsonSerializer.Deserialize(ref reader, typeof(T), ObjectModelContext.Default)! :
+                            (T)JsonSerializer.Deserialize(ref reader, typeof(T), CommandContext.Default)!;
+                    }
                 }
 
                 if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)

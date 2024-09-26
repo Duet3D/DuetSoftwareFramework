@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -9,6 +10,7 @@ using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files.ImageProcessing;
+using SixLabors.ImageSharp.Processing;
 using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.Files
@@ -47,8 +49,25 @@ namespace DuetControlServer.Files
                     fileName.EndsWith(".nc", StringComparison.InvariantCultureIgnoreCase)
                ))
             {
-                await ParseHeader(fileStream, readThumbnailContent, result);
+                Dictionary<string, Task<object?>> evaluationTasks = [];
+
+                // Parse the file
+                await ParseHeader(fileStream, readThumbnailContent, evaluationTasks, result);
                 await ParseFooter(fileStream, result);
+
+                // Wait for key-value evaluation tasks to finish and add the results
+                foreach (KeyValuePair<string, Task<object?>> kvp in evaluationTasks)
+                {
+                    try
+                    {
+                        object? value = await kvp.Value;
+                        result.CustomInfo.Add(kvp.Key, JsonSerializer.SerializeToElement(value));
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.Warn(e, "Failed to evaluate key '{0}' from job file '{1}'", kvp.Key, result.FileName);
+                    }
+                }
 
                 while (result.Filament.Count > 0 && result.Filament[0] == 0F)
                 {
@@ -74,9 +93,10 @@ namespace DuetControlServer.Files
         /// </summary>
         /// <param name="stream">Stream</param>
         /// <param name="readThumbnailContent">Whether thumbnail content shall be returned</param>
+        /// <param name="userDefinedKeys">User-defined keys and the corresponding evaluation task</param>
         /// <param name="partialFileInfo">G-code file information</param>
         /// <returns>Asynchronous task</returns>
-        private static async Task ParseHeader(Stream stream, bool readThumbnailContent, GCodeFileInfo partialFileInfo)
+        private static async Task ParseHeader(Stream stream, bool readThumbnailContent, Dictionary<string, Task<object?>> userDefinedKeys, GCodeFileInfo partialFileInfo)
         {
             Code code = new();
             CodeParserBuffer codeParserBuffer = new(Settings.FileBufferSize, true);
@@ -100,6 +120,7 @@ namespace DuetControlServer.Files
                     gotNewInfo |= (partialFileInfo.LayerHeight == 0) && FindLayerHeight(code.Comment, ref partialFileInfo);
                     gotNewInfo |= (partialFileInfo.NumLayers == 0) && FindNumLayers(code.Comment, ref partialFileInfo);
                     gotNewInfo |= FindFilamentUsed(code.Comment, ref partialFileInfo);
+                    gotNewInfo |= AddUserDefinedKey(code, userDefinedKeys);
                     gotNewInfo |= string.IsNullOrEmpty(partialFileInfo.GeneratedBy) && FindGeneratedBy(code.Comment, ref partialFileInfo);
                     gotNewInfo |= await ParseThumbnails(stream, code, codeParserBuffer, partialFileInfo, readThumbnailContent);
                 }
@@ -410,6 +431,30 @@ namespace DuetControlServer.Files
                         }
                         return true;
                     }
+                }
+            }
+            return false;
+        }
+
+        private const string CustomInfoPrefix = "customInfo";
+
+        /// <summary>
+        /// Check if this line contains a user-defined key and add it if that is the case
+        /// </summary>
+        /// <param name="code">Code possibly containing the user-defined key-value pair</param>
+        /// <param name="userDefinedKeys">Dictionary of user-defined key vs. value evaluation task</param>
+        private static bool AddUserDefinedKey(Code code, Dictionary<string, Task<object?>> userDefinedKeys)
+        {
+            if (code.Comment!.StartsWith(CustomInfoPrefix))
+            {
+                string comment = code.Comment[CustomInfoPrefix.Length..];
+                int index = comment.IndexOf('=');
+                if (index > 0)
+                {
+                    string key = comment[..index].Trim(), value = comment[(index + 1)..].Trim();
+                    _logger.Debug("Evaluating user-defined key '{0}' with value '{1}'", key, value);
+                    userDefinedKeys.Add(key, Model.Expressions.EvaluateExpressionRaw(code, value, false));
+                    return true;
                 }
             }
             return false;

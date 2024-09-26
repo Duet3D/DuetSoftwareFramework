@@ -1,6 +1,7 @@
 ﻿using DuetAPI.ObjectModel;
 using NUnit.Framework;
 using System.IO;
+using System.Text;
 using System.Text.Json;
 
 namespace UnitTests.Machine
@@ -11,6 +12,7 @@ namespace UnitTests.Machine
         static void TestLoadedModel(ObjectModel model)
         {
             // Test all supported data types
+            Assert.That(model.Global["foobar"].Value.GetInt32(), Is.EqualTo(123));
             Assert.That(model.Directories.System, Is.EqualTo("0:/sys/custom"));
             Assert.That(model.Move.Axes[0].Letter, Is.EqualTo('W'));
             Assert.That(model.State.AtxPower, Is.True);
@@ -37,6 +39,42 @@ namespace UnitTests.Machine
             Assert.That(model.Sensors.FilamentMonitors[0].Type, Is.EqualTo(FilamentMonitorType.RotatingMagnet));
         }
 
+#if false
+        [Test]
+        public void DerserializeFromJsonDocument()
+        {
+            string modelPath = Path.Combine(Directory.GetCurrentDirectory(), "../../../Machine/JSON/model.json");
+            string jsonText = System.IO.File.ReadAllText(modelPath);
+            using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
+
+            ObjectModel model = JsonSerializer.Deserialize(parsedJson, ObjectModelContext.Default.ObjectModel);
+
+            // Test the loaded model values
+            TestLoadedModel(model);
+
+            // Serialize OM again and make sure it matches the saved state
+            string serializedModel = JsonSerializer.Serialize(model, DuetAPI.Utility.JsonHelper.DefaultJsonOptions);
+            Assert.That(serializedModel, Is.EqualTo(jsonText));
+        }
+
+        // FIXME Deserialization via standard calls isn't working yet
+        [Test]
+        public void DerserializeFromJsonReader()
+        {
+            string modelPath = Path.Combine(Directory.GetCurrentDirectory(), "../../../Machine/JSON/model.json");
+            byte[] jsonBytes = System.IO.File.ReadAllBytes(modelPath);
+
+            ObjectModel model = JsonSerializer.Deserialize(jsonBytes, ObjectModelContext.Default.ObjectModel);
+
+            // Test the loaded model values
+            TestLoadedModel(model);
+
+            // Serialize OM again and make sure it matches the saved state
+            string serializedModel = JsonSerializer.Serialize(model, DuetAPI.Utility.JsonHelper.DefaultJsonOptions);
+            Assert.That(serializedModel, Is.EqualTo(Encoding.UTF8.GetString(jsonBytes)));
+        }
+#endif
+
         [Test]
         public void UpdateFromJson()
         {
@@ -54,7 +92,6 @@ namespace UnitTests.Machine
             string serializedModel = JsonSerializer.Serialize(model, DuetAPI.Utility.JsonHelper.DefaultJsonOptions);
             Assert.That(serializedModel, Is.EqualTo(jsonText));
         }
-
 
         [Test]
         public void UpdateFromJsonReader()

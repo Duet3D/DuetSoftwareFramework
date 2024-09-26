@@ -437,6 +437,10 @@ namespace DuetAPI.ObjectModel
         /// <exception cref="JsonException">Failed to deserialize data</exception>
         public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
         {
+            if (reader.TokenType == JsonTokenType.None && !reader.Read())
+            {
+                throw new JsonException("failed to read from JSON reader");
+            }
             if (reader.TokenType != JsonTokenType.StartObject)
             {
                 throw new JsonException("expected start of object");
