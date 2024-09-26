@@ -56,7 +56,7 @@ namespace DuetWebServer.Services
             {
                 if (httpContext.Request.Headers.TryGetValue(HeaderNames.Host, out StringValues hostValue) &&
                     Uri.TryCreate(httpContext.Request.Headers[CorsConstants.Origin], UriKind.Absolute, out Uri? uri) &&
-                    (string.Equals(uri.Host, hostValue, StringComparison.InvariantCultureIgnoreCase) ||
+                    ((string.Equals(uri.Host, hostValue, StringComparison.InvariantCultureIgnoreCase) && httpContext.Connection.LocalPort is 80 or 443) ||
                      string.Equals($"{uri.Host}:{uri.Port}", hostValue, StringComparison.InvariantCultureIgnoreCase)))
                 {
                     // Origin matches Host, request is legit
