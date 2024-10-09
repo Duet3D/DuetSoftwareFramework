@@ -13,7 +13,7 @@
             get => _filaments;
 			set => SetPropertyValue(ref _filaments, value);
         }
-        private string _filaments = "0:/filaments";
+        private string _filaments = "0:/filaments/";
 
         /// <summary>
         /// Path to the firmware directory
@@ -23,7 +23,7 @@
             get => _firmware;
 			set => SetPropertyValue(ref _firmware, value);
         }
-        private string _firmware = "0:/firmware";
+        private string _firmware = "0:/firmware/";
 
         /// <summary>
         /// Path to the G-Codes directory
@@ -33,7 +33,7 @@
             get => _gCodes;
 			set => SetPropertyValue(ref _gCodes, value);
         }
-        private string _gCodes = "0:/gcodes";
+        private string _gCodes = "0:/gcodes/";
 
         /// <summary>
         /// Path to the macros directory
@@ -43,7 +43,7 @@
             get => _macros;
 			set => SetPropertyValue(ref _macros, value);
         }
-        private string _macros = "0:/macros";
+        private string _macros = "0:/macros/";
 
         /// <summary>
         /// Path to the menu directory
@@ -56,7 +56,7 @@
             get => _menu;
 			set => SetPropertyValue(ref _menu, value);
         }
-        private string _menu = "0:/menu";
+        private string _menu = "0:/menu/";
 
         /// <summary>
         /// Path to the system directory
@@ -67,7 +67,7 @@
             get => _system;
 			set => SetPropertyValue(ref _system, value);
         }
-        private string _system = "0:/sys";
+        private string _system = "0:/sys/";
 
         /// <summary>
         /// Path to the web directory
@@ -77,6 +77,6 @@
             get => _web;
 			set => SetPropertyValue(ref _web, value);
         }
-        private string _web = "0:/www";
+        private string _web = "0:/www/";
     }
 }
