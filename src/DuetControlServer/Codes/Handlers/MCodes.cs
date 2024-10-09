@@ -200,7 +200,7 @@ namespace DuetControlServer.Codes.Handlers
 
                             using (await JobProcessor.LockAsync(code.CancellationToken))
                             {
-                                if (!code.IsFromFileChannel && JobProcessor.IsProcessing)
+                                if (!code.IsFromFileChannel && (JobProcessor.IsProcessing || JobProcessor.IsPaused))
                                 {
                                     return new Message(MessageType.Error, "Cannot set file to print, because a file is already being printed");
                                 }
@@ -425,7 +425,7 @@ namespace DuetControlServer.Codes.Handlers
 
                             using (await JobProcessor.LockAsync(code.CancellationToken))
                             {
-                                if (!code.IsFromFileChannel && JobProcessor.IsProcessing)
+                                if (!code.IsFromFileChannel && (JobProcessor.IsProcessing || JobProcessor.IsPaused))
                                 {
                                     return new Message(MessageType.Error, "Cannot set file to simulate, because a file is already being printed");
                                 }
