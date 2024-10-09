@@ -9,7 +9,7 @@ namespace DuetControlServer.Files
     /// <summary>
     /// Static class used to provide functions for file path resolution
     /// </summary>
-    public static class FilePath
+    public static partial class FilePath
     {
         /// <summary>
         /// Default name of the config file
@@ -37,6 +37,18 @@ namespace DuetControlServer.Files
         public const string RunOnceFile = "runonce.g";
 
         /// <summary>
+        /// Regex to obtain a drive number from a RRF-style path
+        /// </summary>
+        /// <returns></returns>
+        [GeneratedRegex(@"^(\d+):/*(.*)")]
+        private static partial Regex _generateDriveRegex();
+
+        /// <summary>
+        /// Regular expression to extract name and index from a filter item
+        /// </summary>
+        private static readonly Regex _driveRegex = _generateDriveRegex();
+
+        /// <summary>
         /// Resolve a RepRapFirmware/FatFs-style file path to a physical file path.
         /// The first drive (0:/) is reserved for usage with the base directory as specified in the settings
         /// </summary>
@@ -47,7 +59,7 @@ namespace DuetControlServer.Files
         {
             filePath = filePath.Replace('\\', '/');
 
-            Match match = Regex.Match(filePath, @"^(\d+):/*(.*)");
+            Match match = _driveRegex.Match(filePath);
             if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
             {
                 if (driveNumber == 0)
@@ -83,7 +95,7 @@ namespace DuetControlServer.Files
                         _ => Model.Provider.Get.Directories.System,
                     };
 
-                    match = Regex.Match(directoryPath, @"^(\d+):/*(.*)");
+                    match = _driveRegex.Match(directoryPath);
                     if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
                     {
                         if (driveNumber == 0)
@@ -113,7 +125,7 @@ namespace DuetControlServer.Files
         {
             filePath = filePath.Replace('\\', '/');
 
-            Match match = Regex.Match(filePath, @"^(\d+):/*(.*)");
+            Match match = _driveRegex.Match(filePath);
             if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
             {
                 if (driveNumber == 0)
@@ -149,7 +161,7 @@ namespace DuetControlServer.Files
                         _ => Model.Provider.Get.Directories.System,
                     };
 
-                    match = Regex.Match(directoryPath, @"^(\d+):/*(.*)");
+                    match = _driveRegex.Match(directoryPath);
                     if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
                     {
                         if (driveNumber == 0)
@@ -179,7 +191,7 @@ namespace DuetControlServer.Files
         {
             filePath = filePath.Replace('\\', '/');
 
-            Match match = Regex.Match(filePath, @"^(\d+):/*(.*)");
+            Match match = _driveRegex.Match(filePath);
             if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
             {
                 if (driveNumber == 0)
@@ -200,7 +212,7 @@ namespace DuetControlServer.Files
 
             if (directory is not null && !filePath.StartsWith('/'))
             {
-                match = Regex.Match(directory, @"^(\d+):/*(.*)");
+                match = _driveRegex.Match(directory);
                 if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
                 {
                     if (driveNumber == 0)
@@ -233,7 +245,7 @@ namespace DuetControlServer.Files
         {
             filePath = filePath.Replace('\\', '/');
 
-            Match match = Regex.Match(filePath, @"^(\d+):/*(.*)");
+            Match match = _driveRegex.Match(filePath);
             if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
             {
                 if (driveNumber == 0)
@@ -254,7 +266,7 @@ namespace DuetControlServer.Files
 
             if (directory is not null && !filePath.StartsWith('/'))
             {
-                match = Regex.Match(directory, @"^(\d+):/*(.*)");
+                match = _driveRegex.Match(directory);
                 if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
                 {
                     if (driveNumber == 0)
