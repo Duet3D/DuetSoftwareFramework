@@ -121,6 +121,7 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // Done
+            CurrentState.SetBusy(true);
             Stack.Push(state);
             CurrentState = state;
             return state;
@@ -1307,6 +1308,7 @@ namespace DuetControlServer.SPI.Channel
             }
             BufferedCodes.Clear();
             BytesBuffered = 0;
+            _suppressEmptyReply = true;
 
             foreach (State state in Stack)
             {
@@ -1335,8 +1337,6 @@ namespace DuetControlServer.SPI.Channel
                     state.SetBusy(false);
                 }
             }
-
-            _suppressEmptyReply = true;
         }
 
         /// <summary>
@@ -1385,6 +1385,7 @@ namespace DuetControlServer.SPI.Channel
             }
             BufferedCodes.Clear();
             BytesBuffered = 0;
+            _suppressEmptyReply = true;
 
             // Clear codes that are still pending but have not been fed into the SPI interface yet
             Code.CancelPending(Channel);
