@@ -100,12 +100,12 @@ try
             {
                 code = await connection.ReceiveCode();
 
+                Console.WriteLine($"[{connection.Mode}] {code.Channel}: {code}");
+
                 // If you do not wish to let the received code execute, you can run connection.ResolveCode instead.
                 // Before you call one of Cancel, Ignore, or Resolve you may execute as many commands as you want.
                 // Codes initiated from the intercepting connection cannot be intercepted from the same connection.
                 await connection.IgnoreCode();
-
-                Console.WriteLine($"[{connection.Mode}] {code.Channel}: {code}");
             }
             while (true);
         }
