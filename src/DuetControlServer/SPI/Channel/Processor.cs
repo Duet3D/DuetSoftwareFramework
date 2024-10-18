@@ -604,10 +604,7 @@ namespace DuetControlServer.SPI.Channel
                 // Invalidate remaining buffered codes from the last macro file
                 foreach (Code bufferedCode in BufferedCodes)
                 {
-                    if (bufferedCode != startCode)
-                    {
-                        Codes.Processor.CancelCode(bufferedCode);
-                    }
+                    Codes.Processor.CancelCode(bufferedCode);
                 }
                 BufferedCodes.Clear();
                 BytesBuffered = 0;

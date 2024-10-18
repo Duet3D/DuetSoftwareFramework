@@ -154,9 +154,7 @@ namespace DuetControlServer.Codes.Pipelines
                         return stackItem.FlushAsync();
                     }
                 }
-
-                Processor.Logger.Warn("Failed to find corresponding state for file flush request, falling back to current state");
-                return CurrentStackItem.FlushAsync();
+                return Task.FromResult(false);
             }
         }
 
@@ -178,9 +176,7 @@ namespace DuetControlServer.Codes.Pipelines
                         return stackItem.FlushAsync(code);
                     }
                 }
-
-                Processor.Logger.Warn("Failed to find corresponding state for code flush request, falling back to current state");
-                return CurrentStackItem.FlushAsync(code);
+                return Task.FromResult(false);
             }
         }
 
