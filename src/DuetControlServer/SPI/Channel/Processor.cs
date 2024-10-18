@@ -121,7 +121,6 @@ namespace DuetControlServer.SPI.Channel
             }
 
             // Done
-            CurrentState.SetBusy(true);
             Stack.Push(state);
             CurrentState = state;
             return state;
@@ -526,13 +525,18 @@ namespace DuetControlServer.SPI.Channel
         }
 
         /// <summary>
-        /// Called when the last or all files have been aborted
+        /// Called when the last or all files have been aborted by the firmware
         /// </summary>
         /// <param name="abortAll">Whether to abort all files</param>
-        /// <param name="fromFirmware">Whether the request came from the firmware</param>
-        public void FilesAborted(bool abortAll, bool fromFirmware)
+        public void FilesAborted(bool abortAll)
         {
             bool macroAborted = false;
+
+            // If only the last macro is aborted, we may have a pending reply for e.g. M99
+            if (!abortAll)
+            {
+                ResolvePendingReplies();
+            }
 
             // Clean up the stack
             Code? startCode = null;
@@ -548,9 +552,9 @@ namespace DuetControlServer.SPI.Channel
                 {
                     using (macro.Lock())
                     {
-                        // Resolve potential start codes when the macro file finishes
-                        if (startCode is not null)
+                        if (startCode is not null && abortAll)
                         {
+                            // Wait for the macro to be fully cancelled and then cancel the code that started it
                             _ = macro.WaitForFinishAsync().ContinueWith(async task =>
                             {
                                 try
@@ -571,14 +575,14 @@ namespace DuetControlServer.SPI.Channel
                 }
                 else if (startCode is not null)
                 {
-                    // Cancel the code that started the blocking message prompt
+                    // This is a message prompt. Cancel the code that started it
                     Codes.Processor.CancelCode(startCode);
                     startCode = null;
                 }
 
                 // Pop the stack
                 Pop();
-                if (startCode is not null)
+                if (startCode is not null && abortAll)
                 {
                     _logger.Debug("==> Unfinished starting code: {0}", startCode);
                 }
@@ -593,7 +597,6 @@ namespace DuetControlServer.SPI.Channel
             if (abortAll)
             {
                 // Cancel pending codes and requests
-                _allFilesAborted = !fromFirmware && (DataTransfer.ProtocolVersion >= 3);
                 InvalidateRegular();
             }
             else
@@ -601,14 +604,25 @@ namespace DuetControlServer.SPI.Channel
                 // Invalidate remaining buffered codes from the last macro file
                 foreach (Code bufferedCode in BufferedCodes)
                 {
-                    Codes.Processor.CancelCode(bufferedCode);
+                    if (bufferedCode != startCode)
+                    {
+                        Codes.Processor.CancelCode(bufferedCode);
+                    }
                 }
                 BufferedCodes.Clear();
                 BytesBuffered = 0;
+
+                // If only the last file was closed (e.g. from M99), carry on with the execution of the code that started it
+                if (startCode is not null)
+                {
+                    BytesBuffered += startCode.BinarySize;
+                    BufferedCodes.Insert(0, startCode);
+                    _logger.Debug("==> Resuming unfinished starting code: {0}", startCode);
+                }
             }
 
             // Abort the file print if necessary
-            if ((Channel == CodeChannel.File || Channel == CodeChannel.File2) && (abortAll || !macroAborted))
+            if ((Channel is CodeChannel.File or CodeChannel.File2) && (abortAll || !macroAborted))
             {
                 using (JobProcessor.Lock())
                 {
@@ -618,15 +632,11 @@ namespace DuetControlServer.SPI.Channel
         }
 
         /// <summary>
-        /// Abort the last or all files asynchronously
+        /// Abort all files asynchronously
         /// </summary>
-        /// <param name="abortAll">Whether to abort all files</param>
-        /// <param name="fromFirmware">Whether the request came from the firmware</param>
         /// <returns>Asynchronous task</returns>
-        public async Task AbortFilesAsync(bool abortAll, bool fromFirmware)
+        public async Task AbortAllFilesAsync()
         {
-            bool macroAborted = false;
-
             // Clean up the stack
             Code? startCode = null;
             while (CurrentState.WaitingForAcknowledgement || CurrentState.File is MacroFile)
@@ -660,7 +670,6 @@ namespace DuetControlServer.SPI.Channel
                         // Abort the macro file
                         macro.Abort();
                     }
-                    macroAborted = true;
                 }
                 else if (startCode is not null)
                 {
@@ -675,33 +684,14 @@ namespace DuetControlServer.SPI.Channel
                 {
                     _logger.Debug("==> Unfinished starting code: {0}", startCode);
                 }
-
-                // Stop if only a single file is supposed to be aborted
-                if (!abortAll && macroAborted)
-                {
-                    break;
-                }
             }
 
-            if (abortAll)
-            {
-                // Cancel pending codes and requests
-                _allFilesAborted = !fromFirmware && (DataTransfer.ProtocolVersion >= 3);
-                InvalidateRegular();
-            }
-            else
-            {
-                // Invalidate remaining buffered codes from the last macro file
-                foreach (Code bufferedCode in BufferedCodes)
-                {
-                    Codes.Processor.CancelCode(bufferedCode);
-                }
-                BufferedCodes.Clear();
-                BytesBuffered = 0;
-            }
+            // Cancel pending codes and requests
+            _allFilesAborted = (DataTransfer.ProtocolVersion >= 3);
+            InvalidateRegular();
 
             // Abort the job files if necessary
-            if ((Channel == CodeChannel.File || Channel == CodeChannel.File2) && (abortAll || !macroAborted))
+            if (Channel is CodeChannel.File or CodeChannel.File2)
             {
                 using (await JobProcessor.LockAsync())
                 {

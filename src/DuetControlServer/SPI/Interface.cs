@@ -674,7 +674,7 @@ namespace DuetControlServer.SPI
 
             using (await _channels[channel].LockAsync())
             {
-                await _channels[channel].AbortFilesAsync(true, false);
+                await _channels[channel].AbortAllFilesAsync();
             }
         }
 
@@ -1173,7 +1173,7 @@ namespace DuetControlServer.SPI
 
             using (_channels[channel].Lock())
             {
-                _channels[channel].FilesAborted(abortAll, true);
+                _channels[channel].FilesAborted(abortAll);
             }
         }
 
