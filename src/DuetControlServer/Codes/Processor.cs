@@ -155,22 +155,43 @@ namespace DuetControlServer.Codes
             // Deal with priority codes
             if (code.Flags.HasFlag(CodeFlags.IsPrioritized))
             {
-                // Check if the code has to be moved to another channel first
+                // Process this priority code here if it is idle
                 if (processor.IsIdle(code))
                 {
                     await processor.WriteCodeAsync(code, stage);
                     return;
                 }
 
-                // Move priority codes to an empty code channel (if possible)
+                // Otherwise move it to another idle code channel with the same emulation type (if possible)
+                using (await Model.Provider.AccessReadOnlyAsync())
+                {
+                    Compatibility compatibility = Model.Provider.Get.Inputs[code.Channel]?.Compatibility ?? Compatibility.RepRapFirmware;
+                    for (int input = 0; input < Inputs.Total; input++)
+                    {
+                        CodeChannel channel = (CodeChannel)input;
+                        if (channel != code.Channel && channel is not CodeChannel.File and not CodeChannel.File2)
+                        {
+                            ChannelProcessor next = _processors[input];
+                            if (Model.Provider.Get.Inputs[channel]?.Compatibility == compatibility && next.IsIdle(code))
+                            {
+                                code.Channel = channel;
+                                await next.WriteCodeAsync(code, stage); // This can't block if the channel is idle
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                // Otherwise move it to an arbitrary idle code channel (if possible)
                 for (int input = 0; input < Inputs.Total; input++)
                 {
-                    if ((CodeChannel)input != code.Channel)
+                    CodeChannel channel = (CodeChannel)input;
+                    if (channel != code.Channel && channel is not CodeChannel.File and not CodeChannel.File2)
                     {
                         ChannelProcessor next = _processors[input];
                         if (next.IsIdle(code))
                         {
-                            code.Channel = (CodeChannel)input;
+                            code.Channel = channel;
                             await next.WriteCodeAsync(code, stage);
                             return;
                         }

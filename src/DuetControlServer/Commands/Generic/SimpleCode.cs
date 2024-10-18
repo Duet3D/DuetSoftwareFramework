@@ -91,9 +91,9 @@ namespace DuetControlServer.Commands
                         code.Flags |= CodeFlags.Asynchronous;
                     }
 
-                    // M108, M112, M122, and M999 (B0) always go to an idle channel so we (hopefully) get a low-latency response
+                    // M108, M112, M122, M292, and M999 (B0) always go to an idle channel so we (hopefully) get a low-latency response
                     if (code.Type == CodeType.MCode &&
-                        (code.MajorNumber == 108 || code.MajorNumber == 112 || code.MajorNumber == 122 || (code.MajorNumber == 999 && code.GetInt('B', 0) == 0)))
+                        (code.MajorNumber is 108 or 112 or 122 or 292 || (code.MajorNumber == 999 && code.GetInt('B', 0) == 0)))
                     {
                         code.Flags |= CodeFlags.IsPrioritized;
                         priorityCodes.Add(code);
