@@ -404,6 +404,7 @@ namespace DuetControlServer.SPI
         /// <param name="reason">Reason why the print has stopped</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
+        /// <exception cref="OperationCanceledException">Connection lost while trying to notify RRF</exception>
         public static async Task StopPrint(PrintStoppedReason reason)
         {
             if (Settings.NoSpi)
@@ -1623,7 +1624,7 @@ namespace DuetControlServer.SPI
                 }
                 if (_stopPrintRequest is not null)
                 {
-                    _stopPrintRequest.SetResult();      // called from the print task so this never throws an exception
+                    _stopPrintRequest.SetCanceled();
                     _stopPrintRequest = null;
                 }
             }
@@ -1706,7 +1707,7 @@ namespace DuetControlServer.SPI
                 }
                 if (_stopPrintRequest is not null)
                 {
-                    _stopPrintRequest.SetResult();      // called from the print task so this never throws an exception
+                    _stopPrintRequest.SetCanceled();
                     _stopPrintRequest = null;
                 }
             }
