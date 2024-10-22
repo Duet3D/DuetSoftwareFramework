@@ -451,12 +451,13 @@ namespace DuetWebServer.Controllers
         /// </summary>
         /// <param name="dir">Directory to list</param>
         /// <param name="first">First file to list or -1 if unknown</param>
+        /// <param name="max">Maximum number of files to list or -1 if unset</param>
         /// <returns>
         /// HTTP status code:
         /// (200) JSON response
         /// </returns>
         [HttpGet("rr_filelist")]
-        public async Task<IActionResult> GetFileList(string? dir, int first = -1)
+        public async Task<IActionResult> GetFileList(string? dir, int first = -1, int max = -1)
         {
             try
             {
@@ -465,13 +466,13 @@ namespace DuetWebServer.Controllers
                     return Content("{\"err\":1}");
                 }
                 string resolvedPath = await ResolvePath(dir);
-                return File(FileLists.GetFileListUtf8(dir, resolvedPath, first), "application/json");
+                return File(FileLists.GetFileListUtf8(dir, resolvedPath, first, -1, max), "application/json");
             }
             catch (Exception e)
             {
                 LogError(e, "Failed to handle rr_filelist request");
             }
-            return Content("{\"err\":2}");
+            return Content("{\"err\":2}", "application/json");
         }
 
         /// <summary>
@@ -481,26 +482,27 @@ namespace DuetWebServer.Controllers
         /// <param name="dir">Directory to list</param>
         /// <param name="first">First file to list (defaults to 0)</param>
         /// <param name="flagDirs">Whether directories should be flagged using an asterisk prefix</param>
+        /// <param name="max">Maximum number of files to list or -1 if unset</param>
         /// <returns>
         /// HTTP status code:
         /// (200) JSON response
         /// </returns>
         [HttpGet("rr_files")]
-        public async Task<IActionResult> GetFiles(string? dir, int first = 0, int flagDirs = 0)
+        public async Task<IActionResult> GetFiles(string? dir, int first = 0, int flagDirs = 0, int max = -1)
         {
             try
             {
                 if (!string.IsNullOrWhiteSpace(dir))
                 {
                     string resolvedPath = await ResolvePath(dir);
-                    return Content(FileLists.GetFiles(dir, resolvedPath, first, flagDirs != 0), "application/json");
+                    return Content(FileLists.GetFiles(dir, resolvedPath, first, flagDirs != 0, -1, max), "application/json");
                 }
             }
             catch (Exception e)
             {
                 LogError(e, "Failed to handle rr_filelist request");
             }
-            return Content("{\"err\":1}");
+            return Content("{\"err\":1}", "application/json");
         }
 
         /// <summary>

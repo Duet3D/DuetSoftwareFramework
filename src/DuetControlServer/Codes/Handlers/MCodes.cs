@@ -98,15 +98,15 @@ namespace DuetControlServer.Codes.Handlers
                         }
 
                         // Check if JSON file lists were requested
-                        int startAt = Math.Max(code.GetInt('R', 0), 0), type = code.GetInt('S', 0);
+                        int startAt = Math.Max(code.GetInt('R', 0), 0), type = code.GetInt('S', 0), maxItems = code.GetInt('C', -1);
                         if (type == 2)
                         {
-                            string json = FileLists.GetFiles(virtualDirectory, physicalDirectory, startAt, true, maxSize);
+                            string json = FileLists.GetFiles(virtualDirectory, physicalDirectory, startAt, true, maxSize, maxItems);
                             return new Message(MessageType.Success, json);
                         }
                         if (type == 3)
                         {
-                            string json = FileLists.GetFileList(virtualDirectory, physicalDirectory, startAt, maxSize);
+                            string json = FileLists.GetFileList(virtualDirectory, physicalDirectory, startAt, maxSize, maxItems);
                             return new Message(MessageType.Success, json);
                         }
 
@@ -134,6 +134,12 @@ namespace DuetControlServer.Codes.Handlers
                             if (numItems++ >= startAt)
                             {
                                 string filename = Path.GetFileName(file);
+                                if ((maxSize > 0 && result.Length + filename.Length + 3 > maxSize) || (maxItems > 0 && numItems > startAt + maxItems))
+                                {
+                                    // Stay within limits...
+                                    break;
+                                }
+
                                 if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
                                 {
                                     result.AppendLine(filename);

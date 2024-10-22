@@ -18,8 +18,9 @@ namespace DuetAPI.Utility
         /// <param name="startAt">First item to send</param>
         /// <param name="flagDirs">Prefix directories with an asterisk</param>
         /// <param name="maxSize">Maximum size of the file list in bytes or -1 if unset</param>
+        /// <param name="maxItems">Maximum number of items to send or -1 if unset</param>
         /// <returns>UTF8-encoded JSON file list</returns>
-        public static byte[] GetFilesUtf8(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1)
+        public static byte[] GetFilesUtf8(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1, int maxItems = -1)
         {
             using MemoryStream fileList = new();
             using Utf8JsonWriter writer = new(fileList);
@@ -38,17 +39,16 @@ namespace DuetAPI.Utility
 
             try
             {
-
                 // List directories
                 foreach (string dir in Directory.EnumerateDirectories(physicalDirectory))
                 {
-                    if (startAt < 0 || numItems++ >= startAt)
+                    if (numItems++ >= startAt)
                     {
                         string name = Path.GetFileName(dir);
                         name = flagDirs ? "*" + name : name;
 
-                        // Check if we're about to exceed the maximum size and stop if that is the case
-                        if (maxSize > 0 && GetNextFileListSize(name) > maxSize)
+                        // Check if we're about to exceed the maximum size or max number of items and stop if that is the case
+                        if ((maxSize > 0 && GetNextFileListSize(name) > maxSize) || (maxItems > 0 && numItems > Math.Max(startAt, 0) + maxItems))
                         {
                             writer.WriteEndArray();
                             writer.WriteNumber("next", numItems - 1);
@@ -66,12 +66,12 @@ namespace DuetAPI.Utility
                 // List files
                 foreach (string file in Directory.EnumerateFiles(physicalDirectory))
                 {
-                    if (startAt < 0 || numItems++ >= startAt)
+                    if (numItems++ >= startAt)
                     {
                         string name = Path.GetFileName(file);
 
-                        // Check if we're about to exceed the maximum size and stop if that is the case
-                        if (maxSize > 0 && GetNextFileListSize(name) > maxSize)
+                        // Check if we're about to exceed the maximum size or max number of items and stop if that is the case
+                        if ((maxSize > 0 && GetNextFileListSize(name) > maxSize) || (maxItems > 0 && numItems > Math.Max(startAt, 0) + maxItems))
                         {
                             writer.WriteEndArray();
                             writer.WriteNumber("next", numItems - 1);
@@ -96,7 +96,7 @@ namespace DuetAPI.Utility
             }
             catch
             {
-                if (startAt < 0)
+                if (startAt >= 0)
                 {
                     // Something went wrong...
                     return Encoding.UTF8.GetBytes("{\"err\":2}");
@@ -113,10 +113,11 @@ namespace DuetAPI.Utility
         /// <param name="startAt">First item to send</param>
         /// <param name="flagDirs">Prefix directories with an asterisk</param>
         /// <param name="maxSize">Maximum size of the file list in bytes or -1 if unset</param>
+        /// <param name="maxItems">Maximum number of items to send or -1 if unset</param>
         /// <returns>JSON file list</returns>
-        public static string GetFiles(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1)
+        public static string GetFiles(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1, int maxItems = -1)
         {
-            return Encoding.UTF8.GetString(GetFilesUtf8(directory, physicalDirectory, startAt, flagDirs, maxSize));
+            return Encoding.UTF8.GetString(GetFilesUtf8(directory, physicalDirectory, startAt, flagDirs, maxSize, maxItems));
         }
 
         /// <summary>
@@ -126,8 +127,9 @@ namespace DuetAPI.Utility
         /// <param name="physicalDirectory">Physical directory</param>
         /// <param name="startAt">First file index to return. Set startAt to -1 to omit error handling and the JSON object container</param>
         /// <param name="maxSize">Maximum size of the file list in bytes or -1 if unset</param>
+        /// <param name="maxItems">Maximum number of items to send or -1 if unset</param>
         /// <returns>UTF8-encoded JSON list</returns>
-        public static byte[] GetFileListUtf8(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1)
+        public static byte[] GetFileListUtf8(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1, int maxItems = -1)
         {
             using MemoryStream fileList = new();
             using Utf8JsonWriter writer = new(fileList);
@@ -162,12 +164,12 @@ namespace DuetAPI.Utility
                 // List directories
                 foreach (string dir in Directory.EnumerateDirectories(physicalDirectory))
                 {
-                    if (startAt < 0 || numItems++ >= startAt)
+                    if (numItems++ >= startAt)
                     {
                         DirectoryInfo info = new(dir);
 
-                        // Check if we're about to exceed the maximum size and stop if that is the case
-                        if (maxSize > 0 && GetNextDirectorySize(info.Name, info.LastWriteTime) > maxSize)
+                        // Check if we're about to exceed the maximum size or max number of items and stop if that is the case
+                        if ((maxSize > 0 && GetNextDirectorySize(info.Name, info.LastWriteTime) > maxSize) || (maxItems > 0 && numItems > Math.Max(startAt, 0) + maxItems))
                         {
                             if (startAt >= 0)
                             {
@@ -195,12 +197,12 @@ namespace DuetAPI.Utility
                 // List files
                 foreach (string file in Directory.EnumerateFiles(physicalDirectory))
                 {
-                    if (startAt < 0 || numItems++ >= startAt)
+                    if (numItems++ >= startAt)
                     {
                         FileInfo info = new(file);
 
-                        // Check if we're about to exceed the maximum size and stop if that is the case
-                        if (maxSize > 0 && GetNextFileSize(info.Name, info.Length, info.LastWriteTime) > maxSize)
+                        // Check if we're about to exceed the maximum size or max number of items and stop if that is the case
+                        if ((maxSize > 0 && GetNextFileSize(info.Name, info.Length, info.LastWriteTime) > maxSize) || (maxItems > 0 && numItems > Math.Max(startAt, 0) + maxItems))
                         {
                             if (startAt >= 0)
                             {
@@ -259,10 +261,11 @@ namespace DuetAPI.Utility
         /// <param name="physicalDirectory">Physical directory</param>
         /// <param name="startAt">First file index to return. Set startAt to -1 to omit error handling and the JSON object container</param>
         /// <param name="maxSize">Maximum size of the file list in bytes or -1 if unset</param>
+        /// <param name="maxItems">Maximum number of items to send or -1 if unset</param>
         /// <returns>JSON list</returns>
-        public static string GetFileList(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1)
+        public static string GetFileList(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1, int maxItems = -1)
         {
-            return Encoding.UTF8.GetString(GetFileListUtf8(directory, physicalDirectory, startAt, maxSize));
+            return Encoding.UTF8.GetString(GetFileListUtf8(directory, physicalDirectory, startAt, maxSize, maxItems));
         }
     }
 }
