@@ -38,6 +38,16 @@ namespace DuetAPI.ObjectModel
         private DriverId? _driver;
 
         /// <summary>
+        /// Motor jerk during the current print only (in mm/s)
+        /// </summary>
+        public int PrintingJerk
+        {
+            get => _printingJerk;
+            set => SetPropertyValue(ref _printingJerk, value);
+        }
+        private int _printingJerk = 15;
+
+        /// <summary>
         /// Name of the currently loaded filament
         /// </summary>
         public string Filament
