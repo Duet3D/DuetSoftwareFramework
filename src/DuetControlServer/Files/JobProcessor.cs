@@ -577,20 +577,28 @@ namespace DuetControlServer.Files
                     }
 
                     // Notify RRF
-                    if (isCancelled)
+                    try
                     {
-                        // Prints are cancelled by M0/M1/M2 which is processed by RRF
-                        _logger.Info("Cancelled job file");
+                        if (isCancelled)
+                        {
+                            // Prints are cancelled by M0/M1/M2 which is processed by RRF
+                            _logger.Info("Cancelled job file");
+                        }
+                        else if (isAborted)
+                        {
+                            await SPI.Interface.StopPrint(PrintStoppedReason.Abort);
+                            _logger.Info("Aborted job file");
+                        }
+                        else
+                        {
+                            await SPI.Interface.StopPrint(PrintStoppedReason.NormalCompletion);
+                            _logger.Info("Finished job file");
+                        }
                     }
-                    else if (isAborted)
+                    catch (OperationCanceledException)
                     {
-                        await SPI.Interface.StopPrint(PrintStoppedReason.Abort);
-                        _logger.Info("Aborted job file");
-                    }
-                    else
-                    {
-                        await SPI.Interface.StopPrint(PrintStoppedReason.NormalCompletion);
-                        _logger.Info("Finished job file");
+                        // SPI link lost while attempting to notify RRF, don't attempt anything else next
+                        isAborted = true;
                     }
 
                     // Update special fields that are not available in RRF
