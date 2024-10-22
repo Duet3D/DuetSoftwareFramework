@@ -1143,8 +1143,7 @@ namespace DuetHttpClient.Connector
                         throw new HttpRequestException(errorMessage);
                     }
                 }
-            }
-            while (nextIndex > 0);
+            } while (nextIndex > 0);
 
             return result;
         }

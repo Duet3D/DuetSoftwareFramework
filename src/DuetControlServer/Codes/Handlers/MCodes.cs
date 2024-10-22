@@ -127,33 +127,29 @@ namespace DuetControlServer.Codes.Handlers
                             result.AppendLine("Begin file list:");
                         }
 
-                        int numItems = 0;
                         bool itemFound = false;
                         foreach (string file in Directory.EnumerateFileSystemEntries(physicalDirectory))
                         {
-                            if (numItems++ >= startAt)
+                            string filename = Path.GetFileName(file);
+                            if (maxSize > 0 && result.Length + filename.Length + 3 > maxSize)
                             {
-                                string filename = Path.GetFileName(file);
-                                if ((maxSize > 0 && result.Length + filename.Length + 3 > maxSize) || (maxItems > 0 && numItems > startAt + maxItems))
-                                {
-                                    // Stay within limits...
-                                    break;
-                                }
-
-                                if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
-                                {
-                                    result.AppendLine(filename);
-                                }
-                                else
-                                {
-                                    if (itemFound)
-                                    {
-                                        result.Append(',');
-                                    }
-                                    result.Append($"\"{filename}\"");
-                                }
-                                itemFound = true;
+                                // Stay within limits...
+                                break;
                             }
+
+                            if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
+                            {
+                                result.AppendLine(filename);
+                            }
+                            else
+                            {
+                                if (itemFound)
+                                {
+                                    result.Append(',');
+                                }
+                                result.Append($"\"{filename}\"");
+                            }
+                            itemFound = true;
                         }
 
                         if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
