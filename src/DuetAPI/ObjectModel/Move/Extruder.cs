@@ -40,12 +40,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Motor jerk during the current print only (in mm/s)
         /// </summary>
-        public int PrintingJerk
+        public float PrintingJerk
         {
             get => _printingJerk;
             set => SetPropertyValue(ref _printingJerk, value);
         }
-        private int _printingJerk = 15;
+        private float _printingJerk = 15;
 
         /// <summary>
         /// Name of the currently loaded filament
