@@ -71,7 +71,8 @@ namespace DuetControlServer.Files
                 {
                     if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
                     {
-                        return Path.Combine(Model.Provider.Get.Volumes[driveNumber].Path, match.Groups[2].Value);
+                        string? path = Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
+                        return Path.Combine(path, match.Groups[2].Value);
                     }
                 }
 
@@ -105,7 +106,8 @@ namespace DuetControlServer.Files
 
                         if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
                         {
-                            directoryPath = Path.Combine(Model.Provider.Get.Volumes[driveNumber].Path, match.Groups[2].Value);
+                            string? path = Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
+                            directoryPath = Path.Combine(path, match.Groups[2].Value);
                         }
                     }
                 }
@@ -137,7 +139,8 @@ namespace DuetControlServer.Files
                 {
                     if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
                     {
-                        return Path.Combine(Model.Provider.Get.Volumes[driveNumber].Path, match.Groups[2].Value);
+                        string? path = Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
+                        return Path.Combine(path, match.Groups[2].Value);
                     }
                 }
 
@@ -171,7 +174,8 @@ namespace DuetControlServer.Files
 
                         if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
                         {
-                            directoryPath = Path.Combine(Model.Provider.Get.Volumes[driveNumber].Path, match.Groups[2].Value);
+                            string? path = Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
+                            directoryPath = Path.Combine(path, match.Groups[2].Value);
                         }
                     }
                 }
@@ -203,7 +207,8 @@ namespace DuetControlServer.Files
                 {
                     if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
                     {
-                        return Path.Combine(Model.Provider.Get.Volumes[driveNumber].Path, match.Groups[2].Value);
+                        string? path = Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
+                        return Path.Combine(path, match.Groups[2].Value);
                     }
                 }
 
@@ -224,7 +229,8 @@ namespace DuetControlServer.Files
                     {
                         if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
                         {
-                            directory = Path.Combine(Model.Provider.Get.Volumes[driveNumber].Path, match.Groups[2].Value);
+                            string? path = Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
+                            directory = Path.Combine(path, match.Groups[2].Value);
                         }
                     }
                 }
@@ -257,7 +263,8 @@ namespace DuetControlServer.Files
                 {
                     if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
                     {
-                        return Path.Combine(Model.Provider.Get.Volumes[driveNumber].Path, match.Groups[2].Value);
+                        string? path = Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
+                        return Path.Combine(path, match.Groups[2].Value);
                     }
                 }
 
@@ -278,7 +285,8 @@ namespace DuetControlServer.Files
                     {
                         if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
                         {
-                            directory = Path.Combine(Model.Provider.Get.Volumes[driveNumber].Path, match.Groups[2].Value);
+                            string? path = Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
+                            directory = Path.Combine(path, match.Groups[2].Value);
                         }
                     }
                 }
@@ -304,15 +312,17 @@ namespace DuetControlServer.Files
 
             using (Model.Provider.AccessReadOnly())
             {
-                foreach (DuetAPI.ObjectModel.Volume storage in Model.Provider.Get.Volumes)
+                for (int i = 1; i < Model.Provider.Get.Volumes.Count; i++)
                 {
-                    if (filePath.StartsWith(storage.Path))
+                    string? path = Model.Provider.Get.Volumes[i].Path;
+                    if (path is not null && filePath.StartsWith(path))
                     {
-                        return Path.Combine("0:/", filePath[storage.Path.Length..]);
+                        return Path.Combine($"{i}:/", filePath[path.Length..]);
                     }
                 }
             }
 
+            // Use default first volume as fallback
             return Path.Combine("0:/", filePath);
         }
 
@@ -332,15 +342,17 @@ namespace DuetControlServer.Files
 
             using (await Model.Provider.AccessReadOnlyAsync())
             {
-                foreach (DuetAPI.ObjectModel.Volume storage in Model.Provider.Get.Volumes)
+                for (int i = 1; i < Model.Provider.Get.Volumes.Count; i++)
                 {
-                    if (filePath.StartsWith(storage.Path))
+                    string? path = Model.Provider.Get.Volumes[i].Path;
+                    if (path is not null && filePath.StartsWith(path))
                     {
-                        return Path.Combine("0:/", filePath[storage.Path.Length..]);
+                        return Path.Combine($"{i}:/", filePath[path.Length..]);
                     }
                 }
             }
 
+            // Use default first volume as fallback
             return Path.Combine("0:/", filePath);
         }
     }
