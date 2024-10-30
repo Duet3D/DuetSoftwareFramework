@@ -41,13 +41,21 @@ namespace DuetControlServer.Files
                 Size = fileStream.Length
             };
 
-            if (fileStream.Length > 0 && (
-                    fileName.EndsWith(".gcode", StringComparison.InvariantCultureIgnoreCase) ||
-                    fileName.EndsWith(".g", StringComparison.InvariantCultureIgnoreCase) ||
-                    fileName.EndsWith(".gco", StringComparison.InvariantCultureIgnoreCase) ||
-                    fileName.EndsWith(".gc", StringComparison.InvariantCultureIgnoreCase) ||
-                    fileName.EndsWith(".nc", StringComparison.InvariantCultureIgnoreCase)
-               ))
+            // Only allow job and macro files to be parsed
+            bool isValidFileToParse = fileStream.Length > 0 && (
+                fileName.EndsWith(".gcode", StringComparison.InvariantCultureIgnoreCase) ||
+                fileName.EndsWith(".g", StringComparison.InvariantCultureIgnoreCase) ||
+                fileName.EndsWith(".gco", StringComparison.InvariantCultureIgnoreCase) ||
+                fileName.EndsWith(".gc", StringComparison.InvariantCultureIgnoreCase) ||
+                fileName.EndsWith(".nc", StringComparison.InvariantCultureIgnoreCase)
+            );
+            if (!isValidFileToParse)
+            {
+                string macroDirectory = await FilePath.ToPhysicalAsync("", FileDirectory.Macros);
+                isValidFileToParse = fileName.StartsWith(macroDirectory);
+            }
+
+            if (isValidFileToParse)
             {
                 Dictionary<string, Task<object?>> evaluationTasks = [];
 
