@@ -38,12 +38,13 @@
         /// <summary>
         /// Name of this volume
         /// </summary>
-        public string Name
+        [SbcProperty(false)]
+        public string? Name
         {
             get => _name;
 			set => SetPropertyValue(ref _name, value);
         }
-        private string _name = string.Empty;
+        private string? _name;
 
         /// <summary>
         /// Number of currently open files or null if unknown
@@ -69,12 +70,13 @@
         /// <summary>
         /// Logical path of the storage device
         /// </summary>
-        public string Path
+        [SbcProperty(false)]
+        public string? Path
         {
             get => _path;
 			set => SetPropertyValue(ref _path, value);
         }
-        private string _path = string.Empty;
+        private string? _path;
 
         /// <summary>
         /// Speed of the storage device (in bytes/s or null if unknown)
