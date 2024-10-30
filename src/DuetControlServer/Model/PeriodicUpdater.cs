@@ -434,6 +434,22 @@ namespace DuetControlServer.Model
             bool volumesUpdated = false;
             void VolumeUpdated(object? sender, PropertyChangedEventArgs e) => volumesUpdated = true;
 
+            // Read file labels from /dev/disk/by-label (if applicable)
+            Dictionary<string, string> labelSymlinks = new();
+            if (Directory.Exists("/dev/disk/by-label"))
+            {
+                DirectoryInfo dirInfo = new("/dev/disk/by-label");
+                foreach (FileInfo file in dirInfo.GetFiles())
+                {
+                    string? resolvedName = file.ResolveLinkTarget(true)?.Name;
+                    if (resolvedName is not null)
+                    {
+                        labelSymlinks.Add(resolvedName, file.Name);
+                    }
+                }
+            }
+
+            // Update volume info
             int index = 0;
             foreach (DriveInfo drive in drives)
             {
@@ -466,8 +482,9 @@ namespace DuetControlServer.Model
                     volume.Capacity = (drive.DriveType == DriveType.Network) ? null : totalSize;
                     volume.FreeSpace = (drive.DriveType == DriveType.Network) ? null : drive.AvailableFreeSpace;
                     volume.Mounted = drive.IsReady;
+                    volume.Name = drive.Name; // labelSymlinks.TryGetValue(Path.GetFileName(drive.Name), out string? label) ? label : null;
                     volume.PartitionSize = (drive.DriveType == DriveType.Network) ? null : totalSize;
-                    volume.Path = drive.VolumeLabel;
+                    volume.Path = drive.RootDirectory.FullName;
                     volume.PropertyChanged -= VolumeUpdated;
                 }
             }
