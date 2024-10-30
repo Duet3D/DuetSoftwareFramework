@@ -435,7 +435,7 @@ namespace DuetControlServer.Model
             void VolumeUpdated(object? sender, PropertyChangedEventArgs e) => volumesUpdated = true;
 
             // Read file labels from /dev/disk/by-label (if applicable)
-            Dictionary<string, string> labelSymlinks = new();
+            Dictionary<string, string> labelSymlinks = [];
             if (Directory.Exists("/dev/disk/by-label"))
             {
                 DirectoryInfo dirInfo = new("/dev/disk/by-label");
@@ -482,7 +482,8 @@ namespace DuetControlServer.Model
                     volume.Capacity = (drive.DriveType == DriveType.Network) ? null : totalSize;
                     volume.FreeSpace = (drive.DriveType == DriveType.Network) ? null : drive.AvailableFreeSpace;
                     volume.Mounted = drive.IsReady;
-                    volume.Name = drive.Name; // labelSymlinks.TryGetValue(Path.GetFileName(drive.Name), out string? label) ? label : null;
+                    // It's a shame DriveInfo does not provide a correct VolumeLabel property and no device node, so we need to *guess* it more or less
+                    volume.Name = labelSymlinks.TryGetValue(Path.GetFileName(drive.RootDirectory.FullName), out string? label) ? label : drive.VolumeLabel;
                     volume.PartitionSize = (drive.DriveType == DriveType.Network) ? null : totalSize;
                     volume.Path = drive.RootDirectory.FullName;
                     volume.PropertyChanged -= VolumeUpdated;

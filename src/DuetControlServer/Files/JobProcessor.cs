@@ -509,8 +509,7 @@ namespace DuetControlServer.Files
                         }
                     }
                 }
-            }
-            while (!Program.CancellationToken.IsCancellationRequested);
+            } while (!Program.CancellationToken.IsCancellationRequested);
 
             // No longer printing
             Codes.Processor.SetJobFile(file.Channel, null);
