@@ -457,7 +457,7 @@ namespace DuetAPI.Commands
                                 {
                                     throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({args[0]})", result);
                                 }
-                                if (sbyte.TryParse(args[1], out sbyte minorNumber) && minorNumber >= 0)
+                                if (int.TryParse(args[1], out int minorNumber) && minorNumber >= 0)
                                 {
                                     result.MinorNumber = minorNumber;
                                 }

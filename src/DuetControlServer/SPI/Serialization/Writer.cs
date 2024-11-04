@@ -72,8 +72,8 @@ namespace DuetControlServer.SPI.Serialization
                 Channel = code.Channel,
                 FilePosition = (uint)(code.FilePosition ?? 0xFFFFFFFF),
                 Letter = (byte)code.Type,
-                MajorCode = (code.Type == CodeType.Comment) ? 0 : (code.MajorNumber ?? -1),
-                MinorCode = code.MinorNumber ?? -1,
+                MajorCode = (code.Type == CodeType.Comment) ? 0 : (code.MajorNumber ?? 0),
+                MinorCode = code.MinorNumber ?? 0,
                 NumParameters = (byte)((code.Type == CodeType.Comment) ? 1 : code.Parameters.Count)
             };
 

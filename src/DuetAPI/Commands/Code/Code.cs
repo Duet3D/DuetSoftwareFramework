@@ -95,7 +95,7 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Minor code number (e.g. 3 in G54.3)
         /// </summary>
-        public sbyte? MinorNumber { get; set; }
+        public int? MinorNumber { get; set; }
 
         /// <summary>
         /// Flags of this code
