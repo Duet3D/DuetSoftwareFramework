@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.ObjectModel;
 
 namespace DuetAPI.ObjectModel
 {
@@ -42,7 +43,28 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Feedforward coefficients to apply to the mapped heaters during extrusions
         /// </summary>
+        [Obsolete("Use FeedForwardPwm instead")]
         public ObservableCollection<float> FeedForward { get; } = [];
+
+        /// <summary>
+        /// Time advance for applying feedforward in milliseconds
+        /// </summary>
+        public float FeedForwardAdvance
+        {
+            get => _feedForwardAdvance;
+            set => SetPropertyValue(ref _feedForwardAdvance, value);
+        }
+        private float _feedForwardAdvance;
+
+        /// <summary>
+        /// Feedforward coefficients to apply to the mapped heaters during extrusions
+        /// </summary>
+        public ObservableCollection<float> FeedForwardPwm { get; } = [];
+
+        /// <summary>
+        /// Temperature increase per mm/dec extrusion speed
+        /// </summary>
+        public ObservableCollection<float> FeedForwardTemp { get; } = [];
 
         /// <summary>
         /// Extruder drive index for resolving the tool filament (index or -1)
