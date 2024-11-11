@@ -263,7 +263,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                         // catch
                         writer.Indent--;
                         writer.WriteLine("}");
-                        writer.WriteLine($"catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof({prop.Type.ToString().TrimEnd('?')}), jsonProperty.Value.Clone(), e))");
+                        writer.WriteLine($"catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof({prop.Type.ToString().TrimEnd('?')}), jsonProperty.Value.Clone(), e))");
                         writer.WriteLine("{");
                         writer.Indent++;
                         writer.WriteLine("// suppressed");
@@ -402,7 +402,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                         // catch
                         writer.Indent--;
                         writer.WriteLine("}");
-                        writer.WriteLine($"catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof({prop.Type.ToString().TrimEnd('?')}), jsonProperty.Value.Clone(), e))");
+                        writer.WriteLine($"catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof({prop.Type.ToString().TrimEnd('?')}), jsonProperty.Value.Clone(), e))");
                         writer.WriteLine("{");
                         writer.Indent++;
                         writer.WriteLine("// suppressed");

@@ -190,7 +190,7 @@ namespace DuetAPI.ObjectModel
                             }
                         }
                     }
-                    catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), jsonItem, e))
+                    catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(T), jsonItem, e))
                     {
                         // suppressed
                     }
@@ -270,7 +270,7 @@ namespace DuetAPI.ObjectModel
                         }
                         i++;
                     }
-                    catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(T), JsonElement.ParseValue(ref reader), e))
+                    catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(T), JsonElement.ParseValue(ref reader), e))
                     {
                         // suppressed
                     }

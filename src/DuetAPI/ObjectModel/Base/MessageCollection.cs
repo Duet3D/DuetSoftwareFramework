@@ -90,7 +90,7 @@ namespace DuetAPI.ObjectModel
                 {
                     Add(JsonSerializer.Deserialize(item, ObjectModelContext.Default.Message)!);
                 }
-                catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(Message), item, e))
+                catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(Message), item, e))
                 {
                     // suppressed
                 }
@@ -126,7 +126,7 @@ namespace DuetAPI.ObjectModel
                 {
                     Add(JsonSerializer.Deserialize(ref reader, ObjectModelContext.Default.Message)!);
                 }
-                catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(Message), JsonElement.ParseValue(ref reader), e))
+                catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(Message), JsonElement.ParseValue(ref reader), e))
                 {
                     // suppressed
                 }

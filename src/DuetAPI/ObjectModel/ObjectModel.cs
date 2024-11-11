@@ -203,7 +203,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="jsonValue">JSON data</param>
         /// <param name="e">Exception that caused the error</param>
         /// <returns>True if the exception can be suppressed</returns>
-        internal static bool DeserializationFailed(object sender, Type type, JsonElement jsonValue, JsonException e)
+        internal static bool DeserializationFailed(object sender, Type type, JsonElement jsonValue, Exception e)
         {
             if (OnDeserializationFailed is null)
             {

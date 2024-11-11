@@ -408,7 +408,7 @@ namespace DuetAPI.ObjectModel
                             item.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
                         }
                     }
-                    catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
+                    catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
                     {
                         // suppressed
                     }
@@ -421,7 +421,7 @@ namespace DuetAPI.ObjectModel
                         newValue.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
                         Add(jsonProperty.Name, newValue);
                     }
-                    catch (JsonException e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
+                    catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
                     {
                         // suppressed
                     }
