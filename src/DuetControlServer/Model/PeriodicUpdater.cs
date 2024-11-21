@@ -80,6 +80,7 @@ namespace DuetControlServer.Model
             TimeSpan measuredDelay = TimeSpan.Zero;
             string lastHostname = Environment.MachineName;
             bool updateNetworkSeq, updateVolumesSeq;
+            string? lastIPAddress = null;
 
             do
             {
@@ -88,9 +89,11 @@ namespace DuetControlServer.Model
                 DriveInfo[] drives = DriveInfo.GetDrives();
 
                 // Run another update cycle
+                string currentIPAddress;
                 using (await Provider.AccessReadWriteAsync())
                 {
                     updateNetworkSeq = await UpdateNetwork(networkInterfaces);
+                    currentIPAddress = Provider.Get.Network.Interfaces.FirstOrDefault(iface => iface.ActualIP != null)?.ActualIP ?? "0.0.0.0";
                     UpdateSbc();
                     updateVolumesSeq = UpdateVolumes(drives);
                     CleanMessages();
@@ -139,6 +142,7 @@ namespace DuetControlServer.Model
                 {
                     if (updateNetworkSeq)
                     {
+                        // Update the network seq value
                         Code code = new()
                         {
                             Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous,
@@ -152,6 +156,25 @@ namespace DuetControlServer.Model
                             ]
                         };
                         await code.Execute();
+
+                        // Update the IP address to report on 12864 displays
+                        if (currentIPAddress != lastIPAddress)
+                        {
+                            lastIPAddress = currentIPAddress;
+
+                            code = new()
+                            {
+                                Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous,
+                                Channel = CodeChannel.Trigger,
+                                Type = CodeType.MCode,
+                                MajorNumber = 552,
+                                Parameters =
+                                [
+                                    new('P', currentIPAddress ?? "0.0.0.0")
+                                ]
+                            };
+                            await code.Execute();
+                        }
                     }
 
                     if (updateVolumesSeq)

@@ -920,6 +920,14 @@ namespace DuetControlServer.Codes.Handlers
                     }
                     throw new OperationCanceledException();
 
+                // Set IP address (reserved in SBC mode)
+                case 552:
+                    if (await Processor.FlushAsync(code))
+                    {
+                        return new Message(MessageType.Error, "M552 is reserved for SBC mode");
+                    }
+                    throw new OperationCanceledException();
+
                 // Fork input reader
                 case 606:
                     if (await Processor.FlushAsync(code))
