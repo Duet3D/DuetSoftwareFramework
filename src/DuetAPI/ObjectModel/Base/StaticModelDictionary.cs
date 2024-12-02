@@ -451,7 +451,7 @@ namespace DuetAPI.ObjectModel
                 if (reader.TokenType == JsonTokenType.PropertyName)
                 {
                     string key = reader.GetString()!;
-                    reader.Skip();
+                    reader.Read();
 
                     if (reader.TokenType == JsonTokenType.Null)
                     {
