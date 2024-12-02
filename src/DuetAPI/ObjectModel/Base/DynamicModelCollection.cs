@@ -264,7 +264,7 @@ namespace DuetAPI.ObjectModel
                                 T? newItem = (T?)item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
                                 if (!ReferenceEquals(item, newItem))
                                 {
-                                    this[i] = item;
+                                    this[i] = newItem!;
                                 }
                             }
                         }
