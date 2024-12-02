@@ -11,7 +11,7 @@
   "PreinstallPackageArguments": "update",
   "InstallPackageCommand": "/usr/bin/apt",
   "InstallPackageArguments": "install -y {package}",
-  "InstallPythonPackageCommand": "/opt/dsf/bin/pip3_install.py",
+  "InstallPythonPackageCommand": "/opt/dsf/bin/pipInstall2.py",
   "InstallPythonPackageArguments": "{package}",
   "InstallPackageEnvironment": {
     "DEBIAN_FRONTEND": "noninteractive"
