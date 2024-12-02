@@ -506,7 +506,7 @@ namespace DuetControlServer.Model
                     volume.FreeSpace = (drive.DriveType == DriveType.Network) ? null : drive.AvailableFreeSpace;
                     volume.Mounted = drive.IsReady;
                     // It's a shame DriveInfo does not provide a correct VolumeLabel property and no device node, so we need to *guess* it more or less
-                    volume.Name = labelSymlinks.TryGetValue(Path.GetFileName(drive.RootDirectory.FullName), out string? label) ? label : drive.VolumeLabel;
+                    volume.Name = labelSymlinks.TryGetValue(Path.GetFileName(drive.RootDirectory.FullName), out string? label) ? label : (drive.VolumeLabel == "/" ? null : drive.VolumeLabel);
                     volume.PartitionSize = (drive.DriveType == DriveType.Network) ? null : totalSize;
                     volume.Path = drive.RootDirectory.FullName;
                     volume.PropertyChanged -= VolumeUpdated;
