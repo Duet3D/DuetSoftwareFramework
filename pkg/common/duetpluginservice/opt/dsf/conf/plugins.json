@@ -12,7 +12,7 @@
   "InstallPackageCommand": "/usr/bin/apt",
   "InstallPackageArguments": "install -y {package}",
   "InstallPythonPackageCommand": "/opt/dsf/bin/pipInstall2.py",
-  "InstallPythonPackageArguments": "{package}",
+  "InstallPythonPackageArguments": "-m {manifestFile} -p {pluginPath}",
   "InstallPackageEnvironment": {
     "DEBIAN_FRONTEND": "noninteractive"
   },
@@ -20,5 +20,7 @@
   "InstallLocalPackageArguments": "--force-confold -i {file}",
   "UninstallLocalPackageCommand": "/usr/bin/dpkg",
   "UninstallLocalPackageArguments": "-r {package}",
+  "PythonLaunchCommand": "/bin/bash",
+  "PythonLaunchArguments": "--rcfile {pluginDir}/venv/bin/activate -c \"{command} {args}\"",
   "StopTimeout": 4000
 }
