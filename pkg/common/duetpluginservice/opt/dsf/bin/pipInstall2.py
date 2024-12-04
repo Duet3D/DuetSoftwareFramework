@@ -60,7 +60,7 @@ VENV_FOLDER = 'venv'
 MANIFEST_KEY = 'sbcPythonDependencies'
 PIP = 'pip'
 
-if os.name == 'nt': # Windows
+if os.name == 'nt':  # Windows
     BIN_DIR = 'Scripts'
     PYTHON_VERSION = 'python.exe'
 else:
@@ -166,8 +166,7 @@ class Dependency:
         return dep
 
 
-
-def createLogger(logname):   ##### Create a custom logger so messages go to journalctl#####
+def createLogger(logname):  # Create a custom logger so messages go to journalctl#####
     global logger
     logger = logging.getLogger(logname)
     logger.propagate = False
@@ -178,10 +177,11 @@ def createLogger(logname):   ##### Create a custom logger so messages go to jour
     logger.addHandler(c_handler)
     logger.setLevel(logging.DEBUG)
 
+
 def validateParams():
     parser = argparse.ArgumentParser(
-            description='pipInstall2',
-            allow_abbrev=False)
+        description='pipInstall2',
+        allow_abbrev=False)
     # Environment
     parser.add_argument('-m', type=str, nargs=1, default=[],
                         help='module path')
@@ -196,21 +196,21 @@ def validateParams():
         logger.info('Exiting: No manifest file (-m) was provided')
         sys.exit(ExitCodes.NO_MANIFEST_PROVIDED)
     elif not os.path.isfile(mFile):
-        logger.info('Exiting: Manifest file ' +mFile + ' does not exist')
+        logger.info('Exiting: Manifest file ' + mFile + ' does not exist')
         sys.exit(ExitCodes.MANIFEST_DOES_NOT_EXIST)
 
     if pPath is None:
         logger.info('Exiting: No plugin path (-p) was provided')
         sys.exit(ExitCodes.NO_PLUGIN_PROVIDED)
-    elif not os.path.isdir(pPath):    
+    elif not os.path.isdir(pPath):
         logger.info('Exiting: Plugin file ' + mFile + 'does not exist')
         sys.exit(ExitCodes.PLUGIN_DOES_NOT_EXIST)
-        
+
     return mFile, pPath
 
 
 def parseVersion(request) -> Dependency:
-# Get the module name any conditional and version
+    # Get the module name any conditional and version
     if ',' in request:
         logger.info('Unsupported Conditional in: ' + str(request))
         sys.exit(ExitCodes.UNSUPPORTED_CONDITIONAL)
@@ -221,6 +221,7 @@ def parseVersion(request) -> Dependency:
         sys.exit(ExitCodes.INVALID_DEPENDENCY)
 
     return dep
+
 
 def runsubprocess(cmd):
     try:
@@ -234,24 +235,26 @@ def runsubprocess(cmd):
         return result.stdout
     except subprocess.CalledProcessError as e1:
         pass
-        #logger.info('ProcessError -- ' + str(e1))  #  Supress this error 
+        # logger.info('ProcessError -- ' + str(e1))  #  Supress this error
     except OSError as e2:
         logger.info('OSError -- ' + str(e2))
     return False
 
+
 def createPythonEnv(envPath):
-    pythonFile = os.path.normpath(os.path.join(envPath,BIN_DIR,PYTHON_VERSION))
-    if os.path.isfile(pythonFile): # No need to recreate
+    pythonFile = os.path.normpath(os.path.join(envPath, BIN_DIR, PYTHON_VERSION))
+    if os.path.isfile(pythonFile):  # No need to recreate
         return
 
     cmd = PYTHON_VERSION + ' -m venv --system-site-packages  ' + envPath
     logger.info('Creating Python Virtual Environment at: ' + envPath)
     result = runsubprocess(cmd)
     if result != '':
-        logger.info ('Problem creating Virtual Environment')
+        logger.info('Problem creating Virtual Environment')
         logger.info(result)
         sys.exit(ExitCodes.PROBLEM_CREATING_VENV)
     return
+
 
 def getModuleList(mFile):
     with open(mFile) as jsonfile:
@@ -266,17 +269,18 @@ def getModuleList(mFile):
 
     return mList
 
-def getInstalledVersion(m,envPath ):
+
+def getInstalledVersion(m, envPath):
     if (m in sys.builtin_module_names):
         return 'Built-In'
 
     try:
-        globals()[m] = __import__(m)  #Will likely not work if alternate python versions allowed in future
+        globals()[m] = __import__(m)  # Will likely not work if alternate python versions allowed in future
         result = globals()[m].__version__
         return result
 
     except AttributeError or ImportError:  # Check to see if pip thinks its installed
-        pythonFile = os.path.normpath(os.path.join(envPath,BIN_DIR,PYTHON_VERSION))
+        pythonFile = os.path.normpath(os.path.join(envPath, BIN_DIR, PYTHON_VERSION))
         cmd = pythonFile + ' -m ' + PIP + ' list'
 
         request = runsubprocess(cmd)
@@ -285,13 +289,13 @@ def getInstalledVersion(m,envPath ):
             sys.exit(ExitCodes.PIP_LIST_ERROR)
         # Normalise to lower case and underscore
         request = request.lower()
-        request = request.replace('-','_')
+        request = request.replace('-', '_')
 
-        if m in request: #  The module exists
+        if m in request:  # The module exists
             # Try to get version number
-            regex = '^'+ m + '\s+(.*)'
-            result = re.findall(regex,request,flags=re.MULTILINE)
-            if result[0] != '': # version number found
+            regex = '^' + m + '\s+(.*)'
+            result = re.findall(regex, request, flags=re.MULTILINE)
+            if result[0] != '':  # version number found
                 return result[0]
             # Module found but no version number available
             return '0'
@@ -300,7 +304,7 @@ def getInstalledVersion(m,envPath ):
 
 
 def installModule(dep: Dependency, envPath: str):
-    pythonFile = os.path.normpath(os.path.join(envPath,BIN_DIR,PYTHON_VERSION))
+    pythonFile = os.path.normpath(os.path.join(envPath, BIN_DIR, PYTHON_VERSION))
     cmd = pythonFile + ' -m ' + PIP + ' install --no-cache-dir --upgrade ' + '"' + dep.uri + '"'
 
     result = runsubprocess(cmd)
@@ -309,9 +313,10 @@ def installModule(dep: Dependency, envPath: str):
 
     return True
 
-def installModules(mList,envPath):
-    sList = [] # Success 
-    fList = [] # Fail
+
+def installModules(mList, envPath):
+    sList = []  # Success
+    fList = []  # Fail
     for requestedVersion in mList:
         # Get the elements of the requested module - parseVersion may modify
         dep = parseVersion(requestedVersion)
@@ -322,13 +327,13 @@ def installModules(mList,envPath):
         installedVersion = getInstalledVersion(dep.uri, envPath)
 
         #  Determine next action
-        if installedVersion == 'Built-In': # Rule 1
+        if installedVersion == 'Built-In':  # Rule 1
             resultCode = 2
         else:
             installOk = installModule(dep, envPath)
             if installOk:
                 resultCode = 1
-            elif installedVersion not in ['Built_in','None']:
+            elif installedVersion not in ['Built_in', 'None']:
                 resultCode = 4
             else:
                 resultCode = 3
@@ -351,6 +356,7 @@ def installModules(mList,envPath):
 
     return sList, fList
 
+
 def main(progName):
     #  Set up logging so journalc can be used
     createLogger(progName)
@@ -359,7 +365,7 @@ def main(progName):
 
     #  Validate that the call was well formed and get the arguments
     manifestFile, pluginPath = validateParams()
-    venvPath = os.path.normpath(os.path.join(pluginPath,VENV_FOLDER))
+    venvPath = os.path.normpath(os.path.join(pluginPath, VENV_FOLDER))
 
     #  Create virtual environment
     createPythonEnv(venvPath)
@@ -371,7 +377,7 @@ def main(progName):
     successList = []
     failList = []
 
-    successList, failList = installModules(moduleList,venvPath)
+    successList, failList = installModules(moduleList, venvPath)
 
     if len(successList) > 0:
         logger.info('-----------------------------------------------')
@@ -390,6 +396,8 @@ def main(progName):
     logger.info('---------------------------------------')
     logger.info('All modules were successfully installed')
     logger.info('---------------------------------------')
+
+
 if __name__ == "__main__":  # Do not run anything below if the file is imported by another program
     programName = sys.argv[0]
     main(programName)
