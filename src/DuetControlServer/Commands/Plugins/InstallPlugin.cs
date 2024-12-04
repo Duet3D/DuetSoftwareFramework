@@ -109,7 +109,7 @@ namespace DuetControlServer.Commands
             {
                 foreach (char c in package)
                 {
-                    if (!char.IsLetterOrDigit(c) && c != '.' && c != '-' && c != '_' && c != '+' && c != '<' && c != '>' && c != '=' && c != ',')
+                    if (!char.IsLetterOrDigit(c) && c != '.' && c != '-' && c != '_' && c != '+' && c != '<' && c != '>' && c != '=' && c != ',' && c != ':' && c != '/' && c != '@' && c != '#' && c != '~')
                     {
                         throw new ArgumentException($"Illegal characters in required Python package {package}");
                     }
