@@ -83,7 +83,7 @@ class ExitCodes(Enum):
 
 
 class Dependency:
-    regex = r'(^([\w\-_]+)((==|~=|>=|<=|>|<)((\d+!)?(\d)+(\.\d+)*((a|b|rc)\d+)?(\.post\d+)?(\.dev\d+)?))?$)|(^git\+.*$)'
+    regex = r'(^([\w\-_]+)((==|~=|>=|<=|>|<)((\d+!)?(\d)+(\.\d+)*(-?(a|b|rc)\d+)?(\.post\d+)?(\.dev\d+)?))?$)|(^git\+.*$)'
 
     class RegexGroups(Enum):
         PYPI = 0
