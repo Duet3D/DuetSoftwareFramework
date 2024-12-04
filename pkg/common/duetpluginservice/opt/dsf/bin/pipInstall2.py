@@ -135,27 +135,27 @@ class Dependency:
 
         dep = Dependency()
 
-        if result[cls.RegexGroups.PYPI] != '':
+        if result[cls.RegexGroups.PYPI.value] != '':
             # Standard PyPi dependency
-            if result[cls.RegexGroups.COMPARATOR] == '~=':
-                result[cls.RegexGroups.COMPARATOR] = '>='
+            if result[cls.RegexGroups.COMPARATOR.value] == '~=':
+                result[cls.RegexGroups.COMPARATOR.value] = '>='
 
             dep.type = cls.DepTypes.PYPI
 
             # Convert to canonical name format
-            name = str(result[cls.RegexGroups.PACKAGE_NAME])
+            name = str(result[cls.RegexGroups.PACKAGE_NAME.value])
             name = name.lower()
             name = name.replace('-', '_')
             name = name.replace('.', '_')
             dep.package = name
 
-            dep.comparator = str(result[cls.RegexGroups.COMPARATOR])
-            dep.version = str(result[cls.RegexGroups.VERSION])
+            dep.comparator = str(result[cls.RegexGroups.COMPARATOR.value])
+            dep.version = str(result[cls.RegexGroups.VERSION.value])
 
-        elif result[cls.RegexGroups.GIT] != '':
+        elif result[cls.RegexGroups.GIT.value] != '':
             # Git dependency
             dep.type = cls.DepTypes.GIT
-            dep.package = str(result[cls.RegexGroups.GIT])
+            dep.package = str(result[cls.RegexGroups.GIT.value])
             dep.comparator = None
             dep.version = None
         else:
@@ -279,7 +279,7 @@ def getInstalledVersion(m, envPath):
         result = globals()[m].__version__
         return result
 
-    except AttributeError or ImportError:  # Check to see if pip thinks its installed
+    except (AttributeError, ImportError, ModuleNotFoundError):  # Check to see if pip thinks its installed
         pythonFile = os.path.normpath(os.path.join(envPath, BIN_DIR, PYTHON_VERSION))
         cmd = pythonFile + ' -m ' + PIP + ' list'
 
@@ -324,7 +324,7 @@ def installModules(mList, envPath):
         logger.info('Checking for python module: ' + dep.uri)
 
         # Check to see what is installed
-        installedVersion = getInstalledVersion(dep.uri, envPath)
+        installedVersion = getInstalledVersion(dep.package, envPath)
 
         #  Determine next action
         if installedVersion == 'Built-In':  # Rule 1
