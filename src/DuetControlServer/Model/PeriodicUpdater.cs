@@ -320,7 +320,7 @@ namespace DuetControlServer.Model
                             Match signalMatch = signalRegex.Match(wifiData);
                             if (signalMatch.Success)
                             {
-                                networkInterface.Signal = int.Parse(signalMatch.Groups[1].Value);
+                                networkInterface.RSSI = int.Parse(signalMatch.Groups[1].Value);
                             }
 
                             // Get WiFi SSID
@@ -350,7 +350,7 @@ namespace DuetControlServer.Model
                         }
                         catch (Exception e)
                         {
-                            networkInterface.Signal = null;
+                            networkInterface.RSSI = null;
                             networkInterface.SSID = string.Empty;
                             _logger.Debug(e);
                         }
@@ -359,7 +359,7 @@ namespace DuetControlServer.Model
                     }
                     else
                     {
-                        networkInterface.Signal = null;
+                        networkInterface.RSSI = null;
                         networkInterface.SSID = null;
                         networkInterface.Type = NetworkInterfaceType.LAN;
                         networkInterface.WifiCountry = null;
