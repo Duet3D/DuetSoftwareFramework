@@ -444,7 +444,7 @@ namespace DuetHttpClient.Connector
                     // Wait a moment before attempting to reconnect
                     try
                     {
-                        await Task.Delay(2000, _terminateSession.Token);
+                        await Task.Delay(Options.RetryDelay, _terminateSession.Token);
                     }
                     catch (OperationCanceledException)
                     {
@@ -738,7 +738,7 @@ namespace DuetHttpClient.Connector
                     errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
                     if (response.StatusCode == HttpStatusCode.ServiceUnavailable)
                     {
-                        await Task.Delay(2000, cancellationToken);
+                        await Task.Delay(Options.RetryDelay, cancellationToken);
                     }
                     else if (response.StatusCode >= HttpStatusCode.InternalServerError)
                     {
