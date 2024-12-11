@@ -637,68 +637,72 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Query object model
                 case 409:
+                    if (code.TryGetInt('I', out int iVal) && iVal > 0)
                     {
-                        if (code.TryGetInt('I', out int iVal) && iVal > 0)
+                        return new Message(MessageType.Error, "M409 I1 is reserved for internal purposes only");
+                    }
+
+                    if (code.TryGetString('K', out string? key) && (!code.TryGetInt('R', out int rParam) || rParam == 0))
+                    {
+                        if (!key.TrimStart('#').StartsWith("network") && !key.TrimStart('#').StartsWith("volumes"))
                         {
-                            return new Message(MessageType.Error, "M409 I1 is reserved for internal purposes only");
+                            // Only return query results for network and volume keys as part of M409
+                            break;
                         }
 
-                        if (code.TryGetString('K', out string? key) && (!code.TryGetInt('R', out int rParam) || rParam == 0))
+                        // Wait until pending codes have finished
+                        if (!await Processor.FlushAsync(code))
                         {
-                            if (!key.TrimStart('#').StartsWith("network") && !key.TrimStart('#').StartsWith("volumes"))
-                            {
-                                // Only return query results for network and volume keys as part of M409
-                                break;
-                            }
+                            throw new OperationCanceledException();
+                        }
 
-                            // Retrieve filtered OM data. At present, flags are ignored
-                            code.TryGetString('F', out string? flags);
-                            using JsonDocument queryResult = JsonSerializer.SerializeToDocument(Filter.GetFiltered(key + ".**"), JsonHelper.DefaultJsonOptions);
+                        // Retrieve filtered OM data. At present, flags are ignored
+                        code.TryGetString('F', out string? flags);
+                        using JsonDocument queryResult = JsonSerializer.SerializeToDocument(Filter.GetFiltered(key + ".**"), JsonHelper.DefaultJsonOptions);
 
-                            // Get down to the requested depth
-                            JsonElement result = queryResult.RootElement;
-                            if (key is not null)
+                        // Get down to the requested depth
+                        JsonElement result = queryResult.RootElement;
+                        if (key is not null)
+                        {
+                            foreach (string depth in key.Split('.'))
                             {
-                                foreach (string depth in key.Split('.'))
+                                if (result.ValueKind == JsonValueKind.Object)
                                 {
-                                    if (result.ValueKind == JsonValueKind.Object)
+                                    foreach (var subItem in result.EnumerateObject())
                                     {
-                                        foreach (var subItem in result.EnumerateObject())
-                                        {
-                                            result = subItem.Value;
-                                            break;
-                                        }
+                                        result = subItem.Value;
+                                        break;
                                     }
                                 }
                             }
+                        }
 
-                            // Generate final OM response
-                            object finalResult;
-                            if (result.ValueKind == JsonValueKind.Array)
+                        // Generate final OM response
+                        object finalResult;
+                        if (result.ValueKind == JsonValueKind.Array)
+                        {
+                            finalResult = new
                             {
-                                finalResult = new
-                                {
-                                    key,
-                                    flags = flags ?? string.Empty,
-                                    result,
-                                    next = 0
-                                };
-                            }
-                            else
-                            {
-                                finalResult = new
-                                {
-                                    key,
-                                    flags = flags ?? string.Empty,
-                                    result
-                                };
-                            }
-                            return new Message(MessageType.Success, JsonSerializer.Serialize(finalResult, JsonHelper.DefaultJsonOptions));
+                                key,
+                                flags = flags ?? string.Empty,
+                                result,
+                                next = 0
+                            };
                         }
                         else
                         {
-                            break;
+                            finalResult = new
+                            {
+                                key,
+                                flags = flags ?? string.Empty,
+                                result
+                            };
                         }
+                        return new Message(MessageType.Success, JsonSerializer.Serialize(finalResult, JsonHelper.DefaultJsonOptions));
+                    }
+                    else
+                    {
+                        break;
                     }
 
                 // Create Directory on SD-Card
@@ -709,6 +713,7 @@ namespace DuetControlServer.Codes.Handlers
                         try
                         {
                             Directory.CreateDirectory(physicalPath);
+                            return new Message();
                         }
                         catch (Exception e)
                         {
@@ -747,6 +752,7 @@ namespace DuetControlServer.Codes.Handlers
                             {
                                 throw new FileNotFoundException();
                             }
+                            return new Message();
                         }
                         catch (Exception e)
                         {
@@ -772,6 +778,7 @@ namespace DuetControlServer.Codes.Handlers
                             {
                                 File.Delete(physicalPath);
                             }
+                            return new Message();
                         }
                         catch (Exception e)
                         {
