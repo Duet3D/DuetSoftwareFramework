@@ -315,9 +315,14 @@ namespace DuetControlServer.Codes.Handlers
                             }
 
                             string prefix = await code.EmulatingMarlin() ? "ok\n" : string.Empty;
-                            string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
+                            string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes), parentDirectory = Path.GetDirectoryName(physicalFile)!;
                             try
                             {
+                                if (!Directory.Exists(parentDirectory))
+                                {
+                                    Directory.CreateDirectory(parentDirectory);
+                                }
+
                                 FileStream fileStream = new(physicalFile, FileMode.Create, FileAccess.Write, FileShare.Read, Settings.FileBufferSize);
                                 StreamWriter writer = new(fileStream, Encoding.UTF8, Settings.FileBufferSize);
                                 Commands.Code.FilesBeingWritten[numChannel] = writer;
