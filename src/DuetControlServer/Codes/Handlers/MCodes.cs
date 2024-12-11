@@ -637,72 +637,74 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Query object model
                 case 409:
-                    if (code.TryGetInt('I', out int iVal) && iVal > 0)
                     {
-                        return new Message(MessageType.Error, "M409 I1 is reserved for internal purposes only");
-                    }
-
-                    if (code.TryGetString('K', out string? key) && (!code.TryGetInt('R', out int rParam) || rParam == 0))
-                    {
-                        if (!key.TrimStart('#').StartsWith("network") && !key.TrimStart('#').StartsWith("volumes"))
+                        if (code.TryGetInt('I', out int iVal) && iVal > 0)
                         {
-                            // Only return query results for network and volume keys as part of M409
-                            break;
+                            return new Message(MessageType.Error, "M409 I1 is reserved for internal purposes only");
                         }
 
-                        // Wait until pending codes have finished
-                        if (!await Processor.FlushAsync(code))
+                        if (code.TryGetString('K', out string? key) && (!code.TryGetInt('R', out int rParam) || rParam == 0))
                         {
-                            throw new OperationCanceledException();
-                        }
-
-                        // Retrieve filtered OM data. At present, flags are ignored
-                        code.TryGetString('F', out string? flags);
-                        using JsonDocument queryResult = JsonSerializer.SerializeToDocument(Filter.GetFiltered(key + ".**"), JsonHelper.DefaultJsonOptions);
-
-                        // Get down to the requested depth
-                        JsonElement result = queryResult.RootElement;
-                        if (key is not null)
-                        {
-                            foreach (string depth in key.Split('.'))
+                            if (!key.TrimStart('#').StartsWith("network") && !key.TrimStart('#').StartsWith("volumes"))
                             {
-                                if (result.ValueKind == JsonValueKind.Object)
+                                // Only return query results for network and volume keys as part of M409
+                                break;
+                            }
+
+                            // Wait until pending codes have finished
+                            if (!await Processor.FlushAsync(code))
+                            {
+                                throw new OperationCanceledException();
+                            }
+
+                            // Retrieve filtered OM data. At present, flags are ignored
+                            code.TryGetString('F', out string? flags);
+                            using JsonDocument queryResult = JsonSerializer.SerializeToDocument(Filter.GetFiltered(key + ".**"), JsonHelper.DefaultJsonOptions);
+
+                            // Get down to the requested depth
+                            JsonElement result = queryResult.RootElement;
+                            if (key is not null)
+                            {
+                                foreach (string depth in key.Split('.'))
                                 {
-                                    foreach (var subItem in result.EnumerateObject())
+                                    if (result.ValueKind == JsonValueKind.Object)
                                     {
-                                        result = subItem.Value;
-                                        break;
+                                        foreach (var subItem in result.EnumerateObject())
+                                        {
+                                            result = subItem.Value;
+                                            break;
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        // Generate final OM response
-                        object finalResult;
-                        if (result.ValueKind == JsonValueKind.Array)
-                        {
-                            finalResult = new
+                            // Generate final OM response
+                            object finalResult;
+                            if (result.ValueKind == JsonValueKind.Array)
                             {
-                                key,
-                                flags = flags ?? string.Empty,
-                                result,
-                                next = 0
-                            };
+                                finalResult = new
+                                {
+                                    key,
+                                    flags = flags ?? string.Empty,
+                                    result,
+                                    next = 0
+                                };
+                            }
+                            else
+                            {
+                                finalResult = new
+                                {
+                                    key,
+                                    flags = flags ?? string.Empty,
+                                    result
+                                };
+                            }
+                            return new Message(MessageType.Success, JsonSerializer.Serialize(finalResult, JsonHelper.DefaultJsonOptions));
                         }
                         else
                         {
-                            finalResult = new
-                            {
-                                key,
-                                flags = flags ?? string.Empty,
-                                result
-                            };
+                            break;
                         }
-                        return new Message(MessageType.Success, JsonSerializer.Serialize(finalResult, JsonHelper.DefaultJsonOptions));
-                    }
-                    else
-                    {
-                        break;
                     }
 
                 // Create Directory on SD-Card
