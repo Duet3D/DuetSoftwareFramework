@@ -192,8 +192,7 @@ Two instances of this service run as
 1. DSF user
 2. Root user
 
-It is in charge of plugin installations, security profiles, and plugin lifecycles.
-Hence this service starts and stops whenever DuetControlServer does (using the `PartOf` systemd binding).
+It is in charge of plugin installations, security profiles, and plugin lifecycles. In normal operation the Root user instance of the service is only used for the DuetPiManagement plugin, all other plugins run as the DSF user. Hence this service starts and stops whenever DuetControlServer does (using the `PartOf` systemd binding).
 
 Unlike DuetControlServer, which starts early in the boot process (`sysinit` target), this service is started as soon as the system reaches the `multi-user` target.
 This is intended to reduce load on the system during start-up and to make sure potentially required resources are available when third-party plugins are started.
