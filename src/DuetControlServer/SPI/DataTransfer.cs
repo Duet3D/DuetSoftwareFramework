@@ -668,7 +668,7 @@ namespace DuetControlServer.SPI
             }
             catch (ArgumentException e)
             {
-                throw new ArgumentException("Failed to serialize code", e);
+                throw new ArgumentException("Failed to serialize code (too long?)", e);
             }
         }
 
@@ -688,7 +688,7 @@ namespace DuetControlServer.SPI
             }
             catch (ArgumentException e)
             {
-                throw new ArgumentException("Failed to serialize code", e);
+                throw new ArgumentException("Failed to serialize code (too long?)", e);
             }
 
             // See if the code fits into the buffer
