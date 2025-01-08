@@ -129,8 +129,8 @@ namespace DuetAPI.ObjectModel
                     "dht21" => AnalogSensorType.DHT21,
                     "dht22" => AnalogSensorType.DHT22,
                     "bme280" => AnalogSensorType.BME280,
-                    "bme280-pressure" => AnalogSensorType.BME280Pressure,
-                    "bme280-humidity" => AnalogSensorType.BME280Humidity,
+                    "bmepressure" => AnalogSensorType.BME280Pressure,
+                    "bmehumidity" => AnalogSensorType.BME280Humidity,
                     "dhthumidity" => AnalogSensorType.DHTHumidity,
                     "currentloooppyro" => AnalogSensorType.CurrentLoop,
                     "mcutemp" => AnalogSensorType.McuTemp,
@@ -186,10 +186,10 @@ namespace DuetAPI.ObjectModel
                     writer.WriteStringValue("bme280");
                     break;
                 case AnalogSensorType.BME280Pressure:
-                    writer.WriteStringValue("bme280-pressure");
+                    writer.WriteStringValue("bmepressure");
                     break;
                 case AnalogSensorType.BME280Humidity:
-                    writer.WriteStringValue("bme280-humidity");
+                    writer.WriteStringValue("bmehumidity");
                     break;
                 case AnalogSensorType.CurrentLoop:
                     writer.WriteStringValue("currentlooppyro");
