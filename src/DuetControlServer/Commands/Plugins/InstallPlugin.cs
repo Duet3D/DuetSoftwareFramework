@@ -29,6 +29,10 @@ namespace DuetControlServer.Commands
             {
                 throw new NotSupportedException("Plugin support has been disabled");
             }
+            if (Settings.DisablePluginInstallations)
+            {
+                throw new NotSupportedException("Installation of third-party plugins has been disabled");
+            }
 
             Plugin plugin;
             using (ZipArchive zipArchive = ZipFile.OpenRead(PluginFile))

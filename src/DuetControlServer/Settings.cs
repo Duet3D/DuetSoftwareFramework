@@ -61,6 +61,11 @@ namespace DuetControlServer
         public static bool RootPluginSupport { get; set; }
 
         /// <summary>
+        /// Disable installation of third-party plugins using the IPC API
+        /// </summary>
+        public static bool DisablePluginInstallations { get; set; }
+
+        /// <summary>
         /// Path to the file holding a list of loaded plugins
         /// </summary>
         public static string PluginsFilename { get; set; } = DefaultPluginsFile;
