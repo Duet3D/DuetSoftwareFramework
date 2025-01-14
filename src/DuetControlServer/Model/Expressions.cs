@@ -1,6 +1,7 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetAPI.Utility;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -428,6 +429,10 @@ namespace DuetControlServer.Model
                 }
                 return encodeStrings ? encodeString(stringValue) : stringValue;
             }
+            if (obj is DriverId driverId)
+            {
+                return driverId.ToString();
+            }
             if (obj is int intValue)
             {
                 return intValue.ToString("G", CultureInfo.InvariantCulture);
@@ -470,6 +475,10 @@ namespace DuetControlServer.Model
             if (obj is string[] stringArray)
             {
                 return '{' + string.Join(',', stringArray.Select(stringValue => encodeString(stringValue))) + (stringArray.Length == 1 ? ",}" : "}");
+            }
+            if (obj is DriverId[] driverIdArray)
+            {
+                return '{' + string.Join(',', driverIdArray.Select(driverIdValue => encodeString(driverIdValue.ToString()))) + (driverIdArray.Length == 1 ? ",}" : "}");
             }
             if (obj is int[] intArray)
             {
