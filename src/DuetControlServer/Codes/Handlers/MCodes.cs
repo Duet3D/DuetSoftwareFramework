@@ -448,7 +448,7 @@ namespace DuetControlServer.Codes.Handlers
                     }
                     throw new OperationCanceledException();
 
-                // Compute SHA1 hash of target file
+                // Compute CRC32 checksum of target file
                 case 38:
                     if (await Processor.FlushAsync(code))
                     {
@@ -456,20 +456,17 @@ namespace DuetControlServer.Codes.Handlers
                         try
                         {
                             await using FileStream stream = new(physicalFile, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
-
-                            using System.Security.Cryptography.SHA1 sha1 = System.Security.Cryptography.SHA1.Create();
-                            byte[] hash = await Task.Run(() => sha1.ComputeHash(stream), code.CancellationToken);
-
-                            return new Message(MessageType.Success, BitConverter.ToString(hash).Replace("-", string.Empty));
+                            uint checksum = await CRC32.CalculateAsync(stream, Settings.FileBufferSize, code.CancellationToken);
+                            return new Message(MessageType.Success, checksum.ToString("x8"));
                         }
                         catch (Exception e)
                         {
-                            _logger.Debug(e, "Failed to compute SHA1 checksum");
+                            _logger.Debug(e, "Failed to compute CRC32 checksum");
                             if (e is AggregateException ae)
                             {
                                 e = ae.InnerException!;
                             }
-                            return new Message(MessageType.Error, $"Could not compute SHA1 checksum for file {file}: {e.Message}");
+                            return new Message(MessageType.Error, $"Could not compute CRC32 checksum for file {file}: {e.Message}");
                         }
                     }
                     throw new OperationCanceledException();
