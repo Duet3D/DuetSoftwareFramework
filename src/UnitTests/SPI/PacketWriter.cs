@@ -80,7 +80,7 @@ namespace UnitTests.SPI
             int majorCode = MemoryMarshal.Read<int>(span.Slice(4, 4));
             ClassicAssert.AreEqual(10, majorCode);
             int minorCode = MemoryMarshal.Read<int>(span.Slice(8, 4));
-            ClassicAssert.AreEqual(-1, minorCode);
+            ClassicAssert.AreEqual(0, minorCode);
             uint filePosition = MemoryMarshal.Read<uint>(span.Slice(12, 4));
             ClassicAssert.AreEqual(0xFFFFFFFF, filePosition);
 
@@ -109,7 +109,7 @@ namespace UnitTests.SPI
             int majorCode = MemoryMarshal.Read<int>(span.Slice(4, 4));
             ClassicAssert.AreEqual(1, majorCode);
             int minorCode = MemoryMarshal.Read<int>(span.Slice(8, 4));
-            ClassicAssert.AreEqual(-1, minorCode);
+            ClassicAssert.AreEqual(0, minorCode);
             uint filePosition = MemoryMarshal.Read<uint>(span.Slice(12, 4));
             ClassicAssert.AreEqual(0xFFFFFFFF, filePosition);
 
@@ -180,7 +180,7 @@ namespace UnitTests.SPI
             int majorCode = MemoryMarshal.Read<int>(span.Slice(4, 4));
             ClassicAssert.AreEqual(0, majorCode);
             int minorCode = MemoryMarshal.Read<int>(span.Slice(8, 4));
-            ClassicAssert.AreEqual(-1, minorCode);
+            ClassicAssert.AreEqual(0, minorCode);
             uint filePosition = MemoryMarshal.Read<uint>(span.Slice(12, 4));
             ClassicAssert.AreEqual(0xFFFFFFFF, filePosition);
 
