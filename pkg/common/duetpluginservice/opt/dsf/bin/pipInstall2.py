@@ -26,19 +26,22 @@ Version numbers specifying max / min ranges are not supported
 
 Rules (executed in order):
 Try to install unless:
-        1. If the module is a Built-In ==> do nothing
+        1. If the module is a Built-In or installed (and has no version number) ==> do nothing
 
 Note: If a module is already installed but failes reinstall / update
       The occurence is logged and the install request is considered successful        
 
-Return Codes:
+Exit Codes:
 
-0 - All modules successfully installed or already installed.
-1 = Something nasty happened or one or more modules could not be installed
+See class ExitCodes below.
 
 Verson:
 1.0.0
 Initial Release
+Version 1.1.0
+Modified by Andy at Duet3d
+Version 1.1.1
+Fixed issue handling modules with no version number e.e shlex
 """
 
 
@@ -203,7 +206,7 @@ def validateParams():
         logger.info('Exiting: No plugin path (-p) was provided')
         sys.exit(ExitCodes.NO_PLUGIN_PROVIDED)
     elif not os.path.isdir(pPath):
-        logger.info('Exiting: Plugin file ' + mFile + 'does not exist')
+        logger.info('Exiting: Plugin file ' + mFile + ' does not exist')
         sys.exit(ExitCodes.PLUGIN_DOES_NOT_EXIST)
 
     return mFile, pPath
@@ -271,18 +274,19 @@ def getModuleList(mFile):
 
 
 def getInstalledVersion(m, envPath):
-    if (m in sys.builtin_module_names):
+    if (m in sys.builtin_module_names): # Returns compiled modules will miss some std modules
         return 'Built-In'
 
     try:
         globals()[m] = __import__(m)  # Will likely not work if alternate python versions allowed in future
         result = globals()[m].__version__
         return result
-
-    except (AttributeError, ImportError, ModuleNotFoundError):  # Check to see if pip thinks its installed
+    except (AttributeError): # No version information
+        if globals()[m].__name__ == m: # Module is installed so treat it as a builtin
+            return 'Built-In'
+    except (ImportError, ModuleNotFoundError):  # Check to see if pip thinks its installed
         pythonFile = os.path.normpath(os.path.join(envPath, BIN_DIR, PYTHON_VERSION))
         cmd = pythonFile + ' -m ' + PIP + ' list'
-
         request = runsubprocess(cmd)
         if request is False:
             logger.info('Aborting: Failed to get pip list')
@@ -295,19 +299,21 @@ def getInstalledVersion(m, envPath):
             # Try to get version number
             regex = '^' + m + '\s+(.*)'
             result = re.findall(regex, request, flags=re.MULTILINE)
-            if result[0] != '':  # version number found
+            if result and result[0] != '':  # version number found
                 return result[0]
-            # Module found but no version number available
-            return '0'
+            else:
+                logger.info('Module ' + m + ' exists but does not have a version number.')
+                return('0') # Set version number to 0
         else:
-            return 'None'
+            logger.info('Module ' + m + ' is not installed')
+            return('None')
 
 
 def installModule(dep: Dependency, envPath: str):
     pythonFile = os.path.normpath(os.path.join(envPath, BIN_DIR, PYTHON_VERSION))
     cmd = pythonFile + ' -m ' + PIP + ' install --no-cache-dir --upgrade ' + '"' + dep.uri + '"'
-
     result = runsubprocess(cmd)
+    
     if result == False:  # module could not be installed
         return False
 
