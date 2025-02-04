@@ -134,7 +134,7 @@ namespace DuetControlServer.Model
 
         private static bool _keyUpdated = false;
 
-        private static List<string> _updatedKeys = [];
+        private static readonly List<string> _updatedKeys = [];
 
         private static async Task RequestModel(string key, string flags)
         {
