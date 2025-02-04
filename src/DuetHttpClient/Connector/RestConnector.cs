@@ -316,7 +316,7 @@ namespace DuetHttpClient.Connector
                     // Connection lost, check if we can reconnect after a short delay
                     try
                     {
-                        await Task.Delay(2000, _terminateSession.Token);
+                        await Task.Delay(Options.RetryDelay, _terminateSession.Token);
                         await Reconnect();
                     }
                     catch (Exception e) when (e is OperationCanceledException || e is HttpRequestException)
@@ -362,7 +362,7 @@ namespace DuetHttpClient.Connector
                     if (!_terminateSession.IsCancellationRequested)
                     {
                         // Wait a moment before attempting to reconnect
-                        await Task.Delay(2000);
+                        await Task.Delay(Options.RetryDelay, _terminateSession.Token);
                     }
                 }
                 while (!_terminateSession.IsCancellationRequested);

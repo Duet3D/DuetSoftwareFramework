@@ -11,8 +11,8 @@
   "PreinstallPackageArguments": "update",
   "InstallPackageCommand": "/usr/bin/apt",
   "InstallPackageArguments": "install -y {package}",
-  "InstallPythonPackageCommand": "/opt/dsf/bin/pip3_install.py",
-  "InstallPythonPackageArguments": "{package}",
+  "InstallPythonPackageCommand": "/opt/dsf/bin/pipInstall2.py",
+  "InstallPythonPackageArguments": "-m {manifestFile} -p {pluginPath}",
   "InstallPackageEnvironment": {
     "DEBIAN_FRONTEND": "noninteractive"
   },
@@ -20,5 +20,7 @@
   "InstallLocalPackageArguments": "--force-confold -i {file}",
   "UninstallLocalPackageCommand": "/usr/bin/dpkg",
   "UninstallLocalPackageArguments": "-r {package}",
+  "PythonLaunchCommand": "/bin/bash",
+  "PythonLaunchArguments": "-c \"{pluginDir}/venv/bin/python {command} {args}\"",
   "StopTimeout": 4000
 }

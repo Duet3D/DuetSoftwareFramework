@@ -121,11 +121,17 @@ namespace DuetControlServer.Codes.Handlers
 
                             // Evaluate the filename and result to write
                             string filename = await Expressions.EvaluateExpression(code, filenameExpression, false, false);
-                            string physicalFilename = await FilePath.ToPhysicalAsync(filename, FileDirectory.System);
+                            string physicalFilename = await FilePath.ToPhysicalAsync(filename, FileDirectory.System), parentDirectory = Path.GetDirectoryName(physicalFilename)!;
                             result = await Expressions.Evaluate(code, true);
 
                             // Write it to the designated file
                             _logger.Debug("{0} '{1}' to {2}", append ? "Appending" : "Writing", result, filename);
+
+                            if (!Directory.Exists(parentDirectory))
+                            {
+                                Directory.CreateDirectory(parentDirectory);
+                            }
+
                             await using (FileStream fs = new(physicalFilename, append ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.Read, Settings.FileBufferSize))
                             {
                                 await using StreamWriter writer = new(fs, Encoding.UTF8, Settings.FileBufferSize);

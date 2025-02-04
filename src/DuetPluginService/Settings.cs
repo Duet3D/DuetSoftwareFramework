@@ -132,7 +132,7 @@ namespace DuetPluginService
         /// <summary>
         /// Command-line arguments to invoke Python scripts with virtual environments
         /// </summary>
-        public static string PythonLaunchArguments { get; set; } = "--rcfile {pluginDir}/venv/bin/activate -c \"{command} {args}\"";
+        public static string PythonLaunchArguments { get; set; } = "-c \"{pluginDir}/venv/bin/python {command} {args}\"";
 
         /// <summary>
         /// Timeout in ms for SIGTERM requests. When it expires plugin processes are forcefully killed

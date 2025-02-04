@@ -2,9 +2,9 @@
 
 # Set ownership and permissions
 chown -R dsf:dsf /opt/dsf/conf/plugins*
-chown dsf:dsf /opt/dsf/bin/pip3_install.py
+chown dsf:dsf /opt/dsf/bin/pipInstall2.py
 chmod 755 /opt/dsf/plugins
-chmod 744 /opt/dsf/bin/pip3_install.py
+chmod 744 /opt/dsf/bin/pipInstall2.py
 
 # Update systemd services
 systemctl -q daemon-reload

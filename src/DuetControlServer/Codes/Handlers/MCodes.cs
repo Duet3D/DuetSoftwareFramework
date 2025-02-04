@@ -315,9 +315,14 @@ namespace DuetControlServer.Codes.Handlers
                             }
 
                             string prefix = await code.EmulatingMarlin() ? "ok\n" : string.Empty;
-                            string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes);
+                            string physicalFile = await FilePath.ToPhysicalAsync(file, FileDirectory.GCodes), parentDirectory = Path.GetDirectoryName(physicalFile)!;
                             try
                             {
+                                if (!Directory.Exists(parentDirectory))
+                                {
+                                    Directory.CreateDirectory(parentDirectory);
+                                }
+
                                 FileStream fileStream = new(physicalFile, FileMode.Create, FileAccess.Write, FileShare.Read, Settings.FileBufferSize);
                                 StreamWriter writer = new(fileStream, Encoding.UTF8, Settings.FileBufferSize);
                                 Commands.Code.FilesBeingWritten[numChannel] = writer;
@@ -443,7 +448,7 @@ namespace DuetControlServer.Codes.Handlers
                     }
                     throw new OperationCanceledException();
 
-                // Compute SHA1 hash of target file
+                // Compute CRC32 checksum of target file
                 case 38:
                     if (await Processor.FlushAsync(code))
                     {
@@ -451,20 +456,17 @@ namespace DuetControlServer.Codes.Handlers
                         try
                         {
                             await using FileStream stream = new(physicalFile, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
-
-                            using System.Security.Cryptography.SHA1 sha1 = System.Security.Cryptography.SHA1.Create();
-                            byte[] hash = await Task.Run(() => sha1.ComputeHash(stream), code.CancellationToken);
-
-                            return new Message(MessageType.Success, BitConverter.ToString(hash).Replace("-", string.Empty));
+                            uint checksum = await CRC32.CalculateAsync(stream, Settings.FileBufferSize, code.CancellationToken);
+                            return new Message(MessageType.Success, checksum.ToString("x8"));
                         }
                         catch (Exception e)
                         {
-                            _logger.Debug(e, "Failed to compute SHA1 checksum");
+                            _logger.Debug(e, "Failed to compute CRC32 checksum");
                             if (e is AggregateException ae)
                             {
                                 e = ae.InnerException!;
                             }
-                            return new Message(MessageType.Error, $"Could not compute SHA1 checksum for file {file}: {e.Message}");
+                            return new Message(MessageType.Error, $"Could not compute CRC32 checksum for file {file}: {e.Message}");
                         }
                     }
                     throw new OperationCanceledException();
@@ -646,6 +648,12 @@ namespace DuetControlServer.Codes.Handlers
                                 break;
                             }
 
+                            // Wait until pending codes have finished
+                            if (!await Processor.FlushAsync(code))
+                            {
+                                throw new OperationCanceledException();
+                            }
+
                             // Retrieve filtered OM data. At present, flags are ignored
                             code.TryGetString('F', out string? flags);
                             using JsonDocument queryResult = JsonSerializer.SerializeToDocument(Filter.GetFiltered(key + ".**"), JsonHelper.DefaultJsonOptions);
@@ -704,6 +712,7 @@ namespace DuetControlServer.Codes.Handlers
                         try
                         {
                             Directory.CreateDirectory(physicalPath);
+                            return new Message();
                         }
                         catch (Exception e)
                         {
@@ -742,6 +751,7 @@ namespace DuetControlServer.Codes.Handlers
                             {
                                 throw new FileNotFoundException();
                             }
+                            return new Message();
                         }
                         catch (Exception e)
                         {
@@ -767,6 +777,7 @@ namespace DuetControlServer.Codes.Handlers
                             {
                                 File.Delete(physicalPath);
                             }
+                            return new Message();
                         }
                         catch (Exception e)
                         {

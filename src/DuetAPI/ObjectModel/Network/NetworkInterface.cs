@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.ObjectModel;
 
 namespace DuetAPI.ObjectModel
 {
@@ -88,15 +89,26 @@ namespace DuetAPI.ObjectModel
         private int? _numReconnects;
 
         /// <summary>
+        /// Received signal strength indicator of the WiFi adapter (only WiFi, in dBm, or null if unknown)
+        /// </summary>
+        [SbcProperty(true)]
+        public int? RSSI
+        {
+            get => _rssi;
+			set => SetPropertyValue(ref _rssi, value);
+        }
+        private int? _rssi;
+
+        /// <summary>
         /// Signal of the WiFi adapter (only WiFi, in dBm, or null if unknown)
         /// </summary>
+        [Obsolete("Use RSSI instead")]
         [SbcProperty(false)]
         public int? Signal
         {
-            get => _signal;
-			set => SetPropertyValue(ref _signal, value);
+            get => _rssi;
+			set => SetPropertyValue(ref _rssi, value);
         }
-        private int? _signal;
 
         /// <summary>
         /// Speed of the network interface (in MBit, null if unknown, 0 if not connected)

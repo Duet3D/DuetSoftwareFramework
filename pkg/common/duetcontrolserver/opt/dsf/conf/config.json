@@ -2,6 +2,7 @@
   "AutoUpdateFirmware": true,
   "PluginSupport": true,
   "RootPluginSupport": false,
+  "DisablePluginInstallations": false,
   "PluginsFilename": "/opt/dsf/conf/plugins.txt",
   "PluginAutoRestartInterval": 2000,
   "LogLevel": "info",

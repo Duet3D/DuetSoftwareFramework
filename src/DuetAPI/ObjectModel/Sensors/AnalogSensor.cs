@@ -26,6 +26,16 @@
         private float? _c;
 
         /// <summary>
+        /// High sensor reading (only linear analog sensors, otherwise null)
+        /// </summary>
+        public float? HighReading
+        {
+            get => _highReading;
+			set => SetPropertyValue(ref _highReading, value);
+        }
+        private float? _highReading;
+
+        /// <summary>
         /// Last sensor reading (in C) or null if invalid
         /// </summary>
         public float? LastReading
@@ -34,6 +44,16 @@
 			set => SetPropertyValue(ref _lastReading, value);
         }
         private float? _lastReading;
+
+        /// <summary>
+        /// Low sensor reading (only linear analog sensors, otherwise null)
+        /// </summary>
+        public float? LowReading
+        {
+            get => _lowReading;
+			set => SetPropertyValue(ref _lowReading, value);
+        }
+        private float? _lowReading;
 
         /// <summary>
         /// Name of this sensor or null if not configured

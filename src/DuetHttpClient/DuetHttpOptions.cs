@@ -18,6 +18,11 @@ namespace DuetHttpClient
         public int MaxRetries { get; set; } = 3;
 
         /// <summary>
+        /// Delay betwen HTTP retries
+        /// </summary>
+        public TimeSpan RetryDelay { get; set; } = TimeSpan.FromMilliseconds(250);
+
+        /// <summary>
         /// Defines whether messages are supposed to be observed.
         /// If this is true, messages are added to the object model and they must be cleared manually
         /// </summary>

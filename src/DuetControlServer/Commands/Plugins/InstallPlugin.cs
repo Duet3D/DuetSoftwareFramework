@@ -29,6 +29,10 @@ namespace DuetControlServer.Commands
             {
                 throw new NotSupportedException("Plugin support has been disabled");
             }
+            if (Settings.DisablePluginInstallations)
+            {
+                throw new NotSupportedException("Installation of third-party plugins has been disabled");
+            }
 
             Plugin plugin;
             using (ZipArchive zipArchive = ZipFile.OpenRead(PluginFile))
@@ -109,7 +113,7 @@ namespace DuetControlServer.Commands
             {
                 foreach (char c in package)
                 {
-                    if (!char.IsLetterOrDigit(c) && c != '.' && c != '-' && c != '_' && c != '+' && c != '<' && c != '>' && c != '=' && c != ',')
+                    if (!char.IsLetterOrDigit(c) && c != '.' && c != '-' && c != '_' && c != '+' && c != '<' && c != '>' && c != '=' && c != ',' && c != ':' && c != '/' && c != '@' && c != '#' && c != '~')
                     {
                         throw new ArgumentException($"Illegal characters in required Python package {package}");
                     }
