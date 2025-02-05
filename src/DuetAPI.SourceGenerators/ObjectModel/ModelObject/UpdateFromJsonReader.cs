@@ -433,7 +433,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
             {{
                 if (reader.TokenType == JsonTokenType.PropertyName)
                 {{
-                    {GeneratePropertyReadCalls()}
+{GeneratePropertyReadCalls()}
                     {(properties.Count > 0 ? "else" : "// no properties")}
                     {{
 #if VERIFY_OBJECT_MODEL

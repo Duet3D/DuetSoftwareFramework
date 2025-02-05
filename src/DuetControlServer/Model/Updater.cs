@@ -219,6 +219,7 @@ namespace DuetControlServer.Model
                                             if (readerCopy.TokenType == JsonTokenType.StartObject)
                                             {
                                                 axisCount++;
+                                                readerCopy.Skip();
                                             }
                                         }
 
@@ -301,8 +302,9 @@ namespace DuetControlServer.Model
                     }
 
                     // Update changed object model keys
-                    foreach (string key in _updatedKeys)
+                    for (int i = 0; i < _updatedKeys.Count; i++)
                     {
+                        string key = _updatedKeys[i];
                         if (key != "reply" && (!Settings.UpdateOnly || key is "boards" or "directories" or "state"))
                         {
                             _logger.Debug(() => $"Requesting update of key {key}, new seq {_lastSeqs[key]}");

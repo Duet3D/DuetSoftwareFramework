@@ -172,6 +172,16 @@ namespace DuetAPI.ObjectModel
         private float _tolerance = 0.03F;
 
         /// <summary>
+        /// Touch mode options (if supported, otherwise null)
+        /// </summary>
+        public ProbeTouchMode? TouchMode
+        {
+            get => _touchMode;
+            set => SetPropertyValue(ref _touchMode, value);
+        }
+        private ProbeTouchMode? _touchMode;
+
+        /// <summary>
         /// Travel speed when probing multiple points (in mm/min)
         /// </summary>
         public float TravelSpeed

@@ -443,7 +443,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
 
             foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
             {{
-                {GeneratePropertyUpdateCalls()}
+{GeneratePropertyUpdateCalls()}
 #if VERIFY_OBJECT_MODEL
                 {(properties.Count > 0 ? (cls == "ObjectModel" ? "else if (jsonProperty.Name != \"seqs\")" : "else") : "// no properties")}
                 {{
