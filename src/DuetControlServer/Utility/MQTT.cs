@@ -1,7 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetControlServer.Commands;
 using MQTTnet;
-using MQTTnet.Client;
 using System;
 using System.Threading.Tasks;
 
@@ -61,7 +60,7 @@ namespace DuetControlServer.Utility
             return new Message();
         }
 
-        private static MqttFactory? _factory = null;
+        private static MqttClientFactory? _factory = null;
         private static IMqttClient? _client = null;
 
         /// <summary>
@@ -104,7 +103,7 @@ namespace DuetControlServer.Utility
                         .WithTcpServer(code.GetString('H'), code.GetInt('R', 1883))
                         .Build();
 
-                    _factory ??= new MqttFactory();
+                    _factory ??= new();
                     var client = _factory.CreateMqttClient();
                     await client.ConnectAsync(options, code.CancellationToken);
                     _client = client;
