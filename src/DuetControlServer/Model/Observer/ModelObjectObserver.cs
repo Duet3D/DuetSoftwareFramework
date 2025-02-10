@@ -19,10 +19,16 @@ namespace DuetControlServer.Model
         /// <param name="e">Event arguments</param>
         private static void VariableModelObjectChanging(object? sender, PropertyChangingEventArgs e)
         {
-            if (sender?.GetType().GetProperty(e.PropertyName!)?.GetValue(sender) is ModelObject modelMember)
+            object? currentValue = sender?.GetType().GetProperty(e.PropertyName!)?.GetValue(sender);
+            if (currentValue is ModelObject modelMember)
             {
                 // Prevent memory leaks in case variable model objects are replaced
                 UnsubscribeFromModelObject(modelMember);
+            }
+            else if (currentValue?.GetType().IsGenericType == true && currentValue.GetType().GetGenericTypeDefinition() == typeof(ObservableCollection<>))
+            {
+                // Same for observable collections
+                UnsubscribeFromObservableCollection((dynamic)currentValue);
             }
         }
 
@@ -37,7 +43,7 @@ namespace DuetControlServer.Model
         /// <param name="hasVariableModelObjects">Whether this instance has any variable model objects</param>
         /// <param name="path">Property path</param>
         /// <returns>Property change handler</returns>
-        private static PropertyChangedEventHandler PropertyChanged(bool hasVariableModelObjects, object[] path)
+        private static PropertyChangedEventHandler PropertyChanged(bool hasVariableModelObjects, bool hasVariableObservableCollections, object[] path)
         {
             return (sender, e) =>
             {
@@ -47,8 +53,13 @@ namespace DuetControlServer.Model
 
                 if (hasVariableModelObjects && value is ModelObject modelMember)
                 {
-                    // Subscribe to variable ModelObject events again
+                    // Subscribe to variable ModelObject events
                     SubscribeToModelObject(modelMember, AddToPath(path, propertyName));
+                }
+                else if (hasVariableObservableCollections && value?.GetType().IsGenericType == true && value.GetType().GetGenericTypeDefinition() == typeof(ObservableCollection<>))
+                {
+                    // Subscribe to variable ObservableCollection events
+                    SubscribeToObservableCollection((dynamic)value, propertyName, path);
                 }
             };
         }
@@ -60,7 +71,7 @@ namespace DuetControlServer.Model
         /// <param name="path">Collection path</param>
         private static void SubscribeToModelObject(ModelObject modelObject, object[] path)
         {
-            bool hasVariableModelObjects = false;
+            bool hasVariableModelObjects = false, hasVariableObservableCollections = false;
             foreach (PropertyInfo property in modelObject.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
             {
                 if (property.GetMethod!.GetParameters().Length != 0)
@@ -88,11 +99,12 @@ namespace DuetControlServer.Model
                 }
 
                 hasVariableModelObjects |= property.PropertyType.IsAssignableTo(typeof(ModelObject)) && (property.SetMethod is not null);
+                hasVariableObservableCollections |= property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(ObservableCollection<>);
             }
 
             if (modelObject is INotifyPropertyChanged propChangeModel)
             {
-                PropertyChangedEventHandler changeHandler = PropertyChanged(hasVariableModelObjects, path);
+                PropertyChangedEventHandler changeHandler = PropertyChanged(hasVariableModelObjects, hasVariableObservableCollections, path);
                 propChangeModel.PropertyChanged += changeHandler;
                 _propertyChangedHandlers[modelObject] = changeHandler;
             }
