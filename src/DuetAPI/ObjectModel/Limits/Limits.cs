@@ -174,11 +174,23 @@
 			set => SetPropertyValue(ref _portsPerHeater, value);
 		}
 		private int? _portsPerHeater;
+		
+		/// <summary>
+		/// Maximum number of axes reported when the move key is requested.
+		/// If the number of reported axes is greater than or equal to this value, a client
+		/// may need to request move.axes explicitly in order to get the full move.axes array
+		/// </summary>
+		public int? ReportedAxes
+		{
+			get => _reportedAxes;
+			set => SetPropertyValue(ref _reportedAxes, value);
+		}
+		private int? _reportedAxes;
 
         /// <summary>
-        /// Maximum number of restore points or null if unknown
-        /// </summary>
-        public int? RestorePoints
+		/// Maximum number of restore points or null if unknown
+		/// </summary>
+		public int? RestorePoints
 		{
 			get => _restorePoints;
 			set => SetPropertyValue(ref _restorePoints, value);

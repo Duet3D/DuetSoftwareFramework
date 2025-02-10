@@ -223,7 +223,7 @@ namespace DuetControlServer.Model
                                             }
                                         }
 
-                                        if (axisCount >= 9)
+                                        if (axisCount >= (Provider.Get.Limits.ReportedAxes ?? 9))
                                         {
                                             _updatedKeys.Add("move.axes");
                                         }

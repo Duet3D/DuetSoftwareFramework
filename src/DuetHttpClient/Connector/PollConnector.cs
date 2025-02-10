@@ -372,8 +372,8 @@ namespace DuetHttpClient.Connector
                                                             }
                                                         }
 
-                                                        // move.axes requires special querying if it exceeds 9 items
-                                                        if (keyName.GetString() == "move" && keyResult.TryGetProperty("axes", out JsonElement moveAxes) && moveAxes.GetArrayLength() >= 9)
+                                                        // move.axes requires special querying if it exceeds limits.reporteAxes or 9 items
+                                                        if (keyName.GetString() == "move" && keyResult.TryGetProperty("axes", out JsonElement moveAxes) && moveAxes.GetArrayLength() >= (Model.Limits.ReportedAxes ?? 9))
                                                         {
                                                             int nextAxis = moveAxes.GetArrayLength(), axisOffset = 0;
                                                             do
