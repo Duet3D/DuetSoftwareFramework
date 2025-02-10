@@ -18,12 +18,12 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Sensitivity of the touch probe
         /// </summary>
-        public float Sensivity
+        public float Sensitivity
         {
-            get => _sensivity;
-            set => SetPropertyValue(ref _sensivity, value);
+            get => _sensitivity;
+            set => SetPropertyValue(ref _sensitivity, value);
         }
-        private float _sensivity;
+        private float _sensitivity;
 
         /// <summary>
         /// Speed while probing in touch mode (in mm/s)
