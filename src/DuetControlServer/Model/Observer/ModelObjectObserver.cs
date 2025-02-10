@@ -98,8 +98,11 @@ namespace DuetControlServer.Model
                     SubscribeToObservableCollection((dynamic)value, propertyName, path);
                 }
 
-                hasVariableModelObjects |= property.PropertyType.IsAssignableTo(typeof(ModelObject)) && (property.SetMethod is not null);
-                hasVariableObservableCollections |= property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(ObservableCollection<>);
+                if (property.SetMethod is not null)
+                {
+                    hasVariableModelObjects |= property.PropertyType.IsAssignableTo(typeof(ModelObject));
+                    hasVariableObservableCollections |= property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(ObservableCollection<>);
+                }
             }
 
             if (modelObject is INotifyPropertyChanged propChangeModel)
