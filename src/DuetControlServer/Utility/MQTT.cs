@@ -27,9 +27,15 @@ namespace DuetControlServer.Utility
             }
 
             // Basic client options
-            _clientOptionsBuilder = new MqttClientOptionsBuilder()
-                .WithClientId(code.GetString('C'))
-                .WithCredentials(code.GetString('U'), code.GetString('K'));
+            _clientOptionsBuilder = new MqttClientOptionsBuilder();
+            if (code.TryGetString('C', out string? clientId))
+            {
+                _clientOptionsBuilder = _clientOptionsBuilder.WithClientId(clientId);
+            }
+            if (code.TryGetString('U', out string? username))
+            {
+                _clientOptionsBuilder = _clientOptionsBuilder.WithCredentials(username, code.GetString('K'));
+            }
 
             // Optional will message
             if (code.TryGetString('W', out string? willMessage))
