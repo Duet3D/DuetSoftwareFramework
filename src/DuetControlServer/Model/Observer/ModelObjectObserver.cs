@@ -112,7 +112,7 @@ namespace DuetControlServer.Model
                 _propertyChangedHandlers[modelObject] = changeHandler;
             }
 
-            if (hasVariableModelObjects)
+            if (hasVariableModelObjects || hasVariableObservableCollections)
             {
                 // This is barely needed so only register it where it is actually required.
                 // It makes sure that events are removed again when a ModelObject instance is replaced
