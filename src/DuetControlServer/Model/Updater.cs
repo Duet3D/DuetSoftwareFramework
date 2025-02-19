@@ -226,6 +226,7 @@ namespace DuetControlServer.Model
                                         if (axisCount >= (Provider.Get.Limits.ReportedAxes ?? 9))
                                         {
                                             _updatedKeys.Add("move.axes");
+                                            last = false;   // Don't delete missing items from the axis array yet
                                         }
                                         break;
                                     }
