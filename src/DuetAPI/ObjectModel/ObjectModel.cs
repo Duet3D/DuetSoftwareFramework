@@ -150,7 +150,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="key">Property name to update</param>
         /// <param name="reader">JSON reader</param>
         /// <param name="offset">Index offset</param>
-        /// <param name="last">Whether this is the last update</param>
+        /// <param name="last">Whether this is the last update. May be used to flag whether move.axes is about to be updated, too</param>
         /// <returns>Whether the key could be updated</returns>
         public bool UpdateFromFirmwareJsonReader(string? key, ref Utf8JsonReader reader, int offset = 0, bool last = true) => GeneratedUpdateFromJsonReader(key, ref reader, true, offset, last);
 

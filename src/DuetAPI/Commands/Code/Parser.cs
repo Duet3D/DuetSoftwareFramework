@@ -591,8 +591,18 @@ namespace DuetAPI.Commands
                     }
                     else if (c == '(' && !inExpression)
                     {
-                        // Starting encapsulated comment
-                        contentRead = inEncapsulatedComment = true;
+                        if (inKeywordArgument)
+                        {
+                            // No space between keyword and brace. This is not an encapsulated comment
+                            inEncapsulatedComment = false;
+                            result.KeywordArgument = "(";
+                            numRoundBraces++;
+                        }
+                        else
+                        {
+                            // Starting encapsulated comment
+                            contentRead = inEncapsulatedComment = true;
+                        }
                     }
                     else if (c == '\'')
                     {

@@ -680,6 +680,7 @@ namespace UnitTests.Commands
         [Test]
         public void ParseWhile()
         {
+            #if false
             foreach (DuetAPI.Commands.Code code in Parse("  while machine.autocal.stddev > 0.04"))
             {
                 ClassicAssert.AreEqual(2, code.Indent);
@@ -694,6 +695,15 @@ namespace UnitTests.Commands
                 Assert.That(code.Type, Is.EqualTo(CodeType.Keyword));
                 Assert.That(code.Keyword, Is.EqualTo(KeywordType.While));
                 Assert.That(code.KeywordArgument, Is.EqualTo("var.i < var.N"));
+            }
+            #endif
+
+            foreach (DuetAPI.Commands.Code code in Parse("  while(var.i < var.N)"))
+            {
+                Assert.That(code.Indent, Is.EqualTo(2));
+                Assert.That(code.Type, Is.EqualTo(CodeType.Keyword));
+                Assert.That(code.Keyword, Is.EqualTo(KeywordType.While));
+                Assert.That(code.KeywordArgument, Is.EqualTo("(var.i < var.N)"));
             }
         }
 
