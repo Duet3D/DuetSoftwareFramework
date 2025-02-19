@@ -163,6 +163,10 @@ namespace DuetAPI.SourceGenerators.ObjectModel
                                 {
                                     writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, offset, last);");
                                 }
+                                else if (prop.Identifier.ValueText == "Move")
+                                {
+                                    writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, last);");
+                                }
                                 else
                                 {
                                     writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties);");

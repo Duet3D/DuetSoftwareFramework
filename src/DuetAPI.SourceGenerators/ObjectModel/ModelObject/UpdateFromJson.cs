@@ -93,6 +93,10 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                         {
                             writer.WriteLine($"{prop.Identifier.ValueText} = ({propType}){prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties)!;");
                         }
+                        else if (cls == "Move" && prop.Identifier.ValueText == "Axes")
+                        {
+                            writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties, 0, last);");
+                        }
                         else
                         {
                             writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);");
@@ -432,9 +436,9 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
         /// </summary>
         /// <remarks>This method is auto-generated</remarks>
         /// <param name=""jsonElement"">Element to update this intance from</param>
-        /// <param name=""ignoreSbcProperties"">Whether SBC properties are ignored</param>{(isDynamic ? "\n        /// <returns>Updated instance</returns>" : "")}
+        /// <param name=""ignoreSbcProperties"">Whether SBC properties are ignored</param>{(isDynamic ? "\n        /// <returns>Updated instance</returns>" : "")}{(cls == "Move" ? "\n        /// <param name=\"last\">Whether Move.Axes is final</param>" : "")}
         /// <exception cref=""JsonException"">Failed to deserialize data</exception>
-        public {(isInherited ? "override " : isInheritedFrom ? "virtual " : "") + (isDynamic ? "IDynamicModelObject?" : "void")} {(useGeneratedUpdateFromJson ? "Generated" : "")}UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+        public {(isInherited ? "override " : isInheritedFrom ? "virtual " : "") + (isDynamic ? "IDynamicModelObject?" : "void")} {(useGeneratedUpdateFromJson ? "Generated" : "")}UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties{(cls == "Move" ? ", bool last" : string.Empty)})
         {{
             if (jsonElement.ValueKind == JsonValueKind.Null)
             {{
@@ -443,7 +447,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
 
             foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
             {{
-{GeneratePropertyUpdateCalls()}
+                {GeneratePropertyUpdateCalls()}
 #if VERIFY_OBJECT_MODEL
                 {(properties.Count > 0 ? (cls == "ObjectModel" ? "else if (jsonProperty.Name != \"seqs\")" : "else") : "// no properties")}
                 {{
@@ -451,7 +455,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                 }}
 #endif 
             }}{(isDynamic ? "\n            return this;" : "")}
-        }}", Encoding.UTF8);
+        }}{(cls == "Move" ? "\n        /// <summary>Wrapper function</summary>\n        /// <param name=\"jsonElement\">JSON element</param>\n        /// <param name=\"ignoreSbcProperties\">Ignore SBC properties</param>\n        public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties) => UpdateFromJson(jsonElement, ignoreSbcProperties, true);" : "")}", Encoding.UTF8);
         }
     }
 }
