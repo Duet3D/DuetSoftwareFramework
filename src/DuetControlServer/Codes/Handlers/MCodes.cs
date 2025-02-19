@@ -1193,6 +1193,19 @@ namespace DuetControlServer.Codes.Handlers
                     }
                     break;
 
+                // Send/receive data
+                case 260:
+                case 261:
+                    if (code.File != null && code.TryGetString('V', out string? varName))
+                    {
+                        // These codes can create local variables, so keep track of them
+                        using (await code.File.LockAsync())
+                        {
+                            code.File.AddLocalVariable(varName);
+                        }
+                    }
+                    break;
+
                 // Query object model
                 case 409:
                     if (code.HasParameter('I') && !string.IsNullOrWhiteSpace(code.Result.Content))
