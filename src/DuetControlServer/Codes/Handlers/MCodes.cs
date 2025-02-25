@@ -611,7 +611,7 @@ namespace DuetControlServer.Codes.Handlers
                 // Publish MQTT message
                 case 118:
                 {
-                    if (code.TryGetInt('L', out int lParam) && lParam == 6)
+                    if (code.TryGetInt('P', out int pParam) && pParam == 6)
                     {
                         if (await Processor.FlushAsync(code))
                         {
