@@ -603,6 +603,7 @@ namespace DuetControlServer.Files
                     // Update special fields that are not available in RRF
                     using (await Provider.AccessReadWriteAsync())
                     {
+                        Provider.Get.Job.File.CustomInfo.Clear();
                         Provider.Get.Job.LastFileAborted = isAborted;
                         Provider.Get.Job.LastFileCancelled = isCancelled;
                         Provider.Get.Job.LastFileSimulated = isSimulating;
