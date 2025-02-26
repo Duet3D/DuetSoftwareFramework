@@ -138,5 +138,19 @@ namespace UnitTests.Machine
 
             ClassicAssert.IsTrue(success);
         }
+
+        [Test]
+        public void PluginData()
+        {
+            string jsonText = "{\"plugins\":{\"DuetPiManagementPlugin\":{\"data\":{\"Foo\":\"bar\"}}}}";
+
+            ObjectModel model = new();
+            using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
+            model.UpdateFromJson(parsedJson.RootElement, false);
+
+            Assert.That(model.Plugins.ContainsKey("DuetPiManagementPlugin"));
+            Assert.That(model.Plugins["DuetPiManagementPlugin"].Data.ContainsKey("Foo"));
+            Assert.That(model.Plugins["DuetPiManagementPlugin"].Data["Foo"].GetString(), Is.EqualTo("bar"));
+        }
     }
 }
