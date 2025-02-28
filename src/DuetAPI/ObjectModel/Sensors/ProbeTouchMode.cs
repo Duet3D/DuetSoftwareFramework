@@ -16,16 +16,6 @@ namespace DuetAPI.ObjectModel
         private bool _active;
 
         /// <summary>
-        /// Sensitivity of the touch probe
-        /// </summary>
-        public float Sensitivity
-        {
-            get => _sensitivity;
-            set => SetPropertyValue(ref _sensitivity, value);
-        }
-        private float _sensitivity;
-
-        /// <summary>
         /// Speed while probing in touch mode (in mm/s)
         /// </summary>
         public float Speed
@@ -34,6 +24,16 @@ namespace DuetAPI.ObjectModel
             set => SetPropertyValue(ref _speed, value);
         }
         private float _speed;
+
+        /// <summary>
+        /// Threshold value of the touch probe
+        /// </summary>
+        public float Threshold
+        {
+            get => _threshold;
+            set => SetPropertyValue(ref _threshold, value);
+        }
+        private float _threshold;
 
         /// <summary>
         /// Height of the trigger point of the touch probe (in mm)
