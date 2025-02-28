@@ -12,7 +12,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// User-defined key-value pairs
         /// </summary>
-        [SbcProperty(false)]
+        [SbcProperty(true)]
         public JsonModelDictionary CustomInfo { get; } = new JsonModelDictionary(false);
 
         /// <summary>
