@@ -358,7 +358,7 @@ namespace DuetAPI.ObjectModel
         /// <param name="key">Key to look up</param>
         /// <param name="value">Retrieved value</param>
         /// <returns>Whether the key could be found</returns>
-        public bool TryGetValue(string key, out JsonElement? value) => _dictionary.TryGetValue(key, out value);
+        public bool TryGetValue(string key, [NotNullWhen(true)] out JsonElement? value) => _dictionary.TryGetValue(key, out value);
 
         /// <summary>
         /// Update this instance from a given JSON element
