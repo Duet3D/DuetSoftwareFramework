@@ -66,6 +66,8 @@ namespace DuetPluginService.Permissions
                         case SbcPermissions.NetworkAccess:
                             includes.AppendLine("  #include <abstractions/nameservice>");
                             rules.AppendLine("  network,");
+                            rules.AppendLine("  /proc/net/dev r,");
+                            rules.AppendLine("  /proc/net/wireless r,");
                             break;
                         case SbcPermissions.WebcamAccess:
                             rules.AppendLine("  /dev/dma_heap/* rw,");
