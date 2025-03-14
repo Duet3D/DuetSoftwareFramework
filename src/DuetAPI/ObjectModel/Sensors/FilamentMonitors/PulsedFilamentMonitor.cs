@@ -119,4 +119,14 @@ public partial class PulsedFilamentMonitor : FilamentMonitor
 	/// Configured properties of this filament monitor
 	/// </summary>
 	public PulsedFilamentMonitorConfigured Configured { get; } = new PulsedFilamentMonitorConfigured();
+
+	/// <summary>
+	/// Current position of the filament monitor (in mm)
+	/// </summary>
+	public float Position
+	{
+		get => _position;
+		set => SetPropertyValue(ref _position, value);
+	}
+	private float _position;
 }
