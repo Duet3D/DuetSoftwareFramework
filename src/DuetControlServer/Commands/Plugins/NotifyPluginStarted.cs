@@ -1,0 +1,60 @@
+﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
+using DuetAPI.ObjectModel;
+using DuetAPI.Utility;
+using DuetControlServer.IPC;
+using Nito.AsyncEx;
+
+namespace DuetControlServer.Commands
+{
+    /// <summary>
+    /// Implementation of the <see cref="DuetAPI.Commands.NotifyPluginStarted"/> command
+    /// </summary>
+    public sealed class NotifyPluginStarted : DuetAPI.Commands.NotifyPluginStarted
+    {
+        /// <summary>
+        /// Event that is set when a plugin has started
+        /// </summary>
+        public static readonly AsyncAutoResetEvent PluginStartedEvent = new(false);
+
+        /// <summary>
+        /// Source connection of this command
+        /// </summary>
+        public Connection? Connection { get; set; }
+
+        /// <summary>
+        /// Flag the plugin as started
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
+        {
+            // Fill in plugin name if required
+            if (string.IsNullOrEmpty(Plugin))
+            {
+                Plugin = Connection!.PluginId ?? throw new UnauthorizedAccessException("Failed to determine plugin ID");
+            }
+
+            // Check permissions. Only the owner or plugins with the ManagePlugins permission may modify other plugins
+            if (Connection!.PluginId != Plugin && !Connection!.Permissions.HasFlag(SbcPermissions.ManagePlugins))
+            {
+                throw new UnauthorizedAccessException("Insufficient permissions");
+            }
+
+            // Update the plugin state
+            using (await Model.Provider.AccessReadWriteAsync(cancellationToken))
+            {
+                if (Model.Provider.Get.Plugins.TryGetValue(Plugin, out Plugin? plugin))
+                {
+                    plugin.Started = true;
+                    PluginStartedEvent.Set();
+                }
+                else
+                {
+                    throw new ArgumentException($"Plugin {Plugin} not found");
+                }
+            }
+        }
+    }
+}

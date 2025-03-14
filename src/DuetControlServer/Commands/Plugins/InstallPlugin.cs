@@ -175,6 +175,7 @@ namespace DuetControlServer.Commands
                 plugin.UpdateFromJson(manifestJson.RootElement, false);
             }
             plugin.Pid = -1;
+            plugin.Started = false;
 
             // Check for reserved permissions
             if (plugin.SbcPermissions.HasFlag(SbcPermissions.ServicePlugins))

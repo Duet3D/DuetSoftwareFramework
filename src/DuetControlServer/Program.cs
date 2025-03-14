@@ -236,6 +236,7 @@ namespace DuetControlServer
                                 Plugin plugin = new();
                                 plugin.UpdateFromJson(manifestJson.RootElement, false);
                                 plugin.Pid = -1;
+                                plugin.Started = false;
                                 using (await Model.Provider.AccessReadWriteAsync())
                                 {
                                     Model.Provider.Get.Plugins.Add(plugin.Id, plugin);

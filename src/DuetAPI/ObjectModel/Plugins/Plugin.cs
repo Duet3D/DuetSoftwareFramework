@@ -31,4 +31,14 @@ public partial class Plugin : PluginManifest
         set => SetPropertyValue(ref _pid, value);
     }
     private int _pid = -1;
+
+    /// <summary>
+    /// Indicates if the plugin is fully started
+    /// </summary>
+    public bool Started
+    {
+        get => _started;
+        set => SetPropertyValue(ref _started, value);
+    }
+    private bool _started;
 }

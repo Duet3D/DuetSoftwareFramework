@@ -47,6 +47,7 @@ namespace DuetControlServer.Commands
 
                         // Stop the plugin
                         plugin.Pid = 0;
+                        plugin.Started = false;
                         stopPlugin = true;
                         asRoot = plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser);
                     }

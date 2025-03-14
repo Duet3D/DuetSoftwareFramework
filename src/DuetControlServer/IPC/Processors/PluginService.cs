@@ -218,6 +218,7 @@ namespace DuetControlServer.IPC.Processors
                             if (item.Pid > 0 && item.SbcPermissions.HasFlag(SbcPermissions.SuperUser) == Connection.IsRoot)
                             {
                                 item.Pid = 0;
+                                item.Started = false;
                             }
                         }
                     }
@@ -254,6 +255,7 @@ namespace DuetControlServer.IPC.Processors
                             if (item.Pid > 0 && item.SbcPermissions.HasFlag(SbcPermissions.SuperUser) == Connection.IsRoot)
                             {
                                 item.Pid = -1;
+                                item.Started = false;
                             }
                         }
                     }

@@ -160,7 +160,7 @@ public partial class State : ModelObject, IStaticModelObject
     private int _nextTool = -1;
 
     /// <summary>
-    /// Indicates if at least one plugin has been started
+    /// This value is set to true when the plugins have been started
     /// </summary>
     [SbcProperty(false)]
     public bool PluginsStarted

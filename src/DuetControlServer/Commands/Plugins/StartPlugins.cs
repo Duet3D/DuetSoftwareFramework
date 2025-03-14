@@ -62,7 +62,8 @@ namespace DuetControlServer.Commands
 
                         try
                         {
-                            StartPlugin startCommand = new() {
+                            StartPlugin startCommand = new()
+                            {
                                 Plugin = pluginName,
                                 SaveState = false
                             };
@@ -75,6 +76,35 @@ namespace DuetControlServer.Commands
                         }
                     }
                 }
+
+                // Wait for pending plugins to finish their start process
+                bool waitingForStart;
+                do
+                {
+                    waitingForStart = true;
+                    using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
+                    {
+                        foreach (Plugin item in Model.Provider.Get.Plugins.Values)
+                        {
+                            if (item.Pid > 0 && item.SbcNotifyStarted && !item.Started)
+                            {
+                                waitingForStart = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (waitingForStart)
+                    {
+                        // Wait for the next plugin to start or to stop, in case the plugin we're waiting for failed during start-up
+                        using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, Program.CancellationToken);
+                        await Task.WhenAny(
+                            NotifyPluginStarted.PluginStartedEvent.WaitAsync(cts.Token),
+                            SetPluginProcess.PluginStoppedEvent.WaitAsync(cts.Token)
+                        );
+                    }
+                }
+                while (waitingForStart);
 
                 // Plugins have been started...
                 using (await Model.Provider.AccessReadWriteAsync(cancellationToken))

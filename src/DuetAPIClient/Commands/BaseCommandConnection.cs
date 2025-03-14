@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -22,7 +23,6 @@ namespace DuetAPIClient;
 /// <param name="mode">Connection type</param>
 public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnection(mode)
 {
-
     /// <summary>
     /// Add a new third-party HTTP endpoint in the format /machine/{ns}/{path}
     /// </summary>
@@ -296,6 +296,17 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     {
         await PerformCommand(new LockObjectModel(), cancellationToken);
         return new ObjectModelLock(this);
+    }
+
+    /// <summary>
+    /// Notify the control server that a plugin has been started
+    /// </summary>
+    /// <param name="plugin">Plugin ID (only needed if running as root)</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns></returns>
+    public async Task NotifyPluginStarted(string? plugin = null, CancellationToken cancellationToken = default)
+    {
+        await PerformCommand(new NotifyPluginStarted { Plugin = plugin }, cancellationToken);
     }
 
     /// <summary>

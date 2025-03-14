@@ -191,6 +191,16 @@ public partial class PluginManifest : ModelObject, IStaticModelObject
     private bool _sbcAutoRestart;
 
     /// <summary>
+    /// Plugin notifies DSF when it is fully started
+    /// </summary>
+    public bool SbcNotifyStarted
+    {
+        get => _sbcNotifyStarted;
+        set => SetPropertyValue(ref _sbcNotifyStarted, value);
+    }
+    private bool _sbcNotifyStarted;
+
+    /// <summary>
     /// Defines if messages from stdout/stderr are output as generic messages
     /// </summary>
     public bool SbcOutputRedirected

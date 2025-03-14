@@ -47,6 +47,7 @@ namespace DuetControlServer.Commands
                     using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream, cancellationToken: cancellationToken);
                     plugin.UpdateFromJson(manifestJson.RootElement, false);
                     plugin.Pid = -1;
+                    plugin.Started = false;
                 }
                 else
                 {

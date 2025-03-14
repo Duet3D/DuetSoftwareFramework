@@ -1,4 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
+using Nito.AsyncEx;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,6 +11,11 @@ namespace DuetControlServer.Commands
     /// </summary>
     public sealed class SetPluginProcess : DuetAPI.Commands.SetPluginProcess
     {
+        /// <summary>
+        /// Event that is set when a plugin has stopped
+        /// </summary>
+        public static readonly AsyncAutoResetEvent PluginStoppedEvent = new(false);
+
         /// <summary>
         /// Logger instance
         /// </summary>
@@ -54,6 +60,11 @@ namespace DuetControlServer.Commands
                         });
                     }
                     plugin.Pid = Pid;
+                    plugin.Started = Pid > 0 && !plugin.SbcNotifyStarted;
+                    if (!plugin.Started)
+                    {
+                        PluginStoppedEvent.Set();
+                    }
                 }
                 else
                 {
