@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -65,12 +66,13 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Converts simple G/M/T-codes to a regular Code instances, executes them and returns the result as text
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Code result as text</returns>
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
-        public override async Task<string> Execute()
+        public override async Task<string> ExecuteAsync(CancellationToken cancellationToken = default)
         {
             // Check if the corresponding code channel has been disabled
-            using (await Model.Provider.AccessReadOnlyAsync())
+            using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
             {
                 if (!Settings.NoSpi && Model.Provider.Get.Inputs[Channel] is null)
                 {
@@ -112,7 +114,7 @@ namespace DuetControlServer.Commands
             catch (CodeParserException cpe)
             {
                 result.Append(MessageType.Error, cpe.Message);
-                using (await Model.Provider.AccessReadOnlyAsync())
+                using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
                 {
                     // Repetier or other host servers expect an "ok" after error messages
                     if (Model.Provider.Get.Inputs[Channel]?.Compatibility is Compatibility.Marlin or Compatibility.NanoDLP)
@@ -128,7 +130,7 @@ namespace DuetControlServer.Commands
                 // Execute priority codes first
                 foreach (Code priorityCode in priorityCodes)
                 {
-                    Message? codeResult = await priorityCode.Execute();
+                    Message? codeResult = await priorityCode.ExecuteAsync(cancellationToken);
                     try
                     {
                         if (codeResult is not null && !string.IsNullOrEmpty(codeResult.Content))
@@ -150,7 +152,7 @@ namespace DuetControlServer.Commands
                     {
                         for (int i = 0; i < codes.Count; i++)
                         {
-                            codeTasks[i] = codes[i].Execute();
+                            codeTasks[i] = codes[i].ExecuteAsync(cancellationToken);
                         }
                     }
 

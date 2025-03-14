@@ -1,28 +1,27 @@
-﻿namespace DuetAPI.ObjectModel
+﻿namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// Calibration or mesh grid results
+/// </summary>
+public partial class MoveDeviations : ModelObject, IStaticModelObject
 {
     /// <summary>
-    /// Calibration or mesh grid results
+    /// RMS deviation (in mm)
     /// </summary>
-    public partial class MoveDeviations : ModelObject, IStaticModelObject
+    public float Deviation
     {
-        /// <summary>
-        /// RMS deviation (in mm)
-        /// </summary>
-        public float Deviation
-        {
-            get => _deviation;
-			set => SetPropertyValue(ref _deviation, value);
-        }
-        private float _deviation;
-
-        /// <summary>
-        /// Mean deviation (in mm)
-        /// </summary>
-        public float Mean
-        {
-            get => _mean;
-			set => SetPropertyValue(ref _mean, value);
-        }
-        private float _mean;
+        get => _deviation;
+        set => SetPropertyValue(ref _deviation, value);
     }
+    private float _deviation;
+
+    /// <summary>
+    /// Mean deviation (in mm)
+    /// </summary>
+    public float Mean
+    {
+        get => _mean;
+        set => SetPropertyValue(ref _mean, value);
+    }
+    private float _mean;
 }

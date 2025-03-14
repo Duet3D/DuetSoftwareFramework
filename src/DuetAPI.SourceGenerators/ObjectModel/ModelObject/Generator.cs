@@ -39,12 +39,11 @@ using DuetAPI.Utility;
 #nullable enable
 #pragma warning disable 618
 
-namespace DuetAPI.ObjectModel
+namespace DuetAPI.ObjectModel;
+
+public partial class {cls}
 {{
-    public partial class {cls}
-    {{
-        {GenerateMethods(context, receiver, cls)}
-    }}
+    {GenerateMethods(context, receiver, cls)}
 }}", Encoding.UTF8);
 
                     context.AddSource($"{cls}.g.cs", sourceText);
@@ -64,7 +63,7 @@ namespace DuetAPI.ObjectModel
             using StringWriter stringWriter = new();
             using IndentedTextWriter writer = new(stringWriter)
             {
-                Indent = 2
+                Indent = 1
             };
             writer.WriteLine(Assign.Generate(receiver, cls));
             writer.WriteLine();

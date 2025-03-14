@@ -169,7 +169,7 @@ namespace DuetControlServer.IPC.Processors
                                     code.Connection = Connection;
                                     code.SourceConnection = Connection.Id;
                                     _ = code
-                                        .Execute()
+                                        .ExecuteAsync()
                                         .ContinueWith(async task =>
                                         {
                                             try

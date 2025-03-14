@@ -178,7 +178,7 @@ namespace DuetControlServer.IPC.Processors
                                     Connection.CheckPermissions(commandType);
 
                                     // Execute regular commands here
-                                    object? result = await command.Invoke();
+                                    object? result = await command.InvokeAsync();
                                     await Connection.SendResponse(result);
                                 }
                                 else if (SupportedCommands.Contains(commandType))

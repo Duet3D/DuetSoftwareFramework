@@ -1,5 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -12,8 +13,9 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Apply a full patch to the object model. May be used only in non-SPI mode
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public override Task Execute()
+        public override Task ExecuteAsync(CancellationToken cancellationToken = default)
         {
             if (!Settings.NoSpi)
             {

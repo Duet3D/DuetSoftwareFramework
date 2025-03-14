@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
 {
@@ -10,10 +11,11 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Wait for all pending codes of the given channel to finish
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public override async Task Execute()
+        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
         {
-            using (await Model.Provider.AccessReadWriteAsync())
+            using (await Model.Provider.AccessReadWriteAsync(cancellationToken))
             {
                 Model.Provider.IsUpdating = Updating;
             }

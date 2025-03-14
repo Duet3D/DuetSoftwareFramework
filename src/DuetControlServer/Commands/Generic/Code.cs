@@ -131,9 +131,10 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Run an arbitrary G/M/T-code and wait for it to finish or to be enqueued if it is asynchronous
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Result of the code</returns>
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
-        public override async Task<Message?> Execute()
+        public override async Task<Message?> ExecuteAsync(CancellationToken cancellationToken = default)
         {
             // Assign a cancellation token when the execution starts
             if (CancellationToken == default)

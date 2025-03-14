@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Reflection;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -15,8 +16,9 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Set an atomic property in the object model
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public override Task<bool> Execute()
+        public override Task<bool> ExecuteAsync(CancellationToken cancellationToken = default)
         {
             if (!IPC.LockManager.IsLocked)
             {

@@ -303,7 +303,7 @@ namespace DuetControlServer
 
                 // Stop the plugins again
                 StopPlugins stopCommand = new();
-                await stopCommand.Execute();
+                await stopCommand.ExecuteAsync();
 
                 // Shut down DCS
                 await SPI.Interface.ShutdownAsync();
@@ -421,7 +421,7 @@ namespace DuetControlServer
             try
             {
                 StopPlugins stopCommand = new();
-                await stopCommand.Execute();
+                await stopCommand.ExecuteAsync();
             }
             catch (Exception e)
             {

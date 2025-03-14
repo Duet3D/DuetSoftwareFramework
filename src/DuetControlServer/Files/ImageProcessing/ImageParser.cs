@@ -4,6 +4,7 @@ using System;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Files.ImageProcessing
@@ -27,8 +28,9 @@ namespace DuetControlServer.Files.ImageProcessing
         /// <param name="code">Code to reuse while parsing</param>
         /// <param name="readThumbnailContent">Whether thumbnail content shall be returned</param>
         /// <param name="format">Thumbnail format</param>
+        /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public static async ValueTask ProcessAsync(Stream stream, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, Code code, bool readThumbnailContent, ThumbnailInfoFormat format)
+        public static async ValueTask ProcessAsync(Stream stream, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, Code code, bool readThumbnailContent, ThumbnailInfoFormat format, CancellationToken cancellationToken)
         {
             // Need a valid comment to start parsing...
             if (code.Comment is null)
@@ -68,7 +70,7 @@ namespace DuetControlServer.Files.ImageProcessing
                 Program.CancellationToken.ThrowIfCancellationRequested();
 
                 code.Reset();
-                if (!await Code.ParseAsync(stream, code, codeParserBuffer))
+                if (!await Code.ParseAsync(stream, code, codeParserBuffer, cancellationToken))
                 {
                     continue;
                 }

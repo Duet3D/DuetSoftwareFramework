@@ -1,32 +1,31 @@
 ﻿using System.Text.Json.Serialization;
 using DuetAPI.Utility;
 
-namespace DuetAPI.ObjectModel
+namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// Possible state of a spindle
+/// </summary>
+[JsonConverter(typeof(JsonCamelCaseStringEnumConverter<SpindleState>))]
+public enum SpindleState
 {
     /// <summary>
-    /// Possible state of a spindle
+    /// Spinde not configured
     /// </summary>
-    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<SpindleState>))]
-    public enum SpindleState
-    {
-        /// <summary>
-        /// Spinde not configured
-        /// </summary>
-        Unconfigured,
+    Unconfigured,
 
-        /// <summary>
-        /// Spindle is stopped (inactive)
-        /// </summary>
-        Stopped,
+    /// <summary>
+    /// Spindle is stopped (inactive)
+    /// </summary>
+    Stopped,
 
-        /// <summary>
-        /// Spindle is going forwards
-        /// </summary>
-        Forward,
+    /// <summary>
+    /// Spindle is going forwards
+    /// </summary>
+    Forward,
 
-        /// <summary>
-        /// Spindle is going in reverse
-        /// </summary>
-        Reverse
-    }
+    /// <summary>
+    /// Spindle is going in reverse
+    /// </summary>
+    Reverse
 }

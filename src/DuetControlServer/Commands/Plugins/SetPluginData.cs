@@ -2,6 +2,7 @@
 using DuetAPI.Utility;
 using DuetControlServer.IPC;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -19,8 +20,9 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Set custom plugin data in the object model
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public override async Task Execute()
+        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
         {
             if (!Settings.PluginSupport)
             {
@@ -40,7 +42,7 @@ namespace DuetControlServer.Commands
             }
 
             // Update the plugin data
-            using (await Model.Provider.AccessReadWriteAsync())
+            using (await Model.Provider.AccessReadWriteAsync(cancellationToken))
             {
                 if (Model.Provider.Get.Plugins.TryGetValue(Plugin, out Plugin? plugin))
                 {

@@ -173,12 +173,13 @@ namespace DuetControlServer.Files
         /// Synchronize the File and File2 code streams, may only be called when a job is live
         /// </summary>
         /// <param name="code">Code to synchronize at</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>True if the sync request was successful, false otherwise</returns>
         /// <remarks>
         /// This must be called while the Job class is NOT locked and it must be called from the same
         /// code on File *AND* File2, else the sync request is never resolved (or at least not before the file is cancelled)
         /// </remarks>
-        public static async Task<bool> DoSync(Code code)
+        public static async Task<bool> DoSyncAsync(Code code, CancellationToken cancellationToken = default)
         {
             if (!code.IsFromFileChannel)
             {
@@ -189,7 +190,7 @@ namespace DuetControlServer.Files
                 throw new ArgumentException("Code has no file position and cannot be used for sync requests", nameof(code));
             }
 
-            using (await LockAsync(code.CancellationToken))
+            using (await LockAsync(cancellationToken))
             {
                 if (_file is null || _file.IsClosed || _file2 is null || _file2.IsClosed)
                 {
@@ -223,7 +224,7 @@ namespace DuetControlServer.Files
         /// <param name="motionSystem">Motion system</param>
         /// <param name="filePosition">New file position</param>
         /// <returns>File position</returns>
-        public static async Task SetFilePosition(int motionSystem, long filePosition)
+        public static async Task SetFilePositionAsync(int motionSystem, long filePosition)
         {
             if (_file is not null && motionSystem == 0)
             {
@@ -272,7 +273,7 @@ namespace DuetControlServer.Files
         public static async Task SelectFile(string fileName, string physicalFile, bool simulating = false)
         {
             // Analyze and open the file
-            GCodeFileInfo info = await InfoParser.Parse(physicalFile, true);
+            GCodeFileInfo info = await InfoParser.ParseAsync(physicalFile, true);
             CodeFile file = new(fileName, physicalFile, CodeChannel.File);
 
             // A file being printed may start another file print
@@ -405,7 +406,7 @@ namespace DuetControlServer.Files
 
                         readCode.Flags |= CodeFlags.Asynchronous;
                         codes.Enqueue(readCode);
-                        await readCode.Execute();
+                        await readCode.ExecuteAsync();
                     }
                     catch (Exception e)
                     {
@@ -494,7 +495,7 @@ namespace DuetControlServer.Files
                         {
                             // Adjust the file position
                             long newFilePosition = _pausePosition ?? currentFilePosition;
-                            await SetFilePosition(file.Channel == CodeChannel.File ? 0 : 1, newFilePosition);
+                            await SetFilePositionAsync(file.Channel == CodeChannel.File ? 0 : 1, newFilePosition);
                             _logger.Info("Job on {0} has been paused at byte {1}, reason {2}", file.Channel, (_pausePosition == null) ? $"{newFilePosition} (no fpos from firmware)" : newFilePosition.ToString(), _pauseReason);
 
                             // Wait for the print to be resumed

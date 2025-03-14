@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -12,11 +13,12 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Evaluate an arbitrary expression
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Evaluation result</returns>
-        public override async Task<JsonElement> Execute()
+        public override async Task<JsonElement> ExecuteAsync(CancellationToken cancellationToken = default)
         {
             // Check if the corresponding code channel has been disabled
-            using (await Model.Provider.AccessReadOnlyAsync())
+            using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
             {
                 if (Model.Provider.Get.Inputs[Channel] is null)
                 {

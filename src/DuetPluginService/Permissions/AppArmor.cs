@@ -3,170 +3,175 @@ using DuetAPI.Utility;
 using System;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.Permissions
+namespace DuetPluginService.Permissions;
+
+/// <summary>
+/// Collection of functions to manage AppArmor permission enforcement
+/// </summary>
+/// <remarks>
+/// This implementation still relies on fixed SD paths. In the future this code must react to changes of directories in the OM!
+/// </remarks>
+public static class AppArmor
 {
     /// <summary>
-    /// Permission enforcement using AppArmor
+    /// Generate an AppArmor security profile for the given plugin and load it
     /// </summary>
-    /// <remarks>
-    /// This implementation still relies on fixed SD paths. In the future this code must react to changes of directories in the OM!
-    /// </remarks>
-    public static class AppArmor
+    /// <param name="plugin">Plugin</param>
+    /// <param name="settings">Application settings</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public static async Task InstallProfileAsync(Plugin plugin, Settings settings, CancellationToken cancellationToken)
     {
-        /// <summary>
-        /// Generate an AppArmor security profile for the given plugin and load it
-        /// </summary>
-        /// <param name="plugin">Plugin</param>
-        /// <returns>Asynchronous task</returns>
-        public static async Task InstallProfile(Plugin plugin)
-        {
-            // Load template
-            string profile = await File.ReadAllTextAsync(Settings.AppArmorTemplate);
-            profile = profile.Replace("{pluginDirectory}", Path.Combine(Settings.PluginDirectory, plugin.Id));
+        // Load template
+        string profile = await File.ReadAllTextAsync(settings.AppArmorTemplate, cancellationToken);
+        profile = profile.Replace("{pluginDirectory}", Path.Combine(settings.PluginDirectory, plugin.Id));
 
-            // Build security profile
-            StringBuilder includes = new(), rules = new();
-            foreach (SbcPermissions permission in Enum.GetValues(typeof(SbcPermissions)))
+        // Build security profile
+        StringBuilder includes = new(), rules = new();
+        foreach (SbcPermissions permission in Enum.GetValues(typeof(SbcPermissions)))
+        {
+            if (plugin.SbcPermissions.HasFlag(permission))
             {
-                if (plugin.SbcPermissions.HasFlag(permission))
+                switch (permission)
                 {
-                    switch (permission)
-                    {
-                        case SbcPermissions.CodeInterceptionRead:
-                        case SbcPermissions.CodeInterceptionReadWrite:
-                        case SbcPermissions.CommandExecution:
-                        case SbcPermissions.ManageUserSessions:
-                        case SbcPermissions.ObjectModelRead:
-                        case SbcPermissions.ObjectModelReadWrite:
-                        case SbcPermissions.RegisterHttpEndpoints:
-                        case SbcPermissions.ServicePlugins:
-                            // enforced by DCS
-                            break;
+                    case SbcPermissions.CodeInterceptionRead:
+                    case SbcPermissions.CodeInterceptionReadWrite:
+                    case SbcPermissions.CommandExecution:
+                    case SbcPermissions.ManageUserSessions:
+                    case SbcPermissions.ObjectModelRead:
+                    case SbcPermissions.ObjectModelReadWrite:
+                    case SbcPermissions.RegisterHttpEndpoints:
+                    case SbcPermissions.ServicePlugins:
+                        // enforced by DCS
+                        break;
 
-                        case SbcPermissions.ManagePlugins:
-                            rules.AppendLine($"  {Settings.PluginDirectory.TrimEnd(Path.DirectorySeparatorChar)}/ r,");
-                            rules.AppendLine($"  {Settings.PluginDirectory.TrimEnd(Path.DirectorySeparatorChar)}/** rw,");
-                            // partially enforced by DCS
-                            break;
+                    case SbcPermissions.ManagePlugins:
+                        rules.AppendLine($"  {settings.PluginDirectory.TrimEnd(Path.DirectorySeparatorChar)}/ r,");
+                        rules.AppendLine($"  {settings.PluginDirectory.TrimEnd(Path.DirectorySeparatorChar)}/** rw,");
+                        // partially enforced by DCS
+                        break;
 
-                        case SbcPermissions.FileSystemAccess:
-                            rules.AppendLine( "  / rw,");
-                            rules.AppendLine( "  /** rw,");
-                            break;
-                        case SbcPermissions.GpioAccess:
-                            rules.AppendLine("  /dev/gpio* rwmlk,");
-                            rules.AppendLine("  /dev/i2c* rwmlk,");
-                            rules.AppendLine("  /dev/spidev* rwmlk,");
-                            break;
-                        case SbcPermissions.LaunchProcesses:
-                            rules.AppendLine("  /** mix,");
-                            break;
-                        case SbcPermissions.NetworkAccess:
-                            includes.AppendLine("  #include <abstractions/nameservice>");
-                            rules.AppendLine("  network,");
-                            rules.AppendLine("  /proc/net/dev r,");
-                            rules.AppendLine("  /proc/net/wireless r,");
-                            break;
-                        case SbcPermissions.WebcamAccess:
-                            rules.AppendLine("  /dev/dma_heap/* rw,");
-                            rules.AppendLine("  /dev/media* rwmlk,");
-                            rules.AppendLine("  /dev/v4l-* rwmlk,");
-                            rules.AppendLine("  /dev/video* rwmlk,");
-                            rules.AppendLine("  /run/udev/data/** rwmlk,");
-                            rules.AppendLine("  /usr/bin/libcamerify rm,");
-                            rules.AppendLine("  /usr/libexec/libcamera/* rm,");
-                            rules.AppendLine("  /usr/share/libcamera/** r,");
-                            break;
-                        case SbcPermissions.ReadFilaments:
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "filaments")}/ r,");
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "filaments")}/** r,");
-                            break;
-                        case SbcPermissions.WriteFilaments:
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "filaments")}/** wk,");
-                            break;
-                        case SbcPermissions.ReadFirmware:
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "firmware")}/ r,");
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "firmware")}/** r,");
-                            break;
-                        case SbcPermissions.WriteFirmware:
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "firmware")}/** wk,");
-                            break;
-                        case SbcPermissions.ReadGCodes:
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "gcodes")}/ r,");
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "gcodes")}/** r,");
-                            break;
-                        case SbcPermissions.WriteGCodes:
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "gcodes")}/** wk,");
-                            break;
-                        case SbcPermissions.ReadMacros:
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "macros")}/ r,");
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "macros")}/** r,");
-                            break;
-                        case SbcPermissions.WriteMacros:
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "macros")}/** wk,");
-                            break;
-                        case SbcPermissions.ReadMenu:
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "menu")}/ r,");
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "menu")}/** r,");
-                            break;
-                        case SbcPermissions.WriteMenu:
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "menu")}/** wk,");
-                            break;
-                        case SbcPermissions.ReadSystem:
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "sys")}/ r,");
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "sys")}/** r,");
-                            break;
-                        case SbcPermissions.WriteSystem:
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "sys")}/** wk,");
-                            break;
-                        case SbcPermissions.ReadWeb:
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "www")}/ r,");
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "www")}/** r,");
-                            break;
-                        case SbcPermissions.WriteWeb:
-                            rules.AppendLine($"  {Path.Combine(Settings.BaseDirectory, "www")}/** wk,");
-                            break;
+                    case SbcPermissions.FileSystemAccess:
+                        rules.AppendLine( "  / rw,");
+                        rules.AppendLine( "  /** rw,");
+                        break;
+                    case SbcPermissions.GpioAccess:
+                        rules.AppendLine("  /dev/gpio* rwmlk,");
+                        rules.AppendLine("  /dev/i2c* rwmlk,");
+                        rules.AppendLine("  /dev/spidev* rwmlk,");
+                        break;
+                    case SbcPermissions.LaunchProcesses:
+                        rules.AppendLine("  /** mix,");
+                        break;
+                    case SbcPermissions.NetworkAccess:
+                        includes.AppendLine("  #include <abstractions/nameservice>");
+                        rules.AppendLine("  network,");
+                        rules.AppendLine("  /proc/net/dev r,");
+                        rules.AppendLine("  /proc/net/wireless r,");
+                        break;
+                    case SbcPermissions.WebcamAccess:
+                        rules.AppendLine("  /dev/dma_heap/* rw,");
+                        rules.AppendLine("  /dev/media* rwmlk,");
+                        rules.AppendLine("  /dev/v4l-* rwmlk,");
+                        rules.AppendLine("  /dev/video* rwmlk,");
+                        rules.AppendLine("  /run/udev/data/** rwmlk,");
+                        rules.AppendLine("  /usr/bin/libcamerify rm,");
+                        rules.AppendLine("  /usr/libexec/libcamera/* rm,");
+                        rules.AppendLine("  /usr/share/libcamera/** r,");
+                        break;
+                    case SbcPermissions.ReadFilaments:
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "filaments")}/ r,");
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "filaments")}/** r,");
+                        break;
+                    case SbcPermissions.WriteFilaments:
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "filaments")}/** wk,");
+                        break;
+                    case SbcPermissions.ReadFirmware:
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "firmware")}/ r,");
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "firmware")}/** r,");
+                        break;
+                    case SbcPermissions.WriteFirmware:
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "firmware")}/** wk,");
+                        break;
+                    case SbcPermissions.ReadGCodes:
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "gcodes")}/ r,");
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "gcodes")}/** r,");
+                        break;
+                    case SbcPermissions.WriteGCodes:
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "gcodes")}/** wk,");
+                        break;
+                    case SbcPermissions.ReadMacros:
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "macros")}/ r,");
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "macros")}/** r,");
+                        break;
+                    case SbcPermissions.WriteMacros:
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "macros")}/** wk,");
+                        break;
+                    case SbcPermissions.ReadMenu:
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "menu")}/ r,");
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "menu")}/** r,");
+                        break;
+                    case SbcPermissions.WriteMenu:
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "menu")}/** wk,");
+                        break;
+                    case SbcPermissions.ReadSystem:
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "sys")}/ r,");
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "sys")}/** r,");
+                        break;
+                    case SbcPermissions.WriteSystem:
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "sys")}/** wk,");
+                        break;
+                    case SbcPermissions.ReadWeb:
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "www")}/ r,");
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "www")}/** r,");
+                        break;
+                    case SbcPermissions.WriteWeb:
+                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "www")}/** wk,");
+                        break;
 
-                        case SbcPermissions.None:
-                        case SbcPermissions.SuperUser:
-                            // not applicable
-                            break;
-                    }
+                    case SbcPermissions.None:
+                    case SbcPermissions.SuperUser:
+                        // not applicable
+                        break;
                 }
-
             }
-            profile = profile.Replace("{includes}", includes.ToString());
-            profile = profile.Replace("{rules}", rules.ToString());
 
-            // Save and apply it
-            string profilePath = Path.Combine(Settings.AppArmorProfileDirectory, $"dsf.{plugin.Id}");
-            await File.WriteAllTextAsync(profilePath, profile);
-
-            await System.Diagnostics.Process
-                .Start(Settings.AppArmorParser, $"-r \"{profilePath}\"")
-                .WaitForExitAsync(Program.CancellationToken);
         }
+        profile = profile.Replace("{includes}", includes.ToString());
+        profile = profile.Replace("{rules}", rules.ToString());
 
-        /// <summary>
-        /// Remove an AppArmor security profile for the given pugin and unload it
-        /// </summary>
-        /// <param name="plugin">Plugin</param>
-        /// <returns>Asynchronous task</returns>
-        public static async Task UninstallProfile(Plugin plugin)
+        // Save and apply it. This must not be interrupted!
+        string profilePath = Path.Combine(settings.AppArmorProfileDirectory, $"dsf.{plugin.Id}");
+        await File.WriteAllTextAsync(profilePath, profile, CancellationToken.None);
+
+        // Load new profile
+        await System.Diagnostics.Process
+            .Start(settings.AppArmorParser, $"-r \"{profilePath}\"")
+            .WaitForExitAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Remove an AppArmor security profile for the given pugin and unload it
+    /// </summary>
+    /// <param name="pluginId">Plugin ID</param>
+    /// <param name="settings">Application settings</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public static async Task UninstallProfileAsync(string pluginId, Settings settings, CancellationToken cancellationToken)
+    {
+        string profilePath = Path.Combine(settings.AppArmorProfileDirectory, $"dsf.{pluginId}");
+        if (File.Exists(profilePath))
         {
-            string profilePath = Path.Combine(Settings.AppArmorProfileDirectory, $"dsf.{plugin.Id}");
-            if (File.Exists(profilePath))
-            {
-                // Disable the profile via AppArmor
-                await System.Diagnostics.Process
-                    .Start(Settings.AppArmorParser, $"-R \"{profilePath}\"")
-                    .WaitForExitAsync(Program.CancellationToken);
+            // Disable the profile via AppArmor
+            await System.Diagnostics.Process
+                .Start(settings.AppArmorParser, $"-R \"{profilePath}\"")
+                .WaitForExitAsync(cancellationToken);
 
-                // Delete it
-                File.Delete(profilePath);
-            }
+            // Delete it
+            File.Delete(profilePath);
         }
     }
 }

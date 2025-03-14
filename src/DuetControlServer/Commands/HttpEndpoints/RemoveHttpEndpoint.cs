@@ -1,4 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -17,9 +18,9 @@ namespace DuetControlServer.Commands
         /// Remove a third-party HTTP endpoint
         /// </summary>
         /// <returns>True if the endpoint could be removed</returns>
-        public override async Task<bool> Execute()
+        public override async Task<bool> ExecuteAsync(CancellationToken cancellationToken = default)
         {
-            using (await Model.Provider.AccessReadWriteAsync())
+            using (await Model.Provider.AccessReadWriteAsync(cancellationToken))
             {
                 for (int i = 0; i < Model.Provider.Get.SBC!.DSF.HttpEndpoints.Count; i++)
                 {

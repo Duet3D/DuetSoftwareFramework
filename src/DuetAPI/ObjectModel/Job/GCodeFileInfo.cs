@@ -2,119 +2,118 @@
 using System.Collections.ObjectModel;
 using System.Text.Json.Serialization;
 
-namespace DuetAPI.ObjectModel
+namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// Holds information about a G-code file
+/// </summary>
+public partial class GCodeFileInfo : ModelObject, IStaticModelObject
 {
     /// <summary>
-    /// Holds information about a G-code file
+    /// User-defined key-value pairs
     /// </summary>
-    public partial class GCodeFileInfo : ModelObject, IStaticModelObject
+    [SbcProperty(true)]
+    public JsonModelDictionary CustomInfo { get; } = new JsonModelDictionary(false);
+
+    /// <summary>
+    /// Filament consumption per extruder drive (in mm)
+    /// </summary>
+    public ObservableCollection<float> Filament { get; } = [];
+
+    /// <summary>
+    /// The filename of the G-code file
+    /// </summary>
+    public string FileName
     {
-        /// <summary>
-        /// User-defined key-value pairs
-        /// </summary>
-        [SbcProperty(true)]
-        public JsonModelDictionary CustomInfo { get; } = new JsonModelDictionary(false);
-
-        /// <summary>
-        /// Filament consumption per extruder drive (in mm)
-        /// </summary>
-        public ObservableCollection<float> Filament { get; } = [];
-
-        /// <summary>
-        /// The filename of the G-code file
-        /// </summary>
-        public string FileName
-        {
-            get => _fileName;
-			set => SetPropertyValue(ref _fileName, value);
-        }
-        private string _fileName = string.Empty;
-
-        /// <summary>
-        /// Name of the application that generated this file
-        /// </summary>
-        public string? GeneratedBy
-        {
-            get => _generatedBy;
-			set => SetPropertyValue(ref _generatedBy, value);
-        }
-        private string? _generatedBy;
-
-        /// <summary>
-        /// Build height of the G-code job or 0 if not found (in mm)
-        /// </summary>
-        public float Height
-        {
-            get => _height;
-			set => SetPropertyValue(ref _height, value);
-        }
-        private float _height;
-
-        /// <summary>
-        /// Value indicating when the file was last modified or null if unknown
-        /// </summary>
-        [JsonConverter(typeof(Utility.JsonOptionalShortDateTimeConverter))]
-        public DateTime? LastModified
-        {
-            get => _lastModified;
-            set => SetPropertyValue(ref _lastModified, value);
-        }
-        private DateTime? _lastModified;
-
-        /// <summary>
-        /// Height of each other layer or 0 if not found (in mm)
-        /// </summary>
-        public float LayerHeight
-        {
-            get => _layerHeight;
-			set => SetPropertyValue(ref _layerHeight, value);
-        }
-        private float _layerHeight;
-
-        /// <summary>
-        /// Number of total layers or 0 if unknown
-        /// </summary>
-        public int NumLayers
-        {
-            get => _numLayers;
-			set => SetPropertyValue(ref _numLayers, value);
-        }
-        private int _numLayers;
-
-        /// <summary>
-        /// Estimated print time (in s)
-        /// </summary>
-        public long? PrintTime
-        {
-            get => _printTime;
-			set => SetPropertyValue(ref _printTime, value);
-        }
-        private long? _printTime;
-        
-        /// <summary>
-        /// Estimated print time from G-code simulation (in s)
-        /// </summary>
-        public long? SimulatedTime
-        {
-            get => _simulatedTime;
-			set => SetPropertyValue(ref _simulatedTime, value);
-        }
-        private long? _simulatedTime;
-
-        /// <summary>
-        /// Size of the file
-        /// </summary>
-        public long Size
-        {
-            get => _size;
-			set => SetPropertyValue(ref _size, value);
-        }
-        private long _size;
-
-        /// <summary>
-        /// Collection of thumbnails parsed from Gcode
-        /// </summary>
-        [SbcProperty(true)]
-        public StaticModelCollection<ThumbnailInfo> Thumbnails { get; } = [];
+        get => _fileName;
+        set => SetPropertyValue(ref _fileName, value);
     }
+    private string _fileName = string.Empty;
+
+    /// <summary>
+    /// Name of the application that generated this file
+    /// </summary>
+    public string? GeneratedBy
+    {
+        get => _generatedBy;
+        set => SetPropertyValue(ref _generatedBy, value);
+    }
+    private string? _generatedBy;
+
+    /// <summary>
+    /// Build height of the G-code job or 0 if not found (in mm)
+    /// </summary>
+    public float Height
+    {
+        get => _height;
+        set => SetPropertyValue(ref _height, value);
+    }
+    private float _height;
+
+    /// <summary>
+    /// Value indicating when the file was last modified or null if unknown
+    /// </summary>
+    [JsonConverter(typeof(Utility.JsonOptionalShortDateTimeConverter))]
+    public DateTime? LastModified
+    {
+        get => _lastModified;
+        set => SetPropertyValue(ref _lastModified, value);
+    }
+    private DateTime? _lastModified;
+
+    /// <summary>
+    /// Height of each other layer or 0 if not found (in mm)
+    /// </summary>
+    public float LayerHeight
+    {
+        get => _layerHeight;
+        set => SetPropertyValue(ref _layerHeight, value);
+    }
+    private float _layerHeight;
+
+    /// <summary>
+    /// Number of total layers or 0 if unknown
+    /// </summary>
+    public int NumLayers
+    {
+        get => _numLayers;
+        set => SetPropertyValue(ref _numLayers, value);
+    }
+    private int _numLayers;
+
+    /// <summary>
+    /// Estimated print time (in s)
+    /// </summary>
+    public long? PrintTime
+    {
+        get => _printTime;
+        set => SetPropertyValue(ref _printTime, value);
+    }
+    private long? _printTime;
+    
+    /// <summary>
+    /// Estimated print time from G-code simulation (in s)
+    /// </summary>
+    public long? SimulatedTime
+    {
+        get => _simulatedTime;
+        set => SetPropertyValue(ref _simulatedTime, value);
+    }
+    private long? _simulatedTime;
+
+    /// <summary>
+    /// Size of the file
+    /// </summary>
+    public long Size
+    {
+        get => _size;
+        set => SetPropertyValue(ref _size, value);
+    }
+    private long _size;
+
+    /// <summary>
+    /// Collection of thumbnails parsed from Gcode
+    /// </summary>
+    [SbcProperty(true)]
+    public StaticModelCollection<ThumbnailInfo> Thumbnails { get; } = [];
 }

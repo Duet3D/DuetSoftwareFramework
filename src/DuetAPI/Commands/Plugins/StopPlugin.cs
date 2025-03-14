@@ -1,21 +1,20 @@
 ﻿using DuetAPI.Utility;
 
-namespace DuetAPI.Commands
+namespace DuetAPI.Commands;
+
+/// <summary>
+/// Stop a plugin
+/// </summary>
+[RequiredPermissions(SbcPermissions.ManagePlugins)]
+public class StopPlugin : Command
 {
     /// <summary>
-    /// Stop a plugin
+    /// Identifier of the plugin
     /// </summary>
-    [RequiredPermissions(SbcPermissions.ManagePlugins)]
-    public class StopPlugin : Command
-    {
-        /// <summary>
-        /// Identifier of the plugin
-        /// </summary>
-        public string Plugin { get; set; } = string.Empty;
+    public string Plugin { get; set; } = string.Empty;
 
-        /// <summary>
-        /// Defines if the list of executing plugins may be saved
-        /// </summary>
-        public bool SaveState { get; set; } = true;
-    }
+    /// <summary>
+    /// Defines if the list of executing plugins may be saved
+    /// </summary>
+    public bool SaveState { get; set; } = true;
 }

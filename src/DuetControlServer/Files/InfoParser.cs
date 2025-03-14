@@ -6,11 +6,11 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files.ImageProcessing;
-using SixLabors.ImageSharp.Processing;
 using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.Files
@@ -30,13 +30,14 @@ namespace DuetControlServer.Files
         /// </summary>
         /// <param name="fileName">File to analyze</param>
         /// <param name="readThumbnailContent">Whether thumbnail content shall be returned</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Information about the file</returns>
-        public static async Task<GCodeFileInfo> Parse(string fileName, bool readThumbnailContent)
+        public static async Task<GCodeFileInfo> ParseAsync(string fileName, bool readThumbnailContent, CancellationToken cancellationToken = default)
         {
             await using FileStream fileStream = new(fileName, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
             GCodeFileInfo result = new()
             {
-                FileName = await FilePath.ToVirtualAsync(fileName),
+                FileName = await FilePath.ToVirtualAsync(fileName, cancellationToken: cancellationToken),
                 LastModified = File.GetLastWriteTime(fileName),
                 Size = fileStream.Length
             };
@@ -51,7 +52,7 @@ namespace DuetControlServer.Files
             );
             if (!isValidFileToParse)
             {
-                string macroDirectory = await FilePath.ToPhysicalAsync("", FileDirectory.Macros);
+                string macroDirectory = await FilePath.ToPhysicalAsync(string.Empty, FileDirectory.Macros, cancellationToken);
                 isValidFileToParse = fileName.StartsWith(macroDirectory);
             }
 
@@ -60,8 +61,8 @@ namespace DuetControlServer.Files
                 Dictionary<string, Task<object?>> evaluationTasks = [];
 
                 // Parse the file
-                await ParseHeader(fileStream, readThumbnailContent, evaluationTasks, result);
-                await ParseFooter(fileStream, result);
+                await ParseHeader(fileStream, readThumbnailContent, evaluationTasks, result, cancellationToken);
+                await ParseFooter(fileStream, result, cancellationToken);
 
                 // Wait for key-value evaluation tasks to finish and add the results
                 foreach (KeyValuePair<string, Task<object?>> kvp in evaluationTasks)
@@ -104,7 +105,7 @@ namespace DuetControlServer.Files
         /// <param name="userDefinedKeys">User-defined keys and the corresponding evaluation task</param>
         /// <param name="partialFileInfo">G-code file information</param>
         /// <returns>Asynchronous task</returns>
-        private static async Task ParseHeader(Stream stream, bool readThumbnailContent, Dictionary<string, Task<object?>> userDefinedKeys, GCodeFileInfo partialFileInfo)
+        private static async Task ParseHeader(Stream stream, bool readThumbnailContent, Dictionary<string, Task<object?>> userDefinedKeys, GCodeFileInfo partialFileInfo, CancellationToken cancellationToken)
         {
             Code code = new();
             CodeParserBuffer codeParserBuffer = new(Settings.FileBufferSize, true);
@@ -116,7 +117,7 @@ namespace DuetControlServer.Files
                 Program.CancellationToken.ThrowIfCancellationRequested();
 
                 gotNewInfo = false;
-                if (!await DuetAPI.Commands.Code.ParseAsync(stream, code, codeParserBuffer))
+                if (!await DuetAPI.Commands.Code.ParseAsync(stream, code, codeParserBuffer, cancellationToken))
                 {
                     continue;
                 }
@@ -130,7 +131,7 @@ namespace DuetControlServer.Files
                     gotNewInfo |= FindFilamentUsed(code.Comment, ref partialFileInfo);
                     gotNewInfo |= AddUserDefinedKey(code, userDefinedKeys);
                     gotNewInfo |= string.IsNullOrEmpty(partialFileInfo.GeneratedBy) && FindGeneratedBy(code.Comment, ref partialFileInfo);
-                    gotNewInfo |= await ParseThumbnails(stream, code, codeParserBuffer, partialFileInfo, readThumbnailContent);
+                    gotNewInfo |= await ParseThumbnails(stream, code, codeParserBuffer, partialFileInfo, readThumbnailContent, cancellationToken);
                 }
 
                 // Is the file info complete?
@@ -149,7 +150,7 @@ namespace DuetControlServer.Files
         /// <param name="stream">Stream</param>
         /// <param name="partialFileInfo">G-code file information</param>
         /// <returns>Asynchronous task</returns>
-        private static async Task ParseFooter(Stream stream, GCodeFileInfo partialFileInfo)
+        private static async Task ParseFooter(Stream stream, GCodeFileInfo partialFileInfo, CancellationToken cancellationToken)
         {
             stream.Seek(0, SeekOrigin.End);
             ReadLineFromEndData readData = new(stream.Position);
@@ -159,10 +160,8 @@ namespace DuetControlServer.Files
             bool inRelativeMode = false, lastLineHadInfo = false, hadFilament = partialFileInfo.Filament.Count > 0;
             do
             {
-                Program.CancellationToken.ThrowIfCancellationRequested();
-
                 // Read another line
-                if (!await ReadLineFromEndAsync(stream, buffer, readData))
+                if (!await ReadLineFromEndAsync(stream, buffer, readData, cancellationToken))
                 {
                     break;
                 }
@@ -253,11 +252,12 @@ namespace DuetControlServer.Files
         /// <param name="stream">Stream</param>
         /// <param name="buffer">Internal buffer</param>
         /// <param name="readData">Data about the read progress while reading backwards</param>
+        /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Whether another line could be read</returns>
-        private static async ValueTask<bool> ReadLineFromEndAsync(Stream stream, byte[] buffer, ReadLineFromEndData readData)
+        private static async ValueTask<bool> ReadLineFromEndAsync(Stream stream, byte[] buffer, ReadLineFromEndData readData, CancellationToken cancellationToken)
         {
             int bytesRead = 0;
-            do
+            for(;;)
             {
                 // Read more from the file if necessary
                 if (readData.BufferPointer == 0 && readData.FilePosition != 0)
@@ -265,14 +265,14 @@ namespace DuetControlServer.Files
                     if (readData.FilePosition < buffer.Length)
                     {
                         stream.Seek(0, SeekOrigin.Begin);
-                        readData.BufferPointer = Math.Min(await stream.ReadAsync(buffer), (int)readData.FilePosition);
+                        readData.BufferPointer = Math.Min(await stream.ReadAsync(buffer, cancellationToken), (int)readData.FilePosition);
                         readData.FilePosition = 0;
                     }
                     else
                     {
                         readData.FilePosition -= Math.Min(readData.FilePosition, buffer.Length);
                         stream.Seek(readData.FilePosition, SeekOrigin.Begin);
-                        readData.BufferPointer = await stream.ReadAsync(buffer);
+                        readData.BufferPointer = await stream.ReadAsync(buffer, cancellationToken);
                     }
                 }
 
@@ -300,10 +300,7 @@ namespace DuetControlServer.Files
                     bytesRead++;
                     readData.LineBuffer[^bytesRead] = c;
                 }
-
-                Program.CancellationToken.ThrowIfCancellationRequested();
             }
-            while (true);
         }
 
         /// <summary>
@@ -587,8 +584,9 @@ namespace DuetControlServer.Files
         /// <param name="parsedFileInfo">G-code file information</param>
         /// <param name="codeParserBuffer">Parser buffer</param>
         /// <param name="readThumbnailContent">Whether thumbnail content shall be returned</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>True if the code contains thumbnail data</returns>
-        private static async ValueTask<bool> ParseThumbnails(Stream stream, Code code, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, bool readThumbnailContent)
+        private static async ValueTask<bool> ParseThumbnails(Stream stream, Code code, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, bool readThumbnailContent, CancellationToken cancellationToken = default)
         {
             if (code.Comment is null)
             {
@@ -601,19 +599,19 @@ namespace DuetControlServer.Files
             if (trimmedComment.StartsWith("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
             {
                 _logger.Debug("Found embedded thumbnail PNG image");
-                await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.PNG);
+                await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.PNG, cancellationToken);
                 return true;
             }
             if (trimmedComment.StartsWith("thumbnail_JPG", StringComparison.InvariantCultureIgnoreCase))
             {
                 _logger.Debug("Found embedded thumbnail JPG Image");
-                await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.JPEG);
+                await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.JPEG, cancellationToken);
                 return true;
             }
             if (trimmedComment.StartsWith("thumbnail_QOI", StringComparison.InvariantCultureIgnoreCase))
             {
                 _logger.Debug("Found embedded thumbnail QOI Image");
-                await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.QOI);
+                await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.QOI, cancellationToken);
                 return true;
             }
 

@@ -1,48 +1,50 @@
 ﻿using System;
-using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetAPI.Commands
+namespace DuetAPI.Commands;
+
+/// <summary>
+/// Base class of commands that do not return a result
+/// </summary>
+public abstract class Command : BaseCommand
 {
     /// <summary>
-    /// Base class of commands that do not return a result
+    /// Reserved for the actual command implementation in the control server
     /// </summary>
-    public abstract class Command : BaseCommand
-    {
-        /// <summary>
-        /// Reserved for the actual command implementation in the control server
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public virtual Task Execute() => throw new NotImplementedException($"{Command} not implemented");
-
-        /// <summary>
-        /// Invokes the command implementation
-        /// </summary>
-        /// <returns>null</returns>
-        public override async Task<object?> Invoke()
-        {
-            await Execute();
-            return null;
-        }
-    }
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public virtual Task ExecuteAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException($"{Command} not implemented");
 
     /// <summary>
-    /// Base class of a command that returns a result
+    /// Invokes the command implementation
     /// </summary>
-    /// <typeparam name="T">Type of the command result</typeparam>
-    [JsonDerivedType(typeof(Code))]
-    public abstract class Command<T> : BaseCommand
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>null</returns>
+    public override async Task<object?> InvokeAsync(CancellationToken cancellationToken = default)
     {
-        /// <summary>
-        /// Reserved for the actual command implementation in the control server
-        /// </summary>
-        /// <returns>Command result</returns>
-        public virtual Task<T> Execute() => throw new NotImplementedException($"{Command}<{nameof(T)}> not implemented");
-
-        /// <summary>
-        /// Invokes the command implementation
-        /// </summary>
-        /// <returns>Command result</returns>
-        public override async Task<object?> Invoke() => await Execute();
+        await ExecuteAsync(cancellationToken);
+        return null;
     }
+}
+
+/// <summary>
+/// Base class of a command that returns a result
+/// </summary>
+/// <typeparam name="T">Type of the command result</typeparam>
+public abstract class Command<T> : BaseCommand
+{
+    /// <summary>
+    /// Reserved for the actual command implementation in the control server
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Command result</returns>
+    public virtual Task<T> ExecuteAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException($"{Command}<{nameof(T)}> not implemented");
+
+    /// <summary>
+    /// Invokes the command implementation
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Command result</returns>
+    public override async Task<object?> InvokeAsync(CancellationToken cancellationToken = default) => await ExecuteAsync(cancellationToken);
 }

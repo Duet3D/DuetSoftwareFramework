@@ -89,7 +89,7 @@ namespace DuetControlServer.IPC.Processors
                     Connection.CheckPermissions(commandType);
 
                     // Execute it and send back the result
-                    object? result = await command.Invoke();
+                    object? result = await command.InvokeAsync();
                     await Connection.SendResponse(result);
 
                     // Shut down the socket if this was the last command

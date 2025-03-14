@@ -14,113 +14,35 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 
-namespace DuetHttpClient.Connector
+namespace DuetHttpClient.Connector;
+
+/// <summary>
+/// HTTP connector for standalone mode (which requires polling)
+/// </summary>
+internal partial class PollConnector : BaseConnector
 {
     /// <summary>
-    /// HTTP connector for standalone mode (which requires polling)
+    /// Minimum HTTP API level to support this
     /// </summary>
-    internal partial class PollConnector : BaseConnector
+    private const int MinApiLevel = 1;
+
+    /// <summary>
+    /// Establish a HTTP connection to a Duet board running in standalone mode
+    /// </summary>
+    /// <param name="baseUri">Base URI of the remote board</param>
+    /// <param name="options">Default connection options</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Poll connector instance</returns>
+    /// <exception cref="HttpRequestException">Board did not return a valid HTTP code</exception>
+    /// <exception cref="InvalidPasswordException">Invalid password specified</exception>
+    /// <exception cref="NoFreeSessionException">No free session available</exception>
+    /// <exception cref="InvalidVersionException">Unsupported DSF version</exception>
+    public static async Task<PollConnector> ConnectAsync(Uri baseUri, DuetHttpOptions options, CancellationToken cancellationToken)
     {
-        /// <summary>
-        /// Minimum HTTP API level to support this
-        /// </summary>
-        private const int MinApiLevel = 1;
-
-        /// <summary>
-        /// Establish a HTTP connection to a Duet board running in standalone mode
-        /// </summary>
-        /// <param name="baseUri">Base URI of the remote board</param>
-        /// <param name="options">Default connection options</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Poll connector instance</returns>
-        /// <exception cref="HttpRequestException">Board did not return a valid HTTP code</exception>
-        /// <exception cref="InvalidPasswordException">Invalid password specified</exception>
-        /// <exception cref="NoFreeSessionException">No free session available</exception>
-        /// <exception cref="InvalidVersionException">Unsupported DSF version</exception>
-        public static async Task<PollConnector> ConnectAsync(Uri baseUri, DuetHttpOptions options, CancellationToken cancellationToken)
+        uint? sessionKey = null;
+        using (HttpClient client = new() { Timeout = options.Timeout })
         {
-            uint? sessionKey = null;
-            using (HttpClient client = new() { Timeout = options.Timeout })
-            {
-                using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"rr_connect?password={HttpUtility.UrlPathEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken);
-                response.EnsureSuccessStatusCode();
-
-#if NET6_0_OR_GREATER
-                using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-#else
-                using Stream responseStream = await response.Content.ReadAsStreamAsync();
-#endif
-                Responses.PollConnectResponse connectResponse = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.PollConnectResponse, cancellationToken))!;
-                sessionKey = connectResponse.Err switch
-                {
-                    0 => connectResponse.SessionKey,
-                    1 => throw new InvalidPasswordException(),
-                    2 => throw new NoFreeSessionException(),
-                    _ => throw new LoginException($"rr_connect returned unknown err {connectResponse.Err}"),
-                };
-                if (connectResponse.IsEmulated)
-                {
-                    // Don't attempt to use emulated endpoints since the remote server provides support for RESTful calls too
-                    throw new HttpRequestException("HTTP backend is emulated");
-                }
-
-                if (connectResponse.ApiLevel < MinApiLevel)
-                {
-                    throw new InvalidVersionException("Incompatible API level");
-                }
-            }
-
-            return new PollConnector(baseUri, options, sessionKey);
-        }
-
-        /// <summary>
-        /// Constructor of a PollConnector instance
-        /// </summary>
-        /// <param name="baseUri">Base URI of the remote board</param>
-        /// <param name="options">Connection options or null</param>
-        private PollConnector(Uri baseUri, DuetHttpOptions options, uint? sessionKey) : base(baseUri, options)
-        {
-            // Make new task to keep the session alive
-            _sessionKey = sessionKey;
-            _ = Task.Run(MaintainSession);
-        }
-
-        /// <summary>
-        /// Optional session key to be used for HTTP requests
-        /// </summary>
-        private uint? _sessionKey;
-
-        /// <summary>
-        /// Dictionary of keys vs sequence numbers
-        /// </summary>
-        private readonly Dictionary<string, int> _seqs = [];
-
-        /// <summary>
-        /// Dictionary of running codes vs sequence numbers
-        /// </summary>
-        private readonly Dictionary<TaskCompletionSource<string>, int> _runningCodes = [];
-
-        /// <summary>
-        /// Reconnect to the board when the connection has been reset
-        /// </summary>
-        protected override async Task Reconnect(CancellationToken cancellationToken = default)
-        {
-            lock (_seqs)
-            {
-                _seqs.Clear();
-            }
-
-            lock (_runningCodes)
-            {
-                foreach (TaskCompletionSource<string> tcs in _runningCodes.Keys)
-                {
-                    tcs.TrySetCanceled(CancellationToken.None);
-                }
-                _runningCodes.Clear();
-            }
-
-            using HttpRequestMessage request = new(HttpMethod.Get, $"rr_connect?password={HttpUtility.UrlPathEncode(Options.Password)}&time={DateTime.Now:s}");
-            using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+            using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"rr_connect?password={HttpUtility.UrlPathEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken);
             response.EnsureSuccessStatusCode();
 
 #if NET6_0_OR_GREATER
@@ -129,14 +51,13 @@ namespace DuetHttpClient.Connector
             using Stream responseStream = await response.Content.ReadAsStreamAsync();
 #endif
             Responses.PollConnectResponse connectResponse = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.PollConnectResponse, cancellationToken))!;
-            _sessionKey = connectResponse.Err switch
+            sessionKey = connectResponse.Err switch
             {
                 0 => connectResponse.SessionKey,
                 1 => throw new InvalidPasswordException(),
                 2 => throw new NoFreeSessionException(),
                 _ => throw new LoginException($"rr_connect returned unknown err {connectResponse.Err}"),
             };
-
             if (connectResponse.IsEmulated)
             {
                 // Don't attempt to use emulated endpoints since the remote server provides support for RESTful calls too
@@ -149,685 +70,1058 @@ namespace DuetHttpClient.Connector
             }
         }
 
-        /// <summary>
-        /// Send a generic a HTTP request
-        /// </summary>
-        /// <param name="request">HTTP request to send</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>HTTP response</returns>
-        protected override async ValueTask<HttpResponseMessage> SendRequest(HttpRequestMessage request, TimeSpan timeout, CancellationToken cancellationToken = default)
+        return new PollConnector(baseUri, options, sessionKey);
+    }
+
+    /// <summary>
+    /// Constructor of a PollConnector instance
+    /// </summary>
+    /// <param name="baseUri">Base URI of the remote board</param>
+    /// <param name="options">Connection options or null</param>
+    private PollConnector(Uri baseUri, DuetHttpOptions options, uint? sessionKey) : base(baseUri, options)
+    {
+        // Make new task to keep the session alive
+        _sessionKey = sessionKey;
+        _ = Task.Run(MaintainSession);
+    }
+
+    /// <summary>
+    /// Optional session key to be used for HTTP requests
+    /// </summary>
+    private uint? _sessionKey;
+
+    /// <summary>
+    /// Dictionary of keys vs sequence numbers
+    /// </summary>
+    private readonly Dictionary<string, int> _seqs = [];
+
+    /// <summary>
+    /// Dictionary of running codes vs sequence numbers
+    /// </summary>
+    private readonly Dictionary<TaskCompletionSource<string>, int> _runningCodes = [];
+
+    /// <summary>
+    /// Reconnect to the board when the connection has been reset
+    /// </summary>
+    protected override async Task Reconnect(CancellationToken cancellationToken = default)
+    {
+        lock (_seqs)
         {
-            if (_sessionKey != null)
-            {
-                request.Headers.Add("X-Session-Key", _sessionKey.ToString());
-            }
-            HttpResponseMessage response = await base.SendRequest(request, timeout, cancellationToken);
-            if (response.StatusCode == HttpStatusCode.ServiceUnavailable &&
-                (request.Method != HttpMethod.Get || request.RequestUri?.AbsolutePath != "/rr_reply"))
-            {
-                // RRF has run out of G-code replies, try to fetch rr_reply once more
-                int replySeq;
-                lock (_seqs)
-                {
-                    _seqs.TryGetValue("reply", out replySeq);
-                }
-                await GetGCodeReply(replySeq + 1);
-            }
-            return response;
+            _seqs.Clear();
         }
 
-        /// <summary>
-        /// Internal method to query to the object model
-        /// </summary>
-        /// <param name="key">Key to query</param>
-        /// <param name="flags">Query flags</param>
-        /// <returns>Received JSON</returns>
-        private async Task<JsonDocument> GetObjectModel(string key, string flags)
+        lock (_runningCodes)
         {
-            string errorMessage = "Invalid number of maximum retries configured";
-            for (int i = 0; i <= Options.MaxRetries; i++)
+            foreach (TaskCompletionSource<string> tcs in _runningCodes.Keys)
             {
-                try
-                {
-                    string query = string.IsNullOrEmpty(key) ? $"rr_model?flags={flags}" : $"rr_model?key={key}&flags={flags}";
-                    using HttpRequestMessage request = new(HttpMethod.Get, query);
-                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, _terminateSession.Token);
-                    if (response.IsSuccessStatusCode)
-                    {
-                        using Stream stream = await response.Content.ReadAsStreamAsync();
-                        return await JsonDocument.ParseAsync(stream, cancellationToken: _terminateSession.Token);
-                    }
-
-                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                    if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                    {
-                        break;
-                    }
-                }
-                catch (OperationCanceledException oce)
-                {
-                    if (_terminateSession.IsCancellationRequested)
-                    {
-                        throw;
-                    }
-                    errorMessage = oce.Message;
-                }
+                tcs.TrySetCanceled(CancellationToken.None);
             }
-            throw new HttpRequestException(errorMessage);
+            _runningCodes.Clear();
         }
 
-        /// <summary>
-        /// TCS to complete when the object model is up-to-date
-        /// </summary>
-        private readonly List<TaskCompletionSource<object?>> _modelUpdateTcs = [];
+        using HttpRequestMessage request = new(HttpMethod.Get, $"rr_connect?password={HttpUtility.UrlPathEncode(Options.Password)}&time={DateTime.Now:s}");
+        using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+        response.EnsureSuccessStatusCode();
 
-        /// <summary>
-        /// Wait for the object model to be up-to-date
-        /// </summary>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Asynchronous task</returns>
-        public override Task WaitForModelUpdate(CancellationToken cancellationToken = default)
+#if NET6_0_OR_GREATER
+        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+#else
+        using Stream responseStream = await response.Content.ReadAsStreamAsync();
+#endif
+        Responses.PollConnectResponse connectResponse = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.PollConnectResponse, cancellationToken))!;
+        _sessionKey = connectResponse.Err switch
         {
-            if (disposed)
-            {
-                throw new ObjectDisposedException(null);
-            }
-            if (!Options.ObserveObjectModel)
-            {
-                throw new InvalidOperationException("Cannot wait for object model, because the object model is not observed");
-            }
+            0 => connectResponse.SessionKey,
+            1 => throw new InvalidPasswordException(),
+            2 => throw new NoFreeSessionException(),
+            _ => throw new LoginException($"rr_connect returned unknown err {connectResponse.Err}"),
+        };
 
-            TaskCompletionSource<object?> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-            lock (_modelUpdateTcs)
-            {
-                _modelUpdateTcs.Add(tcs);
-            }
-
-            CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_terminateSession.Token, cancellationToken);
-            CancellationTokenRegistration ctsRegistration = cts.Token.Register(() => tcs.TrySetCanceled());
-            return tcs.Task.ContinueWith(async task =>
-            {
-                try
-                {
-                    await task;
-                }
-                finally
-                {
-                    ctsRegistration.Dispose();
-                }
-            }, TaskContinuationOptions.RunContinuationsAsynchronously);
+        if (connectResponse.IsEmulated)
+        {
+            // Don't attempt to use emulated endpoints since the remote server provides support for RESTful calls too
+            throw new HttpRequestException("HTTP backend is emulated");
         }
 
-        /// <summary>
-        /// Filename of the thumbnail collection
-        /// </summary>
-        private string? _thumbnailFile = string.Empty;
+        if (connectResponse.ApiLevel < MinApiLevel)
+        {
+            throw new InvalidVersionException("Incompatible API level");
+        }
+    }
 
-        /// <summary>
-        /// Maintain the HTTP session
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private async Task MaintainSession()
+    /// <summary>
+    /// Send a generic a HTTP request
+    /// </summary>
+    /// <param name="request">HTTP request to send</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>HTTP response</returns>
+    protected override async ValueTask<HttpResponseMessage> SendRequest(HttpRequestMessage request, TimeSpan timeout, CancellationToken cancellationToken = default)
+    {
+        if (_sessionKey != null)
+        {
+            request.Headers.Add("X-Session-Key", _sessionKey.ToString());
+        }
+        HttpResponseMessage response = await base.SendRequest(request, timeout, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.ServiceUnavailable &&
+            (request.Method != HttpMethod.Get || request.RequestUri?.AbsolutePath != "/rr_reply"))
+        {
+            // RRF has run out of G-code replies, try to fetch rr_reply once more
+            int replySeq;
+            lock (_seqs)
+            {
+                _seqs.TryGetValue("reply", out replySeq);
+            }
+            await GetGCodeReply(replySeq + 1);
+        }
+        return response;
+    }
+
+    /// <summary>
+    /// Internal method to query to the object model
+    /// </summary>
+    /// <param name="key">Key to query</param>
+    /// <param name="flags">Query flags</param>
+    /// <returns>Received JSON</returns>
+    private async Task<JsonDocument> GetObjectModel(string key, string flags)
+    {
+        string errorMessage = "Invalid number of maximum retries configured";
+        for (int i = 0; i <= Options.MaxRetries; i++)
         {
             try
             {
-                do
+                string query = string.IsNullOrEmpty(key) ? $"rr_model?flags={flags}" : $"rr_model?key={key}&flags={flags}";
+                using HttpRequestMessage request = new(HttpMethod.Get, query);
+                using HttpResponseMessage response = await SendRequest(request, Options.Timeout, _terminateSession.Token);
+                if (response.IsSuccessStatusCode)
                 {
-                    try
+                    using Stream stream = await response.Content.ReadAsStreamAsync();
+                    return await JsonDocument.ParseAsync(stream, cancellationToken: _terminateSession.Token);
+                }
+
+                errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                {
+                    break;
+                }
+            }
+            catch (OperationCanceledException oce)
+            {
+                if (_terminateSession.IsCancellationRequested)
+                {
+                    throw;
+                }
+                errorMessage = oce.Message;
+            }
+        }
+        throw new HttpRequestException(errorMessage);
+    }
+
+    /// <summary>
+    /// TCS to complete when the object model is up-to-date
+    /// </summary>
+    private readonly List<TaskCompletionSource<object?>> _modelUpdateTcs = [];
+
+    /// <summary>
+    /// Wait for the object model to be up-to-date
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public override Task WaitForModelUpdate(CancellationToken cancellationToken = default)
+    {
+        if (disposed)
+        {
+            throw new ObjectDisposedException(null);
+        }
+        if (!Options.ObserveObjectModel)
+        {
+            throw new InvalidOperationException("Cannot wait for object model, because the object model is not observed");
+        }
+
+        TaskCompletionSource<object?> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_modelUpdateTcs)
+        {
+            _modelUpdateTcs.Add(tcs);
+        }
+
+        CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_terminateSession.Token, cancellationToken);
+        CancellationTokenRegistration ctsRegistration = cts.Token.Register(() => tcs.TrySetCanceled());
+        return tcs.Task.ContinueWith(async task =>
+        {
+            try
+            {
+                await task;
+            }
+            finally
+            {
+                ctsRegistration.Dispose();
+            }
+        }, TaskContinuationOptions.RunContinuationsAsynchronously);
+    }
+
+    /// <summary>
+    /// Filename of the thumbnail collection
+    /// </summary>
+    private string? _thumbnailFile = string.Empty;
+
+    /// <summary>
+    /// Maintain the HTTP session
+    /// </summary>
+    /// <returns>Asynchronous task</returns>
+    private async Task MaintainSession()
+    {
+        try
+        {
+            do
+            {
+                try
+                {
+                    if (Options.ObserveObjectModel)
                     {
-                        if (Options.ObserveObjectModel)
+                        // Request the limits if no sequence numbers have been set yet
+                        bool isSeqsEmpty;
+                        lock (_seqs)
                         {
-                            // Request the limits if no sequence numbers have been set yet
-                            bool isSeqsEmpty;
-                            lock (_seqs)
-                            {
-                                isSeqsEmpty = _seqs.Count == 0;
-                            }
+                            isSeqsEmpty = _seqs.Count == 0;
+                        }
 
-                            if (isSeqsEmpty)
+                        if (isSeqsEmpty)
+                        {
+                            using JsonDocument limitsDocument = await GetObjectModel("limits", "d99vn");
+                            if (limitsDocument.RootElement.TryGetProperty("key", out JsonElement limitsKey) && limitsKey.GetString()!.Equals("limits", StringComparison.InvariantCultureIgnoreCase) &&
+                                limitsDocument.RootElement.TryGetProperty("result", out JsonElement limitsResult))
                             {
-                                using JsonDocument limitsDocument = await GetObjectModel("limits", "d99vn");
-                                if (limitsDocument.RootElement.TryGetProperty("key", out JsonElement limitsKey) && limitsKey.GetString()!.Equals("limits", StringComparison.InvariantCultureIgnoreCase) &&
-                                    limitsDocument.RootElement.TryGetProperty("result", out JsonElement limitsResult))
-                                {
-                                    lock (Model)
-                                    {
-                                        Model.UpdateFromFirmwareJson("limits", limitsResult);
-                                    }
-                                }
-                            }
-
-                            // Request the next status update
-                            using JsonDocument statusDocument = await GetObjectModel(string.Empty, "d99fn");
-                            if (statusDocument.RootElement.TryGetProperty("key", out JsonElement statusKey) && string.IsNullOrEmpty(statusKey.GetString()) &&
-                                statusDocument.RootElement.TryGetProperty("result", out JsonElement statusResult))
-                            {
-                                // Update frequently changing properties
                                 lock (Model)
                                 {
-                                    Model.UpdateFromFirmwareJson(string.Empty, statusResult);
-                                    UpdateLayers();
-                                }
-
-                                // Update object model keys depending on the sequence numbers
-                                foreach (JsonProperty seqProperty in statusResult.GetProperty("seqs").EnumerateObject())
-                                {
-                                    if (seqProperty.Value.ValueKind == JsonValueKind.Number)
-                                    {
-                                        int seq, newSeq = seqProperty.Value.GetInt32();
-                                        lock (_seqs)
-                                        {
-                                            _seqs.TryGetValue(seqProperty.Name, out seq);
-                                        }
-
-                                        if (newSeq > seq)
-                                        {
-                                            if (seqProperty.Name == "reply")
-                                            {
-                                                await GetGCodeReply(newSeq);
-                                            }
-                                            else
-                                            {
-                                                int next = 0, offset = 0;
-                                                do
-                                                {
-                                                    // Request the next model chunk
-                                                    using JsonDocument keyDocument = await GetObjectModel(seqProperty.Name, (next == 0) ? "d99vno" : $"d99vnoa{next}");
-                                                    offset = next;
-                                                    next = keyDocument.RootElement.TryGetProperty("next", out JsonElement nextValue) ? nextValue.GetInt32() : 0;
-
-                                                    if (keyDocument.RootElement.TryGetProperty("key", out JsonElement keyName) &&
-                                                        keyDocument.RootElement.TryGetProperty("result", out JsonElement keyResult))
-                                                    {
-                                                        lock (_seqs)
-                                                        {
-                                                            _seqs[seqProperty.Name] = newSeq;
-                                                        }
-
-                                                        GCodeFileInfo? fileInfoToUpdate = null;
-                                                        lock (Model)
-                                                        {
-                                                            if (Model.UpdateFromFirmwareJson(keyName.GetString(), keyResult, offset, next == 0))
-                                                            {
-                                                                if (keyName.GetString() == "job" &&
-                                                                    Model.Job.File.Thumbnails.Count != 0 && _thumbnailFile != Model.Job.File.FileName)
-                                                                {
-                                                                    _thumbnailFile = Model.Job.File.FileName;
-                                                                    fileInfoToUpdate = (GCodeFileInfo)Model.Job.File.Clone();
-                                                                }
-                                                            }
-                                                            else
-                                                            {
-                                                                // Invalid key
-                                                                break;
-                                                            }
-                                                        }
-
-                                                        if (fileInfoToUpdate is not null)
-                                                        {
-                                                            await GetThumbnails(fileInfoToUpdate, _terminateSession.Token);
-                                                            lock (Model)
-                                                            {
-                                                                Model.Job.File.Thumbnails.Assign(fileInfoToUpdate.Thumbnails);
-                                                            }
-                                                        }
-
-                                                        // move.axes requires special querying if it exceeds limits.reporteAxes or 9 items
-                                                        if (keyName.GetString() == "move" && keyResult.TryGetProperty("axes", out JsonElement moveAxes) && moveAxes.GetArrayLength() >= (Model.Limits.ReportedAxes ?? 9))
-                                                        {
-                                                            int nextAxis = moveAxes.GetArrayLength(), axisOffset = 0;
-                                                            do
-                                                            {
-                                                                using JsonDocument moveAxesDocument = await GetObjectModel("move.axes", $"d99vnoa{nextAxis}");
-                                                                axisOffset = nextAxis;
-                                                                nextAxis = moveAxesDocument.RootElement.TryGetProperty("next", out JsonElement nextAxisValue) ? nextAxisValue.GetInt32() : 0;
-
-                                                                if (moveAxesDocument.RootElement.TryGetProperty("result", out JsonElement moveAxesResult))
-                                                                {
-                                                                    lock (Model)
-                                                                    {
-                                                                        Model.Move.Axes.UpdateFromJson(moveAxesResult, false, axisOffset, nextAxis == 0);
-                                                                    }
-                                                                }
-                                                            }
-                                                            while (nextAxis != 0);
-                                                        }
-                                                    }
-                                                }
-                                                while (next != 0);
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Object model is now up-to-date
-                                lock (_modelUpdateTcs)
-                                {
-                                    foreach (TaskCompletionSource<object?> tcs in _modelUpdateTcs)
-                                    {
-                                        tcs.TrySetResult(null);
-                                    }
-                                    _modelUpdateTcs.Clear();
+                                    Model.UpdateFromFirmwareJson("limits", limitsResult);
                                 }
                             }
-                            else
+                        }
+
+                        // Request the next status update
+                        using JsonDocument statusDocument = await GetObjectModel(string.Empty, "d99fn");
+                        if (statusDocument.RootElement.TryGetProperty("key", out JsonElement statusKey) && string.IsNullOrEmpty(statusKey.GetString()) &&
+                            statusDocument.RootElement.TryGetProperty("result", out JsonElement statusResult))
+                        {
+                            // Update frequently changing properties
+                            lock (Model)
                             {
-                                // Request only seqs.reply to know when to query rr_reply
-                                using JsonDocument replySeqDocument = await GetObjectModel("seqs.reply", string.Empty);
-                                if (replySeqDocument.RootElement.TryGetProperty("result", out JsonElement replySeqElement) &&
-                                    replySeqElement.ValueKind == JsonValueKind.Number)
+                                Model.UpdateFromFirmwareJson(string.Empty, statusResult);
+                                UpdateLayers();
+                            }
+
+                            // Update object model keys depending on the sequence numbers
+                            foreach (JsonProperty seqProperty in statusResult.GetProperty("seqs").EnumerateObject())
+                            {
+                                if (seqProperty.Value.ValueKind == JsonValueKind.Number)
                                 {
-                                    int seq, newSeq = replySeqElement.GetInt32();
+                                    int seq, newSeq = seqProperty.Value.GetInt32();
                                     lock (_seqs)
                                     {
-                                        _seqs.TryGetValue("reply", out seq);
+                                        _seqs.TryGetValue(seqProperty.Name, out seq);
                                     }
 
                                     if (newSeq > seq)
                                     {
-                                        await GetGCodeReply(newSeq);
+                                        if (seqProperty.Name == "reply")
+                                        {
+                                            await GetGCodeReply(newSeq);
+                                        }
+                                        else
+                                        {
+                                            int next = 0, offset = 0;
+                                            do
+                                            {
+                                                // Request the next model chunk
+                                                using JsonDocument keyDocument = await GetObjectModel(seqProperty.Name, (next == 0) ? "d99vno" : $"d99vnoa{next}");
+                                                offset = next;
+                                                next = keyDocument.RootElement.TryGetProperty("next", out JsonElement nextValue) ? nextValue.GetInt32() : 0;
+
+                                                if (keyDocument.RootElement.TryGetProperty("key", out JsonElement keyName) &&
+                                                    keyDocument.RootElement.TryGetProperty("result", out JsonElement keyResult))
+                                                {
+                                                    lock (_seqs)
+                                                    {
+                                                        _seqs[seqProperty.Name] = newSeq;
+                                                    }
+
+                                                    GCodeFileInfo? fileInfoToUpdate = null;
+                                                    lock (Model)
+                                                    {
+                                                        if (Model.UpdateFromFirmwareJson(keyName.GetString(), keyResult, offset, next == 0))
+                                                        {
+                                                            if (keyName.GetString() == "job" &&
+                                                                Model.Job.File.Thumbnails.Count != 0 && _thumbnailFile != Model.Job.File.FileName)
+                                                            {
+                                                                _thumbnailFile = Model.Job.File.FileName;
+                                                                fileInfoToUpdate = (GCodeFileInfo)Model.Job.File.Clone();
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            // Invalid key
+                                                            break;
+                                                        }
+                                                    }
+
+                                                    if (fileInfoToUpdate is not null)
+                                                    {
+                                                        await GetThumbnails(fileInfoToUpdate, _terminateSession.Token);
+                                                        lock (Model)
+                                                        {
+                                                            Model.Job.File.Thumbnails.Assign(fileInfoToUpdate.Thumbnails);
+                                                        }
+                                                    }
+
+                                                    // move.axes requires special querying if it exceeds limits.reporteAxes or 9 items
+                                                    if (keyName.GetString() == "move" && keyResult.TryGetProperty("axes", out JsonElement moveAxes) && moveAxes.GetArrayLength() >= (Model.Limits.ReportedAxes ?? 9))
+                                                    {
+                                                        int nextAxis = moveAxes.GetArrayLength(), axisOffset = 0;
+                                                        do
+                                                        {
+                                                            using JsonDocument moveAxesDocument = await GetObjectModel("move.axes", $"d99vnoa{nextAxis}");
+                                                            axisOffset = nextAxis;
+                                                            nextAxis = moveAxesDocument.RootElement.TryGetProperty("next", out JsonElement nextAxisValue) ? nextAxisValue.GetInt32() : 0;
+
+                                                            if (moveAxesDocument.RootElement.TryGetProperty("result", out JsonElement moveAxesResult))
+                                                            {
+                                                                lock (Model)
+                                                                {
+                                                                    Model.Move.Axes.UpdateFromJson(moveAxesResult, false, axisOffset, nextAxis == 0);
+                                                                }
+                                                            }
+                                                        }
+                                                        while (nextAxis != 0);
+                                                    }
+                                                }
+                                            }
+                                            while (next != 0);
+                                        }
                                     }
+                                }
+                            }
+
+                            // Object model is now up-to-date
+                            lock (_modelUpdateTcs)
+                            {
+                                foreach (TaskCompletionSource<object?> tcs in _modelUpdateTcs)
+                                {
+                                    tcs.TrySetResult(null);
+                                }
+                                _modelUpdateTcs.Clear();
+                            }
+                        }
+                        else
+                        {
+                            // Request only seqs.reply to know when to query rr_reply
+                            using JsonDocument replySeqDocument = await GetObjectModel("seqs.reply", string.Empty);
+                            if (replySeqDocument.RootElement.TryGetProperty("result", out JsonElement replySeqElement) &&
+                                replySeqElement.ValueKind == JsonValueKind.Number)
+                            {
+                                int seq, newSeq = replySeqElement.GetInt32();
+                                lock (_seqs)
+                                {
+                                    _seqs.TryGetValue("reply", out seq);
+                                }
+
+                                if (newSeq > seq)
+                                {
+                                    await GetGCodeReply(newSeq);
                                 }
                             }
                         }
                     }
-                    catch (Exception e) when (e is OperationCanceledException || e is HttpRequestException)
+                }
+                catch (Exception e) when (e is OperationCanceledException || e is HttpRequestException)
+                {
+                    // This happens when the remote end is offline or unavailable
+                    lock (Model)
                     {
-                        // This happens when the remote end is offline or unavailable
-                        lock (Model)
-                        {
-                            Model.State.Status = MachineStatus.Disconnected;
-                            Model.Global.Clear();
-                        }
-                    }
-
-                    // Wait a moment before attempting to reconnect
-                    try
-                    {
-                        await Task.Delay(Options.RetryDelay, _terminateSession.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        // can only occur if the session is disposed
+                        Model.State.Status = MachineStatus.Disconnected;
+                        Model.Global.Clear();
                     }
                 }
-                while (!_terminateSession.IsCancellationRequested);
+
+                // Wait a moment before attempting to reconnect
+                try
+                {
+                    await Task.Delay(Options.RetryDelay, _terminateSession.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // can only occur if the session is disposed
+                }
             }
-            finally
+            while (!_terminateSession.IsCancellationRequested);
+        }
+        finally
+        {
+            _sessionTaskTerminated.SetResult(null);
+        }
+    }
+
+    /// <summary>
+    /// Number of the last layer
+    /// </summary>
+    private int _lastLayer = -1;
+
+    /// <summary>
+    /// Last recorded print duration
+    /// </summary>
+    private int _lastDuration;
+
+    /// <summary>
+    /// Filament usage at the time of the last layer change
+    /// </summary>
+    private List<float> _lastFilamentUsage = [];
+
+    /// <summary>
+    /// Last file position at the time of the last layer change
+    /// </summary>
+    private long _lastFilePosition;
+
+    /// <summary>
+    /// Last known Z height
+    /// </summary>
+    private float _lastHeight;
+
+    /// <summary>
+    /// Update the layers
+    /// </summary>
+    private void UpdateLayers()
+    {
+        // Are we printing?
+        if (Model.Job.Duration is null)
+        {
+            if (_lastLayer != -1)
             {
-                _sessionTaskTerminated.SetResult(null);
+                _lastLayer = -1;
+                _lastDuration = 0;
+                _lastFilamentUsage.Clear();
+                _lastFilePosition = 0L;
+                _lastHeight = 0F;
+            }
+            return;
+        }
+
+        // Reset the layers when a new print is started
+        if (_lastLayer == -1)
+        {
+            _lastLayer = 0;
+            Model.Job.Layers.Clear();
+        }
+
+        // Don't continue from here unless the layer number is known
+        if (Model.Job.Layer is null)
+        {
+            return;
+        }
+
+        int numChangedLayers = Math.Abs(Model.Job.Layer.Value - _lastLayer);
+        if (numChangedLayers > 0 && Model.Job.Layer.Value > 0 && _lastLayer > 0)
+        {
+            // Compute average stats per changed layer
+            int printDuration = Model.Job.Duration.Value - (Model.Job.WarmUpDuration is not null ? Model.Job.WarmUpDuration.Value : 0);
+            float avgLayerDuration = (printDuration - _lastDuration) / numChangedLayers;
+            List<float> totalFilamentUsage = [], avgFilamentUsage = [];
+            long bytesPrinted = (Model.Job.FilePosition is not null) ? (Model.Job.FilePosition.Value - _lastFilePosition) : 0L;
+            float avgFractionPrinted = (Model.Job.File.Size > 0) ? (float)bytesPrinted / (Model.Job.File.Size * numChangedLayers) : 0F;
+            for (int i = 0; i < Model.Move.Extruders.Count; i++)
+            {
+                Extruder? extruder = Model.Move.Extruders[i];
+                if (extruder is not null)
+                {
+                    float lastFilamentUsage = (i < _lastFilamentUsage.Count) ? _lastFilamentUsage[i] : 0F;
+                    totalFilamentUsage.Add(extruder.RawPosition);
+                    avgFilamentUsage.Add((extruder.RawPosition - lastFilamentUsage) / numChangedLayers);
+                }
+            }
+            float currentHeight = 0F;
+            foreach (Axis axis in Model.Move.Axes)
+            {
+                if (axis is not null && axis.Letter == 'Z' && axis.UserPosition is not null)
+                {
+                    currentHeight = axis.UserPosition.Value;
+                    break;
+                }
+            }
+            float avgHeight = Math.Abs(currentHeight - _lastHeight) / numChangedLayers;
+
+            // Add missing layers
+            for (int i = Model.Job.Layers.Count; i < Model.Job.Layer.Value - 1; i++)
+            {
+                Layer newLayer = new();
+                foreach (AnalogSensor? sensor in Model.Sensors.Analog)
+                {
+                    if (sensor is not null)
+                    {
+                        newLayer.Temperatures.Add(sensor.LastReading);
+                    }
+                }
+                newLayer.Height = avgHeight;
+                Model.Job.Layers.Add(newLayer);
+            }
+
+            // Merge data
+            for (int i = Math.Min(_lastLayer, Model.Job.Layer.Value); i < Math.Max(_lastLayer, Model.Job.Layer.Value); i++)
+            {
+                Layer layer = Model.Job.Layers[i - 1];
+                layer.Duration += avgLayerDuration;
+                for (int k = 0; k < avgFilamentUsage.Count; k++)
+                {
+                    if (k >= layer.Filament.Count)
+                    {
+                        layer.Filament.Add(avgFilamentUsage[k]);
+                    }
+                    else
+                    {
+                        layer.Filament[k] += avgFilamentUsage[k];
+                    }
+                }
+                layer.FractionPrinted += avgFractionPrinted;
+            }
+
+            // Record values for the next layer change
+            _lastDuration = printDuration;
+            _lastFilamentUsage = totalFilamentUsage;
+            _lastFilePosition = Model.Job.FilePosition ?? 0L;
+            _lastHeight = currentHeight;
+        }
+        _lastLayer = Model.Job.Layer.Value;
+    }
+
+    /// <summary>
+    /// Indicates if this instance has been disposed
+    /// </summary>
+    private bool disposed;
+
+    /// <summary>
+    /// Dispose this instance and the corresponding session
+    /// </summary>
+    /// <returns>Asynchronous task</returns>
+    public override async ValueTask DisposeAsync()
+    {
+        lock (this)
+        {
+            if (disposed)
+            {
+                return;
+            }
+            disposed = true;
+        }
+
+        // Terminate the session and wait for it
+        _terminateSession.Cancel();
+        await _sessionTaskTerminated.Task;
+
+        // Cancel all running codes
+        lock (_runningCodes)
+        {
+            foreach (TaskCompletionSource<string> tcs in _runningCodes.Keys)
+            {
+                tcs.SetCanceled();
+            }
+            _runningCodes.Clear();
+        }
+
+        // Disconnect if possible
+        try
+        {
+            using CancellationTokenSource cts = new(Options.Timeout);
+            await HttpClient.GetAsync("rr_disconnect", cts.Token);
+        }
+        catch
+        {
+            // ignored
+        }
+
+        // Dispose of the HTTP client
+        HttpClient.Dispose();
+    }
+
+    /// <summary>
+    /// Send a G/M/T-code and return the G-code reply
+    /// </summary>
+    /// <param name="code">Code to send</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Code reply</returns>
+    public override Task<string> SendCode(string code, CancellationToken cancellationToken = default) => SendCode(code, false, cancellationToken);
+
+    /// <summary>
+    /// Send a G/M/T-code and return the G-code reply
+    /// </summary>
+    /// <param name="code">Code to send</param>
+    /// <param name="executeAsynchronously">Don't wait for the code to finish</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Code reply</returns>
+    public override async Task<string> SendCode(string code, bool executeAsynchronously, CancellationToken cancellationToken = default)
+    {
+        // Check if we can expect a code reply at all
+        bool canAwaitCode = false;
+        using (StringReader codeStream = new(code))
+        {
+            Code codeObj = new();
+            while (Code.Parse(codeStream, codeObj))
+            {
+                if (codeObj.Type != CodeType.Comment &&
+                    (codeObj.Type != CodeType.MCode || (codeObj.MajorNumber != 997 && codeObj.MajorNumber != 999)))
+                {
+                    canAwaitCode = !executeAsynchronously;
+                    break;
+                }
+                codeObj.Reset();
             }
         }
 
-        /// <summary>
-        /// Number of the last layer
-        /// </summary>
-        private int _lastLayer = -1;
-
-        /// <summary>
-        /// Last recorded print duration
-        /// </summary>
-        private int _lastDuration;
-
-        /// <summary>
-        /// Filament usage at the time of the last layer change
-        /// </summary>
-        private List<float> _lastFilamentUsage = [];
-
-        /// <summary>
-        /// Last file position at the time of the last layer change
-        /// </summary>
-        private long _lastFilePosition;
-
-        /// <summary>
-        /// Last known Z height
-        /// </summary>
-        private float _lastHeight;
-
-        /// <summary>
-        /// Update the layers
-        /// </summary>
-        private void UpdateLayers()
+        // Get the current reply sequence number
+        int replySeq;
+        lock (_seqs)
         {
-            // Are we printing?
-            if (Model.Job.Duration is null)
+            if (!_seqs.TryGetValue("reply", out replySeq))
             {
-                if (_lastLayer != -1)
-                {
-                    _lastLayer = -1;
-                    _lastDuration = 0;
-                    _lastFilamentUsage.Clear();
-                    _lastFilePosition = 0L;
-                    _lastHeight = 0F;
-                }
-                return;
+                replySeq = -1;
             }
-
-            // Reset the layers when a new print is started
-            if (_lastLayer == -1)
-            {
-                _lastLayer = 0;
-                Model.Job.Layers.Clear();
-            }
-
-            // Don't continue from here unless the layer number is known
-            if (Model.Job.Layer is null)
-            {
-                return;
-            }
-
-            int numChangedLayers = Math.Abs(Model.Job.Layer.Value - _lastLayer);
-            if (numChangedLayers > 0 && Model.Job.Layer.Value > 0 && _lastLayer > 0)
-            {
-                // Compute average stats per changed layer
-                int printDuration = Model.Job.Duration.Value - (Model.Job.WarmUpDuration is not null ? Model.Job.WarmUpDuration.Value : 0);
-                float avgLayerDuration = (printDuration - _lastDuration) / numChangedLayers;
-                List<float> totalFilamentUsage = [], avgFilamentUsage = [];
-                long bytesPrinted = (Model.Job.FilePosition is not null) ? (Model.Job.FilePosition.Value - _lastFilePosition) : 0L;
-                float avgFractionPrinted = (Model.Job.File.Size > 0) ? (float)bytesPrinted / (Model.Job.File.Size * numChangedLayers) : 0F;
-                for (int i = 0; i < Model.Move.Extruders.Count; i++)
-                {
-                    Extruder? extruder = Model.Move.Extruders[i];
-                    if (extruder is not null)
-                    {
-                        float lastFilamentUsage = (i < _lastFilamentUsage.Count) ? _lastFilamentUsage[i] : 0F;
-                        totalFilamentUsage.Add(extruder.RawPosition);
-                        avgFilamentUsage.Add((extruder.RawPosition - lastFilamentUsage) / numChangedLayers);
-                    }
-                }
-                float currentHeight = 0F;
-                foreach (Axis axis in Model.Move.Axes)
-                {
-                    if (axis is not null && axis.Letter == 'Z' && axis.UserPosition is not null)
-                    {
-                        currentHeight = axis.UserPosition.Value;
-                        break;
-                    }
-                }
-                float avgHeight = Math.Abs(currentHeight - _lastHeight) / numChangedLayers;
-
-                // Add missing layers
-                for (int i = Model.Job.Layers.Count; i < Model.Job.Layer.Value - 1; i++)
-                {
-                    Layer newLayer = new();
-                    foreach (AnalogSensor? sensor in Model.Sensors.Analog)
-                    {
-                        if (sensor is not null)
-                        {
-                            newLayer.Temperatures.Add(sensor.LastReading);
-                        }
-                    }
-                    newLayer.Height = avgHeight;
-                    Model.Job.Layers.Add(newLayer);
-                }
-
-                // Merge data
-                for (int i = Math.Min(_lastLayer, Model.Job.Layer.Value); i < Math.Max(_lastLayer, Model.Job.Layer.Value); i++)
-                {
-                    Layer layer = Model.Job.Layers[i - 1];
-                    layer.Duration += avgLayerDuration;
-                    for (int k = 0; k < avgFilamentUsage.Count; k++)
-                    {
-                        if (k >= layer.Filament.Count)
-                        {
-                            layer.Filament.Add(avgFilamentUsage[k]);
-                        }
-                        else
-                        {
-                            layer.Filament[k] += avgFilamentUsage[k];
-                        }
-                    }
-                    layer.FractionPrinted += avgFractionPrinted;
-                }
-
-                // Record values for the next layer change
-                _lastDuration = printDuration;
-                _lastFilamentUsage = totalFilamentUsage;
-                _lastFilePosition = Model.Job.FilePosition ?? 0L;
-                _lastHeight = currentHeight;
-            }
-            _lastLayer = Model.Job.Layer.Value;
         }
 
-        /// <summary>
-        /// Indicates if this instance has been disposed
-        /// </summary>
-        private bool disposed;
-
-        /// <summary>
-        /// Dispose this instance and the corresponding session
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public override async ValueTask DisposeAsync()
+        // Make sure we know when to resolve the requested code
+        if (replySeq == -1 && canAwaitCode)
         {
-            lock (this)
+            using JsonDocument replySeqDocument = await GetObjectModel("seqs.reply", string.Empty);
+            if (replySeqDocument.RootElement.TryGetProperty("result", out JsonElement replySeqElement) &&
+                replySeqElement.ValueKind == JsonValueKind.Number)
             {
-                if (disposed)
-                {
-                    return;
-                }
-                disposed = true;
+                replySeq = replySeqElement.GetInt32();
+                await GetGCodeReply(replySeq);
             }
+        }
 
-            // Terminate the session and wait for it
-            _terminateSession.Cancel();
-            await _sessionTaskTerminated.Task;
-
-            // Cancel all running codes
-            lock (_runningCodes)
-            {
-                foreach (TaskCompletionSource<string> tcs in _runningCodes.Keys)
-                {
-                    tcs.SetCanceled();
-                }
-                _runningCodes.Clear();
-            }
-
-            // Disconnect if possible
+        // Send it to RRF
+        Task<string>? codeTask = null;
+        string errorMessage = "Invalid number of maximum retries configured";
+        for (int i = 0; i <= Options.MaxRetries; i++)
+        {
             try
             {
-                using CancellationTokenSource cts = new(Options.Timeout);
-                await HttpClient.GetAsync("rr_disconnect", cts.Token);
-            }
-            catch
-            {
-                // ignored
-            }
-
-            // Dispose of the HTTP client
-            HttpClient.Dispose();
-        }
-
-        /// <summary>
-        /// Send a G/M/T-code and return the G-code reply
-        /// </summary>
-        /// <param name="code">Code to send</param>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Code reply</returns>
-        public override Task<string> SendCode(string code, CancellationToken cancellationToken = default) => SendCode(code, false, cancellationToken);
-
-        /// <summary>
-        /// Send a G/M/T-code and return the G-code reply
-        /// </summary>
-        /// <param name="code">Code to send</param>
-        /// <param name="executeAsynchronously">Don't wait for the code to finish</param>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Code reply</returns>
-        public override async Task<string> SendCode(string code, bool executeAsynchronously, CancellationToken cancellationToken = default)
-        {
-            // Check if we can expect a code reply at all
-            bool canAwaitCode = false;
-            using (StringReader codeStream = new(code))
-            {
-                Code codeObj = new();
-                while (Code.Parse(codeStream, codeObj))
+                using HttpRequestMessage request = new(HttpMethod.Get, $"rr_gcode?gcode={HttpUtility.UrlPathEncode(code)}");
+                using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                if (response.IsSuccessStatusCode)
                 {
-                    if (codeObj.Type != CodeType.Comment &&
-                        (codeObj.Type != CodeType.MCode || (codeObj.MajorNumber != 997 && codeObj.MajorNumber != 999)))
-                    {
-                        canAwaitCode = !executeAsynchronously;
-                        break;
-                    }
-                    codeObj.Reset();
-                }
-            }
-
-            // Get the current reply sequence number
-            int replySeq;
-            lock (_seqs)
-            {
-                if (!_seqs.TryGetValue("reply", out replySeq))
-                {
-                    replySeq = -1;
-                }
-            }
-
-            // Make sure we know when to resolve the requested code
-            if (replySeq == -1 && canAwaitCode)
-            {
-                using JsonDocument replySeqDocument = await GetObjectModel("seqs.reply", string.Empty);
-                if (replySeqDocument.RootElement.TryGetProperty("result", out JsonElement replySeqElement) &&
-                    replySeqElement.ValueKind == JsonValueKind.Number)
-                {
-                    replySeq = replySeqElement.GetInt32();
-                    await GetGCodeReply(replySeq);
-                }
-            }
-
-            // Send it to RRF
-            Task<string>? codeTask = null;
-            string errorMessage = "Invalid number of maximum retries configured";
-            for (int i = 0; i <= Options.MaxRetries; i++)
-            {
-                try
-                {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_gcode?gcode={HttpUtility.UrlPathEncode(code)}");
-                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
-                    if (response.IsSuccessStatusCode)
-                    {
-                        // Make sure the full G-code could be stored
+                    // Make sure the full G-code could be stored
 #if NET6_0_OR_GREATER
-                        using (Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken))
+                    using (Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken))
 #else
-                        using (Stream responseStream = await response.Content.ReadAsStreamAsync())
+                    using (Stream responseStream = await response.Content.ReadAsStreamAsync())
 #endif
-                        {
-                            Responses.GcodeReply responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.GcodeReply, cancellationToken))!;
-                            if (responseObj.Buff == 0)
-                            {
-                                throw new ArgumentException("G-code buffer is full");
-                            }
-                        }
-
-                        // Stop here if no reply can be expected
-                        if (!canAwaitCode)
-                        {
-                            return string.Empty;
-                        }
-
-                        // Enqueue this code request
-                        TaskCompletionSource<string> codeRequest = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                        lock (_runningCodes)
-                        {
-                            _runningCodes.Add(codeRequest, replySeq);
-                        }
-                        codeTask = codeRequest.Task;
-                        break;
-                    }
-
-                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                    if (response.StatusCode == HttpStatusCode.ServiceUnavailable)
                     {
-                        await Task.Delay(Options.RetryDelay, cancellationToken);
+                        Responses.GcodeReply responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.GcodeReply, cancellationToken))!;
+                        if (responseObj.Buff == 0)
+                        {
+                            throw new ArgumentException("G-code buffer is full");
+                        }
                     }
-                    else if (response.StatusCode >= HttpStatusCode.InternalServerError)
+
+                    // Stop here if no reply can be expected
+                    if (!canAwaitCode)
                     {
-                        break;
+                        return string.Empty;
                     }
+
+                    // Enqueue this code request
+                    TaskCompletionSource<string> codeRequest = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                    lock (_runningCodes)
+                    {
+                        _runningCodes.Add(codeRequest, replySeq);
+                    }
+                    codeTask = codeRequest.Task;
+                    break;
                 }
-                catch (OperationCanceledException oce)
+
+                errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                if (response.StatusCode == HttpStatusCode.ServiceUnavailable)
                 {
-                    if (cancellationToken.IsCancellationRequested || _terminateSession.IsCancellationRequested)
-                    {
-                        throw;
-                    }
-                    errorMessage = oce.Message;
+                    await Task.Delay(Options.RetryDelay, cancellationToken);
+                }
+                else if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                {
+                    break;
                 }
             }
-
-            // Code has been started or it could not be transmitted
-            if (codeTask is not null)
+            catch (OperationCanceledException oce)
             {
-                return await codeTask;
+                if (cancellationToken.IsCancellationRequested || _terminateSession.IsCancellationRequested)
+                {
+                    throw;
+                }
+                errorMessage = oce.Message;
             }
-            throw new HttpRequestException(errorMessage);
         }
 
-        /// <summary>
-        /// Get the G-code reply
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        private async Task GetGCodeReply(int seq)
+        // Code has been started or it could not be transmitted
+        if (codeTask is not null)
         {
-            string errorMessage = "Invalid number of maximum retries configured";
-            for (int i = 0; i <= Options.MaxRetries; i++)
+            return await codeTask;
+        }
+        throw new HttpRequestException(errorMessage);
+    }
+
+    /// <summary>
+    /// Get the G-code reply
+    /// </summary>
+    /// <returns>Asynchronous task</returns>
+    private async Task GetGCodeReply(int seq)
+    {
+        string errorMessage = "Invalid number of maximum retries configured";
+        for (int i = 0; i <= Options.MaxRetries; i++)
+        {
+            try
             {
-                try
+                using HttpRequestMessage request = new(HttpMethod.Get, "rr_reply");
+                using HttpResponseMessage response = await SendRequest(request, Options.Timeout, _terminateSession.Token);
+                if (response.IsSuccessStatusCode)
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, "rr_reply");
-                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, _terminateSession.Token);
-                    if (response.IsSuccessStatusCode)
+                    // Get the reply and update the sequence number
+                    string gcodeReply = await response.Content.ReadAsStringAsync();
+                    lock (_seqs)
                     {
-                        // Get the reply and update the sequence number
-                        string gcodeReply = await response.Content.ReadAsStringAsync();
-                        lock (_seqs)
-                        {
-                            _seqs["reply"] = seq;
-                        }
+                        _seqs["reply"] = seq;
+                    }
 
-                        // Check if a code is waiting to be resolved
-                        bool codeHandled = false;
-                        lock (_runningCodes)
+                    // Check if a code is waiting to be resolved
+                    bool codeHandled = false;
+                    lock (_runningCodes)
+                    {
+                        foreach (var kv in _runningCodes)
                         {
-                            foreach (var kv in _runningCodes)
+                            if (seq > kv.Value)
                             {
-                                if (seq > kv.Value)
-                                {
-                                    kv.Key.SetResult(gcodeReply);
-                                    codeHandled = true;
-                                }
-                            }
-
-                            foreach (TaskCompletionSource<string> codeTask in _runningCodes.Keys.ToList())
-                            {
-                                if (codeTask.Task.IsCompleted)
-                                {
-                                    _runningCodes.Remove(codeTask);
-                                }
+                                kv.Key.SetResult(gcodeReply);
+                                codeHandled = true;
                             }
                         }
 
-                        // If not, check if the message can be stored
-                        if (!codeHandled && Options.ObserveMessages)
+                        foreach (TaskCompletionSource<string> codeTask in _runningCodes.Keys.ToList())
                         {
-                            lock (Model)
+                            if (codeTask.Task.IsCompleted)
                             {
-                                if (gcodeReply.StartsWith("Error: "))
-                                {
-                                    Model.Messages.Add(new Message(MessageType.Error, gcodeReply.Substring("Error: ".Length)));
-                                }
-                                else if (gcodeReply.StartsWith("Warning: "))
-                                {
-                                    Model.Messages.Add(new Message(MessageType.Warning, gcodeReply.Substring("Warning: ".Length)));
-                                }
-                                else
-                                {
-                                    Model.Messages.Add(new Message(MessageType.Success, gcodeReply));
-                                }
+                                _runningCodes.Remove(codeTask);
                             }
                         }
+                    }
+
+                    // If not, check if the message can be stored
+                    if (!codeHandled && Options.ObserveMessages)
+                    {
+                        lock (Model)
+                        {
+                            if (gcodeReply.StartsWith("Error: "))
+                            {
+                                Model.Messages.Add(new Message(MessageType.Error, gcodeReply.Substring("Error: ".Length)));
+                            }
+                            else if (gcodeReply.StartsWith("Warning: "))
+                            {
+                                Model.Messages.Add(new Message(MessageType.Warning, gcodeReply.Substring("Warning: ".Length)));
+                            }
+                            else
+                            {
+                                Model.Messages.Add(new Message(MessageType.Success, gcodeReply));
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                {
+                    break;
+                }
+            }
+            catch (OperationCanceledException oce)
+            {
+                if (_terminateSession.IsCancellationRequested)
+                {
+                    throw;
+                }
+                errorMessage = oce.Message;
+            }
+        }
+        throw new HttpRequestException(errorMessage);
+    }
+
+    /// <summary>
+    /// Upload arbitrary content to a file
+    /// </summary>
+    /// <param name="filename">Target filename</param>
+    /// <param name="content">File content</param>
+    /// <param name="lastModified">Last modified datetime. Ignored in SBC mode</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public override async Task Upload(string filename, Stream content, DateTime? lastModified = null, CancellationToken cancellationToken = default)
+    {
+        // Compute the CRC32 checksum
+        Crc32 crc32 = new();
+        string checksum = string.Empty;
+        foreach (byte b in crc32.ComputeHash(content))
+        {
+            checksum += b.ToString("x2").ToLower();
+        }
+        content.Seek(0, SeekOrigin.Begin);
+
+        // Try to upload it
+        string query = (lastModified is not null) ? $"rr_upload?name={HttpUtility.UrlPathEncode(filename)}&time={lastModified:s}&crc32={checksum}" : $"rr_upload?name={HttpUtility.UrlPathEncode(filename)}&crc32={checksum}";
+        using HttpRequestMessage request = new(HttpMethod.Post, query);
+        request.Content = new StreamContent(content);
+
+        // Check if that worked
+        using HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+#if NET6_0_OR_GREATER
+        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+#else
+        using Stream responseStream = await response.Content.ReadAsStreamAsync();
+#endif
+        Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken))!;
+        if (responseObj.Err != 0)
+        {
+            throw new HttpRequestException($"rr_upload returned err {responseObj.Err}");
+        }
+    }
+
+    /// <summary>
+    /// Delete a file or directory
+    /// </summary>
+    /// <param name="filename">Target filename</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public override async Task Delete(string filename, CancellationToken cancellationToken = default)
+    {
+        string errorMessage = "Invalid number of maximum retries configured";
+        for (int i = 0; i <= Options.MaxRetries; i++)
+        {
+            try
+            {
+                using HttpRequestMessage request = new(HttpMethod.Get, $"rr_delete?name={HttpUtility.UrlPathEncode(filename)}");
+                using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                if (response.IsSuccessStatusCode)
+                {
+#if NET6_0_OR_GREATER
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+#else
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync();
+#endif
+                    Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken))!;
+                    if (responseObj.Err == 0)
+                    {
                         return;
                     }
+                    else if (responseObj.Err == 1)
+                    {
+                        throw new FileNotFoundException();
+                    }
+                    else
+                    {
+                        throw new HttpRequestException($"rr_delete returned err {responseObj.Err}");
+                    }
+                }
+
+                errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                {
+                    break;
+                }
+            }
+            catch (OperationCanceledException oce)
+            {
+                if (cancellationToken.IsCancellationRequested || _terminateSession.IsCancellationRequested)
+                {
+                    throw;
+                }
+                errorMessage = oce.Message;
+            }
+        }
+        throw new HttpRequestException(errorMessage);
+    }
+
+    /// <summary>
+    /// Move a file or directory
+    /// </summary>
+    /// <param name="from">Source file</param>
+    /// <param name="to">Destination file</param>
+    /// <param name="force">Overwrite file if it already exists</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public override async Task Move(string from, string to, bool force = false, CancellationToken cancellationToken = default)
+    {
+        string errorMessage = "Invalid number of maximum retries configured";
+        for (int i = 0; i <= Options.MaxRetries; i++)
+        {
+            try
+            {
+                using HttpRequestMessage request = new(HttpMethod.Get, $"rr_move?old={HttpUtility.UrlPathEncode(from)}&new={HttpUtility.UrlPathEncode(to)}&deleteexisting={(force ? "yes" : "no")}");
+                using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                if (response.IsSuccessStatusCode)
+                {
+#if NET6_0_OR_GREATER
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+#else
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync();
+#endif
+                    Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken))!;
+                    if (responseObj.Err == 0)
+                    {
+                        return;
+                    }
+                    else if (responseObj.Err == 1)
+                    {
+                        throw new FileNotFoundException();
+                    }
+                    else
+                    {
+                        throw new HttpRequestException($"rr_move returned err {responseObj.Err}");
+                    }
+                }
+
+                errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                {
+                    break;
+                }
+            }
+            catch (OperationCanceledException oce)
+            {
+                if (cancellationToken.IsCancellationRequested || _terminateSession.IsCancellationRequested)
+                {
+                    throw;
+                }
+                errorMessage = oce.Message;
+            }
+        }
+        throw new HttpRequestException(errorMessage);
+    }
+
+    /// <summary>
+    /// Make a new directory
+    /// </summary>
+    /// <param name="directory">Target directory</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public override async Task MakeDirectory(string directory, CancellationToken cancellationToken = default)
+    {
+        string errorMessage = "Invalid number of maximum retries configured";
+        for (int i = 0; i <= Options.MaxRetries; i++)
+        {
+            try
+            {
+                using HttpRequestMessage request = new(HttpMethod.Get, $"rr_mkdir?dir={HttpUtility.UrlPathEncode(directory)}");
+                using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                if (response.IsSuccessStatusCode)
+                {
+#if NET6_0_OR_GREATER
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+#else
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync();
+#endif
+                    Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken))!;
+                    if (responseObj.Err == 0)
+                    {
+                        return;
+                    }
+                    else
+                    {
+                        throw new HttpRequestException($"rr_mkdir returned err {responseObj.Err}");
+                    }
+                }
+
+                errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                {
+                    break;
+                }
+            }
+            catch (OperationCanceledException oce)
+            {
+                if (cancellationToken.IsCancellationRequested || _terminateSession.IsCancellationRequested)
+                {
+                    throw;
+                }
+                errorMessage = oce.Message;
+            }
+        }
+        throw new HttpRequestException(errorMessage);
+    }
+
+    /// <summary>
+    /// Download a file
+    /// </summary>
+    /// <param name="filename">Name of the file to download</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Disposable download response</returns>
+    public override async Task<HttpResponseMessage> Download(string filename, CancellationToken cancellationToken = default)
+    {
+        using HttpRequestMessage request = new(HttpMethod.Get, $"rr_download?name={HttpUtility.UrlPathEncode(filename)}");
+        HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new FileNotFoundException();
+        }
+
+        response.EnsureSuccessStatusCode();
+        return response;
+    }
+
+    /// <summary>
+    /// Enumerate all files and directories in the given directory
+    /// </summary>
+    /// <param name="directory">Directory to query</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>List of all files and directories</returns>
+    public override async Task<IList<FileListItem>> GetFileList(string directory, CancellationToken cancellationToken = default)
+    {
+        List<FileListItem> result = [];
+
+        int nextIndex = 0;
+        do
+        {
+            string errorMessage = "Invalid number of maximum retries configured";
+            for (int i = 0; i <= Options.MaxRetries; i++)
+            {
+                try
+                {
+                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_filelist?dir={HttpUtility.UrlPathEncode(directory)}&first={nextIndex}");
+                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+#if NET6_0_OR_GREATER
+                        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+#else
+                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
+#endif
+                        Responses.FileListResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.FileListResponse, cancellationToken))!;
+                        if (responseObj.Err == 0)
+                        {
+                            foreach (Responses.FileItem item in responseObj.Files)
+                            {
+                                result.Add(new FileListItem()
+                                {
+                                    Filename = item.Name,
+                                    IsDirectory = item.Type == 'd',
+                                    LastModified = item.Date,
+                                    Size = item.Size
+                                });
+                            }
+                            nextIndex = responseObj.Next;
+                        }
+                        else if (responseObj.Err == 2)
+                        {
+                            throw new DirectoryNotFoundException();
+                        }
+                        else
+                        {
+                            throw new HttpRequestException($"rr_filelist returned err {responseObj.Err}");
+                        }
+                        break;
+                    }
 
                     errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
                     if (response.StatusCode >= HttpStatusCode.InternalServerError)
@@ -837,444 +1131,149 @@ namespace DuetHttpClient.Connector
                 }
                 catch (OperationCanceledException oce)
                 {
-                    if (_terminateSession.IsCancellationRequested)
+                    if (cancellationToken.IsCancellationRequested || _terminateSession.IsCancellationRequested)
                     {
                         throw;
                     }
                     errorMessage = oce.Message;
                 }
-            }
-            throw new HttpRequestException(errorMessage);
-        }
 
-        /// <summary>
-        /// Upload arbitrary content to a file
-        /// </summary>
-        /// <param name="filename">Target filename</param>
-        /// <param name="content">File content</param>
-        /// <param name="lastModified">Last modified datetime. Ignored in SBC mode</param>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Asynchronous task</returns>
-        public override async Task Upload(string filename, Stream content, DateTime? lastModified = null, CancellationToken cancellationToken = default)
-        {
-            // Compute the CRC32 checksum
-            Crc32 crc32 = new();
-            string checksum = string.Empty;
-            foreach (byte b in crc32.ComputeHash(content))
-            {
-                checksum += b.ToString("x2").ToLower();
-            }
-            content.Seek(0, SeekOrigin.Begin);
-
-            // Try to upload it
-            string query = (lastModified is not null) ? $"rr_upload?name={HttpUtility.UrlPathEncode(filename)}&time={lastModified:s}&crc32={checksum}" : $"rr_upload?name={HttpUtility.UrlPathEncode(filename)}&crc32={checksum}";
-            using HttpRequestMessage request = new(HttpMethod.Post, query);
-            request.Content = new StreamContent(content);
-
-            // Check if that worked
-            using HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
-            response.EnsureSuccessStatusCode();
-
-#if NET6_0_OR_GREATER
-            using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-#else
-            using Stream responseStream = await response.Content.ReadAsStreamAsync();
-#endif
-            Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken))!;
-            if (responseObj.Err != 0)
-            {
-                throw new HttpRequestException($"rr_upload returned err {responseObj.Err}");
-            }
-        }
-
-        /// <summary>
-        /// Delete a file or directory
-        /// </summary>
-        /// <param name="filename">Target filename</param>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Asynchronous task</returns>
-        public override async Task Delete(string filename, CancellationToken cancellationToken = default)
-        {
-            string errorMessage = "Invalid number of maximum retries configured";
-            for (int i = 0; i <= Options.MaxRetries; i++)
-            {
-                try
+                if (i == Options.MaxRetries)
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_delete?name={HttpUtility.UrlPathEncode(filename)}");
-                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
-                    if (response.IsSuccessStatusCode)
-                    {
+                    throw new HttpRequestException(errorMessage);
+                }
+            }
+        } while (nextIndex > 0);
+
+        return result;
+    }
+
+    /// <summary>
+    /// Get G-code file info
+    /// </summary>
+    /// <param name="filename">File to query</param>
+    /// <param name="readThumbnailContent">Whether thumbnail contents shall be parsed</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>G-code file info</returns>
+    public override async Task<GCodeFileInfo> GetFileInfo(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default)
+    {
+        string errorMessage = "Invalid number of maximum retries configured";
+        string encodedFilename = HttpUtility.UrlPathEncode(filename);
+        for (int i = 0; i <= Options.MaxRetries; i++)
+        {
+            try
+            {
+                using HttpRequestMessage request = new(HttpMethod.Get, $"rr_fileinfo?name={encodedFilename}");
+                using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                if (response.IsSuccessStatusCode)
+                {
 #if NET6_0_OR_GREATER
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
 #else
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync();
 #endif
-                        Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken))!;
-                        if (responseObj.Err == 0)
+                    using JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
+                    if (responseJson.RootElement.TryGetProperty("err", out JsonElement errValue) && errValue.ValueKind == JsonValueKind.Number)
+                    {
+                        int err = errValue.GetInt32();
+                        if (err == 0)
                         {
-                            return;
+                            GCodeFileInfo result = new();
+                            result.UpdateFromJson(responseJson.RootElement, false);
+
+                            if (readThumbnailContent)
+                            {
+                                await GetThumbnails(result, cancellationToken);
+                            }
+
+                            return result;
                         }
-                        else if (responseObj.Err == 1)
+                        else if (err == 1)
                         {
                             throw new FileNotFoundException();
                         }
                         else
                         {
-                            throw new HttpRequestException($"rr_delete returned err {responseObj.Err}");
+                            throw new HttpRequestException($"rr_mkdir returned err {err}");
                         }
                     }
-
-                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                    if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                    else
                     {
-                        break;
+                        throw new HttpRequestException("rr_fileinfo did not return an err value");
                     }
                 }
-                catch (OperationCanceledException oce)
+
+                errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                if (response.StatusCode >= HttpStatusCode.InternalServerError)
                 {
-                    if (cancellationToken.IsCancellationRequested || _terminateSession.IsCancellationRequested)
-                    {
-                        throw;
-                    }
-                    errorMessage = oce.Message;
+                    break;
                 }
             }
-            throw new HttpRequestException(errorMessage);
-        }
-
-        /// <summary>
-        /// Move a file or directory
-        /// </summary>
-        /// <param name="from">Source file</param>
-        /// <param name="to">Destination file</param>
-        /// <param name="force">Overwrite file if it already exists</param>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Asynchronous task</returns>
-        public override async Task Move(string from, string to, bool force = false, CancellationToken cancellationToken = default)
-        {
-            string errorMessage = "Invalid number of maximum retries configured";
-            for (int i = 0; i <= Options.MaxRetries; i++)
+            catch (OperationCanceledException oce)
             {
-                try
+                if (cancellationToken.IsCancellationRequested || _terminateSession.IsCancellationRequested)
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_move?old={HttpUtility.UrlPathEncode(from)}&new={HttpUtility.UrlPathEncode(to)}&deleteexisting={(force ? "yes" : "no")}");
-                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
-                    if (response.IsSuccessStatusCode)
-                    {
-#if NET6_0_OR_GREATER
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-#else
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
-#endif
-                        Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken))!;
-                        if (responseObj.Err == 0)
-                        {
-                            return;
-                        }
-                        else if (responseObj.Err == 1)
-                        {
-                            throw new FileNotFoundException();
-                        }
-                        else
-                        {
-                            throw new HttpRequestException($"rr_move returned err {responseObj.Err}");
-                        }
-                    }
-
-                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                    if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                    {
-                        break;
-                    }
+                    throw;
                 }
-                catch (OperationCanceledException oce)
-                {
-                    if (cancellationToken.IsCancellationRequested || _terminateSession.IsCancellationRequested)
-                    {
-                        throw;
-                    }
-                    errorMessage = oce.Message;
-                }
+                errorMessage = oce.Message;
             }
-            throw new HttpRequestException(errorMessage);
         }
+        throw new HttpRequestException(errorMessage);
+    }
 
-        /// <summary>
-        /// Make a new directory
-        /// </summary>
-        /// <param name="directory">Target directory</param>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Asynchronous task</returns>
-        public override async Task MakeDirectory(string directory, CancellationToken cancellationToken = default)
+    private async Task GetThumbnails(GCodeFileInfo fileinfo, CancellationToken cancellationToken)
+    {
+        foreach (ThumbnailInfo thumbnail in fileinfo.Thumbnails)
         {
-            string errorMessage = "Invalid number of maximum retries configured";
-            for (int i = 0; i <= Options.MaxRetries; i++)
+            if (thumbnail.Offset > 0)
             {
-                try
-                {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_mkdir?dir={HttpUtility.UrlPathEncode(directory)}");
-                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
-                    if (response.IsSuccessStatusCode)
-                    {
-#if NET6_0_OR_GREATER
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-#else
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
-#endif
-                        Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken))!;
-                        if (responseObj.Err == 0)
-                        {
-                            return;
-                        }
-                        else
-                        {
-                            throw new HttpRequestException($"rr_mkdir returned err {responseObj.Err}");
-                        }
-                    }
-
-                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                    if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                    {
-                        break;
-                    }
-                }
-                catch (OperationCanceledException oce)
-                {
-                    if (cancellationToken.IsCancellationRequested || _terminateSession.IsCancellationRequested)
-                    {
-                        throw;
-                    }
-                    errorMessage = oce.Message;
-                }
-            }
-            throw new HttpRequestException(errorMessage);
-        }
-
-        /// <summary>
-        /// Download a file
-        /// </summary>
-        /// <param name="filename">Name of the file to download</param>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Disposable download response</returns>
-        public override async Task<HttpResponseMessage> Download(string filename, CancellationToken cancellationToken = default)
-        {
-            using HttpRequestMessage request = new(HttpMethod.Get, $"rr_download?name={HttpUtility.UrlPathEncode(filename)}");
-            HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
-            if (response.StatusCode == HttpStatusCode.NotFound)
-            {
-                throw new FileNotFoundException();
-            }
-
-            response.EnsureSuccessStatusCode();
-            return response;
-        }
-
-        /// <summary>
-        /// Enumerate all files and directories in the given directory
-        /// </summary>
-        /// <param name="directory">Directory to query</param>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>List of all files and directories</returns>
-        public override async Task<IList<FileListItem>> GetFileList(string directory, CancellationToken cancellationToken = default)
-        {
-            List<FileListItem> result = [];
-
-            int nextIndex = 0;
-            do
-            {
-                string errorMessage = "Invalid number of maximum retries configured";
-                for (int i = 0; i <= Options.MaxRetries; i++)
+                for (int k = 0; thumbnail.Data is null && k <= Options.MaxRetries; k++)
                 {
                     try
                     {
-                        using HttpRequestMessage request = new(HttpMethod.Get, $"rr_filelist?dir={HttpUtility.UrlPathEncode(directory)}&first={nextIndex}");
-                        using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                        long offset = thumbnail.Offset;
+                        StringBuilder thumbnailData = new();
 
-                        if (response.IsSuccessStatusCode)
+                        do
                         {
-#if NET6_0_OR_GREATER
-                            using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-#else
-                            using Stream responseStream = await response.Content.ReadAsStreamAsync();
-#endif
-                            Responses.FileListResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.FileListResponse, cancellationToken))!;
-                            if (responseObj.Err == 0)
+                            using HttpRequestMessage request = new(HttpMethod.Get, $"rr_thumbnail?name={fileinfo.FileName}&offset={offset}");
+                            using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                            if (response.IsSuccessStatusCode)
                             {
-                                foreach (Responses.FileItem item in responseObj.Files)
+#if NET6_0_OR_GREATER
+                                using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+#else
+                                using Stream responseStream = await response.Content.ReadAsStreamAsync();
+#endif
+                                using JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
+                                if (responseJson.RootElement.TryGetProperty("err", out JsonElement errValue) && errValue.ValueKind == JsonValueKind.Number)
                                 {
-                                    result.Add(new FileListItem()
+                                    int err = errValue.GetInt32();
+                                    if (err != 0)
                                     {
-                                        Filename = item.Name,
-                                        IsDirectory = item.Type == 'd',
-                                        LastModified = item.Date,
-                                        Size = item.Size
-                                    });
-                                }
-                                nextIndex = responseObj.Next;
-                            }
-                            else if (responseObj.Err == 2)
-                            {
-                                throw new DirectoryNotFoundException();
-                            }
-                            else
-                            {
-                                throw new HttpRequestException($"rr_filelist returned err {responseObj.Err}");
-                            }
-                            break;
-                        }
-
-                        errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                        if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                        {
-                            break;
-                        }
-                    }
-                    catch (OperationCanceledException oce)
-                    {
-                        if (cancellationToken.IsCancellationRequested || _terminateSession.IsCancellationRequested)
-                        {
-                            throw;
-                        }
-                        errorMessage = oce.Message;
-                    }
-
-                    if (i == Options.MaxRetries)
-                    {
-                        throw new HttpRequestException(errorMessage);
-                    }
-                }
-            } while (nextIndex > 0);
-
-            return result;
-        }
-
-        /// <summary>
-        /// Get G-code file info
-        /// </summary>
-        /// <param name="filename">File to query</param>
-        /// <param name="readThumbnailContent">Whether thumbnail contents shall be parsed</param>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>G-code file info</returns>
-        public override async Task<GCodeFileInfo> GetFileInfo(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default)
-        {
-            string errorMessage = "Invalid number of maximum retries configured";
-            string encodedFilename = HttpUtility.UrlPathEncode(filename);
-            for (int i = 0; i <= Options.MaxRetries; i++)
-            {
-                try
-                {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_fileinfo?name={encodedFilename}");
-                    using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
-                    if (response.IsSuccessStatusCode)
-                    {
-#if NET6_0_OR_GREATER
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-#else
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
-#endif
-                        using JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
-                        if (responseJson.RootElement.TryGetProperty("err", out JsonElement errValue) && errValue.ValueKind == JsonValueKind.Number)
-                        {
-                            int err = errValue.GetInt32();
-                            if (err == 0)
-                            {
-                                GCodeFileInfo result = new();
-                                result.UpdateFromJson(responseJson.RootElement, false);
-
-                                if (readThumbnailContent)
-                                {
-                                    await GetThumbnails(result, cancellationToken);
-                                }
-
-                                return result;
-                            }
-                            else if (err == 1)
-                            {
-                                throw new FileNotFoundException();
-                            }
-                            else
-                            {
-                                throw new HttpRequestException($"rr_mkdir returned err {err}");
-                            }
-                        }
-                        else
-                        {
-                            throw new HttpRequestException("rr_fileinfo did not return an err value");
-                        }
-                    }
-
-                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                    if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                    {
-                        break;
-                    }
-                }
-                catch (OperationCanceledException oce)
-                {
-                    if (cancellationToken.IsCancellationRequested || _terminateSession.IsCancellationRequested)
-                    {
-                        throw;
-                    }
-                    errorMessage = oce.Message;
-                }
-            }
-            throw new HttpRequestException(errorMessage);
-        }
-
-        private async Task GetThumbnails(GCodeFileInfo fileinfo, CancellationToken cancellationToken)
-        {
-            foreach (ThumbnailInfo thumbnail in fileinfo.Thumbnails)
-            {
-                if (thumbnail.Offset > 0)
-                {
-                    for (int k = 0; thumbnail.Data is null && k <= Options.MaxRetries; k++)
-                    {
-                        try
-                        {
-                            long offset = thumbnail.Offset;
-                            StringBuilder thumbnailData = new();
-
-                            do
-                            {
-                                using HttpRequestMessage request = new(HttpMethod.Get, $"rr_thumbnail?name={fileinfo.FileName}&offset={offset}");
-                                using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
-                                if (response.IsSuccessStatusCode)
-                                {
-#if NET6_0_OR_GREATER
-                                    using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-#else
-                                    using Stream responseStream = await response.Content.ReadAsStreamAsync();
-#endif
-                                    using JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
-                                    if (responseJson.RootElement.TryGetProperty("err", out JsonElement errValue) && errValue.ValueKind == JsonValueKind.Number)
-                                    {
-                                        int err = errValue.GetInt32();
-                                        if (err != 0)
-                                        {
-                                            throw new ArgumentException($"err {err}");
-                                        }
-
-                                        offset = responseJson.RootElement.GetProperty("next").GetInt32();
-                                        thumbnailData.Append(responseJson.RootElement.GetProperty("data").GetString());
+                                        throw new ArgumentException($"err {err}");
                                     }
+
+                                    offset = responseJson.RootElement.GetProperty("next").GetInt32();
+                                    thumbnailData.Append(responseJson.RootElement.GetProperty("data").GetString());
                                 }
-                            } while (offset != 0);
-                            thumbnail.Data = thumbnailData.ToString();
-                        }
-                        catch (Exception e)
-                        {
-                            thumbnail.Data = null;
-                            if (e is not HttpRequestException)
-                            {
-                                // Retries only apply to HTTP exceptions
-                                break;
                             }
+                        } while (offset != 0);
+                        thumbnail.Data = thumbnailData.ToString();
+                    }
+                    catch (Exception e)
+                    {
+                        thumbnail.Data = null;
+                        if (e is not HttpRequestException)
+                        {
+                            // Retries only apply to HTTP exceptions
+                            break;
                         }
                     }
                 }
             }
         }
-
-        // ** Plugin and system package calls are not supported (yet) **
     }
+
+    // ** Plugin and system package calls are not supported (yet) **
 }

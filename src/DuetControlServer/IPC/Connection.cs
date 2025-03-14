@@ -44,7 +44,7 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// API version of the client
         /// </summary>
-        /// <seealso cref="DuetAPI.Connection.Defaults.ProtocolVersion"/>
+        /// <seealso cref="Defaults.ProtocolVersion"/>
         public int ApiVersion { get; set; }
 
         /// <summary>

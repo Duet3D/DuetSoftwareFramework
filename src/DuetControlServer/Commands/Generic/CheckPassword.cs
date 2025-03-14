@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
 {
@@ -10,8 +11,9 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Check the given password
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public override async Task<bool> Execute()
+        public override async Task<bool> ExecuteAsync(CancellationToken cancellationToken = default)
         {
             using (await Model.Provider.AccessReadOnlyAsync())
             {

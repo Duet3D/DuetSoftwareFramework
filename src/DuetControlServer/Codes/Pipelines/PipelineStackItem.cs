@@ -2,6 +2,7 @@
 using DuetControlServer.Files;
 using Nito.AsyncEx;
 using System;
+using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
@@ -137,35 +138,19 @@ namespace DuetControlServer.Codes.Pipelines
         /// <summary>
         /// Wait for the pipeline state to finish processing codes
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public async Task<bool> FlushAsync()
+        /// <remarks>This method does not throw an exception even if the cancellation token is triggered</remarks>
+        public async Task<bool> FlushAsync(CancellationToken cancellationToken = default)
         {
-            if (Program.CancellationToken.IsCancellationRequested)
+            if (cancellationToken.IsCancellationRequested)
             {
                 return false;
             }
 
             try
             {
-                await _idleEvent.WaitAsync(Program.CancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                return false;
-            }
-            return true;
-        }
-
-        /// <summary>
-        /// Wait for the pipeline state to finish processing codes
-        /// </summary>
-        /// <param name="code">Code waiting for the flush</param>
-        /// <returns>Whether the codes have been flushed successfully</returns>
-        public async Task<bool> FlushAsync(Code code)
-        {
-            try
-            {
-                await _idleEvent.WaitAsync(code.CancellationToken);
+                await _idleEvent.WaitAsync(cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -195,14 +180,15 @@ namespace DuetControlServer.Codes.Pipelines
         /// Enqueue a given code asynchrously on this pipeline state for execution
         /// </summary>
         /// <param name="code">Code to enqueue</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public ValueTask WriteCodeAsync(Code code)
+        public ValueTask WriteCodeAsync(Code code, CancellationToken cancellationToken = default)
         {
             lock (this)
             {
                 Busy = true;
             }
-            return PendingCodes.Writer.WriteAsync(code, Program.CancellationToken);
+            return PendingCodes.Writer.WriteAsync(code, cancellationToken);
         }
     }
 }

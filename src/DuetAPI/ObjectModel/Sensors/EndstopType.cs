@@ -1,37 +1,36 @@
 ﻿using DuetAPI.Utility;
 using System.Text.Json.Serialization;
 
-namespace DuetAPI.ObjectModel
+namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// Type of a configured endstop
+/// </summary>
+[JsonConverter(typeof(JsonCamelCaseStringEnumConverter<EndstopType>))]
+public enum EndstopType
 {
     /// <summary>
-    /// Type of a configured endstop
+    /// Generic input pin
     /// </summary>
-    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<EndstopType>))]
-    public enum EndstopType
-    {
-        /// <summary>
-        /// Generic input pin
-        /// </summary>
-        InputPin,
+    InputPin,
 
-        /// <summary>
-        /// Z-probe acts as an endstop
-        /// </summary>
-        ZProbeAsEndstop,
+    /// <summary>
+    /// Z-probe acts as an endstop
+    /// </summary>
+    ZProbeAsEndstop,
 
-        /// <summary>
-        /// Motor stall detection stops all the drives when triggered
-        /// </summary>
-        MotorStallAny,
+    /// <summary>
+    /// Motor stall detection stops all the drives when triggered
+    /// </summary>
+    MotorStallAny,
 
-        /// <summary>
-        /// Motor stall detection stops individual drives when triggered
-        /// </summary>
-        MotorStallIndividual,
+    /// <summary>
+    /// Motor stall detection stops individual drives when triggered
+    /// </summary>
+    MotorStallIndividual,
 
-        /// <summary>
-        /// Unknown type
-        /// </summary>
-        Unknown
-    }
+    /// <summary>
+    /// Unknown type
+    /// </summary>
+    Unknown
 }

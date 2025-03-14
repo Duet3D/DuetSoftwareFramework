@@ -1,4 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -11,10 +12,11 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Set an atomic property in the object model
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public override async Task Execute()
+        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
         {
-            using (await Model.Provider.AccessReadOnlyAsync())
+            using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
             {
                 if (Enabled == Model.PeriodicUpdater.IsProtocolEnabled(Protocol))
                 {
@@ -32,7 +34,7 @@ namespace DuetControlServer.Commands
                 Model.PeriodicUpdater.ProtocolDisabled(Protocol);
             }
 
-            using (await Model.Provider.AccessReadWriteAsync())
+            using (await Model.Provider.AccessReadWriteAsync(cancellationToken))
             {
                 foreach (NetworkInterface iface in Model.Provider.Get.Network.Interfaces)
                 {

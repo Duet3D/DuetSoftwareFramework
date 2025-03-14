@@ -6,6 +6,7 @@ using DuetControlServer.Files;
 using System;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Codes
@@ -72,15 +73,17 @@ namespace DuetControlServer.Codes
         /// </summary>
         /// <param name="channel">Code channel to wait for</param>
         /// <param name="flushAll">Flush all codes on all stack levels</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static Task<bool> FlushAsync(CodeChannel channel, bool flushAll = false) => _processors[(int)channel].FlushAsync(flushAll);
+        public static Task<bool> FlushAsync(CodeChannel channel, bool flushAll = false, CancellationToken cancellationToken = default) => _processors[(int)channel].FlushAsync(flushAll, cancellationToken);
 
         /// <summary>
         /// Wait for all pending codes of the given file to finish
         /// </summary>
         /// <param name="file">Code file</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static Task<bool> FlushAsync(CodeFile file) => _processors[(int)file.Channel].FlushAsync(file);
+        public static Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default) => _processors[(int)file.Channel].FlushAsync(file, cancellationToken);
 
         /// <summary>
         /// Wait for all pending codes on the same stack level as the given code to finish.
@@ -91,13 +94,12 @@ namespace DuetControlServer.Codes
         /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
         /// <param name="syncFileStreams">Whether the file streams are supposed to be synchronized (if applicable)</param>
         /// <param name="ifExecuting">Return true only if the corresponding code input is actually active (ignored if syncFileStreams is true)</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static async Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true, bool syncFileStreams = false, bool ifExecuting = true)
+        public static async Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true, bool syncFileStreams = false, bool ifExecuting = true, CancellationToken cancellationToken = default)
         {
-            ArgumentNullException.ThrowIfNull(code);
-
             // Wait for the pending codes on this channel to go
-            if (!await _processors[(int)code.Channel].FlushAsync(code, evaluateExpressions, evaluateAll))
+            if (!await _processors[(int)code.Channel].FlushAsync(code, evaluateExpressions, evaluateAll, cancellationToken))
             {
                 return false;
             }
@@ -105,7 +107,7 @@ namespace DuetControlServer.Codes
             if (syncFileStreams && code.IsFromFileChannel)
             {
                 // Wait for both file streams to reach the same position
-                if (await JobProcessor.DoSync(code))
+                if (await JobProcessor.DoSyncAsync(code, cancellationToken))
                 {
                     await code.UpdateNextFilePositionAsync();
                     return true;
@@ -115,7 +117,7 @@ namespace DuetControlServer.Codes
             else if (ifExecuting)
             {
                 // Make sure the current code channel is executing G/M/T-codes
-                using (await Model.Provider.AccessReadOnlyAsync(code.CancellationToken))
+                using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
                 {
                     if (Model.Provider.Get.Inputs[code.Channel]?.Active != true)
                     {

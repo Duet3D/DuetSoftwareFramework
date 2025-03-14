@@ -1,37 +1,36 @@
 ﻿using DuetAPI.Utility;
 using System.Text.Json.Serialization;
 
-namespace DuetAPI.ObjectModel
+namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// Enumeration of possible expansion board states
+/// </summary>
+[JsonConverter(typeof(JsonCamelCaseStringEnumConverter<BoardState>))]
+public enum BoardState
 {
     /// <summary>
-    /// Enumeration of possible expansion board states
+    /// Unknown state
     /// </summary>
-    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<BoardState>))]
-    public enum BoardState
-    {
-        /// <summary>
-        /// Unknown state
-        /// </summary>
-        Unknown,
+    Unknown,
 
-        /// <summary>
-        /// Flashing new firmware
-        /// </summary>
-        Flashing,
+    /// <summary>
+    /// Flashing new firmware
+    /// </summary>
+    Flashing,
 
-        /// <summary>
-        /// Failed to flash new firmware
-        /// </summary>
-        FlashFailed,
+    /// <summary>
+    /// Failed to flash new firmware
+    /// </summary>
+    FlashFailed,
 
-        /// <summary>
-        /// Board is being reset
-        /// </summary>
-        Resetting,
+    /// <summary>
+    /// Board is being reset
+    /// </summary>
+    Resetting,
 
-        /// <summary>
-        /// Board is up and running
-        /// </summary>
-        Running
-    }
+    /// <summary>
+    /// Board is up and running
+    /// </summary>
+    Running
 }

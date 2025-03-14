@@ -1,4 +1,5 @@
 ﻿using DuetControlServer.IPC;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -16,7 +17,8 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Unlock the machine model again
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public override Task Execute() => LockManager.UnlockMachineModel(Connection!);
+        public override Task ExecuteAsync(CancellationToken cancellationToken = default) => LockManager.UnlockMachineModel(Connection!, cancellationToken);
     }
 }

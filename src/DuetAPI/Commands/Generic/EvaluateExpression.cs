@@ -1,22 +1,22 @@
 ﻿using System.Text.Json;
 using DuetAPI.Utility;
 
-namespace DuetAPI.Commands
+namespace DuetAPI.Commands;
+
+/// <summary>
+/// Evaluate an arbitrary expression on the given channel
+/// </summary>
+[RequiredPermissions(SbcPermissions.CommandExecution)]
+public class EvaluateExpression : Command<JsonElement>
 {
     /// <summary>
-    /// Evaluate an arbitrary expression on the given channel
+    /// Code channel where the expression is evaluated
     /// </summary>
-    [RequiredPermissions(SbcPermissions.CommandExecution)]
-    public class EvaluateExpression : Command<JsonElement>
-    {
-        /// <summary>
-        /// Code channel where the expression is evaluated
-        /// </summary>
-        public CodeChannel Channel { get; set; }
+    public CodeChannel Channel { get; set; }
 
-        /// <summary>
-        /// Expression to evaluate
-        /// </summary>
-        public string Expression { get; set; } = string.Empty;
-    }
+    /// <summary>
+    /// Expression to evaluate
+    /// </summary>
+    public string Expression { get; set; } = string.Empty;
 }
+

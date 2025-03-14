@@ -1,46 +1,45 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace DuetAPI.ObjectModel
+namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// Compatibility level for emulation
+/// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter<Compatibility>))]
+public enum Compatibility
 {
     /// <summary>
-    /// Compatibility level for emulation
+    /// No emulation (same as RepRapFirmware)
     /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter<Compatibility>))]
-    public enum Compatibility
-    {
-        /// <summary>
-        /// No emulation (same as RepRapFirmware)
-        /// </summary>
-        Default,
+    Default,
 
-        /// <summary>
-        /// Emulating RepRapFirmware
-        /// </summary>
-        RepRapFirmware,
+    /// <summary>
+    /// Emulating RepRapFirmware
+    /// </summary>
+    RepRapFirmware,
 
-        /// <summary>
-        /// Emulating Marlin
-        /// </summary>
-        Marlin,
+    /// <summary>
+    /// Emulating Marlin
+    /// </summary>
+    Marlin,
 
-        /// <summary>
-        /// Emulating Teacup
-        /// </summary>
-        Teacup,
+    /// <summary>
+    /// Emulating Teacup
+    /// </summary>
+    Teacup,
 
-        /// <summary>
-        /// Emulating Sprinter
-        /// </summary>
-        Sprinter,
+    /// <summary>
+    /// Emulating Sprinter
+    /// </summary>
+    Sprinter,
 
-        /// <summary>
-        /// Emulating Repetier
-        /// </summary>
-        Repetier,
+    /// <summary>
+    /// Emulating Repetier
+    /// </summary>
+    Repetier,
 
-        /// <summary>
-        /// Special emulation for NanoDLP
-        /// </summary>
-        NanoDLP
-    }
+    /// <summary>
+    /// Special emulation for NanoDLP
+    /// </summary>
+    NanoDLP
 }

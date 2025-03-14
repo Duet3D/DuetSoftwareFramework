@@ -1,28 +1,27 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 
-namespace DuetAPI.Commands
+namespace DuetAPI.Commands;
+
+/// <summary>
+/// Remove an existing HTTP endpoint.
+/// Returns true if the endpoint could be successfully removed
+/// </summary>
+[RequiredPermissions(SbcPermissions.RegisterHttpEndpoints)]
+public class RemoveHttpEndpoint : Command<bool>
 {
     /// <summary>
-    /// Remove an existing HTTP endpoint.
-    /// Returns true if the endpoint could be successfully removed
+    /// Type of the endpoint
     /// </summary>
-    [RequiredPermissions(SbcPermissions.RegisterHttpEndpoints)]
-    public class RemoveHttpEndpoint : Command<bool>
-    {
-        /// <summary>
-        /// Type of the endpoint
-        /// </summary>
-        public HttpEndpointType EndpointType { get; set; }
+    public HttpEndpointType EndpointType { get; set; }
 
-        /// <summary>
-        /// Namespace of the endpoint
-        /// </summary>
-        public string Namespace { get; set; } = string.Empty;
+    /// <summary>
+    /// Namespace of the endpoint
+    /// </summary>
+    public string Namespace { get; set; } = string.Empty;
 
-        /// <summary>
-        /// Endpoint path to unregister
-        /// </summary>
-        public string Path { get; set; } = string.Empty;
-    }
+    /// <summary>
+    /// Endpoint path to unregister
+    /// </summary>
+    public string Path { get; set; } = string.Empty;
 }

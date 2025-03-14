@@ -1,5 +1,6 @@
 ﻿using DuetControlServer.IPC;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -17,11 +18,12 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Wait for all pending codes of the given channel to finish
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public override async Task Execute()
+        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
         {
             // Check if the corresponding code channel has been disabled
-            using (await Model.Provider.AccessReadOnlyAsync())
+            using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
             {
                 if (Model.Provider.Get.Inputs[Channel] is null)
                 {

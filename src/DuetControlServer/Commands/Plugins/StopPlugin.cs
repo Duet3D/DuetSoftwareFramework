@@ -3,6 +3,7 @@ using DuetAPI.Utility;
 using System;
 using System.IO;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -15,9 +16,10 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Stop a plugin
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="ArgumentException">Plugin is invalid</exception>
-        public override async Task Execute()
+        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
         {
             if (!Settings.PluginSupport)
             {
@@ -58,7 +60,7 @@ namespace DuetControlServer.Commands
             if (stopPlugin)
             {
                 // Stop it via the plugin service. This will reset the PID to -1 too
-                await IPC.Processors.PluginService.PerformCommand(this, asRoot);
+                await IPC.Processors.PluginService.PerformCommandAsync(this, asRoot);
             }
 
             // Save the execution state if requested

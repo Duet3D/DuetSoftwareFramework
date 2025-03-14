@@ -18,7 +18,7 @@ namespace UnitTests.File
         public async Task Test(string fileName)
         {
             string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes", fileName);
-            GCodeFileInfo info = await DuetControlServer.Files.InfoParser.Parse(filePath, true);
+            GCodeFileInfo info = await DuetControlServer.Files.InfoParser.ParseAsync(filePath, true);
 
             TestContext.Out.Write(JsonSerializer.Serialize(info, typeof(GCodeFileInfo), new JsonSerializerOptions { WriteIndented = true }));
 
@@ -40,7 +40,7 @@ namespace UnitTests.File
         public async Task TestThumbnails(string fileName, int thumbnailCount)
         {
             string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes", fileName);
-            GCodeFileInfo info = await DuetControlServer.Files.InfoParser.Parse(filePath, true);
+            GCodeFileInfo info = await DuetControlServer.Files.InfoParser.ParseAsync(filePath, true);
             TestContext.Out.Write(JsonSerializer.Serialize(info, typeof(GCodeFileInfo), new JsonSerializerOptions { WriteIndented = true }));
             ClassicAssert.AreEqual(info.Thumbnails.Count, thumbnailCount);
         }
@@ -49,7 +49,7 @@ namespace UnitTests.File
         public async Task TestThumbnailResponse(string fileName)
         {
             string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes", fileName);
-            GCodeFileInfo info = await DuetControlServer.Files.InfoParser.Parse(filePath, true);
+            GCodeFileInfo info = await DuetControlServer.Files.InfoParser.ParseAsync(filePath, true);
 
             string thumbnailResponse = await DuetControlServer.Files.InfoParser.ParseThumbnail(filePath, info.Thumbnails[0].Offset);
             ClassicAssert.IsTrue(thumbnailResponse.Contains(info.Thumbnails[0].Data![..1024]));
@@ -61,7 +61,7 @@ namespace UnitTests.File
         public async Task TestEmpty()
         {
             string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes/Circle.gcode");
-            GCodeFileInfo info = await DuetControlServer.Files.InfoParser.Parse(filePath, true);
+            GCodeFileInfo info = await DuetControlServer.Files.InfoParser.ParseAsync(filePath, true);
 
             TestContext.Out.Write(JsonSerializer.Serialize(info, typeof(GCodeFileInfo), new JsonSerializerOptions { WriteIndented = true }));
 

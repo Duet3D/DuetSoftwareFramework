@@ -1,155 +1,169 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
+using DuetPluginService.Services;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.Commands
+namespace DuetPluginService.Commands;
+
+/// <summary>
+/// Implementation of the <see cref="DuetAPI.Commands.UninstallPlugin"/> command
+/// </summary>
+public sealed class UninstallPlugin(PluginManager pluginManager, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.UninstallPlugin
 {
+    private readonly Settings _settings = settings.Value;
+
     /// <summary>
-    /// Implementation of the <see cref="DuetAPI.Commands.UninstallPlugin"/> command
+    /// Internal flag to indicate that custom plugin files should not be purged
     /// </summary>
-    public sealed class UninstallPlugin : DuetAPI.Commands.UninstallPlugin
+    public bool ForUpgrade { get; set; }
+
+    /// <summary>
+    /// Uninstall a plugin
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <exception cref="ArgumentException">Plugin is invalid</exception>
+    public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        /// <summary>
-        /// Internal flag to indicate that custom plugin files should not be purged
-        /// </summary>
-        public bool ForUpgrade { get; set; }
+        ILogger logger = loggerFactory.CreateLogger($"Plugin {Plugin}");
 
-        /// <summary>
-        /// Uninstall a plugin
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        /// <exception cref="ArgumentException">Plugin is invalid</exception>
-        public override async Task Execute()
+        using (await pluginManager.LockAsync(cancellationToken))
         {
-            NLog.Logger logger = NLog.LogManager.GetLogger(Plugin);
-
-            using (await Plugins.LockAsync())
+            // Get the plugin first
+            Plugin? plugin = null;
+            foreach (Plugin item in pluginManager.Plugins)
             {
-                // Get the plugin first
-                Plugin? plugin = null;
-                foreach (Plugin item in Plugins.List)
+                if (item.Id == Plugin)
                 {
-                    if (item.Id == Plugin)
-                    {
-                        plugin = item;
-                        break;
-                    }
+                    plugin = item;
+                    break;
+                }
+            }
+
+            if (plugin is null)
+            {
+                throw new ArgumentException($"Plugin {Plugin} not found by {(Utility.IsRoot ? "root service" : "service")}");
+            }
+            if (plugin.Pid > 0)
+            {
+                throw new ArgumentException("Plugin must be stopped before it can be uninstalled");
+            }
+
+            // Root plugins are deleted by the root service to avoid potential permission issues
+            if (plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser) == Utility.IsRoot)
+            {
+                string manifestFile = Path.Combine(_settings.PluginDirectory, $"{Plugin}.json");
+
+                // Check if the manifest is writable
+                LinuxApi.Commands.GetPermissions(manifestFile, out LinuxApi.UnixPermissions userPermission, out _, out _);
+                if (!userPermission.HasFlag(LinuxApi.UnixPermissions.Write))
+                {
+                    throw new ArgumentException("Plugin cannot be uninstalled via API");
                 }
 
-                if (plugin is null)
+                // Remove the plugin manifest
+                if (ForUpgrade)
                 {
-                    throw new ArgumentException($"Plugin {Plugin} not found by {(Program.IsRoot ? "root service" : "service")}");
+                    logger.LogInformation("Uninstalling plugin {Plugin} for upgrade", Plugin);
                 }
-                if (plugin.Pid > 0)
+                else
                 {
-                    throw new ArgumentException("Plugin must be stopped before it can be uninstalled");
+                    logger.LogInformation("Uninstalling plugin {Plugin}", Plugin);
                 }
 
-                // Root plugins are deleted by the root service to avoid potential permission issues
-                if (plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser) == Program.IsRoot)
-                {
-                    string manifestFile = Path.Combine(Settings.PluginDirectory, $"{Plugin}.json");
-
-                    // Check if the manifest is writable
-                    LinuxApi.Commands.GetPermissions(manifestFile, out LinuxApi.UnixPermissions userPermission, out _, out _);
-                    if (!userPermission.HasFlag(LinuxApi.UnixPermissions.Write))
+                if (File.Exists(manifestFile))
                     {
-                        throw new ArgumentException("Plugin cannot be uninstalled via API");
-                    }
-
-                    // Remove the plugin manifest
-                    logger.Info("Uninstalling plugin {0}", Plugin + (ForUpgrade ? " for upgrade" : string.Empty));
-                    if (File.Exists(manifestFile))
-                    {
-                        logger.Debug("Removing plugin manifest");
+                        logger.LogDebug("Removing plugin manifest");
                         File.Delete(manifestFile);
                     }
 
-                    // Remove installed files and directories from the dwc and www directories
+                // Remove installed files and directories from the dwc and www directories
+                foreach (string dwcFile in plugin.DwcFiles)
+                {
+                    string installWwwPath = Path.Combine(_settings.BaseDirectory, "www", dwcFile);
+                    if (File.Exists(installWwwPath))
+                    {
+                        logger.LogDebug("Removing {File}", installWwwPath);
+                        File.Delete(installWwwPath);
+                    }
+
+                    string directory = Path.GetDirectoryName(installWwwPath)!;
+                    if (!Directory.EnumerateFileSystemEntries(directory).Any())
+                    {
+                        logger.LogDebug("Removing {Directory}", directory);
+                        Directory.Delete(directory);
+                    }
+                }
+
+                if (ForUpgrade)
+                {
+                    // Remove only installed files
+                    foreach (string dsfFile in plugin.DsfFiles)
+                    {
+                        string file = Path.Combine(_settings.PluginDirectory, Plugin, "dsf", dsfFile);
+                        if (File.Exists(file))
+                        {
+                            logger.LogDebug("Deleting file {File}", file);
+                            File.Delete(file);
+                        }
+                    }
+
                     foreach (string dwcFile in plugin.DwcFiles)
                     {
-                        string installWwwPath = Path.Combine(Settings.BaseDirectory, "www", dwcFile);
-                        if (File.Exists(installWwwPath))
+                        string file = Path.Combine(_settings.PluginDirectory, Plugin, "dwc", dwcFile);
+                        if (File.Exists(file))
                         {
-                            logger.Debug("Removing {0}", installWwwPath);
-                            File.Delete(installWwwPath);
-                        }
-
-                        string directory = Path.GetDirectoryName(installWwwPath)!;
-                        if (!Directory.EnumerateFileSystemEntries(directory).Any())
-                        {
-                            logger.Debug("Removing {0}", directory);
-                            Directory.Delete(directory);
+                            logger.LogDebug("Deleting file {File}", file);
+                            File.Delete(file);
                         }
                     }
 
-                    if (ForUpgrade)
+                    foreach (string sdFile in plugin.SdFiles)
                     {
-                        // Remove only installed files
-                        foreach (string dsfFile in plugin.DsfFiles)
+                        string fileName = Path.Combine(_settings.BaseDirectory, sdFile);
+                        if (File.Exists(fileName) && !plugin.SbcConfigFiles.Any(file => fileName == Path.Combine(_settings.BaseDirectory, "sys", file) || fileName == Path.Combine(_settings.BaseDirectory, file)))
                         {
-                            string file = Path.Combine(Settings.PluginDirectory, Plugin, "dsf", dsfFile);
-                            if (File.Exists(file))
+                            if (Path.GetFileName(sdFile).Equals("daemon.g"))
                             {
-                                logger.Debug("Deleting file {0}", file);
-                                File.Delete(file);
+                                // daemon.g may be still open at this time
+                                logger.LogDebug("Renaming file {SourceFile} to {File}", sdFile, sdFile + ".bak");
+                                File.Move(sdFile, sdFile + ".bak", true);
                             }
-                        }
-
-                        foreach (string dwcFile in plugin.DwcFiles)
-                        {
-                            string file = Path.Combine(Settings.PluginDirectory, Plugin, "dwc", dwcFile);
-                            if (File.Exists(file))
+                            else
                             {
-                                logger.Debug("Deleting file {0}", file);
-                                File.Delete(file);
+                                logger.LogDebug("Deleting file {File}", fileName);
+                                File.Delete(fileName);
                             }
-                        }
-
-                        foreach (string sdFile in plugin.SdFiles)
-                        {
-                            string fileName = Path.Combine(Settings.BaseDirectory, sdFile);
-                            if (File.Exists(fileName) && !plugin.SbcConfigFiles.Any(file => fileName == Path.Combine(Settings.BaseDirectory, "sys", file) || fileName == Path.Combine(Settings.BaseDirectory, file)))
-                            {
-                                if (Path.GetFileName(sdFile).Equals("daemon.g"))
-                                {
-                                    // daemon.g may be still open at this time
-                                    logger.Debug("Renaming file {0} to {1}", sdFile, sdFile + ".bak");
-                                    File.Move(sdFile, sdFile + ".bak", true);
-                                }
-                                else
-                                {
-                                    logger.Debug("Deleting file {0}", fileName);
-                                    File.Delete(fileName);
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Remove the full plugin directory
-                        string pluginDirectory = Path.Combine(Settings.PluginDirectory, Plugin);
-                        if (Directory.Exists(pluginDirectory))
-                        {
-                            logger.Debug("Removing plugin directory {0}", pluginDirectory);
-                            Directory.Delete(pluginDirectory, true);
                         }
                     }
                 }
-
-                // Remove the security policy
-                if (Program.IsRoot)
+                else
                 {
-                    await Permissions.Manager.UninstallProfile(plugin);
+                    // Remove the full plugin directory
+                    string pluginDirectory = Path.Combine(_settings.PluginDirectory, Plugin);
+                    if (Directory.Exists(pluginDirectory))
+                    {
+                        logger.LogDebug("Removing plugin directory {Directory}", pluginDirectory);
+                        Directory.Delete(pluginDirectory, true);
+                    }
                 }
-
-                // Plugin has been uninstalled
-                Plugins.List.Remove(plugin);
-                logger.Info("Plugin {0} has been uninstalled", Plugin);
             }
+
+            // Remove the security policy
+            if (Utility.IsRoot && !_settings.DisableAppArmor)
+            {
+                await Permissions.AppArmor.UninstallProfileAsync(Plugin, _settings, cancellationToken);
+            }
+
+            // Plugin has been uninstalled
+            pluginManager.Plugins.Remove(plugin);
+            logger.LogInformation("Plugin has been uninstalled");
         }
     }
 }

@@ -1,25 +1,24 @@
 ﻿using System.Collections.ObjectModel;
 
-namespace DuetAPI.ObjectModel
+namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// Information about centre rotation as defined by G68
+/// </summary>
+public partial class MoveRotation : ModelObject, IStaticModelObject
 {
     /// <summary>
-    /// Information about centre rotation as defined by G68
+    /// Angle of the centre rotatation (in deg)
     /// </summary>
-    public partial class MoveRotation : ModelObject, IStaticModelObject
+    public float Angle
     {
-        /// <summary>
-        /// Angle of the centre rotatation (in deg)
-        /// </summary>
-        public float Angle
-        {
-            get => _angle;
-            set => SetPropertyValue(ref _angle, value);
-        }
-        private float _angle;
-
-        /// <summary>
-        /// XY coordinates of the centre rotation
-        /// </summary>
-        public ObservableCollection<float> Centre { get; } = [0F, 0F];
+        get => _angle;
+        set => SetPropertyValue(ref _angle, value);
     }
+    private float _angle;
+
+    /// <summary>
+    /// XY coordinates of the centre rotation
+    /// </summary>
+    public ObservableCollection<float> Centre { get; } = [0F, 0F];
 }

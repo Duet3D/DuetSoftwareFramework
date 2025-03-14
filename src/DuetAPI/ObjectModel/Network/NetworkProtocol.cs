@@ -1,42 +1,41 @@
 ﻿using DuetAPI.Utility;
 using System.Text.Json.Serialization;
 
-namespace DuetAPI.ObjectModel
+namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// Supported network protocols
+/// </summary>
+[JsonConverter(typeof(JsonCamelCaseStringEnumConverter<NetworkProtocol>))]
+public enum NetworkProtocol
 {
     /// <summary>
-    /// Supported network protocols
+    /// HTTP protocol
     /// </summary>
-    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<NetworkProtocol>))]
-    public enum NetworkProtocol
-    {
-        /// <summary>
-        /// HTTP protocol
-        /// </summary>
-        HTTP,
+    HTTP,
 
-        /// <summary>
-        /// HTTPS protocol
-        /// </summary>
-        HTTPS,
+    /// <summary>
+    /// HTTPS protocol
+    /// </summary>
+    HTTPS,
 
-        /// <summary>
-        /// FTP protocol
-        /// </summary>
-        FTP,
+    /// <summary>
+    /// FTP protocol
+    /// </summary>
+    FTP,
 
-        /// <summary>
-        /// SFTP protocol
-        /// </summary>
-        SFTP,
+    /// <summary>
+    /// SFTP protocol
+    /// </summary>
+    SFTP,
 
-        /// <summary>
-        /// Telnet protocol
-        /// </summary>
-        Telnet,
+    /// <summary>
+    /// Telnet protocol
+    /// </summary>
+    Telnet,
 
-        /// <summary>
-        /// SSH protocol
-        /// </summary>
-        SSH
-    }
+    /// <summary>
+    /// SSH protocol
+    /// </summary>
+    SSH
 }

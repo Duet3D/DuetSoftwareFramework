@@ -263,7 +263,7 @@ namespace DuetControlServer.Codes.Handlers
                                     return new Message(MessageType.Error, "Position is out of range");
                                 }
 
-                                await JobProcessor.SetFilePosition(motionSystem, newPosition);
+                                await JobProcessor.SetFilePositionAsync(motionSystem, newPosition);
                             }
                         }
 
@@ -397,7 +397,7 @@ namespace DuetControlServer.Codes.Handlers
                                 if (code.MinorNumber != 1)
                                 {
                                     string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString(), FileDirectory.GCodes);
-                                    GCodeFileInfo info = await InfoParser.Parse(file, false);
+                                    GCodeFileInfo info = await InfoParser.ParseAsync(file, false);
 
                                     string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
                                     return new Message(MessageType.Success, "{\"err\":0," + json[1..]);
@@ -590,7 +590,7 @@ namespace DuetControlServer.Codes.Handlers
                         await SPI.Interface.WaitForUpdateAsync();
 
                         // Perform emergency stop but don't wait longer than 4.5s
-                        Task stopTask = SPI.Interface.EmergencyStop();
+                        Task stopTask = SPI.Interface.EmergencyStopAsync();
                         Task completedTask = await Task.WhenAny(stopTask, Task.Delay(4500, Program.CancellationToken));
                         if (stopTask != completedTask)
                         {
@@ -1077,7 +1077,7 @@ namespace DuetControlServer.Codes.Handlers
 
                             // Stop all the plugins
                             Commands.StopPlugins stopCommand = new();
-                            await stopCommand.Execute();
+                            await stopCommand.ExecuteAsync();
 
                             // Flash the firmware
                             await using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
@@ -1106,7 +1106,7 @@ namespace DuetControlServer.Codes.Handlers
                                 await Updater.WaitForFullUpdate();
 
                                 Commands.StartPlugins startCommand = new();
-                                await startCommand.Execute();
+                                await startCommand.ExecuteAsync();
                             }
                             return new Message();
                         }
@@ -1181,7 +1181,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Pop
                 case 121:
-                    await Updater.WaitForFullUpdate(code.CancellationToken);        // This may change inputs[].active, so sync the OM here
+                    await Updater.WaitForFullUpdateAsync(code.CancellationToken);        // This may change inputs[].active, so sync the OM here
                     break;
 
                 // Diagnostics
@@ -1218,7 +1218,7 @@ namespace DuetControlServer.Codes.Handlers
                 // Select movement queue number
                 case 596:
                     _logger.Debug("Requesting full model update after M596");
-                    await Updater.WaitForFullUpdate(code.CancellationToken);        // This changes inputs[].active, so sync the OM here
+                    await Updater.WaitForFullUpdateAsync(code.CancellationToken);        // This changes inputs[].active, so sync the OM here
                     _logger.Debug("Requested full model update after M596");
                     break;
 
@@ -1227,7 +1227,7 @@ namespace DuetControlServer.Codes.Handlers
                     if (code.TryGetInt('S', out int sParam) && sParam == 1)
                     {
                         _logger.Debug("Requesting full model update after M606 S1");
-                        await Updater.WaitForFullUpdate(code.CancellationToken);    // This changes inputs[].active, so sync the OM here
+                        await Updater.WaitForFullUpdateAsync(code.CancellationToken);    // This changes inputs[].active, so sync the OM here
                         _logger.Debug("Requested full model update after M606 S1");
 
                         SPI.Channel.Processor.StartCopiedMacros();

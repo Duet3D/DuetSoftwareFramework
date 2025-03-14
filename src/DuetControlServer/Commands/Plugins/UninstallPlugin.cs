@@ -4,6 +4,7 @@ using DuetControlServer.IPC;
 using System;
 using System.IO;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -27,9 +28,10 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Uninstall a plugin
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="ArgumentException">Plugin is invalid</exception>
-        public override async Task Execute()
+        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
         {
             if (!Settings.PluginSupport)
             {
@@ -37,14 +39,14 @@ namespace DuetControlServer.Commands
             }
 
             // Make sure the upgrade switch is only used by the plugin service
-            if (ForUpgrade && (Connection is not null && !Connection.Permissions.HasFlag(SbcPermissions.ServicePlugins)))
+            if (ForUpgrade && Connection is not null && !Connection.Permissions.HasFlag(SbcPermissions.ServicePlugins))
             {
                 throw new ArgumentException($"{nameof(ForUpgrade)} switch must not be used by third-party applications");
             }
 
             // Find the plugin to uninstall
             Plugin plugin;
-            using (await Model.Provider.AccessReadOnlyAsync())
+            using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
             {
                 if (Model.Provider.Get.Plugins.TryGetValue(Plugin, out plugin))
                 {
@@ -68,12 +70,12 @@ namespace DuetControlServer.Commands
             {
                 Plugin = Plugin
             };
-            await IPC.Processors.PluginService.PerformCommand(stopCommand, plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser));
+            await IPC.Processors.PluginService.PerformCommandAsync(stopCommand, plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser));
 
             // Make sure we don't attempt to start it again once it's uninstalled
             await using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write);
             await using StreamWriter writer = new(fileStream);
-            using (await Model.Provider.AccessReadOnlyAsync())
+            using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
             {
                 foreach (Plugin item in Model.Provider.Get.Plugins.Values)
                 {
@@ -86,11 +88,11 @@ namespace DuetControlServer.Commands
 
             // Perform the actual uninstallation via the plugin service.
             // If it is a root plugin, the root plugin service will clean up everything
-            await IPC.Processors.PluginService.PerformCommand(this, false);
-            await IPC.Processors.PluginService.PerformCommand(this, true);
+            await IPC.Processors.PluginService.PerformCommandAsync(this, false);
+            await IPC.Processors.PluginService.PerformCommandAsync(this, true);
 
             // Reset it in the object model
-            using (await Model.Provider.AccessReadWriteAsync())
+            using (await Model.Provider.AccessReadWriteAsync(cancellationToken))
             {
                 Model.Provider.Get.Plugins.Remove(Plugin);
             }

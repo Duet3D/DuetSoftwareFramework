@@ -39,7 +39,7 @@ namespace DuetControlServer.Codes.Handlers
                 {
                     return true;
                 }
-                return await SPI.Interface.EvaluateExpression(channel, $"exists({stringArgument})");
+                return await SPI.Interface.EvaluateExpressionAsync(channel, $"exists({stringArgument})");
             }
             throw new ArgumentException("exists requires an argument");
         }

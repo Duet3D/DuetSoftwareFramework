@@ -1,73 +1,72 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace DuetAPI.Commands
+namespace DuetAPI.Commands;
+
+/// <summary>
+/// Enumeration of conditional G-code keywords
+/// </summary>
+[JsonConverter(typeof(JsonNumberEnumConverter<KeywordType>))]
+public enum KeywordType : byte
 {
     /// <summary>
-    /// Enumeration of conditional G-code keywords
+    /// No conditional code
     /// </summary>
-    [JsonConverter(typeof(JsonNumberEnumConverter<KeywordType>))]
-    public enum KeywordType : byte
-    {
-        /// <summary>
-        /// No conditional code
-        /// </summary>
-        None,
+    None,
 
-        /// <summary>
-        /// If condition
-        /// </summary>
-        If,
+    /// <summary>
+    /// If condition
+    /// </summary>
+    If,
 
-        /// <summary>
-        /// Else-if condition
-        /// </summary>
-        ElseIf,
+    /// <summary>
+    /// Else-if condition
+    /// </summary>
+    ElseIf,
 
-        /// <summary>
-        /// Else condition
-        /// </summary>
-        Else,
+    /// <summary>
+    /// Else condition
+    /// </summary>
+    Else,
 
-        /// <summary>
-        /// While condition
-        /// </summary>
-        While,
+    /// <summary>
+    /// While condition
+    /// </summary>
+    While,
 
-        /// <summary>
-        /// Break instruction
-        /// </summary>
-        /// <seealso cref="While"/>
-        Break,
+    /// <summary>
+    /// Break instruction
+    /// </summary>
+    /// <seealso cref="While"/>
+    Break,
 
-        /// <summary>
-        /// Abort instruction
-        /// </summary>
-        Abort,
+    /// <summary>
+    /// Abort instruction
+    /// </summary>
+    Abort,
 
-        /// <summary>
-        /// Var operation
-        /// </summary>
-        Var,
+    /// <summary>
+    /// Var operation
+    /// </summary>
+    Var,
 
-        /// <summary>
-        /// Set operation
-        /// </summary>
-        Set,
+    /// <summary>
+    /// Set operation
+    /// </summary>
+    Set,
 
-        /// <summary>
-        /// Echo operation
-        /// </summary>
-        Echo,
+    /// <summary>
+    /// Echo operation
+    /// </summary>
+    Echo,
 
-        /// <summary>
-        /// Continue instruction
-        /// </summary>
-        /// <seealso cref="While"/>
-        Continue,
+    /// <summary>
+    /// Continue instruction
+    /// </summary>
+    /// <seealso cref="While"/>
+    Continue,
 
-        /// <summary>
-        /// Global operation
-        /// </summary>
-        Global
-    }
+    /// <summary>
+    /// Global operation
+    /// </summary>
+    Global
 }

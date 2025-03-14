@@ -391,7 +391,7 @@ namespace DuetControlServer.Files
                             }
 
                             // Evaluate the condition
-                            string? stringEvaluationResult = await Model.Expressions.Evaluate(code, true);
+                            string? stringEvaluationResult = await Model.Expressions.EvaluateAsync(code, true);
                             if (bool.TryParse(stringEvaluationResult, out bool evaluationResult))
                             {
                                 _logger.Debug("Evaluation result: ({0}) = {1}", code.KeywordArgument, evaluationResult);

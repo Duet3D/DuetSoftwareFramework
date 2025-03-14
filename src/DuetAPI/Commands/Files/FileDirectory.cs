@@ -1,46 +1,45 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace DuetAPI.Commands
+namespace DuetAPI.Commands;
+
+/// <summary>
+/// Base file directory for lookups
+/// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter<FileDirectory>))]
+public enum FileDirectory
 {
     /// <summary>
-    /// Base file directory for lookups
+    /// Filaments directory
     /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter<FileDirectory>))]
-    public enum FileDirectory
-    {
-        /// <summary>
-        /// Filaments directory
-        /// </summary>
-        Filaments,
+    Filaments,
 
-        /// <summary>
-        /// Firmware directory
-        /// </summary>
-        Firmware,
+    /// <summary>
+    /// Firmware directory
+    /// </summary>
+    Firmware,
 
-        /// <summary>
-        /// GCodes directory
-        /// </summary>
-        GCodes,
+    /// <summary>
+    /// GCodes directory
+    /// </summary>
+    GCodes,
 
-        /// <summary>
-        /// Macros directory
-        /// </summary>
-        Macros,
+    /// <summary>
+    /// Macros directory
+    /// </summary>
+    Macros,
 
-        /// <summary>
-        /// Menu directory
-        /// </summary>
-        Menu,
+    /// <summary>
+    /// Menu directory
+    /// </summary>
+    Menu,
 
-        /// <summary>
-        /// System directory
-        /// </summary>
-        System,
+    /// <summary>
+    /// System directory
+    /// </summary>
+    System,
 
-        /// <summary>
-        /// WWW directory
-        /// </summary>
-        Web
-    }
+    /// <summary>
+    /// WWW directory
+    /// </summary>
+    Web
 }

@@ -56,8 +56,9 @@ namespace DuetControlServer.IPC.Processors
         /// </summary>
         /// <param name="command">Command to perform</param>
         /// <param name="asRoot">Send it to the service running as root</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task PerformCommand(BaseCommand command, bool asRoot)
+        public static async Task PerformCommandAsync(BaseCommand command, bool asRoot, CancellationToken cancellationToken = default)
         {
             TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
             using (await (asRoot ? _rootMonitor : _monitor).EnterAsync(Program.CancellationToken))
@@ -87,6 +88,7 @@ namespace DuetControlServer.IPC.Processors
                     }
                 }
             }
+            #warning add ct support
             await tcs.Task;
         }
 
@@ -136,7 +138,7 @@ namespace DuetControlServer.IPC.Processors
                 await Model.Updater.WaitForFullUpdate();
 
                 Commands.StartPlugins startCommand = new();
-                _ = Task.Run(startCommand.Execute);
+                _ = Task.Run(async () => await startCommand.ExecuteAsync());
             }
 
             // Process incoming requests
@@ -241,7 +243,7 @@ namespace DuetControlServer.IPC.Processors
                     if (stopPlugins)
                     {
                         Commands.StopPlugins stopCommand = new();
-                        _ = Task.Run(stopCommand.Execute);
+                        _ = Task.Run(async () => await stopCommand.ExecuteAsync());
                     }
 
                     // Plugins from this service are no longer running

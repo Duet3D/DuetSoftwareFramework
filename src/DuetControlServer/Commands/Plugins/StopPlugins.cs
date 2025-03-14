@@ -3,6 +3,7 @@ using Nito.AsyncEx;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -20,18 +21,19 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Stop all the plugins
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public override async Task Execute()
+        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
         {
             if (!Settings.PluginSupport)
             {
                 return;
             }
 
-            using (await _stopLock.LockAsync(Program.CancellationToken))
+            using (await _stopLock.LockAsync(cancellationToken))
             {
                 // Don't proceed if all the plugins have been stopped
-                using (await Model.Provider.AccessReadOnlyAsync())
+                using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
                 {
                     if (!Model.Provider.Get.State.PluginsStarted)
                     {
@@ -42,7 +44,7 @@ namespace DuetControlServer.Commands
                 // Stop all plugins
                 StringBuilder startedPlugins = new();
                 List<Task> stopTasks = [];
-                using (await Model.Provider.AccessReadOnlyAsync())
+                using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
                 {
                     foreach (Plugin item in Model.Provider.Get.Plugins.Values)
                     {
@@ -58,7 +60,7 @@ namespace DuetControlServer.Commands
                                     SaveState = false,
                                     StoppingAll = true
                                 };
-                                stopTasks.Add(stopCommand.Execute());
+                                stopTasks.Add(stopCommand.ExecuteAsync(cancellationToken));
                             }
                         }
                     }
@@ -73,7 +75,7 @@ namespace DuetControlServer.Commands
                     // Can be expected when the remote service is terminated too early
                 }
 
-                using (await Model.Provider.AccessReadWriteAsync())
+                using (await Model.Provider.AccessReadWriteAsync(cancellationToken))
                 {
                     // Plugins have been stopped
                     Model.Provider.Get.State.PluginsStarted = false;

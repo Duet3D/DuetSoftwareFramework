@@ -327,7 +327,7 @@ namespace DuetControlServer.Utility
                                 new('B', board.CanAddress)
                             ]
                         };
-                        Message result = await updateCode.Execute() ?? new Message();
+                        Message result = await updateCode.ExecuteAsync() ?? new Message();
 
                         // Unlike with M997, we need to wait for RRF to complete the update process
                         while (true)
@@ -366,7 +366,7 @@ namespace DuetControlServer.Utility
                         Type = CodeType.MCode,
                         MajorNumber = 997
                     };
-                    Message result = await updateCode.Execute() ?? new Message();
+                    Message result = await updateCode.ExecuteAsync() ?? new Message();
                     Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
                 }
                 catch (Exception e)
@@ -386,7 +386,7 @@ namespace DuetControlServer.Utility
                         Type = CodeType.MCode,
                         MajorNumber = 999
                     };
-                    Message result = await updateCode.Execute() ?? new Message();
+                    Message result = await updateCode.ExecuteAsync() ?? new Message();
                     Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
                 }
                 catch (Exception e)

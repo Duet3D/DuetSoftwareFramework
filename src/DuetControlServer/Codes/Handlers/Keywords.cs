@@ -122,7 +122,7 @@ namespace DuetControlServer.Codes.Handlers
                             // Evaluate the filename and result to write
                             string filename = await Expressions.EvaluateExpression(code, filenameExpression, false, false);
                             string physicalFilename = await FilePath.ToPhysicalAsync(filename, FileDirectory.System), parentDirectory = Path.GetDirectoryName(physicalFilename)!;
-                            result = await Expressions.Evaluate(code, true);
+                            result = await Expressions.EvaluateAsync(code, true);
 
                             // Write it to the designated file
                             _logger.Debug("{0} '{1}' to {2}", append ? "Appending" : "Writing", result, filename);
@@ -149,7 +149,7 @@ namespace DuetControlServer.Codes.Handlers
                             return new Message();
                         }
                     }
-                    result = await Expressions.Evaluate(code, true);
+                    result = await Expressions.EvaluateAsync(code, true);
 
                     if (code.Keyword == KeywordType.Abort)
                     {
@@ -244,7 +244,7 @@ namespace DuetControlServer.Codes.Handlers
                     }
 
                     // Replace SBC fields and prepare the variable name
-                    expression = await Expressions.Evaluate(code, false) ?? string.Empty;
+                    expression = await Expressions.EvaluateAsync(code, false) ?? string.Empty;
                     string fullVarName = varName;
                     if (code.Keyword == KeywordType.Set)
                     {

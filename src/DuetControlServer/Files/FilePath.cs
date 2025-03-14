@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
 
@@ -122,8 +123,9 @@ namespace DuetControlServer.Files
         /// </summary>
         /// <param name="filePath">File path to resolve</param>
         /// <param name="directory">Directory containing filePath if it is not absolute is specified</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Resolved file path</returns>
-        public static async Task<string> ToPhysicalAsync(string filePath, FileDirectory directory)
+        public static async Task<string> ToPhysicalAsync(string filePath, FileDirectory directory, CancellationToken cancellationToken = default)
         {
             filePath = filePath.Replace('\\', '/');
 
@@ -135,7 +137,7 @@ namespace DuetControlServer.Files
                     return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
                 }
 
-                using (await Model.Provider.AccessReadOnlyAsync())
+                using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
                 {
                     if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
                     {
@@ -150,7 +152,7 @@ namespace DuetControlServer.Files
             if (!filePath.StartsWith('/'))
             {
                 string directoryPath;
-                using (await Model.Provider.AccessReadOnlyAsync())
+                using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
                 {
                     directoryPath = directory switch
                     {
@@ -246,8 +248,9 @@ namespace DuetControlServer.Files
         /// </summary>
         /// <param name="filePath">File path to resolve</param>
         /// <param name="directory">Directory containing filePath if it is not absolute is specified</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Resolved file path</returns>
-        public static async Task<string> ToPhysicalAsync(string filePath, string? directory = null)
+        public static async Task<string> ToPhysicalAsync(string filePath, string? directory = null, CancellationToken cancellationToken = default)
         {
             filePath = filePath.Replace('\\', '/');
 
@@ -259,7 +262,7 @@ namespace DuetControlServer.Files
                     return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
                 }
 
-                using (await Model.Provider.AccessReadOnlyAsync())
+                using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
                 {
                     if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
                     {
@@ -281,7 +284,7 @@ namespace DuetControlServer.Files
                         directory = Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
                     }
 
-                    using (await Model.Provider.AccessReadOnlyAsync())
+                    using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
                     {
                         if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
                         {
@@ -331,8 +334,9 @@ namespace DuetControlServer.Files
         /// The first drive (0:/) is reserved for usage with the base directory as specified in the settings.
         /// </summary>
         /// <param name="filePath">File path to convert</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Resolved file path</returns>
-        public static async Task<string> ToVirtualAsync(string filePath)
+        public static async Task<string> ToVirtualAsync(string filePath, CancellationToken cancellationToken = default)
         {
             if (filePath.StartsWith(Settings.BaseDirectory))
             {
@@ -340,7 +344,7 @@ namespace DuetControlServer.Files
                 return Path.Combine("0:/", filePath);
             }
 
-            using (await Model.Provider.AccessReadOnlyAsync())
+            using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
             {
                 for (int i = 1; i < Model.Provider.Get.Volumes.Count; i++)
                 {

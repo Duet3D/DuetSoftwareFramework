@@ -1,21 +1,20 @@
 ﻿using DuetAPI.Utility;
 
-namespace DuetAPI.Commands
+namespace DuetAPI.Commands;
+
+/// <summary>
+/// Resolve a RepRapFirmware-style path to an actual file path
+/// </summary>
+[RequiredPermissions(SbcPermissions.CommandExecution | SbcPermissions.FileSystemAccess)]
+public class ResolvePath : Command<string>
 {
     /// <summary>
-    /// Resolve a RepRapFirmware-style path to an actual file path
+    /// Path that is RepRapFirmware-compatible
     /// </summary>
-    [RequiredPermissions(SbcPermissions.CommandExecution | SbcPermissions.FileSystemAccess)]
-    public class ResolvePath : Command<string>
-    {
-        /// <summary>
-        /// Path that is RepRapFirmware-compatible
-        /// </summary>
-        public string Path { get; set; } = string.Empty;
+    public string Path { get; set; } = string.Empty;
 
-        /// <summary>
-        /// Optional base directory to resolve the path relative to
-        /// </summary>
-        public FileDirectory? BaseDirectory { get; set; }
-    }
+    /// <summary>
+    /// Optional base directory to resolve the path relative to
+    /// </summary>
+    public FileDirectory? BaseDirectory { get; set; }
 }

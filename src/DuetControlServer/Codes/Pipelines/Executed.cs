@@ -4,6 +4,7 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Codes.Handlers;
 using DuetControlServer.Files;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Codes.Pipelines
@@ -149,8 +150,9 @@ namespace DuetControlServer.Codes.Pipelines
         /// Wait for the pipeline stage to become idle
         /// </summary>
         /// <param name="file">Code file</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public override Task<bool> FlushAsync(CodeFile file) => _stackItem.FlushAsync();
+        public override Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default) => _stackItem.FlushAsync(cancellationToken);
 
         /// <summary>
         /// Wait for the pipeline stage to become idle
@@ -158,8 +160,9 @@ namespace DuetControlServer.Codes.Pipelines
         /// <param name="code">Code waiting for the flush</param>
         /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
         /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public override Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true) => _stackItem.FlushAsync(code);
+        public override Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true, CancellationToken cancellationToken = default) => _stackItem.FlushAsync(cancellationToken);
 
         /// <summary>
         /// Execute a given code on this pipeline stage

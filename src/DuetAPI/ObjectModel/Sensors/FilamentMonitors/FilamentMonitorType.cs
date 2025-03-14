@@ -1,37 +1,36 @@
 ﻿using DuetAPI.Utility;
 using System.Text.Json.Serialization;
 
-namespace DuetAPI.ObjectModel
+namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// Enumeration of supported filament sensors
+/// </summary>
+[JsonConverter(typeof(JsonCamelCaseStringEnumConverter<FilamentMonitorType>))]
+public enum FilamentMonitorType
 {
     /// <summary>
-    /// Enumeration of supported filament sensors
+    /// Simple filament sensor
     /// </summary>
-    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<FilamentMonitorType>))]
-    public enum FilamentMonitorType
-    {
-        /// <summary>
-        /// Simple filament sensor
-        /// </summary>
-        Simple,
+    Simple,
 
-        /// <summary>
-        /// Laser filament sensor
-        /// </summary>
-        Laser,
+    /// <summary>
+    /// Laser filament sensor
+    /// </summary>
+    Laser,
 
-        /// <summary>
-        /// Pulsed filament sensor
-        /// </summary>
-        Pulsed,
+    /// <summary>
+    /// Pulsed filament sensor
+    /// </summary>
+    Pulsed,
 
-        /// <summary>
-        /// Rotating magnet filament sensor
-        /// </summary>
-        RotatingMagnet,
+    /// <summary>
+    /// Rotating magnet filament sensor
+    /// </summary>
+    RotatingMagnet,
 
-        /// <summary>
-        /// Unknown sensor type
-        /// </summary>
-        Unknown
-    }
+    /// <summary>
+    /// Unknown sensor type
+    /// </summary>
+    Unknown
 }

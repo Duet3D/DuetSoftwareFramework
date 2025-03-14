@@ -10,6 +10,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
@@ -303,8 +304,9 @@ namespace DuetControlServer.Model
         /// </summary>
         /// <param name="code">Code holding expressions</param>
         /// <param name="evaluateAll">Whether all or only SBC fields are supposed to be evaluated</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Evaluation result or null</returns>
-        public static async Task<string?> Evaluate(Code code, bool evaluateAll)
+        public static async Task<string?> EvaluateAsync(Code code, bool evaluateAll, CancellationToken cancellationToken = default)
         {
             if (code.KeywordArgument is not null)
             {
@@ -313,7 +315,7 @@ namespace DuetControlServer.Model
                     StringBuilder builder = new();
                     foreach (string expression in SplitExpression(code.KeywordArgument))
                     {
-                        string result = await EvaluateExpression(code, expression, !evaluateAll, false);
+                        string result = await EvaluateExpression(code, expression, !evaluateAll, false, cancellationToken);
                         if (builder.Length != 0)
                         {
                             builder.Append(' ');
@@ -326,7 +328,7 @@ namespace DuetControlServer.Model
                 if (code.Keyword == KeywordType.Abort)
                 {
                     string keywordArgument = code.KeywordArgument.Trim();
-                    return await EvaluateExpression(code, keywordArgument, !evaluateAll, false);
+                    return await EvaluateExpression(code, keywordArgument, !evaluateAll, false, cancellationToken);
                 }
 
                 string keywordExpression;
@@ -354,7 +356,7 @@ namespace DuetControlServer.Model
                 }
 
                 // Evaluate SBC properties
-                return await EvaluateExpression(code, keywordExpression.Trim(), !evaluateAll, false);
+                return await EvaluateExpression(code, keywordExpression.Trim(), !evaluateAll, false, cancellationToken);
             }
 
             if (code.Parameters.Any(parameter => parameter.IsExpression))
@@ -517,10 +519,11 @@ namespace DuetControlServer.Model
         /// <param name="code">Code holding the expression(s)</param>
         /// <param name="expression">Expression(s) to replace</param>
         /// <param name="onlySbcFields">Whether to replace only SBC fields</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Replaced expression(s)</returns>
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
         /// <exception cref="OperationCanceledException">Code was cancelled</exception>
-        public static async Task<object?> EvaluateExpressionRaw(Code code, string expression, bool onlySbcFields)
+        public static async Task<object?> EvaluateExpressionRaw(Code code, string expression, bool onlySbcFields, CancellationToken cancellationToken = default)
         {
             int i = 0;
 
@@ -605,7 +608,7 @@ namespace DuetControlServer.Model
                         string filterString = wantsCount ? lastTokenValue[1..].Trim() : lastTokenValue.Trim();
                         if (IsSbcExpression(filterString, false))
                         {
-                            using (await Provider.AccessReadOnlyAsync())
+                            using (await Provider.AccessReadOnlyAsync(cancellationToken))
                             {
                                 if (Filter.GetSpecific(filterString, true, out object? sbcField))
                                 {
@@ -744,7 +747,7 @@ namespace DuetControlServer.Model
                 code.CancellationToken.ThrowIfCancellationRequested();
                 try
                 {
-                    return await SPI.Interface.EvaluateExpression(code.Channel, subExpression);
+                    return await SPI.Interface.EvaluateExpressionAsync(code.Channel, subExpression, cancellationToken: cancellationToken);
                 }
                 catch (CodeParserException) when (code.CancellationToken.IsCancellationRequested)
                 {
@@ -906,7 +909,7 @@ namespace DuetControlServer.Model
             code.CancellationToken.ThrowIfCancellationRequested();
             try
             {
-                return await SPI.Interface.EvaluateExpression(code.Channel, expressionContent);
+                return await SPI.Interface.EvaluateExpressionAsync(code.Channel, expressionContent);
             }
             catch (CodeParserException) when (code.CancellationToken.IsCancellationRequested)
             {
@@ -921,12 +924,13 @@ namespace DuetControlServer.Model
         /// <param name="expression">Expression(s) to replace</param>
         /// <param name="onlySbcFields">Whether to replace only SBC fields</param>
         /// <param name="encodeResult">Whether the final result shall be encoded</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Replaced expression(s)</returns>
         /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
         /// <exception cref="OperationCanceledException">Code was cancelled</exception>
-        public static async Task<string> EvaluateExpression(Code code, string expression, bool onlySbcFields, bool encodeResult)
+        public static async Task<string> EvaluateExpression(Code code, string expression, bool onlySbcFields, bool encodeResult, CancellationToken cancellationToken = default)
         {
-            object? result = await EvaluateExpressionRaw(code, expression, onlySbcFields);
+            object? result = await EvaluateExpressionRaw(code, expression, onlySbcFields, cancellationToken);
             return (onlySbcFields && result is string resultString) ? resultString : ObjectToString(result, false, encodeResult, code);
         }
     }

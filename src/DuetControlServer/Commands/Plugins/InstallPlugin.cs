@@ -4,6 +4,7 @@ using System;
 using System.IO;
 using System.IO.Compression;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -21,9 +22,10 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Install or upgrade a plugin
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="ArgumentException">Plugin is incompatible</exception>
-        public override async Task Execute()
+        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
         {
             if (!Settings.PluginSupport)
             {
@@ -38,7 +40,7 @@ namespace DuetControlServer.Commands
             using (ZipArchive zipArchive = ZipFile.OpenRead(PluginFile))
             {
                 // Get the plugin manifest from the ZIP file
-                plugin = await ExtractManifest(zipArchive);
+                plugin = await ExtractManifestAsync(zipArchive, cancellationToken);
 
                 // Run preflight check to make sure no malicious files are installed
                 foreach (ZipArchiveEntry entry in zipArchive.Entries)
@@ -60,7 +62,7 @@ namespace DuetControlServer.Commands
             }
 
             // Validate the current DSF/RRF versions
-            using (await Model.Provider.AccessReadOnlyAsync())
+            using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
             {
                 // Check the required DSF version
                 if (!PluginManifest.CheckVersion(Program.Version, plugin.SbcDsfVersion!))
@@ -86,7 +88,7 @@ namespace DuetControlServer.Commands
             }
 
             // Make sure all the required plugins dependencies are installed
-            using (await Model.Provider.AccessReadOnlyAsync())
+            using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
             {
                 foreach (string dependency in plugin.SbcPluginDependencies)
                 {
@@ -121,7 +123,7 @@ namespace DuetControlServer.Commands
             }
 
             // Uninstall the old plugin (if applicable)
-            using (await Model.Provider.AccessReadOnlyAsync())
+            using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
             {
                 Upgrade = Model.Provider.Get.Plugins.ContainsKey(plugin.Id);
             }
@@ -129,14 +131,14 @@ namespace DuetControlServer.Commands
             if (Upgrade)
             {
                 UninstallPlugin uninstallCommand = new() { Plugin = plugin.Id, ForUpgrade = true };
-                await uninstallCommand.Execute();
+                await uninstallCommand.ExecuteAsync();
             }
 
             // Forward this command to the plugin services
             // 1) Install regular files via dsf user
             // 2) Perform policy generation using AppArmor profiles via root
-            await IPC.Processors.PluginService.PerformCommand(this, false);
-            await IPC.Processors.PluginService.PerformCommand(this, true);
+            await IPC.Processors.PluginService.PerformCommandAsync(this, false, cancellationToken);
+            await IPC.Processors.PluginService.PerformCommandAsync(this, true, cancellationToken);
 
             // If possible, reload the plugin manifest with the updated file lists and register it in the object model
             string manifestFilename = Path.Combine(Settings.PluginDirectory, plugin.Id + ".json");
@@ -144,11 +146,11 @@ namespace DuetControlServer.Commands
             {
                 await using (FileStream manifestStream = new(manifestFilename, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize))
                 {
-                    using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
+                    using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream, cancellationToken: cancellationToken);
                     plugin.UpdateFromJson(manifestJson.RootElement, false);
                 }
 
-                using (await Model.Provider.AccessReadWriteAsync())
+                using (await Model.Provider.AccessReadWriteAsync(cancellationToken))
                 {
                     Model.Provider.Get.Plugins.Add(plugin.Id, plugin);
                 }
@@ -159,16 +161,17 @@ namespace DuetControlServer.Commands
         /// Extract, parse, and verify the plugin manifest
         /// </summary>
         /// <param name="zipArchive">ZIP archive containing the plugin files</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Plugin manifest</returns>
         /// <exception cref="ArgumentException">Plugin is incompatible</exception>
-        private static async Task<Plugin> ExtractManifest(ZipArchive zipArchive)
+        private static async Task<Plugin> ExtractManifestAsync(ZipArchive zipArchive, CancellationToken cancellationToken = default)
         {
             // Extract the plugin manifest
             ZipArchiveEntry? manifestFile = zipArchive.GetEntry("plugin.json") ?? throw new ArgumentException("plugin.json not found in the ZIP file");
             Plugin plugin = new();
             await using (Stream manifestStream = manifestFile.Open())
             {
-                using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
+                using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream, cancellationToken: cancellationToken);
                 plugin.UpdateFromJson(manifestJson.RootElement, false);
             }
             plugin.Pid = -1;

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -11,9 +12,10 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Uninstall a system package
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="ArgumentException">Package could not be uninstalled</exception>
-        public override async Task Execute()
+        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
         {
             if (!Settings.RootPluginSupport)
             {
@@ -21,7 +23,7 @@ namespace DuetControlServer.Commands
             }
 
             // Forward this command to the plugin services
-            await IPC.Processors.PluginService.PerformCommand(this, true);
+            await IPC.Processors.PluginService.PerformCommandAsync(this, true, cancellationToken);
         }
     }
 }

@@ -7,485 +7,484 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace DuetAPI.ObjectModel
+namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// Class for holding string keys and custom values
+/// </summary>
+/// <remarks>
+/// Key names are NOT converted to camel-case (unlike regular class properties)
+/// </remarks>
+/// <param name="nullRemovesItems">Defines if setting items to null effectively removes them</param>
+public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems) : IDictionary<string, TValue>, IModelDictionary where TValue : IStaticModelObject, new()
 {
     /// <summary>
-    /// Class for holding string keys and custom values
+    /// Flags if keys can be removed again by setting their value to null
     /// </summary>
-    /// <remarks>
-    /// Key names are NOT converted to camel-case (unlike regular class properties)
-    /// </remarks>
-    /// <param name="nullRemovesItems">Defines if setting items to null effectively removes them</param>
-    public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems) : IDictionary<string, TValue>, IModelDictionary where TValue : IStaticModelObject, new()
+    [JsonIgnore]
+    public bool NullRemovesItems { get; } = nullRemovesItems;
+
+    /// <summary>
+    /// Internal storage for key/value pairs
+    /// </summary>
+    private readonly Dictionary<string, TValue> _dictionary = [];
+
+    /// <summary>
+    /// Event that is called when the entire directory is cleared. Only used if <see cref="NullRemovesItems"/> is false
+    /// </summary>
+    public event EventHandler? DictionaryCleared;
+
+    /// <summary>
+    /// Event that is called when a key has been changed
+    /// </summary>
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>
+    /// Event that is called when a key is being changed
+    /// </summary>
+    public event PropertyChangingEventHandler? PropertyChanging;
+
+    /// <summary>
+    /// Get an element from the dictionary
+    /// </summary>
+    /// <param name="key">Key</param>
+    /// <returns>Value</returns>
+    [return: MaybeNull]
+    private TValue GetValue(string key)
     {
-        /// <summary>
-        /// Flags if keys can be removed again by setting their value to null
-        /// </summary>
-        [JsonIgnore]
-        public bool NullRemovesItems { get; } = nullRemovesItems;
-
-        /// <summary>
-        /// Internal storage for key/value pairs
-        /// </summary>
-        private readonly Dictionary<string, TValue> _dictionary = [];
-
-        /// <summary>
-        /// Event that is called when the entire directory is cleared. Only used if <see cref="NullRemovesItems"/> is false
-        /// </summary>
-        public event EventHandler? DictionaryCleared;
-
-        /// <summary>
-        /// Event that is called when a key has been changed
-        /// </summary>
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        /// <summary>
-        /// Event that is called when a key is being changed
-        /// </summary>
-        public event PropertyChangingEventHandler? PropertyChanging;
-
-        /// <summary>
-        /// Get an element from the dictionary
-        /// </summary>
-        /// <param name="key">Key</param>
-        /// <returns>Value</returns>
-        [return: MaybeNull]
-        private TValue GetValue(string key)
+        if (NullRemovesItems)
         {
-            if (NullRemovesItems)
-            {
-                return _dictionary.TryGetValue(key, out TValue? result) ? result : default;
-            }
-            return _dictionary[key];
+            return _dictionary.TryGetValue(key, out TValue? result) ? result : default;
         }
+        return _dictionary[key];
+    }
 
-        /// <summary>
-        /// Index operator
-        /// </summary>
-        /// <param name="key">Key</param>
-        /// <returns>Value</returns>
-        [AllowNull]
-        public TValue this[string key]
+    /// <summary>
+    /// Index operator
+    /// </summary>
+    /// <param name="key">Key</param>
+    /// <returns>Value</returns>
+    [AllowNull]
+    public TValue this[string key]
+    {
+        get => GetValue(key)!;
+        set
         {
-            get => GetValue(key)!;
-            set
-            {
-                PropertyChanging?.Invoke(this, new(key));
-                if (NullRemovesItems && value is null)
-                {
-                    _dictionary.Remove(key);
-                }
-                else
-                {
-                    _dictionary[key] = value!;
-                }
-                PropertyChanged?.Invoke(this, new(key));
-            }
-        }
-
-        /// <summary>
-        /// Basic index operator
-        /// </summary>
-        /// <param name="key">Key object</param>
-        /// <returns>Value if found</returns>
-        [AllowNull]
-        [MaybeNull]
-        public object this[object key]
-        {
-            get => this[(string)key];
-            set => this[(string)key] = (TValue?)value;
-        }
-
-        /// <summary>
-        /// Get an enumerator for this instance
-        /// </summary>
-        /// <returns>Enumerator instance</returns>
-        public IEnumerator<KeyValuePair<string, TValue>> GetEnumerator() => _dictionary.GetEnumerator();
-
-        /// <summary>
-        /// List of keys
-        /// </summary>
-        public ICollection<string> Keys => _dictionary.Keys;
-
-        /// <summary>
-        /// List of values
-        /// </summary>
-        public ICollection<TValue> Values => _dictionary.Values;
-
-        /// <summary>
-        /// Whether the dictionary is read-only
-        /// </summary>
-        public bool IsReadOnly => false;
-
-        /// <summary>
-        /// Whether this dictionary has a fixed size
-        /// </summary>
-        public bool IsFixedSize => false;
-
-        /// <summary>
-        /// Collection of dictionary keys
-        /// </summary>
-        ICollection IDictionary.Keys => _dictionary.Keys;
-
-        /// <summary>
-        /// Collection of dictionary values
-        /// </summary>
-        ICollection IDictionary.Values => _dictionary.Values;
-
-        /// <summary>
-        /// If this is thread-safe
-        /// </summary>
-        public bool IsSynchronized => false;
-
-        /// <summary>
-        /// Synchronization root
-        /// </summary>
-        public object SyncRoot => _dictionary;
-
-        /// <summary>
-        /// Returns the number of items in this collection
-        /// </summary>
-        public int Count => _dictionary.Count;
-
-        /// <summary>
-        /// Add a new item
-        /// </summary>
-        /// <param name="key">Key to add</param>
-        /// <param name="value">Value to add</param>
-        public void Add(string key, TValue value)
-        {
+            PropertyChanging?.Invoke(this, new(key));
             if (NullRemovesItems && value is null)
             {
-                throw new ArgumentNullException(nameof(value));
+                _dictionary.Remove(key);
             }
-
-            PropertyChanging?.Invoke(this, new(key));
-            _dictionary.Add(key, value);
+            else
+            {
+                _dictionary[key] = value!;
+            }
             PropertyChanged?.Invoke(this, new(key));
         }
+    }
 
-        /// <summary>
-        /// Add a new item
-        /// </summary>
-        /// <param name="key">Key to add</param>
-        /// <param name="value">Value to add</param>
-        public void Add(object key, object? value) => Add((string)key, (TValue)value!);
+    /// <summary>
+    /// Basic index operator
+    /// </summary>
+    /// <param name="key">Key object</param>
+    /// <returns>Value if found</returns>
+    [AllowNull]
+    [MaybeNull]
+    public object this[object key]
+    {
+        get => this[(string)key];
+        set => this[(string)key] = (TValue?)value;
+    }
 
-        /// <summary>
-        /// Add a new item
-        /// </summary>
-        /// <param name="item">Item to add</param>
-        public void Add(KeyValuePair<string, TValue> item) => Add(item.Key, item.Value);
+    /// <summary>
+    /// Get an enumerator for this instance
+    /// </summary>
+    /// <returns>Enumerator instance</returns>
+    public IEnumerator<KeyValuePair<string, TValue>> GetEnumerator() => _dictionary.GetEnumerator();
 
-        /// <summary>
-        /// Assign the properties from another instance
-        /// </summary>
-        /// <param name="from">Other instance</param>
-        public void Assign(IStaticModelObject from)
+    /// <summary>
+    /// List of keys
+    /// </summary>
+    public ICollection<string> Keys => _dictionary.Keys;
+
+    /// <summary>
+    /// List of values
+    /// </summary>
+    public ICollection<TValue> Values => _dictionary.Values;
+
+    /// <summary>
+    /// Whether the dictionary is read-only
+    /// </summary>
+    public bool IsReadOnly => false;
+
+    /// <summary>
+    /// Whether this dictionary has a fixed size
+    /// </summary>
+    public bool IsFixedSize => false;
+
+    /// <summary>
+    /// Collection of dictionary keys
+    /// </summary>
+    ICollection IDictionary.Keys => _dictionary.Keys;
+
+    /// <summary>
+    /// Collection of dictionary values
+    /// </summary>
+    ICollection IDictionary.Values => _dictionary.Values;
+
+    /// <summary>
+    /// If this is thread-safe
+    /// </summary>
+    public bool IsSynchronized => false;
+
+    /// <summary>
+    /// Synchronization root
+    /// </summary>
+    public object SyncRoot => _dictionary;
+
+    /// <summary>
+    /// Returns the number of items in this collection
+    /// </summary>
+    public int Count => _dictionary.Count;
+
+    /// <summary>
+    /// Add a new item
+    /// </summary>
+    /// <param name="key">Key to add</param>
+    /// <param name="value">Value to add</param>
+    public void Add(string key, TValue value)
+    {
+        if (NullRemovesItems && value is null)
         {
-            // Validate the types
-            if (from is not StaticModelDictionary<TValue> other)
-            {
-                throw new ArgumentException("Types do not match", nameof(from));
-            }
-            if (NullRemovesItems != other.NullRemovesItems)
-            {
-                throw new ArgumentException("Incompatible item null handling");
-            }
+            throw new ArgumentNullException(nameof(value));
+        }
 
-            // Check if this dictionary needs to cleared first
-            foreach (string key in Keys.ToList())
-            {
-                if (!other.ContainsKey(key))
-                {
-                    Clear();
-                    break;
-                }
-            }
+        PropertyChanging?.Invoke(this, new(key));
+        _dictionary.Add(key, value);
+        PropertyChanged?.Invoke(this, new(key));
+    }
 
-            // Update items
-            foreach (var kv in other)
-            {
-                if (TryGetValue(kv.Key, out TValue? existingItem))
-                {
-                    if (existingItem is null)
-                    {
-                        if (kv.Value is not null)
-                        {
-                            this[kv.Key] = kv.Value;
-                        }
-                    }
-                    else if (!existingItem.Equals(kv.Value))
-                    {
-                        if (kv.Value is ICloneable cloneableItem)
-                        {
-                            this[kv.Key] = (TValue)cloneableItem.Clone();
+    /// <summary>
+    /// Add a new item
+    /// </summary>
+    /// <param name="key">Key to add</param>
+    /// <param name="value">Value to add</param>
+    public void Add(object key, object? value) => Add((string)key, (TValue)value!);
 
-                        }
-                        else
-                        {
-                            this[kv.Key] = kv.Value;
-                        }
-                    }
-                }
-                else
-                {
-                    Add(kv);
-                }
+    /// <summary>
+    /// Add a new item
+    /// </summary>
+    /// <param name="item">Item to add</param>
+    public void Add(KeyValuePair<string, TValue> item) => Add(item.Key, item.Value);
+
+    /// <summary>
+    /// Assign the properties from another instance
+    /// </summary>
+    /// <param name="from">Other instance</param>
+    public void Assign(IStaticModelObject from)
+    {
+        // Validate the types
+        if (from is not StaticModelDictionary<TValue> other)
+        {
+            throw new ArgumentException("Types do not match", nameof(from));
+        }
+        if (NullRemovesItems != other.NullRemovesItems)
+        {
+            throw new ArgumentException("Incompatible item null handling");
+        }
+
+        // Check if this dictionary needs to cleared first
+        foreach (string key in Keys.ToList())
+        {
+            if (!other.ContainsKey(key))
+            {
+                Clear();
+                break;
             }
         }
 
-        /// <summary>
-        /// Clear this dictionary
-        /// </summary>
-        public void Clear()
+        // Update items
+        foreach (var kv in other)
         {
-            if (NullRemovesItems)
+            if (TryGetValue(kv.Key, out TValue? existingItem))
             {
-                List<string> keys = new(_dictionary.Keys);
-                foreach (string key in keys)
+                if (existingItem is null)
                 {
-                    Remove(key);
+                    if (kv.Value is not null)
+                    {
+                        this[kv.Key] = kv.Value;
+                    }
+                }
+                else if (!existingItem.Equals(kv.Value))
+                {
+                    if (kv.Value is ICloneable cloneableItem)
+                    {
+                        this[kv.Key] = (TValue)cloneableItem.Clone();
+
+                    }
+                    else
+                    {
+                        this[kv.Key] = kv.Value;
+                    }
                 }
             }
             else
             {
-                _dictionary.Clear();
-                DictionaryCleared?.Invoke(this, new EventArgs());
+                Add(kv);
             }
         }
+    }
 
-        /// <summary>
-        /// Create a clone of this instance
-        /// </summary>
-        /// <returns></returns>
-        public object Clone()
-        {
-            StaticModelDictionary<TValue> clone = new(NullRemovesItems);
-            foreach (KeyValuePair<string, TValue> kv in _dictionary)
-            {
-                if (kv.Value is ICloneable cloneableItem)
-                {
-                    clone.Add(kv.Key, (TValue)cloneableItem);
-                }
-                else
-                {
-                    clone.Add(kv);
-                }
-            }
-            return clone;
-        }
-
-        /// <summary>
-        /// Check if a key is present
-        /// </summary>
-        /// <param name="key">Key to check</param>
-        /// <returns>Whether the key is present</returns>
-        public bool ContainsKey(string key) => _dictionary.ContainsKey(key);
-
-        /// <summary>
-        /// Check if a key is present
-        /// </summary>
-        /// <param name="key">Key to check</param>
-        /// <returns>Whether the key is present</returns>
-        public bool Contains(object key) => ContainsKey((string)key);
-
-        /// <summary>
-        /// Copy this instance to another array
-        /// </summary>
-        /// <param name="array">Destination array</param>
-        /// <param name="index">Start index</param>
-        public void CopyTo(Array array, int index)
+    /// <summary>
+    /// Clear this dictionary
+    /// </summary>
+    public void Clear()
+    {
+        if (NullRemovesItems)
         {
             List<string> keys = new(_dictionary.Keys);
-            for (int i = 0; i < Count; i++)
+            foreach (string key in keys)
             {
-                string key = keys[i];
-                array.SetValue(new KeyValuePair<string, TValue>(key, _dictionary[key]), i + index);
+                Remove(key);
             }
         }
-
-        /// <summary>
-        /// Copy this instance to another dictionary
-        /// </summary>
-        /// <param name="array">Destination array</param>
-        /// <param name="arrayIndex">Start iondex</param>
-        public void CopyTo(KeyValuePair<string, TValue>[] array, int arrayIndex) => CopyTo(array, arrayIndex);
-
-        /// <summary>
-        /// Check if a key-value pair exists
-        /// </summary>
-        /// <param name="item">Item to check</param>
-        /// <returns>If the item exists in the dictionary</returns>
-        public bool Contains(KeyValuePair<string, TValue> item) => _dictionary.TryGetValue(item.Key, out TValue? value) && Equals(value, item.Value);
-
-        /// <summary>
-        /// Get an enumerator
-        /// </summary>
-        /// <returns>Enumerator</returns>
-        IEnumerator IEnumerable.GetEnumerator() => _dictionary.GetEnumerator();
-
-        /// <summary>
-        /// Get an enumerator
-        /// </summary>
-        /// <returns>Enumerator</returns>
-        IDictionaryEnumerator IDictionary.GetEnumerator() => (IDictionaryEnumerator)GetEnumerator();
-
-        /// <summary>
-        /// Remove a key (only supported if <see cref="NullRemovesItems"/> is true)
-        /// </summary>
-        /// <param name="key">Key to remove</param>
-        /// <returns>Whether the key could be found</returns>
-        public bool Remove(string key)
+        else
         {
-            if (NullRemovesItems)
-            {
-                if (_dictionary.TryGetValue(key, out _))
-                {
-                    PropertyChanging?.Invoke(this, new(key));
-                    _dictionary.Remove(key);
-                    PropertyChanged?.Invoke(this, new(key));
-                    return true;
-                }
-                return false;
-            }
-            throw new NotSupportedException();
+            _dictionary.Clear();
+            DictionaryCleared?.Invoke(this, new EventArgs());
         }
+    }
 
-        /// <summary>
-        /// Remove a key (only supported if <see cref="NullRemovesItems"/> is true)
-        /// </summary>
-        /// <param name="key">Key to remove</param>
-        /// <returns>Whether the key could be found</returns>
-        public void Remove(object key) => Remove((string)key);
-
-        /// <summary>
-        /// Remove a key-value pair if applicable
-        /// </summary>
-        /// <param name="item">Item to remove</param>
-        /// <returns>If the key-value pair was present</returns>
-        public bool Remove(KeyValuePair<string, TValue> item) => Contains(item) && Remove(item.Key);
-
-        /// <summary>
-        /// Try to get a value
-        /// </summary>
-        /// <param name="key">Key to look up</param>
-        /// <param name="value">Retrieved value</param>
-        /// <returns>Whether the key could be found</returns>
-        public bool TryGetValue(string key, out TValue value) => _dictionary.TryGetValue(key, out value!);
-
-        /// <summary>
-        /// Update this instance from a given JSON element
-        /// </summary>
-        /// <param name="jsonElement">Element to update this intance from</param>
-        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
-        /// <returns>Updated instance</returns>
-        /// <exception cref="JsonException">Failed to deserialize data</exception>
-        /// <remarks>Accepts null as the JSON value to clear existing items</remarks>
-        public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+    /// <summary>
+    /// Create a clone of this instance
+    /// </summary>
+    /// <returns></returns>
+    public object Clone()
+    {
+        StaticModelDictionary<TValue> clone = new(NullRemovesItems);
+        foreach (KeyValuePair<string, TValue> kv in _dictionary)
         {
-            foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
+            if (kv.Value is ICloneable cloneableItem)
             {
-                if (NullRemovesItems && jsonProperty.Value.ValueKind == JsonValueKind.Null)
+                clone.Add(kv.Key, (TValue)cloneableItem);
+            }
+            else
+            {
+                clone.Add(kv);
+            }
+        }
+        return clone;
+    }
+
+    /// <summary>
+    /// Check if a key is present
+    /// </summary>
+    /// <param name="key">Key to check</param>
+    /// <returns>Whether the key is present</returns>
+    public bool ContainsKey(string key) => _dictionary.ContainsKey(key);
+
+    /// <summary>
+    /// Check if a key is present
+    /// </summary>
+    /// <param name="key">Key to check</param>
+    /// <returns>Whether the key is present</returns>
+    public bool Contains(object key) => ContainsKey((string)key);
+
+    /// <summary>
+    /// Copy this instance to another array
+    /// </summary>
+    /// <param name="array">Destination array</param>
+    /// <param name="index">Start index</param>
+    public void CopyTo(Array array, int index)
+    {
+        List<string> keys = new(_dictionary.Keys);
+        for (int i = 0; i < Count; i++)
+        {
+            string key = keys[i];
+            array.SetValue(new KeyValuePair<string, TValue>(key, _dictionary[key]), i + index);
+        }
+    }
+
+    /// <summary>
+    /// Copy this instance to another dictionary
+    /// </summary>
+    /// <param name="array">Destination array</param>
+    /// <param name="arrayIndex">Start iondex</param>
+    public void CopyTo(KeyValuePair<string, TValue>[] array, int arrayIndex) => CopyTo(array, arrayIndex);
+
+    /// <summary>
+    /// Check if a key-value pair exists
+    /// </summary>
+    /// <param name="item">Item to check</param>
+    /// <returns>If the item exists in the dictionary</returns>
+    public bool Contains(KeyValuePair<string, TValue> item) => _dictionary.TryGetValue(item.Key, out TValue? value) && Equals(value, item.Value);
+
+    /// <summary>
+    /// Get an enumerator
+    /// </summary>
+    /// <returns>Enumerator</returns>
+    IEnumerator IEnumerable.GetEnumerator() => _dictionary.GetEnumerator();
+
+    /// <summary>
+    /// Get an enumerator
+    /// </summary>
+    /// <returns>Enumerator</returns>
+    IDictionaryEnumerator IDictionary.GetEnumerator() => (IDictionaryEnumerator)GetEnumerator();
+
+    /// <summary>
+    /// Remove a key (only supported if <see cref="NullRemovesItems"/> is true)
+    /// </summary>
+    /// <param name="key">Key to remove</param>
+    /// <returns>Whether the key could be found</returns>
+    public bool Remove(string key)
+    {
+        if (NullRemovesItems)
+        {
+            if (_dictionary.TryGetValue(key, out _))
+            {
+                PropertyChanging?.Invoke(this, new(key));
+                _dictionary.Remove(key);
+                PropertyChanged?.Invoke(this, new(key));
+                return true;
+            }
+            return false;
+        }
+        throw new NotSupportedException();
+    }
+
+    /// <summary>
+    /// Remove a key (only supported if <see cref="NullRemovesItems"/> is true)
+    /// </summary>
+    /// <param name="key">Key to remove</param>
+    /// <returns>Whether the key could be found</returns>
+    public void Remove(object key) => Remove((string)key);
+
+    /// <summary>
+    /// Remove a key-value pair if applicable
+    /// </summary>
+    /// <param name="item">Item to remove</param>
+    /// <returns>If the key-value pair was present</returns>
+    public bool Remove(KeyValuePair<string, TValue> item) => Contains(item) && Remove(item.Key);
+
+    /// <summary>
+    /// Try to get a value
+    /// </summary>
+    /// <param name="key">Key to look up</param>
+    /// <param name="value">Retrieved value</param>
+    /// <returns>Whether the key could be found</returns>
+    public bool TryGetValue(string key, out TValue value) => _dictionary.TryGetValue(key, out value!);
+
+    /// <summary>
+    /// Update this instance from a given JSON element
+    /// </summary>
+    /// <param name="jsonElement">Element to update this intance from</param>
+    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+    /// <returns>Updated instance</returns>
+    /// <exception cref="JsonException">Failed to deserialize data</exception>
+    /// <remarks>Accepts null as the JSON value to clear existing items</remarks>
+    public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+    {
+        foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
+        {
+            if (NullRemovesItems && jsonProperty.Value.ValueKind == JsonValueKind.Null)
+            {
+                Remove(jsonProperty.Name);
+            }
+            else if (TryGetValue(jsonProperty.Name, out TValue? item))
+            {
+                try
                 {
-                    Remove(jsonProperty.Name);
-                }
-                else if (TryGetValue(jsonProperty.Name, out TValue? item))
-                {
-                    try
+                    if (item is null)
                     {
-                        if (item is null)
+                        if (jsonProperty.Value.ValueKind != JsonValueKind.Null)
                         {
-                            if (jsonProperty.Value.ValueKind != JsonValueKind.Null)
-                            {
-                                item = new();
-                                item.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
-                                this[jsonProperty.Name] = item;
-                            }
-                        }
-                        else
-                        {
+                            item = new();
                             item.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
-                        }
-                    }
-                    catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
-                    {
-                        // suppressed
-                    }
-                }
-                else
-                {
-                    try
-                    {
-                        TValue newValue = new();
-                        newValue.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
-                        Add(jsonProperty.Name, newValue);
-                    }
-                    catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
-                    {
-                        // suppressed
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Update this instance from a given JSON reader
-        /// </summary>
-        /// <param name="reader">JSON reader</param>
-        /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
-        /// <exception cref="JsonException">Failed to deserialize data</exception>
-        public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
-        {
-            if (reader.TokenType == JsonTokenType.None && !reader.Read())
-            {
-                throw new JsonException("failed to read from JSON reader");
-            }
-            if (reader.TokenType != JsonTokenType.StartObject)
-            {
-                throw new JsonException("expected start of object");
-            }
-
-            while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
-            {
-                if (reader.TokenType == JsonTokenType.PropertyName)
-                {
-                    string key = reader.GetString()!;
-                    reader.Read();
-
-                    if (reader.TokenType == JsonTokenType.Null)
-                    {
-                        if (NullRemovesItems)
-                        {
-                            Remove(key);
-                        }
-                        else
-                        {
-                            this[key] = default;
-                        }
-                    }
-                    else if (TryGetValue(key, out TValue? item))
-                    {
-                        if (item is null)
-                        {
-                            if (reader.TokenType != JsonTokenType.Null)
-                            {
-                                item = new();
-                                item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
-                                this[key] = item;
-                            }
-                        }
-                        else
-                        {
-                            item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            this[jsonProperty.Name] = item;
                         }
                     }
                     else
                     {
-                        TValue newItem = new();
-                        newItem.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
-                        Add(key, newItem);
+                        item.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
                     }
+                }
+                catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
+                {
+                    // suppressed
+                }
+            }
+            else
+            {
+                try
+                {
+                    TValue newValue = new();
+                    newValue.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                    Add(jsonProperty.Name, newValue);
+                }
+                catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
+                {
+                    // suppressed
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Update this instance from a given JSON reader
+    /// </summary>
+    /// <param name="reader">JSON reader</param>
+    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+    /// <exception cref="JsonException">Failed to deserialize data</exception>
+    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+    {
+        if (reader.TokenType == JsonTokenType.None && !reader.Read())
+        {
+            throw new JsonException("failed to read from JSON reader");
+        }
+        if (reader.TokenType != JsonTokenType.StartObject)
+        {
+            throw new JsonException("expected start of object");
+        }
+
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+        {
+            if (reader.TokenType == JsonTokenType.PropertyName)
+            {
+                string key = reader.GetString()!;
+                reader.Read();
+
+                if (reader.TokenType == JsonTokenType.Null)
+                {
+                    if (NullRemovesItems)
+                    {
+                        Remove(key);
+                    }
+                    else
+                    {
+                        this[key] = default;
+                    }
+                }
+                else if (TryGetValue(key, out TValue? item))
+                {
+                    if (item is null)
+                    {
+                        if (reader.TokenType != JsonTokenType.Null)
+                        {
+                            item = new();
+                            item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            this[key] = item;
+                        }
+                    }
+                    else
+                    {
+                        item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                    }
+                }
+                else
+                {
+                    TValue newItem = new();
+                    newItem.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                    Add(key, newItem);
                 }
             }
         }

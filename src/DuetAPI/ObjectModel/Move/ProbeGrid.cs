@@ -1,42 +1,41 @@
 ﻿using DuetAPI.Utility;
 using System.Collections.ObjectModel;
 
-namespace DuetAPI.ObjectModel
+namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// Information about the configured probe grid (see M557)
+/// </summary>
+/// <seealso cref="Heightmap"/>
+public partial class ProbeGrid : ModelObject, IStaticModelObject
 {
     /// <summary>
-    /// Information about the configured probe grid (see M557)
+    /// Axis letters of this heightmap
     /// </summary>
-    /// <seealso cref="Heightmap"/>
-    public partial class ProbeGrid : ModelObject, IStaticModelObject
+    public ObservableCollection<char> Axes { get; } = ['X', 'Y'];
+
+    /// <summary>
+    /// End coordinates of the heightmap
+    /// </summary>
+    public ObservableCollection<float> Maxs { get; } = [-1F, -1F];
+
+    /// <summary>
+    /// Start coordinates of the heightmap
+    /// </summary>
+    public ObservableCollection<float> Mins { get; } = [0F, 0F];
+
+    /// <summary>
+    /// Probing radius for delta kinematics
+    /// </summary>
+    public float Radius
     {
-        /// <summary>
-        /// Axis letters of this heightmap
-        /// </summary>
-        public ObservableCollection<char> Axes { get; } = ['X', 'Y'];
-
-        /// <summary>
-        /// End coordinates of the heightmap
-        /// </summary>
-        public ObservableCollection<float> Maxs { get; } = [-1F, -1F];
-
-        /// <summary>
-        /// Start coordinates of the heightmap
-        /// </summary>
-        public ObservableCollection<float> Mins { get; } = [0F, 0F];
-
-        /// <summary>
-        /// Probing radius for delta kinematics
-        /// </summary>
-        public float Radius
-        {
-            get => _radius;
-            set => SetPropertyValue(ref _radius, value);
-        }
-        private float _radius;
-
-        /// <summary>
-        /// Spacings between the coordinates
-        /// </summary>
-        public ObservableCollection<float> Spacings { get; } = [0F, 0F];
+        get => _radius;
+        set => SetPropertyValue(ref _radius, value);
     }
+    private float _radius;
+
+    /// <summary>
+    /// Spacings between the coordinates
+    /// </summary>
+    public ObservableCollection<float> Spacings { get; } = [0F, 0F];
 }

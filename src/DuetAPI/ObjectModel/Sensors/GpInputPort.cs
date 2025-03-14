@@ -1,18 +1,17 @@
-﻿namespace DuetAPI.ObjectModel
+﻿namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// Details about a general-purpose input port
+/// </summary>
+public partial class GpInputPort : ModelObject, IStaticModelObject
 {
     /// <summary>
-    /// Details about a general-purpose input port
+    /// Value of this port (0..1)
     /// </summary>
-    public partial class GpInputPort : ModelObject, IStaticModelObject
+    public float Value
     {
-        /// <summary>
-        /// Value of this port (0..1)
-        /// </summary>
-        public float Value
-        {
-            get => _value;
-			set => SetPropertyValue(ref _value, value);
-        }
-        private float _value;
+        get => _value;
+        set => SetPropertyValue(ref _value, value);
     }
+    private float _value;
 }

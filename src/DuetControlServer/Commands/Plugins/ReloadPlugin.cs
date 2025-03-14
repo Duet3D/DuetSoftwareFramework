@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -14,16 +15,17 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Start a plugin
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="ArgumentException">Plugin is invalid</exception>
-        public override async Task Execute()
+        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
         {
             if (!Settings.PluginSupport)
             {
                 throw new NotSupportedException("Plugin support has been disabled");
             }
 
-            using (await Model.Provider.AccessReadWriteAsync())
+            using (await Model.Provider.AccessReadWriteAsync(cancellationToken))
             {
                 // The plugin must be stopped at this point
                 if (Model.Provider.Get.Plugins.TryGetValue(Plugin, out Plugin plugin) && plugin.Pid > 0)
@@ -42,7 +44,7 @@ namespace DuetControlServer.Commands
                     }
 
                     await using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
-                    using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
+                    using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream, cancellationToken: cancellationToken);
                     plugin.UpdateFromJson(manifestJson.RootElement, false);
                     plugin.Pid = -1;
                 }
@@ -58,8 +60,8 @@ namespace DuetControlServer.Commands
             }
 
             // Reload the plugin via the plugin services
-            await IPC.Processors.PluginService.PerformCommand(this, true);
-            await IPC.Processors.PluginService.PerformCommand(this, false);
+            await IPC.Processors.PluginService.PerformCommandAsync(this, true, cancellationToken);
+            await IPC.Processors.PluginService.PerformCommandAsync(this, false, cancellationToken);
         }
     }
 }

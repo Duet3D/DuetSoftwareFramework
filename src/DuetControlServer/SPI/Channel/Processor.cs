@@ -61,7 +61,7 @@ namespace DuetControlServer.SPI.Channel
         /// Lock access to this code channel asynchronously
         /// </summary>
         /// <returns>Disposable lock</returns>
-        public AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync(Program.CancellationToken);
+        public AwaitableDisposable<IDisposable> LockAsync(CancellationToken cancellationToken = default) => _lock.LockAsync(cancellationToken);
 
         /// <summary>
         /// This is set to true if all the files have been aborted and RRF has to be notified
@@ -439,7 +439,7 @@ namespace DuetControlServer.SPI.Channel
         /// </summary>
         /// <param name="state">Stack item</param>
         /// <returns>Asynchronous task</returns>
-        private Task<bool> GetFlushTask(State state)
+        private Task<bool> GetFlushTask(State state, CancellationToken cancellationToken = default)
         {
             // Check if we can resolve the flush request immediately if nothing is being done
             if (state == CurrentState &&
@@ -453,6 +453,7 @@ namespace DuetControlServer.SPI.Channel
             // Need to wait for the SPI connector to finish other operations first
             TaskCompletionSource<bool> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
             state.FlushRequests.Enqueue(tcs);
+            #warning add ct support
             return tcs.Task;
         }
 
@@ -461,30 +462,56 @@ namespace DuetControlServer.SPI.Channel
         /// This method may be deprecated; in theory it should suffice to flush the pipeline only (with stricter Busy conditions)
         /// </summary>
         /// <param name="file">Optional code file for the flush target</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Whether the codes could be flushed</returns>
-        public Task<bool> FlushAsync(CodeFile? file = null)
+        public Task<bool> FlushAsync(CancellationToken cancellationToken = default)
         {
             // Need to find the correct state for a flush request first.
             // Generic flush requests are not meant for temporary macro states
             foreach (State state in Stack)
             {
-                if ((state.File == file) || (file is null && (state.File is not MacroFile macro || !macro.WasStarted || macro.IsExecuting) && !state.MacroCompleted))
+                if ((state.File is not MacroFile macro || !macro.WasStarted || macro.IsExecuting) && !state.MacroCompleted)
                 {
-                    return GetFlushTask(state);
+                    return GetFlushTask(state, cancellationToken);
                 }
             }
 
             // Fallback, should not happen
             _logger.Warn("Failed to find suitable stack level for flush request, falling back to current one");
-            return GetFlushTask(CurrentState);
+            return GetFlushTask(CurrentState, cancellationToken);
+        }
+
+        /// <summary>
+        /// Flush pending codes and return true on success or false on failure.
+        /// This method may be deprecated; in theory it should suffice to flush the pipeline only (with stricter Busy conditions)
+        /// </summary>
+        /// <param name="file">Optional code file for the flush target</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Whether the codes could be flushed</returns>
+        public Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
+        {
+            // Need to find the correct state for a flush request first.
+            // Generic flush requests are not meant for temporary macro states
+            foreach (State state in Stack)
+            {
+                if (state.File == file)
+                {
+                    return GetFlushTask(state, cancellationToken);
+                }
+            }
+
+            // Fallback, should not happen
+            _logger.Warn("Failed to find suitable stack level for flush request, falling back to current one");
+            return GetFlushTask(CurrentState, cancellationToken);
         }
 
         /// <summary>
         /// Flush all pending codes and return true on success or false on failure.
         /// This method may be deprecated; in theory it should suffice to flush the pipeline only (with stricter Busy conditions)
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Whether the codes could be flushed</returns>
-        public Task<bool> FlushAllAsync() => GetFlushTask(BaseState);
+        public Task<bool> FlushAllAsync(CancellationToken cancellationToken = default) => GetFlushTask(BaseState, cancellationToken);
 
         /// <summary>
         /// Lock all movement systems and wait for standstill
@@ -887,7 +914,7 @@ namespace DuetControlServer.SPI.Channel
             {
                 _logger.Debug("Running code from firmware '{0}' on channel {1}", code, Channel);
                 Code codeObj = new(code) { Channel = Channel, Flags = CodeFlags.IsFromFirmware | CodeFlags.IsLastCode };
-                _ = codeObj.Execute().ContinueWith(async task =>
+                _ = codeObj.ExecuteAsync().ContinueWith(async task =>
                 {
                     try
                     {

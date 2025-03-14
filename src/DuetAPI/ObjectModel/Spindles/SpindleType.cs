@@ -1,22 +1,21 @@
 ﻿using System.Text.Json.Serialization;
 using DuetAPI.Utility;
 
-namespace DuetAPI.ObjectModel
+namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// Spindle type
+/// </summary>
+[JsonConverter(typeof(JsonCamelCaseStringEnumConverter<SpindleType>))]
+public enum SpindleType
 {
     /// <summary>
-    /// Spindle type
+    /// Enable and direction
     /// </summary>
-    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<SpindleType>))]
-    public enum SpindleType
-    {
-        /// <summary>
-        /// Enable and direction
-        /// </summary>
-        EnaDir,
+    EnaDir,
 
-        /// <summary>
-        /// Forward and reverse
-        /// </summary>
-        FwdRev
-    }
+    /// <summary>
+    /// Forward and reverse
+    /// </summary>
+    FwdRev
 }

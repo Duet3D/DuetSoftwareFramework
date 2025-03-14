@@ -44,38 +44,38 @@ namespace UnitTests.Machine
             DuetControlServer.Model.Provider.Get.Volumes.Add(new DuetAPI.ObjectModel.Volume { FreeSpace = 12345 });
 
             DuetControlServer.Commands.Code code = new("echo volumes[0].freeSpace");
-            object result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
+            object result = await DuetControlServer.Model.Expressions.EvaluateAsync(code, false);
             Assert.That(result, Is.EqualTo("12345"));
 
             code = new DuetControlServer.Commands.Code("echo move.axes[0].userPosition");
-            result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
+            result = await DuetControlServer.Model.Expressions.EvaluateAsync(code, false);
             Assert.That(result, Is.EqualTo("move.axes[0].userPosition"));
 
             code = new DuetControlServer.Commands.Code("echo move.axes[{1 + 1}].userPosition");
-            result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
+            result = await DuetControlServer.Model.Expressions.EvaluateAsync(code, false);
             Assert.That(result, Is.EqualTo("move.axes[{1 + 1}].userPosition"));
 
             code = new DuetControlServer.Commands.Code("echo #volumes");
-            result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
+            result = await DuetControlServer.Model.Expressions.EvaluateAsync(code, false);
             Assert.That(result, Is.EqualTo("1"));
 
             code = new DuetControlServer.Commands.Code("echo volumes");
-            Assert.ThrowsAsync<CodeParserException>(async () => await DuetControlServer.Model.Expressions.Evaluate(code, true));
+            Assert.ThrowsAsync<CodeParserException>(async () => await DuetControlServer.Model.Expressions.EvaluateAsync(code, true));
 
             code = new DuetControlServer.Commands.Code("echo plugins");
-            result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
+            result = await DuetControlServer.Model.Expressions.EvaluateAsync(code, false);
             Assert.That(result, Is.EqualTo("{object}"));
 
             code = new DuetControlServer.Commands.Code("echo move.axes[0].userPosition + volumes[0].freeSpace");
-            result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
+            result = await DuetControlServer.Model.Expressions.EvaluateAsync(code, false);
             Assert.That(result, Is.EqualTo("move.axes[0].userPosition +12345"));
 
             code = new DuetControlServer.Commands.Code("echo \"hello\"");
-            result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
+            result = await DuetControlServer.Model.Expressions.EvaluateAsync(code, false);
             Assert.That(result, Is.EqualTo("\"hello\""));
 
             code = new DuetControlServer.Commands.Code("echo {\"hello\" ^ (\"there\" + volumes[0].freeSpace)}");
-            result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
+            result = await DuetControlServer.Model.Expressions.EvaluateAsync(code, false);
             Assert.That(result, Is.EqualTo("{\"hello\" ^ (\"there\" +12345)}"));
 
             DuetControlServer.Model.Expressions.CustomFunctions.Add("fileexists", async (CodeChannel channel, string functionName, object[] vals) =>
@@ -87,7 +87,7 @@ namespace UnitTests.Machine
             });
 
             code = new DuetControlServer.Commands.Code("echo fileexists(\"0:/sys/config.g\")");
-            result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
+            result = await DuetControlServer.Model.Expressions.EvaluateAsync(code, false);
             Assert.That(result, Is.EqualTo("true"));
         }
     }

@@ -135,7 +135,7 @@ namespace DuetControlServer.Model
         /// <seealso cref="AccessReadOnlyAsync()"/>
         /// <seealso cref="AccessReadWriteAsync()"/>
         /// <seealso cref="WaitForUpdate(CancellationToken)"/>
-        /// <seealso cref="Updater.WaitForFullUpdate(CancellationToken)"/>
+        /// <seealso cref="Updater.WaitForFullUpdateAsync(CancellationToken)"/>
         public static ObjectModel Get { get; } = new();
 
         /// <summary>

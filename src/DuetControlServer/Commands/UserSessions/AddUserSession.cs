@@ -1,4 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -17,9 +18,9 @@ namespace DuetControlServer.Commands
         /// Add a new user session
         /// </summary>
         /// <returns>Session ID</returns>
-        public override async Task<int> Execute()
+        public override async Task<int> ExecuteAsync(CancellationToken cancellationToken = default)
         {
-            using (await Model.Provider.AccessReadWriteAsync())
+            using (await Model.Provider.AccessReadWriteAsync(cancellationToken))
             {
                 UserSession newSession = new()
                 {

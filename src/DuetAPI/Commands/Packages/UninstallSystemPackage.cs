@@ -1,16 +1,15 @@
 ﻿using DuetAPI.Utility;
 
-namespace DuetAPI.Commands
+namespace DuetAPI.Commands;
+
+/// <summary>
+/// Uninstall a system package
+/// </summary>
+[RequiredPermissions(SbcPermissions.SuperUser)]
+public class UninstallSystemPackage : Command
 {
     /// <summary>
-    /// Uninstall a system package
+    /// Identifier of the package
     /// </summary>
-    [RequiredPermissions(SbcPermissions.SuperUser)]
-    public class UninstallSystemPackage : Command
-    {
-        /// <summary>
-        /// Identifier of the package
-        /// </summary>
-        public string Package { get; set; } = string.Empty;
-    }
+    public string Package { get; set; } = string.Empty;
 }

@@ -3,6 +3,7 @@ using DuetControlServer.Files;
 using System;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Codes
@@ -155,12 +156,12 @@ namespace DuetControlServer.Codes
         /// </summary>
         /// <param name="flushAll">Whether to flush all states</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public async Task<bool> FlushAsync(bool flushAll)
+        public async Task<bool> FlushAsync(bool flushAll, CancellationToken cancellationToken = default)
         {
             foreach (Pipelines.PipelineBase pipeline in _pipelines)
             {
                 //Logger.Debug("Flushing codes on stage {0}", pipeline.Stage);
-                if (!await pipeline.FlushAsync(flushAll))
+                if (!await pipeline.FlushAsync(flushAll, cancellationToken))
                 {
                     Logger.Debug("Failed to flush codes on stage {0}", pipeline.Stage);
                     return false;
@@ -174,8 +175,9 @@ namespace DuetControlServer.Codes
         /// Wait for all pending codes on the same stack level as the given file to finish
         /// </summary>
         /// <param name="file">Code file</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public async Task<bool> FlushAsync(CodeFile file)
+        public async Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
         {
             foreach (Pipelines.PipelineBase pipeline in _pipelines)
             {
@@ -197,15 +199,16 @@ namespace DuetControlServer.Codes
         /// <param name="code">Code waiting for the flush</param>
         /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
         /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public async Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true)
+        public async Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true, CancellationToken cancellationToken = default)
         {
             foreach (Pipelines.PipelineBase pipeline in _pipelines)
             {
                 if (code.Stage == PipelineStage.Executed || pipeline.Stage > code.Stage)
                 {
                     //Logger.Debug("Flushing codes on stage {0} for {1}", pipeline.Stage, code);
-                    if (!await pipeline.FlushAsync(code, evaluateExpressions, evaluateAll))
+                    if (!await pipeline.FlushAsync(code, evaluateExpressions, evaluateAll, cancellationToken))
                     {
                         Logger.Debug("Failed to flush codes on stage {0} for {1}", pipeline.Stage, code);
                         return false;

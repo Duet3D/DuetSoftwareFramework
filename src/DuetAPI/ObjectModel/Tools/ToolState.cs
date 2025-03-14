@@ -1,27 +1,26 @@
 ﻿using DuetAPI.Utility;
 using System.Text.Json.Serialization;
 
-namespace DuetAPI.ObjectModel
+namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// States of a tool
+/// </summary>
+[JsonConverter(typeof(JsonCamelCaseStringEnumConverter<ToolState>))]
+public enum ToolState
 {
     /// <summary>
-    /// States of a tool
+    /// Tool is turned off
     /// </summary>
-    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<ToolState>))]
-    public enum ToolState
-    {
-        /// <summary>
-        /// Tool is turned off
-        /// </summary>
-        Off,
+    Off,
 
-        /// <summary>
-        /// Tool is active
-        /// </summary>
-        Active,
+    /// <summary>
+    /// Tool is active
+    /// </summary>
+    Active,
 
-        /// <summary>
-        /// Tool is in standby
-        /// </summary>
-        Standby
-    }
+    /// <summary>
+    /// Tool is in standby
+    /// </summary>
+    Standby
 }

@@ -50,7 +50,7 @@ namespace DuetControlServer.Model
         /// </summary>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task WaitForFullUpdate(CancellationToken cancellationToken)
+        public static async Task WaitForFullUpdateAsync(CancellationToken cancellationToken)
         {
             using (await _lock.LockAsync(cancellationToken))
             {
@@ -63,15 +63,16 @@ namespace DuetControlServer.Model
         /// Wait for the model to be fully updated from RepRapFirmware
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static Task WaitForFullUpdate() => WaitForFullUpdate(Program.CancellationToken);
+        public static Task WaitForFullUpdate() => WaitForFullUpdateAsync(Program.CancellationToken);
 
         /// <summary>
         /// Called in non-SPI mode to notify waiting tasks about a finished model update
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task MachineModelFullyUpdated()
+        public static async Task MachineModelFullyUpdated(CancellationToken cancellationToken = default)
         {
-            using (await _lock.LockAsync(Program.CancellationToken))
+            using (await _lock.LockAsync(cancellationToken))
             {
                 _waitForConditionA = !_waitForConditionA;
                 (_waitForConditionA ? _updateConditionA : _updateConditionB).NotifyAll();

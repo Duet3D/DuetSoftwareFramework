@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.IPC
@@ -26,17 +27,18 @@ namespace DuetControlServer.IPC
         /// <summary>
         /// Function to create a read/write lock to the object model
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public static async Task LockMachineModel(Connection connection)
+        public static async Task LockMachineModel(Connection connection, CancellationToken cancellationToken = default)
         {
-            _lock = await Model.Provider.AccessReadWriteAsync();
+            _lock = await Model.Provider.AccessReadWriteAsync(cancellationToken);
             _lockConnection = connection;
         }
 
         /// <summary>
         /// Unlock the machine model again
         /// </summary>
-        public static async Task UnlockMachineModel(Connection connection)
+        public static async Task UnlockMachineModel(Connection connection, CancellationToken cancellationToken = default)
         {
             if (_lockConnection == connection)
             {
@@ -47,7 +49,7 @@ namespace DuetControlServer.IPC
                 if (Settings.NoSpi)
                 {
                     // Make sure functions waiting for full model updates don't stall
-                    await Model.Updater.MachineModelFullyUpdated();
+                    await Model.Updater.MachineModelFullyUpdated(cancellationToken);
                 }
             }
         }

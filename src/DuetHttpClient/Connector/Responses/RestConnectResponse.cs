@@ -1,13 +1,12 @@
-namespace DuetHttpClient.Connector.Responses
+namespace DuetHttpClient.Connector.Responses;
+
+/// <summary>
+/// Response from a connect request in SBC mode
+/// </summary>
+internal class RestConnectResponse
 {
     /// <summary>
-    /// Response from a connect request in SBC mode
+    /// Session key
     /// </summary>
-    internal class RestConnectResponse
-    {
-        /// <summary>
-        /// Session key
-        /// </summary>
-        public string SessionKey { get; set; } = string.Empty;
-    }
+    public string SessionKey { get; set; } = string.Empty;
 }

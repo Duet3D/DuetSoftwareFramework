@@ -1,4 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -11,10 +12,11 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Retrieve a copy of the current machine model
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Clone of the current machine model</returns>
-        public override async Task<ObjectModel> Execute()
+        public override async Task<ObjectModel> ExecuteAsync(CancellationToken cancellationToken = default)
         {
-            using (await Model.Provider.AccessReadOnlyAsync())
+            using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
             {
                 return (ObjectModel)Model.Provider.Get.Clone();
             }

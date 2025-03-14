@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
@@ -129,12 +130,13 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="channel">Where to evaluate the expression</param>
         /// <param name="expression">Expression to evaluate</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Result of the evaluated expression</returns>
         /// <exception cref="CodeParserException">Failed to evaluate expression</exception>
         /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
         /// <exception cref="NotSupportedException">Incompatible firmware version</exception>
         /// <exception cref="ArgumentException">Invalid parameter</exception>
-        public static Task<object?> EvaluateExpression(CodeChannel channel, string expression)
+        public static Task<object?> EvaluateExpressionAsync(CodeChannel channel, string expression, CancellationToken cancellationToken = default)
         {
             if (Program.CancellationToken.IsCancellationRequested)
             {
@@ -167,6 +169,7 @@ namespace DuetControlServer.SPI
                 EvaluateExpressionRequest request = new(channel, expression);
                 _evaluateExpressionRequests.Add(request);
                 _logger.Debug("Evaluating {0} on channel {1}", expression, channel);
+                #warning add ct support
                 return request.Task;
             }
         }
@@ -231,19 +234,19 @@ namespace DuetControlServer.SPI
         /// </summary>
         /// <param name="channel">Code channel to wait for</param>
         /// <param name="flushAll">Flush everything</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static async Task<bool> FlushAsync(CodeChannel channel, bool flushAll)
+        public static async Task<bool> FlushAsync(CodeChannel channel, bool flushAll, CancellationToken cancellationToken = default)
         {
-            Program.CancellationToken.ThrowIfCancellationRequested();
             if (Settings.NoSpi)
             {
                 return true;
             }
 
             Task<bool> flushTask;
-            using (await _channels[channel].LockAsync())
+            using (await _channels[channel].LockAsync(cancellationToken))
             {
-                flushTask = flushAll ? _channels[channel].FlushAllAsync() : _channels[channel].FlushAsync();
+                flushTask = flushAll ? _channels[channel].FlushAllAsync(cancellationToken) : _channels[channel].FlushAsync(cancellationToken);
             }
             return await flushTask;
         }
@@ -252,19 +255,19 @@ namespace DuetControlServer.SPI
         /// Wait for all pending codes to finish
         /// </summary>
         /// <param name="file">Code file</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static async Task<bool> FlushAsync(CodeFile file)
+        public static async Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
         {
-            Program.CancellationToken.ThrowIfCancellationRequested();
             if (Settings.NoSpi)
             {
                 return true;
             }
 
             Task<bool> flushTask;
-            using (await _channels[file.Channel].LockAsync())
+            using (await _channels[file.Channel].LockAsync(cancellationToken))
             {
-                flushTask = _channels[file.Channel].FlushAsync(file);
+                flushTask = _channels[file.Channel].FlushAsync(file, cancellationToken);
             }
             return await flushTask;
         }
@@ -276,19 +279,19 @@ namespace DuetControlServer.SPI
         /// <param name="code">Code waiting for the flush</param>
         /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
         /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Whether the codes have been flushed successfully</returns>
-        public static async Task<bool> FlushAsync(Code code, bool evaluateExpressions = true, bool evaluateAll = true)
+        public static async Task<bool> FlushAsync(Code code, bool evaluateExpressions = true, bool evaluateAll = true, CancellationToken cancellationToken = default)
         {
-            Program.CancellationToken.ThrowIfCancellationRequested();
             if (Settings.NoSpi)
             {
                 return true;
             }
 
             Task<bool> flushTask;
-            using (await _channels[code.Channel].LockAsync())
+            using (await _channels[code.Channel].LockAsync(cancellationToken))
             {
-                flushTask = _channels[code.Channel].FlushAsync(code.File);
+                flushTask = (code.File == null) ? _channels[code.Channel].FlushAsync(cancellationToken) : _channels[code.Channel].FlushAsync(code.File, cancellationToken);
             }
 
             if (await flushTask)
@@ -296,7 +299,7 @@ namespace DuetControlServer.SPI
                 if (evaluateExpressions)
                 {
                     // Code is about to be processed internally, evaluate potential expressions
-                    await Model.Expressions.Evaluate(code, evaluateAll);
+                    await Model.Expressions.EvaluateAsync(code, evaluateAll, cancellationToken);
                 }
                 return true;
             }
@@ -324,7 +327,7 @@ namespace DuetControlServer.SPI
         /// Request an immediate emergency stop
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public static async Task EmergencyStop()
+        public static async Task EmergencyStopAsync()
         {
             Program.CancellationToken.ThrowIfCancellationRequested();
             if (Settings.NoSpi)

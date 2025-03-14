@@ -5,6 +5,7 @@ using Nito.AsyncEx;
 using System;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -28,17 +29,17 @@ namespace DuetControlServer.Commands
         /// Start all the plugins
         /// </summary>
         /// <returns>Asynchronous task</returns>
-        public override async Task Execute()
+        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
         {
             if (!Settings.PluginSupport)
             {
                 return;
             }
 
-            using (await _startLock.LockAsync(Program.CancellationToken))
+            using (await _startLock.LockAsync(cancellationToken))
             {
                 // Don't proceed if all the plugins have been started
-                using (await Model.Provider.AccessReadOnlyAsync())
+                using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
                 {
                     if (Model.Provider.Get.State.PluginsStarted)
                     {
@@ -53,7 +54,7 @@ namespace DuetControlServer.Commands
                     using StreamReader reader = new(fileStream, Encoding.UTF8, false, Settings.FileBufferSize);
                     while (!reader.EndOfStream)
                     {
-                        string? pluginName = await reader.ReadLineAsync();
+                        string? pluginName = await reader.ReadLineAsync(cancellationToken);
                         if (pluginName is null)
                         {
                             break;
@@ -65,7 +66,7 @@ namespace DuetControlServer.Commands
                                 Plugin = pluginName,
                                 SaveState = false
                             };
-                            await startCommand.Execute();
+                            await startCommand.ExecuteAsync(cancellationToken);
                         }
                         catch (Exception e)
                         {
@@ -76,13 +77,13 @@ namespace DuetControlServer.Commands
                 }
 
                 // Plugins have been started...
-                using (await Model.Provider.AccessReadWriteAsync())
+                using (await Model.Provider.AccessReadWriteAsync(cancellationToken))
                 {
                     Model.Provider.Get.State.PluginsStarted = true;
                 }
 
                 // Run dsf-config.g next. It must run asynchronously in case the SBC channel is busy at this point
-                string dsfConfigFile = await FilePath.ToPhysicalAsync(FilePath.DsfConfigFile, FileDirectory.System);
+                string dsfConfigFile = await FilePath.ToPhysicalAsync(FilePath.DsfConfigFile, FileDirectory.System, cancellationToken);
                 if (File.Exists(dsfConfigFile))
                 {
                     Code dsfConfigCode = new()
@@ -96,7 +97,7 @@ namespace DuetControlServer.Commands
                             new CodeParameter('P', FilePath.DsfConfigFile)
                         ]
                     };
-                    await dsfConfigCode.Execute();
+                    await dsfConfigCode.ExecuteAsync(cancellationToken);
                 }
             }
         }

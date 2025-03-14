@@ -115,7 +115,7 @@ namespace DuetControlServer.Model
                             new('S', DateTime.Now.ToString("HH:mm:ss"))
                         ]
                     };
-                    await code.Execute();
+                    await code.ExecuteAsync();
                 }
 
                 // Check if the hostname has to be updated
@@ -134,7 +134,7 @@ namespace DuetControlServer.Model
                             new('P', lastHostname)
                         ]
                     };
-                    await code.Execute();
+                    await code.ExecuteAsync();
                 }
 
                 // Check if the network key has been updated
@@ -155,7 +155,7 @@ namespace DuetControlServer.Model
                                 new('I', 1)
                             ]
                         };
-                        await code.Execute();
+                        await code.ExecuteAsync();
 
                         // Update the IP address to report on 12864 displays
                         if (currentIPAddress != lastIPAddress)
@@ -173,7 +173,7 @@ namespace DuetControlServer.Model
                                     new('P', currentIPAddress ?? "0.0.0.0")
                                 ]
                             };
-                            await code.Execute();
+                            await code.ExecuteAsync();
                         }
                     }
 
@@ -191,7 +191,7 @@ namespace DuetControlServer.Model
                                 new('I', 1)
                             ]
                         };
-                        await code.Execute();
+                        await code.ExecuteAsync();
                     }
                 }
 

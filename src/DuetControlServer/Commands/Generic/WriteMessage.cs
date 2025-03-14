@@ -1,5 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -17,8 +18,9 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Write an arbitrary message
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public override async Task Execute()
+        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
         {
             LogLevel ??= Type switch
             {

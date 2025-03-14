@@ -1,4 +1,5 @@
 ﻿using DuetControlServer.Files;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -11,7 +12,8 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Resolve the given RepRapFirmware-style filename to an absolute path
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Absolute file path</returns>
-        public override Task<string> Execute() => (BaseDirectory != null) ? FilePath.ToPhysicalAsync(Path, BaseDirectory.Value) : FilePath.ToPhysicalAsync(Path);
+        public override Task<string> ExecuteAsync(CancellationToken cancellationToken = default) => (BaseDirectory != null) ? FilePath.ToPhysicalAsync(Path, BaseDirectory.Value, cancellationToken) : FilePath.ToPhysicalAsync(Path, cancellationToken: cancellationToken);
     }
 }

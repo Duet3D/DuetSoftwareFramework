@@ -358,7 +358,7 @@ namespace DuetControlServer.Files
                         }
 
                         codes.Enqueue(readCode);
-                        await readCode.Execute();       // actual execution happens in the background
+                        await readCode.ExecuteAsync();       // actual execution happens in the background
                     }
                     catch (Exception e)
                     {

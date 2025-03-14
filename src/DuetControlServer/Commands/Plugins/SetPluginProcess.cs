@@ -1,5 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -17,8 +18,9 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Update the pid of a given plugin
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public override async Task Execute()
+        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
         {
             if (!Settings.PluginSupport)
             {
@@ -36,11 +38,11 @@ namespace DuetControlServer.Commands
                             try
                             {
                                 // Wait a moment to avoid excessive system load in case the plugin is broken
-                                await Task.Delay(Settings.PluginAutoRestartInterval, Program.CancellationToken);
+                                await Task.Delay(Settings.PluginAutoRestartInterval, cancellationToken);
 
                                 // Restart it
                                 _logger.Info("Auto-restarting plugin {0}", Plugin);
-                                await new StartPlugin() { Plugin = Plugin }.Execute();
+                                await new StartPlugin() { Plugin = Plugin }.ExecuteAsync(cancellationToken);
                             }
                             catch (Exception e)
                             {

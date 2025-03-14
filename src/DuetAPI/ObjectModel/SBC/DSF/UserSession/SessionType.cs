@@ -1,27 +1,26 @@
 ﻿using DuetAPI.Utility;
 using System.Text.Json.Serialization;
 
-namespace DuetAPI.ObjectModel
+namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// Types of user sessions
+/// </summary>
+[JsonConverter(typeof(JsonCamelCaseStringEnumConverter<SessionType>))]
+public enum SessionType
 {
     /// <summary>
-    /// Types of user sessions
+    /// Local client
     /// </summary>
-    [JsonConverter(typeof(JsonCamelCaseStringEnumConverter<SessionType>))]
-    public enum SessionType
-    {
-        /// <summary>
-        /// Local client
-        /// </summary>
-        Local,
+    Local,
 
-        /// <summary>
-        /// Remote client via HTTP
-        /// </summary>
-        HTTP,
+    /// <summary>
+    /// Remote client via HTTP
+    /// </summary>
+    HTTP,
 
-        /// <summary>
-        /// Remote client via Telnet
-        /// </summary>
-        Telnet
-    }
+    /// <summary>
+    /// Remote client via Telnet
+    /// </summary>
+    Telnet
 }

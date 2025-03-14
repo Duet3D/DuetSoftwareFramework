@@ -1,28 +1,27 @@
-﻿namespace DuetAPI.ObjectModel
+﻿namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// Information about the SBC's memory (RAM)
+/// </summary>
+public partial class Memory : ModelObject, IStaticModelObject
 {
     /// <summary>
-    /// Information about the SBC's memory (RAM)
+    /// Available memory (in bytes)
     /// </summary>
-    public partial class Memory : ModelObject, IStaticModelObject
+    public long? Available
     {
-        /// <summary>
-        /// Available memory (in bytes)
-        /// </summary>
-        public long? Available
-        {
-            get => _available;
-            set => SetPropertyValue(ref _available, value);
-        }
-        private long? _available;
-
-        /// <summary>
-        /// Total memory (in bytes)
-        /// </summary>
-        public long? Total
-        {
-            get => _total;
-            set => SetPropertyValue(ref _total, value);
-        }
-        private long? _total;
+        get => _available;
+        set => SetPropertyValue(ref _available, value);
     }
+    private long? _available;
+
+    /// <summary>
+    /// Total memory (in bytes)
+    /// </summary>
+    public long? Total
+    {
+        get => _total;
+        set => SetPropertyValue(ref _total, value);
+    }
+    private long? _total;
 }

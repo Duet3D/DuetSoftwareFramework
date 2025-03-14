@@ -1,38 +1,37 @@
 ﻿using System.Collections.ObjectModel;
 
-namespace DuetAPI.ObjectModel
+namespace DuetAPI.ObjectModel;
+
+/// <summary>
+/// Information about core kinematics
+/// </summary>
+public partial class CoreKinematics : ZLeadscrewKinematics
 {
-    /// <summary>
-    /// Information about core kinematics
-    /// </summary>
-    public partial class CoreKinematics : ZLeadscrewKinematics
+	/// <summary>
+	/// Constructor of this class
+	/// </summary>
+	public CoreKinematics()
 	{
-		/// <summary>
-		/// Constructor of this class
-		/// </summary>
-		public CoreKinematics()
-		{
-			Name = KinematicsName.Cartesian;
-		}
+		Name = KinematicsName.Cartesian;
+	}
 
-		/// <summary>
-		/// Forward matrix
-		/// </summary>
-		public ObservableCollection<float[]> ForwardMatrix { get; } =
-        [
-            [1, 0, 0],
-			[0, 1, 0],
-			[0, 0, 1]
-		];
+	/// <summary>
+	/// Forward matrix
+	/// </summary>
+	public ObservableCollection<float[]> ForwardMatrix { get; } =
+	[
+		[1, 0, 0],
+		[0, 1, 0],
+		[0, 0, 1]
+	];
 
-		/// <summary>
-		/// Inverse matrix
-		/// </summary>
-		public ObservableCollection<float[]> InverseMatrix { get; } =
-        [
-            [1, 0, 0],
-			[0, 1, 0],
-			[0, 0, 1]
-		];
-    }
+	/// <summary>
+	/// Inverse matrix
+	/// </summary>
+	public ObservableCollection<float[]> InverseMatrix { get; } =
+	[
+		[1, 0, 0],
+		[0, 1, 0],
+		[0, 0, 1]
+	];
 }

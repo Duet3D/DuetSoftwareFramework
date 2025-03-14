@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -22,9 +23,10 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Start a plugin
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
         /// <exception cref="ArgumentException">Plugin is invalid</exception>
-        public override async Task Execute()
+        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
         {
             if (!Settings.PluginSupport)
             {
@@ -32,9 +34,9 @@ namespace DuetControlServer.Commands
             }
 
             // Start the plugin and its dependencies
-            using (await _startLock.LockAsync(Program.CancellationToken))
+            using (await _startLock.LockAsync(cancellationToken))
             {
-                await Start(Plugin);
+                await StartAsync(Plugin, cancellationToken: cancellationToken);
             }
 
             // Save the execution state if requested
@@ -42,7 +44,7 @@ namespace DuetControlServer.Commands
             {
                 await using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write, FileShare.None, Settings.FileBufferSize);
                 await using StreamWriter writer = new(fileStream, Encoding.UTF8, Settings.FileBufferSize);
-                using (await Model.Provider.AccessReadOnlyAsync())
+                using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
                 {
                     foreach (Plugin item in Model.Provider.Get.Plugins.Values)
                     {
@@ -60,12 +62,13 @@ namespace DuetControlServer.Commands
         /// </summary>
         /// <param name="id">Plugin identifier</param>
         /// <param name="requiredBy">Plugin that requires this plugin</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Whether the plugin could be found</returns>
-        private async Task Start(string id, string? requiredBy = null)
+        private async Task StartAsync(string id, string? requiredBy = null, CancellationToken cancellationToken = default)
         {
             bool rootPlugin;
             List<string> dependencies = [];
-            using (await Model.Provider.AccessReadOnlyAsync())
+            using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
             {
                 if (Model.Provider.Get.Plugins.TryGetValue(Plugin, out Plugin plugin))
                 {
@@ -123,12 +126,12 @@ namespace DuetControlServer.Commands
             // Start all the dependencies first
             foreach (string dependency in dependencies)
             {
-                await Start(dependency, id);
+                await StartAsync(dependency, id, cancellationToken);
             }
 
             // Start the plugin via the plugin service. This will update the PID too
             StartPlugin startCommand = new() { Plugin = id };
-            await IPC.Processors.PluginService.PerformCommand(startCommand, rootPlugin);
+            await IPC.Processors.PluginService.PerformCommandAsync(startCommand, rootPlugin, cancellationToken);
         }
     }
 }

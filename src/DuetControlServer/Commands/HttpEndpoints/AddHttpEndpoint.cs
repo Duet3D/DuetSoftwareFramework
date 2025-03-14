@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Commands
@@ -19,8 +20,9 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Add a new HTTP endpoint
         /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Reserved file path to a UNIX socket</returns>
-        public override async Task<string> Execute()
+        public override async Task<string> ExecuteAsync(CancellationToken cancellationToken = default)
         {
             // Check if the namespace is reserved
             if (Namespace == "file" || Namespace == "fileinfo" || Namespace == "directory")
@@ -29,7 +31,7 @@ namespace DuetControlServer.Commands
             }
 
             // Check if the requested HTTP endpoint has already been registered. If yes, it may be reused
-            using (await Model.Provider.AccessReadOnlyAsync())
+            using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
             {
                 foreach (HttpEndpoint endpoint in Model.Provider.Get.SBC!.DSF.HttpEndpoints)
                 {
@@ -48,7 +50,7 @@ namespace DuetControlServer.Commands
             string socketPath = System.IO.Path.Combine(Settings.SocketDirectory, Namespace, $"{Path}-{EndpointType}.sock");
             Directory.CreateDirectory(System.IO.Path.GetDirectoryName(socketPath)!);
 
-            using (await Model.Provider.AccessReadWriteAsync())
+            using (await Model.Provider.AccessReadWriteAsync(cancellationToken))
             {
                 HttpEndpoint endpoint = new();
                 Model.Provider.Get.SBC!.DSF.HttpEndpoints.Add(endpoint);
