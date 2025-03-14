@@ -20,14 +20,15 @@ public static class AppArmor
     /// Generate an AppArmor security profile for the given plugin and load it
     /// </summary>
     /// <param name="plugin">Plugin</param>
+    /// <param name="pluginDirectory">Plugin base directory</param>
     /// <param name="settings">Application settings</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public static async Task InstallProfileAsync(Plugin plugin, Settings settings, CancellationToken cancellationToken)
+    public static async Task InstallProfileAsync(Plugin plugin, string pluginDirectory, string sdDirectory, Settings settings, CancellationToken cancellationToken)
     {
         // Load template
         string profile = await File.ReadAllTextAsync(settings.AppArmorTemplate, cancellationToken);
-        profile = profile.Replace("{pluginDirectory}", Path.Combine(settings.PluginDirectory, plugin.Id));
+        profile = profile.Replace("{pluginDirectory}", Path.Combine(pluginDirectory, plugin.Id));
 
         // Build security profile
         StringBuilder includes = new(), rules = new();
@@ -49,8 +50,8 @@ public static class AppArmor
                         break;
 
                     case SbcPermissions.ManagePlugins:
-                        rules.AppendLine($"  {settings.PluginDirectory.TrimEnd(Path.DirectorySeparatorChar)}/ r,");
-                        rules.AppendLine($"  {settings.PluginDirectory.TrimEnd(Path.DirectorySeparatorChar)}/** rw,");
+                        rules.AppendLine($"  {pluginDirectory.TrimEnd(Path.DirectorySeparatorChar)}/ r,");
+                        rules.AppendLine($"  {pluginDirectory.TrimEnd(Path.DirectorySeparatorChar)}/** rw,");
                         // partially enforced by DCS
                         break;
 
@@ -83,53 +84,53 @@ public static class AppArmor
                         rules.AppendLine("  /usr/share/libcamera/** r,");
                         break;
                     case SbcPermissions.ReadFilaments:
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "filaments")}/ r,");
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "filaments")}/** r,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "filaments")}/ r,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "filaments")}/** r,");
                         break;
                     case SbcPermissions.WriteFilaments:
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "filaments")}/** wk,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "filaments")}/** wk,");
                         break;
                     case SbcPermissions.ReadFirmware:
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "firmware")}/ r,");
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "firmware")}/** r,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "firmware")}/ r,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "firmware")}/** r,");
                         break;
                     case SbcPermissions.WriteFirmware:
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "firmware")}/** wk,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "firmware")}/** wk,");
                         break;
                     case SbcPermissions.ReadGCodes:
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "gcodes")}/ r,");
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "gcodes")}/** r,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "gcodes")}/ r,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "gcodes")}/** r,");
                         break;
                     case SbcPermissions.WriteGCodes:
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "gcodes")}/** wk,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "gcodes")}/** wk,");
                         break;
                     case SbcPermissions.ReadMacros:
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "macros")}/ r,");
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "macros")}/** r,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "macros")}/ r,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "macros")}/** r,");
                         break;
                     case SbcPermissions.WriteMacros:
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "macros")}/** wk,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "macros")}/** wk,");
                         break;
                     case SbcPermissions.ReadMenu:
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "menu")}/ r,");
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "menu")}/** r,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "menu")}/ r,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "menu")}/** r,");
                         break;
                     case SbcPermissions.WriteMenu:
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "menu")}/** wk,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "menu")}/** wk,");
                         break;
                     case SbcPermissions.ReadSystem:
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "sys")}/ r,");
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "sys")}/** r,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "sys")}/ r,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "sys")}/** r,");
                         break;
                     case SbcPermissions.WriteSystem:
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "sys")}/** wk,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "sys")}/** wk,");
                         break;
                     case SbcPermissions.ReadWeb:
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "www")}/ r,");
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "www")}/** r,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "www")}/ r,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "www")}/** r,");
                         break;
                     case SbcPermissions.WriteWeb:
-                        rules.AppendLine($"  {Path.Combine(settings.BaseDirectory, "www")}/** wk,");
+                        rules.AppendLine($"  {Path.Combine(sdDirectory, "www")}/** wk,");
                         break;
 
                     case SbcPermissions.None:

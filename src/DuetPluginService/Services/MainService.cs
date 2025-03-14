@@ -19,9 +19,11 @@ namespace DuetPluginService.Services;
 /// <summary>
 /// Main service which interacts with DCS to perform plugin-specific tasks
 /// </summary>
+/// <param name="pluginStore">Plugin store</param>
+/// <param name="hostEnvironment">Host environment</param>
 /// <param name="logger">Logger</param>
 /// <param name="settings">Application settings</param>
-public class MainService(PluginStore pluginStore, ILogger<MainService> logger, IServiceProvider serviceProvider, IOptions<Settings> settings) : BackgroundService
+public class MainService(PluginStore pluginStore, IHostEnvironment hostEnvironment, ILogger<MainService> logger, IServiceProvider serviceProvider, IOptions<Settings> settings) : BackgroundService
 {
     private readonly PluginServiceConnection _connection = new(settings, serviceProvider);
     private readonly Settings _settings = settings.Value;
@@ -34,27 +36,24 @@ public class MainService(PluginStore pluginStore, ILogger<MainService> logger, I
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
         // Load available plugin manifests
-        foreach (string file in Directory.GetFiles(_settings.PluginDirectory))
+        foreach (string file in Directory.GetFiles(hostEnvironment.ContentRootPath, "*.json"))
         {
-            if (file.EndsWith(".json"))
+            try
             {
-                try
+                await using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream, cancellationToken: cancellationToken);
+                Plugin plugin = new();
+                plugin.UpdateFromJson(manifestJson.RootElement, false);
+                plugin.Pid = -1;
+                using (await pluginStore.LockAsync(cancellationToken))
                 {
-                    await using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
-                    using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream, cancellationToken: cancellationToken);
-                    Plugin plugin = new();
-                    plugin.UpdateFromJson(manifestJson.RootElement, false);
-                    plugin.Pid = -1;
-                    using (await pluginStore.LockAsync(cancellationToken))
-                    {
-                        pluginStore.Plugins.Add(plugin);
-                    }
-                    logger.LogInformation("Plugin {Id} loaded", plugin.Id);
+                    pluginStore.Plugins.Add(plugin);
                 }
-                catch (Exception e)
-                {
-                    logger.LogError(e, "Failed to load plugin manifest {File}", Path.GetFileName(file));
-                }
+                logger.LogInformation("Plugin {Id} loaded", plugin.Id);
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Failed to load plugin manifest {File}", Path.GetFileName(file));
             }
         }
 

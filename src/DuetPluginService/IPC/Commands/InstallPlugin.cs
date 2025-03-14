@@ -1,6 +1,8 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
+using DuetAPIClient;
 using DuetPluginService.Singletons;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
@@ -20,9 +22,10 @@ namespace DuetPluginService.IPC.Commands;
 /// Implementation of the <see cref="DuetAPI.Commands.InstallPlugin"/> command
 /// </summary>
 /// <param name="pluginStore">Plugin store</param>
+/// <param name="hostEnvironment">Host environment</param>
 /// <param name="loggerFactory">Logger factory</param>
 /// <param name="settings">Application settings</param>
-public sealed class InstallPlugin(PluginStore pluginStore, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.InstallPlugin
+public sealed class InstallPlugin(PluginStore pluginStore, IHostEnvironment hostEnvironment, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.InstallPlugin
 {
     private readonly Settings _settings = settings.Value;
 
@@ -44,6 +47,14 @@ public sealed class InstallPlugin(PluginStore pluginStore, ILoggerFactory logger
         Plugin plugin = await ExtractManifest(zipArchive);
         ILogger logger = loggerFactory.CreateLogger($"Plugin {plugin.Id}");
 
+        // Obtain virtual SD path
+        string sdPath;
+        using (CommandConnection connection = new())
+        {
+            await connection.Connect(_settings.SocketPath, cancellationToken);
+            sdPath = await connection.ResolvePath("0:/", cancellationToken);
+        }
+
         if (Utility.IsRoot)
         {
             // Run preinstall routine if needed
@@ -64,14 +75,16 @@ public sealed class InstallPlugin(PluginStore pluginStore, ILoggerFactory logger
             // Apply security profile for this plugin unless it gets root permissions anyway
             if (!plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser) && !_settings.DisableAppArmor)
             {
-                await Permissions.AppArmor.InstallProfileAsync(plugin, _settings, cancellationToken);
+
+                // Install security profile
+                await Permissions.AppArmor.InstallProfileAsync(plugin, hostEnvironment.ContentRootPath, sdPath, _settings, cancellationToken);
                 logger.LogInformation("Security profile installed");
             }
         }
         else
         {
             // Delete old files
-            string pluginBase = Path.Combine(_settings.PluginDirectory, plugin.Id);
+            string pluginBase = Path.Combine(hostEnvironment.ContentRootPath, plugin.Id);
             if (!Upgrade && Directory.Exists(pluginBase))
             {
                 try
@@ -134,7 +147,7 @@ public sealed class InstallPlugin(PluginStore pluginStore, ILoggerFactory logger
                 else if (entry.FullName.StartsWith("sd/"))
                 {
                     // Put SD files into 0:/
-                    fileName = Path.Combine(_settings.BaseDirectory, entry.FullName[3..]);
+                    fileName = Path.Combine(hostEnvironment.ContentRootPath, entry.FullName[3..]);
                     plugin.SdFiles.Add(entry.FullName[3..]);
                 }
                 else
@@ -153,7 +166,7 @@ public sealed class InstallPlugin(PluginStore pluginStore, ILoggerFactory logger
                 }
 
                 // Extract the file
-                if (File.Exists(fileName) && plugin.SbcConfigFiles.Any(file => fileName == Path.Combine(_settings.BaseDirectory, "sys", file) || fileName == Path.Combine(_settings.BaseDirectory, file)))
+                if (File.Exists(fileName) && plugin.SbcConfigFiles.Any(file => fileName == Path.Combine(sdPath, "sys", file) || fileName == Path.Combine(sdPath, file)))
                 {
                     logger.LogDebug("Not overwriting config file {File}", entry.FullName);
                 }
@@ -197,7 +210,7 @@ public sealed class InstallPlugin(PluginStore pluginStore, ILoggerFactory logger
             foreach (string dwcFile in plugin.DwcFiles)
             {
                 string pluginWwwPath = Path.Combine(pluginBase, "dwc", dwcFile);
-                string installWwwPath = Path.Combine(_settings.BaseDirectory, "www", dwcFile);
+                string installWwwPath = Path.Combine(hostEnvironment.ContentRootPath, "www", dwcFile);
 
                 // Create parent directory first
                 string directory = Path.GetDirectoryName(installWwwPath)!;
@@ -235,7 +248,7 @@ public sealed class InstallPlugin(PluginStore pluginStore, ILoggerFactory logger
 
             // Install refreshed plugin manifest
             logger.LogDebug("Installing plugin manifest");
-            string manifestFilename = Path.Combine(_settings.PluginDirectory, $"{plugin.Id}.json");
+            string manifestFilename = Path.Combine(hostEnvironment.ContentRootPath, $"{plugin.Id}.json");
             await using (FileStream manifestFile = new(manifestFilename, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 await JsonSerializer.SerializeAsync(manifestFile, plugin, JsonHelper.DefaultJsonOptions);
@@ -345,8 +358,8 @@ public sealed class InstallPlugin(PluginStore pluginStore, ILoggerFactory logger
             {
                 FileName = _settings.InstallPythonPackageCommand,
                 Arguments = _settings.InstallPythonPackageArguments
-                    .Replace("{manifestFile}", Path.Combine(_settings.PluginDirectory, plugin + ".json"))
-                    .Replace("{pluginPath}", Path.Combine(_settings.PluginDirectory, plugin))
+                    .Replace("{manifestFile}", Path.Combine(hostEnvironment.ContentRootPath, plugin + ".json"))
+                    .Replace("{pluginPath}", Path.Combine(hostEnvironment.ContentRootPath, plugin))
             };
             foreach (var kv in _settings.InstallPackageEnvironment)
             {

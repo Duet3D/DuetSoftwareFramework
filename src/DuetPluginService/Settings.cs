@@ -10,25 +10,9 @@ public class Settings
     public const string DefaultConfigFile = "/opt/dsf/conf/plugins.json";
 
     /// <summary>
-    /// Path to the configuration file
-    /// </summary>
-    public string ConfigFilename { get; set; } = DefaultConfigFile;
-
-    /// <summary>
     /// Path to the UNIX socket provided by DuetControlServer
     /// </summary>
     public string SocketPath { get; set; } = DuetAPI.Connection.Defaults.FullSocketPath;
-
-    /// <summary>
-    /// Directory holding DSF plugins
-    /// </summary>
-    public string PluginDirectory { get; set; } = "/opt/dsf/plugins";
-
-    /// <summary>
-    /// Virtual SD card directory.
-    /// Paths starting with 0:/ are mapped to this directory
-    /// </summary>
-    public string BaseDirectory { get; set; } = "/opt/dsf/sd";
 
     /// <summary>
     /// Disable AppArmor security policy generation (not recommended, potential security hazard)
