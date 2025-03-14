@@ -1,7 +1,7 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetAPIClient;
-using DuetPluginService.Services;
+using DuetPluginService.Singletons;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,16 +12,16 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.Commands;
+namespace DuetPluginService.IPC.Commands;
 
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.StartPlugin"/> command
 /// </summary>
-/// <param name="pluginManager">Plugin manager</param>
+/// <param name="pluginStore">Plugin store</param>
 /// <param name="lifetime">Application lifetime</param>
 /// <param name="loggerFactory">Logger factory</param>
 /// <param name="settings">Application settings</param>
-public sealed class StartPlugin(PluginManager pluginManager, IHostApplicationLifetime lifetime, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.StartPlugin
+public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetime lifetime, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.StartPlugin
 {
     private readonly Settings _settings = settings.Value;
 
@@ -37,9 +37,9 @@ public sealed class StartPlugin(PluginManager pluginManager, IHostApplicationLif
 
         // Get the plugin
         Plugin? plugin = null;
-        using (await pluginManager.LockAsync(cancellationToken))
+        using (await pluginStore.LockAsync(cancellationToken))
         {
-            foreach (Plugin item in pluginManager.Plugins)
+            foreach (Plugin item in pluginStore.Plugins)
             {
                 if (item.Id == Plugin)
                 {
@@ -79,10 +79,10 @@ public sealed class StartPlugin(PluginManager pluginManager, IHostApplicationLif
             }
         }
 
-        using (await pluginManager.LockAsync(cancellationToken))
+        using (await pluginStore.LockAsync(cancellationToken))
         {
             // Make sure the same process isn't started twice
-            if (pluginManager.Processes.ContainsKey(plugin.Id))
+            if (pluginStore.Processes.ContainsKey(plugin.Id))
             {
                 return;
             }
@@ -114,8 +114,8 @@ public sealed class StartPlugin(PluginManager pluginManager, IHostApplicationLif
 
             // Update the PID
             plugin.Pid = process.Id;
-            pluginManager.Processes[plugin.Id] = process;
-            logger.LogInformation("Process has been started (pid {Pid})", process.Id);
+            pluginStore.Processes[plugin.Id] = process;
+            logger.LogInformation("Process started (pid {Pid})", process.Id);
             using (CommandConnection connection = new())
             {
                 await connection.Connect(_settings.SocketPath, cancellationToken);
@@ -136,13 +136,13 @@ public sealed class StartPlugin(PluginManager pluginManager, IHostApplicationLif
                     }
 
                     // Update the PID again
-                    using (await pluginManager.LockAsync(cancellationToken))
+                    using (await pluginStore.LockAsync(cancellationToken))
                     {
-                        foreach (Plugin item in pluginManager.Plugins)
+                        foreach (Plugin item in pluginStore.Plugins)
                         {
                             if (item.Id == Plugin)
                             {
-                                logger.LogInformation("Process has been stopped with exit code {ExitCode}", process.ExitCode);
+                                logger.LogInformation("Process stopped with exit code {ExitCode}", process.ExitCode);
                                 item.Pid = -1;
 
                                 if (!lifetime.ApplicationStopping.IsCancellationRequested)
@@ -161,9 +161,9 @@ public sealed class StartPlugin(PluginManager pluginManager, IHostApplicationLif
                 }
                 finally
                 {
-                    using (await pluginManager.LockAsync(cancellationToken))
+                    using (await pluginStore.LockAsync(cancellationToken))
                     {
-                        pluginManager.Processes.Remove(plugin.Id);
+                        pluginStore.Processes.Remove(plugin.Id);
                     }
                     process.Dispose();
                 }

@@ -4,7 +4,6 @@ using DuetAPI.Connection.InitMessages;
 using DuetAPI.Utility;
 using DuetAPIClient;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using System;
 using System.Linq;
@@ -13,12 +12,12 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.Services;
+namespace DuetPluginService.IPC;
 
 /// <summary>
 /// Connection service for plugin management
 /// </summary>
-public class PluginServiceConnection(IOptions<Settings> settings, IServiceProvider serviceProvider) : BaseConnection(ConnectionMode.PluginService), IHostedService
+public class PluginServiceConnection(IOptions<Settings> settings, IServiceProvider serviceProvider) : BaseConnection(ConnectionMode.PluginService)
 {
     private readonly Settings _settings = settings.Value;
 
@@ -41,21 +40,10 @@ public class PluginServiceConnection(IOptions<Settings> settings, IServiceProvid
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public async Task ConnectAsync(CancellationToken cancellationToken)
     {
         PluginServiceInitMessage initMessage = new();
         await Connect(initMessage, _settings.SocketPath, cancellationToken);
-    }
-
-    /// <summary>
-    /// Stop the plugin service connection
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        Close();
-        return Task.CompletedTask;
     }
 
     // <summary>

@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 
-namespace DuetPluginService.Commands;
+namespace DuetPluginService.IPC.Commands;
 
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.UninstallSystemPackage"/> command

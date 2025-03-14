@@ -1,6 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
-using DuetPluginService.Services;
+using DuetPluginService.Singletons;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
@@ -9,12 +9,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.Commands;
+namespace DuetPluginService.IPC.Commands;
 
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.UninstallPlugin"/> command
 /// </summary>
-public sealed class UninstallPlugin(PluginManager pluginManager, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.UninstallPlugin
+public sealed class UninstallPlugin(PluginStore pluginStore, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.UninstallPlugin
 {
     private readonly Settings _settings = settings.Value;
 
@@ -33,11 +33,11 @@ public sealed class UninstallPlugin(PluginManager pluginManager, ILoggerFactory 
     {
         ILogger logger = loggerFactory.CreateLogger($"Plugin {Plugin}");
 
-        using (await pluginManager.LockAsync(cancellationToken))
+        using (await pluginStore.LockAsync(cancellationToken))
         {
             // Get the plugin first
             Plugin? plugin = null;
-            foreach (Plugin item in pluginManager.Plugins)
+            foreach (Plugin item in pluginStore.Plugins)
             {
                 if (item.Id == Plugin)
                 {
@@ -162,8 +162,8 @@ public sealed class UninstallPlugin(PluginManager pluginManager, ILoggerFactory 
             }
 
             // Plugin has been uninstalled
-            pluginManager.Plugins.Remove(plugin);
-            logger.LogInformation("Plugin has been uninstalled");
+            pluginStore.Plugins.Remove(plugin);
+            logger.LogInformation("Plugin uninstalled");
         }
     }
 }

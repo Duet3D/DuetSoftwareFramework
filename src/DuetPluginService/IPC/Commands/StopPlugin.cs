@@ -1,6 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
-using DuetPluginService.Services;
+using DuetPluginService.Singletons;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
@@ -8,14 +8,14 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.Commands;
+namespace DuetPluginService.IPC.Commands;
 
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.StopPlugin"/> command
 /// </summary>
-/// <param name="pluginManager">Plugin manager</param>
+/// <param name="pluginStore">Plugin store</param>
 /// <param name="loggerFactory">Logger factory</param>
-public sealed class StopPlugin(PluginManager pluginManager, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.StopPlugin
+public sealed class StopPlugin(PluginStore pluginStore, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.StopPlugin
 {
     private readonly Settings _settings = settings.Value;
 
@@ -29,11 +29,11 @@ public sealed class StopPlugin(PluginManager pluginManager, ILoggerFactory logge
     {
         ILogger logger = loggerFactory.CreateLogger($"Plugin {Plugin}");
 
-        using (await pluginManager.LockAsync(cancellationToken))
+        using (await pluginStore.LockAsync(cancellationToken))
         {
             // Try to find the plugin first
             Plugin? plugin = null;
-            foreach (Plugin item in pluginManager.Plugins)
+            foreach (Plugin item in pluginStore.Plugins)
             {
                 if (item.Id == Plugin)
                 {
@@ -54,7 +54,7 @@ public sealed class StopPlugin(PluginManager pluginManager, ILoggerFactory logge
             }
 
             // Try to stop the process
-            if (pluginManager.Processes.TryGetValue(plugin.Id, out Process? process) && !process.HasExited)
+            if (pluginStore.Processes.TryGetValue(plugin.Id, out Process? process) && !process.HasExited)
             {
                 try
                 {

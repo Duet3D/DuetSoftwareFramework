@@ -1,5 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
-using DuetPluginService.Services;
+using DuetPluginService.Singletons;
 using Microsoft.Extensions.Options;
 using System;
 using System.IO;
@@ -7,14 +7,14 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.Commands;
+namespace DuetPluginService.IPC.Commands;
 
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.ReloadPlugin"/> command
 /// </summary>
-/// <param name="pluginManager">Plugin manager</param>
+/// <param name="pluginStore">Plugin store</param>
 /// <param name="settings">Application settings</param>
-public sealed class ReloadPlugin(PluginManager pluginManager, IOptions<Settings> settings) : DuetAPI.Commands.ReloadPlugin
+public sealed class ReloadPlugin(PluginStore pluginStore, IOptions<Settings> settings) : DuetAPI.Commands.ReloadPlugin
 {
     private readonly Settings _settings = settings.Value;
 
@@ -26,11 +26,11 @@ public sealed class ReloadPlugin(PluginManager pluginManager, IOptions<Settings>
     /// <exception cref="ArgumentException">Plugin is invalid</exception>
     public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        using (await pluginManager.LockAsync(cancellationToken))
+        using (await pluginStore.LockAsync(cancellationToken))
         {
             // Try to find the plugin first
             Plugin? plugin = null;
-            foreach (Plugin item in pluginManager.Plugins)
+            foreach (Plugin item in pluginStore.Plugins)
             {
                 if (item.Id == Plugin)
                 {
@@ -46,7 +46,7 @@ public sealed class ReloadPlugin(PluginManager pluginManager, IOptions<Settings>
                 if (plugin is null)
                 {
                     plugin = new();
-                    pluginManager.Plugins.Add(plugin);
+                    pluginStore.Plugins.Add(plugin);
                 }
 
                 await using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -61,7 +61,7 @@ public sealed class ReloadPlugin(PluginManager pluginManager, IOptions<Settings>
                     // Don't attempt to remove a non-existent plugin
                     return;
                 }
-                pluginManager.Plugins.Remove(plugin);
+                pluginStore.Plugins.Remove(plugin);
             }
         }
     }

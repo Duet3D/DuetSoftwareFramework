@@ -1,7 +1,6 @@
-﻿using DuetAPI.Commands;
-using DuetAPI.ObjectModel;
+﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
-using DuetPluginService.Services;
+using DuetPluginService.Singletons;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
@@ -15,15 +14,15 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.Commands;
+namespace DuetPluginService.IPC.Commands;
 
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.InstallPlugin"/> command
 /// </summary>
-/// <param name="pluginManager">Plugin manager</param>
+/// <param name="pluginStore">Plugin store</param>
 /// <param name="loggerFactory">Logger factory</param>
 /// <param name="settings">Application settings</param>
-public sealed class InstallPlugin(PluginManager pluginManager, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.InstallPlugin
+public sealed class InstallPlugin(PluginStore pluginStore, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.InstallPlugin
 {
     private readonly Settings _settings = settings.Value;
 
@@ -248,16 +247,16 @@ public sealed class InstallPlugin(PluginManager pluginManager, ILoggerFactory lo
                 logger.LogDebug("Installing Python dependencies");
                 await InstallPythonPackages(plugin.Id, cancellationToken);
             }
-
-            // Done
-            logger.LogInformation("File installation complete");
         }
 
-        // Plugin has been installed
-        using (await pluginManager.LockAsync(cancellationToken))
+        // Plugin installed
+        using (await pluginStore.LockAsync(cancellationToken))
         {
-            pluginManager.Plugins.Add(plugin);
+            pluginStore.Plugins.Add(plugin);
         }
+
+        // Done
+        logger.LogInformation("Plugin installed");
     }
 
     /// <summary>

@@ -1,9 +1,9 @@
 ﻿using DuetPluginService;
 using DuetPluginService.Services;
+using DuetPluginService.Singletons;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using System;
 
 Console.WriteLine($"Duet Plugin Service v{Utility.Version}");
@@ -18,25 +18,22 @@ IHost host = Host.CreateDefaultBuilder()
         string configFile = Settings.DefaultConfigFile;
         for (int i = 0; i < args.Length - 1; i++)
         {
-            if (args[i] == "--config")
+            if (args[i] is "-c" or "--config")
             {
                 configFile = args[i + 1];
                 break;
             }
         }
+
         config
             .AddJsonFile(configFile, true)
             .AddCommandLine(args);
     })
     .ConfigureServices((context, services) => services
         .Configure<Settings>(context.Configuration)
-        .AddSingleton<PluginManager>()
-        .AddHostedService<PluginServiceConnection>()
-        .AddHostedService<ControlService>()
+        .AddSingleton<PluginStore>()
+        .AddHostedService<MainService>()
     )
     .Build();
-
-var settings = host.Services.GetRequiredService<IOptions<Settings>>().Value;
-Console.WriteLine("config path: {0}", settings.ConfigFilename);
 
 await host.RunAsync();
