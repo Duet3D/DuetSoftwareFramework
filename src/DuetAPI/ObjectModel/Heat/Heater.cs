@@ -36,6 +36,26 @@ public partial class Heater : ModelObject, IStaticModelObject
     private float _current = -273.15F;
 
     /// <summary>
+    /// Current feedforward PWM boost applied to the heater
+    /// </summary>
+    public float? ExtrPwmBoost
+    {
+        get => _extrPwmBoost;
+        set => SetPropertyValue(ref _extrPwmBoost, value);
+    }
+    private float? _extrPwmBoost;
+
+    /// <summary>
+    /// Current temperature boost applied to the heater
+    /// </summary>
+    public float? ExtrTempBoost
+    {
+        get => _extrTempBoost;
+        set => SetPropertyValue(ref _extrTempBoost, value);
+    }
+    private float? _extrTempBoost;
+
+    /// <summary>
     /// Maximum temperature allowed for this heater (in C)
     /// </summary>
     /// <remarks>
