@@ -182,32 +182,6 @@ namespace DuetControlServer.IPC
         public bool IsConnected => !disposed && UnixSocket.Connected;
 
         /// <summary>
-        /// Read a generic JSON object from the socket
-        /// </summary>
-        /// <returns>JsonDocument for deserialization</returns>
-        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
-        /// <exception cref="SocketException">Connection has been closed</exception>
-        public async ValueTask<JsonDocument> ReceiveJsonDocument()
-        {
-            do
-            {
-                try
-                {
-                    await using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
-                    _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
-
-                    return await JsonDocument.ParseAsync(jsonStream);
-                }
-                catch (JsonException e)
-                {
-                    _logger.Error(e, "IPC#{0}: Received malformed JSON", Id);
-                    await SendResponse(e);
-                }
-            }
-            while (true);
-        }
-
-        /// <summary>
         /// Read a generic response from the socket
         /// </summary>
         /// <returns>Deserialized base response</returns>
