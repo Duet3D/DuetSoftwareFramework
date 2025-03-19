@@ -76,7 +76,7 @@ public class PluginServiceConnection(IOptions<Settings> settings, IServiceProvid
 
                 // Deserialize incoming command
                 BaseCommand result = (BaseCommand)ActivatorUtilities.CreateInstance(serviceProvider, commandType);
-                Utility.PopulateObject(result, jsonDocument.RootElement);
+                result.UpdateFromJson(jsonDocument.RootElement);
                 return result;
             }
         }

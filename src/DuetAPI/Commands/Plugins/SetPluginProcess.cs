@@ -7,7 +7,7 @@ namespace DuetAPI.Commands;
 /// Reserved for internal purposes, do not use
 /// </summary>
 [RequiredPermissions(SbcPermissions.ServicePlugins)]
-public class SetPluginProcess : Command
+public partial class SetPluginProcess : Command
 {
     /// <summary>
     /// Identifier of the plugin to update

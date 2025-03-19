@@ -11,7 +11,7 @@ namespace DuetAPI.Commands;
 /// <seealso cref="ReceivedHttpRequest"/>.
 /// <seealso cref="SendHttpResponse"/>
 [RequiredPermissions(SbcPermissions.RegisterHttpEndpoints)]
-public class AddHttpEndpoint : Command<string>
+public partial class AddHttpEndpoint : Command<string>
 {
     /// <summary>
     /// Type of the HTTP request

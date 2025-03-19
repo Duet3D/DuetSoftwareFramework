@@ -10,4 +10,4 @@ namespace DuetAPI.Commands;
 /// This command is only permitted in <see cref="ConnectionMode.Subscribe"/> mode
 /// </remarks>
 [RequiredPermissions(SbcPermissions.ObjectModelRead | SbcPermissions.ObjectModelReadWrite)]
-public class Acknowledge : Command { }
+public partial class Acknowledge : Command { }

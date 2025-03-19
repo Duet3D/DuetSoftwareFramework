@@ -8,7 +8,7 @@ namespace DuetAPI.Commands;
 /// Returns the ID of the new user session
 /// </summary>
 [RequiredPermissions(SbcPermissions.ManageUserSessions)]
-public class AddUserSession : Command<int>
+public partial class AddUserSession : Command<int>
 {
     /// <summary>
     /// Access level of this session

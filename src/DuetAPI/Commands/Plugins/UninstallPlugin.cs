@@ -6,7 +6,7 @@ namespace DuetAPI.Commands;
 /// Uninstall a plugin
 /// </summary>
 [RequiredPermissions(SbcPermissions.ManagePlugins)]
-public class UninstallPlugin : Command
+public partial class UninstallPlugin : Command
 {
     /// <summary>
     /// Identifier of the plugin

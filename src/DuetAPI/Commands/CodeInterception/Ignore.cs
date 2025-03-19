@@ -10,4 +10,4 @@ namespace DuetAPI.Commands;
 /// This command is only permitted in <see cref="ConnectionMode.Intercept"/> mode
 /// </remarks>
 [RequiredPermissions(SbcPermissions.CodeInterceptionRead | SbcPermissions.CodeInterceptionReadWrite)]
-public class Ignore : Command { }
+public partial class Ignore : Command { }

@@ -10,7 +10,7 @@ namespace DuetAPI.Commands;
 /// The object model must not be locked from the same connection via <see cref="LockObjectModel"/> when this is called!
 /// </remarks>
 [RequiredPermissions(SbcPermissions.SuperUser)]
-public class SetNetworkProtocol : Command
+public partial class SetNetworkProtocol : Command
 {
     /// <summary>
     /// Protocol to change

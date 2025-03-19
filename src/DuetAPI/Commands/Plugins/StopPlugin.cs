@@ -6,7 +6,7 @@ namespace DuetAPI.Commands;
 /// Stop a plugin
 /// </summary>
 [RequiredPermissions(SbcPermissions.ManagePlugins)]
-public class StopPlugin : Command
+public partial class StopPlugin : Command
 {
     /// <summary>
     /// Identifier of the plugin

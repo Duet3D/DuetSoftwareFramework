@@ -7,4 +7,4 @@ namespace DuetAPI.Commands;
 /// This is mandatory after <see cref="LockObjectModel"/> has been invoked
 /// </summary>
 [RequiredPermissions(SbcPermissions.ObjectModelReadWrite)]
-public class UnlockObjectModel : Command { }
+public partial class UnlockObjectModel : Command { }

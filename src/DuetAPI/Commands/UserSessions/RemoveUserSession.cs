@@ -6,7 +6,7 @@ namespace DuetAPI.Commands;
 /// Remove an existing user session
 /// </summary>
 [RequiredPermissions(SbcPermissions.ManageUserSessions)]
-public class RemoveUserSession : Command<bool>
+public partial class RemoveUserSession : Command<bool>
 {
     /// <summary>
     /// Identifier of the user session to remove

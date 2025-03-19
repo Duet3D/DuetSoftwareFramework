@@ -12,7 +12,7 @@ namespace DuetAPI.Commands;
 /// <seealso cref="LockObjectModel"/>
 /// <seealso cref="UnlockObjectModel"/>
 [RequiredPermissions(SbcPermissions.ObjectModelReadWrite)]
-public class PatchObjectModel : Command
+public partial class PatchObjectModel : Command
 {
     /// <summary>
     /// Key to update

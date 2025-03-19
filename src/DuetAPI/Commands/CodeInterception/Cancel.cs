@@ -6,4 +6,4 @@ namespace DuetAPI.Commands;
 /// Cancel a code in <see cref="Connection.InterceptionMode"/>
 /// </summary>
 [RequiredPermissions(SbcPermissions.CodeInterceptionReadWrite)]
-public class Cancel : Command { }
+public partial class Cancel : Command { }

@@ -7,7 +7,7 @@ namespace DuetAPI.Commands;
 /// Evaluate an arbitrary expression on the given channel
 /// </summary>
 [RequiredPermissions(SbcPermissions.CommandExecution)]
-public class EvaluateExpression : Command<JsonElement>
+public partial class EvaluateExpression : Command<JsonElement>
 {
     /// <summary>
     /// Code channel where the expression is evaluated

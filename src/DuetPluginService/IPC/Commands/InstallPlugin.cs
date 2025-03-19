@@ -12,6 +12,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -40,6 +41,7 @@ public sealed class InstallPlugin(PluginStore pluginStore, IHostEnvironment host
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="ArgumentException">Plugin installation failed</exception>
+    [UnsupportedOSPlatform("windows")]
     public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
         // Extract the plugin manifest

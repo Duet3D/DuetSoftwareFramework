@@ -6,4 +6,4 @@ namespace DuetAPI.Commands;
 /// Start all the previously started plugins again
 /// </summary>
 [RequiredPermissions(SbcPermissions.ManagePlugins)]
-public class StartPlugins : Command { }
+public partial class StartPlugins : Command { }

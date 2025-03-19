@@ -7,4 +7,4 @@ namespace DuetAPI.Commands;
 /// This command is intended for shutdown or update requests
 /// </summary>
 [RequiredPermissions(SbcPermissions.ManagePlugins)]
-public class StopPlugins : Command { }
+public partial class StopPlugins : Command { }

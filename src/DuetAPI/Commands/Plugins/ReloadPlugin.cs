@@ -6,7 +6,7 @@ namespace DuetAPI.Commands;
 /// Reload the manifest of a given plugin. Useful for packaged plugins
 /// </summary>
 [RequiredPermissions(SbcPermissions.ManagePlugins)]
-public class ReloadPlugin : Command
+public partial class ReloadPlugin : Command
 {
     /// <summary>
     /// Identifier of the plugin

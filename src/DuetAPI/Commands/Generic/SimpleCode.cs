@@ -14,7 +14,7 @@ namespace DuetAPI.Commands;
 /// internal code buffer useless.
 /// </remarks>
 [RequiredPermissions(SbcPermissions.CommandExecution)]
-public class SimpleCode : Command<string>
+public partial class SimpleCode : Command<string>
 {
     /// <summary>
     /// Code to parse and execute

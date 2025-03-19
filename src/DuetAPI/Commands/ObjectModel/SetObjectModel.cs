@@ -12,7 +12,7 @@ namespace DuetAPI.Commands;
 /// <seealso cref="LockObjectModel"/>
 /// <seealso cref="UnlockObjectModel"/>
 [RequiredPermissions(SbcPermissions.ObjectModelReadWrite)]
-public class SetObjectModel : Command<bool>
+public partial class SetObjectModel : Command<bool>
 {
     /// <summary>
     /// Path to the property in the machine model

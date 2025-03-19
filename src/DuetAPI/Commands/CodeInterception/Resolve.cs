@@ -11,7 +11,7 @@ namespace DuetAPI.Commands;
 /// This command is only permitted in <see cref="ConnectionMode.Intercept"/> mode
 /// </remarks>
 [RequiredPermissions(SbcPermissions.CodeInterceptionReadWrite)]
-public class Resolve : Command
+public partial class Resolve : Command
 {
     /// <summary>
     /// Type of the resolving message

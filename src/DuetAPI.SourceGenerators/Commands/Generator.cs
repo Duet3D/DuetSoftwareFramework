@@ -4,7 +4,7 @@ using System.CodeDom.Compiler;
 using System.IO;
 using System.Text;
 
-namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject;
+namespace DuetAPI.SourceGenerators.Commands;
 
 internal static class Generator
 {
@@ -16,19 +16,8 @@ internal static class Generator
     {
         if (context.SyntaxReceiver is SourceGeneratorSyntaxReceiver receiver)
         {
-            foreach (string cls in receiver.ModelObjectMembers.Keys)
+            foreach (string cls in receiver.CommandMembers.Keys)
             {
-                if (cls == "ObjectModel")
-                {
-                    // This one has its own generator
-                    continue;
-                }
-                if (receiver.IncompleteModelObjectClasses.TryGetValue(cls, out Location? location))
-                {
-                    context.ReportDiagnostic(Diagnostic.Create(Descriptors.IncompleteModelObjectClass, location, cls));
-                    continue;
-                }
-
                 SourceText sourceText = SourceText.From($@"using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -39,7 +28,7 @@ using DuetAPI.Utility;
 #nullable enable
 #pragma warning disable 618
 
-namespace DuetAPI.ObjectModel;
+namespace DuetAPI.Commands;
 
 public partial class {cls}
 {{
@@ -65,10 +54,6 @@ public partial class {cls}
         {
             Indent = 1
         };
-        writer.WriteLine(Assign.Generate(receiver, cls));
-        writer.WriteLine();
-        writer.WriteLine(Clone.Generate(receiver, cls));
-        writer.WriteLine();
         writer.WriteLine(UpdateFromJson.Generate(context, receiver, cls));
         writer.WriteLine();
         writer.WriteLine(UpdateFromJsonReader.Generate(context, receiver, cls));

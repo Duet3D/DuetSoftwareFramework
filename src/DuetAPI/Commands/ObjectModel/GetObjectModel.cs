@@ -7,4 +7,4 @@ namespace DuetAPI.Commands;
 /// </summary>
 /// <seealso cref="ObjectModel.ObjectModel"/>
 [RequiredPermissions(SbcPermissions.ObjectModelRead | SbcPermissions.ObjectModelReadWrite)]
-public class GetObjectModel : Command<ObjectModel.ObjectModel> { }
+public partial class GetObjectModel : Command<ObjectModel.ObjectModel> { }

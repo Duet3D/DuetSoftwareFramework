@@ -2,13 +2,17 @@
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 
 namespace DuetAPI.SourceGenerators;
 
 internal class SourceGeneratorSyntaxReceiver : ISyntaxReceiver
 {
     public List<string> Enums { get; } = [];
+
+    public Dictionary<string, List<PropertyDeclarationSyntax>> CommandMembers { get; } = [];
 
     public Dictionary<string, List<PropertyDeclarationSyntax>> ModelObjectMembers { get; } = [];
 
@@ -46,7 +50,20 @@ internal class SourceGeneratorSyntaxReceiver : ISyntaxReceiver
 
             if (cds.BaseList != null)
             {
-                if (cds.BaseList.Types.Any(type => type.Type is IdentifierNameSyntax ins && ins.Identifier.ValueText == "ModelObject"))
+                if (cds.BaseList.Types.Any(type => type.Type is IdentifierNameSyntax ins && ins.Identifier.ValueText == "Command") ||
+                    cds.BaseList.Types.Any(type => type.Type is GenericNameSyntax gns && gns.Identifier.ValueText == "Command"))
+                {
+                    List<PropertyDeclarationSyntax> members = [];
+                    foreach (MemberDeclarationSyntax member in cds.Members)
+                    {
+                        if (member is PropertyDeclarationSyntax pds && !pds.AttributeLists.Any(al => al.Attributes.Any(a => a.Name.ToString() == "JsonIgnore")))
+                        {
+                            members.Add(pds);
+                        }
+                    }
+                    CommandMembers.Add(cds.Identifier.ValueText, members);
+                }
+                else if (cds.BaseList.Types.Any(type => type.Type is IdentifierNameSyntax ins && ins.Identifier.ValueText == "ModelObject"))
                 {
                     var membersAndMethods = GetClassMembersAndMethods();
                     ModelObjectMembers.Add(cds.Identifier.ValueText, membersAndMethods.Item1);
@@ -88,8 +105,8 @@ internal class SourceGeneratorSyntaxReceiver : ISyntaxReceiver
             {
                 Tuple<List<PropertyDeclarationSyntax>, List<MethodDeclarationSyntax>> GetClassMembersAndMethods()
                 {
-                    List<PropertyDeclarationSyntax> members = [..ModelObjectMembers[item.Value]];
-                    List<MethodDeclarationSyntax> methods = [..ModelObjectMethods[item.Value]];
+                    List<PropertyDeclarationSyntax> members = [.. ModelObjectMembers[item.Value]];
+                    List<MethodDeclarationSyntax> methods = [.. ModelObjectMethods[item.Value]];
                     foreach (MemberDeclarationSyntax member in item.Key.Members)
                     {
                         if (member is PropertyDeclarationSyntax pds && !pds.AttributeLists.Any(al => al.Attributes.Any(a => a.Name.ToString() == "JsonIgnore")))

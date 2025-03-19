@@ -6,7 +6,7 @@ namespace DuetAPI.Commands;
 /// Resolve a RepRapFirmware-style path to an actual file path
 /// </summary>
 [RequiredPermissions(SbcPermissions.CommandExecution | SbcPermissions.FileSystemAccess)]
-public class ResolvePath : Command<string>
+public partial class ResolvePath : Command<string>
 {
     /// <summary>
     /// Path that is RepRapFirmware-compatible

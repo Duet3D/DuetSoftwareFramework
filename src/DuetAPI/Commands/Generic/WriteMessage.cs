@@ -9,7 +9,7 @@ namespace DuetAPI.Commands;
 /// </summary>
 /// <remarks>If neither <c>OutputMessage</c> nor <c>LogMessage</c> is true, the message is written to the console output</remarks>
 [RequiredPermissions(SbcPermissions.CommandExecution | SbcPermissions.ObjectModelReadWrite)]
-public class WriteMessage : Command
+public partial class WriteMessage : Command
 {
     /// <summary>
     /// Type of the message to write

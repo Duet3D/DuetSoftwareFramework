@@ -7,7 +7,7 @@ namespace DuetAPI.Commands;
 /// If no password was configured before or if it was set to "reprap", this will always return true
 /// </summary>
 [RequiredPermissions(SbcPermissions.ObjectModelRead | SbcPermissions.ObjectModelReadWrite)]
-public class CheckPassword : Command<bool>
+public partial class CheckPassword : Command<bool>
 {
     /// <summary>
     /// Password to check

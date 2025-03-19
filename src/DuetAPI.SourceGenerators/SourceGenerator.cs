@@ -26,6 +26,7 @@ public class Generators : ISourceGenerator
     public void Execute(GeneratorExecutionContext context)
     {
         (context.SyntaxReceiver as SourceGeneratorSyntaxReceiver)!.Prepare();
+        Commands.Generator.Execute(context);
         ObjectModel.Generator.Execute(context);
         ObjectModel.ModelObject.Generator.Execute(context);
     }

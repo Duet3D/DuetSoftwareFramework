@@ -8,4 +8,4 @@ namespace DuetAPI.Commands;
 /// </summary>
 /// <seealso cref="UnlockObjectModel"/>
 [RequiredPermissions(SbcPermissions.ObjectModelReadWrite)]
-public class LockObjectModel : Command { }
+public partial class LockObjectModel : Command { }

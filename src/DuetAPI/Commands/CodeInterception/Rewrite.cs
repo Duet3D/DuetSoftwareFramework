@@ -10,7 +10,7 @@ namespace DuetAPI.Commands;
 /// This command is only permitted in <see cref="ConnectionMode.Intercept"/> mode
 /// </remarks>
 [RequiredPermissions(SbcPermissions.CodeInterceptionReadWrite)]
-public class Rewrite : Command
+public partial class Rewrite : Command
 {
     /// <summary>
     /// Type of the resolving message

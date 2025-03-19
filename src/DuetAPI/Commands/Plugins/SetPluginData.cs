@@ -13,7 +13,7 @@ namespace DuetAPI.Commands;
 /// </remarks>
 /// <exception cref="ArgumentException">Invalid plugin name or data key specified</exception>
 [RequiredPermissions(SbcPermissions.ObjectModelReadWrite)]
-public class SetPluginData : Command
+public partial class SetPluginData : Command
 {
     /// <summary>
     /// Identifier of the plugin to update (only mandatory if running as root)

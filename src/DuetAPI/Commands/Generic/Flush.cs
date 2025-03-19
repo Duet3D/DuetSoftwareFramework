@@ -8,7 +8,7 @@ namespace DuetAPI.Commands;
 /// If the flush request is successful, true is returned
 /// </summary>
 [RequiredPermissions(SbcPermissions.CommandExecution)]
-public class Flush : Command<bool>
+public partial class Flush : Command<bool>
 {
     /// <summary>
     /// Code channel to flush

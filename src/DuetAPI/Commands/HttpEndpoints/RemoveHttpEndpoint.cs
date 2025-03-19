@@ -8,7 +8,7 @@ namespace DuetAPI.Commands;
 /// Returns true if the endpoint could be successfully removed
 /// </summary>
 [RequiredPermissions(SbcPermissions.RegisterHttpEndpoints)]
-public class RemoveHttpEndpoint : Command<bool>
+public partial class RemoveHttpEndpoint : Command<bool>
 {
     /// <summary>
     /// Type of the endpoint

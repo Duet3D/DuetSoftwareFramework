@@ -10,7 +10,7 @@
 /// can guarantee that the necessary code interceptors are active before it
 /// is started.
 /// </remarks>
-public class NotifyPluginStarted : Command
+public partial class NotifyPluginStarted : Command
 {
     /// <summary>
     /// Identifier of the plugin (only mandatory if running as root)

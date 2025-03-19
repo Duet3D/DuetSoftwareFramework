@@ -7,7 +7,7 @@ namespace DuetAPI.Commands;
 /// Analyse a G-code file and return an instance of <see cref="GCodeFileInfo"/> when ready
 /// </summary>
 [RequiredPermissions(SbcPermissions.CommandExecution | SbcPermissions.FileSystemAccess | SbcPermissions.ReadGCodes)]
-public class GetFileInfo : Command<GCodeFileInfo>
+public partial class GetFileInfo : Command<GCodeFileInfo>
 {
     /// <summary>
     /// The filename to extract information from

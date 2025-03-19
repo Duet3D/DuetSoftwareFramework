@@ -8,7 +8,7 @@ namespace DuetAPI.Commands;
 /// </summary>
 /// <exception cref="ArgumentException">Plugin is incompatible</exception>
 [RequiredPermissions(SbcPermissions.ManagePlugins)]
-public class InstallPlugin : Command
+public partial class InstallPlugin : Command
 {
     /// <summary>
     /// Absolute file path to the plugin ZIP bundle
