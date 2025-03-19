@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text.Json;
 using DuetAPI.Commands;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -58,11 +59,16 @@ public class CommandActivator(IServiceProvider serviceProvider)
     /// Create a new command instance
     /// </summary>
     /// <param name="commandName">Command name</param>
+    /// <param name="commandData">Command data</param>
     /// <returns>Command instance</returns>
     /// <exception cref="ArgumentException">Unsupported command</exception>
-    public BaseCommand Create(string commandName)
+    public BaseCommand Create(string commandName, JsonElement commandData)
     {
-        Type? commandType = SupportedCommands.First(item => item.Name.Equals(commandName, StringComparison.InvariantCultureIgnoreCase)) ?? throw new ArgumentException($"Unsupported command {commandName}");
-        return (BaseCommand)ActivatorUtilities.CreateInstance(serviceProvider, commandType);
+        Type? commandType = SupportedCommands.First(item => item.Name.Equals(commandName, StringComparison.InvariantCultureIgnoreCase))
+                            ?? throw new ArgumentException($"Unsupported command {commandName}");
+
+        BaseCommand command = (BaseCommand)ActivatorUtilities.CreateInstance(serviceProvider, commandType);
+        command.UpdateFromJson(commandData);
+        return command;
     }
 }

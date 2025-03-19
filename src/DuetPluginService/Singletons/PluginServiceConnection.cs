@@ -52,14 +52,9 @@ public class PluginServiceConnection(CommandActivator commandActivator, IOptions
                     throw new ArgumentException("Command type must be a string");
                 }
 
-                // Get the command name
-                string? commandName = item.Value.GetString();
-                ArgumentNullException.ThrowIfNull(commandName);
-
-                // Deserialize incoming command
-                BaseCommand result = commandActivator.Create(commandName);
-                result.UpdateFromJson(jsonDocument.RootElement);
-                return result;
+                // Get the command name and deserialize it
+                string commandName = item.Value.GetString()!;
+                return commandActivator.Create(commandName, jsonDocument.RootElement);
             }
         }
         throw new ArgumentException("Command type not found");

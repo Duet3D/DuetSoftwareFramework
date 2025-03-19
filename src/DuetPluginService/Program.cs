@@ -2,17 +2,18 @@
 using DuetPluginService.Services;
 using DuetPluginService.Singletons;
 using DuetPluginService.Singletons.PermissionManagers;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
 
-Console.WriteLine($"Duet Plugin Service v{Utility.Version}");
+Console.WriteLine($"Duet Plugin Service v{VersionHelper.Version}");
 Console.WriteLine("Written by Christian Hammacher for Duet3D");
 Console.WriteLine("Licensed under the terms of the GNU Public License Version 3");
 Console.WriteLine();
 
-IHost host = Host.CreateDefaultBuilder()
+await Host.CreateDefaultBuilder()
     .UseSystemd()
     .ConfigureAppConfiguration((hostingContext, config) =>
     {
@@ -38,6 +39,5 @@ IHost host = Host.CreateDefaultBuilder()
         .AddSingleton<PluginServiceConnection>()
         .AddHostedService<CommandService>()
     )
-    .Build();
-
-await host.RunAsync();
+    .Build()
+    .RunAsync();
