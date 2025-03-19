@@ -387,9 +387,9 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Return file information
                 case 36:
-                    if (code.Parameters.Count > 0)
+                    if (await Processor.FlushAsync(code))
                     {
-                        if (await Processor.FlushAsync(code))
+                        if (code.Parameters.Count > 0)
                         {
                             try
                             {
@@ -411,12 +411,23 @@ namespace DuetControlServer.Codes.Handlers
                             catch (Exception e)
                             {
                                 _logger.Debug(e, "Failed to return file information");
-                                return new Message(MessageType.Success, "{\"err\":1}");
+                                return new Message(MessageType.Warning, $"{{\"err\":1,\"fileName:{JsonSerializer.Serialize(code.GetUnprecedentedString(), JsonHelper.DefaultJsonOptions)}}}");
                             }
                         }
-                        throw new OperationCanceledException();
+                        else
+                        {
+                            using (await Provider.AccessReadOnlyAsync(code.CancellationToken))
+                            {
+                                if (Provider.Get.Job.File is not null)
+                                {
+                                    string json = JsonSerializer.Serialize(Provider.Get.Job.File, JsonHelper.DefaultJsonOptions);
+                                    return new Message(MessageType.Success, "{\"err\":0," + json[1..]);
+                                }
+                            }
+                            return new Message(MessageType.Warning, "{\"err\":1}");
+                        }
                     }
-                    break;
+                    throw new OperationCanceledException();
 
                 // Simulate file
                 case 37:
