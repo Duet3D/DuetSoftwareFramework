@@ -418,7 +418,7 @@ namespace DuetControlServer.Codes.Handlers
                         {
                             using (await Provider.AccessReadOnlyAsync(code.CancellationToken))
                             {
-                                if (Provider.Get.Job.File is not null)
+                                if (Provider.Get.Job.File.FileName != null)
                                 {
                                     string json = JsonSerializer.Serialize(Provider.Get.Job.File, JsonHelper.DefaultJsonOptions);
                                     return new Message(MessageType.Success, "{\"err\":0," + json[1..]);
