@@ -1,6 +1,7 @@
 ﻿using DuetPluginService;
 using DuetPluginService.Services;
 using DuetPluginService.Singletons;
+using DuetPluginService.Singletons.PermissionManagers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -31,8 +32,11 @@ IHost host = Host.CreateDefaultBuilder()
     })
     .ConfigureServices((context, services) => services
         .Configure<Settings>(context.Configuration)
+        .AddSingleton<CommandActivator>()
+        .AddSingleton<IPermissionManager, AppArmorPermissionManager>()
         .AddSingleton<PluginStore>()
-        .AddHostedService<MainService>()
+        .AddSingleton<PluginServiceConnection>()
+        .AddHostedService<CommandService>()
     )
     .Build();
 

@@ -3,37 +3,23 @@ using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
 using DuetAPI.Utility;
 using DuetAPIClient;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System;
-using System.Linq;
 using System.Net.Sockets;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.IPC;
+namespace DuetPluginService.Singletons;
 
 /// <summary>
 /// Connection service for plugin management
 /// </summary>
-public class PluginServiceConnection(IOptions<Settings> settings, IServiceProvider serviceProvider) : BaseConnection(ConnectionMode.PluginService)
+/// <param name="commandActivator">Command activator</param>
+/// <param name="settings">Settings</param>
+public class PluginServiceConnection(CommandActivator commandActivator, IOptions<Settings> settings) : BaseConnection(ConnectionMode.PluginService)
 {
     private readonly Settings _settings = settings.Value;
-
-    /// <summary>
-    /// List of supported commands in this mode
-    /// </summary>
-    public static readonly Type[] SupportedCommands =
-    [
-        typeof(Commands.InstallPlugin),
-        typeof(Commands.ReloadPlugin),
-        typeof(Commands.StartPlugin),
-        typeof(Commands.StopPlugin),
-        typeof(Commands.UninstallPlugin),
-        typeof(Commands.InstallSystemPackage),
-        typeof(Commands.UninstallSystemPackage),
-    ];
 
     /// <summary>
     /// Start the plugin service connection
@@ -66,16 +52,12 @@ public class PluginServiceConnection(IOptions<Settings> settings, IServiceProvid
                     throw new ArgumentException("Command type must be a string");
                 }
 
-                // Check if the received command is valid
+                // Get the command name
                 string? commandName = item.Value.GetString();
-                Type? commandType = SupportedCommands.FirstOrDefault(item => item.Name.Equals(commandName, StringComparison.InvariantCultureIgnoreCase));
-                if (!typeof(BaseCommand).IsAssignableFrom(commandType))
-                {
-                    throw new ArgumentException($"Unsupported command {commandName}");
-                }
+                ArgumentNullException.ThrowIfNull(commandName);
 
                 // Deserialize incoming command
-                BaseCommand result = (BaseCommand)ActivatorUtilities.CreateInstance(serviceProvider, commandType);
+                BaseCommand result = commandActivator.Create(commandName);
                 result.UpdateFromJson(jsonDocument.RootElement);
                 return result;
             }

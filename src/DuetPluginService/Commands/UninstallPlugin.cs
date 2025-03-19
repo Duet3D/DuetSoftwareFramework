@@ -2,6 +2,7 @@
 using DuetAPI.Utility;
 using DuetAPIClient;
 using DuetPluginService.Singletons;
+using DuetPluginService.Singletons.PermissionManagers;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,16 +13,17 @@ using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.IPC.Commands;
+namespace DuetPluginService.Commands;
 
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.UninstallPlugin"/> command
 /// </summary>
+/// <param name="permissionManager">Permission manager</param>
 /// <param name="pluginStore">Plugin store</param>
 /// <param name="hostEnvironment">Host environment</param>
 /// <param name="loggerFactory">Logger factory</param>
 /// <param name="settings">Application settings</param>
-public sealed class UninstallPlugin(PluginStore pluginStore, IHostEnvironment hostEnvironment, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.UninstallPlugin
+public sealed class UninstallPlugin(IPermissionManager permissionManager, PluginStore pluginStore, IHostEnvironment hostEnvironment, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.UninstallPlugin
 {
     private readonly Settings _settings = settings.Value;
 
@@ -172,7 +174,7 @@ public sealed class UninstallPlugin(PluginStore pluginStore, IHostEnvironment ho
         // Remove the security policy
         if (Environment.IsPrivilegedProcess && !_settings.DisableAppArmor)
         {
-            await Permissions.AppArmor.UninstallProfileAsync(Plugin, _settings, cancellationToken);
+            await permissionManager.UninstallProfileAsync(plugin, cancellationToken);
         }
 
         // Plugin has been uninstalled

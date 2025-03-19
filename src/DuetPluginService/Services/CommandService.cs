@@ -7,27 +7,21 @@ using System.Net.Sockets;
 using DuetAPI.ObjectModel;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
-using DuetPluginService.IPC;
 using DuetPluginService.Singletons;
 using System.IO;
-using Microsoft.Extensions.Options;
 using System.Text.Json;
-using DuetPluginService.IPC.Commands;
 
 namespace DuetPluginService.Services;
 
 /// <summary>
 /// Main service which interacts with DCS to perform plugin-specific tasks
 /// </summary>
+/// <param name="connection">Plugin service connection</param>
 /// <param name="pluginStore">Plugin store</param>
 /// <param name="hostEnvironment">Host environment</param>
 /// <param name="logger">Logger</param>
-/// <param name="settings">Application settings</param>
-public class MainService(PluginStore pluginStore, IHostEnvironment hostEnvironment, ILogger<MainService> logger, IServiceProvider serviceProvider, IOptions<Settings> settings) : BackgroundService
+public class CommandService(CommandActivator commandActivator, PluginServiceConnection connection, PluginStore pluginStore, IHostEnvironment hostEnvironment, ILogger<CommandService> logger) : BackgroundService
 {
-    private readonly PluginServiceConnection _connection = new(settings, serviceProvider);
-    private readonly Settings _settings = settings.Value;
-
     /// <summary>
     /// Start the main service
     /// </summary>
@@ -58,7 +52,7 @@ public class MainService(PluginStore pluginStore, IHostEnvironment hostEnvironme
         }
 
         // Connect to DCS
-        await _connection.ConnectAsync(cancellationToken);
+        await connection.ConnectAsync(cancellationToken);
 
         // Start the main service
         await base.StartAsync(cancellationToken);
@@ -79,17 +73,17 @@ public class MainService(PluginStore pluginStore, IHostEnvironment hostEnvironme
             try
             {
                 // Read another command from the IPC connection
-                command = await _connection.ReceiveCommandAsync(stoppingToken);
+                command = await connection.ReceiveCommandAsync(stoppingToken);
                 commandType = command.GetType();
 
                 // Execute it and send back the result
                 object? result = await command.InvokeAsync(stoppingToken);
-                await _connection.SendResponseAsync(result, stoppingToken);
+                await connection.SendResponseAsync(result, stoppingToken);
 
                 // Shut down the socket if this was the last command
                 if (stoppingToken.IsCancellationRequested)
                 {
-                    _connection.Close();
+                    connection.Close();
                     break;
                 }
             }
@@ -119,7 +113,7 @@ public class MainService(PluginStore pluginStore, IHostEnvironment hostEnvironme
                         logger.LogError(e, "Failed to execute command");
                     }
                 }
-                await _connection.SendResponseAsync(e, stoppingToken);
+                await connection.SendResponseAsync(e, stoppingToken);
             }
         }
     }
@@ -142,9 +136,9 @@ public class MainService(PluginStore pluginStore, IHostEnvironment hostEnvironme
             {
                 if (pluginStore.Processes.ContainsKey(plugin.Id))
                 {
-                    StopPlugin stopCommand = ActivatorUtilities.CreateInstance<StopPlugin>(serviceProvider);
-                    stopCommand.Plugin = plugin.Id;
-                    stopTasks.Add(stopCommand.ExecuteAsync(cancellationToken));
+                    Commands.StopPlugin stopPlugin = commandActivator.Create<Commands.StopPlugin>();
+                    stopPlugin.Plugin = plugin.Id;
+                    stopTasks.Add(stopPlugin.ExecuteAsync(cancellationToken));
                 }
             }
         }

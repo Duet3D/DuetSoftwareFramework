@@ -2,6 +2,7 @@
 using DuetAPI.Utility;
 using DuetAPIClient;
 using DuetPluginService.Singletons;
+using DuetPluginService.Singletons.PermissionManagers;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -17,16 +18,17 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.IPC.Commands;
+namespace DuetPluginService.Commands;
 
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.InstallPlugin"/> command
 /// </summary>
+/// <param name="permissionManager">Permission manager</param>
 /// <param name="pluginStore">Plugin store</param>
 /// <param name="hostEnvironment">Host environment</param>
 /// <param name="loggerFactory">Logger factory</param>
 /// <param name="settings">Application settings</param>
-public sealed class InstallPlugin(PluginStore pluginStore, IHostEnvironment hostEnvironment, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.InstallPlugin
+public sealed class InstallPlugin(IPermissionManager permissionManager, PluginStore pluginStore, IHostEnvironment hostEnvironment, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.InstallPlugin
 {
     private readonly Settings _settings = settings.Value;
 
@@ -79,7 +81,7 @@ public sealed class InstallPlugin(PluginStore pluginStore, IHostEnvironment host
             {
 
                 // Install security profile
-                await Permissions.AppArmor.InstallProfileAsync(plugin, hostEnvironment.ContentRootPath, sdPath, _settings, cancellationToken);
+                await permissionManager.InstallProfileAsync(plugin, hostEnvironment.ContentRootPath, sdPath, cancellationToken);
                 logger.LogInformation("Security profile installed");
             }
         }
@@ -221,8 +223,8 @@ public sealed class InstallPlugin(PluginStore pluginStore, IHostEnvironment host
                 }
 
 #if true
-# if NET_7_0_OR_GREATER
-#  warning check if this is fixed in ASP.NET 7
+# if NET9_0_OR_GREATER
+#  warning check if this is fixed in ASP.NET 9
 # endif
                 // Copy the file. ASP.NET 5 and 6 do not perform lstat on symlinks so files served from symlinks are always truncated.
                 // It seems like .NET 6 also treats symlinks as open files for some reason, check if this is still the case in .NET 7 or later

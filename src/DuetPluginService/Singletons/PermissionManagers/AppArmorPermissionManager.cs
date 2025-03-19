@@ -1,21 +1,24 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
+using Microsoft.Extensions.Options;
 using System;
 using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.Permissions;
+namespace DuetPluginService.Singletons.PermissionManagers;
 
 /// <summary>
-/// Collection of functions to manage AppArmor permission enforcement
+/// Class to provide functions to enforce AppArmor permissions for plugins
 /// </summary>
 /// <remarks>
 /// This implementation still relies on fixed SD paths. In the future this code must react to changes of directories in the OM!
 /// </remarks>
-public static class AppArmor
+public class AppArmorPermissionManager(IOptions<Settings> settings) : IPermissionManager
 {
+    private Settings _settings => settings.Value;
+
     /// <summary>
     /// Generate an AppArmor security profile for the given plugin and load it
     /// </summary>
@@ -24,15 +27,15 @@ public static class AppArmor
     /// <param name="settings">Application settings</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public static async Task InstallProfileAsync(Plugin plugin, string pluginDirectory, string sdDirectory, Settings settings, CancellationToken cancellationToken)
+    public async Task InstallProfileAsync(Plugin plugin, string pluginDirectory, string sdDirectory, CancellationToken cancellationToken)
     {
         // Load template
-        string profile = await File.ReadAllTextAsync(settings.AppArmorTemplate, cancellationToken);
+        string profile = await File.ReadAllTextAsync(_settings.AppArmorTemplate, cancellationToken);
         profile = profile.Replace("{pluginDirectory}", Path.Combine(pluginDirectory, plugin.Id));
 
         // Build security profile
         StringBuilder includes = new(), rules = new();
-        foreach (SbcPermissions permission in Enum.GetValues(typeof(SbcPermissions)))
+        foreach (SbcPermissions permission in Enum.GetValues<SbcPermissions>())
         {
             if (plugin.SbcPermissions.HasFlag(permission))
             {
@@ -56,8 +59,8 @@ public static class AppArmor
                         break;
 
                     case SbcPermissions.FileSystemAccess:
-                        rules.AppendLine( "  / rw,");
-                        rules.AppendLine( "  /** rw,");
+                        rules.AppendLine("  / rw,");
+                        rules.AppendLine("  /** rw,");
                         break;
                     case SbcPermissions.GpioAccess:
                         rules.AppendLine("  /dev/gpio* rwmlk,");
@@ -145,30 +148,30 @@ public static class AppArmor
         profile = profile.Replace("{rules}", rules.ToString());
 
         // Save and apply it. This must not be interrupted!
-        string profilePath = Path.Combine(settings.AppArmorProfileDirectory, $"dsf.{plugin.Id}");
+        string profilePath = Path.Combine(_settings.AppArmorProfileDirectory, $"dsf.{plugin.Id}");
         await File.WriteAllTextAsync(profilePath, profile, CancellationToken.None);
 
         // Load new profile
         await System.Diagnostics.Process
-            .Start(settings.AppArmorParser, $"-r \"{profilePath}\"")
+            .Start(_settings.AppArmorParser, $"-r \"{profilePath}\"")
             .WaitForExitAsync(cancellationToken);
     }
 
     /// <summary>
     /// Remove an AppArmor security profile for the given pugin and unload it
     /// </summary>
-    /// <param name="pluginId">Plugin ID</param>
+    /// <param name="plugin">Plugin</param>
     /// <param name="settings">Application settings</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public static async Task UninstallProfileAsync(string pluginId, Settings settings, CancellationToken cancellationToken)
+    public async Task UninstallProfileAsync(Plugin plugin, CancellationToken cancellationToken)
     {
-        string profilePath = Path.Combine(settings.AppArmorProfileDirectory, $"dsf.{pluginId}");
+        string profilePath = Path.Combine(_settings.AppArmorProfileDirectory, $"dsf.{plugin.Id}");
         if (File.Exists(profilePath))
         {
             // Disable the profile via AppArmor
             await System.Diagnostics.Process
-                .Start(settings.AppArmorParser, $"-R \"{profilePath}\"")
+                .Start(_settings.AppArmorParser, $"-R \"{profilePath}\"")
                 .WaitForExitAsync(cancellationToken);
 
             // Delete it

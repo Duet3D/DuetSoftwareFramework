@@ -10,7 +10,7 @@ using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.IPC.Commands;
+namespace DuetPluginService.Commands;
 
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.InstallSystemPackage"/> command
