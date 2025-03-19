@@ -1,4 +1,4 @@
 
-TARGET=LinuxDevices.dll
+TARGET=DsfShared.dll
 
 include ../../Makefile.components

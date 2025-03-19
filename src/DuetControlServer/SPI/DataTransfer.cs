@@ -1,18 +1,18 @@
 ﻿using DuetAPI;
 using DuetAPI.ObjectModel;
+using Code = DuetControlServer.Commands.Code;
+using DuetControlServer.SPI.Communication;
 using DuetControlServer.SPI.Communication.FirmwareRequests;
+using DuetControlServer.SPI.Communication.Shared;
+using DuetControlServer.Model;
+using DuetControlServer.Utility;
+using DuetSharedLibrary;
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-using Code = DuetControlServer.Commands.Code;
-using LinuxApi;
 using System.Collections.Generic;
-using DuetControlServer.SPI.Communication;
-using DuetControlServer.SPI.Communication.Shared;
-using DuetControlServer.Model;
-using DuetControlServer.Utility;
 using System.Diagnostics;
 
 namespace DuetControlServer.SPI

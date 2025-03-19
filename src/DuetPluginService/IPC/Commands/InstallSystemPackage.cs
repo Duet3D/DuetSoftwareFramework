@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -48,9 +49,10 @@ public sealed class InstallSystemPackage(ILoggerFactory loggerFactory, IOptions<
     /// </summary>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="ArgumentException">Failed to uninstall package</exception>
+    [UnsupportedOSPlatform("windows")]
     public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        if (!Utility.IsRoot)
+        if (!Environment.IsPrivilegedProcess)
         {
             throw new ArgumentException("Unable to manage system packages without root privileges");
         }
@@ -112,10 +114,9 @@ public sealed class InstallSystemPackage(ILoggerFactory loggerFactory, IOptions<
                 string updateScript = Path.Combine(packageDirectory, "update.sh");
                 if (File.Exists(updateScript))
                 {
-                    LinuxApi.Commands.Chmod(updateScript,
-                        LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Execute,
-                        LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Execute,
-                        LinuxApi.UnixPermissions.None);
+                    File.SetUnixFileMode(updateScript,
+                        UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                        UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute);
 
                     try
                     {

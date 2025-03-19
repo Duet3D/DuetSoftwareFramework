@@ -13,7 +13,7 @@ using DuetAPI.Connection.InitMessages;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.IPC.Processors;
-using LinuxApi;
+using DuetSharedLibrary;
 
 namespace DuetControlServer.IPC
 {
@@ -97,7 +97,7 @@ namespace DuetControlServer.IPC
             }
 
             // If the remote process is running as dsf, reject it unless the process is in the same directory as DCS (like DWS or DPS)
-            if (!IsRoot && (uid == LinuxApi.Commands.GetEffectiveUserID() || gid == LinuxApi.Commands.GetEffectiveGroupID()))
+            if (!IsRoot && (uid == ProcessHelpers.GetEffectiveUserID() || gid == ProcessHelpers.GetEffectiveGroupID()))
             {
                 string dcsDirectory = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)!;
                 string remoteDirectory = Path.GetDirectoryName(Process.GetProcessById(pid)?.MainModule?.FileName)!;

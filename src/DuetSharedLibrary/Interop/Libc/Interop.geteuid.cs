@@ -3,6 +3,5 @@
 internal partial class Interop
 {
     [DllImport(LibcLibrary)]
-    internal static extern int getgid();
+    internal static extern int geteuid();
 }
-

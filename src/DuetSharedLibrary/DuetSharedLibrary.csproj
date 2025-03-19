@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
+		<TargetFramework>net9.0</TargetFramework>
 		<PackageLicenseExpression>LGPL-3.0</PackageLicenseExpression>
 	</PropertyGroup>
 
@@ -9,6 +9,6 @@
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-		<DocumentationFile>LinuxApi.xml</DocumentationFile>
+		<DocumentationFile>DuetSharedLibrary.xml</DocumentationFile>
 	</PropertyGroup>
 </Project>

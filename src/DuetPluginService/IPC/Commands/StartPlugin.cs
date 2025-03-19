@@ -51,11 +51,11 @@ public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetim
         }
         if (plugin is null)
         {
-            throw new ArgumentException($"Plugin {Plugin} not found by {(Utility.IsRoot ? "root service" : "service")}");
+            throw new ArgumentException($"Plugin {Plugin} not found by {(Environment.IsPrivilegedProcess ? "root service" : "service")}");
         }
 
         // Is this the right service to start the plugin?
-        if (plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser) != Utility.IsRoot)
+        if (plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser) != Environment.IsPrivilegedProcess)
         {
             throw new InvalidOperationException("Wrong plugin service to start this plugin");
         }

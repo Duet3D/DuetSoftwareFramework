@@ -21,7 +21,7 @@ public sealed class UninstallSystemPackage(IOptions<Settings> settings) : DuetAP
     /// <exception cref="ArgumentException">Failed to uninstall package</exception>
     public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        if (!Utility.IsRoot)
+        if (!Environment.IsPrivilegedProcess)
         {
             throw new ArgumentException("Unable to manage system packages without root privileges");
         }

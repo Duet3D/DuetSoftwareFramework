@@ -55,7 +55,7 @@ public sealed class InstallPlugin(PluginStore pluginStore, IHostEnvironment host
             sdPath = await connection.ResolvePath("0:/", cancellationToken);
         }
 
-        if (Utility.IsRoot)
+        if (Environment.IsPrivilegedProcess)
         {
             // Run preinstall routine if needed
             if (plugin.SbcPackageDependencies.Count > 0 && !string.IsNullOrEmpty(_settings.PreinstallPackageCommand))
@@ -183,10 +183,9 @@ public sealed class InstallPlugin(PluginStore pluginStore, IHostEnvironment host
                             plugin.SbcExtraExecutables.Any(executable => (entry.FullName == "dsf/" + executable) || (entry.FullName == $"dsf/{architecture}/{executable}"))))
                     {
                         logger.LogDebug("Changing mode of {File} to 770", fileName);
-                        LinuxApi.Commands.Chmod(fileName,
-                            LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Execute,
-                            LinuxApi.UnixPermissions.Write | LinuxApi.UnixPermissions.Read | LinuxApi.UnixPermissions.Execute,
-                            LinuxApi.UnixPermissions.None);
+                        File.SetUnixFileMode(fileName,
+                            UnixFileMode.UserWrite | UnixFileMode.UserRead | UnixFileMode.UserExecute |
+                            UnixFileMode.GroupWrite | UnixFileMode.GroupRead | UnixFileMode.GroupExecute);
                     }
                 }
             }
@@ -312,7 +311,7 @@ public sealed class InstallPlugin(PluginStore pluginStore, IHostEnvironment host
     /// <param name="package">Name of the package to install</param>
     private async Task InstallPackage(string package, CancellationToken cancellationToken)
     {
-        if (!Utility.IsRoot)
+        if (!Environment.IsPrivilegedProcess)
         {
             throw new ArgumentException("Cannot install packages as regular user");
         }
@@ -347,7 +346,7 @@ public sealed class InstallPlugin(PluginStore pluginStore, IHostEnvironment host
     /// <param name="plugin">Plugin identifier</param>
     private async Task InstallPythonPackages(string plugin, CancellationToken cancellationToken)
     {
-        if (Utility.IsRoot)
+        if (Environment.IsPrivilegedProcess)
         {
             throw new ArgumentException("Cannot install Python packages as root");
         }

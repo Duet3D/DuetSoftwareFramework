@@ -1,7 +1,7 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
+using System.Runtime.Versioning;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -39,6 +39,7 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.RegisterHttpEndpoints"/>
+    [UnsupportedOSPlatform("windows")]
     public async Task<HttpEndpointUnixSocket> AddHttpEndpoint(HttpEndpointType endpointType, string ns, string path, bool isUploadRequest = false, int backlog = HttpEndpointUnixSocket.DefaultBacklog, CancellationToken cancellationToken = default)
     {
         string socketPath = await PerformCommand<string>(new AddHttpEndpoint { EndpointType = endpointType, Namespace = ns, Path = path, IsUploadRequest = isUploadRequest }, cancellationToken);

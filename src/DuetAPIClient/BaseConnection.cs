@@ -2,6 +2,7 @@
 using System.IO;
 using System.Net.Sockets;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -10,6 +11,7 @@ using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
+using Microsoft.VisualBasic;
 
 namespace DuetAPIClient;
 
@@ -181,10 +183,6 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
 
             T FinalDeserialize(ref Utf8JsonReader reader)
             {
-                #if NET9_0_OR_GREATER
-                #warning FIXME use JsonTypeInfoResolver.Combine here
-                #endif
-
                 if (typeof(T) == typeof(ObjectModel))
                 {
                     ObjectModel model = new();
@@ -197,7 +195,7 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
                     fileInfo.UpdateFromJsonReader(ref reader, false);
                     return (T)(object)fileInfo;
                 }
-                else 
+                else
                 {
                     return (typeof(T) == typeof(Message)) ?
                         (T)JsonSerializer.Deserialize(ref reader, typeof(T), ObjectModelContext.Default)! :

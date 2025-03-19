@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -35,6 +36,7 @@ public sealed class UninstallPlugin(PluginStore pluginStore, IHostEnvironment ho
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="ArgumentException">Plugin is invalid</exception>
+    [UnsupportedOSPlatform("windows")]
     public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
         ILogger logger = loggerFactory.CreateLogger($"Plugin {Plugin}");
@@ -60,7 +62,7 @@ public sealed class UninstallPlugin(PluginStore pluginStore, IHostEnvironment ho
 
         if (plugin is null)
         {
-            throw new ArgumentException($"Plugin {Plugin} not found by {(Utility.IsRoot ? "root service" : "service")}");
+            throw new ArgumentException($"Plugin {Plugin} not found by {(Environment.IsPrivilegedProcess ? "root service" : "service")}");
         }
         if (plugin.Pid > 0)
         {
@@ -68,13 +70,13 @@ public sealed class UninstallPlugin(PluginStore pluginStore, IHostEnvironment ho
         }
 
         // Root plugins are deleted by the root service to avoid potential permission issues
-        if (plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser) == Utility.IsRoot)
+        if (plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser) == Environment.IsPrivilegedProcess)
         {
             string manifestFile = Path.Combine(hostEnvironment.ContentRootPath, $"{Plugin}.json");
 
             // Check if the manifest is writable
-            LinuxApi.Commands.GetPermissions(manifestFile, out LinuxApi.UnixPermissions userPermission, out _, out _);
-            if (!userPermission.HasFlag(LinuxApi.UnixPermissions.Write))
+            UnixFileMode fileMode = File.GetUnixFileMode(manifestFile);
+            if (!fileMode.HasFlag(UnixFileMode.UserWrite))
             {
                 throw new ArgumentException("Plugin cannot be uninstalled via API");
             }
@@ -168,7 +170,7 @@ public sealed class UninstallPlugin(PluginStore pluginStore, IHostEnvironment ho
         }
 
         // Remove the security policy
-        if (Utility.IsRoot && !_settings.DisableAppArmor)
+        if (Environment.IsPrivilegedProcess && !_settings.DisableAppArmor)
         {
             await Permissions.AppArmor.UninstallProfileAsync(Plugin, _settings, cancellationToken);
         }

@@ -117,6 +117,13 @@ namespace DuetPiManagementPlugin
             // Read the network settings
             await Network.Protocols.Manager.Init();
 
+            // Tell DSF we're up and running
+            using (CommandConnection commandConnection = new())
+            {
+                await commandConnection.Connect(socketPath);
+                await commandConnection.NotifyPluginStarted();
+            }
+
             // Keep intercepting codes until the plugin is stopped
             do
             {

@@ -1,7 +1,7 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetControlServer.Commands;
 using DuetControlServer.Files;
-using LinuxApi;
+using DuetSharedLibrary;
 using System;
 using System.Collections.Generic;
 using System.IO;

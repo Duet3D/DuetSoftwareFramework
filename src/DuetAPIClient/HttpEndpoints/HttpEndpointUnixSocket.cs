@@ -2,7 +2,7 @@
 using System;
 using System.IO;
 using System.Net.Sockets;
-using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace DuetAPIClient;
 
@@ -11,15 +11,6 @@ namespace DuetAPIClient;
 /// </summary>
 public sealed class HttpEndpointUnixSocket : IDisposable
 {
-    #region Libc access
-    private const string LibcLibrary = "libc";
-
-    [DllImport(LibcLibrary, SetLastError = true, CharSet = CharSet.Ansi)]
-    private static extern int chmod(string pathname, ushort mode);
-
-    const uint GroupRwMode = 0x30;   // 000110000, mode 060
-    #endregion
-
     /// <summary>
     /// Default number of pending connections
     /// </summary>
@@ -59,6 +50,7 @@ public sealed class HttpEndpointUnixSocket : IDisposable
     /// <param name="socketPath">Path to the UNIX socket file</param>
     /// <param name="backlog">Number of simultaneously pending connections</param>
     /// <exception cref="IOException">Socket could not be opened</exception>
+    [UnsupportedOSPlatform("windows")]
     public HttpEndpointUnixSocket(HttpEndpointType endpointType, string ns, string endpointPath, string socketPath, int backlog = DefaultBacklog)
     {
         // Set up information about this HTTP endpoint
@@ -79,11 +71,8 @@ public sealed class HttpEndpointUnixSocket : IDisposable
             _unixSocket.Listen(backlog);
 
             // Allow the group to write to it
-            statxbuf buffer = new();
-            if (Interop.statx(Interop.AT_FDCWD, socketPath, Interop.AT_STATX_SYNC_AS_STAT, Interop.STATX_BASIC_STATS, ref buffer) == 0)
-            {
-                chmod(socketPath, (ushort)(buffer.Mode | GroupRwMode));
-            }
+            UnixFileMode mode = File.GetUnixFileMode(socketPath);
+            File.SetUnixFileMode(socketPath, mode | UnixFileMode.GroupRead | UnixFileMode.GroupWrite);
 
             // Start listening
             AcceptConnections();

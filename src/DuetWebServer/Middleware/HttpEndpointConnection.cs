@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.Utility;
-using LinuxApi;
+using DuetSharedLibrary;
 
 namespace DuetWebServer.Middleware
 {

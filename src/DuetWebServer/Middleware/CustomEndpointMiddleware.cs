@@ -1,5 +1,6 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetSharedLibrary;
 using DuetWebServer.Singletons;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -225,7 +226,7 @@ namespace DuetWebServer.Middleware
                 endpointConnection.GetPeerCredentials(out _, out int uid, out int gid);
                 if (uid != 0 && gid != 0)
                 {
-                    LinuxApi.Commands.Chown(filename, uid, gid);
+                    FileExtensions.ChangeOwner(filename, uid, gid);
                 }
                 body = filename;
             }

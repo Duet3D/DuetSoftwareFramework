@@ -11,6 +11,7 @@
   "sbcExtraExecutables": [
     "gen-https-cert.sh"
   ],
+  "sbcNotifiyStarted": true,
   "sbcOutputRedirected": false,
   "sbcPermissions": [
     "superUser"

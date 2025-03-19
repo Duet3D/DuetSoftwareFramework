@@ -1,5 +1,7 @@
 
+using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using DuetAPI.Utility;
 
@@ -8,13 +10,8 @@ namespace DuetPluginService;
 /// <summary>
 /// Generic utility functions
 /// </summary>
-public static class Utility
+public static partial class Utility
 {
-    /// <summary>
-    /// Whether the application is running as root
-    /// </summary>
-    public static readonly bool IsRoot = (LinuxApi.Commands.GetEffectiveUserID() == 0) || (LinuxApi.Commands.GetEffectiveGroupID() == 0);
-
     /// <summary>
     /// Application version
     /// </summary>
@@ -37,4 +34,5 @@ public static class Utility
             }
         }
     }
+
 }

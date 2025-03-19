@@ -1,6 +1,7 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetPluginService.Singletons;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
@@ -44,11 +45,11 @@ public sealed class StopPlugin(PluginStore pluginStore, ILoggerFactory loggerFac
 
             if (plugin is null)
             {
-                throw new ArgumentException($"Plugin {Plugin} not found by {(Utility.IsRoot ? "root service" : "service")}");
+                throw new ArgumentException($"Plugin {Plugin} not found by {(Environment.IsPrivilegedProcess ? "root service" : "service")}");
             }
 
             // Is this the right service to start the plugin?
-            if (plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser) != Utility.IsRoot)
+            if (plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser) != Environment.IsPrivilegedProcess)
             {
                 throw new InvalidOperationException("Wrong plugin service to start this plugin");
             }
@@ -60,7 +61,7 @@ public sealed class StopPlugin(PluginStore pluginStore, ILoggerFactory loggerFac
                 {
                     // Ask process to terminate
                     logger.LogInformation("Attempting to stop process (pid {Pid})...", process.Id);
-                    LinuxApi.Commands.Kill(process.Id, LinuxApi.Signal.SIGTERM);
+                    process.Terminate();
 
                     // Wait a moment. Do not link this CTS to the main CTS because we may be shutting down at this point
                     using CancellationTokenSource timeoutCts = new(_settings.StopTimeout);
