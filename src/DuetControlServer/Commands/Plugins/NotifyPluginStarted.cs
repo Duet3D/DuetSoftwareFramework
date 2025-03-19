@@ -11,7 +11,7 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.NotifyPluginStarted"/> command
     /// </summary>
-    public sealed class NotifyPluginStarted : DuetAPI.Commands.NotifyPluginStarted
+    public sealed class NotifyPluginStarted : DuetAPI.Commands.NotifyPluginStarted, IConnectionCommand
     {
         /// <summary>
         /// Event that is set when a plugin has started
