@@ -35,6 +35,7 @@ namespace DuetControlServer.Commands
     [JsonSerializable(typeof(InstallSystemPackage))]
     [JsonSerializable(typeof(UninstallSystemPackage))]
     [JsonSerializable(typeof(InstallPlugin))]
+    [JsonSerializable(typeof(NotifyPluginStarted))]
     [JsonSerializable(typeof(ReloadPlugin))]
     [JsonSerializable(typeof(SetPluginData))]
     [JsonSerializable(typeof(SetPluginProcess))]
