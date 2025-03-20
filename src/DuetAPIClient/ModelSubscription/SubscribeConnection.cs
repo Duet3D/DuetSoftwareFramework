@@ -39,13 +39,6 @@ public sealed class SubscribeConnection : BaseConnection
     public SubscriptionMode Mode { get; private set; }
 
     /// <summary>
-    /// Delimited filter expression
-    /// </summary>
-    /// <seealso cref="Filters"/>
-    [Obsolete("Use Filters instead")]
-    public string? Filter { get; private set; }
-
-    /// <summary>
     /// Filter expressions
     /// </summary>
     /// <seealso cref="SubscribeInitMessage.Filter"/>
@@ -85,7 +78,7 @@ public sealed class SubscribeConnection : BaseConnection
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public Task ConnectAsync(SubscriptionMode mode, IEnumerable<string>? filters = null, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(SubscriptionMode mode, IEnumerable<string>? filters = null, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
     {
         Mode = mode;
         Filters.Clear();
@@ -95,7 +88,7 @@ public sealed class SubscribeConnection : BaseConnection
         }
 
         SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Filters = Filters };
-        return ConnectAsync(initMessage, socketPath, cancellationToken);
+        await ConnectAsync(initMessage, socketPath, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -135,7 +128,7 @@ public sealed class SubscribeConnection : BaseConnection
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public Task ConnectAsync(SubscriptionMode mode, CodeChannel? channel, IEnumerable<string>? filters = null, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(SubscriptionMode mode, CodeChannel? channel, IEnumerable<string>? filters = null, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
     {
         Mode = mode;
         Channel = channel;
@@ -146,7 +139,7 @@ public sealed class SubscribeConnection : BaseConnection
         }
 
         SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Channel = Channel, Filters = Filters };
-        return ConnectAsync(initMessage, socketPath, cancellationToken);
+        await ConnectAsync(initMessage, socketPath, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -189,9 +182,9 @@ public sealed class SubscribeConnection : BaseConnection
     {
         if (Mode == SubscriptionMode.Full)
         {
-            await SendCommandAsync(new Acknowledge(), cancellationToken);
+            await SendCommandAsync(new Acknowledge(), cancellationToken).ConfigureAwait(false);
         }
-        using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken);
+        using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken).ConfigureAwait(false);
 
         ObjectModel Deserialize()
         {
@@ -230,8 +223,8 @@ public sealed class SubscribeConnection : BaseConnection
     /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>g
     public async Task<MemoryStream> GetSerializedObjectModelAsync(CancellationToken cancellationToken = default)
     {
-        await SendCommandAsync(new Acknowledge(), cancellationToken);
-        return await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken);
+        await SendCommandAsync(new Acknowledge(), cancellationToken).ConfigureAwait(false);
+        return await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -264,7 +257,7 @@ public sealed class SubscribeConnection : BaseConnection
     /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
     public async Task<JsonDocument> GetObjectModelPatchAsync(CancellationToken cancellationToken = default)
     {
-        await SendCommandAsync(new Acknowledge(), cancellationToken);
-        return await ReceiveJsonDocumentAsync(cancellationToken);
+        await SendCommandAsync(new Acknowledge(), cancellationToken).ConfigureAwait(false);
+        return await ReceiveJsonDocumentAsync(cancellationToken).ConfigureAwait(false);
     }
 }

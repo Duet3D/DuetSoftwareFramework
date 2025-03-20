@@ -42,15 +42,15 @@ internal partial class PollConnector : BaseConnector
         uint? sessionKey = null;
         using (HttpClient client = new() { Timeout = options.Timeout })
         {
-            using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"rr_connect?password={HttpUtility.UrlPathEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken);
+            using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"rr_connect?password={HttpUtility.UrlPathEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
 #if NET6_0_OR_GREATER
-            using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 #else
-            using Stream responseStream = await response.Content.ReadAsStreamAsync();
+            using Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
 #endif
-            Responses.PollConnectResponse connectResponse = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.PollConnectResponse, cancellationToken))!;
+            Responses.PollConnectResponse connectResponse = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.PollConnectResponse, cancellationToken).ConfigureAwait(false))!;
             sessionKey = connectResponse.Err switch
             {
                 0 => connectResponse.SessionKey,
@@ -627,7 +627,7 @@ internal partial class PollConnector : BaseConnector
         try
         {
             using CancellationTokenSource cts = new(Options.Timeout);
-            await HttpClient.GetAsync("rr_disconnect", cts.Token);
+            await HttpClient.GetAsync("rr_disconnect", cts.Token).ConfigureAwait(false);
         }
         catch
         {
@@ -644,7 +644,10 @@ internal partial class PollConnector : BaseConnector
     /// <param name="code">Code to send</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Code reply</returns>
-    public override Task<string> SendCodeAsync(string code, CancellationToken cancellationToken = default) => SendCodeAsync(code, false, cancellationToken);
+    public override async Task<string> SendCodeAsync(string code, CancellationToken cancellationToken = default)
+    {
+        return await SendCodeAsync(code, false, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Send a G/M/T-code and return the G-code reply
@@ -685,12 +688,12 @@ internal partial class PollConnector : BaseConnector
         // Make sure we know when to resolve the requested code
         if (replySeq == -1 && canAwaitCode)
         {
-            using JsonDocument replySeqDocument = await GetObjectModelAsync("seqs.reply", string.Empty);
+            using JsonDocument replySeqDocument = await GetObjectModelAsync("seqs.reply", string.Empty).ConfigureAwait(false);
             if (replySeqDocument.RootElement.TryGetProperty("result", out JsonElement replySeqElement) &&
                 replySeqElement.ValueKind == JsonValueKind.Number)
             {
                 replySeq = replySeqElement.GetInt32();
-                await GetGCodeReplyAsync(replySeq);
+                await GetGCodeReplyAsync(replySeq).ConfigureAwait(false);
             }
         }
 
@@ -702,17 +705,17 @@ internal partial class PollConnector : BaseConnector
             try
             {
                 using HttpRequestMessage request = new(HttpMethod.Get, $"rr_gcode?gcode={HttpUtility.UrlPathEncode(code)}");
-                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
                     // Make sure the full G-code could be stored
 #if NET6_0_OR_GREATER
-                    using (Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken))
+                    using (Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
 #else
-                    using (Stream responseStream = await response.Content.ReadAsStreamAsync())
+                    using (Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
 #endif
                     {
-                        Responses.GcodeReply responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.GcodeReply, cancellationToken))!;
+                        Responses.GcodeReply responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.GcodeReply, cancellationToken).ConfigureAwait(false))!;
                         if (responseObj.Buff == 0)
                         {
                             throw new ArgumentException("G-code buffer is full");
@@ -738,7 +741,7 @@ internal partial class PollConnector : BaseConnector
                 errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
                 if (response.StatusCode == HttpStatusCode.ServiceUnavailable)
                 {
-                    await Task.Delay(Options.RetryDelay, cancellationToken);
+                    await Task.Delay(Options.RetryDelay, cancellationToken).ConfigureAwait(false);
                 }
                 else if (response.StatusCode >= HttpStatusCode.InternalServerError)
                 {
@@ -775,11 +778,11 @@ internal partial class PollConnector : BaseConnector
             try
             {
                 using HttpRequestMessage request = new(HttpMethod.Get, "rr_reply");
-                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, _terminateSession.Token);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, _terminateSession.Token).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
                     // Get the reply and update the sequence number
-                    string gcodeReply = await response.Content.ReadAsStringAsync();
+                    string gcodeReply = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     lock (_seqs)
                     {
                         _seqs["reply"] = seq;
@@ -872,15 +875,15 @@ internal partial class PollConnector : BaseConnector
         request.Content = new StreamContent(content);
 
         // Check if that worked
-        using HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken);
+        using HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
 #if NET6_0_OR_GREATER
-        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 #else
-        using Stream responseStream = await response.Content.ReadAsStreamAsync();
+        using Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
 #endif
-        Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken))!;
+        Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken).ConfigureAwait(false))!;
         if (responseObj.Err != 0)
         {
             throw new HttpRequestException($"rr_upload returned err {responseObj.Err}");
@@ -901,15 +904,15 @@ internal partial class PollConnector : BaseConnector
             try
             {
                 using HttpRequestMessage request = new(HttpMethod.Get, $"rr_delete?name={HttpUtility.UrlPathEncode(filename)}");
-                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
 #if NET6_0_OR_GREATER
-                    using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 #else
-                    using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
 #endif
-                    Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken))!;
+                    Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken).ConfigureAwait(false))!;
                     if (responseObj.Err == 0)
                     {
                         return;
@@ -958,15 +961,15 @@ internal partial class PollConnector : BaseConnector
             try
             {
                 using HttpRequestMessage request = new(HttpMethod.Get, $"rr_move?old={HttpUtility.UrlPathEncode(from)}&new={HttpUtility.UrlPathEncode(to)}&deleteexisting={(force ? "yes" : "no")}");
-                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
 #if NET6_0_OR_GREATER
-                    using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 #else
-                    using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
 #endif
-                    Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken))!;
+                    Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken).ConfigureAwait(false))!;
                     if (responseObj.Err == 0)
                     {
                         return;
@@ -1013,15 +1016,15 @@ internal partial class PollConnector : BaseConnector
             try
             {
                 using HttpRequestMessage request = new(HttpMethod.Get, $"rr_mkdir?dir={HttpUtility.UrlPathEncode(directory)}");
-                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
 #if NET6_0_OR_GREATER
-                    using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 #else
-                    using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
 #endif
-                    Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken))!;
+                    Responses.ErrResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.ErrResponse, cancellationToken).ConfigureAwait(false))!;
                     if (responseObj.Err == 0)
                     {
                         return;
@@ -1059,7 +1062,7 @@ internal partial class PollConnector : BaseConnector
     public override async Task<HttpResponseMessage> DownloadAsync(string filename, CancellationToken cancellationToken = default)
     {
         using HttpRequestMessage request = new(HttpMethod.Get, $"rr_download?name={HttpUtility.UrlPathEncode(filename)}");
-        HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken);
+        HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             throw new FileNotFoundException();
@@ -1088,16 +1091,16 @@ internal partial class PollConnector : BaseConnector
                 try
                 {
                     using HttpRequestMessage request = new(HttpMethod.Get, $"rr_filelist?dir={HttpUtility.UrlPathEncode(directory)}&first={nextIndex}");
-                    using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
+                    using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
 
                     if (response.IsSuccessStatusCode)
                     {
 #if NET6_0_OR_GREATER
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 #else
-                        using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                        using Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
 #endif
-                        Responses.FileListResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.FileListResponse, cancellationToken))!;
+                        Responses.FileListResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.FileListResponse, cancellationToken).ConfigureAwait(false))!;
                         if (responseObj.Err == 0)
                         {
                             foreach (Responses.FileItem item in responseObj.Files)
@@ -1164,15 +1167,15 @@ internal partial class PollConnector : BaseConnector
             try
             {
                 using HttpRequestMessage request = new(HttpMethod.Get, $"rr_fileinfo?name={encodedFilename}");
-                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
 #if NET6_0_OR_GREATER
-                    using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 #else
-                    using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
 #endif
-                    using JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
+                    using JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken).ConfigureAwait(false);
                     if (responseJson.RootElement.TryGetProperty("err", out JsonElement errValue) && errValue.ValueKind == JsonValueKind.Number)
                     {
                         int err = errValue.GetInt32();
@@ -1183,7 +1186,7 @@ internal partial class PollConnector : BaseConnector
 
                             if (readThumbnailContent)
                             {
-                                await GetThumbnailsAsync(result, cancellationToken);
+                                await GetThumbnailsAsync(result, cancellationToken).ConfigureAwait(false);
                             }
 
                             return result;
@@ -1237,15 +1240,15 @@ internal partial class PollConnector : BaseConnector
                         do
                         {
                             using HttpRequestMessage request = new(HttpMethod.Get, $"rr_thumbnail?name={fileinfo.FileName}&offset={offset}");
-                            using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
+                            using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                             if (response.IsSuccessStatusCode)
                             {
 #if NET6_0_OR_GREATER
-                                using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                                using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 #else
-                                using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                                using Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
 #endif
-                                using JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
+                                using JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken).ConfigureAwait(false);
                                 if (responseJson.RootElement.TryGetProperty("err", out JsonElement errValue) && errValue.ValueKind == JsonValueKind.Number)
                                 {
                                     int err = errValue.GetInt32();
@@ -1275,5 +1278,5 @@ internal partial class PollConnector : BaseConnector
         }
     }
 
-#warning add plugin and system calls
+    // ** Plugin and system package calls are not supported (yet) **
 }

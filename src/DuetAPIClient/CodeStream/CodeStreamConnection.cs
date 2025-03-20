@@ -51,13 +51,13 @@ public sealed class CodeStreamConnection : BaseConnection
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public Task ConnectAsync(int bufferSize = Defaults.CodeBufferSize, CodeChannel channel = Defaults.InputChannel, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(int bufferSize = Defaults.CodeBufferSize, CodeChannel channel = Defaults.InputChannel, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
     {
         BufferSize = bufferSize;
         Channel = channel;
 
         CodeStreamInitMessage initMessage = new() { BufferSize = bufferSize, Channel = channel };
-        return ConnectAsync(initMessage, socketPath, cancellationToken);
+        await ConnectAsync(initMessage, socketPath, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

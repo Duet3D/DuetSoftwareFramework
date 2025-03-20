@@ -113,7 +113,7 @@ public sealed class InterceptConnection : BaseCommandConnection
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public Task ConnectAsync(InterceptionMode mode, IEnumerable<CodeChannel>? channels = null, IEnumerable<string>? filters = null, bool priorityCodes = false, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(InterceptionMode mode, IEnumerable<CodeChannel>? channels = null, IEnumerable<string>? filters = null, bool priorityCodes = false, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
     {
         Mode = mode;
         Channels.Clear();
@@ -134,7 +134,7 @@ public sealed class InterceptConnection : BaseCommandConnection
             Filters = Filters,
             PriorityCodes = priorityCodes
         };
-        return ConnectAsync(initMessage, socketPath, cancellationToken);
+        await ConnectAsync(initMessage, socketPath, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -155,7 +155,10 @@ public sealed class InterceptConnection : BaseCommandConnection
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.CodeInterceptionRead"/>
     /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
-    public ValueTask<Code> ReceiveCodeAsync(CancellationToken cancellationToken = default) => ReceiveCommandAsync<Code>(cancellationToken);
+    public async ValueTask<Code> ReceiveCodeAsync(CancellationToken cancellationToken = default)
+    {
+        return await ReceiveCommandAsync<Code>(cancellationToken).ConfigureAwait(false);
+    } 
 
     /// <summary>
     /// When intercepting a code wait for all previous codes of the given channel to finish
@@ -174,7 +177,10 @@ public sealed class InterceptConnection : BaseCommandConnection
     /// <exception cref="InvalidOperationException">Requested code channel is disabled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
-    public Task<bool> FlushAsync(CancellationToken cancellationToken = default) => PerformCommandAsync<bool>(new Flush(), cancellationToken);
+    public async Task<bool> FlushAsync(CancellationToken cancellationToken = default)
+    {
+        return await PerformCommandAsync<bool>(new Flush(), cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Instruct the control server to cancel the last received code (in intercepting mode)
@@ -194,7 +200,10 @@ public sealed class InterceptConnection : BaseCommandConnection
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="Cancel"/>
     /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
-    public ValueTask CancelCodeAsync(CancellationToken cancellationToken = default) => SendCommandAsync(new Cancel(), cancellationToken);
+    public async ValueTask CancelCodeAsync(CancellationToken cancellationToken = default)
+    {
+        await SendCommandAsync(new Cancel(), cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Instruct the control server to ignore the last received code (in intercepting mode)
@@ -216,7 +225,10 @@ public sealed class InterceptConnection : BaseCommandConnection
     /// <seealso cref="Ignore"/>
     /// <seealso cref="SbcPermissions.CodeInterceptionRead"/>
     /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
-    public ValueTask IgnoreCodeAsync(CancellationToken cancellationToken = default) => SendCommandAsync(new Ignore(), cancellationToken);
+    public async ValueTask IgnoreCodeAsync(CancellationToken cancellationToken = default)
+    {
+        await SendCommandAsync(new Ignore(), cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Instruct the control server to resolve the last received code with the given message details (in intercepting mode)
@@ -242,9 +254,9 @@ public sealed class InterceptConnection : BaseCommandConnection
     /// <seealso cref="Message"/>
     /// <seealso cref="Resolve"/>
     /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
-    public ValueTask ResolveCodeAsync(MessageType type, string content, CancellationToken cancellationToken = default)
+    public async ValueTask ResolveCodeAsync(MessageType type, string content, CancellationToken cancellationToken = default)
     {
-        return SendCommandAsync(new Resolve { Content = content, Type = type }, cancellationToken);
+        await SendCommandAsync(new Resolve { Content = content, Type = type }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -269,9 +281,9 @@ public sealed class InterceptConnection : BaseCommandConnection
     /// <seealso cref="Message"/>
     /// <seealso cref="Resolve"/>
     /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
-    public ValueTask ResolveCodeAsync(Message message, CancellationToken cancellationToken = default)
+    public async ValueTask ResolveCodeAsync(Message message, CancellationToken cancellationToken = default)
     {
-        return SendCommandAsync(new Resolve { Content = message.Content, Type = message.Type }, cancellationToken);
+        await SendCommandAsync(new Resolve { Content = message.Content, Type = message.Type }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -283,10 +295,7 @@ public sealed class InterceptConnection : BaseCommandConnection
     /// <seealso cref="Message"/>
     /// <seealso cref="Resolve"/>
     /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
-    public void RewriteCode(Code code)
-    {
-        SendCommand(new Rewrite { Code = code });
-    }
+    public void RewriteCode(Code code) => SendCommand(new Rewrite { Code = code });
 
     /// <summary>
     /// Rewrite the code being intercepted asynchronously. This effectively modifies the code before it is processed further
@@ -299,8 +308,8 @@ public sealed class InterceptConnection : BaseCommandConnection
     /// <seealso cref="Message"/>
     /// <seealso cref="Resolve"/>
     /// <seealso cref="SbcPermissions.CodeInterceptionReadWrite"/>
-    public ValueTask RewriteCodeAsync(Code code, CancellationToken cancellationToken = default)
+    public async ValueTask RewriteCodeAsync(Code code, CancellationToken cancellationToken = default)
     {
-        return SendCommandAsync(new Rewrite { Code = code }, cancellationToken);
+        await SendCommandAsync(new Rewrite { Code = code }, cancellationToken).ConfigureAwait(false);
     }
 }

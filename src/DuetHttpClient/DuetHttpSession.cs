@@ -189,6 +189,6 @@ namespace DuetHttpClient
             return _connector.GetFileInfoAsync(filename, readThumbnailContent, cancellationToken);
         }
 
-#warning add plugin and system calls
+        // ** Plugin and system package calls are not supported (yet) **
     }
 }

@@ -35,15 +35,15 @@ internal class RestConnector : BaseConnector
     public static async Task<RestConnector> ConnectAsync(Uri baseUri, DuetHttpOptions options, CancellationToken cancellationToken)
     {
         using HttpClient client = new() { Timeout = options.Timeout };
-        using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"machine/connect?password={HttpUtility.UrlPathEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken);
+        using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"machine/connect?password={HttpUtility.UrlPathEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken).ConfigureAwait(false);
         if (response.IsSuccessStatusCode)
         {
 #if NET6_0_OR_GREATER
-            using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 #else
-            using Stream responseStream = await response.Content.ReadAsStreamAsync();
+            using Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
 #endif
-            Responses.RestConnectResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.RestConnectResponse, cancellationToken))!;
+            Responses.RestConnectResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.RestConnectResponse, cancellationToken).ConfigureAwait(false))!;
             return new RestConnector(baseUri, options, responseObj.SessionKey);
         }
 
@@ -196,7 +196,7 @@ internal class RestConnector : BaseConnector
 
                 try
                 {
-                    await webSocket.ConnectAsync(wsUri, _terminateSession.Token);
+                    await webSocket.ConnectAsync(wsUri, _terminateSession.Token).ConfigureAwait(false);
 
                     // Read the full object model first
                     using (MemoryStream modelStream = new())
@@ -204,7 +204,7 @@ internal class RestConnector : BaseConnector
                         byte[] modelChunk = new byte[8192];
                         do
                         {
-                            WebSocketReceiveResult result = await webSocket.ReceiveAsync(new ArraySegment<byte>(modelChunk), _terminateSession.Token);
+                            WebSocketReceiveResult result = await webSocket.ReceiveAsync(new ArraySegment<byte>(modelChunk), _terminateSession.Token).ConfigureAwait(false);
                             if (result.MessageType == WebSocketMessageType.Close)
                             {
                                 // Server has closed the connection
@@ -219,7 +219,7 @@ internal class RestConnector : BaseConnector
                         } while (true);
 
                         modelStream.Seek(0, SeekOrigin.Begin);
-                        using JsonDocument modelJson = await JsonDocument.ParseAsync(modelStream, cancellationToken: _terminateSession.Token);
+                        using JsonDocument modelJson = await JsonDocument.ParseAsync(modelStream, cancellationToken: _terminateSession.Token).ConfigureAwait(false);
                         lock (Model)
                         {
                             Model.UpdateFromJson(modelJson.RootElement, false);
@@ -235,10 +235,10 @@ internal class RestConnector : BaseConnector
                     do
                     {
                         // Send back the OK response
-                        await webSocket.SendAsync(new ArraySegment<byte>(okResponse), WebSocketMessageType.Text, true, _terminateSession.Token);
+                        await webSocket.SendAsync(new ArraySegment<byte>(okResponse), WebSocketMessageType.Text, true, _terminateSession.Token).ConfigureAwait(false);
 
                         // Wait a moment
-                        await Task.Delay(Options.UpdateDelay, _terminateSession.Token);
+                        await Task.Delay(Options.UpdateDelay, _terminateSession.Token).ConfigureAwait(false);
 
                         // Either read a JSON patch or keep the connection alive
                         using (CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_terminateSession.Token))
@@ -252,7 +252,7 @@ internal class RestConnector : BaseConnector
 
                                 do
                                 {
-                                    WebSocketReceiveResult result = await webSocket.ReceiveAsync(new ArraySegment<byte>(patchChunk), _terminateSession.Token);
+                                    WebSocketReceiveResult result = await webSocket.ReceiveAsync(new ArraySegment<byte>(patchChunk), _terminateSession.Token).ConfigureAwait(false);
                                     if (result.MessageType == WebSocketMessageType.Close)
                                     {
                                         // Server has closed the connection
@@ -270,7 +270,7 @@ internal class RestConnector : BaseConnector
                                     {
                                         // JSON patch is complete
                                         patchStream.Seek(0, SeekOrigin.Begin);
-                                        using JsonDocument modelJson = await JsonDocument.ParseAsync(patchStream, cancellationToken: _terminateSession.Token);
+                                        using JsonDocument modelJson = await JsonDocument.ParseAsync(patchStream, cancellationToken: _terminateSession.Token).ConfigureAwait(false);
                                         lock (Model)
                                         {
                                             Model.UpdateFromJson(modelJson.RootElement, false);
@@ -287,7 +287,7 @@ internal class RestConnector : BaseConnector
                             catch (OperationCanceledException) when (!_terminateSession.IsCancellationRequested)
                             {
                                 // Timeout while waiting for model update, send a PING request
-                                await webSocket.SendAsync(new ArraySegment<byte>(pingRequest), WebSocketMessageType.Text, true, _terminateSession.Token);
+                                await webSocket.SendAsync(new ArraySegment<byte>(pingRequest), WebSocketMessageType.Text, true, _terminateSession.Token).ConfigureAwait(false);
                             }
                         }
 
@@ -316,8 +316,8 @@ internal class RestConnector : BaseConnector
                 // Connection lost, check if we can reconnect after a short delay
                 try
                 {
-                    await Task.Delay(Options.RetryDelay, _terminateSession.Token);
-                    await ReconnectAsync();
+                    await Task.Delay(Options.RetryDelay, _terminateSession.Token).ConfigureAwait(false);
+                    await ReconnectAsync().ConfigureAwait(false);
                 }
                 catch (Exception e) when (e is OperationCanceledException || e is HttpRequestException)
                 {
@@ -403,7 +403,7 @@ internal class RestConnector : BaseConnector
             try
             {
                 using CancellationTokenSource cts = new(Options.Timeout);
-                await HttpClient.GetAsync("machine/disconnect", cts.Token);
+                await HttpClient.GetAsync("machine/disconnect", cts.Token).ConfigureAwait(false);
             }
             catch
             {
@@ -421,7 +421,10 @@ internal class RestConnector : BaseConnector
     /// <param name="code">Code to send</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Code reply</returns>
-    public override Task<string> SendCodeAsync(string code, CancellationToken cancellationToken = default) => SendCodeAsync(code, false, cancellationToken);
+    public override async Task<string> SendCodeAsync(string code, CancellationToken cancellationToken = default)
+    {
+        return await SendCodeAsync(code, false, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Send a G/M/T-code and return the G-code reply
@@ -438,13 +441,13 @@ internal class RestConnector : BaseConnector
             using HttpRequestMessage request = new(HttpMethod.Post, executeAsynchronously ? "machine/code?async=true" : "machine/code");
             request.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(code));
 
-            using HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken);
+            using HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
             if (response.IsSuccessStatusCode)
             {
 #if NET6_0_OR_GREATER
-                byte[] responseData = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+                byte[] responseData = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
 #else
-                byte[] responseData = await response.Content.ReadAsByteArrayAsync();
+                byte[] responseData = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
 #endif
                 return Encoding.UTF8.GetString(responseData);
             }
@@ -471,7 +474,7 @@ internal class RestConnector : BaseConnector
         using HttpRequestMessage request = new(HttpMethod.Put, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
         request.Content = new StreamContent(content);
 
-        using HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken);
+        using HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
     }
 
@@ -489,7 +492,7 @@ internal class RestConnector : BaseConnector
             try
             {
                 using HttpRequestMessage request = new(HttpMethod.Delete, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
-                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
                     return;
@@ -542,7 +545,7 @@ internal class RestConnector : BaseConnector
                     };
                 request.Content = formData;
 
-                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
                     return;
@@ -585,7 +588,7 @@ internal class RestConnector : BaseConnector
             try
             {
                 using HttpRequestMessage request = new(HttpMethod.Put, $"machine/directory/{HttpUtility.UrlPathEncode(directory)}");
-                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
                     return;
@@ -618,7 +621,7 @@ internal class RestConnector : BaseConnector
     public override async Task<HttpResponseMessage> DownloadAsync(string filename, CancellationToken cancellationToken = default)
     {
         using HttpRequestMessage request = new(HttpMethod.Get, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
-        HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken);
+        HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             throw new FileNotFoundException();
@@ -642,15 +645,15 @@ internal class RestConnector : BaseConnector
             try
             {
                 using HttpRequestMessage request = new(HttpMethod.Get, $"machine/directory/{HttpUtility.UrlPathEncode(directory)}");
-                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
 #if NET6_0_OR_GREATER
-                    using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 #else
-                    using Stream responseStream = await response.Content.ReadAsStreamAsync();
+                    using Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
 #endif
-                    return (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.FileNodeArray, cancellationToken))!
+                    return (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.FileNodeArray, cancellationToken).ConfigureAwait(false))!
                         .Select(item => new FileListItem()
                         {
                             Filename = item.Name,
@@ -699,13 +702,13 @@ internal class RestConnector : BaseConnector
             try
             {
                 using HttpRequestMessage request = new(HttpMethod.Get, $"machine/fileinfo/{HttpUtility.UrlPathEncode(filename)}?readThumbnailContent={(readThumbnailContent ? "true" : "false")}");
-                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
 #if NET6_0_OR_GREATER
-                    byte[] responseData = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+                    byte[] responseData = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
 #else
-                    byte[] responseData = await response.Content.ReadAsByteArrayAsync();
+                    byte[] responseData = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
 #endif
 
                     GCodeFileInfo Deserialize()

@@ -80,8 +80,8 @@ public sealed class HttpEndpointConnection(Socket socket, bool isWebSocket) : ID
     /// <exception cref="SocketException">Connection has been closed</exception>
     public async Task<ReceivedHttpRequest> ReadRequestAsync(CancellationToken cancellationToken = default)
     {
-        await using MemoryStream json = await JsonHelper.ReceiveUtf8JsonAsync(_socket, cancellationToken);
-        return (await JsonSerializer.DeserializeAsync(json, CommandContext.Default.ReceivedHttpRequest, cancellationToken))!;
+        await using MemoryStream json = await JsonHelper.ReceiveUtf8JsonAsync(_socket, cancellationToken).ConfigureAwait(false);
+        return (await JsonSerializer.DeserializeAsync(json, CommandContext.Default.ReceivedHttpRequest, cancellationToken).ConfigureAwait(false))!;
     }
 
     /// <summary>
@@ -137,7 +137,7 @@ public sealed class HttpEndpointConnection(Socket socket, bool isWebSocket) : ID
                 ResponseType = responseType
             };
             byte[] jsonToWrite = JsonSerializer.SerializeToUtf8Bytes(httpResponse, CommandContext.Default.SendHttpResponse);
-            await _socket.SendAsync(jsonToWrite, SocketFlags.None, cancellationToken);
+            await _socket.SendAsync(jsonToWrite, SocketFlags.None, cancellationToken).ConfigureAwait(false);
         }
         finally
         {

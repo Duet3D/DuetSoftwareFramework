@@ -175,14 +175,14 @@ public sealed class Heightmap
         using StreamReader reader = new(stream);
 
         // Read header
-        string? line = await reader.ReadLineAsync();
+        string? line = await reader.ReadLineAsync().ConfigureAwait(false);
         if (line is null || !line.StartsWith("RepRapFirmware height map file v2 generated at"))
         {
             throw new IOException("Invalid file format");
         }
 
         // Read data columns
-        line = await reader.ReadLineAsync();
+        line = await reader.ReadLineAsync().ConfigureAwait(false);
         if (line is null)
         {
             throw new IOException("Invalid file format");
@@ -248,7 +248,7 @@ public sealed class Heightmap
         int index = 0;
         for (int y = 0; y < NumY; y++)
         {
-            line = await reader.ReadLineAsync();
+            line = await reader.ReadLineAsync().ConfigureAwait(false);
             if (line is null)
             {
                 throw new IOException("Unexpected end of file");
@@ -299,9 +299,9 @@ public sealed class Heightmap
         using FileStream stream = new(filename, FileMode.Create, FileAccess.Write);
         using StreamWriter writer = new(stream);
 
-        await writer.WriteLineAsync($"RepRapFirmware height map file v2 generated at {DateTime.Now:yyyy-MM-dd HH:mm}");
-        await writer.WriteLineAsync("xmin,xmax,ymin,ymax,radius,xspacing,yspacing,xnum,ynum");
-        await writer.WriteLineAsync(FormattableString.Invariant($"{XMin:F2},{XMax:F2},{YMin:F2},{YMax:F2},{Radius:F2},{XSpacing:F2},{YSpacing:F2},{NumX},{NumY}"));
+        await writer.WriteLineAsync($"RepRapFirmware height map file v2 generated at {DateTime.Now:yyyy-MM-dd HH:mm}").ConfigureAwait(false);
+        await writer.WriteLineAsync("xmin,xmax,ymin,ymax,radius,xspacing,yspacing,xnum,ynum").ConfigureAwait(false);
+        await writer.WriteLineAsync(FormattableString.Invariant($"{XMin:F2},{XMax:F2},{YMin:F2},{YMax:F2},{Radius:F2},{XSpacing:F2},{YSpacing:F2},{NumX},{NumY}")).ConfigureAwait(false);
 
         string[] values = new string[NumX];
         int i = 0;
@@ -312,7 +312,7 @@ public sealed class Heightmap
                 values[x] = float.IsNaN(ZCoordinates[i]) ? FormattableString.Invariant($"{0,7}") : FormattableString.Invariant(($"{ZCoordinates[i],7:F3}"));
                 i++;
             }
-            await writer.WriteLineAsync(string.Join(",", values));
+            await writer.WriteLineAsync(string.Join(",", values)).ConfigureAwait(false);
         }
     }
 }

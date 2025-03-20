@@ -128,7 +128,7 @@ public sealed class HttpEndpointUnixSocket : IDisposable
         {
             do
             {
-                Socket socket = await _unixSocket.AcceptAsync();
+                Socket socket = await _unixSocket.AcceptAsync().ConfigureAwait(false);
                 HttpEndpointConnection connection = new(socket, EndpointType == HttpEndpointType.WebSocket);
 
                 if (OnEndpointRequestReceived is not null)
@@ -140,7 +140,7 @@ public sealed class HttpEndpointUnixSocket : IDisposable
                 else
                 {
                     // Cannot do anything with this connection. Send an HTTP 500 response and close the connection
-                    await connection.SendResponseAsync(500, "No event handler registered");
+                    await connection.SendResponseAsync(500, "No event handler registered").ConfigureAwait(false);
                     connection.Dispose();
                 }
             }

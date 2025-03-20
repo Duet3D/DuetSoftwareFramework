@@ -44,9 +44,9 @@ public sealed class CommandConnection : BaseCommandConnection
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public Task ConnectAsync(string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
     {
         CommandInitMessage initMessage = new();
-        return ConnectAsync(initMessage, socketPath, cancellationToken);
+        await ConnectAsync(initMessage, socketPath, cancellationToken).ConfigureAwait(false);
     }
 }

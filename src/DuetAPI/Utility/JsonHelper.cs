@@ -196,7 +196,7 @@ public static class JsonHelper
         byte[] readData = new byte[1];
         while (!inJson || numBraces > 0)
         {
-            if (await socket.ReceiveAsync(readData, SocketFlags.None, cancellationToken) <= 0)
+            if (await socket.ReceiveAsync(readData, SocketFlags.None, cancellationToken).ConfigureAwait(false) <= 0)
             {
                 // Do not keep reading if the connection has been gracefully closed
                 jsonStream.Dispose();

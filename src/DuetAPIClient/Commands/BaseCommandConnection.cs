@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
-using DuetAPI.Connection.InitMessages;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 
@@ -64,7 +63,7 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     [UnsupportedOSPlatform("windows")]
     public async Task<HttpEndpointUnixSocket> AddHttpEndpointAsync(HttpEndpointType endpointType, string ns, string path, bool isUploadRequest = false, int backlog = HttpEndpointUnixSocket.DefaultBacklog, CancellationToken cancellationToken = default)
     {
-        string socketPath = await PerformCommandAsync<string>(new AddHttpEndpoint { EndpointType = endpointType, Namespace = ns, Path = path, IsUploadRequest = isUploadRequest }, cancellationToken);
+        string socketPath = await PerformCommandAsync<string>(new AddHttpEndpoint { EndpointType = endpointType, Namespace = ns, Path = path, IsUploadRequest = isUploadRequest }, cancellationToken).ConfigureAwait(false);
         return new HttpEndpointUnixSocket(endpointType, ns, path, socketPath, backlog);
     }
 
@@ -98,14 +97,14 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.ManageUserSessions"/>
-    public Task<int> AddUserSessionAsync(AccessLevel access, SessionType type, string? origin = null, CancellationToken cancellationToken = default)
+    public async Task<int> AddUserSessionAsync(AccessLevel access, SessionType type, string? origin = null, CancellationToken cancellationToken = default)
     {
 #if NET6_0_OR_GREATER
         origin ??= Environment.ProcessId.ToString();
 #else
         origin ??= Process.GetCurrentProcess().Id.ToString();
 #endif
-        return PerformCommandAsync<int>(new AddUserSession { AccessLevel = access, SessionType = type, Origin = origin }, cancellationToken);
+        return await PerformCommandAsync<int>(new AddUserSession { AccessLevel = access, SessionType = type, Origin = origin }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -116,10 +115,7 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="InvalidOperationException">Requested code channel is disabled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
-    public bool CheckPassword(string password)
-    {
-        return PerformCommand<bool>(new CheckPassword { Password = password });
-    }
+    public bool CheckPassword(string password) => PerformCommand<bool>(new CheckPassword { Password = password });
 
     /// <summary>
     /// Check the given password asynchronously (see M551)
@@ -130,9 +126,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="InvalidOperationException">Requested code channel is disabled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
-    public Task<bool> CheckPasswordAsync(string password, CancellationToken cancellationToken = default)
+    public async Task<bool> CheckPasswordAsync(string password, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync<bool>(new CheckPassword { Password = password }, cancellationToken);
+        return await PerformCommandAsync<bool>(new CheckPassword { Password = password }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -162,9 +158,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
-    public Task<JsonElement> EvaluateExpressionAsync(string expression, CodeChannel channel = CodeChannel.SBC, CancellationToken cancellationToken = default)
+    public async Task<JsonElement> EvaluateExpressionAsync(string expression, CodeChannel channel = CodeChannel.SBC, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync<JsonElement>(new EvaluateExpression { Channel = channel, Expression = expression }, cancellationToken);
+        return await PerformCommandAsync<JsonElement>(new EvaluateExpression { Channel = channel, Expression = expression }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -175,10 +171,7 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="InvalidOperationException">Requested code channel is disabled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
-    public bool Flush(CodeChannel channel)
-    {
-        return PerformCommand<bool>(new Flush { Channel = channel });
-    }
+    public bool Flush(CodeChannel channel) => PerformCommand<bool>(new Flush { Channel = channel });
 
     /// <summary>
     /// Wait for all pending codes of the given channel to finish asynchronously
@@ -189,9 +182,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="InvalidOperationException">Requested code channel is disabled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
-    public Task<bool> FlushAsync(CodeChannel channel, CancellationToken cancellationToken = default)
+    public async Task<bool> FlushAsync(CodeChannel channel, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync<bool>(new Flush { Channel = channel }, cancellationToken);
+        return await PerformCommandAsync<bool>(new Flush { Channel = channel }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -204,10 +197,7 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <seealso cref="SbcPermissions.CommandExecution"/>
     /// <seealso cref="SbcPermissions.FileSystemAccess"/>
     /// <seealso cref="SbcPermissions.ReadGCodes"/>
-    public GCodeFileInfo GetFileInfo(string fileName)
-    {
-        return PerformCommand<GCodeFileInfo>(new GetFileInfo { FileName = fileName });
-    }
+    public GCodeFileInfo GetFileInfo(string fileName) => PerformCommand<GCodeFileInfo>(new GetFileInfo { FileName = fileName });
 
     /// <summary>
     /// Parse a G-code file and returns file information about it asynchronously
@@ -221,9 +211,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <seealso cref="SbcPermissions.CommandExecution"/>
     /// <seealso cref="SbcPermissions.FileSystemAccess"/>
     /// <seealso cref="SbcPermissions.ReadGCodes"/>
-    public Task<GCodeFileInfo> GetFileInfoAsync(string fileName, CancellationToken cancellationToken = default)
+    public async Task<GCodeFileInfo> GetFileInfoAsync(string fileName, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync<GCodeFileInfo>(new GetFileInfo { FileName = fileName }, cancellationToken);
+        return await PerformCommandAsync<GCodeFileInfo>(new GetFileInfo { FileName = fileName }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -255,9 +245,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <seealso cref="SbcPermissions.CommandExecution"/>
     /// <seealso cref="SbcPermissions.FileSystemAccess"/>
     /// <seealso cref="SbcPermissions.ReadGCodes"/>
-    public Task<GCodeFileInfo> GetFileInfoAsync(string fileName, bool readThumbnailContent, CancellationToken cancellationToken = default)
+    public async Task<GCodeFileInfo> GetFileInfoAsync(string fileName, bool readThumbnailContent, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync<GCodeFileInfo>(new GetFileInfo { FileName = fileName, ReadThumbnailContent = readThumbnailContent }, cancellationToken);
+        return await PerformCommandAsync<GCodeFileInfo>(new GetFileInfo { FileName = fileName, ReadThumbnailContent = readThumbnailContent }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -280,9 +270,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.ObjectModelRead"/>
     /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public Task<ObjectModel> GetObjectModelAsync(CancellationToken cancellationToken = default)
+    public async Task<ObjectModel> GetObjectModelAsync(CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync<ObjectModel>(new GetObjectModel(), cancellationToken);
+        return await PerformCommandAsync<ObjectModel>(new GetObjectModel(), cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -309,7 +299,7 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
     public async Task<string> GetSerializedObjectModelAsync(CancellationToken cancellationToken = default)
     {
-        JsonElement model = await PerformCommandAsync<JsonElement>(new GetObjectModel(), cancellationToken);
+        JsonElement model = await PerformCommandAsync<JsonElement>(new GetObjectModel(), cancellationToken).ConfigureAwait(false);
         return model.GetRawText();
     }
 
@@ -330,9 +320,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.ManagePlugins"/>
-    public Task InstallPluginAsync(string packageFile, CancellationToken cancellationToken = default)
+    public async Task InstallPluginAsync(string packageFile, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync(new InstallPlugin { PluginFile = packageFile }, cancellationToken);
+        await PerformCommandAsync(new InstallPlugin { PluginFile = packageFile }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -352,9 +342,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.SuperUser"/>
-    public Task InstallSystemPackageAsync(string packageFile, CancellationToken cancellationToken = default)
+    public async Task InstallSystemPackageAsync(string packageFile, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync(new InstallSystemPackage { PackageFile = packageFile }, cancellationToken);
+        await PerformCommandAsync(new InstallSystemPackage { PackageFile = packageFile }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -379,9 +369,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <returns>Asynchronous task</returns>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.SuperUser"/>
-    public Task InvalidateChannelAsync(CodeChannel channel, CancellationToken cancellationToken = default)
+    public async Task InvalidateChannelAsync(CodeChannel channel, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync(new InvalidateChannel { Channel = channel }, cancellationToken);
+        await PerformCommandAsync(new InvalidateChannel { Channel = channel }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -410,7 +400,7 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
         {
             if (connection.IsConnected)
             {
-                await connection.PerformCommandAsync(new UnlockObjectModel(), default);
+                await connection.PerformCommandAsync(new UnlockObjectModel(), default).ConfigureAwait(false);
             }
         }
     }
@@ -437,7 +427,7 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
     public async Task<ObjectModelLock> LockObjectModelAsync(CancellationToken cancellationToken = default)
     {
-        await PerformCommandAsync(new LockObjectModel(), cancellationToken);
+        await PerformCommandAsync(new LockObjectModel(), cancellationToken).ConfigureAwait(false);
         return new ObjectModelLock(this);
     }
 
@@ -461,7 +451,7 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="SocketException">Command could not be processed</exception>
     public async Task NotifyPluginStartedAsync(string? plugin = null, CancellationToken cancellationToken = default)
     {
-        await PerformCommandAsync(new NotifyPluginStarted { Plugin = plugin }, cancellationToken);
+        await PerformCommandAsync(new NotifyPluginStarted { Plugin = plugin }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -486,7 +476,7 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
     public async Task PatchObjectModelAsync(string key, JsonElement patch, CancellationToken cancellationToken = default)
     {
-        await PerformCommandAsync(new PatchObjectModel() { Key = key, Patch = patch }, cancellationToken);
+        await PerformCommandAsync(new PatchObjectModel() { Key = key, Patch = patch }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -513,9 +503,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <remarks>Cancelling the read operation does not cancel the code execution</remarks>
     /// <seealso cref="Code"/>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
-    public Task<Message> PerformCodeAsync(Code code, CancellationToken cancellationToken = default)
+    public async Task<Message> PerformCodeAsync(Code code, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync<Message>(code, cancellationToken);
+        return await PerformCommandAsync<Message>(code, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -547,9 +537,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <remarks>Cancelling the read operation does not cancel the code execution</remarks>
     /// <seealso cref="SimpleCode"/>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
-    public Task<string> PerformSimpleCodeAsync(string code, CodeChannel channel = Defaults.InputChannel, CancellationToken cancellationToken = default)
+    public async Task<string> PerformSimpleCodeAsync(string code, CodeChannel channel = Defaults.InputChannel, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync<string>(new SimpleCode { Code = code, Channel = channel }, cancellationToken);
+        return await PerformCommandAsync<string>(new SimpleCode { Code = code, Channel = channel }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -583,9 +573,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <remarks>Cancelling the read operation does not cancel the code execution</remarks>
     /// <seealso cref="SimpleCode"/>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
-    public Task<string> PerformSimpleCodeAsync(string code, CodeChannel channel, bool executeAsynchronously, CancellationToken cancellationToken = default)
+    public async Task<string> PerformSimpleCodeAsync(string code, CodeChannel channel, bool executeAsynchronously, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync<string>(new SimpleCode { Code = code, Channel = channel, ExecuteAsynchronously = executeAsynchronously }, cancellationToken);
+        return await PerformCommandAsync<string>(new SimpleCode { Code = code, Channel = channel, ExecuteAsynchronously = executeAsynchronously }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -605,9 +595,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.ManagePlugins"/>
-    public Task ReloadPluginAsync(string plugin, CancellationToken cancellationToken = default)
+    public async Task ReloadPluginAsync(string plugin, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync(new ReloadPlugin { Plugin = plugin }, cancellationToken);
+        await PerformCommandAsync(new ReloadPlugin { Plugin = plugin }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -635,9 +625,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.RegisterHttpEndpoints"/>
-    public Task<bool> RemoveHttpEndpointAsync(HttpEndpointType endpointType, string ns, string path, CancellationToken cancellationToken = default)
+    public async Task<bool> RemoveHttpEndpointAsync(HttpEndpointType endpointType, string ns, string path, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync<bool>(new RemoveHttpEndpoint { EndpointType = endpointType, Namespace = ns, Path = path }, cancellationToken);
+        return await PerformCommandAsync<bool>(new RemoveHttpEndpoint { EndpointType = endpointType, Namespace = ns, Path = path }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -658,9 +648,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.ManageUserSessions"/>
-    public Task<bool> RemoveUserSessionAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<bool> RemoveUserSessionAsync(int id, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync<bool>(new RemoveUserSession { Id = id }, cancellationToken);
+        return await PerformCommandAsync<bool>(new RemoveUserSession { Id = id }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -683,9 +673,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
     /// <seealso cref="SbcPermissions.FileSystemAccess"/>
-    public Task<string> ResolvePathAsync(string path, CancellationToken cancellationToken = default)
+    public async Task<string> ResolvePathAsync(string path, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync<string>(new ResolvePath { Path = path }, cancellationToken);
+        return await PerformCommandAsync<string>(new ResolvePath { Path = path }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -713,9 +703,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
     /// <seealso cref="SbcPermissions.FileSystemAccess"/>
-    public Task<string> ResolvePathAsync(string path, FileDirectory baseDirectory, CancellationToken cancellationToken = default)
+    public async Task<string> ResolvePathAsync(string path, FileDirectory baseDirectory, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync<string>(new ResolvePath { Path = path, BaseDirectory = baseDirectory }, cancellationToken);
+        return await PerformCommandAsync<string>(new ResolvePath { Path = path, BaseDirectory = baseDirectory }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -741,9 +731,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public Task<bool> SetObjectModelAsync(string path, string value, CancellationToken cancellationToken = default)
+    public async Task<bool> SetObjectModelAsync(string path, string value, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync<bool>(new SetObjectModel { PropertyPath = path, Value = value }, cancellationToken);
+        return await PerformCommandAsync<bool>(new SetObjectModel { PropertyPath = path, Value = value }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -774,9 +764,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="UnauthorizedAccessException">Insufficient permissions to modify other plugin data</exception>
     /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
     /// <seealso cref="SbcPermissions.ManagePlugins"/>
-    public Task SetPluginDataAsync(string key, JsonElement value, string? plugin = null, CancellationToken cancellationToken = default)
+    public async Task SetPluginDataAsync(string key, JsonElement value, string? plugin = null, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync(new SetPluginData { Plugin = plugin, Key = key, Value = value }, cancellationToken);
+        await PerformCommandAsync(new SetPluginData { Plugin = plugin, Key = key, Value = value }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -804,9 +794,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <exception cref="UnauthorizedAccessException">Insufficient permissions to modify other plugin data</exception>
     /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public Task SetUpdateStatusAsync(bool isUpdating, CancellationToken cancellationToken = default)
+    public async Task SetUpdateStatusAsync(bool isUpdating, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync(new SetUpdateStatus { Updating = isUpdating }, cancellationToken);
+        await PerformCommandAsync(new SetUpdateStatus { Updating = isUpdating }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -827,9 +817,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.ManagePlugins"/>
-    public Task StartPluginAsync(string plugin, CancellationToken cancellationToken = default)
+    public async Task StartPluginAsync(string plugin, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync(new StartPlugin { Plugin = plugin }, cancellationToken);
+        await PerformCommandAsync(new StartPlugin { Plugin = plugin }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -849,9 +839,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.ManagePlugins"/>
-    public Task StopPluginAsync(string plugin, CancellationToken cancellationToken = default)
+    public async Task StopPluginAsync(string plugin, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync(new StopPlugin { Plugin = plugin }, cancellationToken);
+        await PerformCommandAsync(new StopPlugin { Plugin = plugin }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -873,9 +863,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <seealso cref="SbcPermissions.CommandExecution"/>
     /// <seealso cref="SbcPermissions.ObjectModelRead"/>
     /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public Task SyncObjectModelAsync(CancellationToken cancellationToken = default)
+    public async Task SyncObjectModelAsync(CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync(new SyncObjectModel(), cancellationToken);
+        await PerformCommandAsync(new SyncObjectModel(), cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -895,9 +885,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.ManagePlugins"/>
-    public Task UninstallPluginAsync(string plugin, CancellationToken cancellationToken = default)
+    public async Task UninstallPluginAsync(string plugin, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync(new UninstallPlugin { Plugin = plugin }, cancellationToken);
+        await PerformCommandAsync(new UninstallPlugin { Plugin = plugin }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -917,9 +907,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.SuperUser"/>
-    public Task UninstallSystemPackageAsync(string package, CancellationToken cancellationToken = default)
+    public async Task UninstallSystemPackageAsync(string package, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync(new UninstallSystemPackage { Package = package }, cancellationToken);
+        await PerformCommandAsync(new UninstallSystemPackage { Package = package }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -950,9 +940,9 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
     /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public Task WriteMessageAsync(MessageType type, string message, bool outputMessage = true, LogLevel? logLevel = null, CancellationToken cancellationToken = default)
+    public async Task WriteMessageAsync(MessageType type, string message, bool outputMessage = true, LogLevel? logLevel = null, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync(new WriteMessage { Type = type, Content = message, OutputMessage = outputMessage, LogLevel = logLevel }, cancellationToken);
+        await PerformCommandAsync(new WriteMessage { Type = type, Content = message, OutputMessage = outputMessage, LogLevel = logLevel }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -981,8 +971,8 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
     /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public Task WriteMessageAsync(Message message, bool outputMessage = true, LogLevel logLevel = LogLevel.Off, CancellationToken cancellationToken = default)
+    public async Task WriteMessageAsync(Message message, bool outputMessage = true, LogLevel logLevel = LogLevel.Off, CancellationToken cancellationToken = default)
     {
-        return PerformCommandAsync(new WriteMessage { Type = message.Type, Content = message.Content, OutputMessage = outputMessage, LogLevel = logLevel }, cancellationToken);
+        await PerformCommandAsync(new WriteMessage { Type = message.Type, Content = message.Content, OutputMessage = outputMessage, LogLevel = logLevel }, cancellationToken).ConfigureAwait(false);
     }
 }
