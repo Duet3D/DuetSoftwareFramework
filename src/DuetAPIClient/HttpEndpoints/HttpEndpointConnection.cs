@@ -63,13 +63,24 @@ public sealed class HttpEndpointConnection(Socket socket, bool isWebSocket) : ID
     /// <summary>
     /// Read information about the last HTTP request. Note that a call to this method may fail!
     /// </summary>
+    /// <returns>Received HTTP request data</returns>
+    /// <exception cref="SocketException">Connection has been closed</exception>
+    public ReceivedHttpRequest ReadRequest()
+    {
+        using MemoryStream json = JsonHelper.ReceiveUtf8Json(_socket);
+        return JsonSerializer.Deserialize(json, CommandContext.Default.ReceivedHttpRequest)!;
+    }
+
+    /// <summary>
+    /// Read information about the last HTTP request asynchronously. Note that a call to this method may fail!
+    /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Received HTTP request data</returns>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Connection has been closed</exception>
-    public async Task<ReceivedHttpRequest> ReadRequest(CancellationToken cancellationToken = default)
+    public async Task<ReceivedHttpRequest> ReadRequestAsync(CancellationToken cancellationToken = default)
     {
-        await using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_socket, cancellationToken);
+        await using MemoryStream json = await JsonHelper.ReceiveUtf8JsonAsync(_socket, cancellationToken);
         return (await JsonSerializer.DeserializeAsync(json, CommandContext.Default.ReceivedHttpRequest, cancellationToken))!;
     }
 
@@ -79,12 +90,43 @@ public sealed class HttpEndpointConnection(Socket socket, bool isWebSocket) : ID
     /// <param name="statusCode">HTTP code to return</param>
     /// <param name="response">Response data to return</param>
     /// <param name="responseType">Type of data to return</param>
+    /// <exception cref="SocketException">Connection has been closed</exception>
+    /// <remarks>If the underlying connection is a WebSocket, the user must close this connection manually</remarks>
+    public void SendResponse(int statusCode = 204, string response = "", HttpResponseType responseType = HttpResponseType.StatusCode)
+    {
+        try
+        {
+            SendHttpResponse httpResponse = new()
+            {
+                StatusCode = statusCode,
+                Response = response,
+                ResponseType = responseType
+            };
+            byte[] jsonToWrite = JsonSerializer.SerializeToUtf8Bytes(httpResponse, CommandContext.Default.SendHttpResponse);
+            _socket.Send(jsonToWrite, SocketFlags.None);
+        }
+        finally
+        {
+            if (!_isWebSocket)
+            {
+                // Close this connection automatically if only one response can be sent
+                Close();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Send a simple HTTP response to the client asynchronously and dispose this connection unless it is a WebSocket
+    /// </summary>
+    /// <param name="statusCode">HTTP code to return</param>
+    /// <param name="response">Response data to return</param>
+    /// <param name="responseType">Type of data to return</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Connection has been closed</exception>
     /// <remarks>If the underlying connection is a WebSocket, the user must close this connection manually</remarks>
-    public async Task SendResponse(int statusCode = 204, string response = "", HttpResponseType responseType = HttpResponseType.StatusCode, CancellationToken cancellationToken = default)
+    public async Task SendResponseAsync(int statusCode = 204, string response = "", HttpResponseType responseType = HttpResponseType.StatusCode, CancellationToken cancellationToken = default)
     {
         try
         {

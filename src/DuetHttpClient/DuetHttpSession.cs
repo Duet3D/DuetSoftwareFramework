@@ -53,12 +53,8 @@ namespace DuetHttpClient
         /// <summary>
         /// Constructor of a new Duet session
         /// </summary>
-        /// <param name="hostname"></param>
-        /// <param name="port"></param>
-        private DuetHttpSession(BaseConnector connector)
-        {
-            _connector = connector;
-        }
+        /// <param name="connector">Connector to use</param>
+        private DuetHttpSession(BaseConnector connector) => _connector = connector;
 
         /// <summary>
         /// HTTP port of this machine
@@ -84,9 +80,9 @@ namespace DuetHttpClient
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public Task WaitForModelUpdate(CancellationToken cancellationToken = default)
+        public Task WaitForModelUpdateAsync(CancellationToken cancellationToken = default)
         {
-            return _connector.WaitForModelUpdate(cancellationToken);
+            return _connector.WaitForModelUpdateAsync(cancellationToken);
         }
 
         /// <summary>
@@ -95,9 +91,9 @@ namespace DuetHttpClient
         /// <param name="code">Code to send</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Code reply</returns>
-        public Task<string> SendCode(string code, CancellationToken cancellationToken = default)
+        public Task<string> SendCodeAsync(string code, CancellationToken cancellationToken = default)
         {
-            return _connector.SendCode(code, cancellationToken);
+            return _connector.SendCodeAsync(code, cancellationToken);
         }
 
         /// <summary>
@@ -108,9 +104,9 @@ namespace DuetHttpClient
         /// <param name="lastModified">Last modified datetime. Ignored in SBC mode</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public Task Upload(string filename, Stream content, DateTime? lastModified = null, CancellationToken cancellationToken = default)
+        public Task UploadAsync(string filename, Stream content, DateTime? lastModified = null, CancellationToken cancellationToken = default)
         {
-            return _connector.Upload(filename, content, lastModified, cancellationToken);
+            return _connector.UploadAsync(filename, content, lastModified, cancellationToken);
         }
 
         /// <summary>
@@ -119,9 +115,9 @@ namespace DuetHttpClient
         /// <param name="filename">Target filename</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public Task Delete(string filename, CancellationToken cancellationToken = default)
+        public Task DeleteAsync(string filename, CancellationToken cancellationToken = default)
         {
-            return _connector.Delete(filename, cancellationToken);
+            return _connector.DeleteAsync(filename, cancellationToken);
         }
 
         /// <summary>
@@ -132,9 +128,9 @@ namespace DuetHttpClient
         /// <param name="force">Overwrite file if it already exists</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public Task Move(string from, string to, bool force = false, CancellationToken cancellationToken = default)
+        public Task MoveAsync(string from, string to, bool force = false, CancellationToken cancellationToken = default)
         {
-            return _connector.Move(from, to, force, cancellationToken);
+            return _connector.MoveAsync(from, to, force, cancellationToken);
         }
 
         /// <summary>
@@ -145,7 +141,7 @@ namespace DuetHttpClient
         /// <returns>Asynchronous task</returns>
         public Task MakeDirectory(string directory, CancellationToken cancellationToken = default)
         {
-            return _connector.MakeDirectory(directory, cancellationToken);
+            return _connector.MakeDirectoryAsync(directory, cancellationToken);
         }
 
         /// <summary>
@@ -154,9 +150,9 @@ namespace DuetHttpClient
         /// <param name="filename">Name of the file to download</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Download response</returns>
-        public Task<HttpResponseMessage> Download(string filename, CancellationToken cancellationToken = default)
+        public Task<HttpResponseMessage> DownloadAsync(string filename, CancellationToken cancellationToken = default)
         {
-            return _connector.Download(filename, cancellationToken);
+            return _connector.DownloadAsync(filename, cancellationToken);
         }
 
         /// <summary>
@@ -165,9 +161,9 @@ namespace DuetHttpClient
         /// <param name="directory">Directory to query</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>List of all files and directories</returns>
-        public Task<IList<FileListItem>> GetFileList(string directory, CancellationToken cancellationToken = default)
+        public Task<IList<FileListItem>> GetFileListAsync(string directory, CancellationToken cancellationToken = default)
         {
-            return _connector.GetFileList(directory, cancellationToken);
+            return _connector.GetFileListAsync(directory, cancellationToken);
         }
 
         /// <summary>
@@ -176,9 +172,9 @@ namespace DuetHttpClient
         /// <param name="filename">File to query</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>G-code file info</returns>
-        public Task<GCodeFileInfo> GetFileInfo(string filename, CancellationToken cancellationToken = default)
+        public Task<GCodeFileInfo> GetFileInfoAsync(string filename, CancellationToken cancellationToken = default)
         {
-            return _connector.GetFileInfo(filename, false, cancellationToken);
+            return _connector.GetFileInfoAsync(filename, false, cancellationToken);
         }
 
         /// <summary>
@@ -188,11 +184,11 @@ namespace DuetHttpClient
         /// <param name="readThumbnailContent">Whether thumbnail contents shall be parsed</param>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>G-code file info</returns>
-        public Task<GCodeFileInfo> GetFileInfo(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default)
+        public Task<GCodeFileInfo> GetFileInfoAsync(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default)
         {
-            return _connector.GetFileInfo(filename, readThumbnailContent, cancellationToken);
+            return _connector.GetFileInfoAsync(filename, readThumbnailContent, cancellationToken);
         }
 
-        // ** Plugin and system package calls are not supported (yet) **
+#warning add plugin and system calls
     }
 }

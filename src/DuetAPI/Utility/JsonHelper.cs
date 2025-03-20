@@ -121,11 +121,73 @@ public static class JsonHelper
     /// Receive a serialized JSON object from a socket in UTF-8 format
     /// </summary>
     /// <param name="socket">Socket to read from</param>
+    /// <returns>Plain JSON</returns>
+    /// <exception cref="SocketException">Connection has been closed</exception>
+    public static MemoryStream ReceiveUtf8Json(Socket socket)
+    {
+        MemoryStream jsonStream = new();
+        bool inJson = false, inQuotes = false, isEscaped = false;
+        int numBraces = 0;
+
+        byte[] readData = new byte[1];
+        while (!inJson || numBraces > 0)
+        {
+            if (socket.Receive(readData, SocketFlags.None) <= 0)
+            {
+                // Do not keep reading if the connection has been gracefully closed
+                jsonStream.Dispose();
+                throw new SocketException((int)SocketError.NotConnected);
+            }
+
+            char c = (char)readData[0];
+            if (inQuotes)
+            {
+                if (isEscaped)
+                {
+                    isEscaped = false;
+                }
+                else if (c == '\\')
+                {
+                    isEscaped = true;
+                }
+                else if (c == '"')
+                {
+                    inQuotes = false;
+                }
+            }
+            else if (c == '"')
+            {
+                inQuotes = true;
+            }
+            else if (c == '{')
+            {
+                inJson = true;
+                numBraces++;
+            }
+            else if (c == '}')
+            {
+                numBraces--;
+            }
+
+            if (inJson)
+            {
+                jsonStream.WriteByte(readData[0]);
+            }
+        }
+
+        jsonStream.Seek(0, SeekOrigin.Begin);
+        return jsonStream;
+    }
+
+    /// <summary>
+    /// Receive a serialized JSON object from a socket in UTF-8 format asynchronously
+    /// </summary>
+    /// <param name="socket">Socket to read from</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Plain JSON</returns>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Connection has been closed</exception>
-    public static async ValueTask<MemoryStream> ReceiveUtf8Json(Socket socket, CancellationToken cancellationToken = default)
+    public static async ValueTask<MemoryStream> ReceiveUtf8JsonAsync(Socket socket, CancellationToken cancellationToken = default)
     {
         MemoryStream jsonStream = new();
         bool inJson = false, inQuotes = false, isEscaped = false;

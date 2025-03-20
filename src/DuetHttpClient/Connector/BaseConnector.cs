@@ -37,7 +37,7 @@ internal abstract class BaseConnector : IAsyncDisposable
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    protected abstract Task Reconnect(CancellationToken cancellationToken = default);
+    protected abstract Task ReconnectAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Send a generic a HTTP request
@@ -45,7 +45,7 @@ internal abstract class BaseConnector : IAsyncDisposable
     /// <param name="request">HTTP request to send</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>HTTP response</returns>
-    protected virtual async ValueTask<HttpResponseMessage> SendRequest(HttpRequestMessage request, TimeSpan timeout, CancellationToken cancellationToken = default)
+    protected virtual async ValueTask<HttpResponseMessage> SendRequestAsync(HttpRequestMessage request, TimeSpan timeout, CancellationToken cancellationToken = default)
     {
         using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _terminateSession.Token);
         if (timeout != Timeout.InfiniteTimeSpan)
@@ -57,7 +57,7 @@ internal abstract class BaseConnector : IAsyncDisposable
         if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
         {
             // Session is no longer valid, attempt to connect again
-            await Reconnect(cancellationToken);
+            await ReconnectAsync(cancellationToken);
         }
         return response;
     }
@@ -87,7 +87,7 @@ internal abstract class BaseConnector : IAsyncDisposable
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public abstract Task WaitForModelUpdate(CancellationToken cancellationToken = default);
+    public abstract Task WaitForModelUpdateAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Send a G/M/T-code and return the G-code reply
@@ -95,7 +95,7 @@ internal abstract class BaseConnector : IAsyncDisposable
     /// <param name="code">Code to send</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Code reply</returns>
-    public abstract Task<string> SendCode(string code, CancellationToken cancellationToken = default);
+    public abstract Task<string> SendCodeAsync(string code, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Send a G/M/T-code and return the G-code reply
@@ -104,7 +104,7 @@ internal abstract class BaseConnector : IAsyncDisposable
     /// <param name="executeAsynchronously">Don't wait for the code to finish</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Code reply</returns>
-    public abstract Task<string> SendCode(string code, bool executeAsynchronously, CancellationToken cancellationToken = default);
+    public abstract Task<string> SendCodeAsync(string code, bool executeAsynchronously, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Upload arbitrary content to a file
@@ -114,7 +114,7 @@ internal abstract class BaseConnector : IAsyncDisposable
     /// <param name="lastModified">Last modified datetime. Ignored in SBC mode</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public abstract Task Upload(string filename, Stream content, DateTime? lastModified = null, CancellationToken cancellationToken = default);
+    public abstract Task UploadAsync(string filename, Stream content, DateTime? lastModified = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Delete a file or directory
@@ -122,7 +122,7 @@ internal abstract class BaseConnector : IAsyncDisposable
     /// <param name="filename">Target filename</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public abstract Task Delete(string filename, CancellationToken cancellationToken = default);
+    public abstract Task DeleteAsync(string filename, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Move a file or directory
@@ -132,7 +132,7 @@ internal abstract class BaseConnector : IAsyncDisposable
     /// <param name="force">Overwrite file if it already exists</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public abstract Task Move(string from, string to, bool force = false, CancellationToken cancellationToken = default);
+    public abstract Task MoveAsync(string from, string to, bool force = false, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Make a new directory
@@ -140,7 +140,7 @@ internal abstract class BaseConnector : IAsyncDisposable
     /// <param name="directory">Target directory</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public abstract Task MakeDirectory(string directory, CancellationToken cancellationToken = default);
+    public abstract Task MakeDirectoryAsync(string directory, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Download a file
@@ -148,7 +148,7 @@ internal abstract class BaseConnector : IAsyncDisposable
     /// <param name="filename">Name of the file to download</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Download response</returns>
-    public abstract Task<HttpResponseMessage> Download(string filename, CancellationToken cancellationToken = default);
+    public abstract Task<HttpResponseMessage> DownloadAsync(string filename, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Enumerate all files and directories in the given directory
@@ -156,7 +156,7 @@ internal abstract class BaseConnector : IAsyncDisposable
     /// <param name="directory">Directory to query</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>List of all files and directories</returns>
-    public abstract Task<IList<FileListItem>> GetFileList(string directory, CancellationToken cancellationToken = default);
+    public abstract Task<IList<FileListItem>> GetFileListAsync(string directory, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get G-code file info
@@ -165,7 +165,7 @@ internal abstract class BaseConnector : IAsyncDisposable
     /// <param name="readThumbnailContent">Whether thumbnail contents shall be parsed</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>G-code file info</returns>
-    public abstract Task<GCodeFileInfo> GetFileInfo(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default);
+    public abstract Task<GCodeFileInfo> GetFileInfoAsync(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default);
 
     // ** Plugin and system package calls are not supported (yet) **
 

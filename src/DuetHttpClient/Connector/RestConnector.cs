@@ -88,7 +88,7 @@ internal class RestConnector : BaseConnector
     /// <summary>
     /// Reconnect to the board when the connection has been reset
     /// </summary>
-    protected override async Task Reconnect(CancellationToken cancellationToken = default)
+    protected override async Task ReconnectAsync(CancellationToken cancellationToken = default)
     {
         _sessionKey = null;
         HttpClient.DefaultRequestHeaders.Remove("X-Session-Key");
@@ -146,7 +146,7 @@ internal class RestConnector : BaseConnector
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public override Task WaitForModelUpdate(CancellationToken cancellationToken = default)
+    public override Task WaitForModelUpdateAsync(CancellationToken cancellationToken = default)
     {
         if (disposed)
         {
@@ -317,7 +317,7 @@ internal class RestConnector : BaseConnector
                 try
                 {
                     await Task.Delay(Options.RetryDelay, _terminateSession.Token);
-                    await Reconnect();
+                    await ReconnectAsync();
                 }
                 catch (Exception e) when (e is OperationCanceledException || e is HttpRequestException)
                 {
@@ -347,7 +347,7 @@ internal class RestConnector : BaseConnector
                     // Perform a NOOP request
                     using (HttpRequestMessage request = new(HttpMethod.Get, "machine/noop"))
                     {
-                        using HttpResponseMessage response = await SendRequest(request, Options.Timeout);
+                        using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout);
                         response.EnsureSuccessStatusCode();
                     }
 
@@ -421,7 +421,7 @@ internal class RestConnector : BaseConnector
     /// <param name="code">Code to send</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Code reply</returns>
-    public override Task<string> SendCode(string code, CancellationToken cancellationToken = default) => SendCode(code, false, cancellationToken);
+    public override Task<string> SendCodeAsync(string code, CancellationToken cancellationToken = default) => SendCodeAsync(code, false, cancellationToken);
 
     /// <summary>
     /// Send a G/M/T-code and return the G-code reply
@@ -430,7 +430,7 @@ internal class RestConnector : BaseConnector
     /// <param name="executeAsynchronously">Don't wait for the code to finish</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Code reply</returns>
-    public override async Task<string> SendCode(string code, bool executeAsynchronously, CancellationToken cancellationToken = default)
+    public override async Task<string> SendCodeAsync(string code, bool executeAsynchronously, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
         for (int i = 0; i <= Options.MaxRetries; i++)
@@ -438,7 +438,7 @@ internal class RestConnector : BaseConnector
             using HttpRequestMessage request = new(HttpMethod.Post, executeAsynchronously ? "machine/code?async=true" : "machine/code");
             request.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(code));
 
-            using HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
+            using HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken);
             if (response.IsSuccessStatusCode)
             {
 #if NET6_0_OR_GREATER
@@ -466,12 +466,12 @@ internal class RestConnector : BaseConnector
     /// <param name="lastModified">Last modified datetime. Ignored in SBC mode</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public override async Task Upload(string filename, Stream content, DateTime? lastModified = null, CancellationToken cancellationToken = default)
+    public override async Task UploadAsync(string filename, Stream content, DateTime? lastModified = null, CancellationToken cancellationToken = default)
     {
         using HttpRequestMessage request = new(HttpMethod.Put, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
         request.Content = new StreamContent(content);
 
-        using HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
+        using HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -481,7 +481,7 @@ internal class RestConnector : BaseConnector
     /// <param name="filename">Target filename</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public override async Task Delete(string filename, CancellationToken cancellationToken = default)
+    public override async Task DeleteAsync(string filename, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
         for (int i = 0; i <= Options.MaxRetries; i++)
@@ -489,7 +489,7 @@ internal class RestConnector : BaseConnector
             try
             {
                 using HttpRequestMessage request = new(HttpMethod.Delete, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
-                using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
                     return;
@@ -526,7 +526,7 @@ internal class RestConnector : BaseConnector
     /// <param name="force">Overwrite file if it already exists</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public override async Task Move(string from, string to, bool force = false, CancellationToken cancellationToken = default)
+    public override async Task MoveAsync(string from, string to, bool force = false, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
         for (int i = 0; i <= Options.MaxRetries; i++)
@@ -542,7 +542,7 @@ internal class RestConnector : BaseConnector
                     };
                 request.Content = formData;
 
-                using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
                     return;
@@ -577,7 +577,7 @@ internal class RestConnector : BaseConnector
     /// <param name="directory">Target directory</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public override async Task MakeDirectory(string directory, CancellationToken cancellationToken = default)
+    public override async Task MakeDirectoryAsync(string directory, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
         for (int i = 0; i <= Options.MaxRetries; i++)
@@ -585,7 +585,7 @@ internal class RestConnector : BaseConnector
             try
             {
                 using HttpRequestMessage request = new(HttpMethod.Put, $"machine/directory/{HttpUtility.UrlPathEncode(directory)}");
-                using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
                     return;
@@ -615,10 +615,10 @@ internal class RestConnector : BaseConnector
     /// <param name="filename">Name of the file to download</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Disposable download response</returns>
-    public override async Task<HttpResponseMessage> Download(string filename, CancellationToken cancellationToken = default)
+    public override async Task<HttpResponseMessage> DownloadAsync(string filename, CancellationToken cancellationToken = default)
     {
         using HttpRequestMessage request = new(HttpMethod.Get, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
-        HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
+        HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             throw new FileNotFoundException();
@@ -634,7 +634,7 @@ internal class RestConnector : BaseConnector
     /// <param name="directory">Directory to query</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>List of all files and directories</returns>
-    public override async Task<IList<FileListItem>> GetFileList(string directory, CancellationToken cancellationToken = default)
+    public override async Task<IList<FileListItem>> GetFileListAsync(string directory, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
         for (int i = 0; i <= Options.MaxRetries; i++)
@@ -642,7 +642,7 @@ internal class RestConnector : BaseConnector
             try
             {
                 using HttpRequestMessage request = new(HttpMethod.Get, $"machine/directory/{HttpUtility.UrlPathEncode(directory)}");
-                using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
 #if NET6_0_OR_GREATER
@@ -691,7 +691,7 @@ internal class RestConnector : BaseConnector
     /// <param name="readThumbnailContent">Whether thumbnail contents shall be parsed</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>G-code file info</returns>
-    public override async Task<GCodeFileInfo> GetFileInfo(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default)
+    public override async Task<GCodeFileInfo> GetFileInfoAsync(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
         for (int i = 0; i <= Options.MaxRetries; i++)
@@ -699,7 +699,7 @@ internal class RestConnector : BaseConnector
             try
             {
                 using HttpRequestMessage request = new(HttpMethod.Get, $"machine/fileinfo/{HttpUtility.UrlPathEncode(filename)}?readThumbnailContent={(readThumbnailContent ? "true" : "false")}");
-                using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
 #if NET6_0_OR_GREATER

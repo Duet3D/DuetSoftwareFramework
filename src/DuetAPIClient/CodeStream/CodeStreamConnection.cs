@@ -26,19 +26,38 @@ public sealed class CodeStreamConnection : BaseConnection
     /// <param name="socketPath">Path to the UNIX socket file</param>
     /// <param name="bufferSize">Maximum number of codes to execute simultaneously</param>
     /// <param name="channel">Destination channel for incoming codes</param>
+    /// <returns>Asynchronous task</returns>
+    /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
+    /// <exception cref="IOException">Connection mode is unavailable</exception>
+    /// <exception cref="SocketException">Init message could not be processed</exception>
+    public void Connect(int bufferSize = Defaults.CodeBufferSize, CodeChannel channel = Defaults.InputChannel, string socketPath = Defaults.FullSocketPath)
+    {
+        BufferSize = bufferSize;
+        Channel = channel;
+
+        CodeStreamInitMessage initMessage = new() { BufferSize = bufferSize, Channel = channel };
+        Connect(initMessage, socketPath);
+    }
+
+    /// <summary>
+    /// Establish a connection to the given UNIX socket file asynchronously
+    /// </summary>
+    /// <param name="socketPath">Path to the UNIX socket file</param>
+    /// <param name="bufferSize">Maximum number of codes to execute simultaneously</param>
+    /// <param name="channel">Destination channel for incoming codes</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public Task Connect(int bufferSize = Defaults.CodeBufferSize, CodeChannel channel = Defaults.InputChannel, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+    public Task ConnectAsync(int bufferSize = Defaults.CodeBufferSize, CodeChannel channel = Defaults.InputChannel, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
     {
         BufferSize = bufferSize;
         Channel = channel;
 
         CodeStreamInitMessage initMessage = new() { BufferSize = bufferSize, Channel = channel };
-        return Connect(initMessage, socketPath, cancellationToken);
+        return ConnectAsync(initMessage, socketPath, cancellationToken);
     }
 
     /// <summary>

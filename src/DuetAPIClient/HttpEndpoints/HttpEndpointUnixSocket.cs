@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Runtime.Versioning;
+using System.Threading.Tasks;
 
 namespace DuetAPIClient;
 
@@ -75,7 +76,7 @@ public sealed class HttpEndpointUnixSocket : IDisposable
             File.SetUnixFileMode(socketPath, mode | UnixFileMode.GroupRead | UnixFileMode.GroupWrite);
 
             // Start listening
-            AcceptConnections();
+            _ = Task.Run(AcceptConnectionsAsync);
         }
         catch
         {
@@ -121,7 +122,7 @@ public sealed class HttpEndpointUnixSocket : IDisposable
     /// <summary>
     /// Accept incoming UNIX socket connections (HTTP/WebSocket requests)
     /// </summary>
-    private async void AcceptConnections()
+    private async Task AcceptConnectionsAsync()
     {
         try
         {
@@ -139,7 +140,7 @@ public sealed class HttpEndpointUnixSocket : IDisposable
                 else
                 {
                     // Cannot do anything with this connection. Send an HTTP 500 response and close the connection
-                    await connection.SendResponse(500, "No event handler registered");
+                    await connection.SendResponseAsync(500, "No event handler registered");
                     connection.Dispose();
                 }
             }
