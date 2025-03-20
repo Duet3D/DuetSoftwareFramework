@@ -3,134 +3,133 @@ using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPIClient;
 using System;
-using System.Linq;
+using System.Collections.Generic;
+using System.CommandLine;
+using System.IO;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 
-bool quiet = false, priorityCodes = false;
-CodeChannel[]? channels = null;
-string[]? filters = null, types = ["pre", "post", "executed"];
+// General arguments
+var socketPath = new Option<FileInfo>(
+    aliases: ["-s", "--socket"],
+    description: "UNIX socket to connect to",
+    getDefaultValue: () => new FileInfo(Defaults.FullSocketPath)
+);
 
-// Parse the command line arguments
-string? lastArg = null, socketPath = Defaults.FullSocketPath;
-foreach (string arg in args)
-{
-    if (lastArg == "-t" || lastArg == "--types")
-    {
-        types = arg.Split(',');
-    }
-    else if (lastArg == "-c" || lastArg == "--channels")
-    {
-        channels = arg.Split(',').Select(item => (CodeChannel)Enum.Parse(typeof(CodeChannel), item, true)).ToArray();
-    }
-    else if (lastArg == "-f" || lastArg == "--filters")
-    {
-        filters = arg.Split(',');
-    }
-    else if (lastArg == "-s" || lastArg == "--socket")
-    {
-        socketPath = arg;
-    }
-    else if (arg == "-p" || arg == "--priority-codes")
-    {
-        priorityCodes = true;
-    }
-    else if (arg == "-q" || lastArg == "--quiet")
-    {
-        quiet = true;
-    }
-    else if (arg == "-h" || arg == "--help")
-    {
-        Console.WriteLine("Available command line arguments:");
-        Console.WriteLine("-t, --types <types>: Comma-delimited interception types (pre, post, or executed)");
-        Console.WriteLine("-c, --channels <channels>: Comma-delimited input channels where codes may be intercepted");
-        Console.WriteLine("-f, --filters <filters>: Comma-delimited code types that may be intercepted (main codes, keywords, or Q0 for comments)");
-        Console.WriteLine("-p, --priority-codes: Intercept priorty codes instead of regular codes (not recommended)");
-        Console.WriteLine("-s, --socket <socket>: UNIX socket to connect to");
-        Console.WriteLine("-q, --quiet: Do not display when a connection has been established");
-        Console.WriteLine("-h, --help: Display this help text");
-        return 0;
-    }
-    lastArg = arg;
-}
+var quiet = new Option<bool>(
+    aliases: ["-q", "--quiet"],
+    description: "Do not output any messages (not applicable for code replies in interactive mode)"
+);
 
-InterceptConnection? preConnection = null, postConnection = null, executedConnection = null;
-try
+// Main command
+var types = new Option<List<InterceptionMode>>(
+    aliases: ["-t", "--types"],
+    description: "Interception types (pre [before processed by DSF], post [after processed by DSF], or executed)",
+    getDefaultValue: () => [ InterceptionMode.Pre ]
+);
+
+var channels = new Option<List<CodeChannel>?>(
+    aliases: ["-c", "--channels"],
+    description: "Input channels where codes may be intercepted. Defaults to all"
+);
+
+var filters = new Option<List<string>?>(
+    aliases: ["-f", "--filters"],
+    description: "Code types that may be intercepted (main codes, keywords, or Q0 for comments)"
+);
+
+var priorityCodes = new Option<bool>(
+    aliases: ["-p", "--priority-codes"],
+    description: "Intercept priorty codes instead of regular codes (not recommended)"
+);
+
+var rootCommand = new RootCommand("Code logger to intercept G/M/T-codes from DuetControlServer")
 {
-    // Connect to DCS
+    socketPath,
+    quiet,
+    types,
+    channels,
+    filters,
+    priorityCodes
+};
+
+rootCommand.SetHandler(async (socketPath, quiet, types, channels, filters, priorityCodes) =>
+{
+    InterceptConnection? preConnection = null, postConnection = null, executedConnection = null;
     try
     {
-        if (types.Contains("pre"))
-        {
-            preConnection = new InterceptConnection();
-            await preConnection.Connect(InterceptionMode.Pre, channels, filters, priorityCodes, socketPath);
-        }
-        if (types.Contains("post"))
-        {
-            postConnection = new InterceptConnection();
-            await postConnection.Connect(InterceptionMode.Post, channels, filters, priorityCodes, socketPath);
-        }
-        if (types.Contains("executed"))
-        {
-            executedConnection = new InterceptConnection();
-            await executedConnection.Connect(InterceptionMode.Executed, channels, filters, priorityCodes, socketPath);
-        }
-    }
-    catch (SocketException)
-    {
-        if (!quiet)
-        {
-            Console.Error.WriteLine("Failed to connect to DCS");
-        }
-        return 1;
-    }
-
-    if (!quiet)
-    {
-        Console.WriteLine("Connected!");
-    }
-
-    // Start waiting for incoming codes
-    static async Task PrintIncomingCodes(InterceptConnection connection)
-    {
+        // Connect to DCS
         try
         {
-            Code code;
-            do
+            if (types.Contains(InterceptionMode.Pre))
             {
-                code = await connection.ReceiveCode();
-
-                Console.WriteLine($"[{connection.Mode}] {code.Channel}: {code}");
-
-                // If you do not wish to let the received code execute, you can run connection.ResolveCode instead.
-                // Before you call one of Cancel, Ignore, or Resolve you may execute as many commands as you want.
-                // Codes initiated from the intercepting connection cannot be intercepted from the same connection.
-                await connection.IgnoreCode();
+                preConnection = new InterceptConnection();
+                preConnection.Connect(InterceptionMode.Pre, channels, filters, priorityCodes, socketPath.FullName);
             }
-            while (true);
+            if (types.Contains(InterceptionMode.Post))
+            {
+                postConnection = new InterceptConnection();
+                postConnection.Connect(InterceptionMode.Post, channels, filters, priorityCodes, socketPath.FullName);
+            }
+            if (types.Contains(InterceptionMode.Executed))
+            {
+                executedConnection = new InterceptConnection();
+                executedConnection.Connect(InterceptionMode.Executed, channels, filters, priorityCodes, socketPath.FullName);
+            }
         }
         catch (SocketException)
         {
-            // Server has closed the connection
+            if (!quiet)
+            {
+                Console.Error.WriteLine("Failed to connect to DCS");
+            }
+            return;
         }
+
+        if (!quiet)
+        {
+            Console.WriteLine("Connected!");
+        }
+
+        // Keep listening on those connections
+        async Task PrintIncomingCodes(InterceptConnection connection)
+        {
+            try
+            {
+                Code code;
+                do
+                {
+                    code = await connection.ReceiveCodeAsync();
+
+                    Console.WriteLine($"[{connection.Mode}] {code.Channel}: {code}");
+
+                    // If you do not wish to let the received code execute, you can run connection.ResolveCode instead.
+                    // Before you call one of Cancel, Ignore, or Resolve you may execute as many commands as you want.
+                    // Codes initiated from the intercepting connection cannot be intercepted from the same connection.
+                    await connection.IgnoreCodeAsync();
+                }
+                while (true);
+            }
+            catch (SocketException)
+            {
+                // Server has closed the connection
+            }
+        }
+
+        Task[] tasks =
+        [
+            (preConnection is not null) ? PrintIncomingCodes(preConnection) : Task.CompletedTask,
+            (postConnection is not null) ? PrintIncomingCodes(postConnection) : Task.CompletedTask,
+            (executedConnection is not null) ? PrintIncomingCodes(executedConnection) : Task.CompletedTask
+        ];
+
+        // Wait for all tasks to finish
+        await Task.WhenAll(tasks);
     }
-
-    Task[] tasks =
-    [
-                    (preConnection is not null) ? PrintIncomingCodes(preConnection) : Task.CompletedTask,
-                    (postConnection is not null) ? PrintIncomingCodes(postConnection) : Task.CompletedTask,
-                    (executedConnection is not null) ? PrintIncomingCodes(executedConnection) : Task.CompletedTask
-    ];
-
-    // Wait for all tasks to finish
-    await Task.WhenAll(tasks);
-}
-finally
-{
-    preConnection?.Dispose();
-    postConnection?.Dispose();
-    executedConnection?.Dispose();
-}
-
-return 0;
-
+    finally
+    {
+        preConnection?.Dispose();
+        postConnection?.Dispose();
+        executedConnection?.Dispose();
+    }
+}, socketPath, quiet, types, channels, filters, priorityCodes);

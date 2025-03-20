@@ -1,90 +1,81 @@
 ﻿using DuetAPI.Connection;
 using DuetAPIClient;
 using System;
+using System.CommandLine;
+using System.IO;
 using System.Net.Sockets;
-using System.Text.Json;
+using System.Threading.Tasks;
 
-// Parse the command line arguments
-string? lastArg = null, codeToExecute = null, socketPath = Defaults.FullSocketPath;
-bool quiet = false;
-foreach (string arg in args)
-{
-    if (lastArg == "-s" || lastArg == "--socket")
-    {
-        socketPath = arg;
-    }
-    else if (lastArg == "-c" || lastArg == "-c")
-    {
-        codeToExecute = arg;
-    }
-    else if (arg == "-q" || arg == "--quiet")
-    {
-        quiet = true;
-    }
-    else if (arg == "-h" || arg == "--help")
-    {
-        Console.WriteLine("Available command line arguments:");
-        Console.WriteLine("-s, --socket <socket>: UNIX socket to connect to");
-        Console.WriteLine("-c, --code <code>: Execute the given code(s), wait for the result and exit. Alternative codes: startUpdate (Set DSF to updating), endUpdate (End DSF updating state)");
-        Console.WriteLine("-q, --quiet: Do not output any messages (not applicable for code replies in interactive mode)");
-        Console.WriteLine("-h, --help: Display this help text");
-        return 0;
-    }
-    lastArg = arg;
-}
+// General arguments
+var socketPath = new Option<FileInfo>(
+    aliases: ["-s", "--socket"],
+    description: "UNIX socket to connect to",
+    getDefaultValue: () => new FileInfo(Defaults.FullSocketPath)
+);
 
-// Create a new connection and connect to DuetControlServer
-using CommandConnection connection = new();
-try
-{
-    await connection.Connect(socketPath);
-}
-catch (SocketException)
-{
-    if (!quiet)
-    {
-        Console.Error.WriteLine("Failed to connect to DCS");
-    }
-    return 1;
-}
+var quiet = new Option<bool>(
+    aliases: ["-q", "--quiet"],
+    description: "Do not output any messages (not applicable for code replies in interactive mode)"
+);
 
-// Check if this is an interactive session
-if (codeToExecute is null)
+// Main command
+var rootCommand = new RootCommand("Code console to send G/M/T-codes to DuetControlServer")
 {
+    socketPath,
+    quiet
+};
+
+rootCommand.SetHandler((socketPath, quiet) =>
+{
+    // Connect to DCS
+    using CommandConnection connection = new();
+    try
+    {
+        connection.Connect(socketPath.FullName);
+    }
+    catch (SocketException)
+    {
+        if (!quiet)
+        {
+            Console.Error.WriteLine("Failed to connect to DCS");
+        }
+        return Task.FromResult(1);
+    }
+
     if (!quiet)
     {
         // Notify the user that a connection has been established
         Console.WriteLine("Connected!");
     }
 
-    // Register an (interactive) user session
-    int sessionId = await connection.AddUserSession(DuetAPI.ObjectModel.AccessLevel.ReadWrite, DuetAPI.ObjectModel.SessionType.Local, "console");
+    // Register an (interactive) user session (optional)
+    int sessionId = connection.AddUserSession(DuetAPI.ObjectModel.AccessLevel.ReadWrite, DuetAPI.ObjectModel.SessionType.Local, "console");
 
     // Start reading lines from stdin and send them to DCS as simple codes.
     // When the code has finished, the result is printed to stdout
     string? input = Console.ReadLine();
-    while (input is not null && input != "exit" && input != "quit")
+    while (input is not null && !(input is "exit" or "quit"))
     {
         try
         {
+            // startUpdate puts DSF into "updating" mode
             if (input.Equals("startUpdate", StringComparison.InvariantCultureIgnoreCase))
             {
-                await connection.SetUpdateStatus(true);
+                connection.SetUpdateStatus(true);
                 Console.WriteLine("DSF is now in update mode");
             }
+
+            // endUpdate takes DSF out of "updating" mode
             else if (input.Equals("endUpdate", StringComparison.InvariantCultureIgnoreCase))
             {
-                await connection.SetUpdateStatus(false);
+                connection.SetUpdateStatus(false);
                 Console.WriteLine("DSF is no longer in update mode");
             }
-            else if (input.StartsWith("eval ", StringComparison.InvariantCultureIgnoreCase))
-            {
-                JsonElement result = await connection.EvaluateExpression(input[5..].Trim());
-                Console.WriteLine("Evaluation result: {0}", result.GetRawText());
-            }
+
+            // everything else is a code to execute
             else
             {
-                string output = await connection.PerformSimpleCode(input, DuetAPI.CodeChannel.Telnet);
+                string output = connection.PerformSimpleCode(input, DuetAPI.CodeChannel.Telnet);
                 if (output.EndsWith(Environment.NewLine))
                 {
                     Console.Write(output);
@@ -111,44 +102,77 @@ if (codeToExecute is null)
         input = Console.ReadLine();
     }
 
-    // Unregister this session again
+    // Unregister this session again (recommended if there is a registered session)
     if (connection.IsConnected)
     {
-        await connection.RemoveUserSession(sessionId);
+        connection.RemoveUserSession(sessionId);
     }
-}
-else if (codeToExecute.Equals("startUpdate", StringComparison.InvariantCultureIgnoreCase))
-{
-    await connection.SetUpdateStatus(true);
-    if (!quiet)
-    {
-        Console.WriteLine("DSF is now in update mode");
-    }
-}
-else if (codeToExecute.Equals("endUpdate", StringComparison.InvariantCultureIgnoreCase))
-{
-    await connection.SetUpdateStatus(false);
-    if (!quiet)
-    {
-        Console.WriteLine("DSF is no longer in update mode");
-    }
-}
-else
-{
-    // Execute only the given code(s) and quit
-    string output = await connection.PerformSimpleCode(codeToExecute);
-    if (!quiet)
-    {
-        if (output.EndsWith('\n'))
-        {
-            Console.Write(output);
-        }
-        else
-        {
-            Console.WriteLine(output);
-        }
-    }
-}
+    return Task.FromResult(0);
+}, socketPath, quiet);
 
-return 0;
+// exec command
+var code = new Argument<string>("code", "The code to execute");
+var execCommand = new Command("exec", "Execute the given code(s), wait for the result and exit")
+{
+    code
+};
+execCommand.AddAlias("-c");
+execCommand.AddAlias("--code");
+execCommand.SetHandler((socketPath, code, quiet) =>
+{
+    // Connect to DCS
+    using CommandConnection connection = new();
+    try
+    {
+        connection.Connect(socketPath.FullName);
+    }
+    catch (SocketException)
+    {
+        if (!quiet)
+        {
+            Console.Error.WriteLine("Failed to connect to DCS");
+        }
+        return Task.FromResult(1);
+    }
 
+    // startUpdate puts DSF into "updating" mode
+    if (code.Equals("startUpdate", StringComparison.InvariantCultureIgnoreCase))
+    {
+        connection.SetUpdateStatus(true);
+        if (!quiet)
+        {
+            Console.WriteLine("DSF is now in update mode");
+        }
+    }
+
+    // endUpdate takes DSF out of "updating" mode
+    else if (code.Equals("endUpdate", StringComparison.InvariantCultureIgnoreCase))
+    {
+        connection.SetUpdateStatus(false);
+        if (!quiet)
+        {
+            Console.WriteLine("DSF is no longer in update mode");
+        }
+    }
+
+    // everything else is a code to execute
+    else
+    {
+        string output = connection.PerformSimpleCode(code);
+        if (!quiet)
+        {
+            if (output.EndsWith('\n'))
+            {
+                Console.Write(output);
+            }
+            else
+            {
+                Console.WriteLine(output);
+            }
+        }
+    }
+    return Task.FromResult(0);
+}, socketPath, code, quiet);
+rootCommand.AddCommand(execCommand);
+
+return await rootCommand.InvokeAsync(args);
