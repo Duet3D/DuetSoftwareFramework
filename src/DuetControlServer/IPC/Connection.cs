@@ -193,7 +193,7 @@ namespace DuetControlServer.IPC
             {
                 try
                 {
-                    using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
+                    using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(UnixSocket, Program.CancellationToken);
                     _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
 
                     BaseResponse DeserializeResponse()
@@ -258,7 +258,7 @@ namespace DuetControlServer.IPC
             {
                 try
                 {
-                    using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
+                    using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(UnixSocket, Program.CancellationToken);
                     _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
 
                     ClientInitMessage DeserializeInitMessage()
@@ -334,7 +334,7 @@ namespace DuetControlServer.IPC
         /// <exception cref="SocketException">Connection has been closed</exception>
         public async ValueTask<BaseCommand> ReceiveCommand()
         {
-            using MemoryStream receivedJson = await JsonHelper.ReceiveUtf8Json(UnixSocket, Program.CancellationToken);
+            using MemoryStream receivedJson = await JsonHelper.ReceiveUtf8JsonAsync(UnixSocket, Program.CancellationToken);
             _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(receivedJson.ToArray())}");
 
             BaseCommand DeserializeCommand()

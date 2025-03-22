@@ -412,11 +412,11 @@ namespace DuetControlServer.Utility
             ObjectModel objectModel;
             try
             {
-                await commandConnection.Connect(Settings.FullSocketPath);
-                await commandConnection.SyncObjectModel();
+                await commandConnection.ConnectAsync(Settings.FullSocketPath);
+                await commandConnection.SyncObjectModelAsync();
 
-                await subscribeConnection.Connect(SubscriptionMode.Patch, new[] { "boards/**", "directories/**", "state/status" }, Settings.FullSocketPath);
-                objectModel = await subscribeConnection.GetObjectModel();
+                await subscribeConnection.ConnectAsync(SubscriptionMode.Patch, ["boards/**", "directories/**", "state/status"], Settings.FullSocketPath);
+                objectModel = await subscribeConnection.GetObjectModelAsync();
             }
             catch (Exception e)
             {
@@ -438,10 +438,10 @@ namespace DuetControlServer.Utility
             // Get the available firmware versions
             foreach (string firmwareFile in firmwareVersions.Keys)
             {
-                string firmwareFilename = await commandConnection.ResolvePath(Path.Combine(objectModel.Directories.Firmware, firmwareFile));
+                string firmwareFilename = await commandConnection.ResolvePathAsync(Path.Combine(objectModel.Directories.Firmware, firmwareFile));
                 if (!File.Exists(firmwareFilename))
                 {
-                    firmwareFilename = await commandConnection.ResolvePath(Path.Combine(objectModel.Directories.System, firmwareFile));
+                    firmwareFilename = await commandConnection.ResolvePathAsync(Path.Combine(objectModel.Directories.System, firmwareFile));
                 }
 
                 if (File.Exists(firmwareFilename))
@@ -542,14 +542,14 @@ namespace DuetControlServer.Utility
                                 new('B', board.CanAddress)
                             ]
                         };
-                        Message result = await commandConnection.PerformCode(updateCode);
+                        Message result = await commandConnection.PerformCodeAsync(updateCode);
 
                         // Unlike with M997, we need to wait for RRF to complete the update process
                         while (true)
                         {
                             await Task.Delay(2000, Program.CancellationToken);
 
-                            using JsonDocument patch = await subscribeConnection.GetObjectModelPatch();
+                            using JsonDocument patch = await subscribeConnection.GetObjectModelPatchAsync();
                             objectModel.UpdateFromJson(patch.RootElement);
 
                             if (objectModel.State.Status != MachineStatus.Updating)
@@ -581,7 +581,7 @@ namespace DuetControlServer.Utility
                         MajorNumber = 997
                     };
 
-                    Message result = await commandConnection.PerformCode(updateCode);
+                    Message result = await commandConnection.PerformCodeAsync(updateCode);
                     Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
                 }
                 catch (Exception e)
@@ -601,7 +601,7 @@ namespace DuetControlServer.Utility
                         MajorNumber = 999
                     };
 
-                    Message result = await commandConnection.PerformCode(updateCode);
+                    Message result = await commandConnection.PerformCodeAsync(updateCode);
                     Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
                 }
                 catch (Exception e)
