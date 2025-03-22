@@ -29,7 +29,7 @@ public class PluginServiceConnection(CommandActivator commandActivator, IOptions
     public async Task ConnectAsync(CancellationToken cancellationToken)
     {
         PluginServiceInitMessage initMessage = new();
-        await Connect(initMessage, _settings.SocketPath, cancellationToken);
+        await ConnectAsync(initMessage, _settings.SocketPath, cancellationToken);
     }
 
     // <summary>
@@ -41,7 +41,7 @@ public class PluginServiceConnection(CommandActivator commandActivator, IOptions
     /// <exception cref="SocketException">Connection has been closed</exception>
     public async ValueTask<BaseCommand> ReceiveCommandAsync(CancellationToken cancellationToken = default)
     {
-        using JsonDocument jsonDocument = await ReceiveJsonDocument(cancellationToken);
+        using JsonDocument jsonDocument = await ReceiveJsonDocumentAsync(cancellationToken);
         foreach (JsonProperty item in jsonDocument.RootElement.EnumerateObject())
         {
             if (item.Name.Equals(nameof(BaseCommand.Command), StringComparison.InvariantCultureIgnoreCase))

@@ -2,6 +2,7 @@
 using DuetAPI.Utility;
 using DuetAPIClient;
 using DuetPluginService.Singletons;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -117,10 +118,10 @@ public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetim
             plugin.Pid = process.Id;
             pluginStore.Processes[plugin.Id] = process;
             logger.LogInformation("Process started (pid {Pid})", process.Id);
-            using (CommandConnection connection = new())
+            using (InternalCommandConnection connection = new())
             {
-                await connection.Connect(_settings.SocketPath, cancellationToken);
-                await connection.SetPluginProcess(plugin.Id, process.Id, cancellationToken);
+                await connection.ConnectAsync(_settings.SocketPath, cancellationToken);
+                await connection.SetPluginProcessAsync(plugin.Id, process.Id, cancellationToken);
             }
 
             // Wait for the plugin to terminate in the background
@@ -148,9 +149,9 @@ public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetim
 
                                 if (!lifetime.ApplicationStopping.IsCancellationRequested)
                                 {
-                                    using CommandConnection connection = new();
-                                    await connection.Connect(_settings.SocketPath, cancellationToken);
-                                    await connection.SetPluginProcess(plugin.Id, -1, cancellationToken);
+                                    using InternalCommandConnection connection = new();
+                                    await connection.ConnectAsync(_settings.SocketPath, cancellationToken);
+                                    await connection.SetPluginProcessAsync(plugin.Id, -1, cancellationToken);
                                 }
                                 break;
                             }
@@ -190,8 +191,8 @@ public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetim
             try
             {
                 using CommandConnection connection = new();
-                await connection.Connect(_settings.SocketPath);
-                await connection.WriteMessage(messageType, $"[{pluginName}]: {e.Data}");
+                await connection.ConnectAsync(_settings.SocketPath);
+                await connection.WriteMessageAsync(messageType, $"[{pluginName}]: {e.Data}");
             }
             catch
             {

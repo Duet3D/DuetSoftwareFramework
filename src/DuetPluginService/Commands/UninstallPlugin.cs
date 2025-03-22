@@ -47,8 +47,8 @@ public sealed class UninstallPlugin(IPermissionManager permissionManager, Plugin
         string sdPath;
         using (CommandConnection connection = new())
         {
-            await connection.Connect(_settings.SocketPath, cancellationToken);
-            sdPath = await connection.ResolvePath("0:/", cancellationToken);
+            await connection.ConnectAsync(_settings.SocketPath, cancellationToken);
+            sdPath = await connection.ResolvePathAsync("0:/", cancellationToken);
         }
 
         // Get the plugin first

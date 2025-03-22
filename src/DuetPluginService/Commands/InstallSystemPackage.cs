@@ -65,8 +65,8 @@ public sealed class InstallSystemPackage(ILoggerFactory loggerFactory, IOptions<
             logger.LogInformation("Start of combined ZIP package installation");
             using (CommandConnection commandConnection = new())
             {
-                await commandConnection.Connect(_settings.SocketPath);
-                await commandConnection.SetUpdateStatus(true);
+                await commandConnection.ConnectAsync(_settings.SocketPath, cancellationToken);
+                await commandConnection.SetUpdateStatusAsync(true, cancellationToken);
             }
 
             // Unpack the ZIP file first
@@ -150,9 +150,10 @@ public sealed class InstallSystemPackage(ILoggerFactory loggerFactory, IOptions<
             if (packageDirectory is not null)
             {
                 logger.LogInformation("End of combined ZIP package installation");
+
                 using CommandConnection commandConnection = new();
-                await commandConnection.Connect(_settings.SocketPath, cancellationToken);
-                await commandConnection.SetUpdateStatus(false, cancellationToken);
+                await commandConnection.ConnectAsync(_settings.SocketPath, cancellationToken);
+                await commandConnection.SetUpdateStatusAsync(false, cancellationToken);
             }
             else
             {

@@ -2,42 +2,49 @@
 using DuetPluginService.Services;
 using DuetPluginService.Singletons;
 using DuetPluginService.Singletons.PermissionManagers;
-using DuetSharedLibrary;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
+using System.CommandLine;
+using System.CommandLine.Builder;
+using System.CommandLine.Hosting;
+using System.CommandLine.Parsing;
 
-Console.WriteLine($"Duet Plugin Service v{VersionHelper.Version}");
-Console.WriteLine("Written by Christian Hammacher for Duet3D");
-Console.WriteLine("Licensed under the terms of the GNU Public License Version 3");
-Console.WriteLine();
+var configOption = new Option<string>(
+    [ "-c", "--config" ],
+    description: "Path to the configuration file",
+    getDefaultValue: () => Settings.DefaultConfigFile);
 
-await Host.CreateDefaultBuilder()
-    .UseSystemd()
-    .ConfigureAppConfiguration((hostingContext, config) =>
+var rootCommand = new RootCommand("Duet Plugin Service")
+{
+    configOption
+};
+rootCommand.SetHandler(() => Console.WriteLine("Hello World!"));
+
+string configFile = Settings.DefaultConfigFile;
+return await new CommandLineBuilder(rootCommand)
+    .AddMiddleware((context) =>
     {
-        string configFile = Settings.DefaultConfigFile;
-        for (int i = 0; i < args.Length - 1; i++)
-        {
-            if (args[i] is "-c" or "--config")
-            {
-                configFile = args[i + 1];
-                break;
-            }
-        }
-
-        config
-            .AddJsonFile(configFile, true)
-            .AddCommandLine(args);
+        configFile = context.ParseResult.GetValueForOption(configOption)!;
     })
-    .ConfigureServices((context, services) => services
-        .Configure<Settings>(context.Configuration)
-        .AddSingleton<CommandActivator>()
-        .AddSingleton<IPermissionManager, AppArmorPermissionManager>()
-        .AddSingleton<PluginStore>()
-        .AddSingleton<PluginServiceConnection>()
-        .AddHostedService<CommandService>()
+    .UseHost(builder => builder
+        .UseSystemd()
+        .ConfigureAppConfiguration((hostingContext, config) =>
+        {
+            config
+                .AddJsonFile(configFile, optional: true)
+                .AddCommandLine(args);
+        })
+        .ConfigureServices((context, services) => services
+            .Configure<Settings>(context.Configuration)
+            .AddSingleton<CommandActivator>()
+            .AddSingleton<IPermissionManager, AppArmorPermissionManager>()
+            .AddSingleton<PluginStore>()
+            .AddSingleton<PluginServiceConnection>()
+            .AddHostedService<CommandService>()
+        )
     )
+    .UseDefaults()
     .Build()
-    .RunAsync();
+    .InvokeAsync(args);

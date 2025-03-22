@@ -55,8 +55,8 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
         string sdPath;
         using (CommandConnection connection = new())
         {
-            await connection.Connect(_settings.SocketPath, cancellationToken);
-            sdPath = await connection.ResolvePath("0:/", cancellationToken);
+            await connection.ConnectAsync(_settings.SocketPath, cancellationToken);
+            sdPath = await connection.ResolvePathAsync("0:/", cancellationToken);
         }
 
         if (Environment.IsPrivilegedProcess)
