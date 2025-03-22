@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 
-namespace DuetPluginService.Singletons.PermissionManagers;
+namespace DuetPluginService.PermissionManagers;
 
 public interface IPermissionManager
 {

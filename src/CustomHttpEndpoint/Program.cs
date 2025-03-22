@@ -3,6 +3,9 @@ using DuetAPI.ObjectModel;
 using System.CommandLine;
 using System.IO;
 using CustomHttpEndpoint;
+using System.Runtime.Versioning;
+
+[assembly: UnsupportedOSPlatform("windows")]
 
 // General arguments
 var socketPath = new Option<FileInfo>(
@@ -19,7 +22,7 @@ var quiet = new Option<bool>(
 // Main command
 var method = new Option<HttpEndpointType>(
     aliases: ["-m", "--method"],
-    description: "[GET, POST, PUT, PATCH, TRACE, DELETE, OPTIONS, WebSocket]: HTTP method to use",
+    description: "HTTP method to use",
     getDefaultValue: () => HttpEndpointType.GET
 );
 

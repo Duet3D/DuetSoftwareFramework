@@ -1,7 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetAPIClient;
-using DuetPluginService.Singletons;
 using DuetSharedLibrary;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -13,7 +12,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.Commands;
+namespace DuetPluginService.IPC;
 
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.StartPlugin"/> command

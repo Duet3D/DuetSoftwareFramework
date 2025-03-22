@@ -5,10 +5,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 
-namespace DuetPluginService.Singletons;
+namespace DuetPluginService;
 
 /// <summary>
-/// Storage class for registered plugins
+/// Main storage class for registered plugins
 /// </summary>
 public class PluginStore
 {

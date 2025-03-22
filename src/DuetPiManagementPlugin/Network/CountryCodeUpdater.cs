@@ -26,7 +26,7 @@ namespace DuetPiManagementPlugin
         public static async Task Init(string socketPath)
         {
             // Connect to DCS and update the country code initially
-            await _connection.Connect(socketPath);
+            await _connection.ConnectAsync(socketPath);
             await UpdateCountryCode();
 
             // Watch for changes of wpa_supplicant.conf and then update it again
@@ -112,15 +112,15 @@ namespace DuetPiManagementPlugin
                     }
                 }
 
-                ObjectModel model = await _connection.GetObjectModel();
-                await using (await _connection.LockObjectModel())
+                ObjectModel model = await _connection.GetObjectModelAsync();
+                await using (await _connection.LockObjectModelAsync())
                 {
                     for (int i = 0; i < model.Network.Interfaces.Count; i++)
                     {
                         NetworkInterface iface = model.Network.Interfaces[i];
                         if (iface.Type == NetworkInterfaceType.WiFi)
                         {
-                            await _connection.SetObjectModel($"network/interfaces/{i}/wifiCountry", string.IsNullOrWhiteSpace(countryCode) ? "null" : $"\"{countryCode.Trim()}\"");
+                            await _connection.SetObjectModelAsync($"network/interfaces/{i}/wifiCountry", string.IsNullOrWhiteSpace(countryCode) ? "null" : $"\"{countryCode.Trim()}\"");
                         }
                     }
                 }

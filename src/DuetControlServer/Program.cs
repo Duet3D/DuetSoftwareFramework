@@ -351,7 +351,7 @@ namespace DuetControlServer
             try
             {
                 using DuetAPIClient.CommandConnection connection = new();
-                await connection.Connect(Settings.FullSocketPath);
+                await connection.ConnectAsync(Settings.FullSocketPath);
             }
             catch (SocketException)
             {

@@ -4,7 +4,7 @@ using System.Text.Json;
 using DuetAPI.Commands;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DuetPluginService.Singletons;
+namespace DuetPluginService.Commands;
 
 /// <summary>
 /// Singleton to create command instances
@@ -17,13 +17,13 @@ public class CommandActivator(IServiceProvider serviceProvider)
     /// </summary>
     public static readonly Type[] SupportedCommands =
     [
-        typeof(Commands.InstallPlugin),
-        typeof(Commands.ReloadPlugin),
-        typeof(Commands.StartPlugin),
-        typeof(Commands.StopPlugin),
-        typeof(Commands.UninstallPlugin),
-        typeof(Commands.InstallSystemPackage),
-        typeof(Commands.UninstallSystemPackage),
+        typeof(IPC.InstallPlugin),
+        typeof(IPC.ReloadPlugin),
+        typeof(IPC.StartPlugin),
+        typeof(IPC.StopPlugin),
+        typeof(IPC.UninstallPlugin),
+        typeof(IPC.InstallSystemPackage),
+        typeof(IPC.UninstallSystemPackage),
     ];
 
     /// <summary>

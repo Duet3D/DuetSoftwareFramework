@@ -3,6 +3,7 @@ using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
 using DuetAPI.Utility;
 using DuetAPIClient;
+using DuetPluginService.Commands;
 using Microsoft.Extensions.Options;
 using System;
 using System.Net.Sockets;
@@ -10,7 +11,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.Singletons;
+namespace DuetPluginService.IPC;
 
 /// <summary>
 /// Connection service for plugin management

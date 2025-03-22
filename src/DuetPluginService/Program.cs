@@ -1,7 +1,7 @@
 ﻿using DuetPluginService;
-using DuetPluginService.Services;
-using DuetPluginService.Singletons;
-using DuetPluginService.Singletons.PermissionManagers;
+using DuetPluginService.Commands;
+using DuetPluginService.IPC;
+using DuetPluginService.PermissionManagers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

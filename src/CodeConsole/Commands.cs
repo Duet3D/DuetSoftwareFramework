@@ -46,7 +46,7 @@ public static class Commands
         // Start reading lines from stdin and send them to DCS as simple codes.
         // When the code has finished, the result is printed to stdout
         string? input = Console.ReadLine();
-        while (input is not null && !(input is "exit" or "quit"))
+        while (input is not null and not "exit" and not "quit")
         {
             try
             {

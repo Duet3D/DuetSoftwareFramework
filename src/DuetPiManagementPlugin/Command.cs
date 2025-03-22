@@ -14,7 +14,7 @@ namespace DuetPiManagementPlugin
         /// <param name="fileName">File to execute</param>
         /// <param name="arguments">Command-line arguments</param>
         /// <returns>Command output</returns>
-        public static async Task<string> Execute(string fileName, string arguments)
+        public static async Task<string> ExecuteAsync(string fileName, string arguments)
         {
             ProcessStartInfo startInfo = new()
             {
@@ -43,7 +43,7 @@ namespace DuetPiManagementPlugin
         /// <param name="fileName">File to execute</param>
         /// <param name="arguments">Command-line arguments</param>
         /// <returns>Query result</returns>
-        public static async Task<bool> ExecQuery(string fileName, string arguments)
+        public static async Task<bool> ExecQueryAsync(string fileName, string arguments)
         {
             using Process process = Process.Start(fileName, arguments);
             await process.WaitForExitAsync(Program.CancellationToken);

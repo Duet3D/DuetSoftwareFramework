@@ -37,7 +37,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
                     config = await JsonSerializer.DeserializeAsync(configStream, JsonContext.Default.AspNetConfig);
                 }
 
-                bool dwsEnabled = await Command.ExecQuery("systemctl", "is-enabled -q duetwebserver.service");
+                bool dwsEnabled = await Command.ExecQueryAsync("systemctl", "is-enabled -q duetwebserver.service");
                 if (config?.Kestrel?.Endpoints?.Http?.Url is not null && Uri.TryCreate(config.Kestrel.Endpoints.Http.Url.Replace('*', 'x'), UriKind.Absolute, out Uri? url))
                 {
                     _httpPort = url.Port;
@@ -111,8 +111,8 @@ namespace DuetPiManagementPlugin.Network.Protocols
             // Do we need to disable DWS?
             if (disableService)
             {
-                string stopOutput = await Command.Execute("systemctl", "stop duetwebserver.service");
-                string disableOutput = await Command.Execute("systemctl", "disable duetwebserver.service");
+                string stopOutput = await Command.ExecuteAsync("systemctl", "stop duetwebserver.service");
+                string disableOutput = await Command.ExecuteAsync("systemctl", "disable duetwebserver.service");
                 return new Message(MessageType.Success, string.Join('\n', stopOutput, disableOutput).Trim());
             }
 
@@ -155,13 +155,13 @@ namespace DuetPiManagementPlugin.Network.Protocols
             // Enable the service if it was disabled before
             if (enableService)
             {
-                string enableOutput = await Command.Execute("systemctl", "enable -q duetwebserver.service");
-                string startOutput = await Command.Execute("systemctl", "start duetwebserver.service");
+                string enableOutput = await Command.ExecuteAsync("systemctl", "enable -q duetwebserver.service");
+                string startOutput = await Command.ExecuteAsync("systemctl", "start duetwebserver.service");
                 return new Message(MessageType.Success, string.Join('\n', enableOutput, startOutput).Trim());
             }
 
             // Restart the service
-            string restartOutput = await Command.Execute("systemctl", "restart duetwebserver.service");
+            string restartOutput = await Command.ExecuteAsync("systemctl", "restart duetwebserver.service");
             return new Message(MessageType.Success, restartOutput.TrimEnd());
         }
 
@@ -193,7 +193,7 @@ namespace DuetPiManagementPlugin.Network.Protocols
             }
 
             // CORS
-            ObjectModel model = await Program.Connection.GetObjectModel(Program.CancellationToken);
+            ObjectModel model = await Program.Connection.GetObjectModelAsync(Program.CancellationToken);
             if (string.IsNullOrEmpty(model.Network.CorsSite))
             {
                 builder.AppendLine("CORS disabled");

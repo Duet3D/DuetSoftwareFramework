@@ -103,10 +103,10 @@ namespace DuetWebServer.Controllers
             try
             {
                 using CommandConnection connection = await BuildConnection();
-                if ((_settings.OverrideWebPassword == null && await connection.CheckPassword(password ?? string.Empty)) ||
+                if ((_settings.OverrideWebPassword == null && await connection.CheckPasswordAsync(password ?? string.Empty)) ||
                     (_settings.OverrideWebPassword != null && _settings.OverrideWebPassword == (password ?? string.Empty)))
                 {
-                    int sessionId = await connection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, HttpContext.Connection.RemoteIpAddress!.ToString());
+                    int sessionId = await connection.AddUserSessionAsync(AccessLevel.ReadWrite, SessionType.HTTP, HttpContext.Connection.RemoteIpAddress!.ToString());
                     string sessionKey = sessionStorage.MakeSessionKey(sessionId, string.Empty, true);
 
                     string jsonResponse = JsonSerializer.Serialize(new
@@ -183,7 +183,7 @@ namespace DuetWebServer.Controllers
                     if (sessionId > 0)
                     {
                         using CommandConnection connection = await BuildConnection();
-                        await connection.RemoveUserSession(sessionId);
+                        await connection.RemoveUserSessionAsync(sessionId);
                     }
                 }
                 return NoContent();
@@ -238,7 +238,7 @@ namespace DuetWebServer.Controllers
             try
             {
                 using CommandConnection connection = await BuildConnection();
-                string machineModel = await connection.GetSerializedObjectModel();
+                string machineModel = await connection.GetSerializedObjectModelAsync();
                 return Content(machineModel, "application/json");
             }
             catch (Exception e)
@@ -303,7 +303,7 @@ namespace DuetWebServer.Controllers
                 {
                     using CommandConnection connection = await BuildConnection();
                     LogInformation($"Executing code '{code}'");
-                    return Content(await connection.PerformSimpleCode(code, CodeChannel.HTTP, async));
+                    return Content(await connection.PerformSimpleCodeAsync(code, CodeChannel.HTTP, async));
                 }
                 finally
                 {
@@ -528,7 +528,7 @@ namespace DuetWebServer.Controllers
                 }
 
                 using CommandConnection connection = await BuildConnection();
-                var info = await connection.GetFileInfo(resolvedPath, readThumbnailContent);
+                var info = await connection.GetFileInfoAsync(resolvedPath, readThumbnailContent);
 
                 string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
                 return Content(json, "application/json");
@@ -868,7 +868,7 @@ namespace DuetWebServer.Controllers
 
                     // Install it
                     using CommandConnection connection = await BuildConnection();
-                    await connection.InstallPlugin(zipFile);
+                    await connection.InstallPluginAsync(zipFile);
 
                     return NoContent();
                 }
@@ -936,7 +936,7 @@ namespace DuetWebServer.Controllers
 
                     // Uninstall it
                     using CommandConnection connection = await BuildConnection();
-                    await connection.UninstallPlugin(pluginName);
+                    await connection.UninstallPluginAsync(pluginName);
 
                     return NoContent();
                 }
@@ -1017,7 +1017,7 @@ namespace DuetWebServer.Controllers
                 PluginPatchInstruction instruction = (await JsonSerializer.DeserializeAsync<PluginPatchInstruction>(HttpContext.Request.Body))!;
 
                 using CommandConnection connection = await BuildConnection();
-                ObjectModel model = await connection.GetObjectModel();
+                ObjectModel model = await connection.GetObjectModelAsync();
                 if (model.Plugins.TryGetValue(instruction.plugin, out Plugin plugin))
                 {
                     if (!string.IsNullOrEmpty(plugin.SbcExecutable))
@@ -1026,7 +1026,7 @@ namespace DuetWebServer.Controllers
                         return Forbid();
                     }
 
-                    await connection.SetPluginData(instruction.key, instruction.value, instruction.plugin);
+                    await connection.SetPluginDataAsync(instruction.key, instruction.value, instruction.plugin);
                     return NoContent();
                 }
                 return NotFound();
@@ -1085,7 +1085,7 @@ namespace DuetWebServer.Controllers
 
                 // Start it
                 using CommandConnection connection = await BuildConnection();
-                await connection.StartPlugin(pluginName);
+                await connection.StartPluginAsync(pluginName);
 
                 return NoContent();
             }
@@ -1143,7 +1143,7 @@ namespace DuetWebServer.Controllers
 
                 // Stop it
                 using CommandConnection connection = await BuildConnection();
-                await connection.StopPlugin(pluginName);
+                await connection.StopPluginAsync(pluginName);
 
                 return NoContent();
             }
@@ -1210,7 +1210,7 @@ namespace DuetWebServer.Controllers
                     try
                     {
                         using CommandConnection connection = await BuildConnection();
-                        await connection.InstallSystemPackage(packageFile, applicationLifetime.ApplicationStopping);
+                        await connection.InstallSystemPackageAsync(packageFile, applicationLifetime.ApplicationStopping);
                     }
                     catch (OperationCanceledException)
                     {
@@ -1282,7 +1282,7 @@ namespace DuetWebServer.Controllers
 
                     // Uninstall it
                     using CommandConnection connection = await BuildConnection();
-                    await connection.UninstallSystemPackage(package);
+                    await connection.UninstallSystemPackageAsync(package);
 
                     return NoContent();
                 }
@@ -1323,14 +1323,14 @@ namespace DuetWebServer.Controllers
         private async Task<CommandConnection> BuildConnection()
         {
             CommandConnection connection = new();
-            await connection.Connect(_settings.SocketPath);
+            await connection.ConnectAsync(_settings.SocketPath);
             return connection;
         }
 
         private async Task<string> ResolvePath(string path)
         {
             using CommandConnection connection = await BuildConnection();
-            return await connection.ResolvePath(path);
+            return await connection.ResolvePathAsync(path);
         }
     }
 }

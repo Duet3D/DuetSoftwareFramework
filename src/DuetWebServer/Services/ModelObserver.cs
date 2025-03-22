@@ -92,17 +92,17 @@ namespace DuetWebServer.Services
                         // Establish connections to DCS
                         using SubscribeConnection subscribeConnection = new();
                         using CommandConnection commandConnection = new();
-                        await subscribeConnection.Connect(DuetAPI.Connection.SubscriptionMode.Patch, [
+                        await subscribeConnection.ConnectAsync(DuetAPI.Connection.SubscriptionMode.Patch, [
                             "directories/www",
                             "messages/**",
                             "network/corsSite",
                             "sbc/dsf/httpEndpoints/**"
                         ], _settings.SocketPath, cancellationToken);
-                        await commandConnection.Connect(_settings.SocketPath, cancellationToken);
+                        await commandConnection.ConnectAsync(_settings.SocketPath, cancellationToken);
                         logger.LogInformation("Connections to DuetControlServer established");
 
                         // Get the machine model and keep it up-to-date
-                        model = await subscribeConnection.GetObjectModel(cancellationToken);
+                        model = await subscribeConnection.GetObjectModelAsync(cancellationToken);
 
                         // Initialize CORS site
                         if (!string.IsNullOrEmpty(model.Network.CorsSite))
@@ -126,7 +126,7 @@ namespace DuetWebServer.Services
                         // Keep track of the web directory
                         _commandConnection = commandConnection;
                         model.Directories.PropertyChanged += Directories_PropertyChanged;
-                        modelProvider.WebDirectory = await commandConnection.ResolvePath(model.Directories.Web, cancellationToken);
+                        modelProvider.WebDirectory = await commandConnection.ResolvePathAsync(model.Directories.Web, cancellationToken);
 
                         do
                         {
@@ -138,7 +138,7 @@ namespace DuetWebServer.Services
                             model.Messages.Clear();
 
                             // Wait for more updates
-                            using JsonDocument jsonPatch = await subscribeConnection.GetObjectModelPatch(cancellationToken);
+                            using JsonDocument jsonPatch = await subscribeConnection.GetObjectModelPatchAsync(cancellationToken);
                             model.UpdateFromJson(jsonPatch.RootElement, false);
 
                             // Increment sequence numbers
@@ -208,7 +208,7 @@ namespace DuetWebServer.Services
             if (e.PropertyName == nameof(Directories.Web))
             {
                 Directories directories = (Directories)sender!;
-                modelProvider.WebDirectory = await _commandConnection!.ResolvePath(directories.Web);
+                modelProvider.WebDirectory = await _commandConnection!.ResolvePathAsync(directories.Web);
             }
         }
     }

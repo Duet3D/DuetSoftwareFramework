@@ -107,7 +107,7 @@ namespace DuetWebServer.Middleware
         /// <exception cref="SocketException">Connection has been closed</exception>
         private async Task<T> Receive<T>(CancellationToken cancellationToken)
         {
-            await using MemoryStream json = await JsonHelper.ReceiveUtf8Json(_unixSocket, cancellationToken);
+            await using MemoryStream json = await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken);
             return (await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions, cancellationToken))!;
         }
 

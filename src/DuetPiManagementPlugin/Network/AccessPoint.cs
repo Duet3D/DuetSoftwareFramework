@@ -22,7 +22,7 @@ namespace DuetPiManagementPlugin.Network
             {
                 return await NetworkManager.IsHotspotEnabled();
             }
-            return File.Exists("/etc/hostapd/wlan0.conf") && (await Command.ExecQuery("systemctl", "is-active -q hostapd@wlan0.service"));
+            return File.Exists("/etc/hostapd/wlan0.conf") && (await Command.ExecQueryAsync("systemctl", "is-active -q hostapd@wlan0.service"));
         }
 
         /// <summary>
@@ -38,15 +38,15 @@ namespace DuetPiManagementPlugin.Network
             }
             else
             {
-                if (!await Command.ExecQuery("systemctl", "is-active -q hostapd@wlan0.service"))
+                if (!await Command.ExecQueryAsync("systemctl", "is-active -q hostapd@wlan0.service"))
                 {
-                    builder.AppendLine(await Command.Execute("systemctl", "start hostapd@wlan0.service"));
-                    builder.AppendLine(await Command.Execute("systemctl", "enable -q hostapd@wlan0.service"));
+                    builder.AppendLine(await Command.ExecuteAsync("systemctl", "start hostapd@wlan0.service"));
+                    builder.AppendLine(await Command.ExecuteAsync("systemctl", "enable -q hostapd@wlan0.service"));
                 }
-                if (!await Command.ExecQuery("systemctl", "is-active -q dnsmasq.service"))
+                if (!await Command.ExecQueryAsync("systemctl", "is-active -q dnsmasq.service"))
                 {
-                    builder.AppendLine(await Command.Execute("systemctl", "start dnsmasq.service"));
-                    builder.AppendLine(await Command.Execute("systemctl", "enable -q dnsmasq.service"));
+                    builder.AppendLine(await Command.ExecuteAsync("systemctl", "start dnsmasq.service"));
+                    builder.AppendLine(await Command.ExecuteAsync("systemctl", "enable -q dnsmasq.service"));
                 }
             }
             return builder.ToString().Trim();
@@ -65,15 +65,15 @@ namespace DuetPiManagementPlugin.Network
             }
             else
             {
-                if (await Command.ExecQuery("systemctl", "is-active -q hostapd@wlan0.service"))
+                if (await Command.ExecQueryAsync("systemctl", "is-active -q hostapd@wlan0.service"))
                 {
-                    builder.AppendLine(await Command.Execute("systemctl", "stop hostapd@wlan0.service"));
-                    builder.AppendLine(await Command.Execute("systemctl", "disable -q hostapd@wlan0.service"));
+                    builder.AppendLine(await Command.ExecuteAsync("systemctl", "stop hostapd@wlan0.service"));
+                    builder.AppendLine(await Command.ExecuteAsync("systemctl", "disable -q hostapd@wlan0.service"));
                 }
-                if (await Command.ExecQuery("systemctl", "is-active -q dnsmasq.service"))
+                if (await Command.ExecQueryAsync("systemctl", "is-active -q dnsmasq.service"))
                 {
-                    builder.AppendLine(await Command.Execute("systemctl", "stop dnsmasq.service"));
-                    builder.AppendLine(await Command.Execute("systemctl", "disable -q dnsmasq.service"));
+                    builder.AppendLine(await Command.ExecuteAsync("systemctl", "stop dnsmasq.service"));
+                    builder.AppendLine(await Command.ExecuteAsync("systemctl", "disable -q dnsmasq.service"));
                 }
             }
             return builder.ToString().Trim();

@@ -1,5 +1,4 @@
 ﻿using DuetAPI.ObjectModel;
-using DuetPluginService.Singletons;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using System;
@@ -8,7 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.Commands;
+namespace DuetPluginService.IPC;
 
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.ReloadPlugin"/> command

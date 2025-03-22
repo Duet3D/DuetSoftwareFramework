@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.Singletons.PermissionManagers;
+namespace DuetPluginService.PermissionManagers;
 
 /// <summary>
 /// Class to provide functions to enforce AppArmor permissions for plugins

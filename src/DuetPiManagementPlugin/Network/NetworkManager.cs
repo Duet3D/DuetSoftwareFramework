@@ -17,7 +17,7 @@ namespace DuetPiManagementPlugin
         /// <summary>
         /// Check if NetworkManager is active
         /// </summary>
-        public static Task<bool> IsActive() => Command.ExecQuery("systemctl", "-q is-active NetworkManager.service");
+        public static Task<bool> IsActive() => Command.ExecQueryAsync("systemctl", "-q is-active NetworkManager.service");
 
         /// <summary>
         /// Get the WiFi country code using raspi-config
@@ -25,7 +25,7 @@ namespace DuetPiManagementPlugin
         /// <returns>WiFi country code or null</returns>
         public static async Task<string?> GetWiFiCountry()
         {
-            string output = await Command.Execute("raspi-config", "nonint get_wifi_country");
+            string output = await Command.ExecuteAsync("raspi-config", "nonint get_wifi_country");
             return string.IsNullOrWhiteSpace(output) ? null : output;
         }
 
@@ -36,7 +36,7 @@ namespace DuetPiManagementPlugin
         /// <returns>Profile UUID or null if not active</returns>
         private static async Task<string?> GetActiveProfile(string iface)
         {
-            string output = await Command.Execute("nmcli", "-c no -t connection show --active");
+            string output = await Command.ExecuteAsync("nmcli", "-c no -t connection show --active");
             using StringReader reader = new(output);
             string? line;
             while ((line = await reader.ReadLineAsync()) is not null)
@@ -64,9 +64,9 @@ namespace DuetPiManagementPlugin
         {
             if (ssid is null)
             {
-                return await Command.Execute("nmcli", $"-c no -t device connect {iface}");
+                return await Command.ExecuteAsync("nmcli", $"-c no -t device connect {iface}");
             }
-            return await Command.Execute("nmcli", $"-c no -t device wifi connect {ssid} iface {iface}");
+            return await Command.ExecuteAsync("nmcli", $"-c no -t device wifi connect {ssid} iface {iface}");
         }
 
         /// <summary>
@@ -76,7 +76,7 @@ namespace DuetPiManagementPlugin
         /// <returns>Disable result</returns>
         public static async Task<string> Disconnect(string iface)
         {
-            return await Command.Execute("nmcli", $"-c no -t device disconnect {iface}");
+            return await Command.ExecuteAsync("nmcli", $"-c no -t device disconnect {iface}");
         }
 
         private static async Task<string?> GetProfileProperty(string iface, string property)
@@ -84,7 +84,7 @@ namespace DuetPiManagementPlugin
             string? activeProfile = await GetActiveProfile(iface);
             if (activeProfile is not null)
             {
-                string output = await Command.Execute("nmcli", $"-c no -t connection show {activeProfile}");
+                string output = await Command.ExecuteAsync("nmcli", $"-c no -t connection show {activeProfile}");
                 using StringReader reader = new(output);
                 string? line;
                 while ((line = await reader.ReadLineAsync()) != null)
@@ -226,8 +226,8 @@ namespace DuetPiManagementPlugin
             StringBuilder result = new();
             if (applyChanges)
             {
-                result.AppendLine(await Command.Execute("nmcli", nmcliArgs));
-                result.AppendLine(await Command.Execute("nmcli", $"-c no -t device reapply {iface}"));
+                result.AppendLine(await Command.ExecuteAsync("nmcli", nmcliArgs));
+                result.AppendLine(await Command.ExecuteAsync("nmcli", $"-c no -t device reapply {iface}"));
             }
             return result.ToString().Trim();
         }
@@ -313,7 +313,7 @@ namespace DuetPiManagementPlugin
             // Update WiFi country code frist
             if (countryCode is not null)
             {
-                result.AppendLine(await Command.Execute("raspi-config", $"nonint do_wifi_country {countryCode}"));
+                result.AppendLine(await Command.ExecuteAsync("raspi-config", $"nonint do_wifi_country {countryCode}"));
             }
 
             // Turn off hotspot if required
@@ -329,7 +329,7 @@ namespace DuetPiManagementPlugin
                 // Delete all saved SSIDs
                 foreach (string profile in profiles.Keys)
                 {
-                    result.Append(await Command.Execute("nmcli", $"-c no -t connection delete \"{profile}\""));
+                    result.Append(await Command.ExecuteAsync("nmcli", $"-c no -t connection delete \"{profile}\""));
                 }
             }
             else if (ssid is not null)
@@ -343,12 +343,12 @@ namespace DuetPiManagementPlugin
                         if (psk is null)
                         {
                             // Delete WiFi profile
-                            result.AppendLine(await Command.Execute("nmcli", $"-c no -t connection delete \"{kv.Key}\""));
+                            result.AppendLine(await Command.ExecuteAsync("nmcli", $"-c no -t connection delete \"{kv.Key}\""));
                         }
                         else
                         {
                             // Update PSK
-                            result.AppendLine(await Command.Execute("nmcli", $"-c no -t connection modify \"{kv.Key}\" 802-11-wireless-security.psk \"{psk}\""));
+                            result.AppendLine(await Command.ExecuteAsync("nmcli", $"-c no -t connection modify \"{kv.Key}\" 802-11-wireless-security.psk \"{psk}\""));
                         }
 
                         profileUpdated = true;
@@ -361,11 +361,11 @@ namespace DuetPiManagementPlugin
                 {
                     if (string.IsNullOrWhiteSpace(psk))
                     {
-                        result.AppendLine(await Command.Execute("nmcli", $"-c no -t connection device wifi connect \"{ssid}\""));
+                        result.AppendLine(await Command.ExecuteAsync("nmcli", $"-c no -t connection device wifi connect \"{ssid}\""));
                     }
                     else
                     {
-                        result.AppendLine(await Command.Execute("nmcli", $"-c no -t device wifi connect \"{ssid}\" password \"{psk}\""));
+                        result.AppendLine(await Command.ExecuteAsync("nmcli", $"-c no -t device wifi connect \"{ssid}\" password \"{psk}\""));
                     }
                 }
             }
@@ -431,7 +431,7 @@ namespace DuetPiManagementPlugin
             {
                 nmcliArgs += $" band bg channel {_channel}";
             }
-            result.AppendLine(await Command.Execute("nmcli", nmcliArgs));
+            result.AppendLine(await Command.ExecuteAsync("nmcli", nmcliArgs));
 
             // Change the IP address
             if (!IPAddress.Any.Equals(_ipAddress))

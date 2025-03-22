@@ -1,6 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
-using DuetPluginService.Singletons;
 using DuetSharedLibrary;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -9,7 +8,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.Commands;
+namespace DuetPluginService.IPC;
 
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.StopPlugin"/> command

@@ -24,7 +24,7 @@ var rootCommand = new RootCommand("Code console to send G/M/T-codes to DuetContr
 rootCommand.SetHandler(Commands.MainAsync, socketPath, quiet);
 
 // Exec command
-var code = new Argument<string>("code", "The code to execute");
+var code = new Argument<string>("code", "Code to execute");
 var execCommand = new Command("exec", "Execute the given code(s), wait for the result and exit")
 {
     code

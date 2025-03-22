@@ -64,7 +64,7 @@ namespace DuetPiManagementPlugin.Network
             try
             {
                 // Unblock WiFi and enable the adapter
-                if (!await Command.ExecQuery("rfkill", "unblock wifi") || !await Command.ExecQuery("ip", "link set wlan0 up"))
+                if (!await Command.ExecQueryAsync("rfkill", "unblock wifi") || !await Command.ExecQueryAsync("ip", "link set wlan0 up"))
                 {
                     _scanning = false;
                     _scanFailed = true;

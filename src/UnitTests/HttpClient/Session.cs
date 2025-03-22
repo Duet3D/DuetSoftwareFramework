@@ -33,7 +33,7 @@ namespace UnitTests.HttpClient
         public async Task ObjectModel()
         {
             // Wait for the object model to be up-to-date
-            await session!.WaitForModelUpdate();
+            await session!.WaitForModelUpdateAsync();
             ClassicAssert.AreNotEqual(MachineStatus.Starting, session.Model.State.Status);
 
             // Save the current uptime
@@ -45,7 +45,7 @@ namespace UnitTests.HttpClient
 
             // Wait again for UpTime to change. Because other things may update the OM in SBC mode, we await an extra delay first
             await Task.Delay(1000);
-            await session.WaitForModelUpdate();
+            await session.WaitForModelUpdateAsync();
 
             // Make sure the object model is updated
             lock (session.Model)
@@ -58,10 +58,10 @@ namespace UnitTests.HttpClient
         public async Task Codes()
         {
             // Make sure there are no timeouts
-            await session!.SendCode("G4 S6");
+            await session!.SendCodeAsync("G4 S6");
 
             // Check generic G-code reply
-            string response = await session.SendCode("M115");
+            string response = await session.SendCodeAsync("M115");
             ClassicAssert.IsTrue(response.StartsWith("FIRMWARE"));
         }
 
@@ -76,21 +76,21 @@ namespace UnitTests.HttpClient
                 uploadStream.Write(Encoding.UTF8.GetBytes(uploadContent));
                 uploadStream.Seek(0, SeekOrigin.Begin);
 
-                await session!.Upload("0:/sys/unitTest.txt", uploadStream);
+                await session!.UploadAsync("0:/sys/unitTest.txt", uploadStream);
             }
 
             // Download it again
-            using (HttpResponseMessage downloadResponse = await session.Download("0:/sys/unitTest.txt"))
+            using (HttpResponseMessage downloadResponse = await session.DownloadAsync("0:/sys/unitTest.txt"))
             {
                 string downloadContent = await downloadResponse.Content.ReadAsStringAsync();
                 ClassicAssert.AreEqual(uploadContent, downloadContent);
             }
 
             // Move it
-            await session!.Move("0:/sys/unitTest.txt", "0:/sys/unitTest2.txt", true);
+            await session!.MoveAsync("0:/sys/unitTest.txt", "0:/sys/unitTest2.txt", true);
 
             // Delete it again
-            await session!.Delete("0:/sys/unitTest2.txt");
+            await session!.DeleteAsync("0:/sys/unitTest2.txt");
         }
 
         [Test]
@@ -100,18 +100,18 @@ namespace UnitTests.HttpClient
             await session!.MakeDirectory("0:/sys/unitTest");
 
             // Delete it again
-            await session!.Delete("0:/sys/unitTest");
+            await session!.DeleteAsync("0:/sys/unitTest");
         }
 
         [Test]
         public async Task FileList()
         {
             // List files in 0:/sys and check for valid config.g
-            IEnumerable<FileListItem> fileList = await session!.GetFileList("0:/sys");
+            IEnumerable<FileListItem> fileList = await session!.GetFileListAsync("0:/sys");
             ClassicAssert.IsTrue(fileList.Any(item => !item.IsDirectory && item.Filename == "config.g" && item.Size > 0 && item.Size < 192_000));
 
             // List root directories and check for sys directory
-            fileList = await session!.GetFileList("0:/");
+            fileList = await session!.GetFileListAsync("0:/");
             ClassicAssert.IsTrue(fileList.Any(item => item.IsDirectory && item.Filename == "sys"));
         }
 
@@ -119,7 +119,7 @@ namespace UnitTests.HttpClient
         public async Task FileInfo()
         {
             // Get fileinfo for 0:/sys/config.g
-            GCodeFileInfo info = await session!.GetFileInfo("0:/sys/config.g");
+            GCodeFileInfo info = await session!.GetFileInfoAsync("0:/sys/config.g");
             ClassicAssert.Greater(info.Size, 0);
             ClassicAssert.Less(info.Size, 192_000);
         }

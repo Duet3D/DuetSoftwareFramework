@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
-using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
@@ -27,7 +26,6 @@ public static class Commands
     /// <param name="cmd">Command to execute on HTTP request</param>
     /// <param name="cmdArgs">Arguments for the command</param>
     /// <returns>Exit code</returns>
-    [UnsupportedOSPlatform("windows")]
     public static async Task<int> MainAsync(FileInfo socketPath, bool quiet, HttpEndpointType method, string ns, string path, string? cmd, string? cmdArgs)
     {
         if (method == HttpEndpointType.WebSocket && (!string.IsNullOrWhiteSpace(cmd) || !string.IsNullOrWhiteSpace(cmdArgs)))

@@ -11,7 +11,7 @@ using System;
 namespace DuetWebServer
 {
     /// <summary>
-    /// Class used to start the ASP.NET Core endpoint
+    /// Class used to start the ASP.NET endpoint
     /// </summary>
     /// <remarks>
     /// Create a new Startup instance
@@ -33,11 +33,9 @@ namespace DuetWebServer
             services
                 .AddAuthentication(Authorization.SessionKeyAuthenticationHandler.SchemeName)
                 .AddScheme<Authorization.SessionKeyAuthenticationSchemeOptions, Authorization.SessionKeyAuthenticationHandler>(Authorization.SessionKeyAuthenticationHandler.SchemeName, options => {});
-            services.AddAuthorization(options =>
-            {
-                options.AddPolicy(Authorization.Policies.ReadOnly, policy => policy.RequireClaim("access", "readOnly", "readWrite"));
-                options.AddPolicy(Authorization.Policies.ReadWrite, policy => policy.RequireClaim("access", "readWrite"));
-            });
+            services.AddAuthorizationBuilder()
+                .AddPolicy(Authorization.Policies.ReadOnly, policy => policy.RequireClaim("access", "readOnly", "readWrite"))
+                .AddPolicy(Authorization.Policies.ReadWrite, policy => policy.RequireClaim("access", "readWrite"));
             services.AddCors(options => options.AddDefaultPolicy(Services.ModelObserver.CorsPolicy));
             services.AddControllers();
         }

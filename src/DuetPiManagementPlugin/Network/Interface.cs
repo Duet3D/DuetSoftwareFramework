@@ -56,18 +56,18 @@ namespace DuetPiManagementPlugin.Network
             // Set link down (if needed)
             if (isUp)
             {
-                string setDownResult = await Command.Execute("ip", $"link set dev {iface.Name} down");
+                string setDownResult = await Command.ExecuteAsync("ip", $"link set dev {iface.Name} down");
                 result.AppendLine(setDownResult);
             }
 
             // Update MAC address
-            string setResult = await Command.Execute("ip", $"link set dev {iface.Name} address {BitConverter.ToString(parsedAddress.GetAddressBytes()).Replace('-', ':')}");
+            string setResult = await Command.ExecuteAsync("ip", $"link set dev {iface.Name} address {BitConverter.ToString(parsedAddress.GetAddressBytes()).Replace('-', ':')}");
             result.AppendLine(setResult);
 
             // Set link up again (if needed)
             if (isUp)
             {
-                string setUpResult = await Command.Execute("ip", $"link set dev {iface.Name} up");
+                string setUpResult = await Command.ExecuteAsync("ip", $"link set dev {iface.Name} up");
                 result.AppendLine(setUpResult);
             }
 
@@ -81,7 +81,7 @@ namespace DuetPiManagementPlugin.Network
         /// <param name="pParam">P parameter</param>
         /// <param name="sParam">S parameter</param>
         /// <returns>Configuration result</returns>
-        public static async Task<Message> SetConfig(int index, string? pParam, int? sParam)
+        public static async Task<Message> SetConfigAsync(int index, string? pParam, int? sParam)
         {
             NetworkInterface iface = Get(index);
             StringBuilder result = new();
@@ -106,7 +106,7 @@ namespace DuetPiManagementPlugin.Network
                     else
                     {
                         result.AppendLine(await WpaSupplicant.Stop());
-                        result.AppendLine(await Command.Execute("ip", $"link set {iface.Name} down"));
+                        result.AppendLine(await Command.ExecuteAsync("ip", $"link set {iface.Name} down"));
                     }
                 }
                 else if (sParam == 1)
@@ -118,7 +118,7 @@ namespace DuetPiManagementPlugin.Network
                     if (await NetworkManager.IsActive())
                     {
                         // Enable WiFi radio
-                        string radioResult = await Command.Execute("nmcli", "radio wifi on");
+                        string radioResult = await Command.ExecuteAsync("nmcli", "radio wifi on");
                         result.AppendLine(radioResult);
 
                         // Connect (to the given AP name)
@@ -134,11 +134,11 @@ namespace DuetPiManagementPlugin.Network
                         }
 
                         // Disable the adapter
-                        string disableResult = await Command.Execute("ip", $"link set {iface.Name} down");
+                        string disableResult = await Command.ExecuteAsync("ip", $"link set {iface.Name} down");
                         result.AppendLine(disableResult);
 
                         // Unblock WiFi
-                        string unblockResult = await Command.Execute("rfkill", "unblock wifi");
+                        string unblockResult = await Command.ExecuteAsync("rfkill", "unblock wifi");
                         result.AppendLine(unblockResult);
 
                         // Start station mode
@@ -146,14 +146,14 @@ namespace DuetPiManagementPlugin.Network
                         result.AppendLine(wpaResult);
 
                         // Enable the adapter again
-                        string enableResult = await Command.Execute("ip", $"link set {iface.Name} up");
+                        string enableResult = await Command.ExecuteAsync("ip", $"link set {iface.Name} up");
                         result.AppendLine(enableResult);
 
                         // Connect to the given SSID (if applicable)
                         if (pParam is not null)
                         {
                             // Find the network index
-                            string networkList = await Command.Execute("wpa_cli", "list_networks");
+                            string networkList = await Command.ExecuteAsync("wpa_cli", "list_networks");
                             Regex ssidRegex = new($"^(\\d+)\\s+{Regex.Escape(pParam)}\\W", RegexOptions.IgnoreCase);
 
                             int networkIndex = -1;
@@ -182,7 +182,7 @@ namespace DuetPiManagementPlugin.Network
                             }
 
                             // Select it
-                            string selectResult = await Command.Execute("wpa_cli", $"-i {iface.Name} select_network {networkIndex}");
+                            string selectResult = await Command.ExecuteAsync("wpa_cli", $"-i {iface.Name} select_network {networkIndex}");
                             if (selectResult.Trim() != "OK")
                             {
                                 result.AppendLine(selectResult);
@@ -215,7 +215,7 @@ namespace DuetPiManagementPlugin.Network
                         result.AppendLine(await WpaSupplicant.Stop());
 
                         // Disable the adapter
-                        string disableResult = await Command.Execute("ip", $"link set {iface.Name} down");
+                        string disableResult = await Command.ExecuteAsync("ip", $"link set {iface.Name} down");
                         result.AppendLine(disableResult);
                     }
 
@@ -244,7 +244,7 @@ namespace DuetPiManagementPlugin.Network
                     else
                     {
                         // Enable or disable the adapter if required
-                        result.AppendLine(await Command.Execute("ip", $"link set {iface.Name} {(sParam > 0 ? "up" : "down")}"));
+                        result.AppendLine(await Command.ExecuteAsync("ip", $"link set {iface.Name} {(sParam > 0 ? "up" : "down")}"));
                     }
                 }
 

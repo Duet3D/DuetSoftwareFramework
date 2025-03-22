@@ -20,6 +20,13 @@ var bufferSize = new Option<int>(
     aliases: ["-b", "--buffer-size"],
     description: "Maximum number of codes to buffer at once"
 );
+bufferSize.AddValidator((result) =>
+{
+    if (result.GetValueForOption(bufferSize) < 1)
+    {
+        result.ErrorMessage = "Buffer size must be greater than or equal to 1";
+    }
+});
 
 var rootCommand = new RootCommand("Code stream to send G/M/T-codes to DuetControlServer")
 {

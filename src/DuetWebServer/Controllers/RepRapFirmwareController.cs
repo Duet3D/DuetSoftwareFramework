@@ -110,14 +110,14 @@ namespace DuetWebServer.Controllers
             try
             {
                 using CommandConnection connection = await BuildConnection();
-                if ((_settings.OverrideWebPassword == null && await connection.CheckPassword(password ?? string.Empty)) ||
+                if ((_settings.OverrideWebPassword == null && await connection.CheckPasswordAsync(password ?? string.Empty)) ||
                     (_settings.OverrideWebPassword != null && _settings.OverrideWebPassword == (password ?? string.Empty)))
                 {
-                    int sessionId = await connection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, HttpContext.Connection.RemoteIpAddress!.ToString());
+                    int sessionId = await connection.AddUserSessionAsync(AccessLevel.ReadWrite, SessionType.HTTP, HttpContext.Connection.RemoteIpAddress!.ToString());
                     _ = sessionStorage.MakeSessionKey(sessionId, HttpContext.Connection.RemoteIpAddress.ToString(), true);
 
                     // See RepRapFirmware/src/Platform/Platform.cpp -> Platform::GetBoardString()
-                    ObjectModel model = await connection.GetObjectModel();
+                    ObjectModel model = await connection.GetObjectModelAsync();
                     string boardString = model.Boards.First(board => board.CanAddress is null or 0)?.ShortName switch
                     {
                         "Mini5plus" => "duet5lcunknown",
@@ -199,7 +199,7 @@ namespace DuetWebServer.Controllers
                     if (sessionId > 0)
                     {
                         using CommandConnection connection = await BuildConnection();
-                        await connection.RemoveUserSession(sessionId);
+                        await connection.RemoveUserSessionAsync(sessionId);
                     }
                 }
                 return NoContent();
@@ -230,7 +230,7 @@ namespace DuetWebServer.Controllers
                 {
                     using CommandConnection connection = await BuildConnection();
                     LogInformation($"Executing code '{gcode}'");
-                    _ = await connection.PerformSimpleCode(gcode, CodeChannel.HTTP, true);
+                    _ = await connection.PerformSimpleCodeAsync(gcode, CodeChannel.HTTP, true);
                 }
                 return Content("{\"bufferSpace\":255,\"err\":0}", "application/json");
             }
@@ -549,7 +549,7 @@ namespace DuetWebServer.Controllers
                 if (string.IsNullOrWhiteSpace(key) && flags?.Contains('f') == true)
                 {
                     // Update special "seqs" values in common live query resul
-                    response = await connection.PerformSimpleCode($"M409 F\"{flags}\"");
+                    response = await connection.PerformSimpleCodeAsync($"M409 F\"{flags}\"");
 
                     // Update sequence numbers where applicable
                     using JsonDocument jsonDoc = JsonDocument.Parse(response);
@@ -579,7 +579,7 @@ namespace DuetWebServer.Controllers
                 else
                 {
                     // Fall back to M409
-                    response = await connection.PerformSimpleCode($"M409 K\"{key}\" F\"{flags}\"");
+                    response = await connection.PerformSimpleCodeAsync($"M409 K\"{key}\" F\"{flags}\"");
                 }
 
                 return Content(response, "application/json");
@@ -713,7 +713,7 @@ namespace DuetWebServer.Controllers
                 using CommandConnection connection = await BuildConnection();
                 if (string.IsNullOrEmpty(name))
                 {
-                    ObjectModel model = await connection.GetObjectModel();
+                    ObjectModel model = await connection.GetObjectModelAsync();
                     if (string.IsNullOrEmpty(model.Job.File.FileName))
                     {
                         // Not printing a file, cannot get fileinfo
@@ -724,13 +724,13 @@ namespace DuetWebServer.Controllers
                 }
 
                 // Get fileinfo
-                string resolvedPath = await connection.ResolvePath(name, DuetAPI.Commands.FileDirectory.GCodes);
+                string resolvedPath = await connection.ResolvePathAsync(name, DuetAPI.Commands.FileDirectory.GCodes);
                 if (!System.IO.File.Exists(resolvedPath))
                 {
                     LogWarning($"Could not find file {name} (resolved to {resolvedPath})");
                     return Content("{\"err\":1}", "application/json");
                 }
-                GCodeFileInfo info = await connection.GetFileInfo(resolvedPath, true);
+                GCodeFileInfo info = await connection.GetFileInfoAsync(resolvedPath, true);
                 lock (this)
                 {
                     _lastFileInfo = info;
@@ -823,7 +823,7 @@ namespace DuetWebServer.Controllers
                 }
 
                 // Get actual filename
-                string resolvedPath = await connection.ResolvePath(name);
+                string resolvedPath = await connection.ResolvePathAsync(name);
                 if (!System.IO.File.Exists(resolvedPath))
                 {
                     LogWarning($"Could not find file {name} (resolved to {resolvedPath})");
@@ -841,7 +841,7 @@ namespace DuetWebServer.Controllers
                 }
                 if (info is null)
                 {
-                    info = await connection.GetFileInfo(resolvedPath, true);
+                    info = await connection.GetFileInfoAsync(resolvedPath, true);
                     lock (this)
                     {
                         _lastFileInfo = info;
@@ -886,14 +886,14 @@ namespace DuetWebServer.Controllers
         private async Task<CommandConnection> BuildConnection()
         {
             CommandConnection connection = new();
-            await connection.Connect(_settings.SocketPath);
+            await connection.ConnectAsync(_settings.SocketPath);
             return connection;
         }
 
         private async Task<string> ResolvePath(string path)
         {
             using CommandConnection connection = await BuildConnection();
-            return await connection.ResolvePath(path);
+            return await connection.ResolvePathAsync(path);
         }
     }
 }

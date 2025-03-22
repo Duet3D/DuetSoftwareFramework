@@ -390,14 +390,14 @@ namespace DuetPiManagementPlugin.Network
             StringBuilder builder = new();
             if (forAP is not null)
             {
-                builder.Append(await Command.Execute("systemctl", "restart dhcpcd.service"));
+                builder.Append(await Command.ExecuteAsync("systemctl", "restart dhcpcd.service"));
             }
 
             // Restart Ethernet adapter if it is up to apply the new configuration
             if (NetworkInterface.GetAllNetworkInterfaces().Any(item => item.Name == iface && item.OperationalStatus == OperationalStatus.Up) && forAP is null)
             {
-                builder.AppendLine(await Command.Execute("ip", $"link set {iface} down"));
-                builder.AppendLine(await Command.Execute("ip", $"link set {iface} up"));
+                builder.AppendLine(await Command.ExecuteAsync("ip", $"link set {iface} down"));
+                builder.AppendLine(await Command.ExecuteAsync("ip", $"link set {iface} up"));
             }
 
             // Done

@@ -18,7 +18,7 @@ public static class Commands
     /// <param name="socketPath">UNIX socket path for IPC</param>
     /// <param name="quiet">Run command quietly</param>
     /// <param name="bufferSize">Maximum number of commands to buffer</param>
-    /// <returns></returns>
+    /// <returns>Exit code</returns>
     public static async Task<int> MainAsync(FileInfo socketPath, bool quiet, int bufferSize)
     {
         // Create a new connection and connect to DuetControlServer
@@ -61,7 +61,7 @@ public static class Commands
             {
                 // Read the next line from stdin
                 string? line = Console.ReadLine();
-                if (line is null || line == "exit" || line == "quit")
+                if (line is null or "exit" or "quit")
                 {
                     cancellationTokenSource.Cancel();
                     break;

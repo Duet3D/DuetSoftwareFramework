@@ -23,11 +23,11 @@ namespace DuetPiManagementPlugin.Network
         public static async Task<string> Start()
         {
             StringBuilder builder = new();
-            if (!await Command.ExecQuery("systemctl", "is-enabled -q wpa_supplicant.service"))
+            if (!await Command.ExecQueryAsync("systemctl", "is-enabled -q wpa_supplicant.service"))
             {
                 builder.AppendLine(await DHCP.SetIPAddress("wlan0", null, null, null, null));
-                builder.AppendLine(await Command.Execute("systemctl", "start wpa_supplicant.service"));
-                builder.AppendLine(await Command.Execute("systemctl", "enable -q wpa_supplicant.service"));
+                builder.AppendLine(await Command.ExecuteAsync("systemctl", "start wpa_supplicant.service"));
+                builder.AppendLine(await Command.ExecuteAsync("systemctl", "enable -q wpa_supplicant.service"));
             }
             return builder.ToString().Trim();
         }
@@ -39,10 +39,10 @@ namespace DuetPiManagementPlugin.Network
         public static async Task<string> Stop()
         {
             StringBuilder builder = new();
-            if (await Command.ExecQuery("systemctl", "is-enabled -q wpa_supplicant.service"))
+            if (await Command.ExecQueryAsync("systemctl", "is-enabled -q wpa_supplicant.service"))
             {
-                builder.AppendLine(await Command.Execute("systemctl", "stop wpa_supplicant.service"));
-                builder.AppendLine(await Command.Execute("systemctl", "disable -q wpa_supplicant.service"));
+                builder.AppendLine(await Command.ExecuteAsync("systemctl", "stop wpa_supplicant.service"));
+                builder.AppendLine(await Command.ExecuteAsync("systemctl", "disable -q wpa_supplicant.service"));
             }
             return builder.ToString().Trim();
         }
@@ -315,7 +315,7 @@ namespace DuetPiManagementPlugin.Network
             }
 
             // Restart the service to apply the new configuration
-            string restartResult = await Command.Execute("systemctl", "restart wpa_supplicant.service");
+            string restartResult = await Command.ExecuteAsync("systemctl", "restart wpa_supplicant.service");
             if (!string.IsNullOrWhiteSpace(restartResult))
             {
                 result.Content += '\n' + restartResult;

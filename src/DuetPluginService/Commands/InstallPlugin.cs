@@ -1,8 +1,7 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetAPIClient;
-using DuetPluginService.Singletons;
-using DuetPluginService.Singletons.PermissionManagers;
+using DuetPluginService.PermissionManagers;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -18,7 +17,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetPluginService.Commands;
+namespace DuetPluginService.IPC;
 
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.InstallPlugin"/> command

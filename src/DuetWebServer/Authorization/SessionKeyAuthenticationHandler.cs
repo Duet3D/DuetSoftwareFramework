@@ -73,10 +73,10 @@ namespace DuetWebServer.Authorization
                     try
                     {
                         using CommandConnection connection = await BuildConnection();
-                        if (await connection.CheckPassword(Defaults.Password))
+                        if (await connection.CheckPasswordAsync(Defaults.Password))
                         {
                             // No password set - assign a new ticket so that replies are saved
-                            int sessionId = await connection.AddUserSession(AccessLevel.ReadWrite, SessionType.HTTP, ipAddress);
+                            int sessionId = await connection.AddUserSessionAsync(AccessLevel.ReadWrite, SessionType.HTTP, ipAddress);
                             ticket = sessionStorage.MakeSessionTicket(sessionId, ipAddress, true);
                         }
                     }
@@ -100,7 +100,7 @@ namespace DuetWebServer.Authorization
         private async Task<CommandConnection> BuildConnection()
         {
             CommandConnection connection = new();
-            await connection.Connect(_settings.SocketPath);
+            await connection.ConnectAsync(_settings.SocketPath);
             return connection;
         }
     }

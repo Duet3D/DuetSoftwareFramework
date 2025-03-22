@@ -1,5 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPIClient;
+using DuetSharedLibrary;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
@@ -32,9 +33,9 @@ namespace DuetPiManagementPlugin.Network.Protocols
         public static async Task SetProtocol(NetworkProtocol protocol, bool enabled)
         {
             // Update the object model
-            using CommandConnection commandConnection = new();
-            await commandConnection.Connect("/var/run/dsf/dcs.sock", Program.CancellationToken);
-            await commandConnection.SetNetworkProtocol(protocol, enabled);
+            using InternalCommandConnection commandConnection = new();
+            await commandConnection.ConnectAsync("/var/run/dsf/dcs.sock", Program.CancellationToken);
+            await commandConnection.SetNetworkProtocolAsync(protocol, enabled);
 
             // Store this internally as well
             if (enabled)

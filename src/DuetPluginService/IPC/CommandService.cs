@@ -6,15 +6,14 @@ using System;
 using System.Net.Sockets;
 using DuetAPI.ObjectModel;
 using System.Collections.Generic;
-using Microsoft.Extensions.DependencyInjection;
-using DuetPluginService.Singletons;
 using System.IO;
 using System.Text.Json;
+using DuetPluginService.Commands;
 
-namespace DuetPluginService.Services;
+namespace DuetPluginService.IPC;
 
 /// <summary>
-/// Main service which interacts with DCS to perform plugin-specific tasks
+/// Service which interacts with DCS to perform plugin-specific tasks
 /// </summary>
 /// <param name="connection">Plugin service connection</param>
 /// <param name="pluginStore">Plugin store</param>
@@ -136,7 +135,7 @@ public class CommandService(CommandActivator commandActivator, PluginServiceConn
             {
                 if (pluginStore.Processes.ContainsKey(plugin.Id))
                 {
-                    Commands.StopPlugin stopPlugin = commandActivator.Create<Commands.StopPlugin>();
+                    IPC.StopPlugin stopPlugin = commandActivator.Create<IPC.StopPlugin>();
                     stopPlugin.Plugin = plugin.Id;
                     stopTasks.Add(stopPlugin.ExecuteAsync(cancellationToken));
                 }

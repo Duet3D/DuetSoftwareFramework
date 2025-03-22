@@ -418,8 +418,8 @@ namespace DuetWebServer.Singletons
             try
             {
                 using CommandConnection connection = new();
-                await connection.Connect(socketPath);
-                await connection.RemoveUserSession(sessionId);
+                await connection.ConnectAsync(socketPath);
+                await connection.RemoveUserSessionAsync(sessionId);
             }
             catch (Exception e)
             {

@@ -126,8 +126,8 @@ namespace DuetWebServer.Controllers
                 try
                 {
                     using CommandConnection connection = new();
-                    await connection.Connect(_settings.SocketPath);
-                    if (!await connection.CheckPassword(Defaults.Password))
+                    await connection.ConnectAsync(_settings.SocketPath);
+                    if (!await connection.CheckPasswordAsync(Defaults.Password))
                     {
                         // Non-default password set and no sessionKey passed
                         HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
@@ -201,7 +201,7 @@ namespace DuetWebServer.Controllers
             try
             {
                 // Subscribe to object model updates targeting the HTTP code channel
-                await subscribeConnection.Connect(SubscriptionMode.Patch, CodeChannel.HTTP, [], _settings.SocketPath);
+                await subscribeConnection.ConnectAsync(SubscriptionMode.Patch, CodeChannel.HTTP, [], _settings.SocketPath);
             }
             catch (Exception e)
             {
@@ -244,7 +244,7 @@ namespace DuetWebServer.Controllers
             try
             {
                 // Fetch full model copy and send it over initially
-                await using (MemoryStream json = await subscribeConnection.GetSerializedObjectModel())
+                await using (MemoryStream json = await subscribeConnection.GetSerializedObjectModelAsync())
                 {
                     await webSocket.SendAsync(json.ToArray(), WebSocketMessageType.Text, true, default);
                 }
@@ -364,7 +364,7 @@ namespace DuetWebServer.Controllers
                 }
 
                 // Wait for another object model update and send it to the client
-                await using MemoryStream objectModelPatch = await subscribeConnection.GetSerializedObjectModel(cancellationToken);
+                await using MemoryStream objectModelPatch = await subscribeConnection.GetSerializedObjectModelAsync(cancellationToken);
                 await webSocket.SendAsync(objectModelPatch.ToArray(), WebSocketMessageType.Text, true, cancellationToken);
             }
             while (webSocket.State == WebSocketState.Open);

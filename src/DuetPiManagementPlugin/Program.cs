@@ -92,7 +92,7 @@ namespace DuetPiManagementPlugin
             }
 
             // Create an intercepting connection for codes that are not supported natively by DCS
-            await Connection.Connect(InterceptionMode.Pre, null, CodesToIntercept, false, socketPath);
+            await Connection.ConnectAsync(InterceptionMode.Pre, null, CodesToIntercept, false, socketPath);
 
             // Keep the WiFi country up-to-date
             await CountryCodeUpdater.Init(socketPath);
@@ -120,8 +120,8 @@ namespace DuetPiManagementPlugin
             // Tell DSF we're up and running
             using (CommandConnection commandConnection = new())
             {
-                await commandConnection.Connect(socketPath);
-                await commandConnection.NotifyPluginStarted();
+                await commandConnection.ConnectAsync(socketPath);
+                await commandConnection.NotifyPluginStartedAsync();
             }
 
             // Keep intercepting codes until the plugin is stopped
@@ -130,12 +130,12 @@ namespace DuetPiManagementPlugin
                 Code code;
                 try
                 {
-                    code = await Connection.ReceiveCode(CancellationToken);
+                    code = await Connection.ReceiveCodeAsync(CancellationToken);
 
                     // Don't process system codes that need to go straight to the firmware
                     if (code.Flags.HasFlag(CodeFlags.IsInternallyProcessed))
                     {
-                        await Connection.IgnoreCode();
+                        await Connection.IgnoreCodeAsync();
                         continue;
                     }
                 }
@@ -162,31 +162,31 @@ namespace DuetPiManagementPlugin
                                         {
                                             if (!string.IsNullOrEmpty(directory))
                                             {
-                                                directory = await Connection.ResolvePath(directory, CancellationToken);
+                                                directory = await Connection.ResolvePathAsync(directory, CancellationToken);
                                             }
                                             Message result = await Mount.MountShare(device, directory, type, options);
-                                            await Connection.ResolveCode(result, CancellationToken);
+                                            await Connection.ResolveCodeAsync(result, CancellationToken);
                                         }
                                         catch (Exception e)
                                         {
-                                            await Connection.ResolveCode(MessageType.Error, e.Message, CancellationToken);
+                                            await Connection.ResolveCodeAsync(MessageType.Error, e.Message, CancellationToken);
                                             Console.WriteLine(e);
                                         }
                                     }
                                     else if (pParam.Type == typeof(int))
                                     {
                                         // PanelDue wants to mount an already mounted volume, handle it
-                                        await Connection.ResolveCode(MessageType.Success, string.Empty, CancellationToken);
+                                        await Connection.ResolveCodeAsync(MessageType.Success, string.Empty, CancellationToken);
                                     }
                                     else
                                     {
                                         // Unsupported P parameter
-                                        await Connection.ResolveCode(MessageType.Error, "Unsupported P parameter", CancellationToken);
+                                        await Connection.ResolveCodeAsync(MessageType.Error, "Unsupported P parameter", CancellationToken);
                                     }
                                 }
                                 else
                                 {
-                                    await Connection.IgnoreCode();
+                                    await Connection.IgnoreCodeAsync();
                                 }
                                 break;
                             }
@@ -197,24 +197,24 @@ namespace DuetPiManagementPlugin
                             {
                                 try
                                 {
-                                    string directory = await Connection.ResolvePath(node, CancellationToken);
+                                    string directory = await Connection.ResolvePathAsync(node, CancellationToken);
                                     if (Directory.Exists(directory))
                                     {
                                         node = directory;
                                     }
 
                                     Message result = await Mount.UnmountShare(node);
-                                    await Connection.ResolveCode(result, CancellationToken);
+                                    await Connection.ResolveCodeAsync(result, CancellationToken);
                                 }
                                 catch (Exception e)
                                 {
-                                    await Connection.ResolveCode(MessageType.Error, e.Message, CancellationToken);
+                                    await Connection.ResolveCodeAsync(MessageType.Error, e.Message, CancellationToken);
                                     Console.WriteLine(e);
                                 }
                             }
                             else
                             {
-                                await Connection.IgnoreCode();
+                                await Connection.IgnoreCodeAsync();
                             }
                             break;
 
@@ -226,17 +226,17 @@ namespace DuetPiManagementPlugin
                                 if (code.TryGetString('P', out string? address))
                                 {
                                     Message setResult = await Interface.SetMACAddress(index, address);
-                                    await Connection.ResolveCode(setResult, CancellationToken);
+                                    await Connection.ResolveCodeAsync(setResult, CancellationToken);
                                 }
                                 else
                                 {
                                     byte[] macAddress = Interface.Get(index).GetPhysicalAddress().GetAddressBytes();
-                                    await Connection.ResolveCode(MessageType.Success, $"MAC: {BitConverter.ToString(macAddress).Replace('-', ':')}", CancellationToken);
+                                    await Connection.ResolveCodeAsync(MessageType.Success, $"MAC: {BitConverter.ToString(macAddress).Replace('-', ':')}", CancellationToken);
                                 }
                             }
                             catch (Exception e)
                             {
-                                await Connection.ResolveCode(MessageType.Error, e.Message, CancellationToken);
+                                await Connection.ResolveCodeAsync(MessageType.Error, e.Message, CancellationToken);
                                 Console.WriteLine(e);
                             }
                             break;
@@ -247,21 +247,21 @@ namespace DuetPiManagementPlugin
                             {
                                 if (newHostname.Length > 40)
                                 {
-                                    await Connection.ResolveCode(MessageType.Error, "Machine name is too long", CancellationToken);
+                                    await Connection.ResolveCodeAsync(MessageType.Error, "Machine name is too long", CancellationToken);
                                 }
                                 else if (newHostname.Contains('\"') || newHostname.Contains('\\'))
                                 {
-                                    await Connection.ResolveCode(MessageType.Error, "Hostname contains invalid characters", CancellationToken);
+                                    await Connection.ResolveCodeAsync(MessageType.Error, "Hostname contains invalid characters", CancellationToken);
                                 }
                                 else
                                 {
                                     Regex hostnameRegex = new(@"^\s*127\.0\.[01]\.1\s+" + Environment.MachineName + @"\s*$", RegexOptions.IgnoreCase);
 
                                     // 1. Apply new hostname using hostnamectl
-                                    string setResult = await Command.Execute("hostnamectl", $"set-hostname \"{newHostname}\"");
+                                    string setResult = await Command.ExecuteAsync("hostnamectl", $"set-hostname \"{newHostname}\"");
                                     if (!string.IsNullOrWhiteSpace(setResult))
                                     {
-                                        await Connection.ResolveCode(MessageType.Error, setResult, CancellationToken);
+                                        await Connection.ResolveCodeAsync(MessageType.Error, setResult, CancellationToken);
                                         break;
                                     }
 
@@ -291,13 +291,13 @@ namespace DuetPiManagementPlugin
                                     }
 
                                     // Success, let DSF/RRF process this code too
-                                    await Connection.IgnoreCode(CancellationToken);
+                                    await Connection.IgnoreCodeAsync(CancellationToken);
                                 }
                             }
                             else
                             {
                                 // Let RRF generate the response
-                                await Connection.IgnoreCode(CancellationToken);
+                                await Connection.IgnoreCodeAsync(CancellationToken);
                             }
                             break;
 
@@ -310,12 +310,12 @@ namespace DuetPiManagementPlugin
                                     int index = code.GetInt('I', 0);
                                     try
                                     {
-                                        Message manageResult = await Interface.SetConfig(index, pParam, sParam);
-                                        await Connection.ResolveCode(manageResult, CancellationToken);
+                                        Message manageResult = await Interface.SetConfigAsync(index, pParam, sParam);
+                                        await Connection.ResolveCodeAsync(manageResult, CancellationToken);
                                     }
                                     catch (Exception e)
                                     {
-                                        await Connection.ResolveCode(MessageType.Error, e.Message, CancellationToken);
+                                        await Connection.ResolveCodeAsync(MessageType.Error, e.Message, CancellationToken);
                                         Console.WriteLine(e);
                                     }
                                 }
@@ -323,7 +323,7 @@ namespace DuetPiManagementPlugin
                                 {
                                     StringBuilder builder = new();
                                     await Interface.Report(builder, null, code.GetInt('I', -1));
-                                    await Connection.ResolveCode(MessageType.Success, builder.ToString().TrimEnd(), CancellationToken);
+                                    await Connection.ResolveCodeAsync(MessageType.Success, builder.ToString().TrimEnd(), CancellationToken);
                                 }
                             }
                             break;
@@ -334,11 +334,11 @@ namespace DuetPiManagementPlugin
                             {
                                 int index = code.GetInt('I', 0);
                                 string result = await Interface.ManageNetmask(index, code.GetIPAddress('P'));
-                                await Connection.ResolveCode(MessageType.Success, result, CancellationToken);
+                                await Connection.ResolveCodeAsync(MessageType.Success, result, CancellationToken);
                             }
                             catch (Exception e)
                             {
-                                await Connection.ResolveCode(MessageType.Error, e.Message, CancellationToken);
+                                await Connection.ResolveCodeAsync(MessageType.Error, e.Message, CancellationToken);
                                 Console.WriteLine(e);
                             }
                             break;
@@ -351,11 +351,11 @@ namespace DuetPiManagementPlugin
                                 _ = code.TryGetIPAddress('P', out IPAddress? gateway);
                                 _ = code.TryGetIPAddress('S', out IPAddress? dnsServer);
                                 string result = await Interface.ManageGateway(index, gateway, dnsServer);
-                                await Connection.ResolveCode(MessageType.Success, result, CancellationToken);
+                                await Connection.ResolveCodeAsync(MessageType.Success, result, CancellationToken);
                             }
                             catch (Exception e)
                             {
-                                await Connection.ResolveCode(MessageType.Error, e.Message, CancellationToken);
+                                await Connection.ResolveCodeAsync(MessageType.Error, e.Message, CancellationToken);
                                 Console.WriteLine(e);
                             }
                             break;
@@ -367,7 +367,7 @@ namespace DuetPiManagementPlugin
                                 if (code.MinorNumber == 4)
                                 {
                                     // M586.4 is handled by DCS
-                                    await Connection.IgnoreCode();
+                                    await Connection.IgnoreCodeAsync();
                                 }
                                 else if (code.TryGetInt('P', out int protocol))
                                 {
@@ -376,29 +376,29 @@ namespace DuetPiManagementPlugin
                                     if (string.IsNullOrWhiteSpace(result.Content) && (protocol == 4 || code.HasParameter('C')))
                                     {
                                         // Let DSF/RRF process M586 P4 (MQTT) or the combined C parameter
-                                        await Connection.IgnoreCode(CancellationToken);
+                                        await Connection.IgnoreCodeAsync(CancellationToken);
                                     }
                                     else
                                     {
                                         // Return the result of this action
-                                        await Connection.ResolveCode(result, CancellationToken);
+                                        await Connection.ResolveCodeAsync(result, CancellationToken);
                                     }
                                 }
                                 else if (code.HasParameter('C'))
                                 {
                                     // Let DSF/RRF process the standalone C parameter
-                                    await Connection.IgnoreCode(CancellationToken);
+                                    await Connection.IgnoreCodeAsync(CancellationToken);
                                 }
                                 else
                                 {
                                     // Report the protocol status
                                     Message report = await Network.Protocols.Manager.ReportProtocols();
-                                    await Connection.ResolveCode(report, CancellationToken);
+                                    await Connection.ResolveCodeAsync(report, CancellationToken);
                                 }
                             }
                             catch (Exception e)
                             {
-                                await Connection.ResolveCode(MessageType.Error, $"Failed to perform action: {e.Message}", CancellationToken);
+                                await Connection.ResolveCodeAsync(MessageType.Error, $"Failed to perform action: {e.Message}", CancellationToken);
                                 Console.WriteLine(e);
                             }
                             break;
@@ -416,12 +416,12 @@ namespace DuetPiManagementPlugin
                                     {
                                         if (ssid is null)
                                         {
-                                            await Connection.ResolveCode(MessageType.Error, "Missing S parameter");
+                                            await Connection.ResolveCodeAsync(MessageType.Error, "Missing S parameter");
                                             break;
                                         }
                                         if (psk.Length < 8 || psk.Length > 64)
                                         {
-                                            await Connection.ResolveCode(MessageType.Error, "WiFi password must be between 8 and 64 characters");
+                                            await Connection.ResolveCodeAsync(MessageType.Error, "WiFi password must be between 8 and 64 characters");
                                             break;
                                         }
                                     }
@@ -435,7 +435,7 @@ namespace DuetPiManagementPlugin
                                     {
                                         // Output currently configured SSIDs
                                         Message ssidReport = await Interface.ReportSSIDs();
-                                        await Connection.ResolveCode(ssidReport, CancellationToken);
+                                        await Connection.ResolveCodeAsync(ssidReport, CancellationToken);
                                     }
                                     else
                                     {
@@ -447,27 +447,27 @@ namespace DuetPiManagementPlugin
                                             string setIPResult = await Interface.SetIPAddress("wlan0", ip, netmask, gateway, dnsServer);
                                             configResult.Content = (configResult.Content + '\n' + setIPResult).Trim();
                                         }
-                                        await Connection.ResolveCode(configResult, CancellationToken);
+                                        await Connection.ResolveCodeAsync(configResult, CancellationToken);
                                     }
                                 }
                                 else if (code.MinorNumber == 1)
                                 {
                                     Message startResult = WifiScan.Start();
-                                    await Connection.ResolveCode(startResult, CancellationToken);
+                                    await Connection.ResolveCodeAsync(startResult, CancellationToken);
                                 }
                                 else if (code.MinorNumber == 2)
                                 {
                                     Message scanResult = WifiScan.GetResult(code.GetBool('F', false));
-                                    await Connection.ResolveCode(scanResult, CancellationToken);
+                                    await Connection.ResolveCodeAsync(scanResult, CancellationToken);
                                 }
                                 else
                                 {
-                                    await Connection.ResolveCode(MessageType.Warning, "Command is not supported");
+                                    await Connection.ResolveCodeAsync(MessageType.Warning, "Command is not supported");
                                 }
                             }
                             catch (Exception e)
                             {
-                                await Connection.ResolveCode(MessageType.Error, $"Failed to perform action: {e.Message}", CancellationToken);
+                                await Connection.ResolveCodeAsync(MessageType.Error, $"Failed to perform action: {e.Message}", CancellationToken);
                                 Console.WriteLine(e);
                             }
                             break;
@@ -478,11 +478,11 @@ namespace DuetPiManagementPlugin
                             {
                                 // Remove SSID(s) if possible
                                 Message configResult = await Interface.UpdateSSID(code.GetString('S'), null);
-                                await Connection.ResolveCode(configResult, CancellationToken);
+                                await Connection.ResolveCodeAsync(configResult, CancellationToken);
                             }
                             catch (Exception e)
                             {
-                                await Connection.ResolveCode(MessageType.Error, $"Failed to perform action: {e.Message}", CancellationToken);
+                                await Connection.ResolveCodeAsync(MessageType.Error, $"Failed to perform action: {e.Message}", CancellationToken);
                                 Console.WriteLine(e);
                             }
                             break;
@@ -493,11 +493,11 @@ namespace DuetPiManagementPlugin
                             {
                                 // Set up hostapd configuration
                                 Message configResult = await AccessPoint.Configure(code.GetString('S'), code.GetString('P'), code.GetIPAddress('I', IPAddress.Any), code.GetInt('C', 6));
-                                await Connection.ResolveCode(configResult, CancellationToken);
+                                await Connection.ResolveCodeAsync(configResult, CancellationToken);
                             }
                             catch (Exception e)
                             {
-                                await Connection.ResolveCode(MessageType.Error, $"Failed to perform action: {e.Message}", CancellationToken);
+                                await Connection.ResolveCodeAsync(MessageType.Error, $"Failed to perform action: {e.Message}", CancellationToken);
                                 Console.WriteLine(e);
                             }
                             break;
@@ -510,9 +510,9 @@ namespace DuetPiManagementPlugin
 
                                 if (code.TryGetBool('A', out bool? useNTP))
                                 {
-                                    if (!await Command.ExecQuery("timedatectl", $"set-ntp {(useNTP.Value ? "true" : "false")}"))
+                                    if (!await Command.ExecQueryAsync("timedatectl", $"set-ntp {(useNTP.Value ? "true" : "false")}"))
                                     {
-                                        await Connection.ResolveCode(MessageType.Error, "Failed to set NTP");
+                                        await Connection.ResolveCodeAsync(MessageType.Error, "Failed to set NTP");
                                         break;
                                     }
                                     seen = true;
@@ -522,15 +522,15 @@ namespace DuetPiManagementPlugin
                                 {
                                     if (DateTime.TryParseExact(dayString, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date))
                                     {
-                                        if (!await Command.ExecQuery("timedatectl", $"set-time {date:yyyy-MM-dd}"))
+                                        if (!await Command.ExecQueryAsync("timedatectl", $"set-time {date:yyyy-MM-dd}"))
                                         {
-                                            await Connection.ResolveCode(MessageType.Error, "Failed to set date (NTP enabled?)");
+                                            await Connection.ResolveCodeAsync(MessageType.Error, "Failed to set date (NTP enabled?)");
                                             break;
                                         }
                                     }
                                     else
                                     {
-                                        await Connection.ResolveCode(MessageType.Error, "Invalid date format");
+                                        await Connection.ResolveCodeAsync(MessageType.Error, "Invalid date format");
                                         break;
                                     }
                                 }
@@ -539,16 +539,16 @@ namespace DuetPiManagementPlugin
                                 {
                                     if (DateTime.TryParseExact(timeString, "HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime time))
                                     {
-                                        if (!await Command.ExecQuery("timedatectl", $"set-time {time:HH:mm:ss}"))
+                                        if (!await Command.ExecQueryAsync("timedatectl", $"set-time {time:HH:mm:ss}"))
                                         {
-                                            await Connection.ResolveCode(MessageType.Error, "Failed to set time (NYP enabled?)");
+                                            await Connection.ResolveCodeAsync(MessageType.Error, "Failed to set time (NYP enabled?)");
                                             break;
                                         }
                                         seen = true;
                                     }
                                     else
                                     {
-                                        await Connection.ResolveCode(MessageType.Error, "Invalid time format");
+                                        await Connection.ResolveCodeAsync(MessageType.Error, "Invalid time format");
                                         break;
                                     }
                                 }
@@ -562,23 +562,23 @@ namespace DuetPiManagementPlugin
                                     }
                                     else
                                     {
-                                        await Connection.ResolveCode(MessageType.Error, "Invalid time zone");
+                                        await Connection.ResolveCodeAsync(MessageType.Error, "Invalid time zone");
                                         break;
                                     }
                                 }
 
                                 if (seen)
                                 {
-                                    await Connection.IgnoreCode();      // RRF needs to see M905 as well
+                                    await Connection.IgnoreCodeAsync();      // RRF needs to see M905 as well
                                 }
                                 else
                                 {
-                                    await Connection.ResolveCode(MessageType.Success, $"Current date and time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                                    await Connection.ResolveCodeAsync(MessageType.Success, $"Current date and time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                                 }
                             }
                             catch (Exception e)
                             {
-                                await Connection.ResolveCode(MessageType.Error, $"Failed to perform action: {e.Message}", CancellationToken);
+                                await Connection.ResolveCodeAsync(MessageType.Error, $"Failed to perform action: {e.Message}", CancellationToken);
                                 Console.WriteLine(e);
                             }
                             break;
@@ -592,7 +592,7 @@ namespace DuetPiManagementPlugin
                                 {
                                     if (!_pkgFeedVersionRegex().IsMatch(packageFeed) && packageFeed != "dev")
                                     {
-                                        await Connection.ResolveCode(MessageType.Error, "Invalid package feed");
+                                        await Connection.ResolveCodeAsync(MessageType.Error, "Invalid package feed");
                                         break;
                                     }
 
@@ -608,19 +608,19 @@ namespace DuetPiManagementPlugin
                                         await File.WriteAllTextAsync("/etc/apt/sources.list.d/duet3d.list", $"deb https://pkg.duet3d.com/ {packageFeed} armv7");
 
                                         // Done
-                                        await Connection.ResolveCode(MessageType.Success, string.Empty);
+                                        await Connection.ResolveCodeAsync(MessageType.Success, string.Empty);
                                         break;
                                     }
                                     catch (Exception e)
                                     {
-                                        await Connection.ResolveCode(MessageType.Error, $"Failed to perform update: {e.Message}", CancelSource.Token);
+                                        await Connection.ResolveCodeAsync(MessageType.Error, $"Failed to perform update: {e.Message}", CancelSource.Token);
                                     }
                                 }
 
                                 try
                                 {
                                     // Put DSF into update status
-                                    await Connection.SetUpdateStatus(true);
+                                    await Connection.SetUpdateStatusAsync(true);
 
                                     // Update package lists
                                     using (Process updateProcess = Process.Start("/usr/bin/apt-get", "-y update"))
@@ -636,33 +636,33 @@ namespace DuetPiManagementPlugin
                                     if (code.TryGetString('V', out string? version))
                                     {
                                         // Install specific DSF/RRF version
-                                        result = await Command.Execute("install-dsf.sh", version);
+                                        result = await Command.ExecuteAsync("install-dsf.sh", version);
                                     }
                                     else
                                     {
                                         // Perform upgrade
-                                        await Command.ExecQuery("/usr/bin/unattended-upgrade", string.Empty);
+                                        await Command.ExecQueryAsync("/usr/bin/unattended-upgrade", string.Empty);
                                     }
 
                                     // Done
-                                    await Connection.SetUpdateStatus(false, CancelSource.Token);
-                                    await Connection.ResolveCode(string.IsNullOrEmpty(result) ? MessageType.Success : MessageType.Error, result, CancelSource.Token);
+                                    await Connection.SetUpdateStatusAsync(false, CancelSource.Token);
+                                    await Connection.ResolveCodeAsync(string.IsNullOrEmpty(result) ? MessageType.Success : MessageType.Error, result, CancelSource.Token);
                                 }
                                 catch (OperationCanceledException)
                                 {
                                     // Plugin is being updated, attempt to resolve the code at last
-                                    await Connection.ResolveCode(MessageType.Success, string.Empty);
+                                    await Connection.ResolveCodeAsync(MessageType.Success, string.Empty);
                                 }
                                 catch (Exception e)
                                 {
                                     // Something went wrong
-                                    await Connection.SetUpdateStatus(false, CancelSource.Token);
-                                    await Connection.ResolveCode(MessageType.Error, $"Failed to perform update: {e.Message}", CancelSource.Token);
+                                    await Connection.SetUpdateStatusAsync(false, CancelSource.Token);
+                                    await Connection.ResolveCodeAsync(MessageType.Error, $"Failed to perform update: {e.Message}", CancelSource.Token);
                                 }
                             }
                             else
                             {
-                                await Connection.IgnoreCode(CancellationToken);
+                                await Connection.IgnoreCodeAsync(CancellationToken);
                             }
                             break;
 
@@ -670,24 +670,24 @@ namespace DuetPiManagementPlugin
                         case 999:
                             if (code.GetInt('B', 0) == -1)
                             {
-                                string rebootResult = await Command.Execute("systemctl", (code.GetString('P', string.Empty) == "OFF") ? "poweroff" : "reboot");
-                                await Connection.ResolveCode(MessageType.Success, rebootResult);
+                                string rebootResult = await Command.ExecuteAsync("systemctl", (code.GetString('P', string.Empty) == "OFF") ? "poweroff" : "reboot");
+                                await Connection.ResolveCodeAsync(MessageType.Success, rebootResult);
                             }
                             else
                             {
-                                await Connection.IgnoreCode(CancellationToken);
+                                await Connection.IgnoreCodeAsync(CancellationToken);
                             }
                             break;
 
                         // Unknown code. Should never get here
                         default:
-                            await Connection.IgnoreCode();
+                            await Connection.IgnoreCodeAsync();
                             break;
                     }
                 }
                 catch (Exception e) when (e is MissingParameterException or InvalidParameterTypeException)
                 {
-                    await Connection.ResolveCode(MessageType.Error, $"{code.ToShortString()}: {e.Message}");
+                    await Connection.ResolveCodeAsync(MessageType.Error, $"{code.ToShortString()}: {e.Message}");
                 }
             }
             while (!CancellationToken.IsCancellationRequested);
