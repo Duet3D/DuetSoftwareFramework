@@ -306,7 +306,7 @@ namespace DuetControlServer.Model
         /// <returns>Evaluation result or null</returns>
         public static async Task<string?> Evaluate(Code code, bool evaluateAll)
         {
-            if (code.KeywordArgument is not null)
+            if (!string.IsNullOrEmpty(code.KeywordArgument))
             {
                 if (code.Keyword == KeywordType.Echo)
                 {
