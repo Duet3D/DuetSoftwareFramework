@@ -6,6 +6,16 @@
     public partial class Move : ModelObject, IStaticModelObject
     {
         /// <summary>
+        /// Value of the M201 T parameter. Only present in builds that support S-curve acceleration
+        /// </summary>
+        public float? AccelerationTime
+        {
+            get => _accelerationTime;
+            set => SetPropertyValue(ref _accelerationTime, value);
+        }
+        private float? _accelerationTime;
+
+        /// <summary>
         /// List of the configured axes
         /// </summary>
         /// <seealso cref="Axis"/>
@@ -127,6 +137,16 @@
 			set => SetPropertyValue(ref _travelAcceleration, value);
         }
         private float _travelAcceleration = 10000F;
+
+        /// <summary>
+        /// Indicates if S-curve acceleration is used. Only present in builds that support it
+        /// </summary>
+        public bool? UsingSCurve
+        {
+            get => _usingSCurve;
+            set => SetPropertyValue(ref _usingSCurve, value);
+        }
+        private bool? _usingSCurve;
 
         /// <summary>
         /// Virtual total extruder position
