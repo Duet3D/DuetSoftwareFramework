@@ -28,11 +28,6 @@ namespace DuetAPI.ObjectModel
         public ObservableCollection<float> Delays { get; } = [];
 
         /// <summary>
-        /// Input shaper durations (in s)
-        /// </summary>
-        public ObservableCollection<float> Durations { get; } = [];
-
-        /// <summary>
         /// Frequency (in Hz)
         /// </summary>
         public float Frequency
@@ -41,17 +36,6 @@ namespace DuetAPI.ObjectModel
             set => SetPropertyValue(ref _frequency, value);
         }
         private float _frequency = 40F;
-
-        /// <summary>
-        /// Minimum fraction of the original acceleration or feed rate to which the acceleration or
-        /// feed rate may be reduced in order to apply input shaping
-        /// </summary>
-        public float ReductionLimit
-        {
-            get => _reductionLimit;
-            set => SetPropertyValue(ref _reductionLimit, value);
-        }
-        private float _reductionLimit = 0.25F;
 
         /// <summary>
         /// Configured input shaping type

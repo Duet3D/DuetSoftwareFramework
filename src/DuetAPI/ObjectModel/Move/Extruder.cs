@@ -38,16 +38,6 @@ namespace DuetAPI.ObjectModel
         private DriverId? _driver;
 
         /// <summary>
-        /// Motor jerk during the current print only (in mm/s)
-        /// </summary>
-        public float PrintingJerk
-        {
-            get => _printingJerk;
-            set => SetPropertyValue(ref _printingJerk, value);
-        }
-        private float _printingJerk = 15;
-
-        /// <summary>
         /// Name of the currently loaded filament
         /// </summary>
         public string Filament
@@ -136,6 +126,16 @@ namespace DuetAPI.ObjectModel
 			set => SetPropertyValue(ref _pressureAdvance, value);
         }
         private float _pressureAdvance;
+
+        /// <summary>
+        /// Motor jerk during the current print only (in mm/s)
+        /// </summary>
+        public float PrintingJerk
+        {
+            get => _printingJerk;
+            set => SetPropertyValue(ref _printingJerk, value);
+        }
+        private float _printingJerk = 15;
 
         /// <summary>
         /// Raw extruder position as commanded by the slicer without extrusion factor applied (in mm)
