@@ -1,6 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,8 +25,9 @@ public static class Commands
     /// <param name="channels">Channels to intercept</param>
     /// <param name="filters">Code filters</param>
     /// <param name="priorityCodes">Intercept exit codes</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Exit code</returns>
-    public static async Task<int> MainAsync(FileInfo socketPath, bool quiet, List<InterceptionMode> types, List<CodeChannel>? channels, List<string>? filters, bool priorityCodes)
+    public static async Task<int> MainAsync(FileInfo socketPath, bool quiet, InterceptionMode[] types, CodeChannel[]? channels, string[]? filters, bool priorityCodes, CancellationToken cancellationToken)
     {
         InterceptConnection? preConnection = null, postConnection = null, executedConnection = null;
         try
@@ -37,17 +38,17 @@ public static class Commands
                 if (types.Contains(InterceptionMode.Pre))
                 {
                     preConnection = new InterceptConnection();
-                    await preConnection.ConnectAsync(InterceptionMode.Pre, channels, filters, priorityCodes, socketPath.FullName);
+                    await preConnection.ConnectAsync(InterceptionMode.Pre, channels, filters, priorityCodes, socketPath.FullName, cancellationToken);
                 }
                 if (types.Contains(InterceptionMode.Post))
                 {
                     postConnection = new InterceptConnection();
-                    await postConnection.ConnectAsync(InterceptionMode.Post, channels, filters, priorityCodes, socketPath.FullName);
+                    await postConnection.ConnectAsync(InterceptionMode.Post, channels, filters, priorityCodes, socketPath.FullName, cancellationToken);
                 }
                 if (types.Contains(InterceptionMode.Executed))
                 {
                     executedConnection = new InterceptConnection();
-                    await executedConnection.ConnectAsync(InterceptionMode.Executed, channels, filters, priorityCodes, socketPath.FullName);
+                    await executedConnection.ConnectAsync(InterceptionMode.Executed, channels, filters, priorityCodes, socketPath.FullName, cancellationToken);
                 }
             }
             catch (SocketException)
@@ -64,23 +65,12 @@ public static class Commands
                 Console.WriteLine("Connected!");
             }
 
-            // Catch Ctrl+C and stop the tasks when requested
-            using CancellationTokenSource cts = new();
-            Console.CancelKeyPress += (sender, args) =>
-            {
-                if (!cts.IsCancellationRequested)
-                {
-                    cts.Cancel();
-                    args.Cancel = true;
-                }
-            };
-
             // Keep listening on those connections
             Task[] tasks =
             [
-                (preConnection is not null) ? PrintIncomingCodesAsync(preConnection, quiet, cts.Token) : Task.CompletedTask,
-                (postConnection is not null) ? PrintIncomingCodesAsync(postConnection, quiet, cts.Token) : Task.CompletedTask,
-                (executedConnection is not null) ? PrintIncomingCodesAsync(executedConnection, quiet, cts.Token) : Task.CompletedTask
+                (preConnection is not null) ? PrintIncomingCodesAsync(preConnection, quiet, cancellationToken) : Task.CompletedTask,
+                (postConnection is not null) ? PrintIncomingCodesAsync(postConnection, quiet, cancellationToken) : Task.CompletedTask,
+                (executedConnection is not null) ? PrintIncomingCodesAsync(executedConnection, quiet, cancellationToken) : Task.CompletedTask
             ];
 
             // Wait for all tasks to finish

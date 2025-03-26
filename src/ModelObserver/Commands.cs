@@ -13,10 +13,19 @@ namespace ModelObserver;
 
 public static class Commands
 {
-    public static async Task<int> MainAsync(FileInfo socketPath, bool quiet, List<string> filters, bool confirm)
+    /// <summary>
+    /// Main command handler
+    /// </summary>
+    /// <param name="socketPath">UNIX socket path</param>
+    /// <param name="quiet">Disable output messages</param>
+    /// <param name="filters">Object model filters</param>
+    /// <param name="confirm">Confirm object model receipts</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns></returns>
+    public static async Task<int> MainAsync(FileInfo socketPath, bool quiet, string[] filters, bool confirm, CancellationToken cancellationToken)
     {
         // Get an optional filter string
-        if (!quiet && filters.Count == 0)
+        if (!quiet && filters.Length == 0)
         {
             Console.WriteLine("Please enter a filter expression or press RETURN to receive partial model updates:");
             string? line = Console.ReadLine();
@@ -30,9 +39,9 @@ public static class Commands
                 }
             }
         }
-        else if (filters.Count == 1 && filters[0] == "null")
+        else if (filters.Length == 1 && filters[0] == "null")
         {
-            filters.Clear();
+            filters = [];
         }
 
         // Connect to DCS
@@ -55,17 +64,6 @@ public static class Commands
             Console.WriteLine("Connected!");
         }
 
-        // Handle termination requests
-        using CancellationTokenSource cts = new();
-        Console.CancelKeyPress += (sender, e) =>
-        {
-            if (!cts.IsCancellationRequested)
-            {
-                e.Cancel = true;
-                cts.Cancel();
-            }
-        };
-
         // Write incoming fragments indented to the console
         do
         {
@@ -75,7 +73,7 @@ public static class Commands
                 {
                     Console.ReadLine();
                 }
-                using JsonDocument patch = await connection.GetObjectModelPatchAsync(cts.Token);
+                using JsonDocument patch = await connection.GetObjectModelPatchAsync(cancellationToken);
                 Console.WriteLine(GetIndentedJson(patch));
             }
             catch (OperationCanceledException)
@@ -91,7 +89,7 @@ public static class Commands
                 break;
             }
         }
-        while (!cts.IsCancellationRequested);
+        while (!cancellationToken.IsCancellationRequested);
 
         // End
         return 0;

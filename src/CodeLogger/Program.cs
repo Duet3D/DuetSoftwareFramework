@@ -1,6 +1,5 @@
 ﻿using DuetAPI;
 using DuetAPI.Connection;
-using System.Collections.Generic;
 using System.CommandLine;
 using System.IO;
 using CodeLogger;
@@ -18,18 +17,18 @@ var quiet = new Option<bool>(
 );
 
 // Main command
-var types = new Option<List<InterceptionMode>>(
+var types = new Option<InterceptionMode[]>(
     aliases: ["-t", "--types"],
     description: "Interception types (pre [before processed by DSF], post [after processed by DSF], or executed)",
     getDefaultValue: () => [ InterceptionMode.Pre ]
 );
 
-var channels = new Option<List<CodeChannel>?>(
+var channels = new Option<CodeChannel[]?>(
     aliases: ["-c", "--channels"],
     description: "Input channels where codes may be intercepted. Defaults to all"
 );
 
-var filters = new Option<List<string>?>(
+var filters = new Option<string[]?>(
     aliases: ["-f", "--filters"],
     description: "Code types that may be intercepted (main codes, keywords, or Q0 for comments)"
 );
@@ -48,6 +47,15 @@ var rootCommand = new RootCommand("Code logger to intercept G/M/T-codes from Due
     filters,
     priorityCodes
 };
-rootCommand.SetHandler(Commands.MainAsync, socketPath, quiet, types, channels, filters, priorityCodes);
+rootCommand.SetHandler((context) =>
+{
+    var socketPathValue = context.ParseResult.GetValueForOption(socketPath)!;
+    var quietValue = context.ParseResult.GetValueForOption(quiet);
+    var typesValue = context.ParseResult.GetValueForOption(types)!;
+    var channelsValue = context.ParseResult.GetValueForOption(channels);
+    var filtersValue = context.ParseResult.GetValueForOption(filters);
+    var priorityCodesValue = context.ParseResult.GetValueForOption(priorityCodes);
+    return Commands.MainAsync(socketPathValue, quietValue, typesValue, channelsValue, filtersValue, priorityCodesValue, context.GetCancellationToken());
+});
 
 return await rootCommand.InvokeAsync(args);

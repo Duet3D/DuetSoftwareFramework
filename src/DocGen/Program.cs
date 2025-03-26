@@ -298,4 +298,3 @@ async Task WriteTypeDocumentation(StreamWriter writer, Type type, string path, s
         await WritePropertyDocumentation(writer, property, path, classDescription, depth + 1);
     }
 }
-
