@@ -6,7 +6,7 @@
     public partial class ClosedLoopCurrentFraction : ModelObject, IStaticModelObject
     {
         /// <summary>
-        /// Average fraction
+        /// Average fraction of the configured motor current used
         /// </summary>
         public float Avg
         {
@@ -16,7 +16,7 @@
         private float _avg;
 
         /// <summary>
-        /// Maximum fraction
+        /// Maximum fraction of the configured motor current used
         /// </summary>
         public float Max
         {
@@ -32,7 +32,7 @@
     public partial class ClosedLoopPositionError : ModelObject, IStaticModelObject
     {
         /// <summary>
-        /// Maximum position error
+        /// Maximum position error in full steps of the motor
         /// </summary>
         public float Max
         {
@@ -42,7 +42,7 @@
         private float _max;
 
         /// <summary>
-        /// RMS of the position error
+        /// RMS of the position error in full steps of the motor
         /// </summary>
         public float Rms
         {
@@ -58,12 +58,12 @@
     public partial class DriverClosedLoop : ModelObject, IStaticModelObject
     {
         /// <summary>
-        /// Current fraction
+        /// Current fraction f the configured motor current used
         /// </summary>
         public ClosedLoopCurrentFraction CurrentFraction { get; } = new ClosedLoopCurrentFraction();
 
         /// <summary>
-        /// Position error
+        /// Position error in full steps of the motor
         /// </summary>
         public ClosedLoopPositionError PositionError { get; } = new ClosedLoopPositionError();
     }
