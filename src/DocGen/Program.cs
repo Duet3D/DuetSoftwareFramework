@@ -48,7 +48,6 @@ catch (Exception e)
 
 // Generate the documentation page
 Console.Write("Generating documentation.md... ");
-try
 {
     await using FileStream fs = new("./documentation.md", FileMode.Create, FileAccess.Write);
 
@@ -71,10 +70,6 @@ try
     }
 
     Console.WriteLine("Done!");
-}
-catch (Exception e)
-{
-    Console.WriteLine("Error: {0}", e.Message);
 }
 
 /// <summary>
@@ -120,8 +115,8 @@ async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property
         string propertyName = (path is not null) ? $"{path}." : string.Empty;
         propertyName += JsonNamingPolicy.CamelCase.ConvertName(property.Name);
         if (typeof(IEnumerable).IsAssignableFrom(property.PropertyType) &&
-            property.PropertyType != typeof(string) &
-            ((!property.PropertyType.IsGenericType && property.PropertyType != typeof(JsonModelDictionary)) || property.PropertyType.GetGenericTypeDefinition() != typeof(StaticModelDictionary<>)))
+            property.PropertyType != typeof(string) && property.PropertyType != typeof(JsonModelDictionary) &&
+            (!property.PropertyType.IsGenericType || property.PropertyType.GetGenericTypeDefinition() != typeof(StaticModelDictionary<>)))
         {
             propertyName += "[]";
         }
