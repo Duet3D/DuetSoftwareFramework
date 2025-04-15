@@ -86,8 +86,10 @@ if [ $PKGS -eq 1 ] ; then
 	if [ -n "$SIGNING_KEY"  ] ; then
 		if which dpkg-sig >/dev/null 2>&1 ; then
 			dpkg-sig -k $SIGNING_KEY -s builder $DEST_DIR/*.deb
+		elif which debsigs >/dev/null 2>&1 ; then
+			debsigs --sign=builder --default-key=$SIGNING_KEY $DEST_DIR/*.deb
 		else
-			echo "dpkg-sig isn't installed.  Skipping signing."
+			echo "Neither dpkg-sig nor debsigs are installed.  Skipping signing."
 		fi
 	fi
 
