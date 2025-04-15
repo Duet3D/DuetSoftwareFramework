@@ -1,7 +1,7 @@
 # Overview
 
 **This page is auto-generated. If you find any errors, please report them on the [forum](https://forum.duet3d.com) and DO NOT EDIT this page!**
-If you are capable of editing source code, it is encouraged to make pull requests for the original [DSF API code](https://github.com/Duet3D/DuetSoftwareFramework/tree/v3.4-dev/src/DuetAPI/ObjectModel) instead.
+If you are capable of editing source code, it is encouraged to make pull requests for the original [DSF API code](https://github.com/Duet3D/DuetSoftwareFramework/tree/v3.6-dev/src/DuetAPI/ObjectModel) instead.
 
 This page refers to version 3.5 of the Object Model.
 
