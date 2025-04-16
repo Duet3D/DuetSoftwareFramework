@@ -159,7 +159,7 @@ internal static class Clone
     public {(isInherited ? "override " : isInheritedFrom ? "virtual " : "")}object Clone()
     {{
         {cls} clone = new();
-        {GenerateAssignments()}
+{GenerateAssignments()}
         return clone;
     }}", Encoding.UTF8);
     }

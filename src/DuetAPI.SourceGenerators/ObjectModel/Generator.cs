@@ -226,7 +226,7 @@ public partial class ObjectModel
             return true;
         }}
 
-        {GeneratePropertyUpdateCalls()}
+{GeneratePropertyUpdateCalls()}
         if (key == ""move.axes"")
         {{
             Move.Axes.UpdateFromJson(jsonElement, ignoreSbcProperties, offset, last);
@@ -260,7 +260,7 @@ public partial class ObjectModel
             return true;
         }}
 
-        {WritePropertyReadCalls()}
+{WritePropertyReadCalls()}
         if (key == ""move.axes"")
         {{
             Move.Axes.UpdateFromJsonReader(ref reader, ignoreSbcProperties, offset, last);

@@ -143,11 +143,68 @@ namespace DuetControlServer.Model
             _jsonData = await SPI.Interface.RequestObjectModel(key, flags);
         }
 
-        private static int UpdateModel(int offset = 0, bool last = true)
+        private static int UpdateModel(int? offset = null)
         {
-            int next = 0;
+            bool last = true;
+            Utf8JsonReader reader;
 
-            Utf8JsonReader reader = new(_jsonData);
+            // Determine the next value to query. That also lets us know if this is the last update.
+            // This is only required for arrays
+            int next = 0;
+            if (offset != null || _requestedKey == "move")
+            {
+                reader = new(_jsonData);
+                while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+                {
+                    if (reader.TokenType == JsonTokenType.PropertyName)
+                    {
+                        if (offset != null && reader.ValueTextEquals("next") && reader.Read())
+                        {
+                            // Get the next index to query
+                            next = reader.GetInt32();
+                            last = next == 0;
+                        }
+                        else if (_requestedKey == "move" && reader.ValueTextEquals("result"u8) && reader.Read())
+                        {
+                            // Check if move.axes needs an extra query
+                            Utf8JsonReader readerCopy = reader;
+                            while (readerCopy.Read() && readerCopy.TokenType != JsonTokenType.EndObject)
+                            {
+                                if (readerCopy.TokenType == JsonTokenType.PropertyName)
+                                {
+                                    string propertyName = readerCopy.GetString()!;
+                                    if (propertyName == "axes")
+                                    {
+                                        int axisCount = 0;
+                                        while (readerCopy.Read() && readerCopy.TokenType != JsonTokenType.EndArray)
+                                        {
+                                            if (readerCopy.TokenType == JsonTokenType.StartObject)
+                                            {
+                                                axisCount++;
+                                                readerCopy.Skip();
+                                            }
+                                        }
+
+                                        if (axisCount >= (Provider.Get.Limits.ReportedAxes ?? 9))
+                                        {
+                                            _updatedKeys.Add("move.axes");
+                                            last = false;   // Don't delete missing items from the axis array yet
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            reader.Skip();
+                        }
+                    }
+                }
+            }
+
+            // Update data
+            reader = new(_jsonData);
             while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
             {
                 if (reader.TokenType == JsonTokenType.PropertyName)
@@ -203,44 +260,9 @@ namespace DuetControlServer.Model
                                 }
                             }
                         }
-                        else if (_requestedKey == "move")
-                        {
-                            // Check if move.axes needs an extra query
-                            Utf8JsonReader readerCopy = reader;
-                            while (readerCopy.Read() && readerCopy.TokenType != JsonTokenType.EndObject)
-                            {
-                                if (readerCopy.TokenType == JsonTokenType.PropertyName)
-                                {
-                                    string propertyName = readerCopy.GetString()!;
-                                    if (propertyName == "axes")
-                                    {
-                                        int axisCount = 0;
-                                        while (readerCopy.Read() && readerCopy.TokenType != JsonTokenType.EndArray)
-                                        {
-                                            if (readerCopy.TokenType == JsonTokenType.StartObject)
-                                            {
-                                                axisCount++;
-                                                readerCopy.Skip();
-                                            }
-                                        }
-
-                                        if (axisCount >= (Provider.Get.Limits.ReportedAxes ?? 9))
-                                        {
-                                            _updatedKeys.Add("move.axes");
-                                            last = false;   // Don't delete missing items from the axis array yet
-                                        }
-                                        break;
-                                    }
-                                }
-                            }
-                        }
 
                         // Update object model
-                        _keyUpdated = Provider.Get.UpdateFromFirmwareJsonReader(_requestedKey, ref reader, offset, last);
-                    }
-                    else if (reader.ValueTextEquals("next") && reader.Read())
-                    {
-                        next = reader.GetInt32();
+                        _keyUpdated = Provider.Get.UpdateFromFirmwareJsonReader(_requestedKey, ref reader, offset ?? 0, last);
                     }
                     else
                     {
@@ -319,7 +341,7 @@ namespace DuetControlServer.Model
                                 int offset = next;
                                 using (await Provider.AccessReadWriteAsync())
                                 {
-                                    next = UpdateModel(offset, next == 0);
+                                    next = UpdateModel(offset);
                                     if (_keyUpdated)
                                     {
                                         _logger.Debug("Updated key {0}{1}", key, (offset + next != 0) ? $" starting from {offset}, next {next}" : string.Empty);
@@ -335,7 +357,8 @@ namespace DuetControlServer.Model
                                         Provider.Get.State.Status = MachineStatus.Updating;
                                     }
                                 }
-                            } while (next != 0);
+                            }
+                            while (next != 0);
                         }
                     }
 
