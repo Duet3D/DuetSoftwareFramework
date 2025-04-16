@@ -265,7 +265,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
             }}
 
             {cls} other = ({cls})from;
-            {GenerateAssignments()}{(isDynamic ? "            \nreturn this;" : "")}
+{GenerateAssignments()}{(isDynamic ? "            \nreturn this;" : "")}
         }}", Encoding.UTF8);
         }
     }

@@ -159,7 +159,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
         public {(isInherited ? "override " : isInheritedFrom ? "virtual " : "")}object Clone()
         {{
             {cls} clone = new();
-            {GenerateAssignments()}
+{GenerateAssignments()}
             return clone;
         }}", Encoding.UTF8);
         }
