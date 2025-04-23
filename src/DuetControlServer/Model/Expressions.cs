@@ -398,11 +398,11 @@ namespace DuetControlServer.Model
         /// </summary>
         /// <param name="obj">Object to convert</param>
         /// <param name="wantsCount">Whether the count or length is requested</param>
-        /// <param name="encodeStrings">Whether strings are supposed to be encoded for further evaluation</param>
+        /// <param name="encodeValues">Whether values are supposed to be encoded for further evaluation</param>
         /// <param name="code">Code requesting the conversion</param>
         /// <returns>Converted object</returns>
         /// <exception cref="CodeParserException">Thrown on invalid request</exception>
-        private static string ObjectToString(object? obj, bool wantsCount, bool encodeStrings, Code code)
+        private static string ObjectToString(object? obj, bool wantsCount, bool encodeValues, Code code)
         {
             static string encodeString(string value)
             {
@@ -419,7 +419,7 @@ namespace DuetControlServer.Model
             }
             if (obj is char charValue)
             {
-                return encodeStrings ? $"'{charValue}'" : charValue.ToString();
+                return encodeValues ? $"'{charValue}'" : charValue.ToString();
             }
             if (obj is string stringValue)
             {
@@ -427,7 +427,7 @@ namespace DuetControlServer.Model
                 {
                     return stringValue.Length.ToString();
                 }
-                return encodeStrings ? encodeString(stringValue) : stringValue;
+                return encodeValues ? encodeString(stringValue) : stringValue;
             }
             if (obj is DriverId driverId)
             {
@@ -451,7 +451,7 @@ namespace DuetControlServer.Model
             }
             if (obj is DateTime dateTimeValue)
             {
-                return encodeStrings ? $"\"{dateTimeValue:s}\"" : dateTimeValue.ToString("s");
+                return encodeValues ? $"\"{dateTimeValue:s}\"" : dateTimeValue.ToString("s");
             }
             if (obj is IList list)
             {
@@ -466,39 +466,39 @@ namespace DuetControlServer.Model
             }
             if (obj is bool[] boolArray)
             {
-                return '{' + string.Join(',', boolArray.Select(boolValue => boolValue ? "true" : "false")) + (boolArray.Length == 1 ? ",}" : "}");
+                return '{' + string.Join(',', boolArray.Select(boolValue => boolValue ? "true" : "false")) + (encodeValues && boolArray.Length == 1 ? ",}" : "}");
             }
             if (obj is char[] charArray)
             {
-                return '{' + string.Join(',', charArray.Select(charValue => $"'{charValue}'")) + (charArray.Length == 1 ? ",}" : "}");
+                return '{' + string.Join(',', charArray.Select(charValue => $"'{charValue}'")) + (encodeValues && charArray.Length == 1 ? ",}" : "}");
             }
             if (obj is string[] stringArray)
             {
-                return '{' + string.Join(',', stringArray.Select(stringValue => encodeString(stringValue))) + (stringArray.Length == 1 ? ",}" : "}");
+                return '{' + string.Join(',', stringArray.Select(stringValue => encodeString(stringValue))) + (encodeValues && stringArray.Length == 1 ? ",}" : "}");
             }
             if (obj is DriverId[] driverIdArray)
             {
-                return '{' + string.Join(',', driverIdArray.Select(driverIdValue => encodeString(driverIdValue.ToString()))) + (driverIdArray.Length == 1 ? ",}" : "}");
+                return '{' + string.Join(',', driverIdArray.Select(driverIdValue => encodeString(driverIdValue.ToString()))) + (encodeValues && driverIdArray.Length == 1 ? ",}" : "}");
             }
             if (obj is int[] intArray)
             {
-                return '{' + string.Join(',', intArray.Select(intValue => intValue.ToString("G", CultureInfo.InvariantCulture))) + (intArray.Length == 1 ? ",}" : "}");
+                return '{' + string.Join(',', intArray.Select(intValue => intValue.ToString("G", CultureInfo.InvariantCulture))) + (encodeValues && intArray.Length == 1 ? ",}" : "}");
             }
             if (obj is uint[] uintArray)
             {
-                return '{' + string.Join(',', uintArray.Select(uintValue => uintValue.ToString("G", CultureInfo.InvariantCulture))) + (uintArray.Length == 1 ? ",}" : "}");
+                return '{' + string.Join(',', uintArray.Select(uintValue => uintValue.ToString("G", CultureInfo.InvariantCulture))) + (encodeValues && uintArray.Length == 1 ? ",}" : "}");
             }
             if (obj is float[] floatArray)
             {
-                return '{' + string.Join(',', floatArray.Select(floatValue => floatValue.ToString("G", CultureInfo.InvariantCulture))) + (floatArray.Length == 1 ? ",}" : "}");
+                return '{' + string.Join(',', floatArray.Select(floatValue => floatValue.ToString("G", CultureInfo.InvariantCulture))) + (encodeValues && floatArray.Length == 1 ? ",}" : "}");
             }
             if (obj is long[] longArray)
             {
-                return '{' + string.Join(',', longArray.Select(longValue => longValue.ToString("G", CultureInfo.InvariantCulture))) + (longArray.Length == 1 ? ",}" : "}");
+                return '{' + string.Join(',', longArray.Select(longValue => longValue.ToString("G", CultureInfo.InvariantCulture))) + (encodeValues && longArray.Length == 1 ? ",}" : "}");
             }
             if (obj is object[] objectArray)
             {
-                return '{' + string.Join(',', objectArray.Select(objectValue => ObjectToString(objectValue, false, true, code))) + (objectArray.Length == 1 ? ",}" : "}");
+                return '{' + string.Join(',', objectArray.Select(objectValue => ObjectToString(objectValue, false, true, code))) + (encodeValues && objectArray.Length == 1 ? ",}" : "}");
             }
             if (!wantsCount && obj is IList)
             {
