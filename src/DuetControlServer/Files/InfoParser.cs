@@ -290,7 +290,18 @@ namespace DuetControlServer.Files
                         readData.Line = string.Empty;   // overflow
                         return true;
                     }
-                    readData.Line = Encoding.UTF8.GetString(readData.LineBuffer.AsSpan(readData.LineBuffer.Length - bytesRead));
+
+                    void SetLine()
+                    {
+                        Span<byte> lineBuffer = readData.LineBuffer.AsSpan(readData.LineBuffer.Length - bytesRead);
+                        if (lineBuffer.Length >= 3 && lineBuffer[0] == 0xEF && lineBuffer[1] == 0xBB && lineBuffer[2] == 0xBF)
+                        {
+                            // Skip BOM in UTF-8 files
+                            lineBuffer = lineBuffer[3..];
+                        }
+                        readData.Line = Encoding.UTF8.GetString(lineBuffer);
+                    }
+                    SetLine();
                     return true;
                 }
 
