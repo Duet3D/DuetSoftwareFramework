@@ -47,7 +47,8 @@
         private int? _minPercentage;
 
         /// <summary>
-        /// Position of the sensor (in mm)
+        /// Reported sensor position of this filament monitor.
+        /// The maximum value depends on the type of the sensor, e.g. 0..1023 for a Duet3D MFM.
         /// </summary>
         public int Position
         {
