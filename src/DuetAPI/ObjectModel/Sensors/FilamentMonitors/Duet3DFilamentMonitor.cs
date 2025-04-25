@@ -46,15 +46,16 @@ public partial class Duet3DFilamentMonitor : FilamentMonitor
     }
     private int? _minPercentage;
 
-    /// <summary>
-    /// Position of the sensor (in mm)
-    /// </summary>
-    public int Position
-    {
-        get => _position;
-        set => SetPropertyValue(ref _position, value);
-    }
-    private int _position;
+        /// <summary>
+        /// Reported sensor position of this filament monitor.
+        /// The maximum value depends on the type of the sensor, e.g. 0..1023 for a Duet3D MFM.
+        /// </summary>
+        public int Position
+        {
+            get => _position;
+            set => SetPropertyValue(ref _position, value);
+        }
+        private int _position;
 
     /// <summary>
     /// Total extrusion commanded (in mm)
