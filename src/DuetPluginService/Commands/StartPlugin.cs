@@ -1,4 +1,5 @@
-﻿using DuetAPI.ObjectModel;
+﻿using DuetAPI.Connection;
+using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetAPIClient;
 using DuetSharedLibrary;
@@ -96,6 +97,10 @@ public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetim
                     .Replace("{pluginDir}", Path.Combine(hostEnvironment.ContentRootPath, plugin.Id))
                     .Replace("{command}", sbcExecutable)
                     .Replace("{args}", (plugin.SbcExecutableArguments ?? string.Empty).Replace("'", "\\'")),
+                EnvironmentVariables =
+                {
+                    [Defaults.FullSocketPathEnvironmentVariable] = _settings.SocketPath
+                },
                 WorkingDirectory = Path.GetDirectoryName(sbcExecutable),
                 RedirectStandardError = plugin.SbcOutputRedirected,
                 RedirectStandardOutput = plugin.SbcOutputRedirected

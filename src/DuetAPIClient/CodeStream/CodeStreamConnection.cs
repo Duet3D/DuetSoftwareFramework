@@ -23,14 +23,14 @@ public sealed class CodeStreamConnection : BaseConnection
     /// <summary>
     /// Establish a connection to the given UNIX socket file
     /// </summary>
-    /// <param name="socketPath">Path to the UNIX socket file</param>
+    /// <param name="socketPath">Optional path to the DCS UNIX socket file</param>
     /// <param name="bufferSize">Maximum number of codes to execute simultaneously</param>
     /// <param name="channel">Destination channel for incoming codes</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public void Connect(int bufferSize = Defaults.CodeBufferSize, CodeChannel channel = Defaults.InputChannel, string socketPath = Defaults.FullSocketPath)
+    public void Connect(int bufferSize = Defaults.CodeBufferSize, CodeChannel channel = Defaults.InputChannel, string? socketPath = null)
     {
         BufferSize = bufferSize;
         Channel = channel;
@@ -42,16 +42,16 @@ public sealed class CodeStreamConnection : BaseConnection
     /// <summary>
     /// Establish a connection to the given UNIX socket file asynchronously
     /// </summary>
-    /// <param name="socketPath">Path to the UNIX socket file</param>
     /// <param name="bufferSize">Maximum number of codes to execute simultaneously</param>
     /// <param name="channel">Destination channel for incoming codes</param>
+    /// <param name="socketPath">Optional path to the DCS UNIX socket file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public async Task ConnectAsync(int bufferSize = Defaults.CodeBufferSize, CodeChannel channel = Defaults.InputChannel, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(int bufferSize = Defaults.CodeBufferSize, CodeChannel channel = Defaults.InputChannel, string? socketPath = null, CancellationToken cancellationToken = default)
     {
         BufferSize = bufferSize;
         Channel = channel;

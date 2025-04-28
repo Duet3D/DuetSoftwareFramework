@@ -23,12 +23,12 @@ public sealed class CommandConnection : BaseCommandConnection
     /// <summary>
     /// Establish a connection to the given UNIX socket file
     /// </summary>
-    /// <param name="socketPath">Path to the UNIX socket file</param>
+    /// <param name="socketPath">Optional path to the DCS UNIX socket file</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public void Connect(string socketPath = Defaults.FullSocketPath)
+    public void Connect(string? socketPath = null)
     {
         CommandInitMessage initMessage = new();
         Connect(initMessage, socketPath);
@@ -37,14 +37,14 @@ public sealed class CommandConnection : BaseCommandConnection
     /// <summary>
     /// Establish a connection to the given UNIX socket file
     /// </summary>
-    /// <param name="socketPath">Path to the UNIX socket file</param>
+    /// <param name="socketPath">Optional path to the DCS UNIX socket file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public async Task ConnectAsync(string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(string? socketPath = null, CancellationToken cancellationToken = default)
     {
         CommandInitMessage initMessage = new();
         await ConnectAsync(initMessage, socketPath, cancellationToken).ConfigureAwait(false);
