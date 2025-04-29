@@ -49,11 +49,11 @@ public sealed class SubscribeConnection : BaseConnection
     /// </summary>
     /// <param name="mode">Subscription mode</param>
     /// <param name="filters">Optional filter strings</param>
-    /// <param name="socketPath">Path to the UNIX socket file</param>
+    /// <param name="socketPath">Optional path to the DCS UNIX socket file</param>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public void Connect(SubscriptionMode mode, IEnumerable<string>? filters = null, string socketPath = Defaults.FullSocketPath)
+    public void Connect(SubscriptionMode mode, IEnumerable<string>? filters = null, string? socketPath = null)
     {
         Mode = mode;
         Filters.Clear();
@@ -71,14 +71,14 @@ public sealed class SubscribeConnection : BaseConnection
     /// </summary>
     /// <param name="mode">Subscription mode</param>
     /// <param name="filters">Optional filter strings</param>
-    /// <param name="socketPath">Path to the UNIX socket file</param>
+    /// <param name="socketPath">Optional path to the DCS UNIX socket file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public async Task ConnectAsync(SubscriptionMode mode, IEnumerable<string>? filters = null, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(SubscriptionMode mode, IEnumerable<string>? filters = null, string? socketPath = null, CancellationToken cancellationToken = default)
     {
         Mode = mode;
         Filters.Clear();
@@ -97,11 +97,11 @@ public sealed class SubscribeConnection : BaseConnection
     /// <param name="mode">Subscription mode</param>
     /// <param name="channel">Optional code channel to receive messages from (not applicable in Full mode)</param>
     /// <param name="filters">Optional filter strings</param>
-    /// <param name="socketPath">Path to the UNIX socket file</param>
+    /// <param name="socketPath">Optional path to the DCS UNIX socket file</param>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public void Connect(SubscriptionMode mode, CodeChannel? channel, IEnumerable<string>? filters = null, string socketPath = Defaults.FullSocketPath)
+    public void Connect(SubscriptionMode mode, CodeChannel? channel, IEnumerable<string>? filters = null, string? socketPath = null)
     {
         Mode = mode;
         Channel = channel;
@@ -121,14 +121,14 @@ public sealed class SubscribeConnection : BaseConnection
     /// <param name="mode">Subscription mode</param>
     /// <param name="channel">Optional code channel to receive messages from (not applicable in Full mode)</param>
     /// <param name="filters">Optional filter strings</param>
-    /// <param name="socketPath">Path to the UNIX socket file</param>
+    /// <param name="socketPath">Optional path to the DCS UNIX socket file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public async Task ConnectAsync(SubscriptionMode mode, CodeChannel? channel, IEnumerable<string>? filters = null, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(SubscriptionMode mode, CodeChannel? channel, IEnumerable<string>? filters = null, string? socketPath = null, CancellationToken cancellationToken = default)
     {
         Mode = mode;
         Channel = channel;

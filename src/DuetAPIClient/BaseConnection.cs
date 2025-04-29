@@ -80,13 +80,16 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
     /// Establishes a connection to the given UNIX socket file
     /// </summary>
     /// <param name="initMessage">Init message to send to the server</param>
-    /// <param name="socketPath">Path to the UNIX socket file</param>
+    /// <param name="socketPath">Optional path to the DCS UNIX socket file</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="SocketException">Connection has been closed</exception>
-    protected void Connect(ClientInitMessage initMessage, string socketPath)
+    protected void Connect(ClientInitMessage initMessage, string? socketPath)
     {
+        // Set up default socket path if necessary
+        socketPath ??= Environment.GetEnvironmentVariable(Defaults.FullSocketPathEnvironmentVariable) ?? Defaults.FullSocketPath;
+
         // Create a new connection
         UnixDomainSocketEndPoint endPoint = new(socketPath);
         _unixSocket.Connect(endPoint);
@@ -117,15 +120,18 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
     /// Establishes a connection to the given UNIX socket file asynchronously
     /// </summary>
     /// <param name="initMessage">Init message to send to the server</param>
-    /// <param name="socketPath">Path to the UNIX socket file</param>
+    /// <param name="socketPath">Optional path to the DCS UNIX socket file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Connection has been closed</exception>
-    protected async Task ConnectAsync(ClientInitMessage initMessage, string socketPath, CancellationToken cancellationToken)
+    protected async Task ConnectAsync(ClientInitMessage initMessage, string? socketPath, CancellationToken cancellationToken)
     {
+        // Set up default socket path if necessary
+        socketPath ??= Environment.GetEnvironmentVariable(Defaults.FullSocketPathEnvironmentVariable) ?? Defaults.FullSocketPath;
+
         // Create a new connection
         UnixDomainSocketEndPoint endPoint = new(socketPath);
         _unixSocket.Connect(endPoint);

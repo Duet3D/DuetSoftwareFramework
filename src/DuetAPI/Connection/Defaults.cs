@@ -21,6 +21,11 @@ public static class Defaults
     public const string SocketFile = "dcs.sock";
 
     /// <summary>
+    /// Environment variable to set the path to the UNIX socket for DuetControlServer
+    /// </summary>
+    public const string FullSocketPathEnvironmentVariable = "DSF_SOCKET_PATH";
+
+    /// <summary>
     /// Default fully-qualified path to the UNIX socket for DuetControlServer
     /// </summary>
     public const string FullSocketPath = "/run/dsf/dcs.sock";

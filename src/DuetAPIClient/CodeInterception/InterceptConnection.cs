@@ -70,12 +70,12 @@ public sealed class InterceptConnection : BaseCommandConnection
     /// <param name="channels">List of input channels where codes may be intercepted or null for all available channels</param>
     /// <param name="filters">Optional list of codes that may be intercepted</param>
     /// <param name="priorityCodes">Define if priority codes may be intercepted</param>
-    /// <param name="socketPath">Path to the UNIX socket file</param>
+    /// <param name="socketPath">Optional path to the DCS UNIX socket file</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public void Connect(InterceptionMode mode, IEnumerable<CodeChannel>? channels = null, IEnumerable<string>? filters = null, bool priorityCodes = false, string socketPath = Defaults.FullSocketPath)
+    public void Connect(InterceptionMode mode, IEnumerable<CodeChannel>? channels = null, IEnumerable<string>? filters = null, bool priorityCodes = false, string? socketPath = null)
     {
         Mode = mode;
         Channels.Clear();
@@ -106,14 +106,14 @@ public sealed class InterceptConnection : BaseCommandConnection
     /// <param name="channels">List of input channels where codes may be intercepted or null for all available channels</param>
     /// <param name="filters">Optional list of codes that may be intercepted</param>
     /// <param name="priorityCodes">Define if priority codes may be intercepted</param>
-    /// <param name="socketPath">Path to the UNIX socket file</param>
+    /// <param name="socketPath">Optional path to the DCS UNIX socket file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public async Task ConnectAsync(InterceptionMode mode, IEnumerable<CodeChannel>? channels = null, IEnumerable<string>? filters = null, bool priorityCodes = false, string socketPath = Defaults.FullSocketPath, CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(InterceptionMode mode, IEnumerable<CodeChannel>? channels = null, IEnumerable<string>? filters = null, bool priorityCodes = false, string? socketPath = null, CancellationToken cancellationToken = default)
     {
         Mode = mode;
         Channels.Clear();
