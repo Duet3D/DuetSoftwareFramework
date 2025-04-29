@@ -27,7 +27,7 @@ public partial class TimesLeft : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _file, value);
     }
     private int? _file;
-    
+
     /// <summary>
     /// Time left based on the layer progress (in s or null)
     /// </summary>
@@ -41,7 +41,7 @@ public partial class TimesLeft : ModelObject, IStaticModelObject
     private int? _layer;
 
     /// <summary>
-    /// Time left based on the slicer reports (see M73, in s or null)
+    /// Time left based on the slicer reports (see M73 R, in s or null)
     /// </summary>
     public int? Slicer
     {
@@ -49,4 +49,14 @@ public partial class TimesLeft : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _slicer, value);
     }
     private int? _slicer;
+
+    /// <summary>
+    /// Time left before the next colour change is expected (see M73 C, in s or null) 
+    /// </summary>
+    public int? ToPause
+    {
+        get => _toPause;
+        set => SetPropertyValue(ref _toPause, value);
+    }
+    private int? _toPause;
 }
