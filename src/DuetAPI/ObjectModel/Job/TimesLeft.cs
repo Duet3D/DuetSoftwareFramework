@@ -14,7 +14,7 @@ namespace DuetAPI.ObjectModel
         public int? Filament
         {
             get => _filament;
-			set => SetPropertyValue(ref _filament, value);
+            set => SetPropertyValue(ref _filament, value);
         }
         private int? _filament;
 
@@ -24,10 +24,10 @@ namespace DuetAPI.ObjectModel
         public int? File
         {
             get => _file;
-			set => SetPropertyValue(ref _file, value);
+            set => SetPropertyValue(ref _file, value);
         }
         private int? _file;
-        
+
         /// <summary>
         /// Time left based on the layer progress (in s or null)
         /// </summary>
@@ -36,12 +36,12 @@ namespace DuetAPI.ObjectModel
         public int? Layer
         {
             get => _layer;
-			set => SetPropertyValue(ref _layer, value);
+            set => SetPropertyValue(ref _layer, value);
         }
         private int? _layer;
 
         /// <summary>
-        /// Time left based on the slicer reports (see M73, in s or null)
+        /// Time left based on the slicer reports (see M73 R, in s or null)
         /// </summary>
         public int? Slicer
         {
@@ -49,5 +49,15 @@ namespace DuetAPI.ObjectModel
             set => SetPropertyValue(ref _slicer, value);
         }
         private int? _slicer;
+
+        /// <summary>
+        /// Time left before the next colour change is expected (see M73 C, in s or null) 
+        /// </summary>
+        public int? ToPause
+        {
+            get => _toPause;
+            set => SetPropertyValue(ref _toPause, value);
+        }
+        private int? _toPause;
     }
 }
