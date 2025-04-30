@@ -498,7 +498,7 @@ namespace DuetControlServer.Model
             }
             if (obj is object[] objectArray)
             {
-                return '{' + string.Join(',', objectArray.Select(objectValue => ObjectToString(objectValue, false, true, code))) + (encodeValues && objectArray.Length == 1 ? ",}" : "}");
+                return '{' + string.Join(',', objectArray.Select(objectValue => ObjectToString(objectValue, false, encodeValues, code))) + (encodeValues && objectArray.Length == 1 ? ",}" : "}");
             }
             if (!wantsCount && obj is IList)
             {
@@ -915,7 +915,7 @@ namespace DuetControlServer.Model
         }
 
         /// <summary>
-        /// Evaluate expression(s)
+        /// Evaluate expression(s) to human-readable text
         /// </summary>
         /// <param name="code">Code holding the expression(s)</param>
         /// <param name="expression">Expression(s) to replace</param>
