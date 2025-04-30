@@ -500,7 +500,7 @@ namespace DuetControlServer.Model
             }
             if (obj is object[] objectArray)
             {
-                return '{' + string.Join(',', objectArray.Select(objectValue => ObjectToString(objectValue, false, true, code))) + (encodeValues && objectArray.Length == 1 ? ",}" : "}");
+                return '{' + string.Join(',', objectArray.Select(objectValue => ObjectToString(objectValue, false, encodeValues, code))) + (encodeValues && objectArray.Length == 1 ? ",}" : "}");
             }
             if (!wantsCount && obj is IList)
             {
