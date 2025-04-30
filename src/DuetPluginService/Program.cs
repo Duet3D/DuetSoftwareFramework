@@ -9,6 +9,7 @@ using System;
 using System.CommandLine;
 using System.CommandLine.Builder;
 using System.CommandLine.Hosting;
+using System.CommandLine.NamingConventionBinder;
 using System.CommandLine.Parsing;
 
 var configOption = new Option<string>(
@@ -20,7 +21,10 @@ var rootCommand = new RootCommand("Duet Plugin Service")
 {
     configOption
 };
-rootCommand.SetHandler(() => Console.WriteLine("Hello World!"));
+rootCommand.Handler = CommandHandler.Create<IHost>(async (host) =>
+{
+    await host.WaitForShutdownAsync();
+});
 
 string configFile = Settings.DefaultConfigFile;
 return await new CommandLineBuilder(rootCommand)
