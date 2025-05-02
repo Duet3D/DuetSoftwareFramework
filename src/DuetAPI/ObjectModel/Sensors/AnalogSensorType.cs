@@ -132,7 +132,7 @@ namespace DuetAPI.ObjectModel
                     "bmepressure" => AnalogSensorType.BME280Pressure,
                     "bmehumidity" => AnalogSensorType.BME280Humidity,
                     "dhthumidity" => AnalogSensorType.DHTHumidity,
-                    "currentloooppyro" => AnalogSensorType.CurrentLoop,
+                    "currentlooppyro" => AnalogSensorType.CurrentLoop,
                     "mcutemp" => AnalogSensorType.McuTemp,
                     "drivers" => AnalogSensorType.Drivers,
                     "driversduex" => AnalogSensorType.DriversDuex,
