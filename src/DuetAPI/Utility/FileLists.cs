@@ -121,7 +121,7 @@ namespace DuetAPI.Utility
         }
 
         /// <summary>
-        /// Get a /rr_filelist or M20 files response
+        /// Get a /rr_filelist, M20 files response, or a directory file enumeration
         /// </summary>
         /// <param name="directory">RRF path to the directory</param>
         /// <param name="physicalDirectory">Physical directory</param>
