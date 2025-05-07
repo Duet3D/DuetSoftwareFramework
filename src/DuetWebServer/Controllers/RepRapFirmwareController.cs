@@ -457,7 +457,7 @@ namespace DuetWebServer.Controllers
         /// (200) JSON response
         /// </returns>
         [HttpGet("rr_filelist")]
-        public async Task<IActionResult> GetFileList(string? dir, int first = -1, int max = -1)
+        public async Task<IActionResult> GetFileList(string? dir, int first = 0, int max = -1)
         {
             try
             {
@@ -466,7 +466,7 @@ namespace DuetWebServer.Controllers
                     return Content("{\"err\":1}");
                 }
                 string resolvedPath = await ResolvePath(dir);
-                return File(FileLists.GetFileListUtf8(dir, resolvedPath, first, -1, max), "application/json");
+                return File(FileLists.GetFileListUtf8(dir, resolvedPath, Math.Max(first, 0), -1, max), "application/json");
             }
             catch (Exception e)
             {
