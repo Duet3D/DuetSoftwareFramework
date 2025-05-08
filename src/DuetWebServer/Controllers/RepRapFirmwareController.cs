@@ -495,7 +495,7 @@ namespace DuetWebServer.Controllers
                 if (!string.IsNullOrWhiteSpace(dir))
                 {
                     string resolvedPath = await ResolvePath(dir);
-                    return Content(FileLists.GetFiles(dir, resolvedPath, first, flagDirs != 0, -1, max), "application/json");
+                    return Content(FileLists.GetFiles(dir, resolvedPath, Math.Max(first, 0), flagDirs != 0, -1, max), "application/json");
                 }
             }
             catch (Exception e)
