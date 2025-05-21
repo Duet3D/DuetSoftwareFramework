@@ -91,6 +91,11 @@ namespace DuetPiManagementPlugin.Network.Protocols
                     // No changes requested, don't do anything
                     return new Message();
                 }
+
+                if (port > 0)
+                {
+                    _httpsPort = port;
+                }
             }
             else
             {
@@ -105,6 +110,11 @@ namespace DuetPiManagementPlugin.Network.Protocols
                 {
                     // No changes requested, don't do anything
                     return new Message();
+                }
+
+                if (port > 0)
+                {
+                    _httpPort = port;
                 }
             }
 
