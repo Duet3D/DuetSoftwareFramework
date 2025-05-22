@@ -212,6 +212,16 @@ public partial class Axis : ModelObject, IStaticModelObject
     private float _stepsPerMm = 80F;
 
     /// <summary>
+    /// Current step position of the axis (in steps)
+    /// </summary>
+    public int StepPos
+    {
+        get => _stepPos;
+        set => SetPropertyValue(ref _stepPos, value);
+    }
+    private int _stepPos;
+
+    /// <summary>
     /// Current user position (in mm) or null if unknown
     /// </summary>
     /// <remarks>
