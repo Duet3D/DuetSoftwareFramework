@@ -220,6 +220,16 @@ namespace DuetAPI.ObjectModel
             set => SetPropertyValue(ref _stepsPerMm, value);
         }
         private float _stepsPerMm = 80F;
+        
+        /// <summary>
+        /// Current step position of the axis (in steps)
+        /// </summary>
+        public int StepPos
+        {
+            get => _stepPos;
+            set => SetPropertyValue(ref _stepPos, value);
+        }
+        private int _stepPos;
 
         /// <summary>
         /// Current user position (in mm) or null if unknown
@@ -230,7 +240,7 @@ namespace DuetAPI.ObjectModel
         public float? UserPosition
         {
             get => _userPosition;
-			set => SetPropertyValue(ref _userPosition, value);
+            set => SetPropertyValue(ref _userPosition, value);
         }
         private float? _userPosition;
 
