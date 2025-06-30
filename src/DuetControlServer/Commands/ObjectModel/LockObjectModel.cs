@@ -2,22 +2,22 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetControlServer.Commands
+namespace DuetControlServer.Commands;
+
+/// <summary>
+/// Implementation of the <see cref="DuetAPI.Commands.LockObjectModel"/> command
+/// </summary>
+/// <param name="lockManager">Lock manager</param>
+public sealed class LockObjectModel(LockManager lockManager) : DuetAPI.Commands.LockObjectModel, IConnectionCommand
 {
     /// <summary>
-    /// Implementation of the <see cref="DuetAPI.Commands.LockObjectModel"/> command
+    /// Source connection of this command
     /// </summary>
-    public sealed class LockObjectModel : DuetAPI.Commands.LockObjectModel, IConnectionCommand
-    {
-        /// <summary>
-        /// Source connection of this command
-        /// </summary>
-        public Connection? Connection { get; set; }
+    public Connection? Connection { get; set; }
 
-        /// <summary>
-        /// Lock the machine model for write access
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public override Task ExecuteAsync(CancellationToken cancellationToken) => LockManager.LockMachineModel(Connection!, cancellationToken);
-    }
+    /// <summary>
+    /// Lock the machine model for write access
+    /// </summary>
+    /// <returns>Asynchronous task</returns>
+    public override Task ExecuteAsync(CancellationToken cancellationToken) => lockManager.LockMachineModel(Connection!, cancellationToken);
 }

@@ -2,32 +2,31 @@
 using System;
 using System.Text.Json;
 
-namespace DuetControlServer.Model
+namespace DuetControlServer.Model;
+
+/// <summary>
+/// Partial class implementation of the observer for generic helpers
+/// </summary>
+public partial class Observer
 {
     /// <summary>
-    /// Partial class implementation of the observer for generic helpers
+    /// Retrieve the item type of a model collection type
     /// </summary>
-    public static partial class Observer
+    /// <param name="collectionType">Type of the collection</param>
+    /// <returns>Item type or null if not found</returns>
+    private static Type? GetItemType(Type collectionType)
     {
-        /// <summary>
-        /// Retrieve the item type of a model collection type
-        /// </summary>
-        /// <param name="collectionType">Type of the collection</param>
-        /// <returns>Item type or null if not found</returns>
-        private static Type? GetItemType(Type collectionType)
+        for (Type? type = collectionType; type is not null; type = type.BaseType)
         {
-            for (Type? type = collectionType; type is not null; type = type.BaseType)
+            if (type == typeof(JsonModelDictionary))
             {
-                if (type == typeof(JsonModelDictionary))
-                {
-                    return typeof(JsonElement);
-                }
-                if (type.IsGenericType)
-                {
-                    return type.GetGenericArguments()[0];
-                }
+                return typeof(JsonElement);
             }
-            return null;
+            if (type.IsGenericType)
+            {
+                return type.GetGenericArguments()[0];
+            }
         }
+        return null;
     }
 }

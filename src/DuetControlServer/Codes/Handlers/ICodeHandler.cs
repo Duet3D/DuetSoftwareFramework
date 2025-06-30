@@ -1,0 +1,24 @@
+using System.Threading.Tasks;
+using DuetAPI.ObjectModel;
+
+namespace DuetControlServer.Codes.Handlers;
+
+/// <summary>
+/// Interface for code handlers that process codes sent to the control server
+/// </summary>
+public interface ICodeHandler
+{
+    /// <summary>
+    /// Process a code that should be interpreted by the control server
+    /// </summary>
+    /// <param name="code">Code to process</param>
+    /// <returns>Result of the code if the code completed, else null</returns>
+    ValueTask<Message?> ProcessAsync(Commands.Code code);
+
+    /// <summary>
+    /// React to an executed code before its result is returned
+    /// </summary>
+    /// <param name="code">Code processed by RepRapFirmware</param>
+    /// <returns>Result to output</returns>
+    ValueTask CodeExecutedAsync(Commands.Code code);
+}

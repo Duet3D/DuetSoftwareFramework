@@ -1,101 +1,104 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.IPC;
+using DuetControlServer.IPC.Processors;
+using Microsoft.Extensions.Options;
 using System;
 using System.IO;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetControlServer.Commands
+namespace DuetControlServer.Commands;
+
+/// <summary>
+/// Implementation of the <see cref="DuetAPI.Commands.UninstallPlugin"/> command
+/// </summary>
+/// <param name="commandFactory">Command factory</param>
+/// <param name="model">Object model</param>
+/// <param name="settings">Settings</param>
+public sealed class UninstallPlugin(CommandFactory commandFactory, Model.ObjectModel model, IOptions<Settings> settings)
+    : DuetAPI.Commands.UninstallPlugin, IConnectionCommand
 {
     /// <summary>
-    /// Implementation of the <see cref="DuetAPI.Commands.UninstallPlugin"/> command
+    /// Internal flag to indicate that custom plugin files should not be purged
     /// </summary>
-    public sealed class UninstallPlugin : DuetAPI.Commands.UninstallPlugin, IConnectionCommand
+    public bool ForUpgrade { get; set; }
+
+    /// <summary>
+    /// Client connection
+    /// </summary>
+    [JsonIgnore]
+    public Connection? Connection { get; set; }
+
+    /// <summary>
+    /// Uninstall a plugin
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <exception cref="ArgumentException">Plugin is invalid</exception>
+    public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        /// <summary>
-        /// Internal flag to indicate that custom plugin files should not be purged
-        /// </summary>
-        public bool ForUpgrade { get; set; }
-
-        /// <summary>
-        /// Client connection
-        /// </summary>
-        [JsonIgnore]
-        public Connection? Connection { get; set; }
-
-        /// <summary>
-        /// Uninstall a plugin
-        /// </summary>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Asynchronous task</returns>
-        /// <exception cref="ArgumentException">Plugin is invalid</exception>
-        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
+        if (!settings.Value.PluginSupport)
         {
-            if (!Settings.PluginSupport)
-            {
-                throw new NotSupportedException("Plugin support has been disabled");
-            }
+            throw new NotSupportedException("Plugin support has been disabled");
+        }
 
-            // Make sure the upgrade switch is only used by the plugin service
-            if (ForUpgrade && Connection is not null && !Connection.Permissions.HasFlag(SbcPermissions.ServicePlugins))
-            {
-                throw new ArgumentException($"{nameof(ForUpgrade)} switch must not be used by third-party applications");
-            }
+        // Make sure the upgrade switch is only used by the plugin service
+        if (ForUpgrade && Connection is not null && !Connection.Permissions.HasFlag(SbcPermissions.ServicePlugins))
+        {
+            throw new ArgumentException($"{nameof(ForUpgrade)} switch must not be used by third-party applications");
+        }
 
-            // Find the plugin to uninstall
-            Plugin plugin;
-            using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
+        // Find the plugin to uninstall
+        Plugin plugin;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            if (model.Plugins.TryGetValue(Plugin, out plugin))
             {
-                if (Model.Provider.Get.Plugins.TryGetValue(Plugin, out plugin))
+                // Make sure no other plugin depends on this plugin
+                foreach (Plugin item in model.Plugins.Values)
                 {
-                    // Make sure no other plugin depends on this plugin
-                    foreach (Plugin item in Model.Provider.Get.Plugins.Values)
+                    if (item.Id != Plugin && (item.DwcDependencies.Contains(Plugin) || item.SbcPluginDependencies.Contains(Plugin)))
                     {
-                        if (item.Id != Plugin && (item.DwcDependencies.Contains(Plugin) || item.SbcPluginDependencies.Contains(Plugin)))
-                        {
-                            throw new ArgumentException($"Cannot uninstall plugin because plugin {item.Id} depends on it");
-                        }
-                    }
-                }
-                else
-                {
-                    throw new ArgumentException($"Plugin {Plugin} not found");
-                }
-            }
-
-            // Stop it if required
-            StopPlugin stopCommand = new()
-            {
-                Plugin = Plugin
-            };
-            await IPC.Processors.PluginService.PerformCommandAsync(stopCommand, plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser));
-
-            // Make sure we don't attempt to start it again once it's uninstalled
-            await using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Create, FileAccess.Write);
-            await using StreamWriter writer = new(fileStream);
-            using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
-            {
-                foreach (Plugin item in Model.Provider.Get.Plugins.Values)
-                {
-                    if (item.Pid >= 0 && item.Id != Plugin)
-                    {
-                        await writer.WriteLineAsync(item.Id);
+                        throw new ArgumentException($"Cannot uninstall plugin because plugin {item.Id} depends on it");
                     }
                 }
             }
-
-            // Perform the actual uninstallation via the plugin service.
-            // If it is a root plugin, the root plugin service will clean up everything
-            await IPC.Processors.PluginService.PerformCommandAsync(this, false);
-            await IPC.Processors.PluginService.PerformCommandAsync(this, true);
-
-            // Reset it in the object model
-            using (await Model.Provider.AccessReadWriteAsync(cancellationToken))
+            else
             {
-                Model.Provider.Get.Plugins.Remove(Plugin);
+                throw new ArgumentException($"Plugin {Plugin} not found");
             }
+        }
+
+        // Stop it if required
+        StopPlugin stopCommand = commandFactory.Create<StopPlugin>();
+        stopCommand.Plugin = Plugin;
+        await PluginService.PerformCommandAsync(stopCommand, plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser), cancellationToken);
+
+        // Make sure we don't attempt to start it again once it's uninstalled
+        await using FileStream fileStream = new(settings.Value.PluginsFilename, FileMode.Create, FileAccess.Write);
+        await using StreamWriter writer = new(fileStream);
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            foreach (Plugin item in model.Plugins.Values)
+            {
+                if (item.Pid >= 0 && item.Id != Plugin)
+                {
+                    await writer.WriteLineAsync(item.Id);
+                }
+            }
+        }
+
+        // Perform the actual uninstallation via the plugin service.
+        // If it is a root plugin, the root plugin service will clean up everything
+        await PluginService.PerformCommandAsync(this, false, cancellationToken);
+        await PluginService.PerformCommandAsync(this, true, cancellationToken);
+
+        // Reset it in the object model
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            model.Plugins.Remove(Plugin);
         }
     }
 }

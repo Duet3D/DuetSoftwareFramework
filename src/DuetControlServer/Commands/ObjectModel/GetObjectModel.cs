@@ -2,24 +2,24 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetControlServer.Commands
+namespace DuetControlServer.Commands;
+
+/// <summary>
+/// Implementation of the <see cref="DuetAPI.Commands.Command"/> command
+/// </summary>
+/// <param name="model">Object model</param>
+public sealed class GetObjectModel(Model.ObjectModel model) : DuetAPI.Commands.GetObjectModel
 {
     /// <summary>
-    /// Implementation of the <see cref="DuetAPI.Commands.Command"/> command
+    /// Retrieve a copy of the current machine model
     /// </summary>
-    public sealed class GetObjectModel : DuetAPI.Commands.GetObjectModel
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Clone of the current machine model</returns>
+    public override async Task<ObjectModel> ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        /// <summary>
-        /// Retrieve a copy of the current machine model
-        /// </summary>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Clone of the current machine model</returns>
-        public override async Task<ObjectModel> ExecuteAsync(CancellationToken cancellationToken = default)
+        using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
-            {
-                return (ObjectModel)Model.Provider.Get.Clone();
-            }
+            return (ObjectModel)model.Clone();
         }
     }
 }

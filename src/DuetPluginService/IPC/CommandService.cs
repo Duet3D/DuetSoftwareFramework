@@ -19,7 +19,7 @@ namespace DuetPluginService.IPC;
 /// <param name="pluginStore">Plugin store</param>
 /// <param name="hostEnvironment">Host environment</param>
 /// <param name="logger">Logger</param>
-public class CommandService(CommandActivator commandActivator, PluginServiceConnection connection, PluginStore pluginStore, IHostEnvironment hostEnvironment, ILogger<CommandService> logger) : BackgroundService
+public class CommandService(CommandFactory commandActivator, PluginServiceConnection connection, PluginStore pluginStore, IHostEnvironment hostEnvironment, ILogger<CommandService> logger) : BackgroundService
 {
     /// <summary>
     /// Start the main service

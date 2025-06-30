@@ -3,6 +3,7 @@
 		<TargetFramework>net9.0</TargetFramework>
 		<PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
 		<AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
+		<ServerGarbageCollection>false</ServerGarbageCollection>
 	</PropertyGroup>
 
 	<ItemGroup>

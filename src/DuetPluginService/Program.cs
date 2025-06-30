@@ -5,7 +5,6 @@ using DuetPluginService.PermissionManagers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System;
 using System.CommandLine;
 using System.CommandLine.Builder;
 using System.CommandLine.Hosting;
@@ -42,7 +41,7 @@ return await new CommandLineBuilder(rootCommand)
         })
         .ConfigureServices((context, services) => services
             .Configure<Settings>(context.Configuration)
-            .AddSingleton<CommandActivator>()
+            .AddSingleton<CommandFactory>()
             .AddSingleton<IPermissionManager, AppArmorPermissionManager>()
             .AddSingleton<PluginStore>()
             .AddSingleton<PluginServiceConnection>()

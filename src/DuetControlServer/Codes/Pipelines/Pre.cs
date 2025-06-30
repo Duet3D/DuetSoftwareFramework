@@ -1,44 +1,49 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.Connection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using System;
 using System.Threading.Tasks;
 
-namespace DuetControlServer.Codes.Pipelines
+namespace DuetControlServer.Codes.Pipelines;
+
+/// <summary>
+/// Pipeline element for sending codes to code interceptors (pre stage)
+/// </summary>
+/// <param name="channelProcessor">Channel processor</param>
+/// <param name="codeProcessor">Code processor</param>
+/// <param name="lifetime">Application lifetime</param>
+/// <param name="settings">Application settings</param>
+public sealed class Pre(ChannelProcessor channelProcessor, CodeProcessor codeProcessor, IHostApplicationLifetime lifetime, IOptions<Settings> settings)
+    : PipelineBase(PipelineStage.Pre, channelProcessor, codeProcessor, lifetime, settings)
 {
     /// <summary>
-    /// Pipeline element for sending codes to code interceptors (pre stage)
+    /// Process an incoming code
     /// </summary>
-    /// <param name="processor">Channel processor</param>
-    public class Pre(ChannelProcessor processor) : PipelineBase(PipelineStage.Pre, processor)
+    /// <param name="code">Code to process</param>
+    /// <returns>Asynchronous task</returns>
+    public override async Task ProcessCodeAsync(Commands.Code code)
     {
-        /// <summary>
-        /// Process an incoming code
-        /// </summary>
-        /// <param name="code">Code to process</param>
-        /// <returns>Asynchronous task</returns>
-        public override async Task ProcessCodeAsync(Commands.Code code)
+        if (!code.Flags.HasFlag(CodeFlags.IsPreProcessed))
         {
-            if (!code.Flags.HasFlag(CodeFlags.IsPreProcessed))
+            try
             {
-                try
-                {
-                    bool resolved = await IPC.Processors.CodeInterception.Intercept(code, InterceptionMode.Pre);
-                    code.Flags |= CodeFlags.IsPreProcessed;
-                    await Processor.WriteCodeAsync(code, resolved ? PipelineStage.Executed : PipelineStage.ProcessInternally);
-                }
-                catch (Exception e)
-                {
-                    if (e is not OperationCanceledException)
-                    {
-                        Processor.Logger.Error(e, "Failed to execute code {0} on pre stage", code);
-                    }
-                    Codes.Processor.CancelCode(code, e);
-                }
+                bool resolved = await IPC.Processors.CodeInterception.InterceptAsync(code, InterceptionMode.Pre);
+                code.Flags |= CodeFlags.IsPreProcessed;
+                await ChannelProcessor.WriteCodeAsync(code, resolved ? PipelineStage.Executed : PipelineStage.ProcessInternally);
             }
-            else
+            catch (Exception e)
             {
-                await Processor.WriteCodeAsync(code, PipelineStage.ProcessInternally);
+                if (e is not OperationCanceledException)
+                {
+                    ChannelProcessor.Logger.Error(e, "Failed to execute code {0} on pre stage", code);
+                }
+                CodeProcessor.CancelCode(code, e);
             }
+        }
+        else
+        {
+            await ChannelProcessor.WriteCodeAsync(code, PipelineStage.ProcessInternally);
         }
     }
 }

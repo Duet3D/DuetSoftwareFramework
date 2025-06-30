@@ -2,6 +2,9 @@
 
 namespace DuetPluginService;
 
+/// <summary>
+/// Settings class
+/// </summary>
 public class Settings
 {
     /// <summary>

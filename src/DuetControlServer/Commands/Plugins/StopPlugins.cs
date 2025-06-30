@@ -1,4 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
+using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 using System.Collections.Generic;
 using System.Net.Sockets;
@@ -6,80 +7,80 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetControlServer.Commands
+namespace DuetControlServer.Commands;
+
+/// <summary>
+/// Implementation of the <see cref="DuetAPI.Commands.StopPlugins"/> command
+/// </summary>
+/// <param name="commandFactory">Command factory</param>
+/// <param name="model">Object model</param>
+/// <param name="settings">Settings</param>
+public sealed class StopPlugins(CommandFactory commandFactory, Model.ObjectModel model, IOptions<Settings> settings) : DuetAPI.Commands.StopPlugins
 {
     /// <summary>
-    /// Implementation of the <see cref="DuetAPI.Commands.StopPlugins"/> command
+    /// Indicates if the plugins are being started
     /// </summary>
-    public sealed class StopPlugins : DuetAPI.Commands.StopPlugins
-    {
-        /// <summary>
-        /// Indicates if the plugins are being started
-        /// </summary>
-        private static readonly AsyncLock _stopLock = new();
+    private static readonly AsyncLock _stopLock = new();
 
-        /// <summary>
-        /// Stop all the plugins
-        /// </summary>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Asynchronous task</returns>
-        public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Stop all the plugins
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
+    {
+        if (!settings.Value.PluginSupport)
         {
-            if (!Settings.PluginSupport)
+            return;
+        }
+
+        using (await _stopLock.LockAsync(cancellationToken))
+        {
+            // Don't proceed if all the plugins have been stopped
+            using (await model.AccessReadOnlyAsync(cancellationToken))
             {
-                return;
+                if (!model.State.PluginsStarted)
+                {
+                    return;
+                }
             }
 
-            using (await _stopLock.LockAsync(cancellationToken))
+            // Stop all plugins
+            StringBuilder startedPlugins = new();
+            List<Task> stopTasks = [];
+            using (await model.AccessReadOnlyAsync(cancellationToken))
             {
-                // Don't proceed if all the plugins have been stopped
-                using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
+                foreach (Plugin item in model.Plugins.Values)
                 {
-                    if (!Model.Provider.Get.State.PluginsStarted)
+                    if (item.Pid >= 0)
                     {
-                        return;
-                    }
-                }
+                        startedPlugins.AppendLine(item.Id);
 
-                // Stop all plugins
-                StringBuilder startedPlugins = new();
-                List<Task> stopTasks = [];
-                using (await Model.Provider.AccessReadOnlyAsync(cancellationToken))
-                {
-                    foreach (Plugin item in Model.Provider.Get.Plugins.Values)
-                    {
-                        if (item.Pid >= 0)
+                        if (item.Pid > 0)
                         {
-                            startedPlugins.AppendLine(item.Id);
-
-                            if (item.Pid > 0)
-                            {
-                                StopPlugin stopCommand = new()
-                                {
-                                    Plugin = item.Id,
-                                    SaveState = false,
-                                    StoppingAll = true
-                                };
-                                stopTasks.Add(stopCommand.ExecuteAsync(cancellationToken));
-                            }
+                            StopPlugin stopCommand = commandFactory.Create<StopPlugin>();
+                            stopCommand.Plugin = item.Id;
+                            stopCommand.SaveState = false;
+                            stopCommand.StoppingAll = true;
+                            stopTasks.Add(stopCommand.ExecuteAsync(cancellationToken));
                         }
                     }
                 }
+            }
 
-                try
-                {
-                    await Task.WhenAll(stopTasks);
-                }
-                catch (SocketException)
-                {
-                    // Can be expected when the remote service is terminated too early
-                }
+            try
+            {
+                await Task.WhenAll(stopTasks);
+            }
+            catch (SocketException)
+            {
+                // Can be expected when the remote service is terminated too early
+            }
 
-                using (await Model.Provider.AccessReadWriteAsync(cancellationToken))
-                {
-                    // Plugins have been stopped
-                    Model.Provider.Get.State.PluginsStarted = false;
-                }
+            using (await model.AccessReadWriteAsync(cancellationToken))
+            {
+                // Plugins have been stopped
+                model.State.PluginsStarted = false;
             }
         }
     }

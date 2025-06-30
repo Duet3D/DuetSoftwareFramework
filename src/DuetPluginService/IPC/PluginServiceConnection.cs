@@ -18,7 +18,7 @@ namespace DuetPluginService.IPC;
 /// </summary>
 /// <param name="commandActivator">Command activator</param>
 /// <param name="settings">Settings</param>
-public class PluginServiceConnection(CommandActivator commandActivator, IOptions<Settings> settings) : BaseConnection(ConnectionMode.PluginService)
+public class PluginServiceConnection(CommandFactory commandActivator, IOptions<Settings> settings) : BaseConnection(ConnectionMode.PluginService)
 {
     private readonly Settings _settings = settings.Value;
 

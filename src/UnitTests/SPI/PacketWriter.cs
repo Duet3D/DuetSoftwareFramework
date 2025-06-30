@@ -2,14 +2,14 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 using DuetAPI.ObjectModel;
-using DuetControlServer.SPI.Communication;
-using DuetControlServer.SPI.Communication.SbcRequests;
-using DuetControlServer.SPI.Communication.Shared;
-using DuetControlServer.SPI.Serialization;
+using DuetControlServer.Link.Communication;
+using DuetControlServer.Link.Communication.SbcRequests;
+using DuetControlServer.Link.Communication.Shared;
+using DuetControlServer.Link.Serialization;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using Code = DuetControlServer.Commands.Code;
-using CodeFlags = DuetControlServer.SPI.Communication.SbcRequests.CodeFlags;
+using CodeFlags = DuetControlServer.Link.Communication.SbcRequests.CodeFlags;
 
 namespace UnitTests.SPI
 {

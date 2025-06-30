@@ -1,56 +1,56 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 
-namespace DuetControlServer.IPC
+namespace DuetControlServer.IPC;
+
+/// <summary>
+/// Static class to manage read/write locks of third-party plugins
+/// </summary>
+public class LockManager(Model.ObjectModel model, IOptions<Settings> settings)
 {
     /// <summary>
-    /// Static class to manage read/write locks of third-party plugins
+    /// Connection that acquired the current lock
     /// </summary>
-    public static class LockManager
+    private Connection? _lockConnection;
+
+    /// <summary>
+    /// Indicates if a third-party application has locked the object model for writing
+    /// </summary>
+    public bool IsLocked => _lockConnection is not null;
+
+    /// <summary>
+    /// Read/write lock held by a third-party plugins
+    /// </summary>
+    private IDisposable? _lock;
+
+    /// <summary>
+    /// Function to create a read/write lock to the object model
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public async Task LockMachineModel(Connection connection, CancellationToken cancellationToken = default)
     {
-        /// <summary>
-        /// Connection that acquired the current lock
-        /// </summary>
-        private static Connection? _lockConnection;
+        _lock = await model.AccessReadWriteAsync(cancellationToken);
+        _lockConnection = connection;
+    }
 
-        /// <summary>
-        /// Indicates if a third-party application has locked the object model for writing
-        /// </summary>
-        public static bool IsLocked => _lockConnection is not null;
-
-        /// <summary>
-        /// Read/write lock held by a third-party plugins
-        /// </summary>
-        private static IDisposable? _lock;
-
-        /// <summary>
-        /// Function to create a read/write lock to the object model
-        /// </summary>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Asynchronous task</returns>
-        public static async Task LockMachineModel(Connection connection, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Unlock the machine model again
+    /// </summary>
+    public async Task UnlockMachineModel(Connection connection, CancellationToken cancellationToken = default)
+    {
+        if (_lockConnection == connection)
         {
-            _lock = await Model.Provider.AccessReadWriteAsync(cancellationToken);
-            _lockConnection = connection;
-        }
+            _lockConnection = null;
+            _lock?.Dispose();
+            _lock = null;
 
-        /// <summary>
-        /// Unlock the machine model again
-        /// </summary>
-        public static async Task UnlockMachineModel(Connection connection, CancellationToken cancellationToken = default)
-        {
-            if (_lockConnection == connection)
+            if (settings.Value.NoSpi)
             {
-                _lockConnection = null;
-                _lock?.Dispose();
-                _lock = null;
-
-                if (Settings.NoSpi)
-                {
-                    // Make sure functions waiting for full model updates don't stall
-                    await Model.Updater.MachineModelFullyUpdated(cancellationToken);
-                }
+                // Make sure functions waiting for full model updates don't stall
+                await Model.Updater.MachineModelFullyUpdated(cancellationToken);
             }
         }
     }

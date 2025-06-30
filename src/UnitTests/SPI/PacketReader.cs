@@ -4,10 +4,10 @@ using System.Runtime.InteropServices;
 using System.Text;
 using DuetAPI;
 using DuetAPI.Utility;
-using DuetControlServer.SPI.Communication;
-using DuetControlServer.SPI.Communication.FirmwareRequests;
-using DuetControlServer.SPI.Communication.Shared;
-using DuetControlServer.SPI.Serialization;
+using DuetControlServer.Link.Communication;
+using DuetControlServer.Link.Communication.FirmwareRequests;
+using DuetControlServer.Link.Communication.Shared;
+using DuetControlServer.Link.Serialization;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 

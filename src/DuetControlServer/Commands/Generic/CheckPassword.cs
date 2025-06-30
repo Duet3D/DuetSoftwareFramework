@@ -1,29 +1,29 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
 
-namespace DuetControlServer.Commands
+namespace DuetControlServer.Commands;
+
+/// <summary>
+/// Implementation of the <see cref="DuetAPI.Commands.CheckPassword"/> command
+/// </summary>
+/// <param name="model">Object model</param>
+public sealed class CheckPassword(Model.ObjectModel model) : DuetAPI.Commands.CheckPassword
 {
     /// <summary>
-    /// Implementation of the <see cref="DuetAPI.Commands.CheckPassword"/> command
+    /// Check the given password
     /// </summary>
-    public sealed class CheckPassword : DuetAPI.Commands.CheckPassword
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public override async Task<bool> ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        /// <summary>
-        /// Check the given password
-        /// </summary>
-        /// <param name="cancellationToken">Optional cancellation token</param>
-        /// <returns>Asynchronous task</returns>
-        public override async Task<bool> ExecuteAsync(CancellationToken cancellationToken = default)
+        using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            using (await Model.Provider.AccessReadOnlyAsync())
+            if (model.Password == DuetAPI.Connection.Defaults.Password || string.IsNullOrEmpty(model.Password))
             {
-                if (Model.Provider.Password == DuetAPI.Connection.Defaults.Password || string.IsNullOrEmpty(Model.Provider.Password))
-                {
-                    // No password set
-                    return true;
-                }
-                return (Password == Model.Provider.Password);
+                // No password set
+                return true;
             }
+            return Password == model.Password;
         }
     }
 }
