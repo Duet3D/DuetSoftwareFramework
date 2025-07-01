@@ -33,6 +33,7 @@ public class JobProcessor : IAsyncDiagnostics
     private readonly CodeFactory _codeFactory;
     private readonly Logger _dsfLogger;
     private readonly Expressions _expressions;
+    private readonly FileFactory _fileFactory;
     private readonly Parser.FileInfoParser _fileInfoParser;
     private readonly LinkInterface _linkInterface;
     private readonly Model.ObjectModel _model;
@@ -57,6 +58,7 @@ public class JobProcessor : IAsyncDiagnostics
         CodeProcessor codeProcessor,
         Logger dsfLogger,
         Expressions expressions,
+        FileFactory fileFactory,
         Parser.FileInfoParser fileInfoParser,
         LinkInterface linkInterface,
         Model.ObjectModel model,
@@ -67,6 +69,7 @@ public class JobProcessor : IAsyncDiagnostics
         _codeProcessor = codeProcessor;
         _dsfLogger = dsfLogger;
         _expressions = expressions;
+        _fileFactory = fileFactory;
         _fileInfoParser = fileInfoParser;
         _linkInterface = linkInterface;
         _model = model;
@@ -252,18 +255,18 @@ public class JobProcessor : IAsyncDiagnostics
     /// <summary>
     /// Start a new file print
     /// </summary>
-    /// <param name="fileName">File to print</param>
+    /// <param name="virtualFile">File to print</param>
     /// <param name="physicalFile">Physical file to print</param>
     /// <param name="simulating">Whether the file is being simulated</param>
     /// <returns>Asynchronous task</returns>
     /// <remarks>
     /// This class has to be locked when this method is called
     /// </remarks>
-    public async Task SelectFile(string fileName, string physicalFile, bool simulating = false)
+    public async Task SelectFile(string virtualFile, string physicalFile, bool simulating = false)
     {
         // Analyze and open the file
         GCodeFileInfo info = await _fileInfoParser.ParseAsync(physicalFile, true);
-        CodeFile file = new(fileName, physicalFile, CodeChannel.File, _codeFactory, _codeProcessor, _expressions, _linkInterface, _model, _lifetime, _settings);
+        CodeFile file = _fileFactory.Create(virtualFile, physicalFile, CodeChannel.File);
 
         // A file being printed may start another file print
         if (IsFileSelected)
@@ -286,7 +289,7 @@ public class JobProcessor : IAsyncDiagnostics
 
         // Notify RepRapFirmware and start processing the file in the background
         await _linkInterface.SetPrintFileInfo();
-        _logger.Info("Selected file {0}", fileName);
+        _logger.Info("Selected file {0}", virtualFile);
     }
 
     /// <summary>
@@ -553,7 +556,7 @@ public class JobProcessor : IAsyncDiagnostics
                     isCancelled = IsCancelled;
                     isAborted = IsAborted;
                     isSimulating = IsSimulating;
-                    physicalFileName = _file.PhysicalFileName;
+                    physicalFileName = _file.FilePath.Physical;
                 }
 
                 // Notify RRF
@@ -720,7 +723,7 @@ public class JobProcessor : IAsyncDiagnostics
         {
             if (IsFileSelected)
             {
-                builder.Append($"File {_file!.FileName} is selected");
+                builder.Append($"File {_file!.FilePath.Virtual} is selected");
                 if (IsProcessing)
                 {
                     builder.Append(", processing");

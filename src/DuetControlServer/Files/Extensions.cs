@@ -18,6 +18,6 @@ public static partial class ServiceCollectionExtensions
             .AddSingleton<Parser.FileInfoParser>()
             .AddSingleton<FilePathResolver>()
             .AddSingleton<JobProcessor>()
-            .AddSingleton<MacroFileFactory>();
+            .AddSingleton<FileFactory>();
     }
 }

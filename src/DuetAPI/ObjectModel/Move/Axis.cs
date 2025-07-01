@@ -172,6 +172,16 @@ public partial class Axis : ModelObject, IStaticModelObject
     private int? _percentStstCurrent;
 
     /// <summary>
+    /// Whether or not the axis is currently using phase stepping
+    /// </summary>
+    public bool PhaseStep
+    {
+        get => _phaseStep;
+        set => SetPropertyValue(ref _phaseStep, value);
+    }
+    private bool _phaseStep;
+
+    /// <summary>
     /// Motor jerk during the current print only (in mm/s)
     /// </summary>
     public float PrintingJerk

@@ -37,7 +37,7 @@ public sealed class Processor : IAsyncDiagnostics
     private readonly JobProcessor _jobProcessor;
 
     private readonly Model.ObjectModel _model;
-    private readonly MacroFileFactory _macroFileFactory;
+    private readonly FileFactory _macroFileFactory;
     private readonly NLog.Logger _logger;
     private readonly Settings _settings;
 
@@ -68,7 +68,7 @@ public sealed class Processor : IAsyncDiagnostics
         ILinkAdapter linkAdapter,
         LinkInterface linkInterface,
         JobProcessor jobProcessor,
-        MacroFileFactory macroFileFactory,
+        FileFactory macroFileFactory,
         Model.ObjectModel model,
         IOptions<Settings> settings)
     {
@@ -217,7 +217,7 @@ public sealed class Processor : IAsyncDiagnostics
                 {
                     if (!macro.IsAborted)
                     {
-                        _logger.Warn("Aborting orphaned macro file {0}", macro.FileName);
+                        _logger.Warn("Aborting orphaned macro file {0}", macro.FilePath.Virtual);
                         macro.Abort();
                     }
                 }
@@ -225,11 +225,11 @@ public sealed class Processor : IAsyncDiagnostics
                 {
                     if (Channel != CodeChannel.Daemon)
                     {
-                        _logger.Debug("Disposing macro file {0}", macro.FileName);
+                        _logger.Debug("Disposing macro file {0}", macro.FilePath.Virtual);
                     }
                     else
                     {
-                        _logger.Trace("Disposing macro file {0}", macro.FileName);
+                        _logger.Trace("Disposing macro file {0}", macro.FilePath.Virtual);
                     }
                     macro.Dispose();
                 }
@@ -294,7 +294,7 @@ public sealed class Processor : IAsyncDiagnostics
                 {
                     if (!macro.IsAborted)
                     {
-                        _logger.Warn("Aborting orphaned macro file {0}", macro.FileName);
+                        _logger.Warn("Aborting orphaned macro file {0}", macro.FilePath.Virtual);
                         macro.Abort();
                     }
                 }
@@ -302,11 +302,11 @@ public sealed class Processor : IAsyncDiagnostics
                 {
                     if (Channel != CodeChannel.Daemon)
                     {
-                        _logger.Debug("Disposing macro file {0}", macro.FileName);
+                        _logger.Debug("Disposing macro file {0}", macro.FilePath.Virtual);
                     }
                     else
                     {
-                        _logger.Trace("Disposing macro file {0}", macro.FileName);
+                        _logger.Trace("Disposing macro file {0}", macro.FilePath.Virtual);
                     }
                     macro.Dispose();
                 }
@@ -358,7 +358,7 @@ public sealed class Processor : IAsyncDiagnostics
             {
                 if (item.File is MacroFile macro)
                 {
-                    MacroFile copy = _macroFileFactory.Create(macro, Channel);
+                    MacroFile copy = _macroFileFactory.CreateMacro(macro, Channel);
                     Push(copy);
                     lock (_macrosToStart)
                     {
@@ -450,7 +450,7 @@ public sealed class Processor : IAsyncDiagnostics
             }
             if (state.File is MacroFile macro)
             {
-                channelDiagostics.AppendLine($"{prefix} {(macro.IsExecuting ? "Doing" : "Finishing")} macro {state.File.FileName}, started by {((state.StartCode is null) ? "system" : state.StartCode.ToString())}");
+                channelDiagostics.AppendLine($"{prefix} {(macro.IsExecuting ? "Doing" : "Finishing")} macro {state.File.FilePath.Virtual}, started by {((state.StartCode is null) ? "system" : state.StartCode.ToString())}");
             }
             foreach (Code suspendedCode in state.SuspendedCodes)
             {
@@ -1279,9 +1279,9 @@ public sealed class Processor : IAsyncDiagnostics
     /// <summary>
     /// Attempt to start a file macro
     /// </summary>
-    /// <param name="fileName">Name of the macro file</param>
+    /// <param name="virtualFile">Requested name of the macro file</param>
     /// <param name="fromCode">Request comes from a real G/M/T-code</param>
-    public void DoMacroFile(string fileName, bool fromCode)
+    public void DoMacroFile(string virtualFile, bool fromCode)
     {
         // Macro requests are not meant for comment codes, resolve them separately
         ResolveCommentCodes();
@@ -1289,7 +1289,7 @@ public sealed class Processor : IAsyncDiagnostics
         // Cannot start system macro if something is still busy
         if (!fromCode && Stack.Count > 1)
         {
-            _logger.Warn("System macro {0} is requested but the stack is not empty. Discarding request.", fileName);
+            _logger.Warn("System macro {0} is requested but the stack is not empty. Discarding request.", virtualFile);
             _linkAdapter.WriteMacroCompleted(Channel, true);
             return;
         }
@@ -1300,7 +1300,7 @@ public sealed class Processor : IAsyncDiagnostics
         {
             if (CurrentState.MacroCompleted)
             {
-                _logger.Info("Finished intermediate macro file {0}", CurrentState.File!.FileName);
+                _logger.Info("Finished intermediate macro file {0}", CurrentState.File!.FilePath.Virtual);
                 startCode = CurrentState.StartCode;
                 CurrentState.StartCode = null;     // don't add it back to the buffered codes because it's about to be pushed on the stack again
                 Pop();
@@ -1314,14 +1314,14 @@ public sealed class Processor : IAsyncDiagnostics
         }
         else if (Stack.Count > 1)
         {
-            _logger.Warn("System macro {0} is requested but the stack is not empty. Discarding request.", fileName);
+            _logger.Warn("System macro {0} is requested but the stack is not empty. Discarding request.", virtualFile);
             _linkAdapter.WriteMacroCompleted(Channel, true);
             return;
         }
 
         // Try to locate the macro file
-        string physicalFile = _filePathResolver.ToPhysical(fileName, FileDirectory.System);
-        MacroFile? macro = _macroFileFactory.Create(fileName, physicalFile, Channel, startCode, startCode?.SourceConnection ?? 0);
+        string physicalFile = _filePathResolver.ToPhysical(virtualFile, FileDirectory.System);
+        MacroFile? macro = _macroFileFactory.CreateMacro(virtualFile, physicalFile, Channel, startCode, startCode?.SourceConnection ?? 0);
 
         StackState newState = Push(macro);
         newState.StartCode = startCode;

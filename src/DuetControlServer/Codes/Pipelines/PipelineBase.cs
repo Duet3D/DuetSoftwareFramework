@@ -106,7 +106,7 @@ public abstract class PipelineBase
                         if (stackItem.File is not null)
                         {
                             builder.Append(stackItem.File is MacroFile ? "Macro " : "File ");
-                            builder.Append(stackItem.File.FileName);
+                            builder.Append(stackItem.File.FilePath.Virtual);
                             builder.Append(": ");
                         }
 

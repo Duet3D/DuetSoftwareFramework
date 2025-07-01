@@ -18,8 +18,7 @@ namespace DuetControlServer.Files;
 /// <summary>
 /// Class to read G/M/T-codes from files
 /// </summary>
-/// <param name="fileName">Name of the file to process or null if it is optional</param>
-/// <param name="physicalFile">Physical path to the file</param>
+/// <param name="filePath">Path of the file</param>
 /// <param name="channel">Channel to send the codes to</param>
 /// <param name="codeFactory">Factory to create new codes</param>
 /// <param name="codeProcessor">Code processor to process the codes</param>
@@ -29,8 +28,7 @@ namespace DuetControlServer.Files;
 /// <param name="settings">Settings to use</param>
 /// <param name="lifetime">Application lifetime to use</param>
 public class CodeFile(
-    string fileName,
-    string physicalFile,
+    CodeFilePath filePath,
     CodeChannel channel,
     CodeFactory codeFactory,
     CodeProcessor codeProcessor,
@@ -65,7 +63,7 @@ public class CodeFile(
     /// <summary>
     /// File being read from
     /// </summary>
-    private readonly FileStream _fileStream = new(physicalFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
+    private readonly FileStream _fileStream = new(filePath.Physical, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
 
     /// <summary>
     /// Internal buffer used for reading from files
@@ -80,12 +78,7 @@ public class CodeFile(
     /// <summary>
     /// File path to the file being executed
     /// </summary>
-    public string FileName { get; } = fileName;
-
-    /// <summary>
-    /// Physical file path to the file being executed
-    /// </summary>
-    public string PhysicalFileName { get; } = physicalFile;
+    public CodeFilePath FilePath { get; } = filePath;
 
     /// <summary>
     /// Channel to send the codes to
@@ -182,7 +175,7 @@ public class CodeFile(
         LinkInterface linkInterface,
         Model.ObjectModel model,
         IHostApplicationLifetime lifetime,
-        IOptions<Settings> settings) : this(copyFrom.FileName, copyFrom.PhysicalFileName, channel, codeFactory, codeProcessor, expressions, linkInterface, model, lifetime, settings)
+        IOptions<Settings> settings) : this(copyFrom.FilePath, channel, codeFactory, codeProcessor, expressions, linkInterface, model, lifetime, settings)
     {
         // Copy conditional states
         _codeBlocks.Clear();

@@ -187,7 +187,7 @@ public sealed class ChannelProcessor
             //Logger.Debug("Flushing file codes on stage {0} for {1}", pipeline.Stage, code);
             if (!await pipeline.FlushAsync(file, cancellationToken))
             {
-                Logger.Debug("Failed to flush file codes on stage {0} for {1}", pipeline.Stage, file.FileName);
+                Logger.Debug("Failed to flush file codes on stage {0} for {1}", pipeline.Stage, file.FilePath.Virtual);
                 return false;
             }
             //Logger.Debug("Flushed file codes on stage {0} for {1}", pipeline.Stage, code);

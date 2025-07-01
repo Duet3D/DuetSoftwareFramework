@@ -2,6 +2,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NLog;
+using NLog.Config;
+using NLog.Targets;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -19,10 +21,26 @@ namespace DuetControlServer;
 /// <summary>
 /// Settings class
 /// </summary>
-public class Settings
+public sealed class Settings
 {
+    /// <summary>
+    /// Default path to the configuration file
+    /// </summary>
     public const string DefaultConfigFile = "/opt/dsf/conf/config.json";
+
+    /// <summary>
+    /// Default path to the list of enabled plugins
+    /// </summary>
     private const string DefaultPluginsFile = "/opt/dsf/conf/plugins.txt";
+
+    /// <summary>
+    /// Path to the configuration file
+    /// </summary>
+    public string ConfigFile = DefaultConfigFile;
+
+    /// <summary>
+    /// Default regular expression flags used for parsing G-code files
+    /// </summary>
     private const RegexOptions DefaultRegexFlags = RegexOptions.IgnoreCase | RegexOptions.Singleline;
 
     /// <summary>
@@ -362,9 +380,36 @@ public class Settings
     /// Perform final configuration steps
     /// </summary>
     /// <param name="options">Bound options</param>
-    public static void PostConfigure(Settings settings)
+    public void PostConfigure()
     {
+        if (!File.Exists(ConfigFile) && Directory.Exists(Path.GetDirectoryName(ConfigFile)))
+        {
+            // Save default settings to the config file
+            SaveToFile(ConfigFile);
+        }
 
+        // Initialize logging
+        LoggingConfiguration logConfig = new();
+        ColoredConsoleTarget logConsoleTarget = new()
+        {
+            // Create a layout for messages like:
+            // [trace] Really verbose stuff
+            // [debug] Verbose debugging stuff
+            // [info] This is a regular log message
+            // [warning] Something not too nice
+            // [error] IPC#3: This is an IPC error message
+            //         System.Exception: Foobar
+            //         at { ... }
+            // [error] That is some other error message
+            //         System.Exception: Yada yada
+            //         at { ... }
+            // [fatal] System.Exception: Blah blah
+            //         at { ... }
+            Layout = @"[${level:lowercase=true}] ${when:when=!contains('${logger}','.') and !ends-with('${logger}','.g'):inner=${logger}${literal:text=\:} }${message}${onexception:when='${message}'!='${exception:format=ToString}'):${newline}   ${exception:format=ToString}}"
+        };
+        logConfig.AddRule(LogLevel, LogLevel.Fatal, logConsoleTarget);
+        LogManager.AutoShutdown = false;
+        LogManager.Configuration = logConfig;
     }
 
     /// <summary>
@@ -455,6 +500,6 @@ public static class ServiceCollectionExtensions
     {
         return services
             .Configure<Settings>(configuration)
-            .PostConfigure<Settings>(Settings.PostConfigure);
+            .PostConfigure<Settings>(settings => settings.PostConfigure());
     }
 }
