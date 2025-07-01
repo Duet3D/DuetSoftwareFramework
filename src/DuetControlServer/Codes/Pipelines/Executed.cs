@@ -191,11 +191,9 @@ public sealed class Executed : PipelineBase
     /// Wait for the pipeline stage to become idle
     /// </summary>
     /// <param name="code">Code waiting for the flush</param>
-    /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
-    /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
-    public override Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true, CancellationToken cancellationToken = default) => _stackItem.FlushAsync(cancellationToken);
+    public override Task<bool> FlushAsync(Commands.Code code, CancellationToken cancellationToken = default) => _stackItem.FlushAsync(cancellationToken);
 
     /// <summary>
     /// Execute a given code on this pipeline stage

@@ -30,19 +30,6 @@ public static class Reader
     }
 
     /// <summary>
-    /// Read a legacy config response from a memory span
-    /// </summary>
-    /// <param name="from">Origin</param>
-    /// <param name="json">Config response JSON</param>
-    /// <returns>Number of bytes read</returns>
-    public static int ReadLegacyConfigResponse(ReadOnlySpan<byte> from, out ReadOnlySpan<byte> json)
-    {
-        int jsonLength = MemoryMarshal.Read<ushort>(from);
-        json = from.Slice(4, jsonLength);
-        return 4 + jsonLength;
-    }
-
-    /// <summary>
     /// Read a code buffer update from a memory span
     /// </summary>
     /// <param name="from">Origin</param>

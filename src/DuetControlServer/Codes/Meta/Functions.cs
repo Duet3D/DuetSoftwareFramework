@@ -1,5 +1,6 @@
 ﻿using DuetAPI;
 using DuetControlServer.Files;
+using DuetControlServer.Link;
 using DuetControlServer.Model;
 using System;
 using System.Collections.Generic;
@@ -18,7 +19,7 @@ public class Functions
     // Private fields
     private readonly FilePathResolver _filePathResolver;
     private readonly Filter _filter;
-    private readonly Link.Interface _linkInterface;
+    private readonly LinkInterface _linkInterface;
 
     /// <summary>
     /// Initializer function to register custom meta G-code functions
@@ -26,7 +27,7 @@ public class Functions
     /// <param name="expressions">Expressions to register the functions with</param>
     /// <param name="filter">Object model filter</param>
     /// <param name="linkInterface">Link interface</param>
-    public Functions(Expressions expressions, FilePathResolver filePathResolver, Filter filter, Link.Interface linkInterface)
+    public Functions(Expressions expressions, FilePathResolver filePathResolver, Filter filter, LinkInterface linkInterface)
     {
         expressions.CustomFunctions.Add("exists", Exists);
         expressions.CustomFunctions.Add("fileexists", FileExists);

@@ -1,7 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
-using DuetControlServer.Files;
 using DuetControlServer.Files.Parser;
 
 namespace DuetControlServer.Commands;

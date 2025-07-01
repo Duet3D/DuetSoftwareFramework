@@ -1,4 +1,5 @@
 ﻿using DuetControlServer.IPC;
+using DuetControlServer.Link;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,7 +11,7 @@ namespace DuetControlServer.Commands;
 /// </summary>
 /// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model</param>
-public sealed class InvalidateChannel(Link.Interface linkInterface, Model.ObjectModel model) : DuetAPI.Commands.InvalidateChannel, IConnectionCommand
+public sealed class InvalidateChannel(LinkInterface linkInterface, Model.ObjectModel model) : DuetAPI.Commands.InvalidateChannel, IConnectionCommand
 {
     /// <summary>
     /// Source connection of this command

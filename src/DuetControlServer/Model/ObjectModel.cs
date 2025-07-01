@@ -40,6 +40,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     {
         _lifetime = lifetime;
         _updateEvent = new(_updateLock);
+        _fullUpdateEvent = new(_updateLock);
         _settings = settings;
 
         OnDeserializationFailed += DeserializationFailedHandler;
@@ -84,6 +85,11 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// Condition variable to trigger when the machine model has been updated
     /// </summary>
     private readonly AsyncConditionVariable _updateEvent;
+
+    /// <summary>
+    /// Condition variable to trigger when the machine model has been fully updated from RepRapFirmware
+    /// </summary>
+    private readonly AsyncConditionVariable _fullUpdateEvent;
 
     /// <summary>
     /// Function that is called when the object model has been updated
@@ -422,7 +428,6 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
         using (_updateLock.Lock(cancellationToken))
         {
             _updateEvent.Wait(cancellationToken);
-            _lifetime.ApplicationStopping.ThrowIfCancellationRequested();
         }
     }
 
@@ -436,7 +441,6 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
         using (await _updateLock.LockAsync(cancellationToken))
         {
             await _updateEvent.WaitAsync(cancellationToken);
-            _lifetime.ApplicationStopping.ThrowIfCancellationRequested();
         }
     }
 
@@ -450,6 +454,55 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// </summary>
     /// <returns>Asynchronous task</returns>
     public Task WaitForUpdateAsync() => WaitForUpdateAsync(_lifetime.ApplicationStopping);
+
+    /// <summary>
+    /// Wait for the model to be fully updated from RepRapFirmware
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    public void WaitForFullUpdate()
+    {
+        using (_updateLock.Lock())
+        {
+            _fullUpdateEvent.Wait();
+        }
+    }
+
+    /// <summary>
+    /// Wait asynchronously for the model to be fully updated from RepRapFirmware
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public async Task WaitForFullUpdateAsync(CancellationToken cancellationToken = default)
+    {
+        using (await _updateLock.LockAsync(cancellationToken))
+        {
+            await _fullUpdateEvent.WaitAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Called in non-SPI mode to notify waiting tasks about a finished model update (synchronous version)
+    /// </summary>
+    internal void FullyUpdated()
+    {
+        using (_updateLock.Lock())
+        {
+            _fullUpdateEvent.NotifyAll();
+        }
+    }
+
+    /// <summary>
+    /// Called in non-SPI mode to notify waiting tasks about a finished model update
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    internal async Task FullyUpdatedAsync(CancellationToken cancellationToken = default)
+    {
+        using (await _updateLock.LockAsync(cancellationToken))
+        {
+            _fullUpdateEvent.NotifyAll();
+        }
+    }
 
     /// <summary>
     /// Indicates how many config files are being processed
@@ -677,5 +730,30 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
                 builder.AppendLine($"- {kv.Value.Item1.Name} -> {kv.Key.Name} from {kv.Value.Item2.GetRawText()}");
             }
         }
+    }
+
+    /// <summary>
+    /// Event that is raised when the connection to the firmware has been lost
+    /// </summary>
+    public event EventHandler? OnConnectionLost;
+
+    /// <summary>
+    /// Called by the link subsystem when the connection to the Duet has been lost
+    /// </summary>
+    internal void ConnectionLost()
+    {
+        using (AccessReadWrite())
+        {
+            Boards.Clear();
+            Global.Clear();
+            if (State.Status != MachineStatus.Halted && State.Status != MachineStatus.Updating)
+            {
+                State.Status = MachineStatus.Disconnected;
+            }
+            State.DisplayMessage = string.Empty;
+            State.MessageBox = null;
+        }
+
+        OnConnectionLost?.Invoke(this, EventArgs.Empty);
     }
 }

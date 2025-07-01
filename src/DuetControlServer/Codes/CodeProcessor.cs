@@ -2,6 +2,7 @@
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Codes.Meta;
 using DuetControlServer.Files;
 using DuetControlServer.Utility;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,13 +22,16 @@ namespace DuetControlServer.Codes;
 /// Main class delegating parallel G/M/T-code execution
 /// </summary>
 /// <param name="model">Object model</param>
+/// <remarks>
+/// Constructor of this class
+/// </remarks>
+/// <param name="expressions">Expression parser</param>
+/// <param name="model">Object model</param>
+/// <param name="lifetime">Application lifetime</param>
+/// <param name="serviceProvider">Service provider</param>
 [DiagnosticsPriority(-10)]
-public sealed class CodeProcessor : IDiagnostics
+public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel model, IHostApplicationLifetime lifetime, IServiceProvider serviceProvider) : IDiagnostics
 {
-    // Private fields
-    private readonly Model.ObjectModel _model;
-    private readonly IHostApplicationLifetime _lifetime;
-
     /// <summary>
     /// Lock around the files being written
     /// </summary>
@@ -41,23 +45,7 @@ public sealed class CodeProcessor : IDiagnostics
     /// <summary>
     /// Processors per code channel
     /// </summary>
-    public readonly ChannelProcessor[] Processors = new ChannelProcessor[Inputs.Total];
-
-    /// <summary>
-    /// Constructor of this class
-    /// </summary>
-    /// <param name="model">Object model</param>
-    /// <param name="serviceProvider">Service provider</param>
-    /// <param name="lifetime">Application lifetime</param>
-    public CodeProcessor(Model.ObjectModel model, IServiceProvider serviceProvider, IHostApplicationLifetime lifetime)
-    {
-        _model = model;
-        _lifetime = lifetime;
-        foreach (CodeChannel channel in Enum.GetValues<CodeChannel>())
-        {
-            Processors[(int)channel] = ActivatorUtilities.CreateInstance<ChannelProcessor>(serviceProvider, channel, this);
-        }
-    }
+    public readonly Lazy<ChannelProcessor[]> Processors = new(() => [.. Enum.GetValues<CodeChannel>().Select(channel => ActivatorUtilities.CreateInstance<ChannelProcessor>(serviceProvider, channel)) ]);
 
     /// <summary>
     /// Get diagnostics from every channel processor
@@ -65,7 +53,7 @@ public sealed class CodeProcessor : IDiagnostics
     /// <param name="builder">String builder to write to</param>
     public void PrintDiagnostics(StringBuilder builder)
     {
-        foreach (ChannelProcessor processor in Processors)
+        foreach (ChannelProcessor processor in Processors.Value)
         {
             processor.Diagnostics(builder);
         }
@@ -75,7 +63,7 @@ public sealed class CodeProcessor : IDiagnostics
     /// Get the pipeline state of the firmware stage from a given channel
     /// </summary>
     /// <param name="channel"></param>
-    public Pipelines.PipelineStackItem GetFirmwareState(CodeChannel channel) => Processors[(int)channel].FirmwareStackItem;
+    public Pipelines.PipelineStackItem GetFirmwareState(CodeChannel channel) => Processors.Value[(int)channel].FirmwareStackItem;
 
     /// <summary>
     /// Push a new state on the stack of a given channel procesor. Only to be used by the SPI channel processor!
@@ -83,20 +71,20 @@ public sealed class CodeProcessor : IDiagnostics
     /// <param name="channel">Code channel</param>
     /// <param name="file">Optional file</param>
     /// <returns>Pipeline state</returns>
-    public Pipelines.PipelineStackItem Push(CodeChannel channel, CodeFile? file = null) => Processors[(int)channel].Push(file);
+    public Pipelines.PipelineStackItem Push(CodeChannel channel, CodeFile? file = null) => Processors.Value[(int)channel].Push(file);
 
     /// <summary>
     /// Push a new state on the stack of a given pipeline. Only to be used by the SPI channel processor!
     /// </summary>
     /// <param name="channel">Code channel</param>
-    public void Pop(CodeChannel channel) => Processors[(int)channel].Pop();
+    public void Pop(CodeChannel channel) => Processors.Value[(int)channel].Pop();
 
     /// <summary>
     /// Assign the job file to the given channel. Only used by the job tasks!
     /// </summary>
     /// <param name="channel">Code channel</param>
     /// <param name="file">Job file</param>
-    public void SetJobFile(CodeChannel channel, CodeFile? file) => Processors[(int)channel].SetJobFile(file);
+    public void SetJobFile(CodeChannel channel, CodeFile? file) => Processors.Value[(int)channel].SetJobFile(file);
 
     /// <summary>
     /// Wait for all pending codes to finish
@@ -105,7 +93,7 @@ public sealed class CodeProcessor : IDiagnostics
     /// <param name="flushAll">Flush all codes on all stack levels</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
-    public Task<bool> FlushAsync(CodeChannel channel, bool flushAll = false, CancellationToken cancellationToken = default) => Processors[(int)channel].FlushAsync(flushAll, cancellationToken);
+    public Task<bool> FlushAsync(CodeChannel channel, bool flushAll = false, CancellationToken cancellationToken = default) => Processors.Value[(int)channel].FlushAsync(flushAll, cancellationToken);
 
     /// <summary>
     /// Wait for all pending codes of the given file to finish
@@ -113,7 +101,7 @@ public sealed class CodeProcessor : IDiagnostics
     /// <param name="file">Code file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
-    public Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default) => Processors[(int)file.Channel].FlushAsync(file, cancellationToken);
+    public Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default) => Processors.Value[(int)file.Channel].FlushAsync(file, cancellationToken);
 
     /// <summary>
     /// Wait for all pending codes on the same stack level as the given code to finish.
@@ -129,9 +117,16 @@ public sealed class CodeProcessor : IDiagnostics
     public async Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true, bool syncFileStreams = false, bool ifExecuting = true, CancellationToken cancellationToken = default)
     {
         // Wait for the pending codes on this channel to go
-        if (!await Processors[(int)code.Channel].FlushAsync(code, evaluateExpressions, evaluateAll, cancellationToken))
+        if (!await Processors.Value[(int)code.Channel].FlushAsync(code, cancellationToken))
         {
             return false;
+        }
+
+        // See if any expressions need to be evaluated
+        if (evaluateExpressions)
+        {
+            // Code is about to be processed internally, evaluate potential expressions
+            await expressions.EvaluateAsync(code, evaluateAll, cancellationToken);
         }
 
         if (syncFileStreams && code.IsFromFileChannel)
@@ -147,9 +142,9 @@ public sealed class CodeProcessor : IDiagnostics
         else if (ifExecuting)
         {
             // Make sure the current code channel is executing G/M/T-codes
-            using (await _model.AccessReadOnlyAsync(cancellationToken))
+            using (await model.AccessReadOnlyAsync(cancellationToken))
             {
-                if (_model.Inputs[code.Channel]?.Active != true)
+                if (model.Inputs[code.Channel]?.Active != true)
                 {
                     return false;
                 }
@@ -168,7 +163,7 @@ public sealed class CodeProcessor : IDiagnostics
     /// <returns>Asynchronous task</returns>
     public async ValueTask StartCodeAsync(Commands.Code code)
     {
-        ChannelProcessor processor = Processors[(int)code.Channel];
+        ChannelProcessor processor = Processors.Value[(int)code.Channel];
         PipelineStage stage = PipelineStage.Start;
 
         // Deal with priority codes
@@ -182,16 +177,16 @@ public sealed class CodeProcessor : IDiagnostics
             }
 
             // Otherwise move it to another idle code channel with the same emulation type (if possible)
-            using (await _model.AccessReadOnlyAsync())
+            using (await model.AccessReadOnlyAsync())
             {
-                Compatibility compatibility = _model.Inputs[code.Channel]?.Compatibility ?? Compatibility.RepRapFirmware;
+                Compatibility compatibility = model.Inputs[code.Channel]?.Compatibility ?? Compatibility.RepRapFirmware;
                 for (int input = 0; input < Inputs.Total; input++)
                 {
                     CodeChannel channel = (CodeChannel)input;
                     if (channel != code.Channel && channel is not CodeChannel.File and not CodeChannel.File2)
                     {
-                        ChannelProcessor next = Processors[input];
-                        if (_model.Inputs[channel]?.Compatibility == compatibility && next.IsIdle(code))
+                        ChannelProcessor next = Processors.Value[input];
+                        if (model.Inputs[channel]?.Compatibility == compatibility && next.IsIdle(code))
                         {
                             code.Channel = channel;
                             await next.WriteCodeAsync(code, stage); // This can't block if the channel is idle
@@ -207,7 +202,7 @@ public sealed class CodeProcessor : IDiagnostics
                 CodeChannel channel = (CodeChannel)input;
                 if (channel != code.Channel && channel is not CodeChannel.File and not CodeChannel.File2)
                 {
-                    ChannelProcessor next = Processors[input];
+                    ChannelProcessor next = Processors.Value[input];
                     if (next.IsIdle(code))
                     {
                         code.Channel = channel;
@@ -266,7 +261,7 @@ public sealed class CodeProcessor : IDiagnostics
     /// While it may appear nicer to move the cancellation functionality to the code pipeline itself,
     /// this coule lead to performance issues or unexpected behaviour due to intercepted codes. So leave it here for now
     /// </remarks>
-    public readonly CancellationTokenSource[] CancellationTokenSources = new CancellationTokenSource[Inputs.Total];
+    public readonly CancellationTokenSource[] CancellationTokenSources = [.. Enum.GetValues<CodeChannel>().Select(channel => CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping)) ];
 
     /// <summary>
     /// Cancel pending codes of the given channel
@@ -282,7 +277,7 @@ public sealed class CodeProcessor : IDiagnostics
             oldTcs.Dispose();
 
             // Create a new one
-            CancellationTokenSources[(int)channel] = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.ApplicationStopping);
+            CancellationTokenSources[(int)channel] = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
         }
     }
 
@@ -290,7 +285,7 @@ public sealed class CodeProcessor : IDiagnostics
     /// Execute a given code on a given pipeline stage
     /// </summary>
     /// <param name="code">Code to enqueue</param>
-    public void CodeCompleted(Commands.Code code) => Processors[(int)code.Channel].WriteCode(code, PipelineStage.Executed);
+    public void CodeCompleted(Commands.Code code) => Processors.Value[(int)code.Channel].WriteCode(code, PipelineStage.Executed);
 
     /// <summary>
     /// Dictionary of codes vs. synchronization tasks
@@ -318,7 +313,7 @@ public sealed class CodeProcessor : IDiagnostics
             throw new ArgumentException("Code has no file position and cannot be used for sync requests", nameof(code));
         }
 
-        if (!Processors[(int)CodeChannel.File].HasValidJobFile && !Processors[(int)CodeChannel.File2].HasValidJobFile)
+        if (!Processors.Value[(int)CodeChannel.File].HasValidJobFile && !Processors.Value[(int)CodeChannel.File2].HasValidJobFile)
         {
             // There is nothing to sync if the files have finished or if there is only one file stream...
             return true;

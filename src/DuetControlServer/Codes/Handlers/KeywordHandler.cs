@@ -3,6 +3,7 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Codes.Meta;
 using DuetControlServer.Files;
+using DuetControlServer.Link;
 using Microsoft.Extensions.Options;
 using System;
 using System.IO;
@@ -18,7 +19,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="expressions">Meta G-code expression parser</param>
 /// <param name="filePathResolver">File path resolver</param>
 /// <param name="settings">Settings</param>
-public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expressions, FilePathResolver filePathResolver, Link.Interface linkInterface, IOptions<Settings> settings) : ICodeHandler
+public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expressions, FilePathResolver filePathResolver, LinkInterface linkInterface, IOptions<Settings> settings) : ICodeHandler
 {
     /// <summary>
     /// Logger instance

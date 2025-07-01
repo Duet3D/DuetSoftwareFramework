@@ -15,6 +15,7 @@ using DuetControlServer.Codes;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Codes.Meta;
+using DuetControlServer.Link;
 
 namespace DuetControlServer.Files;
 
@@ -33,7 +34,7 @@ public class JobProcessor : IAsyncDiagnostics
     private readonly Logger _dsfLogger;
     private readonly Expressions _expressions;
     private readonly Parser.FileInfoParser _fileInfoParser;
-    private readonly Link.Interface _linkInterface;
+    private readonly LinkInterface _linkInterface;
     private readonly Model.ObjectModel _model;
     private readonly IOptions<Settings> _settings;
     private readonly IHostApplicationLifetime _lifetime;
@@ -43,11 +44,13 @@ public class JobProcessor : IAsyncDiagnostics
     /// </summary>
     /// <param name="codeFactory">Code factory</param>
     /// <param name="codeProcessor">Code processor</param>
+    /// <param name="dsfLogger">Internal logger</param>
     /// <param name="expressions">Expressions</param>
     /// <param name="fileInfoParser">File info parser</param>
     /// <param name="infoParser">Info parser</param>
     /// <param name="linkInterface">Link interface</param>
     /// <param name="model">Object Model</param>
+    /// <param name="updateInterface">Update interface</param>
     /// <param name="settings">Settings</param>
     /// <param name="lifetime">Host application lifetime</param>
     public JobProcessor(CodeFactory codeFactory,
@@ -55,7 +58,7 @@ public class JobProcessor : IAsyncDiagnostics
         Logger dsfLogger,
         Expressions expressions,
         Parser.FileInfoParser fileInfoParser,
-        Link.Interface linkInterface,
+        LinkInterface linkInterface,
         Model.ObjectModel model,
         IOptions<Settings> settings,
         IHostApplicationLifetime lifetime)
@@ -595,8 +598,8 @@ public class JobProcessor : IAsyncDiagnostics
                     int upTime = 0;
                     while (!_lifetime.ApplicationStopping.IsCancellationRequested)
                     {
-                        await Model.Updater.WaitForFullUpdateAsync();
-                        using (await _model.AccessReadOnlyAsync())
+                        await _model.WaitForFullUpdateAsync(_lifetime.ApplicationStopping);
+                        using (await _model.AccessReadOnlyAsync(_lifetime.ApplicationStopping))
                         {
                             if (_model.State.UpTime < upTime || _model.Job.LastDuration is not null)
                             {

@@ -3,6 +3,7 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Codes;
 using DuetControlServer.Codes.Meta;
+using DuetControlServer.Link;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using System;
@@ -114,7 +115,7 @@ public sealed class MacroFile : CodeFile, IDisposable
     /// <param name="lifetime">Host application lifetime</param>
     /// <param name="settings">Settings</param>
     private MacroFile(string fileName, string physicalFile, CodeChannel channel, Code? startCode, int sourceConnection,
-        CodeFactory codeFactory, CodeProcessor codeProcessor, Utility.Logger dsfLogger, Expressions expressions, Link.Interface linkInterface, Model.ObjectModel model, IHostApplicationLifetime lifetime, IOptions<Settings> settings)
+        CodeFactory codeFactory, CodeProcessor codeProcessor, Utility.Logger dsfLogger, Expressions expressions, LinkInterface linkInterface, Model.ObjectModel model, IHostApplicationLifetime lifetime, IOptions<Settings> settings)
         : base(fileName, physicalFile, channel, codeFactory, codeProcessor, expressions, linkInterface, model, lifetime, settings)
     {
         SourceConnection = sourceConnection;
@@ -153,7 +154,7 @@ public sealed class MacroFile : CodeFile, IDisposable
     /// <param name="model">Object model</param>
     /// <param name="lifetime">Host application lifetime</param>
     /// <param name="settings">Settings</param>
-    public MacroFile(MacroFile copyFrom, CodeChannel channel, CodeProcessor codeProcessor, CodeFactory codeFactory, Expressions expressions, Link.Interface linkInterface, Model.ObjectModel model, IHostApplicationLifetime lifetime, IOptions<Settings> settings) : base(copyFrom, channel, codeFactory, codeProcessor, expressions, linkInterface, model, lifetime, settings)
+    public MacroFile(MacroFile copyFrom, CodeChannel channel, CodeProcessor codeProcessor, CodeFactory codeFactory, Expressions expressions, LinkInterface linkInterface, Model.ObjectModel model, IHostApplicationLifetime lifetime, IOptions<Settings> settings) : base(copyFrom, channel, codeFactory, codeProcessor, expressions, linkInterface, model, lifetime, settings)
     {
         SourceConnection = copyFrom.SourceConnection;
         IsNested = copyFrom.IsNested;

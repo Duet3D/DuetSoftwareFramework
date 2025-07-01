@@ -2,15 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
-using DuetControlServer.Codes.Meta;
 using DuetControlServer.Files;
 using DuetControlServer.Link.Adapter;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
@@ -18,8 +15,6 @@ using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Utility;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using Nito.AsyncEx;
-using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.Link;
 
@@ -27,71 +22,52 @@ namespace DuetControlServer.Link;
 /// This class accesses RepRapFirmware via SPI and deals with general communication
 /// </summary>
 /// <param name="channels">Channel manager</param>
-/// <param name="expressions">Expressions parser</param>
 /// <param name="dsfLogger">Internal logger</param>
 /// <param name="filePathResolver">File path resolver</param>
 /// <param name="jobProcessor">Job processor</param>
 /// <param name="linkAdapter">Firmware link adapter</param>
 /// <param name="model">Object model</param>
-/// <param name="updater">Object model updater</param>
 /// <param name="settings">Settings</param>
 [DiagnosticsPriority(-6)]
-public sealed partial class Interface(
+public sealed partial class LinkService(
     Channel.Manager channels,
-    Expressions expressions,
     Logger dsfLogger,
     FilePathResolver filePathResolver,
     JobProcessor jobProcessor,
     ILinkAdapter linkAdapter,
+    LinkInterface linkInterface,
     Model.ObjectModel model,
-    Model.Updater updater,
-    IOptions<Settings> settings) : BackgroundService, IAsyncDiagnostics
+    IOptions<Settings> settings) : BackgroundService
 {
     /// <summary>
     /// Logger instance
     /// </summary>
     private readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
-    // Information about the code channels
-    private int _bytesReserved, _bufferSpace;
-    private readonly Queue<ModelQueryRequest> _modelQueryRequests = new();
+    /// <summary>
+    /// Last time the object model was queried
+    /// </summary>
     private DateTime _lastQueryTime = DateTime.Now;
 
-    // Expression evaluation and variable requests
-    private readonly List<EvaluateExpressionRequest> _evaluateExpressionRequests = [];
-    private readonly List<VariableRequest> _variableRequests = [];
-
-    // Firmware updates
-    private readonly AsyncLock _firmwareUpdateLock = new();
-    private Stream? _iapStream, _firmwareStream;
-    private TaskCompletionSource? _firmwareUpdateRequest;
-
-    // Firmware halt/restart requests
-    private readonly AsyncLock _firmwareActionLock = new();
-    private TaskCompletionSource? _firmwareHaltRequest;
-    private TaskCompletionSource? _firmwareResetRequest;
-
-    // Print handling
-    private readonly AsyncLock _printStateLock = new();
-    private TaskCompletionSource? _setPrintInfoRequest;
-    private Protocol.Shared.PrintStoppedReason _stopPrintReason;
-    private TaskCompletionSource? _stopPrintRequest;
-
-    // Miscellaneous requests
-    private readonly Queue<Tuple<MessageTypeFlags, string>> _messagesToSend = new();
+    /// <summary>
+    /// Open files requested by the firmware
+    /// </summary>
     private readonly Dictionary<uint, FileStream> _openFiles = [];
-    private uint _openFileHandle = Consts.NoFileHandle;
 
     /// <summary>
+    /// Handle counter for open files
+    /// </summary>
+    public uint _openFileHandleCounter = Consts.NoFileHandle;
+
+    // <summary>
     /// Print diagnostics of this class
     /// </summary>
     /// <param name="builder">String builder</param>
     /// <returns>Asynchronous task</returns>
     public async ValueTask PrintDiagnosticsAsync(StringBuilder builder, CancellationToken cancellationToken)
     {
-        #warning fixme
+#warning fixme
         await channels.PrintDiagnosticsAsync(builder, cancellationToken);
-        builder.AppendLine($"Code buffer space: {_bufferSpace}");
         if (linkAdapter is IDiagnostics diagnostics)
         {
             diagnostics.PrintDiagnostics(builder);
@@ -100,434 +76,6 @@ public sealed partial class Interface(
         {
             await asyncDiagnostics.PrintDiagnosticsAsync(builder, cancellationToken);
         }
-    }
-
-    /// <summary>
-    /// Request a specific update of the object model
-    /// </summary>
-    /// <param name="key">Key to request</param>
-    /// <param name="flags">Object model flags</param>
-    /// <returns>Deserialized JSON document</returns>
-    public Task<byte[]> RequestObjectModel(string key, string flags, CancellationToken cancellationToken = default)
-    {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return Task.FromCanceled<byte[]>(cancellationToken);
-        }
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
-
-        ModelQueryRequest request = new(key, flags);
-        lock (_modelQueryRequests)
-        {
-            _modelQueryRequests.Enqueue(request);
-        }
-        return request.Tcs.Task;
-    }
-
-    /// <summary>
-    /// Evaluate an arbitrary expression
-    /// </summary>
-    /// <param name="channel">Where to evaluate the expression</param>
-    /// <param name="expression">Expression to evaluate</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Result of the evaluated expression</returns>
-    /// <exception cref="CodeParserException">Failed to evaluate expression</exception>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    /// <exception cref="NotSupportedException">Incompatible firmware version</exception>
-    /// <exception cref="ArgumentException">Invalid parameter</exception>
-    public Task<object?> EvaluateExpressionAsync(CodeChannel channel, string expression, CancellationToken cancellationToken = default)
-    {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return Task.FromCanceled<object?>(cancellationToken);
-        }
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
-        if (linkAdapter.ProtocolVersion == 1)
-        {
-            throw new NotSupportedException("Incompatible firmware version");
-        }
-        if (Encoding.UTF8.GetByteCount(expression) >= Consts.MaxExpressionLength)
-        {
-            throw new ArgumentException($"Expression too long (max {Consts.MaxExpressionLength} chars)", nameof(expression));
-        }
-
-        lock (_evaluateExpressionRequests)
-        {
-            foreach (EvaluateExpressionRequest item in _evaluateExpressionRequests)
-            {
-                if (item.Channel == channel && item.Expression == expression)
-                {
-                    // There is no reason to evaluate the same expression twice...
-                    return item.Task;
-                }
-            }
-
-            EvaluateExpressionRequest request = new(channel, expression);
-            _evaluateExpressionRequests.Add(request);
-            _logger.Debug("Evaluating {0} on channel {1}", expression, channel);
-            #warning add ct support
-            return request.Task;
-        }
-    }
-
-    /// <summary>
-    /// Set or delete a global or local variable
-    /// </summary>
-    /// <param name="channel">Where to evaluate the expression</param>
-    /// <param name="createVariable">Whether the variable shall be created</param>
-    /// <param name="varName">Name of the variable</param>
-    /// <param name="expression">Expression to evaluate</param>
-    /// <returns>Result of the evaluated expression</returns>
-    /// <exception cref="CodeParserException">Failed to assign or delete variable</exception>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    /// <exception cref="NotSupportedException">Incompatible firmware version</exception>
-    /// <exception cref="ArgumentException">Invalid parameter</exception>
-    public Task<object?> SetVariableAsync(CodeChannel channel, bool createVariable, string varName, string? expression, CancellationToken cancellationToken = default)
-    {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return Task.FromCanceled<object?>(cancellationToken);
-        }
-        if (linkAdapter.ProtocolVersion < 5)
-        {
-            throw new NotSupportedException("Incompatible firmware version");
-        }
-        if (Encoding.UTF8.GetByteCount(varName) >= Consts.MaxVariableLength)
-        {
-            throw new ArgumentException($"Variable too long (max {Consts.MaxVariableLength} chars)");
-        }
-        if (expression is not null && Encoding.UTF8.GetByteCount(expression) >= Consts.MaxExpressionLength)
-        {
-            throw new ArgumentException($"Expression too long (max {Consts.MaxExpressionLength} chars)");
-        }
-
-        VariableRequest request;
-        lock (_variableRequests)
-        {
-            request = new(channel, createVariable, varName, expression);
-            _variableRequests.Add(request);
-            if (expression is not null)
-            {
-                _logger.Debug("Setting variable {0} to {1} on channel {2}", varName, expression, channel);
-            }
-            else
-            {
-                _logger.Debug("Deleting local variable {0} on channel {1}", varName, channel);
-            }
-        }
-        return request.Task;
-    }
-
-    /// <summary>
-    /// Check if a code channel is waiting for acknowledgement
-    /// </summary>
-    /// <param name="channel">Channel to query</param>
-    /// <returns>Whether the channel is awaiting acknowledgement</returns>
-    public bool IsWaitingForAcknowledgment(CodeChannel channel) => channels[channel].IsWaitingForAcknowledgment;
-
-    /// <summary>
-    /// Wait for all pending codes of the first or last stack item to finish
-    /// </summary>
-    /// <param name="channel">Code channel to wait for</param>
-    /// <param name="flushAll">Flush everything</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Whether the codes have been flushed successfully</returns>
-    public async Task<bool> FlushAsync(CodeChannel channel, bool flushAll, CancellationToken cancellationToken = default)
-    {
-        if (settings.Value.NoSpi)
-        {
-            return true;
-        }
-
-        Task<bool> flushTask;
-        using (await channels[channel].LockAsync(cancellationToken))
-        {
-            flushTask = flushAll ? channels[channel].FlushAllAsync(cancellationToken) : channels[channel].FlushAsync(cancellationToken);
-        }
-        return await flushTask;
-    }
-
-    /// <summary>
-    /// Wait for all pending codes to finish
-    /// </summary>
-    /// <param name="file">Code file</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Whether the codes have been flushed successfully</returns>
-    public async Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
-    {
-        if (settings.Value.NoSpi)
-        {
-            return true;
-        }
-
-        Task<bool> flushTask;
-        using (await channels[file.Channel].LockAsync(cancellationToken))
-        {
-            flushTask = channels[file.Channel].FlushAsync(file, cancellationToken);
-        }
-        return await flushTask;
-    }
-
-    /// <summary>
-    /// Wait for all pending codes on the same stack level as the given code to finish.
-    /// By default this replaces all expressions as well for convenient parsing by the code processors.
-    /// </summary>
-    /// <param name="code">Code waiting for the flush</param>
-    /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
-    /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Whether the codes have been flushed successfully</returns>
-    public async Task<bool> FlushAsync(Code code, bool evaluateExpressions = true, bool evaluateAll = true, CancellationToken cancellationToken = default)
-    {
-        if (settings.Value.NoSpi)
-        {
-            return true;
-        }
-
-        Task<bool> flushTask;
-        using (await channels[code.Channel].LockAsync(cancellationToken))
-        {
-            flushTask = (code.File == null) ? channels[code.Channel].FlushAsync(cancellationToken) : channels[code.Channel].FlushAsync(code.File, cancellationToken);
-        }
-
-        if (await flushTask)
-        {
-            if (evaluateExpressions)
-            {
-                // Code is about to be processed internally, evaluate potential expressions
-                await expressions.EvaluateAsync(code, evaluateAll, cancellationToken);
-            }
-            return true;
-        }
-        return false;
-    }
-
-    /// <summary>
-    /// Copy the state from one channel processor to another
-    /// </summary>
-    /// <param name="from">Source channel</param>
-    /// <param name="to">Target channel</param>
-    /// <exception cref="NotImplementedException"></exception>
-    public async Task CopyStateAsync(CodeChannel from, CodeChannel to)
-    {
-        using (await channels[to].LockAsync())
-        {
-            using (await channels[from].LockAsync())
-            {
-                channels[to].CopyState(channels[from]);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Request an immediate emergency stop
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public async Task EmergencyStopAsync(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
-
-        Task onFirmwareHalted;
-        using (await _firmwareActionLock.LockAsync(cancellationToken))
-        {
-            _firmwareHaltRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            onFirmwareHalted = _firmwareHaltRequest.Task;
-        }
-        await onFirmwareHalted;
-    }
-
-    /// <summary>
-    /// Perform a firmware reset and wait for it to finish
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public async Task ResetFirmwareAsync(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
-
-        Task onFirmwareReset;
-        using (await _firmwareActionLock.LockAsync(cancellationToken))
-        {
-            _firmwareResetRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            onFirmwareReset = _firmwareResetRequest.Task;
-        }
-        await onFirmwareReset;
-    }
-
-    /// <summary>
-    /// Attempt to flag the currently executing macro file as (not) pausable
-    /// </summary>
-    /// <param name="channel">Code channel where the macro is being executed</param>
-    /// <param name="isPausable">Whether or not the macro file is pausable</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public async Task SetMacroPausableAsync(CodeChannel channel, bool isPausable, CancellationToken cancellationToken = default)
-    {
-        using (await channels[channel].LockAsync(cancellationToken))
-        {
-            await channels[channel].SetMacroPausable(isPausable);
-        }
-    }
-
-    /// <summary>
-    /// Update the print file info in the firmware
-    /// </summary>
-    /// <returns>Asynchronous task</returns>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    public async Task SetPrintFileInfo()
-    {
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
-
-        Task task;
-        using (await _printStateLock.LockAsync())
-        {
-            _setPrintInfoRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            task = _setPrintInfoRequest.Task;
-        }
-        await task;
-    }
-
-    /// <summary>
-    /// Notify the firmware that the file print has been stopped
-    /// </summary>
-    /// <param name="reason">Reason why the print has stopped</param>
-    /// <returns>Asynchronous task</returns>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    /// <exception cref="OperationCanceledException">Connection lost while trying to notify RRF</exception>
-    public async Task StopPrint(PrintStoppedReason reason)
-    {
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
-
-        Task onPrintStopped;
-        using (await _printStateLock.LockAsync())
-        {
-            _stopPrintReason = reason;
-            _stopPrintRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            onPrintStopped = _stopPrintRequest.Task;
-        }
-        await onPrintStopped;
-    }
-
-    /// <summary>
-    /// Lock all movement systems and wait for standstill
-    /// </summary>
-    /// <param name="channel">Code channel acquiring the lock</param>
-    /// <returns>Disposable lock object that releases the lock when disposed</returns>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    /// <exception cref="OperationCanceledException">Failed to get movement lock</exception>
-    public async Task<IAsyncDisposable> LockAllMovementSystemsAndWaitForStandstill(CodeChannel channel)
-    {
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
-
-        Task<bool> lockTask;
-        using (await channels[channel].LockAsync())
-        {
-            lockTask = channels[channel].LockAllMovementSystemsAndWaitForStandstill();
-        }
-
-        if (await lockTask)
-        {
-            return new MovementLock(channel, this);
-        }
-        throw new OperationCanceledException();
-    }
-
-    /// <summary>
-    /// Unlock all resources occupied by the given channel
-    /// </summary>
-    /// <param name="channel">Channel holding the resources</param>
-    /// <returns>Asynchronous task</returns>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    internal async Task UnlockAll(CodeChannel channel)
-    {
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
-
-        Task unlockTask;
-        using (await channels[channel].LockAsync())
-        {
-            unlockTask = channels[channel].UnlockAll();
-        }
-        await unlockTask;
-    }
-
-    /// <summary>
-    /// Wait for potential firmware update to finish
-    /// </summary>
-    public void WaitForUpdate()
-    {
-        using (_firmwareUpdateLock.Lock())
-        {
-            // This lock is acquired as long as a firmware update is in progress; no need to do anything else
-        }
-    }
-
-    /// <summary>
-    /// Wait for potential firmware update to finish
-    /// </summary>
-    /// <returns>Asynchronous task</returns>
-    public async Task WaitForUpdateAsync()
-    {
-        using (await _firmwareUpdateLock.LockAsync())
-        {
-            // This lock is acquired as long as a firmware update is in progress; no need to do anything else
-        }
-    }
-
-    /// <summary>
-    /// Perform an update of the main firmware via IAP
-    /// </summary>
-    /// <param name="iapStream">IAP binary</param>
-    /// <param name="firmwareStream">Firmware binary</param>
-    /// <exception cref="InvalidOperationException">Firmware is already being updated or not connected over SPI</exception>
-    /// <returns>Asynchronous task</returns>
-    public async Task UpdateFirmware(Stream iapStream, Stream firmwareStream)
-    {
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
-
-        TaskCompletionSource tcs;
-        using (await _firmwareUpdateLock.LockAsync())
-        {
-            if (_firmwareUpdateRequest is not null)
-            {
-                throw new InvalidOperationException("Firmware is already being updated");
-            }
-
-            tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            _iapStream = iapStream;
-            _firmwareStream = firmwareStream;
-            _firmwareUpdateRequest = tcs;
-        }
-        await tcs.Task;
     }
 
     /// <summary>
@@ -542,14 +90,14 @@ public sealed partial class Interface(
         }
 
         // Get the CRC16 checksum of the firmware binary
-        ushort crc16 = CRC16.Calculate(_firmwareStream!);
+        ushort crc16 = CRC16.Calculate(linkInterface.FirmwareStream!);
 
         // Send the IAP binary to the firmware
         _logger.Info("Flashing IAP binary");
         bool dataSent;
         do
         {
-            dataSent = linkAdapter.WriteIapSegment(_iapStream!);
+            dataSent = linkAdapter.WriteIapSegment(linkInterface.IapStream!);
             if (_logger.IsDebugEnabled)
             {
                 Console.Write('.');
@@ -574,11 +122,11 @@ public sealed partial class Interface(
             }
 
             _logger.Info("Flashing RepRapFirmware");
-            _firmwareStream!.Seek(0, SeekOrigin.Begin);
+            linkInterface.FirmwareStream!.Seek(0, SeekOrigin.Begin);
 
             try
             {
-                while (linkAdapter.FlashFirmwareSegment(_firmwareStream))
+                while (linkAdapter.FlashFirmwareSegment(linkInterface.FirmwareStream))
                 {
                     if (_logger.IsDebugEnabled)
                     {
@@ -599,7 +147,7 @@ public sealed partial class Interface(
 
             _logger.Info("Verifying checksum");
         }
-        while (!linkAdapter.VerifyFirmwareChecksum(_firmwareStream.Length, crc16) && ++numRetries < 3);
+        while (!linkAdapter.VerifyFirmwareChecksum(linkInterface.FirmwareStream.Length, crc16) && ++numRetries < 3);
 
         if (numRetries == 3)
         {
@@ -614,51 +162,17 @@ public sealed partial class Interface(
     }
 
     /// <summary>
-    /// Send a message to the firmware
+    /// Start this service asynchronously
     /// </summary>
-    /// <param name="flags">Message flags</param>
-    /// <param name="message">Message content</param>
-    /// <exception cref="InvalidOperationException">Incompatible firmware or not connected over SPI</exception>
-    /// <exception cref="NotSupportedException">Incompatible firmware version</exception>
-    /// <exception cref="ArgumentException">Invalid parameter</exception>
-    public void SendMessage(MessageTypeFlags flags, string message)
-    {
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
-        if (linkAdapter.ProtocolVersion == 1)
-        {
-            throw new NotSupportedException("Incompatible firmware version");
-        }
-        if (message.Length > settings.Value.MaxMessageLength)
-        {
-            throw new ArgumentException($"{nameof(message)} too long");
-        }
-
-        lock (_messagesToSend)
-        {
-            _messagesToSend.Enqueue(new Tuple<MessageTypeFlags, string>(flags, message));
-        }
-    }
-
-    /// <summary>
-    /// Abort all files in RRF on the given channel asynchronously
-    /// </summary>
-    /// <param name="channel">Channel where all the files have been aborted</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    public async Task AbortAllAsync(CodeChannel channel)
+    public override Task StartAsync(CancellationToken cancellationToken)
     {
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
+        // Initialize the link interface
+        linkAdapter.Connect();
 
-        using (await channels[channel].LockAsync())
-        {
-            await channels[channel].AbortAllFilesAsync();
-        }
+        // Run this service
+        return base.StartAsync(cancellationToken);
     }
 
     /// <summary>
@@ -711,6 +225,33 @@ public sealed partial class Interface(
     }
 
     /// <summary>
+    /// Shut down this service
+    /// </summary>
+    /// <param name="stoppingToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public override async Task StopAsync(CancellationToken stoppingToken)
+    {
+        // Cancel the file being printed
+        using (await jobProcessor.LockAsync(stoppingToken))
+        {
+            jobProcessor.Abort();
+        }
+
+        // Close all the files
+        foreach (var kv in _openFiles)
+        {
+            await kv.Value.DisposeAsync();
+        }
+        _openFiles.Clear();
+
+        // Shut down the link subsystem
+        await linkInterface.InvalidateAsync(stoppingToken);
+
+        // Shut down this service
+        await base.StopAsync(stoppingToken);
+    }
+
+    /// <summary>
     /// Perform communication with the RepRapFirmware controller over SPI
     /// </summary>
     /// <param name="stoppingToken">Cancellation token</param>
@@ -719,31 +260,31 @@ public sealed partial class Interface(
         do
         {
             bool blockTask = false, skipChannels = false;
-            using (_firmwareActionLock.Lock(stoppingToken))
+            using (linkInterface.FirmwareActionLock.Lock(stoppingToken))
             {
                 // Check if an emergency stop has been requested
-                if (_firmwareHaltRequest is not null)
+                if (linkInterface.FirmwareHaltRequest is not null)
                 {
                     Invalidate();
                     if (linkAdapter.WriteEmergencyStop())
                     {
                         _logger.Warn("Emergency stop");
-                        _firmwareHaltRequest.SetResult();
-                        _firmwareHaltRequest = null;
+                        linkInterface.FirmwareHaltRequest.SetResult();
+                        linkInterface.FirmwareHaltRequest = null;
                     }
                     skipChannels = true;
                 }
 
                 // Check if a firmware reset has been requested
-                if (_firmwareResetRequest is not null)
+                if (linkInterface.FirmwareResetRequest is not null)
                 {
                     Invalidate();
                     if (linkAdapter.WriteReset())
                     {
                         _logger.Warn("Resetting controller");
                         linkAdapter.PerformFullTransfer(cancellationToken: stoppingToken);
-                        _firmwareResetRequest.SetResult();
-                        _firmwareResetRequest = null;
+                        linkInterface.FirmwareResetRequest.SetResult();
+                        linkInterface.FirmwareResetRequest = null;
 
                         blockTask = !settings.Value.NoTerminateOnReset;
                     }
@@ -752,22 +293,22 @@ public sealed partial class Interface(
             }
 
             // Check if a firmware update is supposed to be performed
-            using (_firmwareUpdateLock.Lock(stoppingToken))
+            using (linkInterface.FirmwareUpdateLock.Lock(stoppingToken))
             {
-                if (_iapStream is not null && _firmwareStream is not null)
+                if (linkInterface.IapStream is not null && linkInterface.FirmwareStream is not null)
                 {
                     Invalidate();
 
                     try
                     {
                         PerformFirmwareUpdate();
-                        _firmwareUpdateRequest?.SetResult();
-                        _firmwareUpdateRequest = null;
+                        linkInterface.FirmwareUpdateRequest?.SetResult();
+                        linkInterface.FirmwareUpdateRequest = null;
                     }
                     catch (Exception e)
                     {
-                        _firmwareUpdateRequest?.SetException(e);
-                        _firmwareUpdateRequest = null;
+                        linkInterface.FirmwareUpdateRequest?.SetException(e);
+                        linkInterface.FirmwareUpdateRequest = null;
 
                         if (!settings.Value.UpdateOnly && settings.Value.NoTerminateOnReset && e is OperationCanceledException)
                         {
@@ -776,7 +317,7 @@ public sealed partial class Interface(
                         throw;
                     }
 
-                    _iapStream = _firmwareStream = null;
+                    linkInterface.IapStream = linkInterface.FirmwareStream = null;
                     blockTask = settings.Value.UpdateOnly || !settings.Value.NoTerminateOnReset;
                 }
             }
@@ -794,20 +335,20 @@ public sealed partial class Interface(
             }
 
             // Check for changes of the print status
-            using (_printStateLock.Lock(stoppingToken))
+            using (linkInterface.PrintStateLock.Lock(stoppingToken))
             {
-                if (_setPrintInfoRequest is not null && linkAdapter.WritePrintFileInfo(model.Job.File))
+                if (linkInterface.SetPrintInfoRequest is not null && linkAdapter.WritePrintFileInfo(model.Job.File))
                 {
                     // The packet providing file info has be sent first because it includes a time_t value that must reside on a 64-bit boundary!
-                    _setPrintInfoRequest.SetResult();
-                    _setPrintInfoRequest = null;
+                    linkInterface.SetPrintInfoRequest.SetResult();
+                    linkInterface.SetPrintInfoRequest = null;
                 }
                 else
                 {
-                    if (_stopPrintRequest is not null && linkAdapter.WritePrintStopped(_stopPrintReason))
+                    if (linkInterface.StopPrintRequest is not null && linkAdapter.WritePrintStopped(linkInterface.StopPrintReason))
                     {
-                        _stopPrintRequest.SetResult();
-                        _stopPrintRequest = null;
+                        linkInterface.StopPrintRequest.SetResult();
+                        linkInterface.StopPrintRequest = null;
                     }
                 }
             }
@@ -831,7 +372,7 @@ public sealed partial class Interface(
                     throw;
                 }
             }
-            _bytesReserved = 0;
+            linkInterface.BytesReserved = 0;
 
             // Process pending codes, macro files and requests for resource locks/unlocks as well as flush requests
             if (!skipChannels)
@@ -842,27 +383,15 @@ public sealed partial class Interface(
             // Request object model updates
             if (linkAdapter.ProtocolVersion == 1)
             {
-                if (DateTime.Now - _lastQueryTime > TimeSpan.FromMilliseconds(settings.Value.ModelUpdateInterval))
-                {
-                    using (model.AccessReadOnly(stoppingToken))
-                    {
-                        if (model.Boards.Count == 0 && linkAdapter.WriteGetLegacyConfigResponse())
-                        {
-                            // We no longer support regular status responses except to obtain the board name for updating the firmware
-                            _lastQueryTime = DateTime.Now;
-                        }
-                    }
-                }
+                throw new Exception("Unsupported firmware version. Upgrade your firmware manually");
             }
-            else
+
+            lock (linkInterface.ModelQueryRequests)
             {
-                lock (_modelQueryRequests)
+                if (linkInterface.ModelQueryRequests.TryPeek(out ModelQueryRequest? request) &&
+                    !request.QuerySent && linkAdapter.WriteGetObjectModel(request.Key, request.Flags))
                 {
-                    if (_modelQueryRequests.TryPeek(out ModelQueryRequest? request) &&
-                        !request.QuerySent && linkAdapter.WriteGetObjectModel(request.Key, request.Flags))
-                    {
-                        request.QuerySent = true;
-                    }
+                    request.QuerySent = true;
                 }
             }
 
@@ -870,9 +399,9 @@ public sealed partial class Interface(
                 int numEvaluationsSent = 0;
 
                 // Ask for expressions to be evaluated
-                lock (_evaluateExpressionRequests)
+                lock (linkInterface.EvaluateExpressionRequests)
                 {
-                    foreach (EvaluateExpressionRequest request in _evaluateExpressionRequests)
+                    foreach (EvaluateExpressionRequest request in linkInterface.EvaluateExpressionRequests)
                     {
                         if (!request.Written)
                         {
@@ -896,9 +425,9 @@ public sealed partial class Interface(
                 }
 
                 // Perform variable updates
-                lock (_variableRequests)
+                lock (linkInterface.VariableRequests)
                 {
-                    foreach (VariableRequest request in _variableRequests.ToList())
+                    foreach (VariableRequest request in linkInterface.VariableRequests.ToList())
                     {
                         if (!request.Written)
                         {
@@ -908,7 +437,7 @@ public sealed partial class Interface(
                                 if (request.Expression is null)
                                 {
                                     request.SetResult(null);
-                                    _variableRequests.Remove(request);
+                                    linkInterface.VariableRequests.Remove(request);
                                 }
                                 else
                                 {
@@ -932,13 +461,13 @@ public sealed partial class Interface(
             }
 
             // Send pending messages
-            lock (_messagesToSend)
+            lock (linkInterface.MessagesToSend)
             {
-                while (_messagesToSend.TryPeek(out Tuple<MessageTypeFlags, string>? message))
+                while (linkInterface.MessagesToSend.TryPeek(out Tuple<MessageTypeFlags, string>? message))
                 {
                     if (linkAdapter.WriteMessage(message.Item1, message.Item2))
                     {
-                        _messagesToSend.Dequeue();
+                        linkInterface.MessagesToSend.Dequeue();
                     }
                     else
                     {
@@ -951,23 +480,6 @@ public sealed partial class Interface(
             linkAdapter.PerformFullTransfer(cancellationToken: stoppingToken);
         }
         while (!stoppingToken.IsCancellationRequested);
-    }
-
-    /// <summary>
-    /// Send a pending code to the firmware
-    /// </summary>
-    /// <param name="code">Code to send</param>
-    /// <param name="codeLength">Length of the binary code in bytes</param>
-    /// <returns>Whether the code could be sent</returns>
-    internal bool SendCode(Code code, int codeLength)
-    {
-        if (_bufferSpace > codeLength && linkAdapter.WriteCode(code))
-        {
-            _bytesReserved += codeLength;
-            _bufferSpace -= codeLength;
-            return true;
-        }
-        return false;
     }
 
     /// <summary>
@@ -1064,25 +576,17 @@ public sealed partial class Interface(
     private void HandleObjectModel()
     {
         _logger.Trace("Received object model");
-        if (linkAdapter.ProtocolVersion > 1)
+        linkAdapter.ReadObjectModel(out ReadOnlySpan<byte> json);
+        lock (linkInterface.ModelQueryRequests)
         {
-            linkAdapter.ReadObjectModel(out ReadOnlySpan<byte> json);
-            lock (_modelQueryRequests)
+            if (linkInterface.ModelQueryRequests.TryDequeue(out ModelQueryRequest? query))
             {
-                if (_modelQueryRequests.TryDequeue(out ModelQueryRequest? query))
-                {
-                    query.Tcs.SetResult(json.ToArray());
-                }
-                else
-                {
-                    _logger.Warn("Failed to find query for object model response");
-                }
+                query.Tcs.SetResult(json.ToArray());
             }
-        }
-        else
-        {
-            linkAdapter.ReadLegacyConfigResponse(out ReadOnlySpan<byte> json);
-            updater.ProcessLegacyConfigResponse(json.ToArray());
+            else
+            {
+                _logger.Warn("Failed to find query for object model response");
+            }
         }
     }
 
@@ -1092,8 +596,8 @@ public sealed partial class Interface(
     private void HandleCodeBufferUpdate()
     {
         linkAdapter.ReadCodeBufferUpdate(out ushort bufferSpace);
-        _bufferSpace = bufferSpace - _bytesReserved;
-        _logger.Trace("Buffer space available: {0}", _bufferSpace);
+        linkInterface.BufferSpace = bufferSpace - linkInterface.BytesReserved;
+        _logger.Trace("Buffer space available: {0}", linkInterface.BufferSpace);
     }
 
     /// <summary>
@@ -1309,9 +813,9 @@ public sealed partial class Interface(
         linkAdapter.ReadEvaluationResult(out string expression, out object? result);
         _logger.Debug("Received evaluation result for expression {0} = {1}", expression, result);
 
-        lock (_evaluateExpressionRequests)
+        lock (linkInterface.EvaluateExpressionRequests)
         {
-            foreach (EvaluateExpressionRequest request in _evaluateExpressionRequests)
+            foreach (EvaluateExpressionRequest request in linkInterface.EvaluateExpressionRequests)
             {
                 // FIXME This should continue to work, but the next time the protocol is
                 // updated, the evaluation response should include the channel as well
@@ -1325,7 +829,7 @@ public sealed partial class Interface(
                     {
                         request.SetResult(result);
                     }
-                    _evaluateExpressionRequests.Remove(request);
+                    linkInterface.EvaluateExpressionRequests.Remove(request);
                     return;
                 }
             }
@@ -1398,9 +902,9 @@ public sealed partial class Interface(
         linkAdapter.ReadEvaluationResult(out string varName, out object? result);
         _logger.Trace("Received variable assignment result for {0} = {1}", varName, result);
 
-        lock (_variableRequests)
+        lock (linkInterface.VariableRequests)
         {
-            foreach (VariableRequest request in _variableRequests)
+            foreach (VariableRequest request in linkInterface.VariableRequests)
             {
                 if (request.VariableName == varName)
                 {
@@ -1412,7 +916,7 @@ public sealed partial class Interface(
                     {
                         request.SetResult(result);
                     }
-                    _variableRequests.Remove(request);
+                    linkInterface.VariableRequests.Remove(request);
                     return;
                 }
             }
@@ -1498,15 +1002,15 @@ public sealed partial class Interface(
             }
 
             // Register a handle and send it back
-            _openFileHandle++;
-            if (_openFileHandle == Consts.NoFileHandle)
+            _openFileHandleCounter++;
+            if (_openFileHandleCounter == Consts.NoFileHandle)
             {
-                _openFileHandle++;
+                _openFileHandleCounter++;
             }
-            _openFiles.Add(_openFileHandle, fs);
+            _openFiles.Add(_openFileHandleCounter, fs);
 
-            _logger.Debug("File {0} opened with handle #{1}", filename, _openFileHandle);
-            linkAdapter.WriteOpenFileResult(_openFileHandle, fs.Length);
+            _logger.Debug("File {0} opened with handle #{1}", filename, _openFileHandleCounter);
+            linkAdapter.WriteOpenFileResult(_openFileHandleCounter, fs.Length);
         }
         catch (Exception e)
         {
@@ -1639,28 +1143,16 @@ public sealed partial class Interface(
             _logger.Error(e, "Failed to close file #{0}", handle);
         }
     }
-
+    
     /// <summary>
     /// Invalidate every resource due to a critical event
     /// </summary>
     private void Invalidate()
     {
-        // No longer starting or stopping a print. Must do this before aborting the print
-        using (_printStateLock.Lock())
-        {
-            if (_setPrintInfoRequest is not null)
-            {
-                _setPrintInfoRequest.SetCanceled();
-                _setPrintInfoRequest = null;
-            }
-            if (_stopPrintRequest is not null)
-            {
-                _stopPrintRequest.SetCanceled();
-                _stopPrintRequest = null;
-            }
-        }
+        // Invalidate pending link interface requests
+        linkInterface.Invalidate();
 
-        // Cancel the file being printed
+        // Cancel the file being printed (if any)
         using (jobProcessor.Lock())
         {
             jobProcessor.Abort();
@@ -1674,131 +1166,15 @@ public sealed partial class Interface(
                 channel.Invalidate();
             }
         }
-        _bytesReserved = _bufferSpace = 0;
-
-        // Resolve pending object model requests
-        lock (_modelQueryRequests)
-        {
-            foreach (ModelQueryRequest request in _modelQueryRequests)
-            {
-                request.Tcs.SetCanceled();
-            }
-            _modelQueryRequests.Clear();
-        }
-
-        // Resolve pending expression evaluation and variable requests
-        lock (_evaluateExpressionRequests)
-        {
-            foreach (EvaluateExpressionRequest request in _evaluateExpressionRequests)
-            {
-                request.SetCanceled();
-            }
-            _evaluateExpressionRequests.Clear();
-        }
-
-        lock (_variableRequests)
-        {
-            foreach (VariableRequest request in _variableRequests)
-            {
-                request.SetCanceled();
-            }
-            _variableRequests.Clear();
-        }
-
-        // Clear messages to send to the firmware
-        lock (_messagesToSend)
-        {
-            _messagesToSend.Clear();
-        }
 
         // Close all the files
         foreach (var kv in _openFiles)
         {
-            kv.Value.Close();
+            kv.Value.Dispose();
         }
         _openFiles.Clear();
 
-        // Notify the updater task
-        updater.ConnectionLost();
-    }
-
-    /// <summary>
-    /// Called to shut down the SPI subsystem asynchronously
-    /// </summary>
-    /// <returns>Asynchronous task</returns>
-    public async Task ShutdownAsync()
-    {
-        // No longer starting or stopping a print. Must do this before aborting the print
-        using (await _printStateLock.LockAsync())
-        {
-            if (_setPrintInfoRequest is not null)
-            {
-                _setPrintInfoRequest.SetCanceled();
-                _setPrintInfoRequest = null;
-            }
-            if (_stopPrintRequest is not null)
-            {
-                _stopPrintRequest.SetCanceled();
-                _stopPrintRequest = null;
-            }
-        }
-
-        // Cancel the file being printed
-        using (await jobProcessor.LockAsync())
-        {
-            jobProcessor.Abort();
-        }
-
-        // Resolve pending macros, unbuffered (system) codes and flush requests
-        foreach (Channel.Processor channel in channels)
-        {
-            using (await channel.LockAsync())
-            {
-                channel.Invalidate();
-            }
-        }
-        _bytesReserved = _bufferSpace = 0;
-
-        // Resolve pending object model requests
-        lock (_modelQueryRequests)
-        {
-            foreach (ModelQueryRequest request in _modelQueryRequests)
-            {
-                request.Tcs.SetCanceled();
-            }
-            _modelQueryRequests.Clear();
-        }
-
-        // Resolve pending expression evaluation and variable requests
-        lock (_evaluateExpressionRequests)
-        {
-            foreach (EvaluateExpressionRequest request in _evaluateExpressionRequests)
-            {
-                request.SetCanceled();
-            }
-            _evaluateExpressionRequests.Clear();
-        }
-
-        lock (_variableRequests)
-        {
-            foreach (VariableRequest request in _variableRequests)
-            {
-                request.SetCanceled();
-            }
-            _variableRequests.Clear();
-        }
-
-        // Clear messages to send to the firmware
-        lock (_messagesToSend)
-        {
-            _messagesToSend.Clear();
-        }
-
-        // Close all the files
-        foreach (var kv in _openFiles)
-        {
-            await kv.Value.DisposeAsync();
-        }
-        _openFiles.Clear();
+        // Notify the updater task about the lost connection
+        model.ConnectionLost();
     }
 }

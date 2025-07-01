@@ -33,17 +33,13 @@ public sealed class Processor : IAsyncDiagnostics
     private readonly FilePathResolver _filePathResolver;
     private readonly Logger _dsfLogger;
     private readonly ILinkAdapter _linkAdapter;
-    private readonly Interface _linkInterface;
+    private readonly LinkInterface _linkInterface;
     private readonly JobProcessor _jobProcessor;
 
     private readonly Model.ObjectModel _model;
     private readonly MacroFileFactory _macroFileFactory;
-    private readonly Settings _settings;
-
-    /// <summary>
-    /// Logger instance
-    /// </summary>
     private readonly NLog.Logger _logger;
+    private readonly Settings _settings;
 
     /// <summary>
     /// What code channel this class is about
@@ -70,7 +66,7 @@ public sealed class Processor : IAsyncDiagnostics
         FilePathResolver filePathResolver,
         Logger dsfLogger,
         ILinkAdapter linkAdapter,
-        Interface linkInterface,
+        LinkInterface linkInterface,
         JobProcessor jobProcessor,
         MacroFileFactory macroFileFactory,
         Model.ObjectModel model,
@@ -86,9 +82,8 @@ public sealed class Processor : IAsyncDiagnostics
         _linkInterface = linkInterface;
         _macroFileFactory = macroFileFactory;
         _model = model;
-        _settings = settings.Value;
-
         _logger = NLog.LogManager.GetLogger(channel.ToString());
+        _settings = settings.Value;
 
         BaseState = CurrentState = new StackState(codeProcessor.GetFirmwareState(channel));
         Stack.Push(CurrentState);

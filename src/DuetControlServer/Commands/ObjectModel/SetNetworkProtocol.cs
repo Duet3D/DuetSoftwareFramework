@@ -1,5 +1,4 @@
 ﻿using DuetAPI.ObjectModel;
-using DuetControlServer.Model;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -8,7 +7,7 @@ namespace DuetControlServer.Commands;
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.SetNetworkProtocol"/> command
 /// </summary>
-public sealed class SetNetworkProtocol(Model.ObjectModel model, Model.PeriodicUpdater periodicUpdater) : DuetAPI.Commands.SetNetworkProtocol
+public sealed class SetNetworkProtocol(Model.ObjectModel model, Model.PeriodicUpdateService periodicUpdater) : DuetAPI.Commands.SetNetworkProtocol
 {
     /// <summary>
     /// Set an atomic property in the object model

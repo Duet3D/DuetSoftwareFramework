@@ -8,6 +8,7 @@ using DuetControlServer.Utility;
 using DuetSharedLibrary;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using NLog.Extensions.Hosting;
 using System;
 using System.CommandLine;
 using System.CommandLine.Builder;
@@ -89,6 +90,7 @@ public static class Program
                 configFile = context.ParseResult.GetValueForOption(configOption)!;
             })
             .UseHost(builder => builder
+                .UseNLog()
                 .UseSystemd()
                 .ConfigureAppConfiguration((hostingContext, config) =>
                 {
@@ -108,7 +110,6 @@ public static class Program
                     .AddUtility()
                 )
             )
-            .UseDefaults()
             .Build()
             .InvokeAsync(args);
     }

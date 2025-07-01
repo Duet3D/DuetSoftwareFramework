@@ -110,8 +110,8 @@ public static class IconImageParser
                 image.Save(memoryStream, PngFormat.Instance);
                 memoryStream.TryGetBuffer(out ArraySegment<byte> buffer);
                 data = Convert.ToBase64String(buffer.Array!, 0, (int)memoryStream.Length);
+                _logger.Debug(data);
             }
-            _logger.Debug(data);
 
             return new()
             {

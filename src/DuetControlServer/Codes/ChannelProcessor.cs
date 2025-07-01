@@ -1,4 +1,5 @@
 ﻿using DuetAPI;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -14,17 +15,14 @@ namespace DuetControlServer.Codes;
 /// Every instance holds the code pipeline elements through which incoming G/M/T-codes are sent.
 /// Note that code files and events disrupting the code flow require their own stack level to maintain the correct order of code execution.
 /// </summary>
-public sealed class ChannelProcessor
+/// <param name="channel">Channel to process</param>
+/// <param name="serviceProvider">Service provider to use for creating pipeline stages</param>
+public sealed class ChannelProcessor 
 {
     /// <summary>
     /// Pipeline stages that support push/pop
     /// </summary>
     private readonly PipelineStage[] StagesWithStack = [.. Enum.GetValues<PipelineStage>().Where(value => value != PipelineStage.Executed)];
-
-    /// <summary>
-    /// Number of pipelines available
-    /// </summary>
-    private static readonly int NumPipelineStages = Enum.GetValues<PipelineStage>().Length;
 
     /// <summary>
     /// Channel of this pipeline
@@ -39,44 +37,38 @@ public sealed class ChannelProcessor
     /// <summary>
     /// Pipelines for code flow
     /// </summary>
-    private readonly Pipelines.PipelineBase[] _pipelines = new Pipelines.PipelineBase[NumPipelineStages];
+    private readonly Lazy<Pipelines.PipelineBase[]> _pipelines;
+
+    /// <summary>
+    /// Constructor for the channel processor
+    /// </summary>
+    /// <param name="channel">Code channe;</param>
+    /// <param name="serviceProvider">Service provider to create pipeline instances</param>
+    public ChannelProcessor(CodeChannel channel, IServiceProvider serviceProvider)
+    {
+        Channel = channel;
+        Logger = NLog.LogManager.GetLogger(channel.ToString()!);
+
+        _pipelines = new Lazy<Pipelines.PipelineBase[]>(() => [
+            ActivatorUtilities.CreateInstance<Pipelines.Start>(serviceProvider, this),
+            ActivatorUtilities.CreateInstance<Pipelines.Pre>(serviceProvider, this),
+            ActivatorUtilities.CreateInstance<Pipelines.ProcessInternally>(serviceProvider, this),
+            ActivatorUtilities.CreateInstance<Pipelines.Post>(serviceProvider, this),
+            ActivatorUtilities.CreateInstance<Pipelines.Firmware>(serviceProvider, this),
+            ActivatorUtilities.CreateInstance<Pipelines.Executed>(serviceProvider, this)
+        ]);
+    }
 
     /// <summary>
     /// Retrieve the firmware state
     /// </summary>
-    public Pipelines.PipelineStackItem FirmwareStackItem => _pipelines[(int)PipelineStage.Firmware].CurrentStackItem;
-
-    /// <summary>
-    /// Constructor of this class
-    /// </summary>
-    /// <param name="channel">Input channel</param>
-    /// <param name="codeProcessor">Code processor</param>
-    /// <param name="serviceProvider">Service provider</param>
-    public ChannelProcessor(CodeChannel channel, CodeProcessor codeProcessor, IServiceProvider serviceProvider)
-    {
-        Channel = channel;
-        Logger = NLog.LogManager.GetLogger(Channel.ToString());
-
-        foreach (PipelineStage stage in Enum.GetValues<PipelineStage>())
-        {
-            _pipelines[(int)stage] = stage switch
-            {
-                PipelineStage.Start => ActivatorUtilities.CreateInstance<Pipelines.Start>(serviceProvider, this, codeProcessor),
-                PipelineStage.Pre => ActivatorUtilities.CreateInstance<Pipelines.Pre>(serviceProvider, this, codeProcessor),
-                PipelineStage.ProcessInternally => ActivatorUtilities.CreateInstance<Pipelines.ProcessInternally>(serviceProvider, this, codeProcessor),
-                PipelineStage.Post => ActivatorUtilities.CreateInstance<Pipelines.Post>(serviceProvider, this, codeProcessor),
-                PipelineStage.Firmware => ActivatorUtilities.CreateInstance<Pipelines.Firmware>(serviceProvider, this, codeProcessor),
-                PipelineStage.Executed => ActivatorUtilities.CreateInstance<Pipelines.Executed>(serviceProvider, this, codeProcessor),
-                _ => throw new ArgumentException($"Unsupported pipeline stage {stage}"),
-            };
-        }
-    }
+    internal Pipelines.PipelineStackItem FirmwareStackItem => _pipelines.Value[(int)PipelineStage.Firmware].CurrentStackItem;
 
     /// <summary>
     /// Lifecycle of this pipeline
     /// </summary>
     /// <returns>Asynchronous task</returns>
-    public Task ExecuteAsync() => Task.WhenAll(_pipelines.Select(stage => stage.WaitForCompletionAsync()));
+    public Task ExecuteAsync() => Task.WhenAll(_pipelines.Value.Select(stage => stage.WaitForCompletionAsync()));
 
     /// <summary>
     /// Get diagnostics from this pipeline
@@ -84,7 +76,7 @@ public sealed class ChannelProcessor
     /// <param name="builder">String builder to write to</param>
     public void Diagnostics(StringBuilder builder)
     {
-        foreach (Pipelines.PipelineBase pipeline in _pipelines)
+        foreach (Pipelines.PipelineBase pipeline in _pipelines.Value)
         {
             if (pipeline.Stage != PipelineStage.Firmware)
             {
@@ -104,11 +96,11 @@ public sealed class ChannelProcessor
         {
             if (stage == PipelineStage.Firmware)
             {
-                newState = _pipelines[(int)stage].Push(file);
+                newState = _pipelines.Value[(int)stage].Push(file);
             }
             else
             {
-                _pipelines[(int)stage].Push(file);
+                _pipelines.Value[(int)stage].Push(file);
             }
         }
         return newState!;
@@ -121,7 +113,7 @@ public sealed class ChannelProcessor
     {
         foreach (PipelineStage stage in StagesWithStack)
         {
-            _pipelines[(int)stage].Pop();
+            _pipelines.Value[(int)stage].Pop();
         }
     }
 
@@ -133,7 +125,7 @@ public sealed class ChannelProcessor
     {
         foreach (PipelineStage stage in StagesWithStack)
         {
-            _pipelines[(int)stage].SetJobFile(file);
+            _pipelines.Value[(int)stage].SetJobFile(file);
         }
     }
 
@@ -142,7 +134,7 @@ public sealed class ChannelProcessor
     /// </summary>
     public bool HasValidJobFile
     {
-        get => _pipelines[0].HasValidJobFile;
+        get => _pipelines.Value[0].HasValidJobFile;
     }
 
     /// <summary>
@@ -154,7 +146,7 @@ public sealed class ChannelProcessor
     {
         foreach (PipelineStage stage in StagesWithStack)
         {
-            if (!_pipelines[(int)stage].IsIdle(code))
+            if (!_pipelines.Value[(int)stage].IsIdle(code))
             {
                 return false;
             }
@@ -169,7 +161,7 @@ public sealed class ChannelProcessor
     /// <returns>Whether the codes have been flushed successfully</returns>
     public async Task<bool> FlushAsync(bool flushAll, CancellationToken cancellationToken = default)
     {
-        foreach (Pipelines.PipelineBase pipeline in _pipelines)
+        foreach (Pipelines.PipelineBase pipeline in _pipelines.Value)
         {
             //Logger.Debug("Flushing codes on stage {0}", pipeline.Stage);
             if (!await pipeline.FlushAsync(flushAll, cancellationToken))
@@ -190,7 +182,7 @@ public sealed class ChannelProcessor
     /// <returns>Whether the codes have been flushed successfully</returns>
     public async Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
     {
-        foreach (Pipelines.PipelineBase pipeline in _pipelines)
+        foreach (Pipelines.PipelineBase pipeline in _pipelines.Value)
         {
             //Logger.Debug("Flushing file codes on stage {0} for {1}", pipeline.Stage, code);
             if (!await pipeline.FlushAsync(file, cancellationToken))
@@ -208,18 +200,16 @@ public sealed class ChannelProcessor
     /// By default this replaces all expressions as well for convenient parsing by the code processors.
     /// </summary>
     /// <param name="code">Code waiting for the flush</param>
-    /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
-    /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
-    public async Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true, CancellationToken cancellationToken = default)
+    public async Task<bool> FlushAsync(Commands.Code code, CancellationToken cancellationToken = default)
     {
-        foreach (Pipelines.PipelineBase pipeline in _pipelines)
+        foreach (Pipelines.PipelineBase pipeline in _pipelines.Value)
         {
             if (code.Stage == PipelineStage.Executed || pipeline.Stage > code.Stage)
             {
                 //Logger.Debug("Flushing codes on stage {0} for {1}", pipeline.Stage, code);
-                if (!await pipeline.FlushAsync(code, evaluateExpressions, evaluateAll, cancellationToken))
+                if (!await pipeline.FlushAsync(code, cancellationToken))
                 {
                     Logger.Debug("Failed to flush codes on stage {0} for {1}", pipeline.Stage, code);
                     return false;
@@ -239,7 +229,7 @@ public sealed class ChannelProcessor
     public void WriteCode(Commands.Code code, PipelineStage stage)
     {
         //Logger.Debug("Sending code {0} to stage {1}", code, stage);
-        _pipelines[(int)stage].WriteCode(code);
+        _pipelines.Value[(int)stage].WriteCode(code);
         //Logger.Debug("Sent code {0} to stage {1}", code, stage);
     }
 
@@ -251,7 +241,7 @@ public sealed class ChannelProcessor
     public async ValueTask WriteCodeAsync(Commands.Code code, PipelineStage stage)
     {
         //Logger.Debug("Sending code {0} to stage {1}", code, stage);
-        await _pipelines[(int)stage].WriteCodeAsync(code);
+        await _pipelines.Value[(int)stage].WriteCodeAsync(code);
         //Logger.Debug("Sent code {0} to stage {1}", code, stage);
     }
 }

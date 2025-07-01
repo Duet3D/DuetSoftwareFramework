@@ -1,14 +1,17 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetControlServer.Model;
 using Microsoft.Extensions.Options;
 
 namespace DuetControlServer.IPC;
 
 /// <summary>
-/// Static class to manage read/write locks of third-party plugins
+/// Class to manage read/write locks of third-party plugins
 /// </summary>
-public class LockManager(Model.ObjectModel model, IOptions<Settings> settings)
+/// <param name="model">Object model</param>
+/// <param name="settings">Settings</param>
+public class LockManager(ObjectModel model, IOptions<Settings> settings)
 {
     /// <summary>
     /// Connection that acquired the current lock
@@ -50,7 +53,7 @@ public class LockManager(Model.ObjectModel model, IOptions<Settings> settings)
             if (settings.Value.NoSpi)
             {
                 // Make sure functions waiting for full model updates don't stall
-                await Model.Updater.MachineModelFullyUpdated(cancellationToken);
+                await model.FullyUpdatedAsync(cancellationToken);
             }
         }
     }

@@ -2,6 +2,7 @@
 using DuetAPI.Commands;
 using DuetControlServer.Codes;
 using DuetControlServer.Codes.Meta;
+using DuetControlServer.Link;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
@@ -34,7 +35,7 @@ public class CodeFile(
     CodeFactory codeFactory,
     CodeProcessor codeProcessor,
     Expressions expressions,
-    Link.Interface linkInterface,
+    LinkInterface linkInterface,
     Model.ObjectModel model,
     IHostApplicationLifetime lifetime,
     IOptions<Settings> settings) : IDisposable
@@ -173,7 +174,15 @@ public class CodeFile(
     /// <param name="model">Object model to access the machine state</param>
     /// <param name="settings">Settings to use</param>
     /// <param name="lifetime">Application lifetime to use</param>
-    public CodeFile(CodeFile copyFrom, CodeChannel channel, CodeFactory codeFactory, CodeProcessor codeProcessor, Expressions expressions, Link.Interface linkInterface, Model.ObjectModel model, IHostApplicationLifetime lifetime, IOptions<Settings> settings) : this(copyFrom.FileName, copyFrom.PhysicalFileName, channel, codeFactory, codeProcessor, expressions, linkInterface, model, lifetime, settings)
+    public CodeFile(CodeFile copyFrom,
+        CodeChannel channel,
+        CodeFactory codeFactory,
+        CodeProcessor codeProcessor,
+        Expressions expressions,
+        LinkInterface linkInterface,
+        Model.ObjectModel model,
+        IHostApplicationLifetime lifetime,
+        IOptions<Settings> settings) : this(copyFrom.FileName, copyFrom.PhysicalFileName, channel, codeFactory, codeProcessor, expressions, linkInterface, model, lifetime, settings)
     {
         // Copy conditional states
         _codeBlocks.Clear();

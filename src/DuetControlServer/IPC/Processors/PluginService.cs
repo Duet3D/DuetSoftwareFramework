@@ -111,9 +111,12 @@ public sealed class PluginService : IProcessor
     /// <param name="initMessage">Initialization message from the client</param>
     /// <param name="commandFactory">Command factory to create commands</param>
     /// <param name="model">Object model instance</param>
-    /// <param name="updater">Object model updater</param>
     /// <param name="settings">Settings</param>
-    public PluginService(Connection conn, ClientInitMessage initMessage, CommandFactory commandFactory, Model.ObjectModel model, IOptions<Settings> settings)
+    public PluginService(Connection conn,
+        ClientInitMessage initMessage,
+        CommandFactory commandFactory,
+        Model.ObjectModel model,
+        IOptions<Settings> settings)
     {
         Connection = conn;
         _commandFactory = commandFactory;
@@ -161,7 +164,7 @@ public sealed class PluginService : IProcessor
         if (!_settings.UpdateOnly && _serviceConnected && _rootServiceConnected)
         {
             // First ensure that object model is up-to-date
-            await Model.Updater.WaitForFullUpdateAsync(cancellationToken);
+            await _model.WaitForFullUpdateAsync(cancellationToken);
 
             Commands.StartPlugins startCommand = _commandFactory.Create<Commands.StartPlugins>();
             _ = Task.Run(async () => await startCommand.ExecuteAsync(), cancellationToken);

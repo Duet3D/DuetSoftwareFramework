@@ -1,7 +1,6 @@
 ﻿using DuetAPI;
 using DuetAPI.ObjectModel;
 using Code = DuetControlServer.Commands.Code;
-using DuetControlServer.Model;
 using DuetControlServer.Utility;
 using DuetSharedLibrary;
 using System;
@@ -29,7 +28,7 @@ public class SPI : IDiagnostics, ILinkAdapter
 
     // General variables
     private readonly Logger _dsfLogger;
-    private readonly Updater _updater;
+    private readonly Model.ObjectModel _model;
     private readonly Settings _settings;
 
     // General transfer variables
@@ -68,13 +67,15 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <summary>
     /// Constructor of this class
     /// </summary>
+    /// <param name="dsfLogger">Internal logger</param>
+    /// <param name="updateInterface">Update interface</param>
     /// <param name="settings">Settings</param>
     /// <exception cref="OperationCanceledException">Failed to connect to board</exception>
-    public SPI(Logger logger, Updater updater, IOptions<Settings> settings)
+    public SPI(Logger dsfLogger, Model.ObjectModel model, IOptions<Settings> settings)
     {
         // Initialize variables
-        _dsfLogger = logger;
-        _updater = updater;
+        _dsfLogger = dsfLogger;
+        _model = model;
         _settings = settings.Value;
         _bufferSize = settings.Value.SpiBufferSize;
         _rxBuffer = new byte[_bufferSize];
@@ -92,7 +93,13 @@ public class SPI : IDiagnostics, ILinkAdapter
         // Initialize transfer ready pin and SPI device
         _transferReadyPin = new InputGpioPin(settings.Value.GpioChipDevice, settings.Value.TransferReadyPin, $"dcs-trp-{settings.Value.TransferReadyPin}");
         _spiDevice = new SpiDevice(settings.Value.SpiDevice, settings.Value.SpiFrequency, settings.Value.SpiTransferMode);
+    }
 
+    /// <summary>
+    /// Attempt to connect to the firmware
+    /// </summary>
+    public void Connect()
+    {
         // Check if large transfers can be performed
         try
         {
@@ -107,7 +114,6 @@ public class SPI : IDiagnostics, ILinkAdapter
             _logger.Warn(e, "Failed to retrieve Kernel SPI buffer size");
         }
 
-#warning FIXME this should happen somewhere else
         // Perform the first transfer
         PerformFullTransfer(true);
     }
@@ -305,7 +311,7 @@ public class SPI : IDiagnostics, ILinkAdapter
                 if (!_hadTimeout && _connected)
                 {
                     _hadTimeout = true;
-                    _updater.ConnectionLost();
+                    _model.ConnectionLost();
                     _dsfLogger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({e.Message})");
                 }
                 _connected = false;
@@ -346,15 +352,6 @@ public class SPI : IDiagnostics, ILinkAdapter
         _rxPointer += _lastPacket.Length + ((padding == 4) ? 0 : padding);
 
         return _lastPacket;
-    }
-
-    /// <summary>
-    /// Read the legacy result of a <see cref="Communication.SbcRequests.Request.GetObjectModel"/> request
-    /// </summary>
-    /// <param name="json">JSON data</param>
-    public void ReadLegacyConfigResponse(out ReadOnlySpan<byte> json)
-    {
-        Protocol.Reader.ReadLegacyConfigResponse(_packetData.Span, out json);
     }
 
     /// <summary>
@@ -697,27 +694,6 @@ public class SPI : IDiagnostics, ILinkAdapter
         // Write it
         WritePacket(Protocol.SbcRequests.Request.Code, codeLength);
         span[..codeLength].CopyTo(GetWriteBuffer(codeLength));
-        return true;
-    }
-
-    /// <summary>
-    /// Write the legacy request for the config response
-    /// </summary>
-    /// <returns>True if the packet could be written</returns>
-    public bool WriteGetLegacyConfigResponse()
-    {
-        if (!CanWritePacket(sizeof(int)))
-        {
-            return false;
-        }
-
-        // Write header
-        WritePacket(Protocol.SbcRequests.Request.GetObjectModel, sizeof(int));
-
-        // Write data
-        byte[] configModuleRequest = [0, 0, 5, 0];
-        configModuleRequest.CopyTo(GetWriteBuffer(configModuleRequest.Length));
-
         return true;
     }
 

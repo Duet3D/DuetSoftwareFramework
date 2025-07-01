@@ -16,5 +16,5 @@ public class CodeProcessorService(CodeProcessor codeProcessor) : BackgroundServi
     /// Task representing the lifecycle of this class
     /// </summary>
     /// <returns>Asynchronous task</returns>
-    protected override Task ExecuteAsync(CancellationToken stoppingToken) => Task.WhenAll(codeProcessor.Processors.Select(processor => processor.ExecuteAsync()));
+    protected override Task ExecuteAsync(CancellationToken stoppingToken) => Task.WhenAll(codeProcessor.Processors.Value.Select(processor => processor.ExecuteAsync()));
 }

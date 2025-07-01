@@ -2,6 +2,7 @@
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
+using DuetControlServer.Link;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -22,7 +23,7 @@ namespace DuetControlServer.Codes.Meta;
 /// <param name="filter">Object model filter</param>
 /// <param name="model">Object model</param>
 /// <param name="linkInterface">Link interface</param>
-public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Link.Interface linkInterface)
+public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, LinkInterface linkInterface)
 {
     /// <summary>
     /// Delegate for asynchronously resolving custom meta G-code fuctions

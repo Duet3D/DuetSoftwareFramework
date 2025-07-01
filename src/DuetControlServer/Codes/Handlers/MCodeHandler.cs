@@ -5,10 +5,12 @@ using DuetAPI.Utility;
 using DuetControlServer.Commands;
 using DuetControlServer.Files;
 using DuetControlServer.Files.Parser;
+using DuetControlServer.Link;
 using DuetControlServer.Model;
 using DuetControlServer.Utility;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using NLog.Config;
 using System;
 using System.IO;
 using System.Linq;
@@ -41,10 +43,10 @@ public class MCodeHandler(
     FileInfoParser fileInfoParser,
     FilePathResolver filePathResolver,
     Filter filter,
-    Link.Interface linkInterface,
+    LinkInterface linkInterface,
     Logger logger,
-    MQTT mqtt,
     Model.ObjectModel model,
+    MQTT mqtt,
     JobProcessor jobProcessor,
     IHostApplicationLifetime lifetime,
     IOptions<Settings> settings) : ICodeHandler
@@ -275,7 +277,7 @@ public class MCodeHandler(
                 if (await codeProcessor.FlushAsync(code))
                 {
                     // Wait for inputs[].motionSystem to be up-to-date
-                    await Updater.WaitForFullUpdateAsync(code.CancellationToken);
+                    await model.WaitForFullUpdateAsync(code.CancellationToken);
 
                     int motionSystem;
                     using (await model.AccessReadOnlyAsync(code.CancellationToken))
@@ -311,7 +313,7 @@ public class MCodeHandler(
                 if (await codeProcessor.FlushAsync(code))
                 {
                     // Wait for inputs[].motionSystem to be up-to-date
-                    await Updater.WaitForFullUpdateAsync(code.CancellationToken);
+                    await model.WaitForFullUpdateAsync(code.CancellationToken);
                     int motionSystem;
                     using (await model.AccessReadOnlyAsync(code.CancellationToken))
                     {
@@ -590,9 +592,9 @@ public class MCodeHandler(
                             if (code.TryGetString('S', out string? levelString))
                             {
                                 NLog.LogLevel level = NLog.LogLevel.FromString(levelString);
-                                foreach (var rule in NLog.LogManager.Configuration.LoggingRules)
+                                foreach (LoggingRule? rule in NLog.LogManager.Configuration?.LoggingRules ?? [])
                                 {
-                                    rule.SetLoggingLevels(level, NLog.LogLevel.Fatal);
+                                    rule?.SetLoggingLevels(level, NLog.LogLevel.Fatal);
                                 }
                                 _settings.LogLevel = level;
                                 seen = true;
@@ -601,17 +603,17 @@ public class MCodeHandler(
                             {
                                 if (oParam)
                                 {
-                                    if (NLog.LogManager.Configuration.FindTargetByName("MessageLogTarget") == null)
+                                    if (NLog.LogManager.Configuration?.FindTargetByName("MessageLogTarget") == null)
                                     {
                                         // Only add this target once and don't allow higher log level than debug, else we may get recursion
                                         MessageLogTarget logTarget = new(model);
-                                        NLog.LogManager.Configuration.AddTarget("MessageLogTarget", logTarget);
-                                        NLog.LogManager.Configuration.AddRule(_settings.LogLevel > NLog.LogLevel.Trace ? _settings.LogLevel : NLog.LogLevel.Debug, NLog.LogLevel.Fatal, logTarget);
+                                        NLog.LogManager.Configuration?.AddTarget("MessageLogTarget", logTarget);
+                                        NLog.LogManager.Configuration?.AddRule(_settings.LogLevel > NLog.LogLevel.Trace ? _settings.LogLevel : NLog.LogLevel.Debug, NLog.LogLevel.Fatal, logTarget);
                                     }
                                 }
                                 else
                                 {
-                                    NLog.LogManager.Configuration.RemoveTarget("MessageLogTarget");
+                                    NLog.LogManager.Configuration?.RemoveTarget("MessageLogTarget");
                                 }
                                 seen = true;
                             }
@@ -1148,7 +1150,7 @@ public class MCodeHandler(
                         }
                         else
                         {
-                            await Updater.WaitForFullUpdateAsync(code.CancellationToken);
+                            await model.WaitForFullUpdateAsync(code.CancellationToken);
 
                             Commands.StartPlugins startCommand = commandFactory.Create<Commands.StartPlugins>();
                             await startCommand.ExecuteAsync();
@@ -1227,7 +1229,7 @@ public class MCodeHandler(
 
             // Pop
             case 121:
-                await Updater.WaitForFullUpdateAsync(code.CancellationToken);        // This may change inputs[].active, so sync the OM here
+                await model.WaitForFullUpdateAsync(code.CancellationToken);        // This may change inputs[].active, so sync the OM here
                 break;
 
             // Diagnostics
@@ -1265,7 +1267,7 @@ public class MCodeHandler(
             // Select movement queue number
             case 596:
                 _logger.Debug("Requesting full model update after M596");
-                await Updater.WaitForFullUpdateAsync(code.CancellationToken);        // This changes inputs[].active, so sync the OM here
+                await model.WaitForFullUpdateAsync(code.CancellationToken);        // This changes inputs[].active, so sync the OM here
                 _logger.Debug("Requested full model update after M596");
                 break;
 
@@ -1274,7 +1276,7 @@ public class MCodeHandler(
                 if (code.TryGetInt('S', out int sParam) && sParam == 1)
                 {
                     _logger.Debug("Requesting full model update after M606 S1");
-                    await Updater.WaitForFullUpdateAsync(code.CancellationToken);    // This changes inputs[].active, so sync the OM here
+                    await model.WaitForFullUpdateAsync(code.CancellationToken);    // This changes inputs[].active, so sync the OM here
                     _logger.Debug("Requested full model update after M606 S1");
 
                     Link.Channel.Processor.StartCopiedMacros();

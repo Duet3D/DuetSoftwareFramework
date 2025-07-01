@@ -14,9 +14,20 @@ namespace DuetControlServer.Link.Adapter;
 public interface ILinkAdapter
 {
     /// <summary>
+    /// Attempt to connect to the firmware
+    /// </summary>
+    void Connect();
+
+    /// <summary>
     /// Currently-used protocol version
     /// </summary>
     int ProtocolVersion { get; }
+
+    /// <summary>
+    /// Perform a full data transfer synchronously
+    /// </summary>
+    /// <param name="connecting">Whether this an initial connection is being established</param>
+    void PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get the maximum time between two full transfers
@@ -30,12 +41,6 @@ public interface ILinkAdapter
     /// <param name="fullTransferCounter">Query and reset the full transfer duration</param>
     /// <returns>Time in ms</returns>
     double GetMaxPinWaitDuration(bool fullTransferCounter);
-
-    /// <summary>
-    /// Perform a full data transfer synchronously
-    /// </summary>
-    /// <param name="connecting">Whether this an initial connection is being established</param>
-    void PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Check if the controller has been reset
@@ -53,12 +58,6 @@ public interface ILinkAdapter
     /// </summary>
     /// <returns>The next packet or null if none is available</returns>
     PacketHeader? ReadNextPacket();
-
-    /// <summary>
-    /// Read the legacy result of a <see cref="Communication.SbcRequests.Request.GetObjectModel"/> request
-    /// </summary>
-    /// <param name="json">JSON data</param>
-    void ReadLegacyConfigResponse(out ReadOnlySpan<byte> json);
 
     /// <summary>
     /// Read the result of a <see cref="Communication.SbcRequests.Request.GetObjectModel"/> request
@@ -246,12 +245,6 @@ public interface ILinkAdapter
     /// <param name="code">Code to send</param>
     /// <returns>True if the packet could be written</returns>
     bool WriteCode(Commands.Code code);
-
-    /// <summary>
-    /// Write the legacy request for the config response
-    /// </summary>
-    /// <returns>True if the packet could be written</returns>
-    bool WriteGetLegacyConfigResponse();
 
     /// <summary>
     /// Request the key of an object module of a specific module

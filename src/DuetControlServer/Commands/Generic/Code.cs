@@ -10,6 +10,7 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Codes.Handlers;
 using DuetControlServer.IPC;
 using DuetControlServer.IPC.Processors;
+using DuetControlServer.Link;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -23,7 +24,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     // Private fields
     private readonly Codes.CodeProcessor _codeProcessor;
     private readonly Codes.Meta.Expressions _expressions;
-    private readonly Link.Interface _linkInterface;
     private readonly ICodeHandler _gCodes;
     private readonly ICodeHandler _mCodes;
     private readonly ICodeHandler _tCodes;
@@ -48,7 +48,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="settings">Settings</param>
     public Code(Codes.CodeProcessor codeProcessor,
         Codes.Meta.Expressions expressions,
-        Link.Interface linkInterface,
+        LinkInterface linkInterface,
         [FromKeyedServices(Keys.GCodes)] ICodeHandler gCodes,
         [FromKeyedServices(Keys.MCodes)] ICodeHandler mCodes,
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
@@ -57,7 +57,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     {
         _codeProcessor = codeProcessor;
         _expressions = expressions;
-        _linkInterface = linkInterface;
         _gCodes = gCodes;
         _mCodes = mCodes;
         _tCodes = tCodes;
@@ -71,7 +70,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="code">Text-based G/M/T-code</param>
     /// <param name="codeProcessor">Code processor</param>
     /// <param name="expressions">Meta G-code expression parser</param>
-    /// <param name="linkInterface">Link interface</param>
     /// <param name="gCodes">G-code handler</param>
     /// <param name="mCodes">M-code handler</param>
     /// <param name="tCodes">T-code handler</param>
@@ -80,7 +78,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     public Code(string code,
         Codes.CodeProcessor codeProcessor,
         Codes.Meta.Expressions expressions,
-        Link.Interface linkInterface,
         [FromKeyedServices(Keys.GCodes)] ICodeHandler gCodes,
         [FromKeyedServices(Keys.MCodes)] ICodeHandler mCodes,
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
@@ -89,7 +86,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     {
         _codeProcessor = codeProcessor;
         _expressions = expressions;
-        _linkInterface = linkInterface;
         _gCodes = gCodes;
         _mCodes = mCodes;
         _tCodes = tCodes;
@@ -236,7 +232,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _logger.Debug("Processing {0}", this);
 
         // Flush the code channel and populate SBC fields where applicable
-        if (Keyword == KeywordType.None && _expressions.ContainsSbcFields(this) && !await _linkInterface.FlushAsync(this, true, false))
+        if (Keyword == KeywordType.None && _expressions.ContainsSbcFields(this) && !await _codeProcessor.FlushAsync(this, true, false))
         {
             throw new OperationCanceledException();
         }

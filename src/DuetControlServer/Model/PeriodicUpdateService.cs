@@ -22,7 +22,7 @@ namespace DuetControlServer.Model;
 /// <summary>
 /// Static class that updates the machine model in certain intervals
 /// </summary>
-public partial class PeriodicUpdater(CodeFactory codeFactory, ObjectModel model, IOptions<Settings> settings) : BackgroundService
+public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel model, IOptions<Settings> settings) : BackgroundService
 {
     /// <summary>
     /// Logger instance

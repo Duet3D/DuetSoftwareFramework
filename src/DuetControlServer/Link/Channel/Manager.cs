@@ -1,7 +1,6 @@
 ﻿using DuetAPI;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.Shared;
-using DuetControlServer.Utility;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections;
@@ -16,16 +15,16 @@ namespace DuetControlServer.Link.Channel;
 /// <summary>
 /// Class used to manage access to channel processors
 /// </summary>
-/// <remarks>
-/// Constructor
-/// </remarks>
 /// <param name="provider">Service provider to use for creating channel processors</param>
-public class Manager(IServiceProvider provider) : IAsyncDiagnostics, IEnumerable<Processor>
+public class Manager(IServiceProvider provider) : IEnumerable<Processor>
 {
     /// <summary>
     /// List of different channels
     /// </summary>
-    private readonly Processor[] _channels = [.. Inputs.ValidChannels.Select(channel => ActivatorUtilities.CreateInstance<Processor>(provider, channel))];
+    /// <remarks>
+    /// This has to be initialized lazily to resolve circular dependencies
+    /// </remarks>
+    private readonly Lazy<Processor[]> _channels = new(() => [.. Inputs.ValidChannels.Select(channel => ActivatorUtilities.CreateInstance<Processor>(provider, channel))]);
 
     /// <summary>
     /// Last channel that started processing stuff
@@ -39,9 +38,16 @@ public class Manager(IServiceProvider provider) : IAsyncDiagnostics, IEnumerable
     /// <returns>Information about the code channel</returns>
     public Processor this[CodeChannel channel]
     {
-        get => _channels[(int)channel];
-        set => _channels[(int)channel] = value;
+        get => _channels.Value[(int)channel];
+        set => _channels.Value[(int)channel] = value;
     }
+
+    /// <summary>
+    /// Check if a code channel is waiting for acknowledgement
+    /// </summary>
+    /// <param name="channel">Channel to query</param>
+    /// <returns>Whether the channel is awaiting acknowledgement</returns>
+    public bool IsWaitingForAcknowledgment(CodeChannel channel) => _channels.Value[(int)channel].IsWaitingForAcknowledgment;
 
     /// <summary>
     /// Print diagnostics of this class
@@ -52,7 +58,7 @@ public class Manager(IServiceProvider provider) : IAsyncDiagnostics, IEnumerable
     /// <exception cref="NotImplementedException"></exception>
     public async ValueTask PrintDiagnosticsAsync(StringBuilder builder, CancellationToken cancellationToken)
     {
-        foreach (Processor channel in _channels)
+        foreach (Processor channel in _channels.Value)
         {
             await channel.PrintDiagnosticsAsync(builder, cancellationToken);
         }
@@ -98,7 +104,7 @@ public class Manager(IServiceProvider provider) : IAsyncDiagnostics, IEnumerable
     /// <returns>Whether the reply could be handled</returns>
     public bool HandleReply(MessageTypeFlags flags, string reply)
     {
-        foreach (Processor channel in _channels)
+        foreach (Processor channel in _channels.Value)
         {
             MessageTypeFlags channelFlag = (MessageTypeFlags)(1 << (int)channel.Channel);
             if (flags.HasFlag(channelFlag))
@@ -116,11 +122,11 @@ public class Manager(IServiceProvider provider) : IAsyncDiagnostics, IEnumerable
     /// Implementation of the GetEnumerator method
     /// </summary>
     /// <returns>Enumerator</returns>
-    IEnumerator IEnumerable.GetEnumerator() => _channels.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => _channels.Value.GetEnumerator();
 
     /// <summary>
     /// Implementation of the GetEnumerator method
     /// </summary>
     /// <returns>Enumerator</returns>
-    IEnumerator<Processor> IEnumerable<Processor>.GetEnumerator() => ((IEnumerable<Processor>)_channels).GetEnumerator();
+    IEnumerator<Processor> IEnumerable<Processor>.GetEnumerator() => ((IEnumerable<Processor>)_channels.Value).GetEnumerator();
 }
