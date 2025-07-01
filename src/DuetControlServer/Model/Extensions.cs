@@ -18,7 +18,7 @@ public static partial class ServiceCollectionExtensions
             .AddSingleton<Filter>()
             .AddSingleton<ObjectModel>()
             .AddSingleton<Observer>()
-            .AddHostedService<Observer>(provider => provider.GetRequiredService<Observer>())
+            .AddHostedService(provider => provider.GetRequiredService<Observer>())
             .AddHostedService<PeriodicUpdateService>()
             .AddHostedService<UpdateService>();
     }

@@ -16,9 +16,9 @@ namespace DuetPluginService.IPC;
 /// <summary>
 /// Connection service for plugin management
 /// </summary>
-/// <param name="commandActivator">Command activator</param>
+/// <param name="commandFactory">Command activator</param>
 /// <param name="settings">Settings</param>
-public class PluginServiceConnection(CommandFactory commandActivator, IOptions<Settings> settings) : BaseConnection(ConnectionMode.PluginService)
+public class PluginServiceConnection(CommandFactory commandFactory, IOptions<Settings> settings) : BaseConnection(ConnectionMode.PluginService)
 {
     private readonly Settings _settings = settings.Value;
 
@@ -55,7 +55,7 @@ public class PluginServiceConnection(CommandFactory commandActivator, IOptions<S
 
                 // Get the command name and deserialize it
                 string commandName = item.Value.GetString()!;
-                return commandActivator.Create(commandName, jsonDocument.RootElement);
+                return commandFactory.Create(commandName, jsonDocument.RootElement);
             }
         }
         throw new ArgumentException("Command type not found");

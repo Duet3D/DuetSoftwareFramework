@@ -5,7 +5,7 @@ namespace DuetAPI;
 /// <summary>
 /// Wrapper around internal server-side exceptions that are reported as part of command responses
 /// </summary>
-/// <seealso cref="DuetAPI.Commands.ErrorResponse"/>
+/// <seealso cref="Commands.ErrorResponse"/>
 /// <param name="command">Name of the command that failed</param>
 /// <param name="type">Type of the thrown .NET error</param>
 /// <param name="message">Message of the thrown .NET error</param>

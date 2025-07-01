@@ -19,7 +19,7 @@ namespace DuetPluginService.IPC;
 /// <param name="pluginStore">Plugin store</param>
 /// <param name="hostEnvironment">Host environment</param>
 /// <param name="logger">Logger</param>
-public class CommandService(CommandFactory commandActivator, PluginServiceConnection connection, PluginStore pluginStore, IHostEnvironment hostEnvironment, ILogger<CommandService> logger) : BackgroundService
+public class CommandService(CommandFactory commandFactory, PluginServiceConnection connection, PluginStore pluginStore, IHostEnvironment hostEnvironment, ILogger<CommandService> logger) : BackgroundService
 {
     /// <summary>
     /// Start the main service
@@ -135,7 +135,7 @@ public class CommandService(CommandFactory commandActivator, PluginServiceConnec
             {
                 if (pluginStore.Processes.ContainsKey(plugin.Id))
                 {
-                    IPC.StopPlugin stopPlugin = commandActivator.Create<IPC.StopPlugin>();
+                    StopPlugin stopPlugin = commandFactory.Create<StopPlugin>();
                     stopPlugin.Plugin = plugin.Id;
                     stopTasks.Add(stopPlugin.ExecuteAsync(cancellationToken));
                 }

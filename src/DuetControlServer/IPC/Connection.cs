@@ -14,6 +14,7 @@ using DuetAPI.Connection.InitMessages;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetSharedLibrary;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DuetControlServer.IPC;
 
@@ -24,7 +25,8 @@ namespace DuetControlServer.IPC;
 /// Constructor for new connections
 /// </remarks>
 /// <param name="socket">New UNIX socket</param>
-public sealed class Connection(Socket socket) : IDisposable
+/// <param name="serviceProvider">Service provider for command activation</param>
+public sealed class Connection(Socket socket, IServiceProvider serviceProvider) : IDisposable
 {
     /// <summary>
     /// Counter for new connections
@@ -389,7 +391,9 @@ public sealed class Connection(Socket socket) : IDisposable
                         }
 
                         // Perform final deserialization and assign source identifier to this command
-                        BaseCommand command = (BaseCommand)JsonSerializer.Deserialize(jsonSpan, commandType, Commands.CommandContext.Default)!;
+                        BaseCommand command = (BaseCommand)ActivatorUtilities.CreateInstance(serviceProvider, commandType);
+                        reader = new Utf8JsonReader(jsonSpan);
+                        command.UpdateFromJsonReader(ref reader);
                         if (command is Commands.IConnectionCommand commandWithSourceConnection)
                         {
                             commandWithSourceConnection.Connection = this;

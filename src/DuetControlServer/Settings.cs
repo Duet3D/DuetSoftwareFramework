@@ -275,7 +275,7 @@ public sealed class Settings
     /// <summary>
     /// Interval of object model updates (in ms)
     /// </summary>
-    public int ModelUpdateInterval { get; set; } = 250;
+    public int ModelUpdateInterval { get; set; } = 100;
 
     /// <summary>
     /// Maximum lock time of the object model. If this time is exceeded, a deadlock is reported and the application is terminated.

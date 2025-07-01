@@ -22,8 +22,9 @@ namespace DuetControlServer.IPC;
 /// <param name="lockManager">Lock manager to handle read/write locks</param>
 /// <param name="model">Object model</param>
 /// <param name="settings">Settings</param>
+/// <param name="serviceProvider">Service provider</param>
 [DiagnosticsPriority(-8)]
-public class Server(ProcessorFactory processorFactory, LockManager lockManager, Model.ObjectModel model, IOptions<Settings> settings) : BackgroundService, IDiagnostics
+public class Server(ProcessorFactory processorFactory, LockManager lockManager, Model.ObjectModel model, IOptions<Settings> settings, IServiceProvider serviceProvider) : BackgroundService, IDiagnostics
 {
     /// <summary>
     /// Minimum supported protocol version number
@@ -139,7 +140,7 @@ public class Server(ProcessorFactory processorFactory, LockManager lockManager, 
     /// <returns>Asynchronous task</returns>
     private async Task ProcessConnectionAsync(Socket socket, CancellationToken cancellationToken)
     {
-        using Connection connection = new(socket);
+        using Connection connection = new(socket, serviceProvider);
         try
         {
             // Check if this connection is permitted
