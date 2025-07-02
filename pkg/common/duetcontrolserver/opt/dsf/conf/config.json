@@ -32,7 +32,7 @@
   "BufferedMacroCodes": 16,
   "MaxCodesPerInput": 32,
   "MaxBufferSpacePerChannel": 1536,
-  "MaxCodeBufferSize": 256,
+  "MaxCodeBufferSize": 384,
   "MaxMessageLength": 4096,
   "FirmwareComments": [
     "printing object",
@@ -46,7 +46,7 @@
     "PRINTING",
     "REMAINING_TIME"
   ],
-  "ModelUpdateInterval": 250,
+  "ModelUpdateInterval": 100,
   "MaxMachineModelLockTime": -1,
   "FileBufferSize": 32768,
   "FileInfoReadLimitHeader": 16384,
