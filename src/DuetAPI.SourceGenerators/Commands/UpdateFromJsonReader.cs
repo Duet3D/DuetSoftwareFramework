@@ -406,11 +406,11 @@ internal static class UpdateFromJsonReader
                 {{
 #if VERIFY_OBJECT_MODEL
                     string? propertyName = reader.GetString();
-                    {((cls == "ObjectModel") ? @"if (propertyName == ""seqs"")
+                    if (propertyName == ""command"")
                     {{
                         reader.Skip();
                     }}
-                    else" : "")}
+                    else
                     {{
                         JsonElement jsonProperty = JsonDocument.ParseValue(ref reader).RootElement;
                         Console.WriteLine(""[warn] Missing property {{0}} = {{1}} in {cls}"", propertyName, jsonProperty.GetRawText());

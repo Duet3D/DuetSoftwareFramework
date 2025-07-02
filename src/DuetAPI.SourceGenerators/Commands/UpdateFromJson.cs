@@ -405,7 +405,7 @@ internal static class UpdateFromJson
         {{
             {GeneratePropertyUpdateCalls()}
 #if VERIFY_OBJECT_MODEL
-            {(properties.Count > 0 ? (cls == "ObjectModel" ? "else if (jsonProperty.Name != \"seqs\")" : "else") : "// no properties")}
+            {((properties.Count > 0) ? "else if (jsonProperty.Name != \"command\")" : "// no properties")}
             {{
                 Console.WriteLine(""[warn] Missing property {{0}} = {{1}} in {cls}"", jsonProperty.Name, jsonProperty.Value.GetRawText());
             }}
