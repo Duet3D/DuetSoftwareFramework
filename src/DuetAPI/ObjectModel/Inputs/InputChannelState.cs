@@ -32,5 +32,10 @@ public enum InputChannelState
 	/// <summary>
 	/// Channel is reading a G/M/T-code
 	/// </summary>
-	Reading
+	Reading,
+
+	/// <summary>
+	/// Channel has not been used yet
+	/// </summary>
+	Unused
 }

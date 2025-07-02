@@ -13,8 +13,8 @@ using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
+using DuetControlServer.Commands;
 using DuetSharedLibrary;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace DuetControlServer.IPC;
 
@@ -26,7 +26,7 @@ namespace DuetControlServer.IPC;
 /// </remarks>
 /// <param name="socket">New UNIX socket</param>
 /// <param name="serviceProvider">Service provider for command activation</param>
-public sealed class Connection(Socket socket, IServiceProvider serviceProvider) : IDisposable
+public sealed class Connection(Socket socket, CommandFactory commandFactory) : IDisposable
 {
     /// <summary>
     /// Counter for new connections
@@ -216,11 +216,11 @@ public sealed class Connection(Socket socket, IServiceProvider serviceProvider) 
                             {
                                 if (reader.TokenType == JsonTokenType.True)
                                 {
-                                    return JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.BaseResponse)!;
+                                    return JsonSerializer.Deserialize(jsonSpan, DuetAPI.Commands.CommandContext.Default.BaseResponse)!;
                                 }
                                 else if (reader.TokenType == JsonTokenType.False)
                                 {
-                                    return JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.ErrorResponse)!;
+                                    return JsonSerializer.Deserialize(jsonSpan, DuetAPI.Commands.CommandContext.Default.ErrorResponse)!;
                                 }
                                 else
                                 {
@@ -391,10 +391,9 @@ public sealed class Connection(Socket socket, IServiceProvider serviceProvider) 
                         }
 
                         // Perform final deserialization and assign source identifier to this command
-                        BaseCommand command = (BaseCommand)ActivatorUtilities.CreateInstance(serviceProvider, commandType);
                         reader = new Utf8JsonReader(jsonSpan);
-                        command.UpdateFromJsonReader(ref reader);
-                        if (command is Commands.IConnectionCommand commandWithSourceConnection)
+                        BaseCommand command = commandFactory.Create(commandName!, ref reader, supportedCommands);
+                        if (command is IConnectionCommand commandWithSourceConnection)
                         {
                             commandWithSourceConnection.Connection = this;
                         }
@@ -472,7 +471,7 @@ public sealed class Connection(Socket socket, IServiceProvider serviceProvider) 
         Type baseType;
         if (command is Commands.Code)
         {
-            baseType = typeof(Code);
+            baseType = typeof(DuetAPI.Commands.Code);
         }
         else
         {

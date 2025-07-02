@@ -352,7 +352,7 @@ public static class Program
             }
 
             // Stop the plugins again
-            StopPlugins stopCommand = new();
+            StopPlugins stopCommand = commandFactory.Create<StopPlugins>();
             await stopCommand.ExecuteAsync();
 
             // Shut down DCS
@@ -464,7 +464,7 @@ public static class Program
         // Shut down the plugins again. This must happen before the cancellation token is triggered
         try
         {
-            StopPlugins stopCommand = new();
+            StopPlugins stopCommand = commandFactory.Create<StopPlugins>();
             await stopCommand.ExecuteAsync();
         }
         catch (Exception e)

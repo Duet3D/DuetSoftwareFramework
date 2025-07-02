@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
+using DuetControlServer.Commands;
 using DuetControlServer.IPC.Processors;
 using DuetControlServer.Utility;
 using Microsoft.Extensions.Hosting;
@@ -18,13 +19,13 @@ namespace DuetControlServer.IPC;
 /// <summary>
 /// Static class that holds main functionality for inter-process communication
 /// </summary>
+/// <param name="commandFactory">Factory to create commands</param>
 /// <param name="processorFactory">Factory to create connection processors</param>
 /// <param name="lockManager">Lock manager to handle read/write locks</param>
 /// <param name="model">Object model</param>
 /// <param name="settings">Settings</param>
-/// <param name="serviceProvider">Service provider</param>
 [DiagnosticsPriority(-8)]
-public class Server(ProcessorFactory processorFactory, LockManager lockManager, Model.ObjectModel model, IOptions<Settings> settings, IServiceProvider serviceProvider) : BackgroundService, IDiagnostics
+public class Server(CommandFactory commandFactory, ProcessorFactory processorFactory, LockManager lockManager, Model.ObjectModel model, IOptions<Settings> settings) : BackgroundService, IDiagnostics
 {
     /// <summary>
     /// Minimum supported protocol version number
@@ -140,7 +141,7 @@ public class Server(ProcessorFactory processorFactory, LockManager lockManager, 
     /// <returns>Asynchronous task</returns>
     private async Task ProcessConnectionAsync(Socket socket, CancellationToken cancellationToken)
     {
-        using Connection connection = new(socket, serviceProvider);
+        using Connection connection = new(socket, commandFactory);
         try
         {
             // Check if this connection is permitted

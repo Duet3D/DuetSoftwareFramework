@@ -35,7 +35,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     /// <summary>
     /// Lock around the files being written
     /// </summary>
-    public readonly AsyncLock[] FileLocks = new AsyncLock[Inputs.Total];
+    public readonly AsyncLock[] FileLocks = [.. Enum.GetValues<CodeChannel>().Select(channel => new AsyncLock()).ToArray()];
 
     /// <summary>
     /// Current stream writer of the files being written to (M28/M29)

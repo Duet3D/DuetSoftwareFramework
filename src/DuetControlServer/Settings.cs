@@ -245,7 +245,7 @@ public sealed class Settings
     /// <summary>
     /// Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware (see code queue)
     /// </summary>
-    public int MaxCodeBufferSize { get; set; } = 256;
+    public int MaxCodeBufferSize { get; set; } = 384;
 
     /// <summary>
     /// Maximum supported length of messages to be sent to RepRapFirmware

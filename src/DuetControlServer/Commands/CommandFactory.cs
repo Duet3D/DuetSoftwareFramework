@@ -13,38 +13,11 @@ namespace DuetControlServer.Commands;
 public class CommandFactory(IServiceProvider serviceProvider)
 {
     /// <summary>
-    /// List of supported commands in this mode
-    /// </summary>
-    public static readonly Type[] SupportedCommands =
-    [
-        // Files
-        typeof(GetFileInfo),
-        typeof(ResolvePath),
-        // Generic
-        typeof(CheckPassword),
-        typeof(Code),                   // FIXME should use CodeFactory instead
-        typeof(EvaluateExpression),
-        typeof(Flush),
-        typeof(InvalidateChannel),
-        typeof(SetUpdateStatus),
-        typeof(SimpleCode),
-        typeof(WriteMessage),
-        // TODO
-    ];
-
-    /// <summary>
     /// Create a new command instance
     /// </summary>
     /// <typeparam name="T">Command type</typeparam>
     /// <returns>Command instance</returns>
-    public T Create<T>() where T : BaseCommand
-    {
-        if (!SupportedCommands.Contains(typeof(T)))
-        {
-            throw new ArgumentException($"Unsupported command {typeof(T).Name}");
-        }
-        return ActivatorUtilities.CreateInstance<T>(serviceProvider);
-    }
+    public T Create<T>() where T : BaseCommand => ActivatorUtilities.CreateInstance<T>(serviceProvider);
 
     /// <summary>
     /// Create a new command instance
@@ -52,29 +25,39 @@ public class CommandFactory(IServiceProvider serviceProvider)
     /// <param name="type">Command type</param>
     /// <returns>Command instance</returns>
     /// <exception cref="ArgumentException">Unsupported command</exception>
-    public BaseCommand Create(Type type)
-    {
-        if (!SupportedCommands.Contains(type))
-        {
-            throw new ArgumentException($"Unsupported command {type.Name}");
-        }
-        return (BaseCommand)ActivatorUtilities.CreateInstance(serviceProvider, type);
-    }
+    public BaseCommand Create(Type type) => (BaseCommand)ActivatorUtilities.CreateInstance(serviceProvider, type);
 
     /// <summary>
-    /// Create a new command instance
+    /// Create a new command instance from the given JSON data
     /// </summary>
     /// <param name="commandName">Command name</param>
     /// <param name="commandData">Command data</param>
     /// <returns>Command instance</returns>
     /// <exception cref="ArgumentException">Unsupported command</exception>
-    public BaseCommand Create(string commandName, JsonElement commandData)
+    public BaseCommand Create(string commandName, JsonElement commandData, Type[] supportedCommands)
     {
-        Type? commandType = SupportedCommands.First(item => item.Name.Equals(commandName, StringComparison.InvariantCultureIgnoreCase))
+        Type? commandType = supportedCommands.First(item => item.Name.Equals(commandName, StringComparison.InvariantCultureIgnoreCase))
                             ?? throw new ArgumentException($"Unsupported command {commandName}");
 
         BaseCommand command = (BaseCommand)ActivatorUtilities.CreateInstance(serviceProvider, commandType);
         command.UpdateFromJson(commandData);
+        return command;
+    }
+
+    /// <summary>
+    /// Create a new command instance from the given JSON reader
+    /// </summary>
+    /// <param name="commandName">Command name</param>
+    /// <param name="commandData">Command data</param>
+    /// <returns>Command instance</returns>
+    /// <exception cref="ArgumentException">Unsupported command</exception>
+    public BaseCommand Create(string commandName, ref Utf8JsonReader reader, Type[] supportedCommands)
+    {
+        Type? commandType = supportedCommands.First(item => item.Name.Equals(commandName, StringComparison.InvariantCultureIgnoreCase))
+                            ?? throw new ArgumentException($"Unsupported command {commandName}");
+
+        BaseCommand command = (BaseCommand)ActivatorUtilities.CreateInstance(serviceProvider, commandType);
+        command.UpdateFromJsonReader(ref reader);
         return command;
     }
 }
