@@ -61,7 +61,7 @@ public interface ILinkAdapter
     PacketHeader? ReadNextPacket();
 
     /// <summary>
-    /// Read the result of a <see cref="Protocol.SbcRequests.GetObjectModel"/> request
+    /// Read the result of a <see cref="Protocol.SbcRequests.Request.GetObjectModel"/> request
     /// </summary>
     /// <param name="json">JSON data</param>
     void ReadObjectModel(out ReadOnlySpan<byte> json);

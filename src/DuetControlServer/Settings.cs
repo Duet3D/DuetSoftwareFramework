@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using DuetAPI.Connection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NLog;
 using NLog.Config;
@@ -87,13 +88,13 @@ public sealed class Settings
     /// <summary>
     /// Directory in which DSF-related UNIX sockets reside
     /// </summary>
-    public string SocketDirectory { get; set; } = DuetAPI.Connection.Defaults.SocketDirectory;
+    public string SocketDirectory { get; set; } = Defaults.SocketDirectory;
 
     /// <summary>
     /// UNIX socket file for DuetControlServer
     /// </summary>
     /// <seealso cref="DuetAPI"/>
-    public string SocketFile { get; set; } = DuetAPI.Connection.Defaults.SocketFile;
+    public string SocketFile { get; set; } = Defaults.SocketFile;
 
     /// <summary>
     /// Fully-qualified path to the main IPC UNIX socket (evaluated during runtime)
@@ -104,7 +105,7 @@ public sealed class Settings
     /// <summary>
     /// File to contain the last start error of DCS. Once DCS starts successfully, it is deleted
     /// </summary>
-    public string StartErrorFile { get; set; } = DuetAPI.Connection.Defaults.StartErrorFile;
+    public string StartErrorFile { get; set; } = Defaults.StartErrorFile;
 
     /// <summary>
     /// Maximum number of simultaneously pending IPC connections
@@ -423,10 +424,13 @@ public static class ServiceCollectionExtensions
     /// <param name="socketDirectory">Directory to create the IPC socket in</param>
     /// <param name="socketFile">Name of the IPC socket file</param>
     /// <param name="baseDirectory">Base directory for the virtual SD card</param>
+    /// <param name="startErrorFile">Output parameter for the path to the start error file</param>
     /// <returns>Service collection</returns>
     public static IServiceCollection AddSettings(this IServiceCollection services, IConfiguration configuration,
-        bool updateOnly, LogLevel? logLevel, FileInfo? configFile, DirectoryInfo? socketDirectory, string? socketFile, DirectoryInfo? baseDirectory)
+        bool updateOnly, LogLevel? logLevel, FileInfo? configFile, DirectoryInfo? socketDirectory, string? socketFile, DirectoryInfo? baseDirectory,
+        out string startErrorFile)
     {
+        startErrorFile = configuration.GetValue(nameof(Settings.StartErrorFile), Defaults.StartErrorFile);
         return services
             .Configure<Settings>(configuration)
             .PostConfigure<Settings>(settings =>

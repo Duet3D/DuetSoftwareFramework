@@ -20,12 +20,20 @@ namespace DuetControlServer.IPC;
 /// Static class that holds main functionality for inter-process communication
 /// </summary>
 /// <param name="commandFactory">Factory to create commands</param>
+/// <param name="firmwareUpdater">Firmware updater</param>
 /// <param name="processorFactory">Factory to create connection processors</param>
 /// <param name="lockManager">Lock manager to handle read/write locks</param>
 /// <param name="model">Object model</param>
+/// <param name="lifetime">Host application lifetime</param>
 /// <param name="settings">Settings</param>
 [DiagnosticsPriority(-8)]
-public class Server(CommandFactory commandFactory, ProcessorFactory processorFactory, LockManager lockManager, Model.ObjectModel model, IOptions<Settings> settings) : BackgroundService, IDiagnostics
+public class Server(CommandFactory commandFactory,
+    FirmwareUpdater firmwareUpdater,
+    ProcessorFactory processorFactory,
+    LockManager lockManager,
+    Model.ObjectModel model,
+    IHostApplicationLifetime lifetime,
+    IOptions<Settings> settings) : BackgroundService, IDiagnostics
 {
     /// <summary>
     /// Minimum supported protocol version number
@@ -46,12 +54,14 @@ public class Server(CommandFactory commandFactory, ProcessorFactory processorFac
     /// <summary>
     /// Initialize the IPC subsystem and start listening for connections
     /// </summary>
-    public override Task StartAsync(CancellationToken cancellationToken)
+    public override async Task StartAsync(CancellationToken cancellationToken)
     {
-        if (settings.Value.UpdateOnly)
+        // Check if the firmware needs to be updated remotely
+        if (settings.Value.UpdateOnly && await firmwareUpdater.TryRemoteFirmwareUpdateAsync(cancellationToken))
         {
-            // Don't do anything if only the firmware is supposed to be updated
-            return base.StartAsync(cancellationToken);
+            // Firmware has been update remotely. Stop here
+            lifetime.StopApplication();
+            return;
         }
 
         // Make sure the parent directory exists but the socket file does not
@@ -68,9 +78,10 @@ public class Server(CommandFactory commandFactory, ProcessorFactory processorFac
         UnixDomainSocketEndPoint endPoint = new(settings.Value.FullSocketPath);
         _unixSocket.Bind(endPoint);
         _unixSocket.Listen(settings.Value.Backlog);
+        _logger.Info("IPC socket created at {0}", settings.Value.FullSocketPath);
 
         // Start main service
-        return base.StartAsync(cancellationToken);
+        await base.StartAsync(cancellationToken);
     }
 
     /// <summary>

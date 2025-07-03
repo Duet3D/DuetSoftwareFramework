@@ -10,7 +10,9 @@ using DuetControlServer.Model;
 using DuetControlServer.Utility;
 using DuetSharedLibrary;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using NLog;
 using NLog.Extensions.Hosting;
 using System;
@@ -116,7 +118,7 @@ rootCommand.SetAction((parserResult) =>
                 }
             })
             .ConfigureServices((context, services) => services
-                .AddSettings(context.Configuration, updateOnlyValue, logLevelValue, configFileValue, socketDirectoryValue, socketFileValue, baseDirectoryValue)
+                .AddSettings(context.Configuration, updateOnlyValue, logLevelValue, configFileValue, socketDirectoryValue, socketFileValue, baseDirectoryValue, out startErrorFile)
                 .AddCodes()
                 .AddCommands()
                 .AddFiles()
@@ -134,8 +136,25 @@ rootCommand.SetAction((parserResult) =>
         return;
     }
 
+    // Delete the startup error file when the application has been fully started
+    host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStarted.Register(() =>
+    {
+        if (File.Exists(startErrorFile))
+        {
+            try
+            {
+                File.Delete(startErrorFile);
+            }
+            catch (Exception e)
+            {
+                LogManager.GetCurrentClassLogger().Warn(e, "Failed to delete start error file {0}", startErrorFile);
+            }
+        }
+    });
+
     // Run the host application
     host.Run();
+    LogManager.Shutdown();
 });
 
 new CommandLineConfiguration(rootCommand).Invoke(args);
@@ -212,7 +231,6 @@ new CommandLineConfiguration(rootCommand).Invoke(args);
         try
         {
             IPC.Server.Init();
-            _logger.Info("IPC socket created at {0}", Settings.FullSocketPath);
         }
         catch (Exception e)
         {
@@ -278,12 +296,6 @@ new CommandLineConfiguration(rootCommand).Invoke(args);
             {
                 _logger.Warn(e, "Failed to notify systemd about process start");
             }
-        }
-
-        // Delete the last DCS error file if it exists
-        if (File.Exists(Settings.StartErrorFile))
-        {
-            File.Delete(Settings.StartErrorFile);
         }
 
         if (!Settings.UpdateOnly)

@@ -239,11 +239,11 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
     }
 
     /// <summary>
-    /// Update the firmware using a remote DCS instance
+    /// Try to update the firmware using a remote DCS instance
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public async Task UpdateFirmwareRemotelyAsync(CancellationToken cancellationToken)
+    /// <returns>True if a remote connection could be established, false otherwise</returns>
+    public async Task<bool> TryRemoteFirmwareUpdateAsync(CancellationToken cancellationToken)
     {
         // Connect to the remote DCS instance first
         using CommandConnection commandConnection = new();
@@ -257,11 +257,9 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
             await subscribeConnection.ConnectAsync(SubscriptionMode.Patch, ["boards/**", "directories/**", "state/status"], settings.Value.FullSocketPath, cancellationToken);
             objectModel = await subscribeConnection.GetObjectModelAsync(cancellationToken);
         }
-        catch (Exception e)
+        catch
         {
-            Console.WriteLine("Error: Failed to connect to DCS ({0})", e.Message);
-            _logger.Debug(e);
-            return;
+            return false;
         }
 
         // Get the different firmware filenames
@@ -310,7 +308,7 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
         if (outdatedBoards.Count == 0)
         {
             Console.WriteLine("All boards are up-to-date!");
-            return;
+            return true;
         }
 
         Console.WriteLine((outdatedBoards.Count == 1) ? "There is {0} outdated board:" : "There are {0} outdated boards:", outdatedBoards.Count);
@@ -448,5 +446,8 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
                 _logger.Debug(e);
             }
         }
+
+        // Done
+        return true;
     }
 }
