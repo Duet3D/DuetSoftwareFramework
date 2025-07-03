@@ -7,7 +7,7 @@ namespace DuetControlServer.Commands;
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.UnlockObjectModel"/> command
 /// </summary>
-/// <param name="model">Object model</param>
+/// <param name="lockManager">Lock manager</param>
 public sealed class UnlockObjectModel(LockManager lockManager) : DuetAPI.Commands.UnlockObjectModel, IConnectionCommand
 {
     /// <summary>
@@ -20,5 +20,9 @@ public sealed class UnlockObjectModel(LockManager lockManager) : DuetAPI.Command
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public override Task ExecuteAsync(CancellationToken cancellationToken = default) => lockManager.UnlockMachineModel(Connection!, cancellationToken);
+    public override Task ExecuteAsync(CancellationToken cancellationToken = default)
+    {
+        lockManager.UnlockMachineModel(Connection!);
+        return Task.CompletedTask;
+    }
 }

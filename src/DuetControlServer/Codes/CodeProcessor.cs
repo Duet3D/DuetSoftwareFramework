@@ -21,10 +21,6 @@ namespace DuetControlServer.Codes;
 /// <summary>
 /// Main class delegating parallel G/M/T-code execution
 /// </summary>
-/// <param name="model">Object model</param>
-/// <remarks>
-/// Constructor of this class
-/// </remarks>
 /// <param name="expressions">Expression parser</param>
 /// <param name="model">Object model</param>
 /// <param name="lifetime">Application lifetime</param>

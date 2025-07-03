@@ -25,8 +25,9 @@ public static class Commands
     /// <param name="path">HTTP request path</param>
     /// <param name="cmd">Command to execute on HTTP request</param>
     /// <param name="cmdArgs">Arguments for the command</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Exit code</returns>
-    public static async Task<int> MainAsync(FileInfo socketPath, bool quiet, HttpEndpointType method, string ns, string path, string? cmd, string? cmdArgs)
+    public static async Task<int> MainAsync(FileInfo socketPath, bool quiet, HttpEndpointType method, string ns, string path, string? cmd, string? cmdArgs, CancellationToken cancellationToken)
     {
         if (method == HttpEndpointType.WebSocket && (!string.IsNullOrWhiteSpace(cmd) || !string.IsNullOrWhiteSpace(cmdArgs)))
         {
@@ -38,7 +39,7 @@ public static class Commands
         CommandConnection connection = new();
         try
         {
-            await connection.ConnectAsync(socketPath.FullName);
+            await connection.ConnectAsync(socketPath.FullName, cancellationToken);
         }
         catch (SocketException)
         {
@@ -53,7 +54,7 @@ public static class Commands
         try
         {
             bool websocketConnected = false;
-            using HttpEndpointUnixSocket socket = await connection.AddHttpEndpointAsync(method, ns, path);
+            using HttpEndpointUnixSocket socket = await connection.AddHttpEndpointAsync(method, ns, path, cancellationToken: cancellationToken);
             socket.OnEndpointRequestReceived += async (unixSocket, requestConnection) =>
             {
                 // Note that a call to ReadRequest can throw an exception in case DCS only created a test connection!
@@ -193,7 +194,7 @@ public static class Commands
             // If the connection is terminated while waiting, continue as well
             if (method == HttpEndpointType.WebSocket || string.IsNullOrWhiteSpace(cmd))
             {
-                Task primaryTask = (method == HttpEndpointType.WebSocket) ? Task.Delay(-1) : Task.Run(() => Console.ReadLine());
+                Task primaryTask = (method == HttpEndpointType.WebSocket) ? Task.Delay(-1, cancellationToken) : Task.Run(() => Console.ReadLine());
                 await Task.WhenAny(primaryTask, PollConnectionAsync(connection));
             }
         }
@@ -207,7 +208,7 @@ public static class Commands
             if (connection.IsConnected)
             {
                 // Remove the endpoint again when the plugin is being unloaded
-                await connection.RemoveHttpEndpointAsync(method, ns, path);
+                await connection.RemoveHttpEndpointAsync(method, ns, path, cancellationToken);
             }
         }
         return 0;

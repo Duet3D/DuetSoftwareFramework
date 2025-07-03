@@ -16,10 +16,6 @@ namespace DuetControlServer.Model;
 /// <summary>
 /// Service to keep the object model up-to-date with the firmware
 /// </summary>
-/// <param name="firmwareUpdater">Firmware updater</param>
-/// <param name="linkInterface">Link interface</param>
-/// <param name="model">Object model to update</param>
-/// <param name="settings">Settings</param>
 public class UpdateService : BackgroundService
 {
     // Private fields
@@ -213,12 +209,6 @@ public class UpdateService : BackgroundService
     /// <returns>Asynchronous task</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (_settings.NoSpi)
-        {
-            // Don't start if no SPI connection is available
-            await Task.Delay(-1, stoppingToken);
-        }
-
         do
         {
             try

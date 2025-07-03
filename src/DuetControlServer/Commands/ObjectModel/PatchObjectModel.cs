@@ -20,11 +20,13 @@ public sealed class PatchObjectModel(Model.ObjectModel model, IOptions<Settings>
     /// <returns>Asynchronous task</returns>
     public override Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        if (!settings.Value.NoSpi)
+        #warning deprecate this?
+        if (true)
         {
             throw new InvalidOperationException("Command is only supported in non-SPI mode");
         }
 
+#if false
         if (model.UpdateFromJson(Key, Patch))
         {
             if (model.IsUpdating && model.State.Status != MachineStatus.Updating)
@@ -38,5 +40,6 @@ public sealed class PatchObjectModel(Model.ObjectModel model, IOptions<Settings>
         }
 
         return Task.CompletedTask;
+#endif
     }
 }

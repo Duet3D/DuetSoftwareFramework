@@ -183,7 +183,7 @@ public sealed class CodeInterception : IProcessor
                     try
                     {
                         // Send it to the client
-                        await Connection.SendCommand(_codeBeingIntercepted!);
+                        await Connection.SendCommandAsync(_codeBeingIntercepted!);
 
                         // Keep processing incoming commands until a final action for the code has been received
                         do
@@ -198,7 +198,7 @@ public sealed class CodeInterception : IProcessor
 
                                 // Execute regular commands here
                                 object? result = await command.InvokeAsync(cancellationToken);
-                                await Connection.SendResponse(result);
+                                await Connection.SendResponseAsync(result);
                             }
                             else if (SupportedCommands.Contains(commandType))
                             {
@@ -346,6 +346,7 @@ public sealed class CodeInterception : IProcessor
     /// </summary>
     /// <param name="code">Code to intercept</param>
     /// <param name="type">Type of the interception</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if the code has been resolved</returns>
     /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
     public static async ValueTask<bool> InterceptAsync(Code code, InterceptionMode type, CancellationToken cancellationToken = default)

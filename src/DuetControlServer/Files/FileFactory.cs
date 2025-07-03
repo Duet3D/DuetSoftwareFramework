@@ -78,11 +78,8 @@ public class FileFactory(IServiceProvider serviceProvider)
     /// <summary>
     /// Create a macro file for execution on the given channel from an existing macro file
     /// </summary>
-    /// <param name="fileName">Virtual file path</param>
-    /// <param name="physicalFile">Physical file path</param>
-    /// <param name="channel">Code requesting the macro</param>
-    /// <param name="startCode">Code starting the macro file</param>
-    /// <param name="sourceConnection">Original IPC connection requesting this macro file</param>
+    /// <param name="copyFrom">Macro file to copy from</param>
+    /// <param name="channel">Code channel requesting the macro</param>
     /// <returns>Macro file or null if it could not be opened</returns>
 
     public MacroFile CreateMacro(MacroFile copyFrom, CodeChannel channel) => ActivatorUtilities.CreateInstance<MacroFile>(serviceProvider, copyFrom, channel);

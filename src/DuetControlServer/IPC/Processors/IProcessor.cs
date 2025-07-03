@@ -22,9 +22,7 @@ public interface IProcessor
     public Connection Connection { get; }
 
     /// <summary>
-    /// Worker method for a given connection.
-    /// No <see cref="CancellationToken"/> is passed here, use <see cref="Program.CancellationToken"/> instead.
-    /// Once this task exits the connection is terminated.
+    /// Worker method for a given connection. Once this task exits the connection is terminated.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token to cancel the worker</param>
     /// <returns>Task that represents the worker lifecycle</returns>

@@ -68,7 +68,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// Constructor of this class
     /// </summary>
     /// <param name="dsfLogger">Internal logger</param>
-    /// <param name="updateInterface">Update interface</param>
+    /// <param name="model">Object model</param>
     /// <param name="settings">Settings</param>
     /// <exception cref="OperationCanceledException">Failed to connect to board</exception>
     public SPI(Logger dsfLogger, Model.ObjectModel model, IOptions<Settings> settings)
@@ -203,6 +203,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// Perform a full data transfer synchronously
     /// </summary>
     /// <param name="connecting">Whether this an initial connection is being established</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the transfer</param>
     public void PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default)
     {
         _lastTransferNumber = _rxHeader.SequenceNumber;
@@ -287,14 +288,6 @@ public class SPI : IDiagnostics, ILinkAdapter
                 _txBuffer = _txBuffer.Next ?? _txBuffers.First!;
                 _rxPointer = _txPointer = 0;
                 _packetId = 0;
-
-                // Deal with reset requests
-                if (_resetting && _settings.NoTerminateOnReset)
-                {
-                    _connected = _resetting = false;
-                    _waitingForFirstTransfer = true;
-                    PerformFullTransfer(cancellationToken: cancellationToken);
-                }
                 break;
             }
             catch (OperationCanceledException e)
@@ -355,7 +348,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     }
 
     /// <summary>
-    /// Read the result of a <see cref="Communication.SbcRequests.Request.GetObjectModel"/> request
+    /// Read the result of a <see cref="Protocol.SbcRequests.Request.GetObjectModel"/> request
     /// </summary>
     /// <param name="json">JSON data</param>
     public void ReadObjectModel(out ReadOnlySpan<byte> json)
@@ -1252,6 +1245,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// Wait for the Duet to flag when it is ready to transfer data
     /// </summary>
     /// <param name="inTransfer">Whether a full transfer is being performed</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the wait</param>
     private void WaitForTransfer(bool inTransfer = true, CancellationToken cancellationToken = default)
     {
         if (_waitingForFirstTransfer)

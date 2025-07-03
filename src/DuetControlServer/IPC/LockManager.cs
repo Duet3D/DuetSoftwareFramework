@@ -2,7 +2,6 @@
 using System.Threading;
 using System.Threading.Tasks;
 using DuetControlServer.Model;
-using Microsoft.Extensions.Options;
 
 namespace DuetControlServer.IPC;
 
@@ -10,8 +9,7 @@ namespace DuetControlServer.IPC;
 /// Class to manage read/write locks of third-party plugins
 /// </summary>
 /// <param name="model">Object model</param>
-/// <param name="settings">Settings</param>
-public class LockManager(ObjectModel model, IOptions<Settings> settings)
+public class LockManager(ObjectModel model)
 {
     /// <summary>
     /// Connection that acquired the current lock
@@ -31,9 +29,21 @@ public class LockManager(ObjectModel model, IOptions<Settings> settings)
     /// <summary>
     /// Function to create a read/write lock to the object model
     /// </summary>
+    /// <param name="connection">Connection that is locking the model</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    public void LockMachineModel(Connection connection, CancellationToken cancellationToken = default)
+    {
+        _lock = model.AccessReadWrite(cancellationToken);
+        _lockConnection = connection;
+    }
+
+    /// <summary>
+    /// Function to create a read/write lock to the object model
+    /// </summary>
+    /// <param name="connection">Connection that is locking the model</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public async Task LockMachineModel(Connection connection, CancellationToken cancellationToken = default)
+    public async Task LockMachineModelAsync(Connection connection, CancellationToken cancellationToken = default)
     {
         _lock = await model.AccessReadWriteAsync(cancellationToken);
         _lockConnection = connection;
@@ -42,19 +52,14 @@ public class LockManager(ObjectModel model, IOptions<Settings> settings)
     /// <summary>
     /// Unlock the machine model again
     /// </summary>
-    public async Task UnlockMachineModel(Connection connection, CancellationToken cancellationToken = default)
+    /// <param name="connection">Connection that is unlocking the model</param>
+    public void UnlockMachineModel(Connection connection)
     {
         if (_lockConnection == connection)
         {
             _lockConnection = null;
             _lock?.Dispose();
             _lock = null;
-
-            if (settings.Value.NoSpi)
-            {
-                // Make sure functions waiting for full model updates don't stall
-                await model.FullyUpdatedAsync(cancellationToken);
-            }
         }
     }
 }

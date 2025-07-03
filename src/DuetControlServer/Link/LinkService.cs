@@ -26,6 +26,7 @@ namespace DuetControlServer.Link;
 /// <param name="filePathResolver">File path resolver</param>
 /// <param name="jobProcessor">Job processor</param>
 /// <param name="linkAdapter">Firmware link adapter</param>
+/// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model</param>
 /// <param name="settings">Settings</param>
 [DiagnosticsPriority(-6)]
@@ -59,10 +60,11 @@ public sealed partial class LinkService(
     /// </summary>
     public uint _openFileHandleCounter = Consts.NoFileHandle;
 
-    // <summary>
-    /// Print diagnostics of this class
+    /// <summary>
+    /// Print diagnostics of this class asynchronously
     /// </summary>
     /// <param name="builder">String builder</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
     public async ValueTask PrintDiagnosticsAsync(StringBuilder builder, CancellationToken cancellationToken)
     {
@@ -286,7 +288,7 @@ public sealed partial class LinkService(
                         linkInterface.FirmwareResetRequest.SetResult();
                         linkInterface.FirmwareResetRequest = null;
 
-                        blockTask = !settings.Value.NoTerminateOnReset;
+                        blockTask = true;
                     }
                     skipChannels = true;
                 }
@@ -309,16 +311,11 @@ public sealed partial class LinkService(
                     {
                         linkInterface.FirmwareUpdateRequest?.SetException(e);
                         linkInterface.FirmwareUpdateRequest = null;
-
-                        if (!settings.Value.UpdateOnly && settings.Value.NoTerminateOnReset && e is OperationCanceledException)
-                        {
-                            _logger.Debug(e, "Firmware update cancelled");
-                        }
                         throw;
                     }
 
                     linkInterface.IapStream = linkInterface.FirmwareStream = null;
-                    blockTask = settings.Value.UpdateOnly || !settings.Value.NoTerminateOnReset;
+                    blockTask = true;
                 }
             }
             if (blockTask)

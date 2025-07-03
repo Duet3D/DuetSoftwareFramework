@@ -19,5 +19,5 @@ public sealed class LockObjectModel(LockManager lockManager) : DuetAPI.Commands.
     /// Lock the machine model for write access
     /// </summary>
     /// <returns>Asynchronous task</returns>
-    public override Task ExecuteAsync(CancellationToken cancellationToken) => lockManager.LockMachineModel(Connection!, cancellationToken);
+    public override Task ExecuteAsync(CancellationToken cancellationToken) => lockManager.LockMachineModelAsync(Connection!, cancellationToken);
 }

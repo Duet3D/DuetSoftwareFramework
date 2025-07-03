@@ -117,6 +117,9 @@ public sealed class CodeStream : IProcessor, IDisposable
     /// </summary>
     /// <param name="conn">Connection instance</param>
     /// <param name="initMessage">Initialization message from the client</param>
+    /// <param name="codeFactory">Code factory to create code instances</param>
+    /// <param name="model">Object model</param>
+    /// <param name="settings">Settings</param>
     public CodeStream(Connection conn, ClientInitMessage initMessage, Codes.CodeFactory codeFactory, Model.ObjectModel model, IOptions<Settings> settings)
     {
         Connection = conn;
@@ -305,7 +308,7 @@ public sealed class CodeStream : IProcessor, IDisposable
                     {
                         _logger.Error(e, "IPC#{0}: Failed to execute stream code", Connection.Id);
                     }
-                    await Connection.SendResponse(e);
+                    await Connection.SendResponseAsync(e);
                 }
             }
             while (!cancellationToken.IsCancellationRequested);

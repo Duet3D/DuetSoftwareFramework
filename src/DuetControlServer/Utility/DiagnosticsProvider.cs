@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetSharedLibrary;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DuetControlServer.Utility;
@@ -61,7 +62,6 @@ public class DiagnosticsProvider(IServiceProvider serviceProvider)
     /// <summary>
     /// Get ordered list of diagnostics providers
     /// </summary>
-    /// <param name="serviceProvider">Service provider</param>
     /// <returns>List of diagnostics providers</returns>
     private IEnumerable<object> GetDiagnosticsProviders()
     {
@@ -82,15 +82,14 @@ public class DiagnosticsProvider(IServiceProvider serviceProvider)
     /// <summary>
     /// Print diagnostics of all registered diagnostic providers
     /// </summary>
-    /// <param name="services">Service collection</param>
-    /// <returns>Service collection</returns>
+    /// <returns>Diagnostics output</returns>
     public async ValueTask<string> PrintAsync()
     {
         BuildDateTimeAttribute buildAttribute = (BuildDateTimeAttribute)Attribute.GetCustomAttribute(System.Reflection.Assembly.GetExecutingAssembly(), typeof(BuildDateTimeAttribute))!;
 
         StringBuilder builder = new();
         builder.AppendLine("=== Duet Control Server ===");
-        builder.AppendLine($"Duet Control Server version {Program.Version} ({buildAttribute.Date ?? "unknown build time"}, {(Environment.Is64BitProcess ? "64-bit" : "32-bit")})");
+        builder.AppendLine($"Duet Control Server version {VersionHelper.GetVersion()} ({buildAttribute.Date ?? "unknown build time"}, {(Environment.Is64BitProcess ? "64-bit" : "32-bit")})");
         foreach (object provider in GetDiagnosticsProviders())
         {
             if (provider is IDiagnostics syncProvider)

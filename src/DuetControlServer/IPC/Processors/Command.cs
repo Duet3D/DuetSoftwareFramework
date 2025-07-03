@@ -100,7 +100,7 @@ public sealed class Command : IProcessor
 
                 // Execute it and send back the result
                 object? result = await command.InvokeAsync(cancellationToken);
-                await Connection.SendResponse(result);
+                await Connection.SendResponseAsync(result);
 
                 // Shut down the socket if this was the last command
                 if (cancellationToken.IsCancellationRequested)
@@ -134,7 +134,7 @@ public sealed class Command : IProcessor
                         _logger.Error(e, "IPC#{0}: Failed to receive command", Connection.Id);
                     }
                 }
-                await Connection.SendException(e);
+                await Connection.SendExceptionAsync(e);
             }
         }
         while (!cancellationToken.IsCancellationRequested);

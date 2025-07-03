@@ -124,7 +124,9 @@ public sealed class ModelSubscription : IProcessor
     /// </summary>
     /// <param name="conn">Connection instance</param>
     /// <param name="initMessage">Initialization message</param>
+    /// <param name="filter">Filter to access the machine model</param>
     /// <param name="model">Object model</param>
+    /// <param name="observer">Observer to receive property change notifications</param>
     /// <param name="settings">Settings</param>
     public ModelSubscription(
         Connection conn,
@@ -209,7 +211,7 @@ public sealed class ModelSubscription : IProcessor
                 if (jsonData is not null)
                 {
                     // Send new JSON data
-                    await Connection.SendRawData(jsonData);
+                    await Connection.SendRawDataAsync(jsonData);
                     jsonData = null;
 
                     // Wait for an acknowledgement from the client

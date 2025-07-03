@@ -200,7 +200,7 @@ public sealed class PluginService : IProcessor
                 // Send it over to the plugin service. Exception logging should take place in the command processor
                 try
                 {
-                    await Connection.SendCommand(request.Item1);
+                    await Connection.SendCommandAsync(request.Item1);
                     BaseResponse response = await Connection.ReceiveResponseAsync(cancellationToken);
                     if (response is ErrorResponse errorResponse)
                     {

@@ -19,9 +19,8 @@ namespace DuetControlServer.Commands;
 /// </summary>
 /// <param name="codeFactory">Code factory</param>
 /// <param name="model">Object model</param>
-/// <param name="settings">Settings</param>
 /// <param name="lifetime">Host application lifetime</param>
-public sealed class SimpleCode(Codes.CodeFactory codeFactory, Model.ObjectModel model, IOptions<Settings> settings, IHostApplicationLifetime lifetime)
+public sealed class SimpleCode(Codes.CodeFactory codeFactory, Model.ObjectModel model, IHostApplicationLifetime lifetime)
     : DuetAPI.Commands.SimpleCode, IConnectionCommand
 {
     /// <summary>
@@ -79,7 +78,7 @@ public sealed class SimpleCode(Codes.CodeFactory codeFactory, Model.ObjectModel 
         // Check if the corresponding code channel has been disabled
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            if (!settings.Value.NoSpi && model.Inputs[Channel] is null)
+            if (model.Inputs[Channel] is null)
             {
                 throw new InvalidOperationException("Requested code channel has been disabled");
             }

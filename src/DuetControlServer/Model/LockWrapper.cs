@@ -11,8 +11,6 @@ namespace DuetControlServer.Model;
 /// Wrapper around the lock which notifies subscribers whenever an update has been processed.
 /// It is also able to detect the origin of model-related deadlocks
 /// </summary>
-/// <param name="lifetime">Lifetime of the application</param>
-/// <param name="settings">Settings of the application</param>
 public sealed class LockWrapper : IDisposable
 {
     /// <summary>

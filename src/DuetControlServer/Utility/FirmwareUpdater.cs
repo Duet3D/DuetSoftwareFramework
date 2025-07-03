@@ -22,6 +22,7 @@ namespace DuetControlServer.Utility;
 /// <param name="codeFactory">Code factory</param>
 /// <param name="filePath">File path resolver</param>
 /// <param name="model">Object model</param>
+/// <param name="lifetime">Host application lifetime</param>
 /// <param name="settings">Settings</param>
 public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath, Model.ObjectModel model, IHostApplicationLifetime lifetime, IOptions<Settings> settings)
 {

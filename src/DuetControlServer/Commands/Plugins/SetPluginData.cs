@@ -11,6 +11,7 @@ namespace DuetControlServer.Commands;
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.SetPluginData"/> command
 /// </summary>
+/// <param name="model">Object model</param>
 /// <param name="settings">Settings</param>
 public sealed class SetPluginData(Model.ObjectModel model, IOptions<Settings> settings) : DuetAPI.Commands.SetPluginData, IConnectionCommand
 {

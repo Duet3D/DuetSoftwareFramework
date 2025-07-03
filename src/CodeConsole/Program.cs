@@ -4,35 +4,49 @@ using System.CommandLine;
 using System.IO;
 
 // Main CLI arguments
-var socketPath = new Option<FileInfo>(
-    aliases: ["-s", "--socket"],
-    description: "UNIX socket to connect to",
-    getDefaultValue: () => new FileInfo(Defaults.FullSocketPath)
-);
+Option<FileInfo> socketPathOption = new("--socket", "-s")
+{
+    Description = "UNIX socket to connect to",
+    DefaultValueFactory = _ => new FileInfo(Defaults.FullSocketPath)
+};
 
-var quiet = new Option<bool>(
-    aliases: ["-q", "--quiet"],
-    description: "Do not output any messages (not applicable for code replies in interactive mode)"
-);
+Option<bool> quietOption = new("--quiet", "-q")
+{
+    Description = "Do not output any messages (not applicable for code replies in interactive mode)"
+};
 
 // Main command
-var rootCommand = new RootCommand("Code console to send G/M/T-codes to DuetControlServer")
+RootCommand rootCommand = new("Code console to send G/M/T-codes to DuetControlServer")
 {
-    socketPath,
-    quiet
+    socketPathOption,
+    quietOption
 };
-rootCommand.SetHandler(Commands.MainAsync, socketPath, quiet);
+rootCommand.SetAction((parseResult, token) => {
+    FileInfo socketPathValue = parseResult.GetRequiredValue(socketPathOption);
+    bool quietValue = parseResult.GetValue(quietOption);
+    return Commands.MainAsync(socketPathValue, quietValue, token);
+});
 
 // Exec command
-var code = new Argument<string>("code", "Code to execute");
-var execCommand = new Command("exec", "Execute the given code(s), wait for the result and exit")
+Argument<string> codeArgument = new("code")
 {
-    code
+    Description = "Code to execute"
 };
-execCommand.AddAlias("-c");
-execCommand.AddAlias("--code");
-execCommand.SetHandler(Commands.ExecAsync, socketPath, quiet, code);
+Command execCommand = new("exec", "Executes the given code(s) and waits for the result before exiting.")
+{
+    quietOption,
+    socketPathOption,
+    codeArgument
+};
+execCommand.Aliases.Add("-c");
+execCommand.Aliases.Add("--code");
+execCommand.SetAction((parseResult, token) =>
+{
+    string codeValue = parseResult.GetRequiredValue(codeArgument);
+    FileInfo socketPathValue = parseResult.GetRequiredValue(socketPathOption);
+    bool quietValue = parseResult.GetValue(quietOption);
+    return Commands.ExecAsync(codeValue, socketPathValue, quietValue, token);
+});
 
-rootCommand.AddCommand(execCommand);
-
-return await rootCommand.InvokeAsync(args);
+rootCommand.Subcommands.Add(execCommand);
+return new CommandLineConfiguration(rootCommand).Invoke(args);

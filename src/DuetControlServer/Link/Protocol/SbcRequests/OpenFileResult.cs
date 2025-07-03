@@ -9,7 +9,7 @@ namespace DuetControlServer.Link.Protocol.SbcRequests;
 public struct OpenFileResult
 {
     /// <summary>
-    /// Handle of the opened file or <see cref="Consts.NoFileHandle"/> if the file could not be opened
+    /// Handle of the opened file or <see cref="Shared.Consts.NoFileHandle"/> if the file could not be opened
     /// </summary>
     public uint Handle;
 

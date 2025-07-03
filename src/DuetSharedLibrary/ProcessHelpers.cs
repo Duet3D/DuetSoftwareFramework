@@ -4,6 +4,9 @@ using System.Runtime.InteropServices;
 
 namespace DuetSharedLibrary;
 
+/// <summary>
+/// Helper class to retrieve process information and perform operations on processes
+/// </summary>
 public static class ProcessHelpers
 {
     /// <summary>

@@ -18,14 +18,15 @@ public static class Commands
     /// <param name="socketPath">UNIX socket path for IPC</param>
     /// <param name="quiet">Run command quietly</param>
     /// <param name="bufferSize">Maximum number of commands to buffer</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Exit code</returns>
-    public static async Task<int> MainAsync(FileInfo socketPath, bool quiet, int bufferSize)
+    public static async Task<int> MainAsync(FileInfo socketPath, bool quiet, int bufferSize, CancellationToken cancellationToken)
     {
         // Create a new connection and connect to DuetControlServer
         using CodeStreamConnection connection = new();
         try
         {
-            await connection.ConnectAsync(bufferSize, DuetAPI.CodeChannel.Telnet, socketPath.FullName);
+            await connection.ConnectAsync(bufferSize, DuetAPI.CodeChannel.Telnet, socketPath.FullName, cancellationToken);
         }
         catch (SocketException)
         {
@@ -44,7 +45,7 @@ public static class Commands
         // Start streaming
         using CancellationTokenSource cts = new();
         await using NetworkStream stream = connection.GetStream();
-        Task inputTask = Task.Run(async () => await ReadCodesAsync(stream, cts));   // This is started with Task.Run() because Console.ReadLine blocks...
+        Task inputTask = Task.Run(async () => await ReadCodesAsync(stream, cts), cancellationToken);   // This is started with Task.Run() because Console.ReadLine blocks...
         Task outputTask = WriteRepliesAsync(stream, quiet, cts.Token);
         await Task.WhenAll(inputTask, outputTask);
 

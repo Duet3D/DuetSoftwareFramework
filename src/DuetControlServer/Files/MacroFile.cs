@@ -101,8 +101,7 @@ public sealed class MacroFile : CodeFile, IDisposable
     /// <summary>
     /// Constructor of a macro started by a G/M/T-code
     /// </summary>
-    /// <param name="fileName">Filename of the macro</param>
-    /// <param name="physicalFile">Physical path of the macro</param>
+    /// <param name="filePath">Filename of the macro</param>
     /// <param name="channel">Code requesting the macro</param>
     /// <param name="startCode">Code starting the macro file</param>
     /// <param name="sourceConnection">Original IPC connection requesting this macro file</param>
@@ -137,10 +136,8 @@ public sealed class MacroFile : CodeFile, IDisposable
     /// <summary>
     /// Constructor of a system macro
     /// </summary>
-    /// <param name="fileName">Filename of the macro</param>
-    /// <param name="physicalFile">Physical path of the macro</param>
+    /// <param name="filePath">Filename of the macro</param>
     /// <param name="channel">Code requesting the macro</param>
-    /// <param name="startCode">Code starting the macro file</param>
     /// <param name="sourceConnection">Original IPC connection requesting this macro file</param>
     /// <param name="codeFactory">Code factory</param>
     /// <param name="codeProcessor">Code processor</param>

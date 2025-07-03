@@ -4,36 +4,42 @@ using System.IO;
 using CodeStream;
 
 // General arguments
-var socketPath = new Option<FileInfo>(
-    aliases: ["-s", "--socket"],
-    description: "UNIX socket to connect to",
-    getDefaultValue: () => new FileInfo(Defaults.FullSocketPath)
-);
+Option<FileInfo> socketPathOption = new("--socket", "-s")
+{
+    Description = "UNIX socket to connect to",
+    DefaultValueFactory = _ => new FileInfo(Defaults.FullSocketPath)
+};
 
-var quiet = new Option<bool>(
-    aliases: ["-q", "--quiet"],
-    description: "Do not output any messages (not applicable for code replies in interactive mode)"
-);
+Option<bool> quietOption = new("--quiet", "-q")
+{
+    Description = "Do not output any messages (not applicable for code replies in interactive mode)"
+};
 
 // Main command
-var bufferSize = new Option<int>(
-    aliases: ["-b", "--buffer-size"],
-    description: "Maximum number of codes to buffer at once"
-);
-bufferSize.AddValidator((result) =>
+Option<int> bufferSizeOption = new("--buffer-size", "-b")
 {
-    if (result.GetValueForOption(bufferSize) < 1)
+    Description = "Maximum number of codes to buffer at once",
+    DefaultValueFactory = _ => 32
+};
+bufferSizeOption.Validators.Add((parseResult) =>
+{
+    if (parseResult.GetValue(bufferSizeOption) < 1)
     {
-        result.ErrorMessage = "Buffer size must be greater than or equal to 1";
+        parseResult.AddError("Buffer size must be greater than or equal to 1");
     }
 });
 
-var rootCommand = new RootCommand("Code stream to send G/M/T-codes to DuetControlServer")
+RootCommand rootCommand = new("Code stream to send G/M/T-codes to DuetControlServer")
 {
-    socketPath,
-    quiet,
-    bufferSize
+    socketPathOption,
+    quietOption,
+    bufferSizeOption
 };
-rootCommand.SetHandler(Commands.MainAsync, socketPath, quiet, bufferSize);
+rootCommand.SetAction((parseResult, token) => {
+    FileInfo socketPathValue = parseResult.GetRequiredValue(socketPathOption)!;
+    bool quietValue = parseResult.GetValue(quietOption);
+    int bufferSizeValue = parseResult.GetRequiredValue(bufferSizeOption);
+    return Commands.MainAsync(socketPathValue, quietValue, bufferSizeValue, token);
+});
 
-await rootCommand.InvokeAsync(args);
+return new CommandLineConfiguration(rootCommand).Invoke(args);

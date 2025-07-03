@@ -109,7 +109,7 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel 
             {
                 _logger.Info("System time has been changed");
                 Code code = codeFactory.Create();
-                code.Flags = (settings.Value.NoSpi ? CodeFlags.None : CodeFlags.IsInternallyProcessed) | CodeFlags.Asynchronous;
+                code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
                 code.Channel = CodeChannel.Trigger;
                 code.Type = CodeType.MCode;
                 code.MajorNumber = 905;
@@ -127,7 +127,7 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel 
                 _logger.Info("Hostname has been changed");
                 lastHostname = Environment.MachineName;
                 Code code = codeFactory.Create();
-                code.Flags = (settings.Value.NoSpi ? CodeFlags.None : CodeFlags.IsInternallyProcessed) | CodeFlags.Asynchronous;
+                code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
                 code.Channel = CodeChannel.Trigger;
                 code.Type = CodeType.MCode;
                 code.MajorNumber = 550;
@@ -139,55 +139,52 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel 
             }
 
             // Check if the network key has been updated
-            if (!settings.Value.NoSpi)
+            if (updateNetworkSeq)
             {
-                if (updateNetworkSeq)
+                // Update the network seq value
+                Code code = codeFactory.Create();
+                code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
+                code.Channel = CodeChannel.Trigger;
+                code.Type = CodeType.MCode;
+                code.MajorNumber = 409;
+                code.Parameters =
+                [
+                    new('K', "network"),
+                    new('I', 1)
+                ];
+                await code.ExecuteAsync(stoppingToken);
+
+                // Update the IP address to report on 12864 displays
+                if (currentIPAddress != lastIPAddress)
                 {
-                    // Update the network seq value
-                    Code code = codeFactory.Create();
+                    lastIPAddress = currentIPAddress;
+
+                    code = codeFactory.Create();
                     code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
                     code.Channel = CodeChannel.Trigger;
                     code.Type = CodeType.MCode;
-                    code.MajorNumber = 409;
+                    code.MajorNumber = 552;
                     code.Parameters =
                     [
-                        new('K', "network"),
-                        new('I', 1)
-                    ];
-                    await code.ExecuteAsync(stoppingToken);
-
-                    // Update the IP address to report on 12864 displays
-                    if (currentIPAddress != lastIPAddress)
-                    {
-                        lastIPAddress = currentIPAddress;
-
-                        code = codeFactory.Create();
-                        code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
-                        code.Channel = CodeChannel.Trigger;
-                        code.Type = CodeType.MCode;
-                        code.MajorNumber = 552;
-                        code.Parameters =
-                        [
-                            new('P', currentIPAddress ?? "0.0.0.0")
-                        ];
-                        await code.ExecuteAsync(stoppingToken);
-                    }
-                }
-
-                if (updateVolumesSeq)
-                {
-                    Code code = codeFactory.Create();
-                    code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
-                    code.Channel = CodeChannel.Trigger;
-                    code.Type = CodeType.MCode;
-                    code.MajorNumber = 409;
-                    code.Parameters =
-                    [
-                        new('K', "volumes"),
-                        new('I', 1)
+                        new('P', currentIPAddress ?? "0.0.0.0")
                     ];
                     await code.ExecuteAsync(stoppingToken);
                 }
+            }
+
+            if (updateVolumesSeq)
+            {
+                Code code = codeFactory.Create();
+                code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
+                code.Channel = CodeChannel.Trigger;
+                code.Type = CodeType.MCode;
+                code.MajorNumber = 409;
+                code.Parameters =
+                [
+                    new('K', "volumes"),
+                    new('I', 1)
+                ];
+                await code.ExecuteAsync(stoppingToken);
             }
 
             // Wait for next scheduled update check

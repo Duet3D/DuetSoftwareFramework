@@ -1,7 +1,9 @@
 using System;
 using System.IO;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI.ObjectModel;
 using DuetAPIClient;
 
 namespace CodeConsole;
@@ -17,13 +19,13 @@ public static class Commands
     /// <param name="socketPath">UNIX socket path for IPC</param>
     /// <param name="quiet">Run command quietly</param>
     /// <returns>Exit code</returns>
-    public static async Task<int> MainAsync(FileInfo socketPath, bool quiet)
+    public static async Task<int> MainAsync(FileInfo socketPath, bool quiet, CancellationToken cancellationToken)
     {
         // Connect to DCS
         using CommandConnection connection = new();
         try
         {
-            await connection.ConnectAsync(socketPath.FullName);
+            await connection.ConnectAsync(socketPath.FullName, cancellationToken);
         }
         catch (SocketException)
         {
@@ -41,7 +43,7 @@ public static class Commands
         }
 
         // Register an (interactive) user session (optional)
-        int sessionId = await connection.AddUserSessionAsync(DuetAPI.ObjectModel.AccessLevel.ReadWrite, DuetAPI.ObjectModel.SessionType.Local, "console");
+        int sessionId = await connection.AddUserSessionAsync(AccessLevel.ReadWrite, SessionType.Local, "console", cancellationToken);
 
         // Start reading lines from stdin and send them to DCS as simple codes.
         // When the code has finished, the result is printed to stdout
@@ -53,21 +55,21 @@ public static class Commands
                 // startUpdate puts DSF into "updating" mode
                 if (input.Equals("startUpdate", StringComparison.InvariantCultureIgnoreCase))
                 {
-                    await connection.SetUpdateStatusAsync(true);
+                    await connection.SetUpdateStatusAsync(true, cancellationToken);
                     Console.WriteLine("DSF is now in update mode");
                 }
 
                 // endUpdate takes DSF out of "updating" mode
                 else if (input.Equals("endUpdate", StringComparison.InvariantCultureIgnoreCase))
                 {
-                    await connection.SetUpdateStatusAsync(false);
+                    await connection.SetUpdateStatusAsync(false, cancellationToken);
                     Console.WriteLine("DSF is no longer in update mode");
                 }
 
                 // everything else is a code to execute
                 else
                 {
-                    string output = await connection.PerformSimpleCodeAsync(input, DuetAPI.CodeChannel.Telnet);
+                    string output = await connection.PerformSimpleCodeAsync(input, DuetAPI.CodeChannel.Telnet, cancellationToken);
                     if (output.EndsWith(Environment.NewLine))
                     {
                         Console.Write(output);
@@ -97,7 +99,7 @@ public static class Commands
         // Unregister this session again (recommended if there is a registered session)
         if (connection.IsConnected)
         {
-            await connection.RemoveUserSessionAsync(sessionId);
+            await connection.RemoveUserSessionAsync(sessionId, cancellationToken);
         }
         return 0;
     }
@@ -105,17 +107,18 @@ public static class Commands
     /// <summary>
     /// Command handler to execute only a single command and exit
     /// </summary>
+    /// <param name="code">Code to execute</param>
     /// <param name="socketPath">UNIX socket path for IPC</param>
     /// <param name="quiet">Run command quietly</param>
-    /// <param name="code">Code to execute</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Exit code</returns>
-    public static async Task<int> ExecAsync(FileInfo socketPath, bool quiet, string code)
+    public static async Task<int> ExecAsync(string code, FileInfo socketPath, bool quiet, CancellationToken cancellationToken)
     {
         // Connect to DCS
         using CommandConnection connection = new();
         try
         {
-            await connection.ConnectAsync(socketPath.FullName);
+            await connection.ConnectAsync(socketPath.FullName, cancellationToken);
         }
         catch (SocketException)
         {
@@ -129,7 +132,7 @@ public static class Commands
         // startUpdate puts DSF into "updating" mode
         if (code.Equals("startUpdate", StringComparison.InvariantCultureIgnoreCase))
         {
-            await connection.SetUpdateStatusAsync(true);
+            await connection.SetUpdateStatusAsync(true, cancellationToken);
             if (!quiet)
             {
                 Console.WriteLine("DSF is now in update mode");
@@ -139,7 +142,7 @@ public static class Commands
         // endUpdate takes DSF out of "updating" mode
         else if (code.Equals("endUpdate", StringComparison.InvariantCultureIgnoreCase))
         {
-            await connection.SetUpdateStatusAsync(false);
+            await connection.SetUpdateStatusAsync(false, cancellationToken);
             if (!quiet)
             {
                 Console.WriteLine("DSF is no longer in update mode");

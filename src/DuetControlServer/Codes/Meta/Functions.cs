@@ -25,6 +25,7 @@ public class Functions
     /// Initializer function to register custom meta G-code functions
     /// </summary>
     /// <param name="expressions">Expressions to register the functions with</param>
+    /// <param name="filePathResolver">File path resolver</param>
     /// <param name="filter">Object model filter</param>
     /// <param name="linkInterface">Link interface</param>
     public Functions(Expressions expressions, FilePathResolver filePathResolver, Filter filter, LinkInterface linkInterface)

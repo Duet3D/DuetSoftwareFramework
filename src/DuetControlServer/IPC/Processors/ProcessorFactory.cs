@@ -4,6 +4,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DuetControlServer.IPC.Processors;
 
+/// <summary>
+/// Factory to create new IPC processor instances
+/// </summary>
+/// <param name="serviceProvider">Service provider</param>
 public class ProcessorFactory(IServiceProvider serviceProvider)
 {
     /// <summary>

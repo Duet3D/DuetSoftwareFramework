@@ -41,6 +41,7 @@ public partial class Observer
     /// Function to generate a property change handler
     /// </summary>
     /// <param name="hasVariableModelObjects">Whether this instance has any variable model objects</param>
+    /// <param name="hasVariableObservableCollections">Whether this instance has any variable observable collections</param>
     /// <param name="path">Property path</param>
     /// <returns>Property change handler</returns>
     private PropertyChangedEventHandler PropertyChanged(bool hasVariableModelObjects, bool hasVariableObservableCollections, object[] path)

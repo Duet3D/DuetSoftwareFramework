@@ -6,93 +6,181 @@ using System.IO;
 using System.Threading.Tasks;
 
 // Main CLI arguments
-var socketPath = new Option<FileInfo>(
-    aliases: ["-s", "--socket"],
-    description: "UNIX socket to connect to",
-    getDefaultValue: () => new FileInfo(Defaults.FullSocketPath)
-);
+Option<FileInfo> socketPathOption = new("--socket", "-s")
+{
+    Description = "UNIX socket to connect to",
+    DefaultValueFactory = _ => new FileInfo(Defaults.FullSocketPath)
+};
 
-var quiet = new Option<bool>(
-    aliases: ["-q", "--quiet"],
-    description: "Do not output control messages"
-);
+Option<bool> quietOption = new("--quiet", "-q")
+{
+    Description = "Do not output control messages"
+};
 
-var id = new Argument<string>("id", "Plugin ID to reload");
+Argument<string> idArgument = new("id")
+{
+    Description = "Plugin identifier"
+};
 
 // List command
-var listCommand = new Command("list", "List plugin status");
-listCommand.SetHandler(Commands.ListAsync, socketPath);
+Command listCommand = new("list", "List plugin status")
+{
+    socketPathOption
+};
+listCommand.SetAction((parserResult, token) =>
+{
+    FileInfo socketPathValue = parserResult.GetRequiredValue(socketPathOption);
+    return Commands.ListAsync(socketPathValue, token);
+});
 
-var listDataCommand = new Command("list-data", "List plugin data");
-listDataCommand.SetHandler(Commands.ListDataAsync, socketPath);
+// List data command
+Command listDataCommand = new("list-data", "List plugin data")
+{
+    socketPathOption
+};
+listDataCommand.SetAction((parserResult, token) => {
+    FileInfo socketPathValue = parserResult.GetRequiredValue(socketPathOption);
+    return Commands.ListDataAsync(socketPathValue, token);
+});
 
 // Install command
-var zipFile = new Argument<FileInfo>("file", "ZIP file to install");
-var installCommand = new Command("install", "Install new ZIP bundle")
+Argument<FileInfo> zipFileOption = new("file")
 {
-    zipFile
+    Description = "ZIP file to install"
 };
-installCommand.SetHandler(Commands.InstallAsync, socketPath, quiet, zipFile);
+Command installCommand = new("install", "Install new ZIP bundle")
+{
+    socketPathOption,
+    quietOption,
+    zipFileOption
+};
+installCommand.SetAction((parserResult, token) =>
+{
+    FileInfo socketPathValue = parserResult.GetRequiredValue(socketPathOption);
+    bool quietValue = parserResult.GetValue(quietOption);
+    FileInfo zipFileValue = parserResult.GetRequiredValue(zipFileOption);
+    return Commands.InstallAsync(socketPathValue, quietValue, zipFileValue, token);
+});
 
 // Reload command
-var reloadCommand = new Command("reload", "Reload a plugin manifest")
+Command reloadCommand = new("reload", "Reload a plugin manifest")
 {
-    id
+    idArgument
 };
-reloadCommand.SetHandler(Commands.ReloadAsync, socketPath, quiet, id);
+reloadCommand.SetAction((parserResult, token) =>
+{
+    FileInfo socketPathValue = parserResult.GetRequiredValue(socketPathOption);
+    bool quietValue = parserResult.GetValue(quietOption);
+    string idValue = parserResult.GetRequiredValue(idArgument);
+    return Commands.ReloadAsync(socketPathValue, quietValue, idValue, token);
+});
 
 // Start command
 var startCommand = new Command("start", "Start a plugin")
 {
-    id
+    idArgument
 };
-startCommand.SetHandler(Commands.StartAsync, socketPath, quiet, id);
+startCommand.SetAction((parserResult, token) =>
+{
+    FileInfo socketPathValue = parserResult.GetRequiredValue(socketPathOption);
+    bool quietValue = parserResult.GetValue(quietOption);
+    string idValue = parserResult.GetRequiredValue(idArgument);
+    return Commands.StartAsync(socketPathValue, quietValue, idValue, token);
+});
 
 // Set data command
-var key = new Argument<string>("key", "Key to set");
-var value = new Argument<string>("value", "Value to set");
+Argument<string> keyArgument = new("key")
+{
+    Description = "Key to set"
+};
+Argument<string> valueArgument = new("value")
+{
+    Description = "Value to set"
+};
 
 var setDataCommand = new Command("set-data", "Set plugin data")
 {
-    id,
-    key,
-    value
+    socketPathOption,
+    quietOption,
+    idArgument,
+    keyArgument,
+    valueArgument
 };
-setDataCommand.SetHandler(Commands.SetDataAsync, socketPath, quiet, id, key, value);
+setDataCommand.SetAction((parserResult, token) =>
+{
+    FileInfo socketPathValue = parserResult.GetRequiredValue(socketPathOption);
+    bool quietValue = parserResult.GetValue(quietOption);
+    string idValue = parserResult.GetRequiredValue(idArgument);
+    string keyValue = parserResult.GetRequiredValue(keyArgument);
+    string valueValue = parserResult.GetRequiredValue(valueArgument);
+    return Commands.SetDataAsync(socketPathValue, quietValue, idValue, keyValue, valueValue, token);
+});
 
 // Stop command
 var stopCommand = new Command("stop", "Stop a plugin")
 {
-    id
+    socketPathOption,
+    quietOption,
+    idArgument
 };
-stopCommand.SetHandler(Commands.StopAsync, socketPath, quiet, id);
+stopCommand.SetAction((parserResult, token) =>
+{
+    FileInfo socketPathValue = parserResult.GetRequiredValue(socketPathOption);
+    bool quietValue = parserResult.GetValue(quietOption);
+    string idValue = parserResult.GetRequiredValue(idArgument);
+    return Commands.StopAsync(socketPathValue, quietValue, idValue, token);
+});
 
 // Uninstall command
 var uninstallCommand = new Command("uninstall", "Uninstall a plugin")
 {
-    id
+    socketPathOption,
+    quietOption,
+    idArgument
 };
-uninstallCommand.SetHandler(Commands.UninstallAsync, socketPath, quiet, id);
+uninstallCommand.SetAction((parserResult, token) =>
+{
+    FileInfo socketPathValue = parserResult.GetRequiredValue(socketPathOption);
+    bool quietValue = parserResult.GetValue(quietOption);
+    string idValue = parserResult.GetRequiredValue(idArgument);
+    return Commands.UninstallAsync(socketPathValue, quietValue, idValue, token);
+});
 
 // Is installed command
 var isInstalledCommand = new Command("is-installed", "Check if a plugin is installed")
 {
-    id
+    socketPathOption,
+    quietOption,
+    idArgument
 };
-isInstalledCommand.SetHandler(Commands.IsInstalledAsync, socketPath, quiet, id);
+isInstalledCommand.SetAction((parseResult, token) =>
+{
+    FileInfo socketPathValue = parseResult.GetRequiredValue(socketPathOption);
+    bool quietValue = parseResult.GetValue(quietOption);
+    string idValue = parseResult.GetRequiredValue(idArgument);
+    return Commands.IsInstalledAsync(socketPathValue, quietValue, idValue, token);
+});
 
 // Is started command
 var isStartedCommand = new Command("is-started", "Check if a plugin is started")
 {
-    id
+    socketPathOption,
+    quietOption,
+    idArgument
 };
-isStartedCommand.SetHandler(Commands.IsStartedAsync, socketPath, quiet, id);
+isStartedCommand.SetAction((parseResult, token) =>
+{
+    FileInfo socketPathValue = parseResult.GetRequiredValue(socketPathOption);
+    bool quietValue = parseResult.GetValue(quietOption);
+    string idValue = parseResult.GetRequiredValue(idArgument);
+    return Commands.IsStartedAsync(socketPathValue, quietValue, idValue, token);
+});
 
 // Root command
 var rootCommand = new RootCommand("Manage installed third-party DSF plugins")
 {
-    socketPath,
-    quiet,
+    socketPathOption,
+    quietOption,
     listDataCommand,
     installCommand,
     reloadCommand,
@@ -103,10 +191,10 @@ var rootCommand = new RootCommand("Manage installed third-party DSF plugins")
     isInstalledCommand,
     isStartedCommand
 };
-rootCommand.SetHandler(() =>
+rootCommand.SetAction((parseResult) =>
 {
-    Console.Error.WriteLine("No command specified");
-    return Task.FromResult(1);
+    parseResult.RootCommandResult.AddError("No command specified");
+    return 1;
 });
 
-await rootCommand.InvokeAsync(args);
+return new CommandLineConfiguration(rootCommand).Invoke(args);

@@ -1140,7 +1140,7 @@ public class MCodeHandler(
                         }
 
                         // Terminate the program - or - restart the plugins when done
-                        if (_settings.UpdateOnly || !_settings.NoTerminateOnReset)
+                        if (_settings.UpdateOnly)
                         {
                             _ = code.Task.ContinueWith(async task =>
                             {
@@ -1289,9 +1289,9 @@ public class MCodeHandler(
 
             // Reset controller
             case 999:
-                if (!_settings.NoTerminateOnReset && code.Parameters.Count == 0)
+                if (code.Parameters.Count == 0)
                 {
-                    // DCS is supposed to terminate via M999 unless this option is explicitly disabled
+                    // DCS is supposed to terminate via M999. Do this when M999 has finished executing
                     _ = code.Task.ContinueWith(async task =>
                     {
                         await task;

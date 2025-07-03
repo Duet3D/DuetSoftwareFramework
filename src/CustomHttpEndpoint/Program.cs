@@ -8,56 +8,65 @@ using System.Runtime.Versioning;
 [assembly: UnsupportedOSPlatform("windows")]
 
 // General arguments
-var socketPath = new Option<FileInfo>(
-    aliases: ["-s", "--socket"],
-    description: "UNIX socket to connect to",
-    getDefaultValue: () => new FileInfo(Defaults.FullSocketPath)
-);
+Option<FileInfo> socketPathOption = new("--socket", "-s")
+{
+    Description = "UNIX socket to connect to",
+    DefaultValueFactory = _ => new FileInfo(Defaults.FullSocketPath)
+};
 
-var quiet = new Option<bool>(
-    aliases: ["-q", "--quiet"],
-    description: "Do not output any messages"
-);
+Option<bool> quietOption = new("--quiet", "-q")
+{
+    Description = "Do not output any messages",
+};
 
 // Main command
-var method = new Option<HttpEndpointType>(
-    aliases: ["-m", "--method"],
-    description: "HTTP method to use",
-    getDefaultValue: () => HttpEndpointType.GET
-);
-
-var ns = new Option<string>(
-    aliases: ["-n", "--namespace"],
-    description: "Namespace to use",
-    getDefaultValue: () => "custom-http-endpoint"
-);
-
-var path = new Option<string>(
-    aliases: ["-p", "--path"],
-    description: "HTTP query path",
-    getDefaultValue: () => "demo"
-);
-
-var cmd = new Option<string>(
-    aliases: ["-e", "--exec"],
-    description: "Command to execute when an HTTP query is received, stdout and stderr are returned as the response body"
-);
-
-var cmdArgs = new Option<string>(
-    aliases: ["-a", "--args"],
-    description: "Arguments for the executable command. Query values in % chars are replaced with query options (e.g. %myvalue%). Not applicable for WebSockets"
-);
-
-var rootCommand = new RootCommand("Create a custom HTTP endpoint in the format /machine/{namespace}/{path}")
+Option<HttpEndpointType> methodOption = new("--method", "-m")
 {
-    socketPath,
-    quiet,
-    method,
-    ns,
-    path,
-    cmd,
-    cmdArgs
+    Description = "HTTP method to use",
+    DefaultValueFactory = _ => HttpEndpointType.GET
 };
-rootCommand.SetHandler(Commands.MainAsync, socketPath, quiet, method, ns, path, cmd, cmdArgs);
 
-return await rootCommand.InvokeAsync(args);
+Option<string> namespaceOption = new("--namespace", "-n")
+{
+    Description = "Namespace to use",
+    DefaultValueFactory = _ => "custom-http-endpoint"
+};
+
+Option<string> pathOption = new("--path", "-p")
+{
+    Description = "HTTP query path",
+    DefaultValueFactory = _ => "demo"
+};
+
+Option<string> execOption = new("--exec", "-e")
+{
+    Description = "Command to execute when an HTTP query is received, stdout and stderr are returned as the response body"
+};
+
+Option<string> execArgsOption = new("--args", "-a")
+{
+    Description = "Arguments for the executable command. Query values in % chars are replaced with query options (e.g. %myvalue%). Not applicable for WebSockets"
+};
+
+RootCommand rootCommand = new("Create a custom HTTP endpoint in the format /machine/{namespace}/{path}")
+{
+    socketPathOption,
+    quietOption,
+    methodOption,
+    namespaceOption,
+    pathOption,
+    execOption,
+    execArgsOption
+};
+rootCommand.SetAction((parserResult, token) => {
+    FileInfo socketPathValue = parserResult.GetRequiredValue(socketPathOption);
+    bool quietValue = parserResult.GetValue(quietOption);
+    HttpEndpointType methodValue = parserResult.GetRequiredValue(methodOption);
+    string namespaceValue = parserResult.GetRequiredValue(namespaceOption);
+    string pathValue = parserResult.GetRequiredValue(pathOption);
+    string? execValue = parserResult.GetValue(execOption);
+    string? execArgsValue = parserResult.GetValue(execArgsOption);
+    return Commands.MainAsync(socketPathValue, quietValue, methodValue, namespaceValue, pathValue, execValue, execArgsValue, token);
+});
+
+return new CommandLineConfiguration(rootCommand).Invoke(args);

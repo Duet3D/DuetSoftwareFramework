@@ -25,7 +25,7 @@ namespace DuetControlServer.IPC;
 /// Constructor for new connections
 /// </remarks>
 /// <param name="socket">New UNIX socket</param>
-/// <param name="serviceProvider">Service provider for command activation</param>
+/// <param name="commandFactory">Command factory to create commands</param>
 public sealed class Connection(Socket socket, CommandFactory commandFactory) : IDisposable
 {
     /// <summary>
@@ -74,7 +74,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
     /// </summary>
     /// <param name="model">Object model</param>
     /// <returns>True if permissions could be assigned</returns>
-    public async Task<bool> AssignPermissions(Model.ObjectModel model)
+    public async Task<bool> AssignPermissionsAsync(Model.ObjectModel model)
     {
         UnixSocket.GetPeerCredentials(out int pid, out int uid, out int gid);
 
@@ -244,7 +244,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
             catch (JsonException e)
             {
                 _logger.Error(e, "IPC#{0}: Received malformed JSON", Id);
-                await SendResponse(e);
+                await SendResponseAsync(e);
             }
         }
         while (true);
@@ -313,7 +313,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
             catch (JsonException e)
             {
                 _logger.Error(e, "IPC#{0}: Received malformed JSON", Id);
-                await SendResponse(e);
+                await SendResponseAsync(e);
             }
         }
         while (true);
@@ -419,7 +419,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
     /// <param name="result">Object to send</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="SocketException">Message could not be sent</exception>
-    public async Task SendResponse(object? result = null)
+    public async Task SendResponseAsync(object? result = null)
     {
         if (result == null)
         {
@@ -447,7 +447,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
     /// <param name="e">Exception to send</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="SocketException">Message could not be sent</exception>
-    public Task SendException(Exception e)
+    public Task SendExceptionAsync(Exception e)
     {
         if (e is AggregateException ae)
         {
@@ -462,10 +462,9 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
     /// Send a command to the client
     /// </summary>
     /// <param name="command">Command to send</param>
-    /// <typeparam name="T">Base type of the command</typeparam>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="SocketException">Message could not be sent</exception>
-    public Task SendCommand(BaseCommand command)
+    public Task SendCommandAsync(BaseCommand command)
     {
         // Get base type for serialization
         Type baseType;
@@ -494,7 +493,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
     /// <param name="data">Data to send</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="SocketException">Message could not be sent</exception>
-    public Task SendRawData(byte[] data)
+    public Task SendRawDataAsync(byte[] data)
     {
         _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(data)}");
         return UnixSocket.SendAsync(data, SocketFlags.None);
@@ -506,7 +505,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
     /// <param name="msg">Message to send</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="SocketException">Message could not be sent</exception>
-    public Task SendInitMessage(InitMessage msg)
+    public Task SendInitMessageAsync(InitMessage msg)
     {
         byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(msg, msg.GetType(), ConnectionContext.Default);
         _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(toSend)}");

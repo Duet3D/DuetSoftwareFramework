@@ -31,18 +31,7 @@ public sealed class InstallSystemPackage(CommandFactory commandFactory, IOptions
         StopPlugins stopCommand = commandFactory.Create<StopPlugins>();
         await stopCommand.ExecuteAsync(cancellationToken);
 
-        try
-        {
-            // Forward this command to the plugin services
-            await PluginService.PerformCommandAsync(this, true, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            // This exception can be expected when RRF has been updated
-            if (settings.Value.NoTerminateOnReset)
-            {
-                throw;
-            }
-        }
+        // Forward this command to the plugin services
+        await PluginService.PerformCommandAsync(this, true, cancellationToken);
     }
 }

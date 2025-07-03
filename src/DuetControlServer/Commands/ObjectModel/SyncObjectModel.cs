@@ -7,7 +7,7 @@ namespace DuetControlServer.Commands;
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.SyncObjectModel"/> command
 /// </summary>
-/// <param name="updateInterface">Update interface</param>
+/// <param name="model">Object model</param>
 public sealed class SyncObjectModel(ObjectModel model) : DuetAPI.Commands.SyncObjectModel
 {
     /// <summary>

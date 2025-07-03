@@ -69,8 +69,8 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
             Dictionary<string, Task<object?>> evaluationTasks = [];
 
             // Parse the file
-            await ParseHeader(fileStream, readThumbnailContent, evaluationTasks, result, cancellationToken);
-            await ParseFooter(fileStream, result, cancellationToken);
+            await ParseHeaderAsync(fileStream, readThumbnailContent, evaluationTasks, result, cancellationToken);
+            await ParseFooterAsync(fileStream, result, cancellationToken);
 
             // Wait for key-value evaluation tasks to finish and add the results
             foreach (KeyValuePair<string, Task<object?>> kvp in evaluationTasks)
@@ -112,8 +112,9 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
     /// <param name="readThumbnailContent">Whether thumbnail content shall be returned</param>
     /// <param name="userDefinedKeys">User-defined keys and the corresponding evaluation task</param>
     /// <param name="partialFileInfo">G-code file information</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    private async Task ParseHeader(Stream stream, bool readThumbnailContent, Dictionary<string, Task<object?>> userDefinedKeys, GCodeFileInfo partialFileInfo, CancellationToken cancellationToken)
+    private async Task ParseHeaderAsync(Stream stream, bool readThumbnailContent, Dictionary<string, Task<object?>> userDefinedKeys, GCodeFileInfo partialFileInfo, CancellationToken cancellationToken)
     {
         Code code = codeFactory.Create();
         CodeParserBuffer codeParserBuffer = new(settings.Value.FileBufferSize, true);
@@ -155,8 +156,9 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
     /// </summary>
     /// <param name="stream">Stream</param>
     /// <param name="partialFileInfo">G-code file information</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    private async Task ParseFooter(Stream stream, GCodeFileInfo partialFileInfo, CancellationToken cancellationToken)
+    private async Task ParseFooterAsync(Stream stream, GCodeFileInfo partialFileInfo, CancellationToken cancellationToken)
     {
         stream.Seek(0, SeekOrigin.End);
         ReadLineFromEndData readData = new(stream.Position, settings.Value.FileBufferSize);
@@ -228,13 +230,13 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
     /// <summary>
     /// Result for wrapping the buffer pointer because ref parameters are not supported for async functions
     /// </summary>
-    /// <param name="filePosition">Current file position</param>
     private class ReadLineFromEndData
     {
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="filePosition">File position</param>
+        /// <param name="fileBufferSize">File buffer size</param>
         public ReadLineFromEndData(long filePosition, int fileBufferSize)
         {
             FilePosition = filePosition;
@@ -270,7 +272,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
     /// <param name="readData">Data about the read progress while reading backwards</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Whether another line could be read</returns>
-    private async ValueTask<bool> ReadLineFromEndAsync(Stream stream, byte[] buffer, ReadLineFromEndData readData, CancellationToken cancellationToken)
+    private static async ValueTask<bool> ReadLineFromEndAsync(Stream stream, byte[] buffer, ReadLineFromEndData readData, CancellationToken cancellationToken)
     {
         int bytesRead = 0;
         for(;;)

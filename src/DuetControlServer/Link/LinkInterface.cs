@@ -57,7 +57,7 @@ public sealed partial class LinkInterface(
     internal TaskCompletionSource? StopPrintRequest;
 
     // Miscellaneous requests
-    public readonly Queue<Tuple<MessageTypeFlags, string>> MessagesToSend = new();
+    internal readonly Queue<Tuple<MessageTypeFlags, string>> MessagesToSend = new();
 
     /// <summary>
     /// Print diagnostics of this class
@@ -74,16 +74,13 @@ public sealed partial class LinkInterface(
     /// </summary>
     /// <param name="key">Key to request</param>
     /// <param name="flags">Object model flags</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Deserialized JSON document</returns>
     public Task<byte[]> RequestObjectModel(string key, string flags, CancellationToken cancellationToken = default)
     {
         if (cancellationToken.IsCancellationRequested)
         {
             return Task.FromCanceled<byte[]>(cancellationToken);
-        }
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
         }
 
         ModelQueryRequest request = new(key, flags);
@@ -110,10 +107,6 @@ public sealed partial class LinkInterface(
         if (cancellationToken.IsCancellationRequested)
         {
             return Task.FromCanceled<object?>(cancellationToken);
-        }
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
         }
         if (linkAdapter.ProtocolVersion == 1)
         {
@@ -150,6 +143,7 @@ public sealed partial class LinkInterface(
     /// <param name="createVariable">Whether the variable shall be created</param>
     /// <param name="varName">Name of the variable</param>
     /// <param name="expression">Expression to evaluate</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Result of the evaluated expression</returns>
     /// <exception cref="CodeParserException">Failed to assign or delete variable</exception>
     /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
@@ -200,11 +194,6 @@ public sealed partial class LinkInterface(
     /// <returns>Whether the codes have been flushed successfully</returns>
     public async Task<bool> FlushAsync(CodeChannel channel, bool flushAll, CancellationToken cancellationToken = default)
     {
-        if (settings.Value.NoSpi)
-        {
-            return true;
-        }
-
         Task<bool> flushTask;
         using (await channels[channel].LockAsync(cancellationToken))
         {
@@ -221,11 +210,6 @@ public sealed partial class LinkInterface(
     /// <returns>Whether the codes have been flushed successfully</returns>
     public async Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
     {
-        if (settings.Value.NoSpi)
-        {
-            return true;
-        }
-
         Task<bool> flushTask;
         using (await channels[file.Channel].LockAsync(cancellationToken))
         {
@@ -243,11 +227,6 @@ public sealed partial class LinkInterface(
     /// <returns>Whether the codes have been flushed successfully</returns>
     public async Task<bool> FlushAsync(Code code, CancellationToken cancellationToken = default)
     {
-        if (settings.Value.NoSpi)
-        {
-            return true;
-        }
-
         Task<bool> flushTask;
         using (await channels[code.Channel].LockAsync(cancellationToken))
         {
@@ -281,10 +260,6 @@ public sealed partial class LinkInterface(
     public async Task EmergencyStopAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
 
         Task onFirmwareHalted;
         using (await FirmwareActionLock.LockAsync(cancellationToken))
@@ -303,10 +278,6 @@ public sealed partial class LinkInterface(
     public async Task ResetFirmwareAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
 
         Task onFirmwareReset;
         using (await FirmwareActionLock.LockAsync(cancellationToken))
@@ -339,11 +310,6 @@ public sealed partial class LinkInterface(
     /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
     public async Task SetPrintFileInfo()
     {
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
-
         Task task;
         using (await PrintStateLock.LockAsync())
         {
@@ -362,11 +328,6 @@ public sealed partial class LinkInterface(
     /// <exception cref="OperationCanceledException">Connection lost while trying to notify RRF</exception>
     public async Task StopPrint(PrintStoppedReason reason)
     {
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
-
         Task onPrintStopped;
         using (await PrintStateLock.LockAsync())
         {
@@ -381,6 +342,7 @@ public sealed partial class LinkInterface(
     /// Class representing an acquired movement lock
     /// </summary>
     /// <param name="channel">Locked code channel</param>
+    /// <param name="linkInterface">Link interface</param>
     private class MovementLock(CodeChannel channel, LinkInterface linkInterface) : IAsyncDisposable
     {
         /// <summary>
@@ -403,11 +365,6 @@ public sealed partial class LinkInterface(
     /// <exception cref="OperationCanceledException">Failed to get movement lock</exception>
     public async Task<IAsyncDisposable> LockAllMovementSystemsAndWaitForStandstill(CodeChannel channel)
     {
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
-
         Task<bool> lockTask;
         using (await channels[channel].LockAsync())
         {
@@ -429,11 +386,6 @@ public sealed partial class LinkInterface(
     /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
     internal async Task UnlockAll(CodeChannel channel)
     {
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
-
         Task unlockTask;
         using (await channels[channel].LockAsync())
         {
@@ -474,11 +426,6 @@ public sealed partial class LinkInterface(
     /// <returns>Asynchronous task</returns>
     public async Task UpdateFirmware(Stream iapStream, Stream firmwareStream)
     {
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
-
         TaskCompletionSource tcs;
         using (await FirmwareUpdateLock.LockAsync())
         {
@@ -505,10 +452,6 @@ public sealed partial class LinkInterface(
     /// <exception cref="ArgumentException">Invalid parameter</exception>
     public void SendMessage(MessageTypeFlags flags, string message)
     {
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
         if (linkAdapter.ProtocolVersion == 1)
         {
             throw new NotSupportedException("Incompatible firmware version");
@@ -532,11 +475,6 @@ public sealed partial class LinkInterface(
     /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
     public async Task AbortAllAsync(CodeChannel channel)
     {
-        if (settings.Value.NoSpi)
-        {
-            throw new InvalidOperationException("Not connected over SPI");
-        }
-
         using (await channels[channel].LockAsync())
         {
             await channels[channel].AbortAllFilesAsync();

@@ -1,6 +1,7 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.IPC.Processors;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 using System;
@@ -93,9 +94,10 @@ public sealed class StartPlugin(CommandFactory commandFactory, Model.ObjectModel
                 }
 
                 // Check the required DSF version
-                if (!PluginManifest.CheckVersion(Program.Version, plugin.SbcDsfVersion!))
+                string version = VersionHelper.GetVersion();
+                if (!PluginManifest.CheckVersion(version, plugin.SbcDsfVersion!))
                 {
-                    throw new ArgumentException($"Incompatible DSF version (requires {plugin.SbcDsfVersion}, got {Program.Version})");
+                    throw new ArgumentException($"Incompatible DSF version (requires {plugin.SbcDsfVersion}, got {version})");
                 }
 
                 // Check the required RRF version

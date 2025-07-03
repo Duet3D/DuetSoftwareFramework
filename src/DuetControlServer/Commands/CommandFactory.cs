@@ -32,6 +32,7 @@ public class CommandFactory(IServiceProvider serviceProvider)
     /// </summary>
     /// <param name="commandName">Command name</param>
     /// <param name="commandData">Command data</param>
+    /// <param name="supportedCommands">List of supported command types</param>
     /// <returns>Command instance</returns>
     /// <exception cref="ArgumentException">Unsupported command</exception>
     public BaseCommand Create(string commandName, JsonElement commandData, Type[] supportedCommands)
@@ -48,7 +49,8 @@ public class CommandFactory(IServiceProvider serviceProvider)
     /// Create a new command instance from the given JSON reader
     /// </summary>
     /// <param name="commandName">Command name</param>
-    /// <param name="commandData">Command data</param>
+    /// <param name="reader">JSON reader</param>
+    /// <param name="supportedCommands">List of supported command types</param>
     /// <returns>Command instance</returns>
     /// <exception cref="ArgumentException">Unsupported command</exception>
     public BaseCommand Create(string commandName, ref Utf8JsonReader reader, Type[] supportedCommands)

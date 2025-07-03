@@ -25,6 +25,9 @@ public sealed class PipelineStackItem
     /// </summary>
     /// <param name="pipeline">Pipeline holding this stack item</param>
     /// <param name="file">Current file or null if not present</param>
+    /// <param name="codeProcessor">Code processor</param>
+    /// <param name="settings">Settings to use</param>
+    /// <param name="lifetime">Host application lifetime</param>
     public PipelineStackItem(PipelineBase pipeline, CodeFile? file, CodeProcessor codeProcessor, Settings settings, IHostApplicationLifetime lifetime)
     {
         _pipeline = pipeline;

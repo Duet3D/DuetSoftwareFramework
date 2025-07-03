@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Utility;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
@@ -56,7 +57,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
         SBC.CPU.NumCores = GetCpuNumCores();
         SBC.DSF.BuildDateTime = buildAttribute.Date ?? "unknown build time";
         SBC.DSF.Is64Bit = Environment.Is64BitProcess;
-        SBC.DSF.Version = Program.Version;
+        SBC.DSF.Version = VersionHelper.GetVersion();
         SBC.DSF.PluginSupport = settings.Value.PluginSupport;
         SBC.DSF.RootPluginSupport = settings.Value.PluginSupport && settings.Value.RootPluginSupport;
         SBC.Memory.Total = GetTotalMemory();
@@ -458,7 +459,6 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// <summary>
     /// Wait for the model to be fully updated from RepRapFirmware
     /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
     public void WaitForFullUpdate()
     {
         using (_updateLock.Lock())

@@ -1,13 +1,10 @@
-﻿using DuetAPI.Utility;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NLog;
 using NLog.Config;
 using NLog.Targets;
-using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -36,7 +33,14 @@ public sealed class Settings
     /// <summary>
     /// Path to the configuration file
     /// </summary>
+    [JsonIgnore]
     public string ConfigFile = DefaultConfigFile;
+
+    /// <summary>
+    /// Indicates if this program is only launched to update the board firmware
+    /// </summary>
+    [JsonIgnore]
+    public bool UpdateOnly { get; set; }
 
     /// <summary>
     /// Default regular expression flags used for parsing G-code files
@@ -47,24 +51,6 @@ public sealed class Settings
     /// Defines whether the mainboard and expansion boards may be updated automatically during unattended upgrades
     /// </summary>
     public bool AutoUpdateFirmware { get; set; } = true;
-
-    /// <summary>
-    /// Indicates if this program is only launched to update the board firmware
-    /// </summary>
-    [JsonIgnore]
-    public bool UpdateOnly { get; set; }
-
-    /// <summary>
-    /// Do NOT start the SPI task. This is meant entirely for development purposes and should not be used!
-    /// </summary>
-    [JsonIgnore]
-    public bool NoSpi { get; set; }
-
-    /// <summary>
-    /// Path to the configuration file
-    /// </summary>
-    [JsonIgnore]
-    public string ConfigFilename { get; set; } = DefaultConfigFile;
 
     /// <summary>
     /// Whether this DCS instance may support third-party plugins.
@@ -143,11 +129,6 @@ public sealed class Settings
     /// This directory is not created by the DCS package. It is provided by DPS
     /// </remarks>
     public string PluginDirectory { get; set; } = "/opt/dsf/plugins";
-
-    /// <summary>
-    /// Set this to true to prevent M999 from stopping this application
-    /// </summary>
-    public bool NoTerminateOnReset { get; set; }
 
     /// <summary>
     /// Internal model update interval after which properties of the machine model from
@@ -379,7 +360,6 @@ public sealed class Settings
     /// <summary>
     /// Perform final configuration steps
     /// </summary>
-    /// <param name="options">Bound options</param>
     public void PostConfigure()
     {
         if (!File.Exists(ConfigFile) && Directory.Exists(Path.GetDirectoryName(ConfigFile)))
@@ -419,70 +399,11 @@ public sealed class Settings
     private void SaveToFile(string fileName)
     {
         using FileStream fileStream = new(fileName, FileMode.Create, FileAccess.Write, FileShare.None, FileBufferSize);
-        using Utf8JsonWriter writer = new(fileStream, new JsonWriterOptions()
+        JsonSerializer.Serialize(fileStream, this, new JsonSerializerOptions()
         {
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-            Indented = true
+            WriteIndented = true
         });
-
-        writer.WriteStartObject();
-        foreach (PropertyInfo property in typeof(Settings).GetProperties(BindingFlags.Public))
-        {
-            if (!Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
-            {
-                object? value = property.GetValue(this);
-                if (value is string stringValue)
-                {
-                    writer.WriteString(property.Name, stringValue);
-                }
-                else if (value is bool boolValue)
-                {
-                    writer.WriteBoolean(property.Name, boolValue);
-                }
-                else if (value is int intValue)
-                {
-                    writer.WriteNumber(property.Name, intValue);
-                }
-                else if (value is uint uintValue)
-                {
-                    writer.WriteNumber(property.Name, uintValue);
-                }
-                else if (value is float floatValue)
-                {
-                    writer.WriteNumber(property.Name, floatValue);
-                }
-                else if (value is double doubleValue)
-                {
-                    writer.WriteNumber(property.Name, doubleValue);
-                }
-                else if (value is List<Regex> regexList)
-                {
-                    writer.WritePropertyName(property.Name);
-
-                    JsonRegexListConverter regexListConverter = new();
-                    regexListConverter.Write(writer, regexList, null);
-                }
-                else if (value is List<string> stringList)
-                {
-                    writer.WritePropertyName(property.Name);
-                    writer.WriteStartArray();
-                    foreach (string item in stringList)
-                    {
-                        writer.WriteStringValue(item);
-                    }
-                    writer.WriteEndArray();
-                }
-                else if (value is LogLevel logLevelValue)
-                {
-                    writer.WriteString(property.Name, logLevelValue.ToString().ToLowerInvariant());
-                }
-                else
-                {
-                    throw new JsonException($"Unknown value type {property.PropertyType.Name}");
-                }
-            }
-        }
-        writer.WriteEndObject();
     }
 }
 
@@ -495,11 +416,28 @@ public static class ServiceCollectionExtensions
     /// Add settings to the service collection
     /// </summary>
     /// <param name="services">Service collection</param>
+    /// <param name="configuration">Configuration to bind the settings to</param>
+    /// <param name="updateOnly">Whether this instance is only launched to update the firmware</param>
+    /// <param name="logLevel">Log level to use</param>
+    /// <param name="configFile">Path to the configuration file</param>
+    /// <param name="socketDirectory">Directory to create the IPC socket in</param>
+    /// <param name="socketFile">Name of the IPC socket file</param>
+    /// <param name="baseDirectory">Base directory for the virtual SD card</param>
     /// <returns>Service collection</returns>
-    public static IServiceCollection AddSettings(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddSettings(this IServiceCollection services, IConfiguration configuration,
+        bool updateOnly, LogLevel? logLevel, FileInfo? configFile, DirectoryInfo? socketDirectory, string? socketFile, DirectoryInfo? baseDirectory)
     {
         return services
             .Configure<Settings>(configuration)
-            .PostConfigure<Settings>(settings => settings.PostConfigure());
+            .PostConfigure<Settings>(settings =>
+            {
+                settings.UpdateOnly = updateOnly;
+                if (logLevel != null) settings.LogLevel = logLevel;
+                if (configFile != null) settings.ConfigFile = configFile.FullName;
+                if (socketDirectory != null) settings.SocketDirectory = socketDirectory.FullName;
+                if (socketFile != null) settings.SocketFile = socketFile;
+                if (baseDirectory != null) settings.BaseDirectory = baseDirectory.FullName;
+                settings.PostConfigure();
+            });
     }
 }

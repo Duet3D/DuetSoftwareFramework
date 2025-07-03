@@ -15,8 +15,6 @@ namespace DuetControlServer.Codes;
 /// Every instance holds the code pipeline elements through which incoming G/M/T-codes are sent.
 /// Note that code files and events disrupting the code flow require their own stack level to maintain the correct order of code execution.
 /// </summary>
-/// <param name="channel">Channel to process</param>
-/// <param name="serviceProvider">Service provider to use for creating pipeline stages</param>
 public sealed class ChannelProcessor 
 {
     /// <summary>
@@ -42,7 +40,7 @@ public sealed class ChannelProcessor
     /// <summary>
     /// Constructor for the channel processor
     /// </summary>
-    /// <param name="channel">Code channe;</param>
+    /// <param name="channel">Code channel</param>
     /// <param name="serviceProvider">Service provider to create pipeline instances</param>
     public ChannelProcessor(CodeChannel channel, IServiceProvider serviceProvider)
     {
@@ -158,6 +156,7 @@ public sealed class ChannelProcessor
     /// Wait for all pending codes to finish
     /// </summary>
     /// <param name="flushAll">Whether to flush all states</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
     public async Task<bool> FlushAsync(bool flushAll, CancellationToken cancellationToken = default)
     {

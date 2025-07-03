@@ -18,6 +18,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="codeProcessor">Code processor</param>
 /// <param name="expressions">Meta G-code expression parser</param>
 /// <param name="filePathResolver">File path resolver</param>
+/// <param name="linkInterface">Link interface</param>
 /// <param name="settings">Settings</param>
 public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expressions, FilePathResolver filePathResolver, LinkInterface linkInterface, IOptions<Settings> settings) : ICodeHandler
 {
@@ -36,7 +37,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
     /// </summary>
     /// <param name="code">Code to process</param>
     /// <returns>Result of the code if the code completed</returns>
-    /// <exception cref="OperationCanceledException">The code was cancelled</exception></exception>
+    /// <exception cref="OperationCanceledException">The code was cancelled</exception>
     public async ValueTask<Message?> ProcessAsync(Commands.Code code)
     {
         if (code.KeywordArgument is null)

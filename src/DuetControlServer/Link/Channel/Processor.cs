@@ -54,7 +54,8 @@ public sealed class Processor : IAsyncDiagnostics
     /// <param name="codeProcessor">Code processor</param>
     /// <param name="dsfLogger">Logger for DSF messages</param>
     /// <param name="filePathResolver">File path resolver</param>
-    /// <param name="link">Link to the firmware</param>
+    /// <param name="linkAdapter">Link adapter</param>
+    /// <param name="linkInterface">Link interface</param>
     /// <param name="jobProcessor">Job processor</param>
     /// <param name="macroFileFactory">Macro file factory</param>
     /// <param name="model">Object model</param>
@@ -63,8 +64,8 @@ public sealed class Processor : IAsyncDiagnostics
         CodeChannel channel,
         CodeFactory codeFactory,
         CodeProcessor codeProcessor,
-        FilePathResolver filePathResolver,
         Logger dsfLogger,
+        FilePathResolver filePathResolver,
         ILinkAdapter linkAdapter,
         LinkInterface linkInterface,
         JobProcessor jobProcessor,
@@ -484,6 +485,7 @@ public sealed class Processor : IAsyncDiagnostics
     /// Get a flush task
     /// </summary>
     /// <param name="state">Stack item</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     private Task<bool> GetFlushTask(StackState state, CancellationToken cancellationToken = default)
     {
@@ -507,7 +509,6 @@ public sealed class Processor : IAsyncDiagnostics
     /// Flush pending codes and return true on success or false on failure.
     /// This method may be deprecated; in theory it should suffice to flush the pipeline only (with stricter Busy conditions)
     /// </summary>
-    /// <param name="file">Optional code file for the flush target</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes could be flushed</returns>
     public Task<bool> FlushAsync(CancellationToken cancellationToken = default)

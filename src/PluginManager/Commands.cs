@@ -1,7 +1,9 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetAPIClient;
 
@@ -14,13 +16,13 @@ public static class Commands
     /// </summary>
     /// <param name="socketPath">UNIX socket path</param>
     /// <returns>Exit code</returns>
-    public static async Task<int> ListAsync(FileInfo socketPath)
+    public static async Task<int> ListAsync(FileInfo socketPath, CancellationToken cancellationToken)
     {
         // Connect to DCS
         using CommandConnection connection = new();
         try
         {
-            await connection.ConnectAsync(socketPath.FullName);
+            await connection.ConnectAsync(socketPath.FullName, cancellationToken);
         }
         catch (Exception e)
         {
@@ -29,7 +31,7 @@ public static class Commands
         }
 
         // Get the object model
-        var model = await connection.GetObjectModelAsync();
+        var model = await connection.GetObjectModelAsync(cancellationToken);
         if (model.Plugins.Count > 0)
         {
             Console.WriteLine("{0,-24} {1,-16} {2,-16} {3,-24} {4,-24} {5,-12}", "Plugin", "Id", "Version", "Author", "License", "Status");
@@ -59,14 +61,15 @@ public static class Commands
     /// List all data of installed plugins
     /// </summary>
     /// <param name="socketPath">UNIX socket path</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Exit code</returns>
-    public static async Task<int> ListDataAsync(FileInfo socketPath)
+    public static async Task<int> ListDataAsync(FileInfo socketPath, CancellationToken cancellationToken)
     {
         // Connect to DCS
         using CommandConnection connection = new();
         try
         {
-            await connection.ConnectAsync(socketPath.FullName);
+            await connection.ConnectAsync(socketPath.FullName, cancellationToken);
         }
         catch (Exception e)
         {
@@ -75,7 +78,7 @@ public static class Commands
         }
 
         // Get the object model
-        var model = await connection.GetObjectModelAsync();
+        var model = await connection.GetObjectModelAsync(cancellationToken);
         if (model.Plugins.Count > 0)
         {
             foreach (var item in model.Plugins.Values)
@@ -102,16 +105,17 @@ public static class Commands
     /// </summary>
     /// <param name="socketPath">UNIX socket path</param>
     /// <param name="quiet">Disable message output</param>
-    /// <param name="zipfile">ZIP file to install</param>
-    /// <returns></returns>
+    /// <param name="zipFile">ZIP file to install</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
     /// <exception cref="NotImplementedException"></exception>
-    public static async Task InstallAsync(FileInfo socketPath, bool quiet, FileInfo zipFile)
+    public static async Task InstallAsync(FileInfo socketPath, bool quiet, FileInfo zipFile, CancellationToken cancellationToken)
     {
         // Connect to DCS
         using CommandConnection connection = new();
         try
         {
-            await connection.ConnectAsync(socketPath.FullName);
+            await connection.ConnectAsync(socketPath.FullName, cancellationToken);
         }
         catch (Exception e)
         {
@@ -122,7 +126,7 @@ public static class Commands
         // Install the plugin
         try
         {
-            await connection.InstallPluginAsync(zipFile.FullName);
+            await connection.InstallPluginAsync(zipFile.FullName, cancellationToken);
             if (!quiet)
             {
                 Console.WriteLine("Plugin installed");
@@ -137,15 +141,18 @@ public static class Commands
     /// <summary>
     /// Reload a plugin manifest
     /// </summary>
+    /// <param name="socketPath">UNIX socket path</param>
+    /// <param name="quiet">Disable message output</param>
     /// <param name="id">Plugin ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Exit code</returns>
-    public static async Task<int> ReloadAsync(FileInfo socketPath, bool quiet, string id)
+    public static async Task<int> ReloadAsync(FileInfo socketPath, bool quiet, string id, CancellationToken cancellationToken)
     {
         // Connect to DCS
         using CommandConnection connection = new();
         try
         {
-            await connection.ConnectAsync(socketPath.FullName);
+            await connection.ConnectAsync(socketPath.FullName, cancellationToken);
         }
         catch (Exception e)
         {
@@ -156,7 +163,7 @@ public static class Commands
         // Install the plugin
         try
         {
-            await connection.ReloadPluginAsync(id);
+            await connection.ReloadPluginAsync(id, cancellationToken);
             if (!quiet)
             {
                 Console.WriteLine("Plugin manifest reloaded");
@@ -177,14 +184,15 @@ public static class Commands
     /// <param name="socketPath">UNIX socket path</param>
     /// <param name="quiet">Disable message output</param>
     /// <param name="id">Plugin ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Exit code</returns>
-    public static async Task<int> StartAsync(FileInfo socketPath, bool quiet, string id)
+    public static async Task<int> StartAsync(FileInfo socketPath, bool quiet, string id, CancellationToken cancellationToken)
     {
         // Connect to DCS
         using CommandConnection connection = new();
         try
         {
-            await connection.ConnectAsync(socketPath.FullName);
+            await connection.ConnectAsync(socketPath.FullName, cancellationToken);
         }
         catch (Exception e)
         {
@@ -195,7 +203,7 @@ public static class Commands
         // Start the plugin
         try
         {
-            await connection.StartPluginAsync(id);
+            await connection.StartPluginAsync(id, cancellationToken);
             if (!quiet)
             {
                 Console.WriteLine("Plugin started");
@@ -218,14 +226,15 @@ public static class Commands
     /// <param name="id">Plugin ID</param>
     /// <param name="key">Key</param>
     /// <param name="value">Value</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Exit code</returns>
-    public static async Task<int> SetDataAsync(FileInfo socketPath, bool quiet, string id, string key, string value)
+    public static async Task<int> SetDataAsync(FileInfo socketPath, bool quiet, string id, string key, string value, CancellationToken cancellationToken)
     {
         // Connect to DCS
         using CommandConnection connection = new();
         try
         {
-            await connection.ConnectAsync(socketPath.FullName);
+            await connection.ConnectAsync(socketPath.FullName, cancellationToken);
         }
         catch (Exception e)
         {
@@ -239,7 +248,7 @@ public static class Commands
             try
             {
                 using JsonDocument json = JsonDocument.Parse(value);
-                await connection.SetPluginDataAsync(key, json.RootElement, id);
+                await connection.SetPluginDataAsync(key, json.RootElement, id, cancellationToken);
             }
             catch (JsonException)
             {
@@ -266,14 +275,15 @@ public static class Commands
     /// <param name="socketPath">UNIX socket path</param>
     /// <param name="quiet">Disable message output</param>
     /// <param name="id">Plugin ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Exit code</returns>
-    public static async Task<int> StopAsync(FileInfo socketPath, bool quiet, string id)
+    public static async Task<int> StopAsync(FileInfo socketPath, bool quiet, string id, CancellationToken cancellationToken)
     {
         // Connect to DCS
         using CommandConnection connection = new();
         try
         {
-            await connection.ConnectAsync(socketPath.FullName);
+            await connection.ConnectAsync(socketPath.FullName, cancellationToken);
         }
         catch (Exception e)
         {
@@ -284,7 +294,7 @@ public static class Commands
         // Stop the plugin
         try
         {
-            await connection.StopPluginAsync(id);
+            await connection.StopPluginAsync(id, cancellationToken);
             if (!quiet)
             {
                 Console.WriteLine("Plugin stopped");
@@ -299,13 +309,20 @@ public static class Commands
         return 0;
     }
 
-    public static async Task<int> UninstallAsync(FileInfo socketPath, bool quiet, string id)
+    /// <summary>
+    /// Uninstall a plugin
+    /// </summary>
+    /// <param name="socketPath">UNIX socket path</param>
+    /// <param name="quiet">Disable output messages</param>
+    /// <param name="id">Plugin ID</param>
+    /// <returns>Exit code</returns>
+    public static async Task<int> UninstallAsync(FileInfo socketPath, bool quiet, string id, CancellationToken cancellationToken)
     {
         // Connect to DCS
         using CommandConnection connection = new();
         try
         {
-            await connection.ConnectAsync(socketPath.FullName);
+            await connection.ConnectAsync(socketPath.FullName, cancellationToken);
         }
         catch (Exception e)
         {
@@ -316,7 +333,7 @@ public static class Commands
         // Uninstall the plugin
         try
         {
-            await connection.UninstallPluginAsync(id);
+            await connection.UninstallPluginAsync(id, cancellationToken);
             if (!quiet)
             {
                 Console.WriteLine("Plugin uninstalled");
@@ -337,14 +354,15 @@ public static class Commands
     /// <param name="socketPath">UNIX socket path</param>
     /// <param name="quiet">Disable output messages</param>
     /// <param name="id">Plugin ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Exit code</returns>
-    public static async Task<int> IsInstalledAsync(FileInfo socketPath, bool quiet, string id)
+    public static async Task<int> IsInstalledAsync(FileInfo socketPath, bool quiet, string id, CancellationToken cancellationToken)
     {
         // Connect to DCS
         using CommandConnection connection = new();
         try
         {
-            await connection.ConnectAsync(socketPath.FullName);
+            await connection.ConnectAsync(socketPath.FullName, cancellationToken);
         }
         catch (Exception e)
         {
@@ -353,7 +371,7 @@ public static class Commands
         }
 
         // Check if the plugin is installed
-        var model = await connection.GetObjectModelAsync();
+        var model = await connection.GetObjectModelAsync(cancellationToken);
         bool isInstalled = model.Plugins.ContainsKey(id);
         if (!quiet)
         {
@@ -375,14 +393,15 @@ public static class Commands
     /// <param name="socketPath">UNIX socket path</param>
     /// <param name="quiet">Disable output messages</param>
     /// <param name="id">Plugin ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Exit code</returns>
-    public static async Task<int> IsStartedAsync(FileInfo socketPath, bool quiet, string id)
+    public static async Task<int> IsStartedAsync(FileInfo socketPath, bool quiet, string id, CancellationToken cancellationToken)
     {
         // Connect to DCS
         using CommandConnection connection = new();
         try
         {
-            await connection.ConnectAsync(socketPath.FullName);
+            await connection.ConnectAsync(socketPath.FullName, cancellationToken);
         }
         catch (Exception e)
         {
@@ -391,7 +410,7 @@ public static class Commands
         }
 
         // Check if the plugin is started
-        var model = await connection.GetObjectModelAsync();
+        var model = await connection.GetObjectModelAsync(cancellationToken);
         if (model.Plugins.TryGetValue(id, out Plugin pluginItem) && pluginItem.Pid > 0)
         {
             if (!quiet)

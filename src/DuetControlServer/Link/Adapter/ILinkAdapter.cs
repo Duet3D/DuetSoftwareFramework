@@ -27,6 +27,7 @@ public interface ILinkAdapter
     /// Perform a full data transfer synchronously
     /// </summary>
     /// <param name="connecting">Whether this an initial connection is being established</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the transfer</param>
     void PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -60,7 +61,7 @@ public interface ILinkAdapter
     PacketHeader? ReadNextPacket();
 
     /// <summary>
-    /// Read the result of a <see cref="Communication.SbcRequests.Request.GetObjectModel"/> request
+    /// Read the result of a <see cref="Protocol.SbcRequests.GetObjectModel"/> request
     /// </summary>
     /// <param name="json">JSON data</param>
     void ReadObjectModel(out ReadOnlySpan<byte> json);

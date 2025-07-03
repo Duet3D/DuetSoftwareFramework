@@ -138,6 +138,7 @@ public class Server(CommandFactory commandFactory, ProcessorFactory processorFac
     /// Function that is called when a new connection has been established
     /// </summary>
     /// <param name="socket">Socket of the new connection</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
     private async Task ProcessConnectionAsync(Socket socket, CancellationToken cancellationToken)
     {
@@ -146,10 +147,10 @@ public class Server(CommandFactory commandFactory, ProcessorFactory processorFac
         {
             // Check if this connection is permitted
             _logger.Debug("Got new connection IPC#{0}, checking permissions...", connection.Id);
-            if (await connection.AssignPermissions(model))
+            if (await connection.AssignPermissionsAsync(model))
             {
                 // Send server-side init message to the client
-                await connection.SendInitMessage(new ServerInitMessage { Id = connection.Id });
+                await connection.SendInitMessageAsync(new ServerInitMessage { Id = connection.Id });
 
                 // Read client-side init message and switch mode
                 IProcessor? processor = await GetConnectionProcessorAsync(connection, cancellationToken);
@@ -158,7 +159,7 @@ public class Server(CommandFactory commandFactory, ProcessorFactory processorFac
                     try
                     {
                         // Send success message
-                        await connection.SendResponse();
+                        await connection.SendResponseAsync();
 
                         // Let the processor deal with the connection
                         await processor.ProcessAsync(cancellationToken);
@@ -180,7 +181,7 @@ public class Server(CommandFactory commandFactory, ProcessorFactory processorFac
             else
             {
                 _logger.Warn("IPC#{0}: Terminating connection due to insufficient permissions", connection.Id);
-                await connection.SendException(new UnauthorizedAccessException("Insufficient permissions"));
+                await connection.SendExceptionAsync(new UnauthorizedAccessException("Insufficient permissions"));
             }
         }
         catch (Exception e)
@@ -196,7 +197,7 @@ public class Server(CommandFactory commandFactory, ProcessorFactory processorFac
             _logger.Debug("IPC#{0}: Connection closed", connection.Id);
 
             // Unlock the machine model again in case the client application crashed
-            await lockManager.UnlockMachineModel(connection, cancellationToken);
+            lockManager.UnlockMachineModel(connection);
         }
     }
 
@@ -204,6 +205,7 @@ public class Server(CommandFactory commandFactory, ProcessorFactory processorFac
     /// Attempt to retrieve a processor for the given connection asynchronously
     /// </summary>
     /// <param name="conn">Connection to get a processor for</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Instance of a base processor</returns>
     private async Task<IProcessor?> GetConnectionProcessorAsync(Connection conn, CancellationToken cancellationToken)
     {
@@ -218,7 +220,7 @@ public class Server(CommandFactory commandFactory, ProcessorFactory processorFac
             {
                 string message = $"Incompatible protocol version (got {initMessage.Version}, need {MinimumProtocolVersion} to {Defaults.ProtocolVersion})";
                 _logger.Warn("IPC#{0}: {1}", conn.Id, message);
-                await conn.SendResponse(new IncompatibleVersionException(message));
+                await conn.SendResponseAsync(new IncompatibleVersionException(message));
                 return null;
             }
             else if (initMessage.Version != Defaults.ProtocolVersion)
@@ -267,7 +269,7 @@ public class Server(CommandFactory commandFactory, ProcessorFactory processorFac
         catch (Exception e) when (e is not OperationCanceledException and not SocketException)
         {
             _logger.Error(e, "IPC#{0}: Failed to assign connection processor", conn.Id);
-            await conn.SendResponse(e);
+            await conn.SendResponseAsync(e);
         }
 
         return null;

@@ -9,6 +9,7 @@ namespace DuetControlServer.Commands;
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.Flush"/> command
 /// </summary>
+/// <param name="codeProcessor">Code processor</param>
 /// <param name="model">Object model</param>
 public sealed class Flush(CodeProcessor codeProcessor, Model.ObjectModel model) : DuetAPI.Commands.Flush, IConnectionCommand
 {

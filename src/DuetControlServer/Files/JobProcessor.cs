@@ -22,9 +22,6 @@ namespace DuetControlServer.Files;
 /// <summary>
 /// Main class dealing with job files
 /// </summary>
-/// <remarks>
-/// Lock this class whenever it is accessed (except for <see cref="Diagnostics(StringBuilder)"/>)
-/// </remarks>
 [DiagnosticsPriority(-9)]
 public class JobProcessor : IAsyncDiagnostics
 {
@@ -41,17 +38,16 @@ public class JobProcessor : IAsyncDiagnostics
     private readonly IHostApplicationLifetime _lifetime;
 
     /// <summary>
-    /// Constructor
+    /// Constructor of this class
     /// </summary>
     /// <param name="codeFactory">Code factory</param>
     /// <param name="codeProcessor">Code processor</param>
     /// <param name="dsfLogger">Internal logger</param>
     /// <param name="expressions">Expressions</param>
+    /// <param name="fileFactory">File factory</param>
     /// <param name="fileInfoParser">File info parser</param>
-    /// <param name="infoParser">Info parser</param>
     /// <param name="linkInterface">Link interface</param>
     /// <param name="model">Object Model</param>
-    /// <param name="updateInterface">Update interface</param>
     /// <param name="settings">Settings</param>
     /// <param name="lifetime">Host application lifetime</param>
     public JobProcessor(CodeFactory codeFactory,
@@ -716,6 +712,7 @@ public class JobProcessor : IAsyncDiagnostics
     /// Print diagnostics of this class
     /// </summary>
     /// <param name="builder">String builder</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
     public async ValueTask PrintDiagnosticsAsync(StringBuilder builder, CancellationToken cancellationToken)
     {

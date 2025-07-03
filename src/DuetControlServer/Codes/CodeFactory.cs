@@ -10,6 +10,7 @@ namespace DuetControlServer.Codes;
 /// <remarks>
 /// This class is specialized for code instances.
 /// It may be further enhanced to reuse of existing instances.
+/// </remarks>
 /// <param name="serviceProvider">Service provider</param>
 public sealed class CodeFactory(IServiceProvider serviceProvider)
 {
