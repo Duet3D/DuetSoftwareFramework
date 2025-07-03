@@ -35,8 +35,7 @@ void Terminate(Exception e, string reason, int exitCode)
 
 Option<bool> updateOnlyOption = new("--update", "-u")
 {
-    Description = "Update RepRapFirmware and exit. This works even if another instance is already started",
-    DefaultValueFactory = _ => true
+    Description = "Update RepRapFirmware and exit. This works even if another instance is already started"
 };
 Option<NLog.LogLevel> logLevelOption = new("--log-level", "-l")
 {
@@ -92,40 +91,51 @@ rootCommand.SetAction((parserResult) =>
         Console.WriteLine();
     }
 
-    // Start the host application
-    new HostBuilder()
-        .UseNLog()
-        .UseSystemd()
-        .ConfigureAppConfiguration((hostingContext, config) =>
-        {
-            try
+    // Set up the host application
+    IHost host;
+    try
+    {
+        host = new HostBuilder()
+            .UseNLog()
+            .UseSystemd()
+            .ConfigureAppConfiguration((hostingContext, config) =>
             {
-                config
-                    .AddJsonFile(configFileValue.FullName, optional: true)
-                    .AddCommandLine(args);
-            }
-            catch (JsonException je)
-            {
-                Terminate(je, $"Failed to load settings: {je.Message}", ExitCode.Configuration);
-            }
-            catch (Exception e)
-            {
-                Terminate(e, $"Failed to initialize settings: {e.Message}", ExitCode.Usage);
-            }
-        })
-        .ConfigureServices((context, services) => services
-            .AddSettings(context.Configuration, updateOnlyValue, logLevelValue, configFileValue, socketDirectoryValue, socketFileValue, baseDirectoryValue)
-            .AddCodes()
-            .AddCommands()
-            .AddFiles()
-            .AddIPC()
-            .AddLink()
-            .AddModel()
-            .AddSPILink()
-            .AddUtility()
-        )
-        .Build()
-        .Run();
+                try
+                {
+                    config
+                        .AddJsonFile(configFileValue.FullName, optional: true)
+                        .AddCommandLine(args);
+                }
+                catch (JsonException je)
+                {
+                    Terminate(je, $"Failed to load settings: {je.Message}", ExitCode.Configuration);
+                }
+                catch (Exception e)
+                {
+                    Terminate(e, $"Failed to initialize settings: {e.Message}", ExitCode.Usage);
+                }
+            })
+            .ConfigureServices((context, services) => services
+                .AddSettings(context.Configuration, updateOnlyValue, logLevelValue, configFileValue, socketDirectoryValue, socketFileValue, baseDirectoryValue)
+                .AddCodes()
+                .AddCommands()
+                .AddFiles()
+                .AddIPC()
+                .AddLink()
+                .AddModel()
+                .AddSPILink()
+                .AddUtility()
+            )
+            .Build();
+    }
+    catch (Exception e)
+    {
+        Terminate(e, $"Failed to initialize environment: {e.Message}", ExitCode.OsError);
+        return;
+    }
+
+    // Run the host application
+    host.Run();
 });
 
 new CommandLineConfiguration(rootCommand).Invoke(args);
@@ -171,13 +181,6 @@ new CommandLineConfiguration(rootCommand).Invoke(args);
             Codes.Handlers.Functions.Init();
             Model.Provider.Init();
             Model.Observer.Init();
-        }
-        catch (Exception e)
-        {
-            await Terminate($"Failed to initialize environment: {e.Message}");
-            _logger.Debug(e);
-            return ExitCode.OsError;
-        }
 
         // Set up SPI subsystem and connect to RRF controller
         if (Settings.NoSpi)
