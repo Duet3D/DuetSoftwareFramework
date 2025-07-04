@@ -764,8 +764,9 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
     /// </summary>
     /// <param name="filename">Path to the job file</param>
     /// <param name="totalSeconds">Total print or simulated time</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public async Task UpdateSimulatedTime(string filename, int totalSeconds)
+    public async Task UpdateSimulatedTimeAsync(string filename, int totalSeconds, CancellationToken cancellationToken = default)
     {
         // Get the last modified datetime
         DateTime lastWriteTime = File.GetLastWriteTime(filename);
@@ -779,7 +780,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
             if (fileStream.Length >= buffer.Length)
             {
                 fileStream.Seek(-buffer.Length, SeekOrigin.End);
-                int bytesRead = await fileStream.ReadAsync(buffer), offset = 0;
+                int bytesRead = await fileStream.ReadAsync(buffer, cancellationToken), offset = 0;
                 if (bytesRead > 0)
                 {
                     string bufferString = Encoding.UTF8.GetString(buffer[..bytesRead].Span);

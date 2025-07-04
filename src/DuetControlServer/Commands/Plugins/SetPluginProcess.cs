@@ -63,7 +63,7 @@ public sealed class SetPluginProcess(CommandFactory commandFactory, Model.Object
                                 _logger.Error(e, "Failed to auto-restart plugin {0}", Plugin);
                             }
                         }
-                    });
+                    }, cancellationToken);
                 }
                 plugin.Pid = Pid;
                 plugin.Started = Pid > 0 && !plugin.SbcNotifyStarted;

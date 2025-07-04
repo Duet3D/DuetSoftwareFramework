@@ -18,6 +18,7 @@ public static partial class ServiceCollectionExtensions
             .AddSingleton<Parser.FileInfoParser>()
             .AddSingleton<FilePathResolver>()
             .AddSingleton<JobProcessor>()
-            .AddSingleton<FileFactory>();
+            .AddSingleton<FileFactory>()
+            .AddHostedService((provider) => provider.GetRequiredService<JobProcessor>());
     }
 }

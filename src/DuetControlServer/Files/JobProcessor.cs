@@ -23,7 +23,7 @@ namespace DuetControlServer.Files;
 /// Main class dealing with job files
 /// </summary>
 [DiagnosticsPriority(-9)]
-public class JobProcessor : IAsyncDiagnostics
+public class JobProcessor : BackgroundService, IAsyncDiagnostics
 {
     // Private fields
     private readonly CodeProcessor _codeProcessor;
@@ -498,15 +498,15 @@ public class JobProcessor : IAsyncDiagnostics
     /// <summary>
     /// Perform actual print jobs
     /// </summary>
-    public async Task RunAsync()
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         do
         {
             // Wait for the next print to start
             bool startingNewPrint;
-            using (await LockAsync())
+            using (await LockAsync(stoppingToken))
             {
-                await _resume.WaitAsync(_lifetime.ApplicationStopping);
+                await _resume.WaitAsync(stoppingToken);
                 startingNewPrint = !_file!.IsClosed;
                 IsProcessing = startingNewPrint;
             }
@@ -520,7 +520,7 @@ public class JobProcessor : IAsyncDiagnostics
                 Task fileTask = DoFilePrint(_file);
 
                 // In case a forked print is supposed to start, start it here
-                using (await LockAsync())
+                using (await LockAsync(stoppingToken))
                 {
                     if (_file2 is not null && _secondFileTask is null)
                     {
@@ -533,7 +533,7 @@ public class JobProcessor : IAsyncDiagnostics
 
                 // Wait for the forked job to complete (if any)
                 Task? secondFileTask;
-                using (await LockAsync())
+                using (await LockAsync(stoppingToken))
                 {
                     secondFileTask = _secondFileTask;
                     _secondFileTask = null;
@@ -547,7 +547,7 @@ public class JobProcessor : IAsyncDiagnostics
                 // Get the last print result
                 bool isCancelled, isAborted, isSimulating;
                 string physicalFileName;
-                using (await LockAsync())
+                using (await LockAsync(stoppingToken))
                 {
                     isCancelled = IsCancelled;
                     isAborted = IsAborted;
@@ -565,12 +565,12 @@ public class JobProcessor : IAsyncDiagnostics
                     }
                     else if (isAborted)
                     {
-                        await _linkInterface.StopPrint(PrintStoppedReason.Abort);
+                        await _linkInterface.StopPrintAsync(PrintStoppedReason.Abort);
                         _logger.Info("Aborted job file");
                     }
                     else
                     {
-                        await _linkInterface.StopPrint(PrintStoppedReason.NormalCompletion);
+                        await _linkInterface.StopPrintAsync(PrintStoppedReason.NormalCompletion);
                         _logger.Info("Finished job file");
                     }
                 }
@@ -581,7 +581,7 @@ public class JobProcessor : IAsyncDiagnostics
                 }
 
                 // Update special fields that are not available in RRF
-                using (await _model.AccessReadWriteAsync())
+                using (await _model.AccessReadWriteAsync(stoppingToken))
                 {
                     _model.Job.File.CustomInfo.Clear();
                     _model.Job.LastFileAborted = isAborted;
@@ -597,8 +597,8 @@ public class JobProcessor : IAsyncDiagnostics
                     int upTime = 0;
                     while (!_lifetime.ApplicationStopping.IsCancellationRequested)
                     {
-                        await _model.WaitForFullUpdateAsync(_lifetime.ApplicationStopping);
-                        using (await _model.AccessReadOnlyAsync(_lifetime.ApplicationStopping))
+                        await _model.WaitForFullUpdateAsync(stoppingToken);
+                        using (await _model.AccessReadOnlyAsync(stoppingToken))
                         {
                             if (_model.State.UpTime < upTime || _model.Job.LastDuration is not null)
                             {
@@ -612,7 +612,7 @@ public class JobProcessor : IAsyncDiagnostics
                     // Try to update the last simulated time
                     if (lastDuration > 0)
                     {
-                        await _fileInfoParser.UpdateSimulatedTime(physicalFileName, lastDuration.Value);
+                        await _fileInfoParser.UpdateSimulatedTimeAsync(physicalFileName, lastDuration.Value, stoppingToken);
                     }
                     else
                     {
@@ -621,7 +621,7 @@ public class JobProcessor : IAsyncDiagnostics
                 }
             }
 
-            using (await LockAsync())
+            using (await LockAsync(stoppingToken))
             {
                 // We are no longer printing a file...
                 _finished.NotifyAll();
@@ -635,7 +635,7 @@ public class JobProcessor : IAsyncDiagnostics
                 IsProcessing = IsSimulating = IsPaused = false;
             }
         }
-        while (!_lifetime.ApplicationStopping.IsCancellationRequested);
+        while (!stoppingToken.IsCancellationRequested);
     }
 
     /// <summary>

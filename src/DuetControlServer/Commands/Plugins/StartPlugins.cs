@@ -86,7 +86,7 @@ public sealed class StartPlugins(CodeFactory codeFactory,
                     catch (Exception e)
                     {
                         _logger.Debug(e);
-                        await dsfLogger.LogOutputAsync(MessageType.Error, $"Failed to start plugin {pluginName}: {e.Message}");
+                        await dsfLogger.LogOutputAsync(MessageType.Error, $"Failed to start plugin {pluginName}: {e.Message}", cancellationToken);
                     }
                 }
             }

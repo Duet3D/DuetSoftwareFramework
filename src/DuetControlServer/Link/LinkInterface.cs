@@ -326,7 +326,7 @@ public sealed partial class LinkInterface(
     /// <returns>Asynchronous task</returns>
     /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
     /// <exception cref="OperationCanceledException">Connection lost while trying to notify RRF</exception>
-    public async Task StopPrint(PrintStoppedReason reason)
+    public async Task StopPrintAsync(PrintStoppedReason reason)
     {
         Task onPrintStopped;
         using (await PrintStateLock.LockAsync())
