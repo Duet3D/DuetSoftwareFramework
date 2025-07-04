@@ -6,37 +6,27 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.CommandLine;
-using System.CommandLine.Builder;
-using System.CommandLine.Hosting;
-using System.CommandLine.NamingConventionBinder;
-using System.CommandLine.Parsing;
 
-var configOption = new Option<string>(
-    [ "-c", "--config" ],
-    description: "Path to the configuration file",
-    getDefaultValue: () => Settings.DefaultConfigFile);
+Option<string> configOption = new("-c", "--config")
+{
+    Description = "Path to the configuration file",
+    DefaultValueFactory = _ => Settings.DefaultConfigFile
+};
 
-var rootCommand = new RootCommand("Duet Plugin Service")
+RootCommand rootCommand = new("Duet Plugin Service")
 {
     configOption
 };
-rootCommand.Handler = CommandHandler.Create<IHost>(async (host) =>
-{
-    await host.WaitForShutdownAsync();
-});
 
-string configFile = Settings.DefaultConfigFile;
-return await new CommandLineBuilder(rootCommand)
-    .AddMiddleware((context) =>
-    {
-        configFile = context.ParseResult.GetValueForOption(configOption)!;
-    })
-    .UseHost(builder => builder
+rootCommand.SetAction((parserResult) =>
+{
+    string configValue = parserResult.GetValue(configOption) ?? Settings.DefaultConfigFile;
+    new HostBuilder()
         .UseSystemd()
         .ConfigureAppConfiguration((hostingContext, config) =>
         {
             config
-                .AddJsonFile(configFile, optional: true)
+                .AddJsonFile(configValue, optional: true)
                 .AddCommandLine(args);
         })
         .ConfigureServices((context, services) => services
@@ -47,7 +37,8 @@ return await new CommandLineBuilder(rootCommand)
             .AddSingleton<PluginServiceConnection>()
             .AddHostedService<CommandService>()
         )
-    )
-    .UseDefaults()
-    .Build()
-    .InvokeAsync(args);
+        .Build()
+        .Run();
+});
+
+new CommandLineConfiguration(rootCommand).Invoke(args);
