@@ -18,6 +18,7 @@ using NLog.Extensions.Hosting;
 using System;
 using System.CommandLine;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 
 string? startErrorFile = Defaults.StartErrorFile;
@@ -97,7 +98,7 @@ rootCommand.SetAction((parserResult) =>
     IHost host;
     try
     {
-        host = new HostBuilder()
+        host = Host.CreateDefaultBuilder([.. parserResult.UnmatchedTokens])
             .UseNLog()
             .UseSystemd()
             .ConfigureAppConfiguration((hostingContext, config) =>
