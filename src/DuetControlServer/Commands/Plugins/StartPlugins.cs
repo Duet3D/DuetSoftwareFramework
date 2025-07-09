@@ -3,6 +3,7 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Codes;
 using DuetControlServer.Files;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 using System;
@@ -18,24 +19,20 @@ namespace DuetControlServer.Commands;
 /// </summary>
 /// <param name="codeFactory">Code factory</param>
 /// <param name="commandFactory">Command factory</param>
-/// <param name="dsfLogger">Internal logger</param>
 /// <param name="filePathResolver">File path resolver</param>
 /// <param name="model">Object model</param>
-/// <param name="settings">Settings</param>
 /// <param name="lifetime">Host application lifetime</param>
+/// <param name="logger">Logger</param>
+/// <param name="settings">Settings</param>
 public sealed class StartPlugins(CodeFactory codeFactory,
     CommandFactory commandFactory,
-    Utility.Logger dsfLogger,
+    Utility.EventLogger eventLogger,
     FilePathResolver filePathResolver,
     Model.ObjectModel model,
     IHostApplicationLifetime lifetime,
+    ILogger<StartPlugins> logger,
     IOptions<Settings> settings) : DuetAPI.Commands.StartPlugins
 {
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
     /// <summary>
     /// Indicates if the plugins are being started
     /// </summary>
@@ -85,8 +82,8 @@ public sealed class StartPlugins(CodeFactory codeFactory,
                     }
                     catch (Exception e)
                     {
-                        _logger.Debug(e);
-                        await dsfLogger.LogOutputAsync(MessageType.Error, $"Failed to start plugin {pluginName}: {e.Message}", cancellationToken);
+                        await eventLogger.LogOutputAsync(MessageType.Error, $"Failed to start plugin {pluginName}: {e.Message}", cancellationToken);
+                        logger.LogError(e, "Failed to start plugin {PluginName}", pluginName);
                     }
                 }
             }

@@ -1,11 +1,12 @@
+using DuetSharedLibrary;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using DuetSharedLibrary;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace DuetControlServer.Utility;
 
@@ -51,8 +52,10 @@ public interface IAsyncDiagnostics
 /// <summary>
 /// Diagnostics provider
 /// </summary>
+/// <param name="logger">Logger</param>
+/// <param name="serviceCollection">Service collection</param>
 /// <param name="serviceProvider">Service provider</param>
-public class DiagnosticsProvider(IServiceProvider serviceProvider)
+public sealed class DiagnosticsProvider(ILogger<DiagnosticsProvider> logger, IServiceProvider serviceProvider)
 {
     /// <summary>
     /// Fixed timeout for asynchronous diagnostic calls
@@ -66,15 +69,42 @@ public class DiagnosticsProvider(IServiceProvider serviceProvider)
     private IEnumerable<object> GetDiagnosticsProviders()
     {
         Dictionary<object, int> diagnosticProviders = [];
-        foreach (var provider in serviceProvider.GetServices<IDiagnostics>())
+        foreach (Type type in Assembly.GetExecutingAssembly().GetTypes())
         {
-            int priority = ((DiagnosticsPriorityAttribute)Attribute.GetCustomAttribute(provider.GetType(), typeof(DiagnosticsPriorityAttribute))!)?.DiagnosticsPriority ?? 0;
-            diagnosticProviders.Add(provider, priority);
-        }
-        foreach (var provider in serviceProvider.GetServices<IDiagnostics>())
-        {
-            int priority = ((DiagnosticsPriorityAttribute)Attribute.GetCustomAttribute(provider.GetType(), typeof(DiagnosticsPriorityAttribute))!)?.DiagnosticsPriority ?? 0;
-            diagnosticProviders.Add(provider, priority);
+            if (type != typeof(IDiagnostics) && typeof(IDiagnostics).IsAssignableFrom(type))
+            {
+                IDiagnostics? serviceWithDiagnostics = (IDiagnostics?)serviceProvider.GetService(type);
+                if (serviceWithDiagnostics != null)
+                {
+                    int? priority = ((DiagnosticsPriorityAttribute)Attribute.GetCustomAttribute(type, typeof(DiagnosticsPriorityAttribute))!)?.DiagnosticsPriority;
+                    if (priority == null)
+                    {
+                        logger.LogWarning("Type {Type} implements IDiagnostics but has no DiagnosticsPriorityAttribute", type);
+                    }
+                    diagnosticProviders.Add(serviceWithDiagnostics, priority ?? 0);
+                }
+                else
+                {
+                    logger.LogWarning("Type {Type} implements IDiagnostics but failed to retrieve corresponding service", type);
+                }
+            }
+            else if (type != typeof(IAsyncDiagnostics) && typeof(IAsyncDiagnostics).IsAssignableFrom(type))
+            {
+                IAsyncDiagnostics? asyncServiceWithDiagnostics = (IAsyncDiagnostics?)serviceProvider.GetService(type);
+                if (asyncServiceWithDiagnostics != null)
+                {
+                    int? priority = ((DiagnosticsPriorityAttribute)Attribute.GetCustomAttribute(type, typeof(DiagnosticsPriorityAttribute))!)?.DiagnosticsPriority;
+                    if (priority == null)
+                    {
+                        logger.LogWarning("Type {Type} implements IAsyncDiagnostics but has no DiagnosticsPriorityAttribute", type);
+                    }
+                    diagnosticProviders.Add(asyncServiceWithDiagnostics, priority ?? 0);
+                }
+                else
+                {
+                    logger.LogWarning("Type {Type} implements IAsyncDiagnostics but failed to retrieve corresponding service", type);
+                }
+            }
         }
         return diagnosticProviders.OrderBy(item => item.Value).Select(item => item.Key);
     }

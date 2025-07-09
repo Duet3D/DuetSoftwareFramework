@@ -10,8 +10,8 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Codes.Handlers;
 using DuetControlServer.IPC;
 using DuetControlServer.IPC.Processors;
-using DuetControlServer.Link;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace DuetControlServer.Commands;
@@ -28,31 +28,27 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     private readonly ICodeHandler _mCodes;
     private readonly ICodeHandler _tCodes;
     private readonly ICodeHandler _keywords;
+    private readonly ILogger<Code> _logger;
     private readonly Settings _settings;
-
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
     /// <summary>
     /// Constructor of a new code
     /// </summary>
     /// <param name="codeProcessor">Code processor</param>
     /// <param name="expressions">Meta G-code expression parser</param>
-    /// <param name="linkInterface">Link interface</param>
     /// <param name="gCodes">G-code handler</param>
     /// <param name="mCodes">M-code handler</param>
     /// <param name="tCodes">T-code handler</param>
     /// <param name="keywords">Keyword handler</param>
+    /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
     public Code(Codes.CodeProcessor codeProcessor,
         Codes.Meta.Expressions expressions,
-        LinkInterface linkInterface,
         [FromKeyedServices(Keys.GCodes)] ICodeHandler gCodes,
         [FromKeyedServices(Keys.MCodes)] ICodeHandler mCodes,
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
         [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
+        ILogger<Code> logger,
         IOptions<Settings> settings) : base()
     {
         _codeProcessor = codeProcessor;
@@ -61,6 +57,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _mCodes = mCodes;
         _tCodes = tCodes;
         _keywords = keywords;
+        _logger = logger;
         _settings = settings.Value;
     }
 
@@ -74,6 +71,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="mCodes">M-code handler</param>
     /// <param name="tCodes">T-code handler</param>
     /// <param name="keywords">Keyword handler</param>
+    /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
     public Code(string code,
         Codes.CodeProcessor codeProcessor,
@@ -82,6 +80,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         [FromKeyedServices(Keys.MCodes)] ICodeHandler mCodes,
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
         [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
+        ILogger<Code> logger,
         IOptions<Settings> settings) : base(code)
     {
         _codeProcessor = codeProcessor;
@@ -90,6 +89,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _mCodes = mCodes;
         _tCodes = tCodes;
         _keywords = keywords;
+        _logger = logger;
         _settings = settings.Value;
     }
 
@@ -166,7 +166,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     {
         if (File is not null && FilePosition is not null)
         {
-            using (File.Lock())
+            using (File.Lock(CancellationToken))
             {
                 long nextFilePosition = FilePosition.Value + (Length ?? 0L);
                 if (File.NextFilePosition < nextFilePosition)
@@ -180,12 +180,13 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <summary>
     /// Update the next file position in case we need to fork this file
     /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    internal async ValueTask UpdateNextFilePositionAsync()
+    internal async ValueTask UpdateNextFilePositionAsync(CancellationToken cancellationToken)
     {
         if (File is not null && FilePosition is not null)
         {
-            using (await File.LockAsync())
+            using (await File.LockAsync(cancellationToken))
             {
                 long nextFilePosition = FilePosition.Value + (Length ?? 0L);
                 if (File.NextFilePosition < nextFilePosition)
@@ -221,7 +222,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
             TextWriter? fileWriter = _codeProcessor.FilesBeingWritten[numChannel];
             if (fileWriter is not null && (Type != CodeType.MCode || MajorNumber != 29))
             {
-                _logger.Debug("Writing {0}", this);
+                _logger.LogDebug("Writing {Code}", this);
                 fileWriter.WriteLine(this);
                 Result = new();
                 return true;
@@ -229,7 +230,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         }
 
         // Try to process this code internally
-        _logger.Debug("Processing {0}", this);
+        _logger.LogDebug("Processing {Code}", this);
 
         // Flush the code channel and populate SBC fields where applicable
         if (Keyword == KeywordType.None && _expressions.ContainsSbcFields(this) && !await _codeProcessor.FlushAsync(this, true, false))
@@ -243,16 +244,16 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
             switch (Type)
             {
                 case CodeType.GCode:
-                    Result = await _gCodes.ProcessAsync(this);
+                    Result = await _gCodes.ProcessAsync(this, CancellationToken);
                     break;
                 case CodeType.MCode:
-                    Result = await _mCodes.ProcessAsync(this);
+                    Result = await _mCodes.ProcessAsync(this, CancellationToken);
                     break;
                 case CodeType.TCode:
-                    Result = await _tCodes.ProcessAsync(this);
+                    Result = await _tCodes.ProcessAsync(this, CancellationToken);
                     break;
                 case CodeType.Keyword:
-                    Result = await _keywords.ProcessAsync(this);
+                    Result = await _keywords.ProcessAsync(this, CancellationToken);
                     break;
             }
 

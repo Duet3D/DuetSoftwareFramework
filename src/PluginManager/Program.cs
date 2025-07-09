@@ -1,9 +1,7 @@
 ﻿using DuetAPI.Connection;
 using PluginManager;
-using System;
 using System.CommandLine;
 using System.IO;
-using System.Threading.Tasks;
 
 // Main CLI arguments
 Option<FileInfo> socketPathOption = new("--socket", "-s")

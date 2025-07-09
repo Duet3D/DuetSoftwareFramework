@@ -1,7 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using NUnit.Framework;
 using System.IO;
-using System.Text;
 using System.Text.Json;
 
 namespace UnitTests.Machine

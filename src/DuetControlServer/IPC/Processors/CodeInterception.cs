@@ -447,7 +447,7 @@ public sealed class CodeInterception : IProcessor
     /// Print diagnostics
     /// </summary>
     /// <param name="builder">String builder to write to</param>
-    public static void PrintDiagnostics(StringBuilder builder)
+    public static void Diagnostics(StringBuilder builder)
     {
         foreach (List<CodeInterception> processorList in _connections.Values)
         {

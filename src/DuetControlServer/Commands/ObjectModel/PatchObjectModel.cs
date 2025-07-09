@@ -14,19 +14,17 @@ namespace DuetControlServer.Commands;
 public sealed class PatchObjectModel(Model.ObjectModel model, IOptions<Settings> settings) : DuetAPI.Commands.PatchObjectModel
 {
     /// <summary>
-    /// Apply a full patch to the object model. May be used only in non-SPI mode
+    /// Apply a full patch to the object model. May be used only if explicitly enabled
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     public override Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        #warning deprecate this?
-        if (true)
+        if (!settings.Value.AllowCustomModelPatches)
         {
             throw new InvalidOperationException("Command is only supported in non-SPI mode");
         }
 
-#if false
         if (model.UpdateFromJson(Key, Patch))
         {
             if (model.IsUpdating && model.State.Status != MachineStatus.Updating)
@@ -40,6 +38,5 @@ public sealed class PatchObjectModel(Model.ObjectModel model, IOptions<Settings>
         }
 
         return Task.CompletedTask;
-#endif
     }
 }

@@ -235,6 +235,11 @@ public sealed class Settings
     public int MaxMessageLength { get; set; } = 4096;
 
     /// <summary>
+    /// Whether to allow custom patches to the object model. Not recommended
+    /// </summary>
+    public bool AllowCustomModelPatches { get; set; }
+
+    /// <summary>
     /// List of string chunks that are identified by RepRapFirmware
     /// </summary>
     /// <remarks>

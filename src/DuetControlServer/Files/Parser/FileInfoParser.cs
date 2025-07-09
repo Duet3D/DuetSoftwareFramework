@@ -14,25 +14,21 @@ using DuetControlServer.Codes;
 using DuetControlServer.Codes.Meta;
 using DuetControlServer.Files.ImageProcessing;
 using DuetControlServer.Files.Parser.ImageProcessing;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.Files.Parser;
 
 /// <summary>
-/// Static class used to retrieve information from G-code jobs
+/// Class used to retrieve information from G-code jobs
 /// </summary>
 /// <param name="codeFactory">Code factory</param>
 /// <param name="expressions">Expression evaluator</param>
 /// <param name="filePath">File path helper</param>
 /// <param name="settings">Settings</param>
-public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, FilePathResolver filePath, IOptions<Settings> settings)
+public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, FilePathResolver filePath, ILogger<FileInfoParser> logger, IOptions<Settings> settings)
 {
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
     /// <summary>
     /// Parse a G-code file
     /// </summary>
@@ -82,7 +78,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
                 }
                 catch (Exception e)
                 {
-                    _logger.Warn(e, "Failed to evaluate key '{0}' from job file '{1}'", kvp.Key, result.FileName);
+                    logger.LogWarning(e, "Failed to evaluate key '{Key}' from job file '{File}'", kvp.Key, result.FileName);
                 }
             }
 
@@ -486,7 +482,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
             if (index > 0)
             {
                 string key = comment[..index].Trim(), value = comment[(index + 1)..].Trim();
-                _logger.Debug("Evaluating user-defined key '{0}' with value '{1}'", key, value);
+                logger.LogDebug("Evaluating user-defined key '{Key}' with value '{Value}'", key, value);
                 userDefinedKeys.Add(key, expressions.EvaluateExpressionRaw(code, value, false));
                 return true;
             }
@@ -627,19 +623,19 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
         string trimmedComment = code.Comment.TrimStart();
         if (trimmedComment.StartsWith("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
         {
-            _logger.Debug("Found embedded thumbnail PNG image");
+            logger.LogDebug("Found embedded thumbnail PNG image");
             await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.PNG, cancellationToken);
             return true;
         }
         if (trimmedComment.StartsWith("thumbnail_JPG", StringComparison.InvariantCultureIgnoreCase))
         {
-            _logger.Debug("Found embedded thumbnail JPG Image");
+            logger.LogDebug("Found embedded thumbnail JPG Image");
             await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.JPEG, cancellationToken);
             return true;
         }
         if (trimmedComment.StartsWith("thumbnail_QOI", StringComparison.InvariantCultureIgnoreCase))
         {
-            _logger.Debug("Found embedded thumbnail QOI Image");
+            logger.LogDebug("Found embedded thumbnail QOI Image");
             await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.QOI, cancellationToken);
             return true;
         }
@@ -647,7 +643,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
         // Icon Image (proprietary)
         if (trimmedComment.Contains("Icon:"))
         {
-            _logger.Debug("Found Icon Image");
+            logger.LogDebug("Found Icon Image");
             await IconImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, cancellationToken);
             return true;
         }

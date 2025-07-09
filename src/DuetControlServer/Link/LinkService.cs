@@ -14,6 +14,7 @@ using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Utility;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace DuetControlServer.Link;
@@ -22,34 +23,24 @@ namespace DuetControlServer.Link;
 /// This class accesses RepRapFirmware via SPI and deals with general communication
 /// </summary>
 /// <param name="channels">Channel manager</param>
-/// <param name="dsfLogger">Internal logger</param>
+/// <param name="eventLogger">Event logger</param>
 /// <param name="filePathResolver">File path resolver</param>
 /// <param name="jobProcessor">Job processor</param>
 /// <param name="linkAdapter">Firmware link adapter</param>
 /// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model</param>
 /// <param name="settings">Settings</param>
-[DiagnosticsPriority(-6)]
 public sealed partial class LinkService(
     Channel.Manager channels,
-    Logger dsfLogger,
+    EventLogger eventLogger,
     FilePathResolver filePathResolver,
     JobProcessor jobProcessor,
     ILinkAdapter linkAdapter,
     LinkInterface linkInterface,
     Model.ObjectModel model,
+    ILogger<LinkService> logger,
     IOptions<Settings> settings) : BackgroundService
 {
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
-    /// <summary>
-    /// Last time the object model was queried
-    /// </summary>
-    private DateTime _lastQueryTime = DateTime.Now;
-
     /// <summary>
     /// Open files requested by the firmware
     /// </summary>
@@ -59,26 +50,6 @@ public sealed partial class LinkService(
     /// Handle counter for open files
     /// </summary>
     public uint _openFileHandleCounter = Consts.NoFileHandle;
-
-    /// <summary>
-    /// Print diagnostics of this class asynchronously
-    /// </summary>
-    /// <param name="builder">String builder</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public async ValueTask PrintDiagnosticsAsync(StringBuilder builder, CancellationToken cancellationToken)
-    {
-#warning fixme
-        await channels.PrintDiagnosticsAsync(builder, cancellationToken);
-        if (linkAdapter is IDiagnostics diagnostics)
-        {
-            diagnostics.PrintDiagnostics(builder);
-        }
-        if (linkAdapter is IAsyncDiagnostics asyncDiagnostics)
-        {
-            await asyncDiagnostics.PrintDiagnosticsAsync(builder, cancellationToken);
-        }
-    }
 
     /// <summary>
     /// Perform the firmware update internally
@@ -95,18 +66,18 @@ public sealed partial class LinkService(
         ushort crc16 = CRC16.Calculate(linkInterface.FirmwareStream!);
 
         // Send the IAP binary to the firmware
-        _logger.Info("Flashing IAP binary");
+        logger.LogInformation("Flashing IAP binary");
         bool dataSent;
         do
         {
             dataSent = linkAdapter.WriteIapSegment(linkInterface.IapStream!);
-            if (_logger.IsDebugEnabled)
+            if (logger.IsEnabled(LogLevel.Debug))
             {
                 Console.Write('.');
             }
         }
         while (dataSent);
-        if (_logger.IsDebugEnabled)
+        if (logger.IsEnabled(LogLevel.Debug))
         {
             Console.WriteLine();
         }
@@ -120,47 +91,47 @@ public sealed partial class LinkService(
         {
             if (numRetries != 0)
             {
-                _logger.Error("Firmware checksum verification failed");
+                logger.LogError("Firmware checksum verification failed");
             }
 
-            _logger.Info("Flashing RepRapFirmware");
+            logger.LogInformation("Flashing RepRapFirmware");
             linkInterface.FirmwareStream!.Seek(0, SeekOrigin.Begin);
 
             try
             {
                 while (linkAdapter.FlashFirmwareSegment(linkInterface.FirmwareStream))
                 {
-                    if (_logger.IsDebugEnabled)
+                    if (logger.IsEnabled(LogLevel.Debug))
                     {
                         Console.Write('.');
                     }
                 }
-                if (_logger.IsDebugEnabled)
+                if (logger.IsEnabled(LogLevel.Debug))
                 {
                     Console.WriteLine();
                 }
             }
             catch (Exception e)
             {
-                _logger.Error(e);
-                dsfLogger.LogOutput(MessageType.Error, "Failed to flash flash firmware. Please install it manually.");
+                eventLogger.LogOutput(MessageType.Error, "Failed to flash flash firmware. Please install it manually.");
+                logger.LogError(e, "Failed to flash firmware");
                 throw;
             }
 
-            _logger.Info("Verifying checksum");
+            logger.LogInformation("Verifying checksum");
         }
         while (!linkAdapter.VerifyFirmwareChecksum(linkInterface.FirmwareStream.Length, crc16) && ++numRetries < 3);
 
         if (numRetries == 3)
         {
             // Failed to flash the firmware
-            dsfLogger.LogOutput(MessageType.Error, "Could not flash firmware after 3 attempts. Please install it manually.");
+            eventLogger.LogOutput(MessageType.Error, "Could not flash firmware after 3 attempts. Please install it manually.");
             throw new OperationCanceledException("Failed to flash firmware after 3 attempts");
         }
 
         // Wait for the IAP binary to restart the controller
         linkAdapter.WaitForIapReset();
-        _logger.Info("Firmware update successful");
+        logger.LogInformation("Firmware update successful");
     }
 
     /// <summary>
@@ -270,7 +241,7 @@ public sealed partial class LinkService(
                     Invalidate();
                     if (linkAdapter.WriteEmergencyStop())
                     {
-                        _logger.Warn("Emergency stop");
+                        logger.LogWarning("Emergency stop");
                         linkInterface.FirmwareHaltRequest.SetResult();
                         linkInterface.FirmwareHaltRequest = null;
                     }
@@ -283,7 +254,7 @@ public sealed partial class LinkService(
                     Invalidate();
                     if (linkAdapter.WriteReset())
                     {
-                        _logger.Warn("Resetting controller");
+                        logger.LogWarning("Resetting controller");
                         linkAdapter.PerformFullTransfer(cancellationToken: stoppingToken);
                         linkInterface.FirmwareResetRequest.SetResult();
                         linkInterface.FirmwareResetRequest = null;
@@ -328,7 +299,7 @@ public sealed partial class LinkService(
             if (linkAdapter.HadReset())
             {
                 Invalidate();
-                dsfLogger.LogOutput(MessageType.Warning, "SPI connection has been reset");
+                eventLogger.LogOutput(MessageType.Warning, "SPI connection has been reset");
             }
 
             // Check for changes of the print status
@@ -358,7 +329,7 @@ public sealed partial class LinkService(
                     PacketHeader? packet = linkAdapter.ReadNextPacket();
                     if (packet is null)
                     {
-                        _logger.Error("Read invalid packet");
+                        logger.LogError("Read invalid packet");
                         break;
                     }
                     ProcessPacket(packet.Value);
@@ -493,7 +464,7 @@ public sealed partial class LinkService(
                 if (sbcRequest != Protocol.SbcRequests.Request.LockAllMovementSystemsAndWaitForStandstill)
                 {
                     // It's expected that RRF will need a moment to lock the movement but report other resend requests
-                    _logger.Warn("Resending packet #{0} (request {1})", packet.Id, sbcRequest);
+                    logger.LogWarning("Resending packet #{Id} (request {Request})", packet.Id, sbcRequest);
                 }
                 break;
             case Request.ObjectModel:
@@ -572,7 +543,7 @@ public sealed partial class LinkService(
     /// <returns>Asynchronous task</returns>
     private void HandleObjectModel()
     {
-        _logger.Trace("Received object model");
+        logger.LogTrace("Received object model");
         linkAdapter.ReadObjectModel(out ReadOnlySpan<byte> json);
         lock (linkInterface.ModelQueryRequests)
         {
@@ -582,7 +553,7 @@ public sealed partial class LinkService(
             }
             else
             {
-                _logger.Warn("Failed to find query for object model response");
+                logger.LogWarning("Failed to find query for object model response");
             }
         }
     }
@@ -594,7 +565,7 @@ public sealed partial class LinkService(
     {
         linkAdapter.ReadCodeBufferUpdate(out ushort bufferSpace);
         linkInterface.BufferSpace = bufferSpace - linkInterface.BytesReserved;
-        _logger.Trace("Buffer space available: {0}", linkInterface.BufferSpace);
+        logger.LogTrace("Buffer space available: {BufferSpace}", linkInterface.BufferSpace);
     }
 
     /// <summary>
@@ -608,7 +579,7 @@ public sealed partial class LinkService(
     private void HandleMessage()
     {
         linkAdapter.ReadMessage(out MessageTypeFlags flags, out string reply);
-        _logger.Trace("Received message [{0}] {1}", flags, reply);
+        logger.LogTrace("Received message [{Flags}] {Message}", flags, reply);
 
         // Deal with log messages
         if ((flags & MessageTypeFlags.LogOff) != MessageTypeFlags.LogOff)
@@ -621,11 +592,11 @@ public sealed partial class LinkService(
                     MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
                                         : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
                                             : MessageType.Success;
-                    LogLevel level = flags.HasFlag(MessageTypeFlags.LogOff) ? LogLevel.Off
-                                        : flags.HasFlag(MessageTypeFlags.LogWarn) ? LogLevel.Warn
-                                            : flags.HasFlag(MessageTypeFlags.LogInfo) ? LogLevel.Info
-                                                : LogLevel.Debug;
-                    dsfLogger.Log(level, type, _partialLogMessage.TrimEnd());
+                    EventLogLevel level = flags.HasFlag(MessageTypeFlags.LogOff) ? EventLogLevel.Off
+                                        : flags.HasFlag(MessageTypeFlags.LogWarn) ? EventLogLevel.Warn
+                                            : flags.HasFlag(MessageTypeFlags.LogInfo) ? EventLogLevel.Info
+                                                : EventLogLevel.Debug;
+                    eventLogger.Log(level, type, _partialLogMessage.TrimEnd());
                 }
                 _partialLogMessage = null;
             }
@@ -689,7 +660,7 @@ public sealed partial class LinkService(
     private void HandleMacroRequest()
     {
         linkAdapter.ReadMacroRequest(out CodeChannel channel, out bool fromCode, out string filename);
-        _logger.Trace("Received macro request for file {0} on channel {1}", filename, channel);
+        logger.LogTrace("Received macro request for file {File} on channel {Channel}", filename, channel);
 
         using (channels[channel].Lock())
         {
@@ -703,7 +674,7 @@ public sealed partial class LinkService(
     private void HandleAbortFileRequest()
     {
         linkAdapter.ReadAbortFile(out CodeChannel channel, out bool abortAll);
-        _logger.Info("Received file abort request on channel {0} for {1}", channel, abortAll ? "all files" : "the last file");
+        logger.LogInformation("Received file abort request on channel {Channel} for {FileType}", channel, abortAll ? "all files" : "the last file");
 
         using (channels[channel].Lock())
         {
@@ -718,7 +689,7 @@ public sealed partial class LinkService(
     private void HandlePrintPaused()
     {
         linkAdapter.ReadPrintPaused(out uint filePosition, out PrintPausedReason pauseReason);
-        _logger.Debug("Received print pause notification for file position {0}, reason {1}", (filePosition == Consts.NoFilePosition) ? "(none)" : filePosition.ToString(), pauseReason);
+        logger.LogDebug("Received print pause notification for file position {Offset}, reason {PauseReason}", (filePosition == Consts.NoFilePosition) ? "(none)" : filePosition.ToString(), pauseReason);
 
         // Update the object model
         using (model.AccessReadWrite())
@@ -753,7 +724,7 @@ public sealed partial class LinkService(
     private void HandleResourceLocked()
     {
         linkAdapter.ReadCodeChannel(out CodeChannel channel);
-        _logger.Trace("Received resource locked notification for channel {0}", channel);
+        logger.LogTrace("Received resource locked notification for channel {Channel}", channel);
 
         using (channels[channel].Lock())
         {
@@ -768,7 +739,7 @@ public sealed partial class LinkService(
     private void HandleFileChunkRequest()
     {
         linkAdapter.ReadFileChunkRequest(out string filename, out uint offset, out int maxLength);
-        _logger.Debug("Received file chunk request for {0}, offset {1}, maxLength {2}", filename, offset, maxLength);
+        logger.LogDebug("Received file chunk request for {File}, offset {Offset}, maxLength {MaxLength}", filename, offset, maxLength);
 
         try
         {
@@ -797,7 +768,7 @@ public sealed partial class LinkService(
         }
         catch (Exception e)
         {
-            _logger.Error(e, "Failed to send requested file chunk of {0}", filename);
+            logger.LogError(e, "Failed to send requested file chunk of {File}", filename);
             linkAdapter.WriteFileChunk(null, 0);
         }
     }
@@ -808,7 +779,7 @@ public sealed partial class LinkService(
     private void HandleEvaluationResult()
     {
         linkAdapter.ReadEvaluationResult(out string expression, out object? result);
-        _logger.Debug("Received evaluation result for expression {0} = {1}", expression, result);
+        logger.LogDebug("Received evaluation result for expression {Expression} = {Result}", expression, result);
 
         lock (linkInterface.EvaluateExpressionRequests)
         {
@@ -832,7 +803,7 @@ public sealed partial class LinkService(
             }
         }
 
-        _logger.Warn("Unresolved evaluation result for expression {0} = {1}", expression, result);
+        logger.LogWarning("Unresolved evaluation result for expression {Expression} = {Result}", expression, result);
     }
 
     /// <summary>
@@ -841,7 +812,7 @@ public sealed partial class LinkService(
     private void HandleDoCode()
     {
         linkAdapter.ReadDoCode(out CodeChannel channel, out string code);
-        _logger.Trace("Received firmware code request on channel {0} => {1}", channel, code);
+        logger.LogTrace("Received firmware code request on channel {Channel} => {Code}", channel, code);
 
         using (channels[channel].Lock())
         {
@@ -855,7 +826,7 @@ public sealed partial class LinkService(
     private void HandleWaitForAcknowledgement()
     {
         linkAdapter.ReadCodeChannel(out CodeChannel channel);
-        _logger.Trace("Received wait for message acknowledgement on channel {0}", channel);
+        logger.LogTrace("Received wait for message acknowledgement on channel {Channel}", channel);
 
         using (channels[channel].Lock())
         {
@@ -869,7 +840,7 @@ public sealed partial class LinkService(
     private void HandleMacroFileClosed()
     {
         linkAdapter.ReadCodeChannel(out CodeChannel channel);
-        _logger.Trace("Received file closal on channel {0}", channel);
+        logger.LogTrace("Received file closal on channel {Channel}", channel);
 
         using (channels[channel].Lock())
         {
@@ -883,7 +854,7 @@ public sealed partial class LinkService(
     private void HandleMessageAcknowledgement()
     {
         linkAdapter.ReadCodeChannel(out CodeChannel channel);
-        _logger.Trace("Received message acknowledgement on channel {0}", channel);
+        logger.LogTrace("Received message acknowledgement on channel {Channel}", channel);
 
         using (channels[channel].Lock())
         {
@@ -897,7 +868,7 @@ public sealed partial class LinkService(
     private void HandleVariableResult()
     {
         linkAdapter.ReadEvaluationResult(out string varName, out object? result);
-        _logger.Trace("Received variable assignment result for {0} = {1}", varName, result);
+        logger.LogTrace("Received variable assignment result for {Variable} = {Result}", varName, result);
 
         lock (linkInterface.VariableRequests)
         {
@@ -919,7 +890,7 @@ public sealed partial class LinkService(
             }
         }
 
-        _logger.Warn("Unresolved variable set result for variable {0} = {1}", varName, result);
+        logger.LogWarning("Unresolved variable set result for variable {Variable} = {Result}", varName, result);
     }
 
     /// <summary>
@@ -928,7 +899,7 @@ public sealed partial class LinkService(
     private void HandleCheckFileExists()
     {
         linkAdapter.ReadCheckFileExists(out string filename);
-        _logger.Debug("Checking if file {0} exists", filename);
+        logger.LogDebug("Checking if file {File} exists", filename);
 
         try
         {
@@ -938,7 +909,7 @@ public sealed partial class LinkService(
         }
         catch (Exception e)
         {
-            _logger.Error(e, "Failed to check if file {0} exists", filename);
+            logger.LogError(e, "Failed to check if file {File} exists", filename);
             linkAdapter.WriteCheckFileExistsResult(false);
         }
     }
@@ -950,7 +921,7 @@ public sealed partial class LinkService(
     private void HandleDeleteFileOrDirectory(bool recursive)
     {
         linkAdapter.ReadDeleteFileOrDirectory(out string filename);
-        _logger.Debug("Attempting to delete {0}", filename);
+        logger.LogDebug("Attempting to delete {File}", filename);
 
         try
         {
@@ -967,7 +938,7 @@ public sealed partial class LinkService(
         }
         catch (Exception e)
         {
-            _logger.Error(e, "Failed to delete file or directory {0}", filename);
+            logger.LogError(e, "Failed to delete file or directory {File}", filename);
             linkAdapter.WriteFileDeleteResult(false);
         }
     }
@@ -978,7 +949,7 @@ public sealed partial class LinkService(
     private void HandleOpenFile()
     {
         linkAdapter.ReadOpenFile(out string filename, out bool forWriting, out bool append, out long preAllocSize);
-        _logger.Debug("Opening {0} for {1} ({2}appending), prealloc {3}", filename, forWriting ? "writing" : "reading", append ? string.Empty : "not ", preAllocSize);
+        logger.LogDebug("Opening {File} for {Operation} ({NotAppending}appending), prealloc {Prealloc}", filename, forWriting ? "writing" : "reading", append ? string.Empty : "not ", preAllocSize);
 
         try
         {
@@ -1006,12 +977,12 @@ public sealed partial class LinkService(
             }
             _openFiles.Add(_openFileHandleCounter, fs);
 
-            _logger.Debug("File {0} opened with handle #{1}", filename, _openFileHandleCounter);
+            logger.LogDebug("File {File} opened with handle #{Handle}", filename, _openFileHandleCounter);
             linkAdapter.WriteOpenFileResult(_openFileHandleCounter, fs.Length);
         }
         catch (Exception e)
         {
-            _logger.Error(e, "Failed to open {0} for {1}", filename, forWriting ? "writing" : "reading");
+            logger.LogError(e, "Failed to open {File} for {Operation}", filename, forWriting ? "writing" : "reading");
             linkAdapter.WriteOpenFileResult(Consts.NoFileHandle, 0);
         }
     }
@@ -1023,7 +994,7 @@ public sealed partial class LinkService(
     private void HandleReadFile()
     {
         linkAdapter.ReadFileRequest(out uint handle, out int maxLength);
-        _logger.Trace("Reading up to {0} bytes from file #{1}", maxLength, handle);
+        logger.LogTrace("Reading up to {MaxLength} bytes from file #{Handle}", maxLength, handle);
 
         try
         {
@@ -1037,7 +1008,7 @@ public sealed partial class LinkService(
         }
         catch (Exception e)
         {
-            _logger.Error(e, "Failed to read {0} bytes from file #{1}", maxLength, handle);
+            logger.LogError(e, "Failed to read {MaxLength} bytes from file #{Handle}", maxLength, handle);
             linkAdapter.WriteFileReadResult([], -1);
         }
     }
@@ -1049,7 +1020,7 @@ public sealed partial class LinkService(
     private void HandleWriteFile()
     {
         linkAdapter.ReadWriteRequest(out uint handle, out ReadOnlySpan<byte> data);
-        _logger.Trace("Writing {0} bytes to file #{1}", data.Length, handle);
+        logger.LogTrace("Writing {DataLength} bytes to file #{Handle}", data.Length, handle);
 
         try
         {
@@ -1062,7 +1033,7 @@ public sealed partial class LinkService(
         }
         catch (Exception e)
         {
-            _logger.Error(e, "Failed to write {0} bytes to file #{1}", data.Length, handle);
+            logger.LogError(e, "Failed to write {DataLength} bytes to file #{Handle}", data.Length, handle);
             linkAdapter.WriteFileWriteResult(false);
         }
     }
@@ -1073,7 +1044,7 @@ public sealed partial class LinkService(
     private void HandleSeekFile()
     {
         linkAdapter.ReadSeekFile(out uint handle, out long offset);
-        _logger.Trace("Seeking to position {0} in file #{1}", offset, handle);
+        logger.LogTrace("Seeking to position {Offset} in file #{Handle}", offset, handle);
 
         try
         {
@@ -1086,7 +1057,7 @@ public sealed partial class LinkService(
         }
         catch (Exception e)
         {
-            _logger.Error(e, "Failed to go to position {0} in file #{1}", offset, handle);
+            logger.LogError(e, "Failed to go to position {Offset} in file #{Handle}", offset, handle);
             linkAdapter.WriteFileSeekResult(false);
         }
     }
@@ -1097,21 +1068,21 @@ public sealed partial class LinkService(
     private void HandleTruncateFile()
     {
         linkAdapter.ReadTruncateFile(out uint handle);
-        _logger.Debug("Truncating file #{0}", handle);
+        logger.LogDebug("Truncating file #{Handle}", handle);
 
         try
         {
             // Go to the file position as requested
             FileStream fs = _openFiles[handle];
             fs.SetLength(fs.Position);
-            _logger.Debug("Truncated file #{0} at byte {1}", handle, fs.Length);
+            logger.LogDebug("Truncated file #{Handle} at byte {Length}", handle, fs.Length);
 
             // Send it back
             linkAdapter.WriteFileTruncateResult(true);
         }
         catch (Exception e)
         {
-            _logger.Error(e, "Failed to truncate file #{0}", handle);
+            logger.LogError(e, "Failed to truncate file #{Handle}", handle);
             linkAdapter.WriteFileTruncateResult(false);
         }
     }
@@ -1122,7 +1093,7 @@ public sealed partial class LinkService(
     private void HandleCloseFile()
     {
         linkAdapter.ReadCloseFile(out uint handle);
-        _logger.Debug("Closing file #{0}", handle);
+        logger.LogDebug("Closing file #{Handle}", handle);
 
         try
         {
@@ -1137,7 +1108,7 @@ public sealed partial class LinkService(
         }
         catch (Exception e)
         {
-            _logger.Error(e, "Failed to close file #{0}", handle);
+            logger.LogError(e, "Failed to close file #{Handle}", handle);
         }
     }
     

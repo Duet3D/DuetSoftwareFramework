@@ -2,6 +2,7 @@
 using DuetControlServer.Link;
 using DuetControlServer.Utility;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Concurrent;
@@ -22,6 +23,7 @@ public class UpdateService : BackgroundService
     private readonly FirmwareUpdater _firmwareUpdater;
     private readonly LinkInterface _linkInterface;
     private readonly ObjectModel _model;
+    private readonly ILogger<UpdateService> _logger;
     private readonly Settings _settings;
 
     /// <summary>
@@ -30,22 +32,19 @@ public class UpdateService : BackgroundService
     /// <param name="firmwareUpdater">Firmware updater</param>
     /// <param name="linkInterface">Link interface</param>
     /// <param name="model">Object model</param>
+    /// <param name="logger">Logger</param>
     /// <param name="settings">Settings</param>
-    public UpdateService(FirmwareUpdater firmwareUpdater, LinkInterface linkInterface, ObjectModel model, IOptions<Settings> settings)
+    public UpdateService(FirmwareUpdater firmwareUpdater, LinkInterface linkInterface, ObjectModel model, ILogger<UpdateService> logger, IOptions<Settings> settings)
     {
         _firmwareUpdater = firmwareUpdater;
         _linkInterface = linkInterface;
         _model = model;
+        _logger = logger;
         _settings = settings.Value;
 
         // Make sure we request the full object model again when the connection is lost
         model.OnConnectionLost += (sender, e) => _lastSeqs.Clear();
     }
-
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
     // Data for object model updates
     private readonly ConcurrentDictionary<string, int> _lastSeqs = new();
@@ -228,7 +227,7 @@ public class UpdateService : BackgroundService
                         UpdateModel();
                         if (_keyUpdated)
                         {
-                            _logger.Debug("Updated key limits");
+                            _logger.LogDebug("Updated key limits");
                         }
                     }
                 }
@@ -253,7 +252,7 @@ public class UpdateService : BackgroundService
                     string key = _updatedKeys[i];
                     if (key != "reply" && (!_settings.UpdateOnly || key is "boards" or "directories" or "state"))
                     {
-                        _logger.Debug(() => $"Requesting update of key {key}, new seq {_lastSeqs[key]}");
+                        _logger.LogDebug("Requesting update of key {Key}, new seq {Seq}", key, _lastSeqs[key]);
 
                         int next = 0;
                         do
@@ -266,11 +265,11 @@ public class UpdateService : BackgroundService
                                 next = UpdateModel(offset);
                                 if (_keyUpdated)
                                 {
-                                    _logger.Debug("Updated key {0}{1}", key, (offset + next != 0) ? $" starting from {offset}, next {next}" : string.Empty);
+                                    _logger.LogDebug("Updated key {Key}{Annotation}", key, (offset + next != 0) ? $" starting from {offset}, next {next}" : string.Empty);
                                 }
                                 else
                                 {
-                                    _logger.Warn($"Invalid key {key} in the object model");
+                                    _logger.LogWarning("Invalid key {Key} in the object model", key);
                                     break;
                                 }
 
@@ -296,7 +295,7 @@ public class UpdateService : BackgroundService
             }
             catch (InvalidOperationException e)
             {
-                _logger.Error(e, "Failed to merge JSON due to internal error: {0}", Encoding.UTF8.GetString(_jsonData));
+                _logger.LogError(e, "Failed to merge JSON due to internal error: {JSON}", Encoding.UTF8.GetString(_jsonData));
             }
             catch (OperationCanceledException)
             {

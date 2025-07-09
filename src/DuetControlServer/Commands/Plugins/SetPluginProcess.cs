@@ -1,4 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 using System;
@@ -12,18 +13,14 @@ namespace DuetControlServer.Commands;
 /// </summary>
 /// <param name="commandFactory">Command factory</param>
 /// <param name="model">Object model</param>
+/// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings</param>
-public sealed class SetPluginProcess(CommandFactory commandFactory, Model.ObjectModel model, IOptions<Settings> settings) : DuetAPI.Commands.SetPluginProcess
+public sealed class SetPluginProcess(CommandFactory commandFactory, Model.ObjectModel model, ILogger<SetPluginProcess> logger, IOptions<Settings> settings) : DuetAPI.Commands.SetPluginProcess
 {
     /// <summary>
     /// Event that is set when a plugin has stopped
     /// </summary>
     public static readonly AsyncAutoResetEvent PluginStoppedEvent = new(false);
-
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
     /// <summary>
     /// Update the pid of a given plugin
@@ -51,7 +48,7 @@ public sealed class SetPluginProcess(CommandFactory commandFactory, Model.Object
                             await Task.Delay(settings.Value.PluginAutoRestartInterval, cancellationToken);
 
                             // Restart it
-                            _logger.Info("Auto-restarting plugin {0}", Plugin);
+                            logger.LogInformation("Auto-restarting plugin {Plugin}", Plugin);
                             StartPlugin startPlugin = commandFactory.Create<StartPlugin>();
                             startPlugin.Plugin = Plugin;
                             await startPlugin.ExecuteAsync(cancellationToken);
@@ -60,7 +57,7 @@ public sealed class SetPluginProcess(CommandFactory commandFactory, Model.Object
                         {
                             if (e is not OperationCanceledException)
                             {
-                                _logger.Error(e, "Failed to auto-restart plugin {0}", Plugin);
+                                logger.LogError(e, "Failed to auto-restart plugin {Plugin}", Plugin);
                             }
                         }
                     }, cancellationToken);

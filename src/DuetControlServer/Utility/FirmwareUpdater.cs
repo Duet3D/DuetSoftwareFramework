@@ -12,6 +12,7 @@ using DuetAPIClient;
 using DuetControlServer.Codes;
 using DuetControlServer.Files;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace DuetControlServer.Utility;
@@ -24,13 +25,8 @@ namespace DuetControlServer.Utility;
 /// <param name="model">Object model</param>
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="settings">Settings</param>
-public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath, Model.ObjectModel model, IHostApplicationLifetime lifetime, IOptions<Settings> settings)
+public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath, Model.ObjectModel model, IHostApplicationLifetime lifetime, ILogger<FirmwareUpdater> logger, IOptions<Settings> settings)
 {
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
     /// <summary>
     /// Update the firmware from this instance
     /// </summary>
@@ -189,7 +185,7 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
                 catch (Exception e)
                 {
                     Console.WriteLine("Error: {0}", e.Message);
-                    _logger.Debug(e);
+                    logger.LogDebug(e, "Failed to update firmware on board #{0}", board.CanAddress);
                 }
             }
         }
@@ -211,7 +207,7 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
             catch (Exception e)
             {
                 Console.WriteLine("Error: {0}", e.Message);
-                _logger.Debug(e);
+                logger.LogDebug(e, "Failed to update firmware on mainboard");
             }
         }
         else if (boardsToUpdate.Count > 0)
@@ -230,7 +226,7 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
             catch (Exception e)
             {
                 Console.WriteLine("Error: {0}", e.Message);
-                _logger.Debug(e);
+                logger.LogDebug(e, "Failed to reset mainboard after firmware update");
             }
         }
 
@@ -401,7 +397,7 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
                 catch (Exception e)
                 {
                     Console.WriteLine("Error: {0}", e.Message);
-                    _logger.Debug(e);
+                    logger.LogDebug(e, "Failed to update firmware on board #{CanAddress}", board.CanAddress);
                 }
             }
         }
@@ -423,7 +419,7 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
             catch (Exception e)
             {
                 Console.WriteLine("Error: {0}", e.Message);
-                _logger.Debug(e);
+                logger.LogDebug(e, "Failed to update firmware on mainboard");
             }
         }
         else if (boardsToUpdate.Count > 0)
@@ -443,7 +439,7 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
             catch (Exception e)
             {
                 Console.WriteLine("Error: {0}", e.Message);
-                _logger.Debug(e);
+                logger.LogDebug(e, "Failed to reset mainboard after firmware update");
             }
         }
 

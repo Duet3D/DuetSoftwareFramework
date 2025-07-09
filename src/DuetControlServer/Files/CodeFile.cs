@@ -1,15 +1,17 @@
 ﻿using DuetAPI;
 using DuetAPI.Commands;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Codes;
 using DuetControlServer.Codes.Meta;
 using DuetControlServer.Link;
-using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
@@ -25,8 +27,8 @@ namespace DuetControlServer.Files;
 /// <param name="expressions">Expressions to evaluate the codes</param>
 /// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model to access the machine state</param>
+/// <param name="loggerFactory">Logger factory</param>
 /// <param name="settings">Settings to use</param>
-/// <param name="lifetime">Application lifetime to use</param>
 public class CodeFile(
     CodeFilePath filePath,
     CodeChannel channel,
@@ -35,13 +37,11 @@ public class CodeFile(
     Expressions expressions,
     LinkInterface linkInterface,
     Model.ObjectModel model,
-    IHostApplicationLifetime lifetime,
+    ILoggerFactory loggerFactory,
     IOptions<Settings> settings) : IDisposable
 {
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+    // Private fields
+    private readonly ILogger<CodeFile> logger = loggerFactory.CreateLogger<CodeFile>();
 
     /// <summary>
     /// Internal lock
@@ -51,14 +51,16 @@ public class CodeFile(
     /// <summary>
     /// Lock this instance
     /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Disposable lock</returns>
-    public IDisposable Lock() => _lock.Lock(lifetime.ApplicationStopping);
+    public IDisposable Lock(CancellationToken cancellationToken) => _lock.Lock(cancellationToken);
 
     /// <summary>
     /// Lock this instance asynchronously
     /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Disposable lock</returns>
-    public AwaitableDisposable<IDisposable> LockAsync() => _lock.LockAsync(lifetime.ApplicationStopping);
+    public AwaitableDisposable<IDisposable> LockAsync(CancellationToken cancellationToken) => _lock.LockAsync(cancellationToken);
 
     /// <summary>
     /// File being read from
@@ -165,8 +167,8 @@ public class CodeFile(
     /// <param name="expressions">Expressions to evaluate the codes</param>
     /// <param name="linkInterface">Link interface</param>
     /// <param name="model">Object model to access the machine state</param>
+    /// <param name="loggerFactory">Logger factory</param>
     /// <param name="settings">Settings to use</param>
-    /// <param name="lifetime">Application lifetime to use</param>
     public CodeFile(CodeFile copyFrom,
         CodeChannel channel,
         CodeFactory codeFactory,
@@ -174,8 +176,8 @@ public class CodeFile(
         Expressions expressions,
         LinkInterface linkInterface,
         Model.ObjectModel model,
-        IHostApplicationLifetime lifetime,
-        IOptions<Settings> settings) : this(copyFrom.FilePath, channel, codeFactory, codeProcessor, expressions, linkInterface, model, lifetime, settings)
+        ILoggerFactory loggerFactory,
+        IOptions<Settings> settings) : this(copyFrom.FilePath, channel, codeFactory, codeProcessor, expressions, linkInterface, model, loggerFactory, settings)
     {
         // Copy conditional states
         _codeBlocks.Clear();
@@ -234,13 +236,14 @@ public class CodeFile(
     /// Read the next available code and interpret conditional codes performing flow control
     /// </summary>
     /// <param name="sharedCode">Code that may be reused</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Read code or null if none found</returns>
     /// <exception cref="CodeParserException">Failed to read the next code</exception>
     /// <exception cref="OperationCanceledException">Failed to flush the pending codes</exception>
     /// <remarks>
     /// This instance must NOT be locked when this is called
     /// </remarks>
-    public async Task<Code?> ReadCodeAsync(Code? sharedCode = null)
+    public async Task<Code?> ReadCodeAsync(Code? sharedCode = null, CancellationToken cancellationToken = default)
     {
         Code code = sharedCode ?? codeFactory.Create();
         bool resetCode = sharedCode is not null;
@@ -260,7 +263,7 @@ public class CodeFile(
 
             // Read the next available code
             bool codeRead;
-            using (await LockAsync())
+            using (await LockAsync(cancellationToken))
             {
                 if (IsClosed)
                 {
@@ -270,19 +273,19 @@ public class CodeFile(
                 do
                 {
                     // Fanuc CNC and LaserWeb G-code may omit the last major G-code number
-                    using (await model.AccessReadOnlyAsync())
+                    using (await model.AccessReadOnlyAsync(cancellationToken))
                     {
-                        _parserBuffer.MayRepeatCode = model.State.MachineMode is DuetAPI.ObjectModel.MachineMode.CNC or DuetAPI.ObjectModel.MachineMode.Laser;
+                        _parserBuffer.MayRepeatCode = model.State.MachineMode is MachineMode.CNC or MachineMode.Laser;
                     }
 
                     // Get the next code
-                    codeRead = await DuetAPI.Commands.Code.ParseAsync(_fileStream, code, _parserBuffer);
+                    codeRead = await DuetAPI.Commands.Code.ParseAsync(_fileStream, code, _parserBuffer, cancellationToken);
                 }
                 while (!codeRead && _parserBuffer.GetPosition(_fileStream) < _fileStream.Length);
 
                 if (codeRead)
                 {
-                    _logger.Trace("Read code {0}", code);
+                    logger.LogTrace("Read code {Code}", code);
                 }
             }
 
@@ -296,7 +299,7 @@ public class CodeFile(
                     {
                         // Wait for pending commands to be executed so all the local variables can be disposed of again.
                         // We don't care if this fails, because we need to tidy up in any case
-                        await codeProcessor.FlushAsync(this);
+                        await codeProcessor.FlushAsync(this, cancellationToken);
                     }
 
                     if (state.Keyword == KeywordType.While)
@@ -315,11 +318,11 @@ public class CodeFile(
                                 {
                                     // Wait for pending codes to be fully executed so that "iterations" can be incremented.
                                     // We don't care if this fails, because we need to tidy up in any case
-                                    await codeProcessor.FlushAsync(this);
+                                    await codeProcessor.FlushAsync(this, cancellationToken);
                                 }
 
                                 Task varDeletionTask;
-                                using (await LockAsync())
+                                using (await LockAsync(cancellationToken))
                                 {
                                     Position = state.FilePosition ?? 0;
                                     _parserBuffer.LineNumber = state.LineNumber;
@@ -330,13 +333,13 @@ public class CodeFile(
                                     readAgain = true;
                                     if (!IsClosed)
                                     {
-                                        _logger.Debug("Restarting {0} block, iterations = {1}", state.Keyword, state.Iterations);
+                                        logger.LogDebug("Restarting {Keyword} block, iterations = {Iterations}", state.Keyword, state.Iterations);
                                     }
                                 }
                                 await varDeletionTask;  // wait outside the code lock to avoid deadlocks
                                 break;
                             }
-                            await EndCodeBlock();
+                            await EndCodeBlockAsync(cancellationToken);
                         }
                         else
                         {
@@ -347,7 +350,7 @@ public class CodeFile(
                     else
                     {
                         // End of generic code block
-                        await EndCodeBlock();
+                        await EndCodeBlockAsync(cancellationToken);
                     }
                 }
                 else
@@ -394,7 +397,7 @@ public class CodeFile(
                             if (!_lastCodeBlock.ExpectingElse)
                             {
                                 // Last if/elif condition was true, ignore the following block
-                                _logger.Debug("Skipping {0} block", code.Keyword);
+                                logger.LogDebug("Skipping {Keyword} block", code.Keyword);
                                 lock (_codeBlocks)
                                 {
                                     _codeBlocks.Push(new CodeBlock(code, false));
@@ -404,12 +407,12 @@ public class CodeFile(
                         }
 
                         // Start a new conditional block if necessary
-                        if (!await codeProcessor.FlushAsync(this) || IsClosed)
+                        if (!await codeProcessor.FlushAsync(this, cancellationToken) || IsClosed)
                         {
                             return null;
                         }
 
-                        _logger.Debug("Evaluating {0} block", code.Keyword);
+                        logger.LogDebug("Evaluating {Keyword} block", code.Keyword);
                         if (code.Keyword != KeywordType.While || codeBlock is null || codeBlock.FilePosition != code.FilePosition)
                         {
                             codeBlock = new CodeBlock(code, false);
@@ -420,10 +423,10 @@ public class CodeFile(
                         }
 
                         // Evaluate the condition
-                        string? stringEvaluationResult = await expressions.EvaluateAsync(code, true);
+                        string? stringEvaluationResult = await expressions.EvaluateAsync(code, true, cancellationToken);
                         if (bool.TryParse(stringEvaluationResult, out bool evaluationResult))
                         {
-                            _logger.Debug("Evaluation result: ({0}) = {1}", code.KeywordArgument, evaluationResult);
+                            logger.LogDebug("Evaluation result: ({KeywordArgument}) = {Result}", code.KeywordArgument, evaluationResult);
                             codeBlock.ProcessBlock = evaluationResult;
                             codeBlock.ExpectingElse = (code.Keyword != KeywordType.While) && !evaluationResult;
                         }
@@ -441,7 +444,7 @@ public class CodeFile(
                         }
 
                         // else condition is true if the last if/elif condition was false
-                        _logger.Debug("{0} {1} block", _lastCodeBlock.ExpectingElse ? "Starting" : "Skipping", code.Keyword);
+                        logger.LogDebug("{Operation} {Keyword} block", _lastCodeBlock.ExpectingElse ? "Starting" : "Skipping", code.Keyword);
                         lock (_codeBlocks)
                         {
                             _codeBlocks.Push(new CodeBlock(code, _lastCodeBlock.ExpectingElse));
@@ -455,12 +458,12 @@ public class CodeFile(
                             throw new CodeParserException("break or continue cannot be called outside while loop", code);
                         }
 
-                        if (!await codeProcessor.FlushAsync(this) || IsClosed)
+                        if (!await codeProcessor.FlushAsync(this, cancellationToken) || IsClosed)
                         {
                             return null;
                         }
 
-                        _logger.Debug("Doing {0}", code.Keyword);
+                        logger.LogDebug("Doing {Keyword}", code.Keyword);
                         foreach (CodeBlock state in _codeBlocks)
                         {
                             state.ProcessBlock = false;
@@ -473,7 +476,7 @@ public class CodeFile(
                         break;
 
                     case KeywordType.Abort:
-                        _logger.Debug("Doing {0}", code.Keyword);
+                        logger.LogDebug("Doing {Keyword}", code.Keyword);
                         Close();
                         return code;
 
@@ -525,7 +528,7 @@ public class CodeFile(
             }
             else
             {
-                _logger.Warn("Cannot add local variable because there is no open code block");
+                logger.LogWarning("Cannot add local variable because there is no open code block");
             }
         }
     }
@@ -550,12 +553,13 @@ public class CodeFile(
     /// <summary>
     /// Called to finish the current code block
     /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    private async Task EndCodeBlock()
+    private async Task EndCodeBlockAsync(CancellationToken cancellationToken)
     {
         Task? varDeletionTask = null;
 
-        using (await LockAsync())
+        using (await LockAsync(cancellationToken))
         {
             CodeBlock? codeBlock;
             lock (_codeBlocks)
@@ -571,11 +575,11 @@ public class CodeFile(
                 // Log the end of this block
                 if (codeBlock.Keyword is KeywordType.If or KeywordType.ElseIf or KeywordType.Else or KeywordType.While)
                 {
-                    _logger.Debug("End of {0} block", codeBlock.Keyword);
+                    logger.LogDebug("End of {Keyword} block", codeBlock.Keyword);
                 }
                 else
                 {
-                    _logger.Debug("End of generic block");
+                    logger.LogDebug("End of generic block");
                 }
 
                 // Delete previously created local variables

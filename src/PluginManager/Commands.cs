@@ -3,7 +3,6 @@ using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetAPIClient;
 

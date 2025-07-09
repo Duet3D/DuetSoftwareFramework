@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace DuetControlServer.Model;
@@ -36,17 +37,13 @@ public sealed class LockWrapper : IDisposable
     // Private fields
     private readonly ObjectModel _model;
     private readonly IHostApplicationLifetime _lifetime;
+    private readonly ILogger _logger;
     private readonly Settings _settings;
 
     /// <summary>
     /// CTS to trigger when the lock is being released
     /// </summary>
     private readonly CancellationTokenSource? _releaseCts;
-
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
     /// <summary>
     /// Constructor of the lock wrapper
@@ -56,14 +53,16 @@ public sealed class LockWrapper : IDisposable
     /// <param name="onUpdated">Callback to invoke when the model has been updated</param>
     /// <param name="model">Object model instance</param>
     /// <param name="lifetime">Lifetime of the application</param>
+    /// <param name="logger">Logger instance</param>`
     /// <param name="settings">Settings of the application</param>
-    public LockWrapper(IDisposable lockItem, bool isWriteLock, OnUpdatedHandler onUpdated, IHostApplicationLifetime lifetime, ObjectModel model, IOptions<Settings> settings)
+    public LockWrapper(IDisposable lockItem, bool isWriteLock, OnUpdatedHandler onUpdated, IHostApplicationLifetime lifetime, ObjectModel model, ILogger logger, IOptions<Settings> settings)
     {
         _lock = lockItem;
         _isWriteLock = isWriteLock;
         _onUpdatedHandler = onUpdated;
         _model = model;
         _lifetime = lifetime;
+        _logger = logger;
         _settings = settings.Value;
 
         if (_settings.MaxMachineModelLockTime > 0)
@@ -76,7 +75,7 @@ public sealed class LockWrapper : IDisposable
                 try
                 {
                     await Task.Delay(_settings.MaxMachineModelLockTime, _releaseCts.Token);
-                    _logger.Fatal("{0} deadlock detected, stack trace of the deadlock:\n{1}", isWriteLock ? "Writer" : "Reader", stackTrace);
+                    _logger.LogCritical("{LockType} deadlock detected, stack trace of the deadlock:\n{StackTrace}", isWriteLock ? "Writer" : "Reader", stackTrace);
                     _lifetime.StopApplication();
                 }
                 finally

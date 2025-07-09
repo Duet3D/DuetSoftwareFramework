@@ -3,20 +3,17 @@ using System.IO;
 using DuetAPI;
 using DuetControlServer.Commands;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace DuetControlServer.Files;
 
 /// <summary>
 /// Factory for creating code and macro files
 /// </summary>
+/// <param name="logger">Logger instance</param>
 /// <param name="serviceProvider">Service provider</param>
-public class FileFactory(IServiceProvider serviceProvider)
+public class FileFactory(ILogger<FileFactory> logger, IServiceProvider serviceProvider)
 {
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
     /// <summary>
     /// Create a code file for execution on the given channel
     /// </summary>
@@ -27,6 +24,18 @@ public class FileFactory(IServiceProvider serviceProvider)
     public CodeFile Create(string virtualFile, string physicalFile, CodeChannel channel)
     {
         return ActivatorUtilities.CreateInstance<CodeFile>(serviceProvider, new CodeFilePath(virtualFile, physicalFile), channel);
+    }
+
+    /// <summary>
+    /// Create a code file copy for execution on the given channel
+    /// </summary>
+    /// <param name="virtualFile">Virtual file path</param>
+    /// <param name="physicalFile">Physical file path</param>
+    /// <param name="channel">Code channel</param>
+    /// <returns>Code file instance</returns>
+    public CodeFile Create(CodeFile copyFrom, CodeChannel channel)
+    {
+        return ActivatorUtilities.CreateInstance<CodeFile>(serviceProvider, copyFrom, channel);
     }
 
     /// <summary>
@@ -49,11 +58,11 @@ public class FileFactory(IServiceProvider serviceProvider)
 
             if (channel != CodeChannel.Daemon)
             {
-                _logger.Info("Starting macro file {0} on channel {1}", virtualFile, channel);
+                logger.LogInformation("Starting macro file {File} on channel {Channel}", virtualFile, channel);
             }
             else
             {
-                _logger.Debug("Starting macro file {0} on channel {1}", virtualFile, channel);
+                logger.LogDebug("Starting macro file {File} on channel {Channel}", virtualFile, channel);
             }
             return macro;
         }
@@ -61,16 +70,16 @@ public class FileFactory(IServiceProvider serviceProvider)
         {
             if (channel != CodeChannel.Daemon)
             {
-                _logger.Debug("Macro file {0} not found", virtualFile);
+                logger.LogDebug("Macro file {File} not found", virtualFile);
             }
             else
             {
-                _logger.Trace("Macro file {0} not found", virtualFile);
+                logger.LogTrace("Macro file {File} not found", virtualFile);
             }
         }
         catch (Exception e)
         {
-            _logger.Error(e, "Failed to start macro file {0}: {1}", virtualFile, e.Message);
+            logger.LogError(e, "Failed to start macro file {File}", virtualFile);
         }
         return null;
     }

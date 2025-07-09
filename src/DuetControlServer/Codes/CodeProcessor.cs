@@ -7,6 +7,7 @@ using DuetControlServer.Files;
 using DuetControlServer.Utility;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -25,7 +26,7 @@ namespace DuetControlServer.Codes;
 /// <param name="model">Object model</param>
 /// <param name="lifetime">Application lifetime</param>
 /// <param name="serviceProvider">Service provider</param>
-[DiagnosticsPriority(-10)]
+[DiagnosticsPriority(0)]
 public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel model, IHostApplicationLifetime lifetime, IServiceProvider serviceProvider) : IDiagnostics
 {
     /// <summary>
@@ -130,7 +131,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
             // Wait for both file streams to reach the same position
             if (await DoSyncAsync(code, cancellationToken))
             {
-                await code.UpdateNextFilePositionAsync();
+                await code.UpdateNextFilePositionAsync(cancellationToken);
                 return true;
             }
             return false;
@@ -148,7 +149,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
         }
 
         // Done
-        await code.UpdateNextFilePositionAsync();
+        await code.UpdateNextFilePositionAsync(cancellationToken);
         return true;
     }
 
@@ -209,7 +210,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
             }
 
             // Log a warning if that failed
-            processor.Logger.Warn("Failed to move priority code {0} to an empty code channel because all of them are occupied", code);
+            processor.Logger.LogWarning("Failed to move priority code {Code} to an empty code channel because all of them are occupied", code);
         }
 
         // Deal with codes from code interceptors

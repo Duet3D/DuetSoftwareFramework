@@ -7,10 +7,12 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
+using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Utility;
 using DuetSharedLibrary;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 
@@ -19,29 +21,47 @@ namespace DuetControlServer.Model;
 /// <summary>
 /// Main object model with extensions for synchronization
 /// </summary>
-[DiagnosticsPriority(-7)]
+[DiagnosticsPriority(-3)]
 public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
 {
     /// <summary>
-    /// Host application lifetime
+    /// Lock for read/write access
     /// </summary>
-    private readonly IHostApplicationLifetime _lifetime;
+    private readonly AsyncReaderWriterLock _readWriteLock = new();
 
     /// <summary>
-    /// Settings
+    /// Base lock for update conditions
     /// </summary>
+    private readonly AsyncLock _updateLock = new();
+
+    /// <summary>
+    /// Condition variable to trigger when the machine model has been updated
+    /// </summary>
+    private readonly AsyncConditionVariable _updateEvent;
+
+    /// <summary>
+    /// Condition variable to trigger when the machine model has been fully updated from RepRapFirmware
+    /// </summary>
+    private readonly AsyncConditionVariable _fullUpdateEvent;
+
+    // Private fields
+    private readonly IHostApplicationLifetime _lifetime;
+    private readonly ILogger<ObjectModel> _logger;
     private readonly IOptions<Settings> _settings;
 
     /// <summary>
     /// Main constructor
     /// </summary>
     /// <param name="lifetime">Host application lifetime</param>
+    /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
-    public ObjectModel(IHostApplicationLifetime lifetime, IOptions<Settings> settings)
+    public ObjectModel(IHostApplicationLifetime lifetime, ILogger<ObjectModel> logger, IOptions<Settings> settings)
     {
-        _lifetime = lifetime;
         _updateEvent = new(_updateLock);
         _fullUpdateEvent = new(_updateLock);
+
+        _lifetime = lifetime;
+        _logger = logger;
         _settings = settings;
 
         OnDeserializationFailed += DeserializationFailedHandler;
@@ -66,31 +86,6 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
         Network.Hostname = Environment.MachineName;
         Network.Name = Environment.MachineName;
     }
-
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
-    /// <summary>
-    /// Lock for read/write access
-    /// </summary>
-    private readonly AsyncReaderWriterLock _readWriteLock = new();
-
-    /// <summary>
-    /// Base lock for update conditions
-    /// </summary>
-    private readonly AsyncLock _updateLock = new();
-
-    /// <summary>
-    /// Condition variable to trigger when the machine model has been updated
-    /// </summary>
-    private readonly AsyncConditionVariable _updateEvent;
-
-    /// <summary>
-    /// Condition variable to trigger when the machine model has been fully updated from RepRapFirmware
-    /// </summary>
-    private readonly AsyncConditionVariable _fullUpdateEvent;
 
     /// <summary>
     /// Function that is called when the object model has been updated
@@ -118,7 +113,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
         {
             if (value)
             {
-                State.Status = DuetAPI.ObjectModel.MachineStatus.Updating;
+                State.Status = MachineStatus.Updating;
             }
             _isUpdating = value;
         }
@@ -143,7 +138,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
             {
                 _deserializationErrors.Add(e.TargetType, new(sender.GetType(), e.JsonValue));
             }
-            _logger.Error("Failed to deserialize {0} -> {1} from {2}", sender.GetType().Name, e.TargetType.Name, e.JsonValue.GetRawText());
+            _logger.LogError("Failed to deserialize {TypeName} -> {TargetType} from {JSON}", sender.GetType().Name, e.TargetType.Name, e.JsonValue.GetRawText());
         }
     }
 
@@ -171,7 +166,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
         }
         catch (Exception e)
         {
-            _logger.Warn(e, "Failed to get CPU hardware");
+            _logger.LogWarning(e, "Failed to get CPU hardware");
         }
         return null;
     }
@@ -202,7 +197,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
         }
         catch (Exception e)
         {
-            _logger.Warn(e, "Failed to get number of CPU cores");
+            _logger.LogWarning(e, "Failed to get number of CPU cores");
         }
         return 1;
     }
@@ -228,7 +223,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
             }
             catch (Exception e)
             {
-                _logger.Warn(e, "Failed to get distribution");
+                _logger.LogWarning(e, "Failed to get distribution");
             }
         }
         return null;
@@ -258,7 +253,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
         }
         catch (Exception e)
         {
-            _logger.Warn(e, "Failed to get SBC model");
+            _logger.LogWarning(e, "Failed to get SBC model");
         }
         return null;
     }
@@ -287,7 +282,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
         }
         catch (Exception e)
         {
-            _logger.Warn(e, "Failed to get SBC serial");
+            _logger.LogWarning(e, "Failed to get SBC serial");
         }
         return null;
     }
@@ -306,7 +301,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
             }
             catch (Exception e)
             {
-                _logger.Warn(e, "Failed to get distribution build time");
+                _logger.LogWarning(e, "Failed to get distribution build time");
             }
         }
         return null;
@@ -339,7 +334,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
             }
             catch (Exception e)
             {
-                _logger.Warn(e, "Failed to get distribution build time");
+                _logger.LogWarning(e, "Failed to get distribution build time");
             }
         }
         return null;
@@ -351,7 +346,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// <returns>Disposable lock object to be used with a using directive</returns>
     public IDisposable AccessReadOnly(CancellationToken cancellationToken)
     {
-        return new LockWrapper(_readWriteLock.ReaderLock(cancellationToken), false, OnModelUpdated, _lifetime, this, _settings);
+        return new LockWrapper(_readWriteLock.ReaderLock(cancellationToken), false, OnModelUpdated, _lifetime, this, _logger, _settings);
     }
 
     /// <summary>
@@ -366,7 +361,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// <returns>Disposable lock object to be used with a using directive</returns>
     public IDisposable AccessReadWrite(CancellationToken cancellationToken)
     {
-        return new LockWrapper(_readWriteLock.WriterLock(cancellationToken), true, OnModelUpdated, _lifetime, this, _settings);
+        return new LockWrapper(_readWriteLock.WriterLock(cancellationToken), true, OnModelUpdated, _lifetime, this, _logger, _settings);
     }
 
     /// <summary>
@@ -381,7 +376,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// <returns>Disposable lock object to be used with a using directive</returns>
     public async Task<IDisposable> AccessReadOnlyAsync(CancellationToken cancellationToken)
     {
-        return new LockWrapper(await _readWriteLock.ReaderLockAsync(cancellationToken), false, OnModelUpdated, _lifetime, this, _settings);
+        return new LockWrapper(await _readWriteLock.ReaderLockAsync(cancellationToken), false, OnModelUpdated, _lifetime, this, _logger, _settings);
     }
 
     /// <summary>
@@ -396,7 +391,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// <returns>Disposable lock object to be used with a using directive</returns>
     public async Task<IDisposable> AccessReadWriteAsync(CancellationToken cancellationToken)
     {
-        return new LockWrapper(await _readWriteLock.WriterLockAsync(cancellationToken), true, OnModelUpdated, _lifetime, this, _settings);
+        return new LockWrapper(await _readWriteLock.WriterLockAsync(cancellationToken), true, OnModelUpdated, _lifetime, this, _logger, _settings);
     }
 
     /// <summary>
@@ -556,14 +551,14 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// <param name="level">Log level</param>
     /// <param name="message">Message to output</param>
     /// <returns>Whether the message has been written</returns>
-    public bool Output(LogLevel level, Message message)
+    public bool Output(EventLogLevel level, Message message, CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrWhiteSpace(message?.Content))
         {
-            using (AccessReadWrite())
+            using (AccessReadWrite(cancellationToken))
             {
                 // Can we output this message?
-                if (State.LogLevel == LogLevel.Off || (byte)State.LogLevel + (byte)level < 3)
+                if (State.LogLevel == EventLogLevel.Off || (byte)State.LogLevel + (byte)level < 3)
                 {
                     return false;
                 }
@@ -572,13 +567,13 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
                 switch (message.Type)
                 {
                     case MessageType.Error:
-                        _logger.Error(message.Content);
+                        _logger.LogError("{Message}", message.Content);
                         break;
                     case MessageType.Warning:
-                        _logger.Warn(message.Content);
+                        _logger.LogWarning("{Message}", message.Content);
                         break;
                     default:
-                        _logger.Info(message.Content);
+                        _logger.LogInformation("{Message}", message.Content);
                         break;
                 }
 
@@ -596,15 +591,16 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// </summary>
     /// <param name="level">Log level</param>
     /// <param name="message">Message to output</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Whether the message has been written</returns>
-    public async Task<bool> OutputAsync(LogLevel level, Message message)
+    public async Task<bool> OutputAsync(EventLogLevel level, Message message, CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrWhiteSpace(message?.Content))
         {
-            using (await AccessReadWriteAsync())
+            using (await AccessReadWriteAsync(cancellationToken))
             {
                 // Can we output this message?
-                if (State.LogLevel == LogLevel.Off || (byte)State.LogLevel + (byte)level < 3)
+                if (State.LogLevel == EventLogLevel.Off || (byte)State.LogLevel + (byte)level < 3)
                 {
                     return false;
                 }
@@ -613,13 +609,13 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
                 switch (message.Type)
                 {
                     case MessageType.Error:
-                        _logger.Error(message.Content);
+                        _logger.LogError("{Message}", message.Content);
                         break;
                     case MessageType.Warning:
-                        _logger.Warn(message.Content);
+                        _logger.LogWarning("{Message}", message.Content);
                         break;
                     default:
-                        _logger.Info(message.Content);
+                        _logger.LogInformation("{Message}", message.Content);
                         break;
                 }
 
@@ -636,8 +632,9 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// Output a generic message
     /// </summary>
     /// <param name="message">Message to output</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public void Output(Message message)
+    public void Output(Message message, CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrWhiteSpace(message?.Content))
         {
@@ -645,18 +642,18 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
             switch (message.Type)
             {
                 case MessageType.Error:
-                    _logger.Error(message.Content);
+                    _logger.LogError("{Message}", message.Content);
                     break;
                 case MessageType.Warning:
-                    _logger.Warn(message.Content);
+                    _logger.LogWarning("{Message}", message.Content);
                     break;
                 default:
-                    _logger.Info(message.Content);
+                    _logger.LogInformation("{Message}", message.Content);
                     break;
             }
 
             // Send it to the object model
-            using (AccessReadWrite())
+            using (AccessReadWrite(cancellationToken))
             {
                 Messages.Add(message);
             }
@@ -669,7 +666,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// <param name="message">Message to output</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public async Task OutputAsync(Message message, CancellationToken cancellationToken)
+    public async Task OutputAsync(Message message, CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrWhiteSpace(message?.Content))
         {
@@ -677,13 +674,13 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
             switch (message.Type)
             {
                 case MessageType.Error:
-                    _logger.Error(message.Content);
+                    _logger.LogError("{Message}", message.Content);
                     break;
                 case MessageType.Warning:
-                    _logger.Warn(message.Content);
+                    _logger.LogWarning("{Message}", message.Content);
                     break;
                 default:
-                    _logger.Info(message.Content);
+                    _logger.LogInformation("{Message}", message.Content);
                     break;
             }
 

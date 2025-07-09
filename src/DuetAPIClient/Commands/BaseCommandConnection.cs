@@ -922,7 +922,7 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
     /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public void WriteMessage(MessageType type, string message, bool outputMessage = true, LogLevel? logLevel = null)
+    public void WriteMessage(MessageType type, string message, bool outputMessage = true, EventLogLevel? logLevel = null)
     {
         PerformCommand(new WriteMessage { Type = type, Content = message, OutputMessage = outputMessage, LogLevel = logLevel });
     }
@@ -940,7 +940,7 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
     /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public async Task WriteMessageAsync(MessageType type, string message, bool outputMessage = true, LogLevel? logLevel = null, CancellationToken cancellationToken = default)
+    public async Task WriteMessageAsync(MessageType type, string message, bool outputMessage = true, EventLogLevel? logLevel = null, CancellationToken cancellationToken = default)
     {
         await PerformCommandAsync(new WriteMessage { Type = type, Content = message, OutputMessage = outputMessage, LogLevel = logLevel }, cancellationToken).ConfigureAwait(false);
     }
@@ -954,7 +954,7 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
     /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public void WriteMessage(Message message, bool outputMessage = true, LogLevel logLevel = LogLevel.Off)
+    public void WriteMessage(Message message, bool outputMessage = true, EventLogLevel logLevel = EventLogLevel.Off)
     {
         PerformCommand(new WriteMessage { Type = message.Type, Content = message.Content, OutputMessage = outputMessage, LogLevel = logLevel });
     }
@@ -971,7 +971,7 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
     /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public async Task WriteMessageAsync(Message message, bool outputMessage = true, LogLevel logLevel = LogLevel.Off, CancellationToken cancellationToken = default)
+    public async Task WriteMessageAsync(Message message, bool outputMessage = true, EventLogLevel logLevel = EventLogLevel.Off, CancellationToken cancellationToken = default)
     {
         await PerformCommandAsync(new WriteMessage { Type = message.Type, Content = message.Content, OutputMessage = outputMessage, LogLevel = logLevel }, cancellationToken).ConfigureAwait(false);
     }

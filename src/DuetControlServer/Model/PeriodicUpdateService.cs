@@ -3,6 +3,7 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Codes;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
@@ -22,13 +23,12 @@ namespace DuetControlServer.Model;
 /// <summary>
 /// Static class that updates the machine model in certain intervals
 /// </summary>
-public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel model, IOptions<Settings> settings) : BackgroundService
+/// <param name="codeFactory">Code factory to create codes</param>
+/// <param name="model">Object model</param>
+/// <param name="logger">Logger instance</param>
+/// <param name="settings">Settings of the application</param>
+public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel model, ILogger<PeriodicUpdateService> logger, IOptions<Settings> settings) : BackgroundService
 {
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
     /// <summary>
     /// List of enabled protocols
     /// </summary>
@@ -107,7 +107,7 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel 
             // Check if the system time has to be updated
             if (measuredDelay > TimeSpan.FromMilliseconds(settings.Value.HostUpdateInterval + 2000) && !Debugger.IsAttached)
             {
-                _logger.Info("System time has been changed");
+                logger.LogInformation("System time has been changed");
                 Code code = codeFactory.Create();
                 code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
                 code.Channel = CodeChannel.Trigger;
@@ -124,7 +124,7 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel 
             // Check if the hostname has to be updated
             if (lastHostname != Environment.MachineName)
             {
-                _logger.Info("Hostname has been changed");
+                logger.LogInformation("Hostname has been changed");
                 lastHostname = Environment.MachineName;
                 Code code = codeFactory.Create();
                 code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
@@ -254,7 +254,7 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel 
                 }
                 catch (Exception e)
                 {
-                    _logger.Debug(e, "Failed to get IPv4 configuration data");
+                    logger.LogDebug(e, "Failed to get IPv4 configuration data");
                 }
 
                 // .NET cannot determine if DHCP is used for a given adapter on Linux, so use "ip -4 addr" to get the IPv4 address lifetime (if any)
@@ -277,7 +277,7 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel 
                         }
                         catch (Exception e)
                         {
-                            _logger.Debug(e, "Failed to query DHCP info via ip utility");
+                            logger.LogDebug(e, "Failed to query DHCP info via ip utility");
                         }
                     }
                 }
@@ -344,7 +344,7 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel 
                     {
                         networkInterface.RSSI = null;
                         networkInterface.SSID = string.Empty;
-                        _logger.Debug(e);
+                        logger.LogDebug(e, "Failed to get WiFi data for interface {InterfaceName}", iface.Name);
                     }
                     networkInterface.Type = NetworkInterfaceType.WiFi;
                     networkInterface.WifiCountry = wifiCountry;
@@ -432,7 +432,7 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel 
         }
         catch (Exception e)
         {
-            _logger.Debug(e, "Failed to update SBC stats");
+            logger.LogDebug(e, "Failed to update SBC stats");
         }
     }
 

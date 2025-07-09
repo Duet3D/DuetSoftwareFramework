@@ -2,6 +2,7 @@
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 using System;
@@ -15,17 +16,17 @@ namespace DuetControlServer.Utility;
 /// <summary>
 /// Class for message logging
 /// </summary>
-public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions<Settings> settings, IHostApplicationLifetime lifetime)
+/// <param name="filePath">File path resolver</param>
+/// <param name="model">Object model</param>
+/// <param name="lifetime">Host application lifetime</param>
+/// <param name="logger">Logger instance</param>
+/// <param name="settings">Settings</param>
+public class EventLogger(FilePathResolver filePath, Model.ObjectModel model, IHostApplicationLifetime lifetime, ILogger<EventLogger> logger, IOptions<Settings> settings)
 {
     /// <summary>
     /// Default log file for M929 in case no P parameter is specified
     /// </summary>
     public const string DefaultLogFile = "eventlog.txt";
-
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
     /// <summary>
     /// Lock for the file
@@ -53,7 +54,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
     /// <param name="filename">Filename to write to</param>
     /// <param name="level">Requested log level</param>
     /// <returns>Asynchronous task</returns>
-    public void Start(string filename, LogLevel level)
+    public void Start(string filename, EventLogLevel level)
     {
         using (_lock.Lock(lifetime.ApplicationStopping))
         {
@@ -77,7 +78,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
             }
 
             // Write event
-            _logger.Info("Event logging to {0} started", filename);
+            logger.LogInformation("Event logging to {File} started", filename);
         }
     }
 
@@ -87,7 +88,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
     /// <param name="filename">Filename to write to</param>
     /// <param name="level">Requested log level</param>
     /// <returns>Asynchronous task</returns>
-    public async Task StartAsync(string filename, LogLevel level)
+    public async Task StartAsync(string filename, EventLogLevel level)
     {
         using (await _lock.LockAsync(lifetime.ApplicationStopping))
         {
@@ -111,7 +112,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
             }
 
             // Write event
-            _logger.Info("Event logging to {0} started", filename);
+            logger.LogInformation("Event logging to {File} started", filename);
         }
     }
 
@@ -151,7 +152,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
             _writer.Close();
             _writer = null;
 
-            _logger.Info("Event logging stopped");
+            logger.LogInformation("Event logging stopped");
         }
 
         if (_fileStream is not null)
@@ -171,7 +172,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
             using (model.AccessReadWrite(lifetime.ApplicationStopped))
             {
                 model.State.LogFile = null;
-                model.State.LogLevel = LogLevel.Off;
+                model.State.LogLevel = EventLogLevel.Off;
             }
         }
     }
@@ -188,7 +189,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
             _writer.Close();
             _writer = null;
 
-            _logger.Info("Event logging stopped");
+            logger.LogInformation("Event logging stopped");
         }
 
         if (_fileStream is not null)
@@ -208,7 +209,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
             using (await model.AccessReadWriteAsync(lifetime.ApplicationStopped))
             {
                 model.State.LogFile = null;
-                model.State.LogLevel = LogLevel.Off;
+                model.State.LogLevel = EventLogLevel.Off;
             }
         }
     }
@@ -218,15 +219,15 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
     /// </summary>
     /// <param name="level">Log level of the message</param>
     /// <param name="message">Message to log</param>
-    public void Log(LogLevel level, Message message)
+    public void Log(EventLogLevel level, Message message)
     {
         using (_lock.Lock(lifetime.ApplicationStopping))
         {
-            if (level != LogLevel.Off && _writer is not null && !string.IsNullOrWhiteSpace(message?.Content))
+            if (level != EventLogLevel.Off && _writer is not null && !string.IsNullOrWhiteSpace(message?.Content))
             {
                 using (model.AccessReadOnly())
                 {
-                    if (model.State.LogLevel == LogLevel.Off || level < model.State.LogLevel)
+                    if (model.State.LogLevel == EventLogLevel.Off || level < model.State.LogLevel)
                     {
                         return;
                     }
@@ -239,7 +240,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
                 }
                 catch (Exception e)
                 {
-                    _logger.Error(e, "Failed to write to log file");
+                    logger.LogError(e, "Failed to write to log file");
                     StopInternal();
                 }
             }
@@ -252,15 +253,15 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
     /// <param name="level">Log level of the message</param>
     /// <param name="message">Message to log</param>
     /// <returns>Asynchronous task</returns>
-    public async Task LogAsync(LogLevel level, Message message)
+    public async Task LogAsync(EventLogLevel level, Message message)
     {
         using (await _lock.LockAsync(lifetime.ApplicationStopping))
         {
-            if (level != LogLevel.Off && _writer is not null && !string.IsNullOrWhiteSpace(message?.Content))
+            if (level != EventLogLevel.Off && _writer is not null && !string.IsNullOrWhiteSpace(message?.Content))
             {
                 using (await model.AccessReadOnlyAsync())
                 {
-                    if (model.State.LogLevel == LogLevel.Off || level < model.State.LogLevel)
+                    if (model.State.LogLevel == EventLogLevel.Off || level < model.State.LogLevel)
                     {
                         return;
                     }
@@ -273,7 +274,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
                 }
                 catch (Exception e)
                 {
-                    _logger.Error(e, "Failed to write to log file");
+                    logger.LogError(e, "Failed to write to log file");
                     await StopInternalAsync();
                 }
             }
@@ -286,7 +287,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
     /// <param name="level">Log level</param>
     /// <param name="type">Message type</param>
     /// <param name="content">Message content</param>
-    public void Log(LogLevel level, MessageType type, string content) => Log(level, new Message(type, content));
+    public void Log(EventLogLevel level, MessageType type, string content) => Log(level, new Message(type, content));
 
     /// <summary>
     /// Write a message including timestamp to the log file asynchronously
@@ -295,7 +296,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
     /// <param name="type">Message type</param>
     /// <param name="content">Message content</param>
     /// <returns>Asynchronous task</returns>
-    public Task LogAsync(LogLevel level, MessageType type, string content) => LogAsync(level, new Message(type, content));
+    public Task LogAsync(EventLogLevel level, MessageType type, string content) => LogAsync(level, new Message(type, content));
 
     /// <summary>
     /// Write a message including timestamp to the log file
@@ -304,7 +305,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
     /// <param name="content">Message content</param>
     public void Log(MessageType type, string content)
     {
-        LogLevel level = (type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
+        EventLogLevel level = (type == MessageType.Success) ? EventLogLevel.Info : EventLogLevel.Warn;
         Log(level, new Message(type, content));
     }
 
@@ -316,7 +317,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
     /// <returns>Asynchronous task</returns>
     public async Task LogAsync(MessageType type, string content)
     {
-        LogLevel level = (type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
+        EventLogLevel level = (type == MessageType.Success) ? EventLogLevel.Info : EventLogLevel.Warn;
         await LogAsync(level, new Message(type, content));
     }
 
@@ -328,7 +329,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
     {
         if (message is not null && !string.IsNullOrEmpty(message.Content))
         {
-            LogLevel level = (message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
+            EventLogLevel level = (message.Type == MessageType.Success) ? EventLogLevel.Info : EventLogLevel.Warn;
             Log(level, message);
         }
     }
@@ -342,7 +343,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
     {
         if (message is not null && !string.IsNullOrEmpty(message.Content))
         {
-            LogLevel level = (message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn;
+            EventLogLevel level = (message.Type == MessageType.Success) ? EventLogLevel.Info : EventLogLevel.Warn;
             await LogAsync(level, message);
         }
     }
@@ -356,7 +357,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
         if (message is not null && !string.IsNullOrEmpty(message.Content))
         {
             model.Output(message);
-            Log((message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn, message);
+            Log((message.Type == MessageType.Success) ? EventLogLevel.Info : EventLogLevel.Warn, message);
         }
     }
 
@@ -371,7 +372,7 @@ public class Logger(FilePathResolver filePath, Model.ObjectModel model, IOptions
         if (message is not null && !string.IsNullOrEmpty(message.Content))
         {
             await model.OutputAsync(message, cancellationToken);
-            await LogAsync((message.Type == MessageType.Success) ? LogLevel.Info : LogLevel.Warn, message);
+            await LogAsync((message.Type == MessageType.Success) ? EventLogLevel.Info : EventLogLevel.Warn, message);
         }
     }
 

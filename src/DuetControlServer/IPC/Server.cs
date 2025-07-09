@@ -12,12 +12,13 @@ using DuetControlServer.Commands;
 using DuetControlServer.IPC.Processors;
 using DuetControlServer.Utility;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace DuetControlServer.IPC;
 
 /// <summary>
-/// Static class that holds main functionality for inter-process communication
+/// Class that holds main functionality for inter-process communication
 /// </summary>
 /// <param name="commandFactory">Factory to create commands</param>
 /// <param name="firmwareUpdater">Firmware updater</param>
@@ -25,14 +26,16 @@ namespace DuetControlServer.IPC;
 /// <param name="lockManager">Lock manager to handle read/write locks</param>
 /// <param name="model">Object model</param>
 /// <param name="lifetime">Host application lifetime</param>
+/// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings</param>
-[DiagnosticsPriority(-8)]
-public class Server(CommandFactory commandFactory,
+[DiagnosticsPriority(-2)]
+public sealed class Server(CommandFactory commandFactory,
     FirmwareUpdater firmwareUpdater,
     ProcessorFactory processorFactory,
     LockManager lockManager,
     Model.ObjectModel model,
     IHostApplicationLifetime lifetime,
+    ILogger<Server> logger,
     IOptions<Settings> settings) : BackgroundService, IDiagnostics
 {
     /// <summary>
@@ -40,11 +43,6 @@ public class Server(CommandFactory commandFactory,
     /// </summary>
     /// <seealso cref="Defaults.ProtocolVersion"/>
     public const int MinimumProtocolVersion = 7;
-
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
     /// <summary>
     /// UNIX socket for inter-process communication
@@ -78,7 +76,7 @@ public class Server(CommandFactory commandFactory,
         UnixDomainSocketEndPoint endPoint = new(settings.Value.FullSocketPath);
         _unixSocket.Bind(endPoint);
         _unixSocket.Listen(settings.Value.Backlog);
-        _logger.Info("IPC socket created at {0}", settings.Value.FullSocketPath);
+        logger.LogInformation("IPC socket created at {File}", settings.Value.FullSocketPath);
 
         // Start main service
         await base.StartAsync(cancellationToken);
@@ -153,11 +151,11 @@ public class Server(CommandFactory commandFactory,
     /// <returns>Asynchronous task</returns>
     private async Task ProcessConnectionAsync(Socket socket, CancellationToken cancellationToken)
     {
-        using Connection connection = new(socket, commandFactory);
+        using Connection connection = new(socket, commandFactory, logger);
         try
         {
             // Check if this connection is permitted
-            _logger.Debug("Got new connection IPC#{0}, checking permissions...", connection.Id);
+            logger.LogDebug("Got new connection IPC#{Id}, checking permissions...", connection.Id);
             if (await connection.AssignPermissionsAsync(model))
             {
                 // Send server-side init message to the client
@@ -186,12 +184,12 @@ public class Server(CommandFactory commandFactory,
                 }
                 else
                 {
-                    _logger.Debug("IPC#{0}: Failed to find processor", connection.Id);
+                    logger.LogDebug("IPC#{Id}: Failed to find processor", connection.Id);
                 }
             }
             else
             {
-                _logger.Warn("IPC#{0}: Terminating connection due to insufficient permissions", connection.Id);
+                logger.LogWarning("IPC#{Id}: Terminating connection due to insufficient permissions", connection.Id);
                 await connection.SendExceptionAsync(new UnauthorizedAccessException("Insufficient permissions"));
             }
         }
@@ -200,12 +198,12 @@ public class Server(CommandFactory commandFactory,
             if (e is not OperationCanceledException && e is not SocketException)
             {
                 // Log unexpected errors
-                _logger.Error(e, "IPC#{0}: Terminating connection due to unexpected exception", connection.Id);
+                logger.LogError(e, "IPC#{Id}: Terminating connection due to unexpected exception", connection.Id);
             }
         }
         finally
         {
-            _logger.Debug("IPC#{0}: Connection closed", connection.Id);
+            logger.LogDebug("IPC#{Id}: Connection closed", connection.Id);
 
             // Unlock the machine model again in case the client application crashed
             lockManager.UnlockMachineModel(connection);
@@ -230,13 +228,13 @@ public class Server(CommandFactory commandFactory,
             if (initMessage.Version < MinimumProtocolVersion || initMessage.Version > Defaults.ProtocolVersion)
             {
                 string message = $"Incompatible protocol version (got {initMessage.Version}, need {MinimumProtocolVersion} to {Defaults.ProtocolVersion})";
-                _logger.Warn("IPC#{0}: {1}", conn.Id, message);
+                logger.LogWarning("IPC#{Id}: {Message}", conn.Id, message);
                 await conn.SendResponseAsync(new IncompatibleVersionException(message));
                 return null;
             }
             else if (initMessage.Version != Defaults.ProtocolVersion)
             {
-                _logger.Warn("IPC#{0}: Client with outdated protocol version connected (got {1}, want {2})", conn.Id, initMessage.Version, Defaults.ProtocolVersion);
+                logger.LogWarning("IPC#{Id}: Client with outdated protocol version connected (got {Version}, want {WantedVersion})", conn.Id, initMessage.Version, Defaults.ProtocolVersion);
             }
 
             // Check the requested mode
@@ -279,7 +277,7 @@ public class Server(CommandFactory commandFactory,
         }
         catch (Exception e) when (e is not OperationCanceledException and not SocketException)
         {
-            _logger.Error(e, "IPC#{0}: Failed to assign connection processor", conn.Id);
+            logger.LogError(e, "IPC#{Id}: Failed to assign connection processor", conn.Id);
             await conn.SendResponseAsync(e);
         }
 
@@ -292,6 +290,6 @@ public class Server(CommandFactory commandFactory,
     /// <param name="builder">String builder to write to</param>
     public void PrintDiagnostics(StringBuilder builder)
     {
-        CodeInterception.PrintDiagnostics(builder);
+        CodeInterception.Diagnostics(builder);
     }
 }

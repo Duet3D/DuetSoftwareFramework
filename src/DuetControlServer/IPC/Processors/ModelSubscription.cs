@@ -15,6 +15,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using DuetControlServer.Link.Protocol.Shared;
+using Microsoft.Extensions.Logging;
 
 namespace DuetControlServer.IPC.Processors;
 
@@ -31,11 +32,6 @@ public sealed class ModelSubscription : IProcessor
     [
         typeof(Acknowledge)
     ];
-
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
     /// <summary>
     /// List of active subscribers
@@ -99,24 +95,11 @@ public sealed class ModelSubscription : IProcessor
     /// </summary>
     public Connection Connection { get; }
 
-    /// <summary>
-    /// Filter to access the machine model
-    /// </summary>
+    // Private fields
     private readonly Model.Filter _filter;
-
-    /// <summary>
-    /// Object model provider to access the machine model
-    /// </summary>
     private readonly Model.ObjectModel _model;
-    
-    /// <summary>
-    /// Observer to receive property change notifications
-    /// </summary>
     private readonly Model.Observer _observer;
-
-    /// <summary>
-    /// Settings
-    /// </summary>
+    private readonly ILogger<ModelSubscription> _logger;
     private readonly Settings _settings;
     
     /// <summary>
@@ -127,6 +110,7 @@ public sealed class ModelSubscription : IProcessor
     /// <param name="filter">Filter to access the machine model</param>
     /// <param name="model">Object model</param>
     /// <param name="observer">Observer to receive property change notifications</param>
+    /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
     public ModelSubscription(
         Connection conn,
@@ -134,6 +118,7 @@ public sealed class ModelSubscription : IProcessor
         Model.Filter filter,
         Model.ObjectModel model,
         Model.Observer observer,
+        ILogger<ModelSubscription> logger,
         IOptions<Settings> settings)
     {
         Connection = conn;
@@ -159,13 +144,14 @@ public sealed class ModelSubscription : IProcessor
         _filter = filter;
         _model = model;
         _observer = observer;
+        _logger = logger;
         _settings = settings.Value;
 
         lock (_subscriptions)
         {
             _subscriptions.Add(this);
         }
-        _logger.Debug("Subscription processor for IPC#{0} registered in {1} mode", conn.Id, _mode);
+        _logger.LogDebug("Subscription processor for IPC#{Id} registered in {Mode} mode", conn.Id, _mode);
     }
 
     /// <summary>
@@ -251,7 +237,7 @@ public sealed class ModelSubscription : IProcessor
                             Connection.Poll();
                             continue;
                         }
-                        _logger.Debug("IPC#{0}: Subscriber connection requested to terminate", Connection.Id);
+                        _logger.LogDebug("IPC#{Id}: Subscriber connection requested to terminate", Connection.Id);
                         throw;
                     }
                 }
@@ -299,7 +285,7 @@ public sealed class ModelSubscription : IProcessor
             {
                 _observer.OnPropertyPathChanged -= MachineModelPropertyChanged;
             }
-            _logger.Debug("IPC#{0}: Subscription processor unregistered", Connection.Id);
+            _logger.LogDebug("IPC#{Id}: Subscription processor unregistered", Connection.Id);
         }
     }
 
@@ -576,7 +562,7 @@ public sealed class ModelSubscription : IProcessor
             }
             catch (Exception e)
             {
-                _logger.Error(e, "IPC#{0}: Failed to record {1} = {2} ({3})", Connection.Id, string.Join('/', path), value, changeType);
+                _logger.LogError(e, "IPC#{Id}: Failed to record {Path} = {Value} ({ChangeType})", Connection.Id, string.Join('/', path), value, changeType);
             }
         }
     }

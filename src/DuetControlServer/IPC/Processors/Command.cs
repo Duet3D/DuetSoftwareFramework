@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Connection.InitMessages;
 using DuetControlServer.Commands;
+using Microsoft.Extensions.Logging;
 
 namespace DuetControlServer.IPC.Processors;
 
@@ -55,7 +56,7 @@ public sealed class Command : IProcessor
     /// <summary>
     /// Logger instance
     /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+    private readonly ILogger<Command> _logger;
 
     /// <summary>
     /// Connection to the IPC client served by this processor
@@ -67,11 +68,13 @@ public sealed class Command : IProcessor
     /// </summary>
     /// <param name="conn">Connection instance</param>
     /// <param name="initMessage">Initialization message from the client</param>
-    public Command(Connection conn, ClientInitMessage initMessage)
+    /// <param name="logger">Logger instance</param>
+    public Command(Connection conn, ClientInitMessage initMessage, ILogger<Command> logger)
     {
         Connection = conn;
+        _logger = logger;
 
-        _logger.Debug("Command processor added for IPC#{0}", conn.Id);
+        _logger.LogDebug("Command processor added for IPC#{Id}", conn.Id);
     }
 
     /// <summary>
@@ -122,16 +125,16 @@ public sealed class Command : IProcessor
                     {
                         if (e is UnauthorizedAccessException)
                         {
-                            _logger.Error("IPC#{0}: Insufficient permissions to execute {1}", Connection.Id, command.Command);
+                            _logger.LogError("IPC#{Id}: Insufficient permissions to execute {Command}", Connection.Id, command.Command);
                         }
                         else
                         {
-                            _logger.Error(e, "IPC#{0}: Failed to execute {1}", Connection.Id, command.Command);
+                            _logger.LogError(e, "IPC#{Id}: Failed to execute {Command}", Connection.Id, command.Command);
                         }
                     }
                     else
                     {
-                        _logger.Error(e, "IPC#{0}: Failed to receive command", Connection.Id);
+                        _logger.LogError(e, "IPC#{Id}: Failed to receive command", Connection.Id);
                     }
                 }
                 await Connection.SendExceptionAsync(e);

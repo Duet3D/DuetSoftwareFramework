@@ -318,7 +318,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
                 StringBuilder builder = new();
                 foreach (string expression in SplitExpression(code.KeywordArgument))
                 {
-                    string result = await EvaluateExpression(code, expression, !evaluateAll, false, cancellationToken);
+                    string result = await EvaluateExpressionAsync(code, expression, !evaluateAll, false, cancellationToken);
                     if (builder.Length != 0)
                     {
                         builder.Append(' ');
@@ -331,7 +331,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
             if (code.Keyword == KeywordType.Abort)
             {
                 string keywordArgument = code.KeywordArgument.Trim();
-                return await EvaluateExpression(code, keywordArgument, !evaluateAll, false, cancellationToken);
+                return await EvaluateExpressionAsync(code, keywordArgument, !evaluateAll, false, cancellationToken);
             }
 
             string keywordExpression;
@@ -359,7 +359,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
             }
 
             // Evaluate SBC properties
-            return await EvaluateExpression(code, keywordExpression.Trim(), !evaluateAll, false, cancellationToken);
+            return await EvaluateExpressionAsync(code, keywordExpression.Trim(), !evaluateAll, false, cancellationToken);
         }
 
         if (code.Parameters.Any(parameter => parameter.IsExpression))
@@ -370,7 +370,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
                 if (parameter.IsExpression)
                 {
                     string trimmedExpression = ((string)parameter).Trim();
-                    string parameterValue = await EvaluateExpression(code, trimmedExpression, !evaluateAll, !evaluateAll, cancellationToken);
+                    string parameterValue = await EvaluateExpressionAsync(code, trimmedExpression, !evaluateAll, !evaluateAll, cancellationToken);
                     if (!evaluateAll && !parameterValue.StartsWith('{') && !parameterValue.EndsWith('}'))
                     {
                         // Encapsulate fully expanded parameters so that plugins and RRF know it was an expression
@@ -747,12 +747,12 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
             }
 
             // Don't return exceptions from cancelled codes
-            code.CancellationToken.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 return await linkInterface.EvaluateExpressionAsync(code.Channel, subExpression, cancellationToken: cancellationToken);
             }
-            catch (CodeParserException) when (code.CancellationToken.IsCancellationRequested)
+            catch (CodeParserException) when (cancellationToken.IsCancellationRequested)
             {
                 throw new OperationCanceledException();
             }
@@ -909,12 +909,12 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
         }
 
         // Don't return exceptions from cancelled codes
-        code.CancellationToken.ThrowIfCancellationRequested();
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             return await linkInterface.EvaluateExpressionAsync(code.Channel, expressionContent, cancellationToken);
         }
-        catch (CodeParserException) when (code.CancellationToken.IsCancellationRequested)
+        catch (CodeParserException) when (cancellationToken.IsCancellationRequested)
         {
             throw new OperationCanceledException();
         }
@@ -931,7 +931,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
     /// <returns>Replaced expression(s)</returns>
     /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
     /// <exception cref="OperationCanceledException">Code was cancelled</exception>
-    public async Task<string> EvaluateExpression(Code code, string expression, bool onlySbcFields, bool encodeResult, CancellationToken cancellationToken = default)
+    public async Task<string> EvaluateExpressionAsync(Code code, string expression, bool onlySbcFields, bool encodeResult, CancellationToken cancellationToken = default)
     {
         object? result = await EvaluateExpressionRaw(code, expression, onlySbcFields, cancellationToken);
         return (onlySbcFields && result is string resultString) ? resultString : ObjectToString(result, false, encodeResult, code);

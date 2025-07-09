@@ -12,7 +12,7 @@ namespace DuetControlServer.Utility;
 /// </summary>
 /// <param name="logger">Logger</param>
 /// <param name="lifetime">Application lifetime</param>
-public class MQTT(Logger logger, IHostApplicationLifetime lifetime)
+public class MQTT(EventLogger logger, IHostApplicationLifetime lifetime)
 {
     private MqttClientOptionsBuilder? _clientOptionsBuilder = null;
     private MqttClientSubscribeOptions? _subscribeOptions = null;

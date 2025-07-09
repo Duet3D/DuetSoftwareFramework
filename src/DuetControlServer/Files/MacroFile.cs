@@ -4,7 +4,9 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Codes;
 using DuetControlServer.Codes.Meta;
 using DuetControlServer.Link;
+using DuetControlServer.Utility;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
@@ -23,15 +25,11 @@ public sealed class MacroFile : CodeFile, IDisposable
     // Private fields
     private readonly CodeFactory _codeFactory;
     private readonly CodeProcessor _codeProcessor;
-    private readonly Utility.Logger _dsfLogger;
+    private readonly EventLogger _eventLogger;
     private readonly Model.ObjectModel _model;
     private readonly IHostApplicationLifetime _lifetime;
+    private readonly ILogger<MacroFile> _logger;
     private readonly Settings _settings;
-
-    /// <summary>
-    /// Static logger instance
-    /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
     /// <summary>
     /// IPC connection that (indirectly) requested this macro file
@@ -107,24 +105,28 @@ public sealed class MacroFile : CodeFile, IDisposable
     /// <param name="sourceConnection">Original IPC connection requesting this macro file</param>
     /// <param name="codeFactory">Code factory</param>
     /// <param name="codeProcessor">Code processor</param>
-    /// <param name="dsfLogger">Duet Software Framework logger</param>
+    /// <param name="eventLogger">Event logger</param>
     /// <param name="expressions">Expression evaluator</param>
     /// <param name="linkInterface">Link interface</param>
     /// <param name="model">Object model</param>
     /// <param name="lifetime">Host application lifetime</param>
+    /// <param name="loggerFactory">Logger factory</param>
     /// <param name="settings">Settings</param>
     public MacroFile(CodeFilePath filePath, CodeChannel channel, Code startCode, int sourceConnection,
-        CodeFactory codeFactory, CodeProcessor codeProcessor, Utility.Logger dsfLogger, Expressions expressions, LinkInterface linkInterface, Model.ObjectModel model, IHostApplicationLifetime lifetime, IOptions<Settings> settings)
-        : base(filePath, channel, codeFactory, codeProcessor, expressions, linkInterface, model, lifetime, settings)
+        CodeFactory codeFactory, CodeProcessor codeProcessor, EventLogger eventLogger, Expressions expressions, LinkInterface linkInterface, Model.ObjectModel model,
+        IHostApplicationLifetime lifetime, ILoggerFactory loggerFactory, IOptions<Settings> settings)
+        : base(filePath, channel, codeFactory, codeProcessor, expressions, linkInterface, model, loggerFactory, settings)
     {
         SourceConnection = sourceConnection;
 
         _codeFactory = codeFactory;
         _codeProcessor = codeProcessor;
-        _dsfLogger = dsfLogger;
+        _eventLogger = eventLogger;
         _model = model;
-        _settings = settings.Value;
         _lifetime = lifetime;
+        _logger = loggerFactory.CreateLogger<MacroFile>();
+        _settings = settings.Value;
+
         _cts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
 
         // Are we executing dsf-config.g? Note that this file may not reside in /sys/ but in a custom sys location, so only check the requested filename
@@ -141,24 +143,25 @@ public sealed class MacroFile : CodeFile, IDisposable
     /// <param name="sourceConnection">Original IPC connection requesting this macro file</param>
     /// <param name="codeFactory">Code factory</param>
     /// <param name="codeProcessor">Code processor</param>
-    /// <param name="dsfLogger">Duet Software Framework logger</param>
+    /// <param name="eventLogger">Event logger</param>
     /// <param name="expressions">Expression evaluator</param>
     /// <param name="linkInterface">Link interface</param>
     /// <param name="model">Object model</param>
-    /// <param name="lifetime">Host application lifetime</param>
+    /// <param name="loggerFactory">Logger factory</param>
     /// <param name="settings">Settings</param>
     public MacroFile(CodeFilePath filePath, CodeChannel channel, int sourceConnection,
-        CodeFactory codeFactory, CodeProcessor codeProcessor, Utility.Logger dsfLogger, Expressions expressions, LinkInterface linkInterface, Model.ObjectModel model, IHostApplicationLifetime lifetime, IOptions<Settings> settings)
-        : base(filePath, channel, codeFactory, codeProcessor, expressions, linkInterface, model, lifetime, settings)
+        CodeFactory codeFactory, CodeProcessor codeProcessor, EventLogger eventLogger, Expressions expressions, LinkInterface linkInterface, Model.ObjectModel model, IHostApplicationLifetime lifetime, ILoggerFactory loggerFactory, IOptions<Settings> settings)
+        : base(filePath, channel, codeFactory, codeProcessor, expressions, linkInterface, model, loggerFactory, settings)
     {
         SourceConnection = sourceConnection;
 
         _codeFactory = codeFactory;
         _codeProcessor = codeProcessor;
-        _dsfLogger = dsfLogger;
+        _eventLogger = eventLogger;
         _model = model;
         _settings = settings.Value;
         _lifetime = lifetime;
+        _logger = loggerFactory.CreateLogger<MacroFile>();
         _cts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
 
         // Are we executing config.g or config-override.g?
@@ -180,9 +183,12 @@ public sealed class MacroFile : CodeFile, IDisposable
     /// <param name="linkInterface">Link interface</param>
     /// <param name="model">Object model</param>
     /// <param name="lifetime">Host application lifetime</param>
+    /// <param name="loggerFactory">Logger factory</param>
     /// <param name="settings">Settings</param>
-    public MacroFile(MacroFile copyFrom, CodeChannel channel, CodeProcessor codeProcessor, CodeFactory codeFactory, Expressions expressions, LinkInterface linkInterface, Model.ObjectModel model, IHostApplicationLifetime lifetime, IOptions<Settings> settings)
-        : base(copyFrom, channel, codeFactory, codeProcessor, expressions, linkInterface, model, lifetime, settings)
+    public MacroFile(MacroFile copyFrom, CodeChannel channel,
+        CodeProcessor codeProcessor, CodeFactory codeFactory, Expressions expressions, LinkInterface linkInterface, Model.ObjectModel model,
+        IHostApplicationLifetime lifetime, ILoggerFactory loggerFactory, IOptions<Settings> settings)
+        : base(copyFrom, channel, codeFactory, codeProcessor, expressions, linkInterface, model, loggerFactory, settings)
     {
         SourceConnection = copyFrom.SourceConnection;
         IsNested = copyFrom.IsNested;
@@ -194,10 +200,11 @@ public sealed class MacroFile : CodeFile, IDisposable
 
         _codeFactory = copyFrom._codeFactory;
         _codeProcessor = copyFrom._codeProcessor;
-        _dsfLogger = copyFrom._dsfLogger;
+        _eventLogger = copyFrom._eventLogger;
         _model = copyFrom._model;
         _settings = copyFrom._settings;
         _lifetime = copyFrom._lifetime;
+        _logger = loggerFactory.CreateLogger<MacroFile>();
         _cts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
     }
 
@@ -228,7 +235,7 @@ public sealed class MacroFile : CodeFile, IDisposable
         _cts.Cancel();
 
         Close();
-        _logger.Info("Aborted macro file {0}", FilePath.Virtual);
+        _logger.LogInformation("Aborted macro file {File}", FilePath.Virtual);
     }
 
     /// <summary>
@@ -361,7 +368,7 @@ public sealed class MacroFile : CodeFile, IDisposable
         // Flush this code channel to make sure it's our turn now
         if (!await _codeProcessor.FlushAsync(this))
         {
-            using (await LockAsync())
+            using (await LockAsync(_cts.Token))
             {
                 Abort();
             }
@@ -396,11 +403,11 @@ public sealed class MacroFile : CodeFile, IDisposable
                         }
 
                         await _model.HandleMacroErrorAsync(FilePath.Virtual, LineNumber, e.Message);
-                        await _dsfLogger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FilePath.Virtual)} line {LineNumber}: {e.Message}");
-                        _logger.Error(e);
+                        await _eventLogger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FilePath.Virtual)} line {LineNumber}: {e.Message}");
+                        _logger.LogError(e, "Error while reading code from macro file {File}", FilePath.Virtual);
                     }
 
-                    using (await LockAsync())
+                    using (await LockAsync(_lifetime.ApplicationStopping))
                     {
                         Abort();
                     }
@@ -429,11 +436,11 @@ public sealed class MacroFile : CodeFile, IDisposable
                         }
 
                         await _model.HandleMacroErrorAsync(FilePath.Virtual, code.LineNumber ?? 0, e.Message);
-                        await _dsfLogger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FilePath.Virtual)} line {code.LineNumber ?? 0}: {e.Message}");
-                        _logger.Warn(e);
+                        await _eventLogger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FilePath.Virtual)} line {code.LineNumber ?? 0}: {e.Message}");
+                        _logger.LogError(e, "Error while executing code {Code} from macro file {File}", code, FilePath.Virtual);
                     }
 
-                    using (await LockAsync())
+                    using (await LockAsync(_lifetime.ApplicationStopping))
                     {
                         Abort();
                     }
@@ -442,13 +449,13 @@ public sealed class MacroFile : CodeFile, IDisposable
             else
             {
                 // No more codes to process, macro file has finished
-                _logger.Debug("{0}: Finished codes from macro file {1}", Channel, FilePath.Virtual);
+                _logger.LogDebug("{Channel}: Finished codes from macro file {File}", Channel, FilePath.Virtual);
                 break;
             }
         }
         while (!_lifetime.ApplicationStopping.IsCancellationRequested);
 
-        using (await LockAsync())
+        using (await LockAsync(_lifetime.ApplicationStopping))
         {
             // No longer executing
             IsExecuting = false;
@@ -456,11 +463,11 @@ public sealed class MacroFile : CodeFile, IDisposable
             {
                 if (Channel != CodeChannel.Daemon)
                 {
-                    _logger.Info("{0}: Finished macro file {1}", Channel, FilePath.Virtual);
+                    _logger.LogInformation("{Channel}: Finished macro file {File}", Channel, FilePath.Virtual);
                 }
                 else
                 {
-                    _logger.Debug("{0}: Finished macro file {1}", Channel, FilePath.Virtual);
+                    _logger.LogDebug("{Channel}: Finished macro file {File}", Channel, FilePath.Virtual);
                 }
             }
 

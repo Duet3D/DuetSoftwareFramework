@@ -1,7 +1,7 @@
 ﻿using DuetAPI;
-using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Linq;
 using System.Text;
@@ -18,11 +18,6 @@ namespace DuetControlServer.Codes;
 public sealed class ChannelProcessor 
 {
     /// <summary>
-    /// Pipeline stages that support push/pop
-    /// </summary>
-    private readonly PipelineStage[] StagesWithStack = [.. Enum.GetValues<PipelineStage>().Where(value => value != PipelineStage.Executed)];
-
-    /// <summary>
     /// Channel of this pipeline
     /// </summary>
     public readonly CodeChannel Channel;
@@ -30,7 +25,7 @@ public sealed class ChannelProcessor
     /// <summary>
     /// Logger instance
     /// </summary>
-    public readonly NLog.Logger Logger;
+    public readonly ILogger<ChannelProcessor> Logger;
 
     /// <summary>
     /// Pipelines for code flow
@@ -42,10 +37,10 @@ public sealed class ChannelProcessor
     /// </summary>
     /// <param name="channel">Code channel</param>
     /// <param name="serviceProvider">Service provider to create pipeline instances</param>
-    public ChannelProcessor(CodeChannel channel, IServiceProvider serviceProvider)
+    public ChannelProcessor(CodeChannel channel, ILogger<ChannelProcessor> logger, IServiceProvider serviceProvider)
     {
         Channel = channel;
-        Logger = NLog.LogManager.GetLogger(channel.ToString()!);
+        Logger = logger;
 
         _pipelines = new Lazy<Pipelines.PipelineBase[]>(() => [
             ActivatorUtilities.CreateInstance<Pipelines.Start>(serviceProvider, this),
@@ -56,6 +51,11 @@ public sealed class ChannelProcessor
             ActivatorUtilities.CreateInstance<Pipelines.Executed>(serviceProvider, this)
         ]);
     }
+
+    /// <summary>
+    /// Pipeline stages that support push/pop
+    /// </summary>
+    private readonly PipelineStage[] StagesWithStack = [.. Enum.GetValues<PipelineStage>().Where(value => value != PipelineStage.Executed)];
 
     /// <summary>
     /// Retrieve the firmware state
@@ -162,13 +162,13 @@ public sealed class ChannelProcessor
     {
         foreach (Pipelines.PipelineBase pipeline in _pipelines.Value)
         {
-            //Logger.Debug("Flushing codes on stage {0}", pipeline.Stage);
+            //Logger.LogDebug("Flushing codes on stage {Stage}", pipeline.Stage);
             if (!await pipeline.FlushAsync(flushAll, cancellationToken))
             {
-                Logger.Debug("Failed to flush codes on stage {0}", pipeline.Stage);
+                Logger.LogDebug("Failed to flush codes on stage {Stage}", pipeline.Stage);
                 return false;
             }
-            //Logger.Debug("Flushed codes on stage {0}", pipeline.Stage);
+            //Logger.LogDebug("Flushed codes on stage {Stage}", pipeline.Stage);
         }
         return true;
     }
@@ -183,13 +183,13 @@ public sealed class ChannelProcessor
     {
         foreach (Pipelines.PipelineBase pipeline in _pipelines.Value)
         {
-            //Logger.Debug("Flushing file codes on stage {0} for {1}", pipeline.Stage, code);
+            //Logger.LogDebug("Flushing file codes on stage {Stage} for {Code}", pipeline.Stage, code);
             if (!await pipeline.FlushAsync(file, cancellationToken))
             {
-                Logger.Debug("Failed to flush file codes on stage {0} for {1}", pipeline.Stage, file.FilePath.Virtual);
+                Logger.LogDebug("Failed to flush file codes on stage {Stage} for {File}", pipeline.Stage, file.FilePath.Virtual);
                 return false;
             }
-            //Logger.Debug("Flushed file codes on stage {0} for {1}", pipeline.Stage, code);
+            //Logger.LogDebug("Flushed file codes on stage {Stage} for {Code}", pipeline.Stage, code);
         }
         return true;
     }
@@ -207,13 +207,13 @@ public sealed class ChannelProcessor
         {
             if (code.Stage == PipelineStage.Executed || pipeline.Stage > code.Stage)
             {
-                //Logger.Debug("Flushing codes on stage {0} for {1}", pipeline.Stage, code);
+                //Logger.LogDebug("Flushing codes on stage {Stage} for {Code}", pipeline.Stage, code);
                 if (!await pipeline.FlushAsync(code, cancellationToken))
                 {
-                    Logger.Debug("Failed to flush codes on stage {0} for {1}", pipeline.Stage, code);
+                    Logger.LogDebug("Failed to flush codes on stage {Stage} for {Code}", pipeline.Stage, code);
                     return false;
                 }
-                //Logger.Debug("Flushed codes on stage {0} for {1}", pipeline.Stage, code);
+                //Logger.LogDebug("Flushed codes on stage {Stage} for {Code}", pipeline.Stage, code);
             }
         }
         return true;
@@ -227,9 +227,9 @@ public sealed class ChannelProcessor
     /// <param name="stage">Stage level to enqueue it at</param>
     public void WriteCode(Commands.Code code, PipelineStage stage)
     {
-        //Logger.Debug("Sending code {0} to stage {1}", code, stage);
+        //Logger.LogDebug("Sending code {Code} to stage {Stage}", code, stage);
         _pipelines.Value[(int)stage].WriteCode(code);
-        //Logger.Debug("Sent code {0} to stage {1}", code, stage);
+        //Logger.LogDebug("Sent code {Code} to stage {Stage}", code, stage);
     }
 
     /// <summary>
@@ -239,8 +239,8 @@ public sealed class ChannelProcessor
     /// <param name="stage">Stage level to enqueue it at</param>
     public async ValueTask WriteCodeAsync(Commands.Code code, PipelineStage stage)
     {
-        //Logger.Debug("Sending code {0} to stage {1}", code, stage);
+        //Logger.LogDebug("Sending code {Code} to stage {Stage}", code, stage);
         await _pipelines.Value[(int)stage].WriteCodeAsync(code);
-        //Logger.Debug("Sent code {0} to stage {1}", code, stage);
+        //Logger.LogDebug("Sent code {Code} to stage {Stage}", code, stage);
     }
 }

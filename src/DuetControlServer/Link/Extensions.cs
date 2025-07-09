@@ -26,7 +26,8 @@ public static partial class ServiceCollectionExtensions
     public static IServiceCollection AddSPILink(this IServiceCollection services)
     {
         return services
-            .AddSingleton<Adapter.ILinkAdapter, Adapter.SPI>()
+            .AddSingleton<Adapter.SPI>()
+            .AddSingleton<Adapter.ILinkAdapter, Adapter.SPI>(services => services.GetRequiredService<Adapter.SPI>())
             .AddSingleton<LinkInterface>()
             .AddHostedService<LinkService>();
     }

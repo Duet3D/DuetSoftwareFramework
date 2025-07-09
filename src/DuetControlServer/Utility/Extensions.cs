@@ -17,7 +17,7 @@ public static partial class ServiceCollectionExtensions
         return services
             .AddSingleton<DiagnosticsProvider>()
             .AddSingleton<FirmwareUpdater>()
-            .AddSingleton<Logger>()
+            .AddSingleton<EventLogger>()
             .AddSingleton<MQTT>();
     }
 }

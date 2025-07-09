@@ -1,5 +1,6 @@
 ﻿using DuetControlServer.Files;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
@@ -238,7 +239,7 @@ public abstract class PipelineBase
             }
         }
 
-        ChannelProcessor.Logger.Error("Failed to find corresponding state for code {0}, cancelling it", code);
+        ChannelProcessor.Logger.LogError("Failed to find corresponding state for code {Code}, cancelling it", code);
         CodeProcessor.CancelCode(code);
         return ValueTask.CompletedTask;
     }

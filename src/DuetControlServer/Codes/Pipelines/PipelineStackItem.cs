@@ -1,6 +1,7 @@
 ﻿using DuetControlServer.Commands;
 using DuetControlServer.Files;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
 using System;
 using System.Threading;
@@ -83,7 +84,7 @@ public sealed class PipelineStackItem
                     }
                     catch (Exception e)
                     {
-                        pipeline.ChannelProcessor.Logger.Error(e, "Failed to process code in stage {0}", pipeline.Stage);
+                        pipeline.ChannelProcessor.Logger.LogError(e, "Failed to process code in stage {0}", pipeline.Stage);
                     }
 
                     // Code processed, see if there is more to do
@@ -178,7 +179,7 @@ public sealed class PipelineStackItem
         }
         if (!PendingCodes.Writer.TryWrite(code))
         {
-            _pipeline.ChannelProcessor.Logger.Error("Pipeline failed to store code immediately so waiting synchronously for it to be added");
+            _pipeline.ChannelProcessor.Logger.LogError("Pipeline failed to store code immediately so waiting synchronously for it to be added");
             PendingCodes.Writer.WriteAsync(code, _lifetime.ApplicationStopping).AsTask().Wait();
         }
     }

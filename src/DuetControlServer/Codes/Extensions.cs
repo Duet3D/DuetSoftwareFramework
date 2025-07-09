@@ -1,5 +1,3 @@
-using System;
-using DuetAPI;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DuetControlServer.Codes;

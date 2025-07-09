@@ -1,6 +1,7 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.Connection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Threading.Tasks;
@@ -36,7 +37,7 @@ public sealed class Post(ChannelProcessor channelProcessor, CodeProcessor codePr
             {
                 if (e is not OperationCanceledException)
                 {
-                    ChannelProcessor.Logger.Error(e, "Failed to execute code {0} on post stage", code);
+                    ChannelProcessor.Logger.LogError(e, "Failed to execute code {Code} on post stage", code);
                 }
                 CodeProcessor.CancelCode(code, e);
             }

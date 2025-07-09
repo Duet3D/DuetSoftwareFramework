@@ -1,4 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.IO;
@@ -11,15 +12,11 @@ namespace DuetControlServer.Commands;
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.AddHttpEndpoint"/> command
 /// </summary>
-/// <param name="model">Object model</param>
+/// <param name="model">Object model</param
+/// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings</param>
-public sealed class AddHttpEndpoint(Model.ObjectModel model, IOptions<Settings> settings) : DuetAPI.Commands.AddHttpEndpoint
+public sealed class AddHttpEndpoint(Model.ObjectModel model, ILogger<AddHttpEndpoint> logger, IOptions<Settings> settings) : DuetAPI.Commands.AddHttpEndpoint
 {
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
     /// <summary>
     /// Add a new HTTP endpoint
     /// </summary>
@@ -65,7 +62,7 @@ public sealed class AddHttpEndpoint(Model.ObjectModel model, IOptions<Settings> 
             endpoint.UnixSocket = socketPath;
         }
 
-        _logger.Debug("Registered new HTTP endpoint {0} machine/{1}/{2} via {3}", EndpointType, Namespace, Path, socketPath);
+        logger.LogDebug("Registered new HTTP endpoint {EndpointType} machine/{Namespace}/{Path} via {SocketPath}", EndpointType, Namespace, Path, socketPath);
         return socketPath;
     }
 

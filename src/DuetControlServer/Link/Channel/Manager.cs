@@ -1,6 +1,7 @@
 ﻿using DuetAPI;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Utility;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections;
@@ -16,7 +17,8 @@ namespace DuetControlServer.Link.Channel;
 /// Class used to manage access to channel processors
 /// </summary>
 /// <param name="provider">Service provider to use for creating channel processors</param>
-public class Manager(IServiceProvider provider) : IEnumerable<Processor>
+[DiagnosticsPriority(-6)]
+public class Manager(IServiceProvider provider) : IAsyncDiagnostics, IEnumerable<Processor>
 {
     /// <summary>
     /// List of different channels

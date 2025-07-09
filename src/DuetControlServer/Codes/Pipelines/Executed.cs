@@ -5,8 +5,10 @@ using DuetControlServer.Codes.Handlers;
 using DuetControlServer.Files;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
+using System.Security.AccessControl;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -19,7 +21,8 @@ namespace DuetControlServer.Codes.Pipelines;
 public sealed class Executed : PipelineBase
 {
     // Private fields
-    private readonly Utility.Logger _dsfLogger;
+    private readonly ChannelProcessor _channelProcessor;
+    private readonly Utility.EventLogger _eventLogger;
     private readonly Model.ObjectModel _model;
     private readonly ICodeHandler _gCodes;
     private readonly ICodeHandler _mCodes;
@@ -30,26 +33,27 @@ public sealed class Executed : PipelineBase
     /// <summary>
     /// Constructor of this class
     /// </summary>
-    /// <param name="processor">Channel processor</param>
+    /// <param name="channelProcessor">Channel processor</param>
     /// <param name="codeProcessor">Code processor</param>
-    /// <param name="dsfLogger">Internal logger</param>
+    /// <param name="eventLogger">Event logger</param>
     /// <param name="model">Object model</param>
     /// <param name="gCodes">G-code handler</param>
     /// <param name="mCodes">M-code handler</param>
     /// <param name="tCodes">T-code handler</param>
     /// <param name="lifetime">Application lifetime</param>
     /// <param name="settings">Application settings</param>
-    public Executed(ChannelProcessor processor,
+    public Executed(ChannelProcessor channelProcessor,
         CodeProcessor codeProcessor,
-        Utility.Logger dsfLogger,
+        Utility.EventLogger eventLogger,
         Model.ObjectModel model,
         [FromKeyedServices(Keys.GCodes)] ICodeHandler gCodes,
         [FromKeyedServices(Keys.MCodes)] ICodeHandler mCodes,
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
         IHostApplicationLifetime lifetime,
-        IOptions<Settings> settings) : base(PipelineStage.Executed, processor, codeProcessor, lifetime, settings)
+        IOptions<Settings> settings) : base(PipelineStage.Executed, channelProcessor, codeProcessor, lifetime, settings)
     {
-        _dsfLogger = dsfLogger;
+        _channelProcessor = channelProcessor;
+        _eventLogger = eventLogger;
         _model = model;
         _gCodes = gCodes;
         _mCodes = mCodes;
@@ -69,21 +73,21 @@ public sealed class Executed : PipelineBase
         if (code.Result is not null)
         {
             // Update the file position
-            await code.UpdateNextFilePositionAsync();
+            await code.UpdateNextFilePositionAsync(code.CancellationToken);
 
             // Notify code handlers
             switch (code.Type)
             {
                 case CodeType.GCode:
-                    await _gCodes.CodeExecutedAsync(code);
+                    await _gCodes.CodeExecutedAsync(code, code.CancellationToken);
                     break;
 
                 case CodeType.MCode:
-                    await _mCodes.CodeExecutedAsync(code);
+                    await _mCodes.CodeExecutedAsync(code, code.CancellationToken);
                     break;
 
                 case CodeType.TCode:
-                    await _tCodes.CodeExecutedAsync(code);
+                    await _tCodes.CodeExecutedAsync(code, code.CancellationToken);
                     break;
             }
 
@@ -100,7 +104,7 @@ public sealed class Executed : PipelineBase
                 // so we only need to log internal code replies that are not part of file prints
                 if (code.File is null || !code.IsFromFileChannel)
                 {
-                    await _dsfLogger.LogAsync(code.Result);
+                    await _eventLogger.LogAsync(code.Result);
                 }
             }
 
@@ -149,7 +153,7 @@ public sealed class Executed : PipelineBase
                 {
                     if (code.IsFromFileChannel)
                     {
-                        await _dsfLogger.LogOutputAsync(code.Result);
+                        await _eventLogger.LogOutputAsync(code.Result);
                     }
                     else
                     {
@@ -158,13 +162,13 @@ public sealed class Executed : PipelineBase
                 }
 
                 // Done
-                ChannelProcessor.Logger.Debug("Finished code {0}", code);
+                _channelProcessor.Logger.LogDebug("Finished code {Code}", code);
                 code.SetFinished();
             }
             else
             {
                 // Cancelled
-                ChannelProcessor.Logger.Debug("Cancelled code {0}", code);
+                _channelProcessor.Logger.LogDebug("Cancelled code {Code}", code);
                 code.SetCancelled();
             }
         }
@@ -173,7 +177,7 @@ public sealed class Executed : PipelineBase
             // Failed to finish code (IPC error?)
             if ((e is OperationCanceledException) != _lifetime.ApplicationStopping.IsCancellationRequested)
             {
-                ChannelProcessor.Logger.Error(e, "Executed interceptor threw an exception when finishing code {0}", code);
+                ChannelProcessor.Logger.LogError(e, "Executed interceptor threw an exception when finishing code {Code}", code);
             }
             code.SetException(e);
         }

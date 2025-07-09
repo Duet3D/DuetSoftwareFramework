@@ -7,6 +7,8 @@ using DuetControlServer.Link.Adapter;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link.Requests;
 using DuetControlServer.Utility;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 using System;
@@ -25,26 +27,27 @@ namespace DuetControlServer.Link.Channel;
 /// <remarks>
 /// This class should be merged with Codes.Pipelines.Firmware at some point
 /// </remarks>
-public sealed class Processor : IAsyncDiagnostics
+public sealed class Processor
 {
-    // Internal variables
+    /// <summary>
+    /// What code channel this class is about
+    /// </summary>
+    public CodeChannel Channel { get; }
+
+    // Private variables
     private readonly CodeFactory _codeFactory;
     private readonly CodeProcessor _codeProcessor;
     private readonly FilePathResolver _filePathResolver;
-    private readonly Logger _dsfLogger;
+    private readonly EventLogger _eventLogger;
     private readonly ILinkAdapter _linkAdapter;
     private readonly LinkInterface _linkInterface;
     private readonly JobProcessor _jobProcessor;
 
     private readonly Model.ObjectModel _model;
     private readonly FileFactory _macroFileFactory;
-    private readonly NLog.Logger _logger;
+    private readonly IHostApplicationLifetime _lifetime;
+    private readonly ILogger _logger;
     private readonly Settings _settings;
-
-    /// <summary>
-    /// What code channel this class is about
-    /// </summary>
-    public CodeChannel Channel { get; }
 
     /// <summary>
     /// Constructor of a code channel processor
@@ -52,38 +55,42 @@ public sealed class Processor : IAsyncDiagnostics
     /// <param name="channel">Code channel of this instance</param>
     /// <param name="codeFactory">Code factory</param>
     /// <param name="codeProcessor">Code processor</param>
-    /// <param name="dsfLogger">Logger for DSF messages</param>
+    /// <param name="eventLogger">Event logger</param>
     /// <param name="filePathResolver">File path resolver</param>
     /// <param name="linkAdapter">Link adapter</param>
     /// <param name="linkInterface">Link interface</param>
     /// <param name="jobProcessor">Job processor</param>
     /// <param name="macroFileFactory">Macro file factory</param>
     /// <param name="model">Object model</param>
+    /// <param name="loggerFactory">Logger factory</param>
     /// <param name="settings">Settings</param>
     public Processor(
         CodeChannel channel,
         CodeFactory codeFactory,
         CodeProcessor codeProcessor,
-        Logger dsfLogger,
+        EventLogger eventLogger,
         FilePathResolver filePathResolver,
         ILinkAdapter linkAdapter,
         LinkInterface linkInterface,
         JobProcessor jobProcessor,
         FileFactory macroFileFactory,
         Model.ObjectModel model,
+        IHostApplicationLifetime lifetime,
+        ILoggerFactory loggerFactory,
         IOptions<Settings> settings)
     {
         Channel = channel;
         _codeFactory = codeFactory;
         _codeProcessor = codeProcessor;
-        _dsfLogger = dsfLogger;
+        _eventLogger = eventLogger;
         _filePathResolver = filePathResolver;
         _jobProcessor = jobProcessor;
         _linkAdapter = linkAdapter;
         _linkInterface = linkInterface;
         _macroFileFactory = macroFileFactory;
         _model = model;
-        _logger = NLog.LogManager.GetLogger(channel.ToString());
+        _lifetime = lifetime;
+        _logger = loggerFactory.CreateLogger(channel.ToString());
         _settings = settings.Value;
 
         BaseState = CurrentState = new StackState(codeProcessor.GetFirmwareState(channel));
@@ -152,7 +159,7 @@ public sealed class Processor : IAsyncDiagnostics
         // Suspend the already buffered codes
         foreach (Code bufferedCode in BufferedCodes)
         {
-            _logger.Debug("Suspending code {0}", bufferedCode);
+            _logger.LogDebug("Suspending code {Code}", bufferedCode);
             CurrentState.SuspendedCodes.Enqueue(bufferedCode);
         }
         BytesBuffered = 0;
@@ -212,13 +219,13 @@ public sealed class Processor : IAsyncDiagnostics
         // Deal with macro files
         if (oldState.File is MacroFile macro)
         {
-            using (macro.Lock())
+            using (macro.Lock(_lifetime.ApplicationStopping))
             {
                 if (macro.IsExecuting)
                 {
                     if (!macro.IsAborted)
                     {
-                        _logger.Warn("Aborting orphaned macro file {0}", macro.FilePath.Virtual);
+                        _logger.LogWarning("Aborting orphaned macro file {File}", macro.FilePath.Virtual);
                         macro.Abort();
                     }
                 }
@@ -226,11 +233,11 @@ public sealed class Processor : IAsyncDiagnostics
                 {
                     if (Channel != CodeChannel.Daemon)
                     {
-                        _logger.Debug("Disposing macro file {0}", macro.FilePath.Virtual);
+                        _logger.LogDebug("Disposing macro file {File}", macro.FilePath.Virtual);
                     }
                     else
                     {
-                        _logger.Trace("Disposing macro file {0}", macro.FilePath.Virtual);
+                        _logger.LogTrace("Disposing macro file {File}", macro.FilePath.Virtual);
                     }
                     macro.Dispose();
                 }
@@ -240,7 +247,7 @@ public sealed class Processor : IAsyncDiagnostics
         // Invalidate macro start codes, pending codes, and flush requests
         if (oldState.StartCode is not null)
         {
-            _logger.Warn("==> Cancelling unfinished starting code: {0}", oldState.StartCode);
+            _logger.LogWarning("==> Cancelling unfinished starting code: {Code}", oldState.StartCode);
             _codeProcessor.CancelCode(oldState.StartCode);
         }
 
@@ -289,13 +296,13 @@ public sealed class Processor : IAsyncDiagnostics
         // Deal with macro files
         if (oldState.File is MacroFile macro)
         {
-            using (await macro.LockAsync())
+            using (await macro.LockAsync(_lifetime.ApplicationStopping))
             {
                 if (macro.IsExecuting)
                 {
                     if (!macro.IsAborted)
                     {
-                        _logger.Warn("Aborting orphaned macro file {0}", macro.FilePath.Virtual);
+                        _logger.LogWarning("Aborting orphaned macro file {File}", macro.FilePath.Virtual);
                         macro.Abort();
                     }
                 }
@@ -303,11 +310,11 @@ public sealed class Processor : IAsyncDiagnostics
                 {
                     if (Channel != CodeChannel.Daemon)
                     {
-                        _logger.Debug("Disposing macro file {0}", macro.FilePath.Virtual);
+                        _logger.LogDebug("Disposing macro file {File}", macro.FilePath.Virtual);
                     }
                     else
                     {
-                        _logger.Trace("Disposing macro file {0}", macro.FilePath.Virtual);
+                        _logger.LogTrace("Disposing macro file {File}", macro.FilePath.Virtual);
                     }
                     macro.Dispose();
                 }
@@ -317,7 +324,7 @@ public sealed class Processor : IAsyncDiagnostics
         // Invalidate macro start codes, pending codes, and flush requests
         if (oldState.StartCode is not null)
         {
-            _logger.Warn("==> Cancelling unfinished starting code: {0}", oldState.StartCode);
+            _logger.LogWarning("==> Cancelling unfinished starting code: {Code}", oldState.StartCode);
             _codeProcessor.CancelCode(oldState.StartCode);
         }
 
@@ -409,10 +416,9 @@ public sealed class Processor : IAsyncDiagnostics
     /// <summary>
     /// Print diagnostics of this class
     /// </summary>
-    /// <param name="builder"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
-    /// <exception cref="NotImplementedException"></exception>
+    /// <param name="builder">String builder to print to</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
     public async ValueTask PrintDiagnosticsAsync(StringBuilder builder, CancellationToken cancellationToken)
     {
         StringBuilder channelDiagostics = new();
@@ -524,7 +530,7 @@ public sealed class Processor : IAsyncDiagnostics
         }
 
         // Fallback, should not happen
-        _logger.Warn("Failed to find suitable stack level for flush request, falling back to current one");
+        _logger.LogWarning("Failed to find suitable stack level for flush request, falling back to current one");
         return GetFlushTask(CurrentState, cancellationToken);
     }
 
@@ -548,7 +554,7 @@ public sealed class Processor : IAsyncDiagnostics
         }
 
         // Fallback, should not happen
-        _logger.Warn("Failed to find suitable stack level for flush request, falling back to current one");
+        _logger.LogWarning("Failed to find suitable stack level for flush request, falling back to current one");
         return GetFlushTask(CurrentState, cancellationToken);
     }
 
@@ -591,7 +597,7 @@ public sealed class Processor : IAsyncDiagnostics
     {
         if (CurrentState.File is MacroFile macro)
         {
-            using (await macro.LockAsync())
+            using (await macro.LockAsync(_lifetime.ApplicationStopping))
             {
                 macro.IsPausable = isPausable;
             }
@@ -624,7 +630,7 @@ public sealed class Processor : IAsyncDiagnostics
 
             if (CurrentState.File is MacroFile macro)
             {
-                using (macro.Lock())
+                using (macro.Lock(_lifetime.ApplicationStopping))
                 {
                     if (startCode is not null && abortAll)
                     {
@@ -658,7 +664,7 @@ public sealed class Processor : IAsyncDiagnostics
             Pop();
             if (startCode is not null && abortAll)
             {
-                _logger.Debug("==> Unfinished starting code: {0}", startCode);
+                _logger.LogDebug("==> Unfinished starting code: {Code}", startCode);
             }
 
             // Stop if only a single file is supposed to be aborted
@@ -688,7 +694,7 @@ public sealed class Processor : IAsyncDiagnostics
             {
                 BytesBuffered += startCode.BinarySize;
                 BufferedCodes.Insert(0, startCode);
-                _logger.Debug("==> Resuming unfinished starting code: {0}", startCode);
+                _logger.LogDebug("==> Resuming unfinished starting code: {Code}", startCode);
             }
         }
 
@@ -720,7 +726,7 @@ public sealed class Processor : IAsyncDiagnostics
 
             if (CurrentState.File is MacroFile macro)
             {
-                using (await macro.LockAsync())
+                using (await macro.LockAsync(_lifetime.ApplicationStopping))
                 {
                     // Resolve potential start codes when the macro file finishes
                     if (startCode is not null)
@@ -753,7 +759,7 @@ public sealed class Processor : IAsyncDiagnostics
             await PopAsync();
             if (startCode is not null)
             {
-                _logger.Debug("==> Unfinished starting code: {0}", startCode);
+                _logger.LogDebug("==> Unfinished starting code: {Code}", startCode);
             }
         }
 
@@ -784,7 +790,7 @@ public sealed class Processor : IAsyncDiagnostics
                 return;
             }
         }
-        _logger.Error("Received a lock confirmation for a non-existent request!");
+        _logger.LogError("Received a lock confirmation for a non-existent request!");
     }
 
     /// <summary>
@@ -888,7 +894,7 @@ public sealed class Processor : IAsyncDiagnostics
                             Pop();
                             if (startCode is not null)
                             {
-                                _logger.Debug("==> Unfinished starting code: {0}", startCode);
+                                _logger.LogDebug("==> Unfinished starting code: {Code}", startCode);
                             }
                         }
                     }
@@ -911,7 +917,7 @@ public sealed class Processor : IAsyncDiagnostics
         {
             if (BufferCode(suspendedCode))
             {
-                _logger.Debug("-> Resumed suspended code");
+                _logger.LogDebug("-> Resumed suspended code");
                 CurrentState.SuspendedCodes.Dequeue();
             }
             else
@@ -947,7 +953,7 @@ public sealed class Processor : IAsyncDiagnostics
         // Log untracked code replies
         while (PendingReplies.TryPop(out Tuple<MessageTypeFlags, string>? reply))
         {
-            _logger.Warn("Pending out-of-order reply: '{0}'", reply.Item2);
+            _logger.LogWarning("Pending out-of-order reply: '{Reply}'", reply.Item2);
         }
     }
 
@@ -959,7 +965,7 @@ public sealed class Processor : IAsyncDiagnostics
     {
         try
         {
-            _logger.Debug("Running code from firmware '{0}' on channel {1}", code, Channel);
+            _logger.LogDebug("Running code from firmware '{Code}' on channel {Channel}", code, Channel);
             Code codeObj = _codeFactory.Create();
             codeObj.Channel = Channel;
             codeObj.Flags = CodeFlags.IsFromFirmware | CodeFlags.IsLastCode;
@@ -1002,13 +1008,13 @@ public sealed class Processor : IAsyncDiagnostics
                 }
                 catch (AggregateException ae)
                 {
-                    await _dsfLogger.LogOutputAsync(MessageType.Error, $"Failed to execute {code} from firmware: [{ae.InnerException!.GetType().Name}] {ae.InnerException.Message}");
-                    _logger.Warn(ae);
+                    await _eventLogger.LogOutputAsync(MessageType.Error, $"Failed to execute {code} from firmware: [{ae.InnerException!.GetType().Name}] {ae.InnerException.Message}");
+                    _logger.LogError(ae, "Failed to execute {Code} from firmware", code);
                 }
                 catch (Exception e)
                 {
-                    await _dsfLogger.LogOutputAsync(MessageType.Error, $"Failed to execute {code} from firmware: [{e.GetType().Name}] {e.Message}");
-                    _logger.Warn(e);
+                    await _eventLogger.LogOutputAsync(MessageType.Error, $"Failed to execute {code} from firmware: [{e.GetType().Name}] {e.Message}");
+                    _logger.LogError(e, "Failed to execute {Code} from firmware", code);
                 }
             }, TaskContinuationOptions.RunContinuationsAsynchronously);
         }
@@ -1049,14 +1055,14 @@ public sealed class Processor : IAsyncDiagnostics
             {
                 BytesBuffered += pendingCode.BinarySize;
                 BufferedCodes.Add(pendingCode);
-                _logger.Debug("Sent {0}, remaining space {1}, needed {2}", pendingCode, _settings.MaxBufferSpacePerChannel - BytesBuffered, pendingCode.BinarySize);
+                _logger.LogDebug("Sent {Code}, remaining space {BytesRemaining}, needed {BytesNeeded}", pendingCode, _settings.MaxBufferSpacePerChannel - BytesBuffered, pendingCode.BinarySize);
                 return true;
             }
             return false;
         }
         catch (Exception e)
         {
-            _logger.Debug(e, "Failed to buffer code {0}", pendingCode);
+            _logger.LogDebug(e, "Failed to buffer code {Code}", pendingCode);
             _codeProcessor.CancelCode(pendingCode, e);
             return true;
         }
@@ -1125,7 +1131,7 @@ public sealed class Processor : IAsyncDiagnostics
         {
             if (!_suppressEmptyReply)
             {
-                _logger.Warn("Out-of-order reply: '{0}'", reply);
+                _logger.LogWarning("Out-of-order reply: '{Reply}'", reply);
             }
             else
             {
@@ -1175,8 +1181,8 @@ public sealed class Processor : IAsyncDiagnostics
         {
             // Code reply is complete, resolve the code
             MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
-                        : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
-                        : MessageType.Success;
+                : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
+                : MessageType.Success;
             if (code.Result is null)
             {
                 code.Result = new Message(type, reply);
@@ -1209,7 +1215,7 @@ public sealed class Processor : IAsyncDiagnostics
         // Figure out which code requested the message box
         if (!CurrentState.WaitingForAcknowledgement)
         {
-            _logger.Debug("Waiting for acknowledgement");
+            _logger.LogDebug("Waiting for acknowledgement");
 
             Code? startCode = null;
             if (BufferedCodes.Count > 0)
@@ -1235,7 +1241,7 @@ public sealed class Processor : IAsyncDiagnostics
         Code? startCode = CurrentState.StartCode;
         if (startCode is not null)
         {
-            _logger.Debug("==> Unfinished starting code: {0}", startCode);
+            _logger.LogDebug("==> Unfinished starting code: {Code}", startCode);
 
             // Code has not finished yet, need a separate response for it
             BytesBuffered += startCode.BinarySize;
@@ -1254,7 +1260,7 @@ public sealed class Processor : IAsyncDiagnostics
     {
         if (CurrentState.WaitingForAcknowledgement)
         {
-            _logger.Debug("Message acknowledged");
+            _logger.LogDebug("Message acknowledged");
 
             Code? startCode = CurrentState.StartCode;
             if (startCode is not null)
@@ -1268,12 +1274,12 @@ public sealed class Processor : IAsyncDiagnostics
             Pop();
             if (startCode is not null)
             {
-                _logger.Debug("==> Unfinished starting code: {0}", startCode);
+                _logger.LogDebug("==> Unfinished starting code: {Code}", startCode);
             }
         }
         else
         {
-            _logger.Error("Tried to acknowledge a message, but no acknowledgement is requested!");
+            _logger.LogError("Tried to acknowledge a message, but no acknowledgement is requested!");
         }
     }
 
@@ -1290,7 +1296,7 @@ public sealed class Processor : IAsyncDiagnostics
         // Cannot start system macro if something is still busy
         if (!fromCode && Stack.Count > 1)
         {
-            _logger.Warn("System macro {0} is requested but the stack is not empty. Discarding request.", virtualFile);
+            _logger.LogWarning("System macro {File} is requested but the stack is not empty. Discarding request.", virtualFile);
             _linkAdapter.WriteMacroCompleted(Channel, true);
             return;
         }
@@ -1301,7 +1307,7 @@ public sealed class Processor : IAsyncDiagnostics
         {
             if (CurrentState.MacroCompleted)
             {
-                _logger.Info("Finished intermediate macro file {0}", CurrentState.File!.FilePath.Virtual);
+                _logger.LogInformation("Finished intermediate macro file {File}", CurrentState.File!.FilePath.Virtual);
                 startCode = CurrentState.StartCode;
                 CurrentState.StartCode = null;     // don't add it back to the buffered codes because it's about to be pushed on the stack again
                 Pop();
@@ -1315,7 +1321,7 @@ public sealed class Processor : IAsyncDiagnostics
         }
         else if (Stack.Count > 1)
         {
-            _logger.Warn("System macro {0} is requested but the stack is not empty. Discarding request.", virtualFile);
+            _logger.LogWarning("System macro {File} is requested but the stack is not empty. Discarding request.", virtualFile);
             _linkAdapter.WriteMacroCompleted(Channel, true);
             return;
         }
@@ -1332,7 +1338,7 @@ public sealed class Processor : IAsyncDiagnostics
             if (startCode is not null)
             {
                 startCode.UpdateNextFilePosition();
-                _logger.Debug("==> Starting code {0}", startCode);
+                _logger.LogDebug("==> Starting code {Code}", startCode);
             }
             macro.Start();
         }

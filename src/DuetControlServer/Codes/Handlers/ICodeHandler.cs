@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 
@@ -12,13 +13,15 @@ public interface ICodeHandler
     /// Process a code that should be interpreted by the control server
     /// </summary>
     /// <param name="code">Code to process</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result of the code if the code completed, else null</returns>
-    ValueTask<Message?> ProcessAsync(Commands.Code code);
+    ValueTask<Message?> ProcessAsync(Commands.Code code, CancellationToken cancellationToken);
 
     /// <summary>
     /// React to an executed code before its result is returned
     /// </summary>
     /// <param name="code">Code processed by RepRapFirmware</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result to output</returns>
-    ValueTask CodeExecutedAsync(Commands.Code code);
+    ValueTask CodeExecutedAsync(Commands.Code code, CancellationToken cancellationToken);
 }

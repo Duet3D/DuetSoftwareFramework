@@ -9,6 +9,7 @@ using DuetControlServer.Files;
 using DuetControlServer.Link.Adapter;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Utility;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 using Code = DuetControlServer.Commands.Code;
@@ -20,18 +21,15 @@ namespace DuetControlServer.Link;
 /// </summary>
 /// <param name="channels">Channel manager</param>
 /// <param name="linkAdapter">Firmware link adapter</param>
+/// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings</param>
-[DiagnosticsPriority(-6)]
+[DiagnosticsPriority(-5)]
 public sealed partial class LinkInterface(
     Channel.Manager channels,
     ILinkAdapter linkAdapter,
+    ILogger<LinkInterface> logger,
     IOptions<Settings> settings) : IDiagnostics
 {
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
     // Information about the code channels
     internal int BytesReserved, BufferSpace;
     internal readonly Queue<ModelQueryRequest> ModelQueryRequests = new();
@@ -130,7 +128,7 @@ public sealed partial class LinkInterface(
 
             EvaluateExpressionRequest request = new(channel, expression);
             EvaluateExpressionRequests.Add(request);
-            _logger.Debug("Evaluating {0} on channel {1}", expression, channel);
+            logger.LogDebug("Evaluating {Expression} on channel {Channel}", expression, channel);
 #warning add ct support
             return request.Task;
         }
@@ -175,11 +173,11 @@ public sealed partial class LinkInterface(
             VariableRequests.Add(request);
             if (expression is not null)
             {
-                _logger.Debug("Setting variable {0} to {1} on channel {2}", varName, expression, channel);
+                logger.LogDebug("Setting variable {Variable} to {Expression} on channel {Channel}", varName, expression, channel);
             }
             else
             {
-                _logger.Debug("Deleting local variable {0} on channel {1}", varName, channel);
+                logger.LogDebug("Deleting local variable {Variable} on channel {Channel}", varName, channel);
             }
         }
         return request.Task;

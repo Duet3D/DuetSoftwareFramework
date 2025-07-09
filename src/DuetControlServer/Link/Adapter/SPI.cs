@@ -13,22 +13,20 @@ using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
+using Microsoft.Extensions.Logging;
 
 namespace DuetControlServer.Link.Adapter;
 
 /// <summary>
 /// Class to handle the SPI link to the firmware
 /// </summary>
+[DiagnosticsPriority(-4)]
 public class SPI : IDiagnostics, ILinkAdapter
 {
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
     // General variables
-    private readonly Logger _dsfLogger;
+    private readonly EventLogger _eventLogger;
     private readonly Model.ObjectModel _model;
+    private readonly ILogger<SPI> _logger;
     private readonly Settings _settings;
 
     // General transfer variables
@@ -67,15 +65,17 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <summary>
     /// Constructor of this class
     /// </summary>
-    /// <param name="dsfLogger">Internal logger</param>
+    /// <param name="eventLogger">EVent logger</param>
     /// <param name="model">Object model</param>
+    /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
     /// <exception cref="OperationCanceledException">Failed to connect to board</exception>
-    public SPI(Logger dsfLogger, Model.ObjectModel model, IOptions<Settings> settings)
+    public SPI(EventLogger eventLogger, Model.ObjectModel model, ILogger<SPI> logger, IOptions<Settings> settings)
     {
         // Initialize variables
-        _dsfLogger = dsfLogger;
+        _eventLogger = eventLogger;
         _model = model;
+        _logger = logger;
         _settings = settings.Value;
         _bufferSize = settings.Value.SpiBufferSize;
         _rxBuffer = new byte[_bufferSize];
@@ -106,12 +106,12 @@ public class SPI : IDiagnostics, ILinkAdapter
             int maxSpiBufferSize = int.Parse(File.ReadAllText("/sys/module/spidev/parameters/bufsiz"));
             if (maxSpiBufferSize < _bufferSize)
             {
-                _logger.Warn("Kernel SPI buffer size is smaller than RepRapFirmware buffer size ({0} configured vs {1} required)", maxSpiBufferSize, Consts.BufferSize);
+                _logger.LogWarning("Kernel SPI buffer size is smaller than RepRapFirmware buffer size ({MaxBufferSize} configured vs {RequiredMaxBufferSize} required)", maxSpiBufferSize, Consts.BufferSize);
             }
         }
         catch (Exception e)
         {
-            _logger.Warn(e, "Failed to retrieve Kernel SPI buffer size");
+            _logger.LogWarning(e, "Failed to retrieve Kernel SPI buffer size");
         }
 
         // Perform the first transfer
@@ -260,13 +260,13 @@ public class SPI : IDiagnostics, ILinkAdapter
                 ProtocolVersion = _rxHeader.ProtocolVersion;
                 if ((_hadTimeout || !_connected) && ProtocolVersion != Consts.ProtocolVersion)
                 {
-                    _dsfLogger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
+                    _eventLogger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
                 }
 
                 // Deal with timeouts and the first transmission
                 if (_hadTimeout)
                 {
-                    _dsfLogger.LogOutput(MessageType.Success, "Connection to Duet established");
+                    _eventLogger.LogOutput(MessageType.Success, "Connection to Duet established");
                     _hadTimeout = _resetting = false;
                 }
                 else if (!_connected)
@@ -297,7 +297,7 @@ public class SPI : IDiagnostics, ILinkAdapter
                     throw;
                 }
 
-                _logger.Debug(e, "Lost connection to Duet");
+                _logger.LogDebug(e, "Lost connection to Duet");
                 _txHeader.ProtocolVersion = Consts.ProtocolVersion;
                 _waitingForFirstTransfer = true;
 
@@ -305,7 +305,7 @@ public class SPI : IDiagnostics, ILinkAdapter
                 {
                     _hadTimeout = true;
                     _model.ConnectionLost();
-                    _dsfLogger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({e.Message})");
+                    _eventLogger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({e.Message})");
                 }
                 _connected = false;
             }
@@ -536,8 +536,7 @@ public class SPI : IDiagnostics, ILinkAdapter
             stream.Write(_rxBuffer[.._rxHeader.DataLength].Span);
         }
 
-        string dump = "Received malformed packet:\n";
-        dump += $"=== Packet #{_lastPacket.Id} from offset {_rxPointer} request {_lastPacket.Request} (length {_lastPacket.Length}) ===\n";
+        string dump = $"=== Packet #{_lastPacket.Id} from offset {_rxPointer} request {_lastPacket.Request} (length {_lastPacket.Length}) ===\n";
         foreach (byte c in _packetData.Span)
         {
             dump += ((int)c).ToString("x2");
@@ -550,7 +549,7 @@ public class SPI : IDiagnostics, ILinkAdapter
         }
         dump += "\n";
         dump += "====================";
-        _logger.Error(dump);
+        _logger.LogError("Received malformed packet: {SpiDump}", dump);
     }
     #endregion
 
@@ -1295,7 +1294,7 @@ public class SPI : IDiagnostics, ILinkAdapter
                 if (stopwatch.ElapsedMilliseconds > timeout + 500)
                 {
                     // In case this application does not seem to get enough CPU time, log a different message
-                    _dsfLogger.LogOutput(MessageType.Warning, "Did not get enough CPU time during SPI transfer, your SBC may be overloaded");
+                    _eventLogger.LogOutput(MessageType.Warning, "Did not get enough CPU time during SPI transfer, your SBC may be overloaded");
                 }
                 throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
             }
@@ -1366,7 +1365,7 @@ public class SPI : IDiagnostics, ILinkAdapter
             uint responseCode = MemoryMarshal.Read<uint>(_rxHeaderBuffer.Span);
             if (responseCode == TransferResponse.BadResponse)
             {
-                _logger.Warn("Received bad response instead of header, retrying exchange of the data response");
+                _logger.LogWarning("Received bad response instead of header, retrying exchange of the data response");
                 if (_connected && ExchangeDataResponse(out bool success) && success)
                 {
                     continue;
@@ -1378,7 +1377,7 @@ public class SPI : IDiagnostics, ILinkAdapter
             _rxHeader = MemoryMarshal.Read<TransferHeader>(_rxHeaderBuffer.Span);
             if (_rxHeader.FormatCode == 0 || _rxHeader.FormatCode == 0xFF)
             {
-                _logger.Warn("Restarting full transfer because a bad header format code was received (0x{0:x2})", _rxHeader.FormatCode);
+                _logger.LogWarning("Restarting full transfer because a bad header format code was received (0x{0:x2})", _rxHeader.FormatCode);
                 ExchangeResponse(TransferResponse.BadResponse);
                 return false;
             }
@@ -1401,21 +1400,21 @@ public class SPI : IDiagnostics, ILinkAdapter
                 uint crc32 = CRC32.Calculate(_rxHeaderBuffer[..12].Span);
                 if (_rxHeader.ChecksumHeader32 != crc32)
                 {
-                    _logger.Warn("Bad header CRC32 (expected 0x{0:x8}, got 0x{1:x8})", _rxHeader.ChecksumHeader32, crc32);
+                    _logger.LogWarning("Bad header CRC32 (expected 0x{ExpectedChecksum:x8}, got 0x{ActualChecksum:x8})", _rxHeader.ChecksumHeader32.ToString("x8"), crc32.ToString(""));
                     responseCode = ExchangeResponse(TransferResponse.BadHeaderChecksum);
                     if (responseCode == TransferResponse.BadHeaderChecksum)
                     {
-                        _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
+                        _logger.LogWarning("Note: RepRapFirmware didn't receive valid data either (code 0x{ResponseCode:x8})", responseCode);
                     }
                     else
                     {
                         if (responseCode == TransferResponse.BadResponse)
                         {
-                            _logger.Warn("Restarting full transfer because RepRapFirmware received a bad header response");
+                            _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad header response");
                         }
                         else
                         {
-                            _logger.Warn("Restarting full transfer because an unexpected response code has been received (code 0x{0:x8})", responseCode);
+                            _logger.LogWarning("Restarting full transfer because an unexpected response code has been received (code 0x{ResponseCode:x8})", responseCode);
                             ExchangeResponse(TransferResponse.BadResponse);
                         }
                         return false;
@@ -1428,16 +1427,16 @@ public class SPI : IDiagnostics, ILinkAdapter
                 ushort crc16 = CRC16.Calculate(_rxHeaderBuffer[..10].Span);
                 if (_rxHeader.ChecksumHeader16 != crc16)
                 {
-                    _logger.Warn("Bad header CRC16 (expected 0x{0:x4}, got 0x{1:x4})", _rxHeader.ChecksumHeader16, crc16);
+                    _logger.LogWarning("Bad header CRC16 (expected 0x{ExpectedChecksum:x4}, got 0x{ActualChecksum:x4})", _rxHeader.ChecksumHeader16, crc16);
                     responseCode = ExchangeResponse(TransferResponse.BadHeaderChecksum);
                     if (responseCode == TransferResponse.BadResponse)
                     {
-                        _logger.Warn("Restarting full transfer because RepRapFirmware received a bad header response");
+                        _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad header response");
                         return false;
                     }
                     if (responseCode != TransferResponse.Success)
                     {
-                        _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
+                        _logger.LogWarning("Note: RepRapFirmware didn't receive valid data either (code 0x{ResponseCode:x8})", responseCode);
                     }
                     continue;
                 }
@@ -1468,8 +1467,7 @@ public class SPI : IDiagnostics, ILinkAdapter
 
             if (lastProtocolVersion != _txHeader.ProtocolVersion)
             {
-                _logger.Warn(_txHeader.ProtocolVersion < Consts.ProtocolVersion ? "Downgrading protocol version {0} to {1}" : "Upgrading protocol version {0} to {1}",
-                    lastProtocolVersion, _txHeader.ProtocolVersion);
+                _logger.LogWarning(_txHeader.ProtocolVersion < Consts.ProtocolVersion ? "Downgrading protocol version {ProtocolVersion} to {DowngradedProtocolVersion}" : "Upgrading protocol version {ProtocolVersion} to {UpgradedProtocolVersion}", lastProtocolVersion, _txHeader.ProtocolVersion);
             }
 
             // Check the data length
@@ -1492,13 +1490,13 @@ public class SPI : IDiagnostics, ILinkAdapter
                 case TransferResponse.BadDataLength:
                     throw new Exception("RepRapFirmware refused data length");
                 case TransferResponse.BadHeaderChecksum:
-                    _logger.Warn("RepRapFirmware got a bad header checksum");
+                    _logger.LogWarning("RepRapFirmware got a bad header checksum");
                     continue;
                 case TransferResponse.BadResponse:
-                    _logger.Warn("Restarting full transfer because RepRapFirmware received a bad header response");
+                    _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad header response");
                     return false;
                 default:
-                    _logger.Warn("Restarting full transfer because a bad header response was received (0x{0:x8})", response);
+                    _logger.LogWarning("Restarting full transfer because a bad header response was received (0x{ResponseCode:x8})", response);
                     if (_rxHeader.DataLength == 0 && _txPointer == 0)
                     {
                         // No data was transferred so we are still in sync. Continue with the next transfer
@@ -1512,7 +1510,7 @@ public class SPI : IDiagnostics, ILinkAdapter
             }
         }
 
-        _logger.Warn("Restarting full transfer because the number of maximum retries has been exceeded");
+        _logger.LogWarning("Restarting full transfer because the number of maximum retries has been exceeded");
         ExchangeResponse(TransferResponse.BadResponse);
         return false;
     }
@@ -1549,7 +1547,7 @@ public class SPI : IDiagnostics, ILinkAdapter
             uint responseCode = MemoryMarshal.Read<uint>(_rxBuffer.Span);
             if (responseCode == TransferResponse.BadResponse)
             {
-                _logger.Warn("Restarting full transfer because RepRapFirmware received a bad data response");
+                _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad data response");
                 return false;
             }
 
@@ -1559,21 +1557,21 @@ public class SPI : IDiagnostics, ILinkAdapter
                 uint crc32 = CRC32.Calculate(_rxBuffer[.._rxHeader.DataLength].Span);
                 if (crc32 != _rxHeader.ChecksumData32)
                 {
-                    _logger.Warn("Bad data CRC32 (expected 0x{0:x8}, got 0x{1:x8})", _rxHeader.ChecksumData32, crc32);
+                    _logger.LogWarning("Bad data CRC32 (expected 0x{ExpectedChecksum:x8}, got 0x{ActualChecksum:x8})", _rxHeader.ChecksumData32, crc32);
                     responseCode = ExchangeResponse(TransferResponse.BadDataChecksum);
                     if (responseCode == TransferResponse.BadDataChecksum)
                     {
-                        _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
+                        _logger.LogWarning("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
                     }
                     else
                     {
                         if (responseCode == TransferResponse.BadResponse)
                         {
-                            _logger.Warn("Restarting full transfer because RepRapFirmware received a bad data response");
+                            _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad data response");
                         }
                         else
                         {
-                            _logger.Warn("Restarting full transfer because an unexpected response code has been received (code 0x{0:x8})", responseCode);
+                            _logger.LogWarning("Restarting full transfer because an unexpected response code has been received (code 0x{ResponseCode:x8})", responseCode);
                             ExchangeResponse(TransferResponse.BadResponse);
                         }
                         return false;
@@ -1586,16 +1584,16 @@ public class SPI : IDiagnostics, ILinkAdapter
                 ushort crc16 = CRC16.Calculate(_rxBuffer[.._rxHeader.DataLength].Span);
                 if (crc16 != _rxHeader.ChecksumData16)
                 {
-                    _logger.Warn("Bad data CRC16 (expected 0x{0:x4}, got 0x{1:x4})", _rxHeader.ChecksumData16, crc16);
+                    _logger.LogWarning("Bad data CRC16 (expected 0x{ExpectedChecksum:x4}, got 0x{ActualChecksum:x4})", _rxHeader.ChecksumData16, crc16);
                     responseCode = ExchangeResponse(TransferResponse.BadDataChecksum);
                     if (responseCode == TransferResponse.BadResponse)
                     {
-                        _logger.Warn("Restarting full transfer because RepRapFirmware received a bad data response");
+                        _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad data response");
                         return false;
                     }
                     if (responseCode != TransferResponse.Success)
                     {
-                        _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
+                        _logger.LogWarning("Note: RepRapFirmware didn't receive valid data either (code 0x{ResponseCode:x8})", responseCode);
                     }
                     continue;
                 }
@@ -1619,22 +1617,22 @@ public class SPI : IDiagnostics, ILinkAdapter
     {
         for (int retry = 0; retry < _settings.MaxSpiRetries; retry++)
         {
-            uint response = ExchangeResponse(TransferResponse.Success);
-            switch (response)
+            uint responseCode = ExchangeResponse(TransferResponse.Success);
+            switch (responseCode)
             {
                 case TransferResponse.Success:
                     success = true;
                     return true;
                 case TransferResponse.BadDataChecksum:
-                    _logger.Warn("RepRapFirmware got a bad data checksum");
+                    _logger.LogWarning("RepRapFirmware got a bad data checksum");
                     success = false;
                     return false;
                 case TransferResponse.BadResponse:
-                    _logger.Warn("Restarting full transfer because RepRapFirmware received a bad data response");
+                    _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad data response");
                     success = false;
                     return true;
                 default:
-                    _logger.Warn("Restarting data response exchange because a bad code was received (0x{0:x8})", response);
+                    _logger.LogWarning("Restarting data response exchange because a bad code was received (0x{ResponseCode:x8})", responseCode);
                     ExchangeResponse(TransferResponse.BadResponse);
                     continue;
             }

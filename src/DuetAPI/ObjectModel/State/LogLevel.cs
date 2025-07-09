@@ -6,8 +6,8 @@ namespace DuetAPI.ObjectModel;
 /// <summary>
 /// Class representing the configured log level
 /// </summary>
-[JsonConverter(typeof(JsonCamelCaseStringEnumConverter<LogLevel>))]
-public enum LogLevel : byte
+[JsonConverter(typeof(JsonCamelCaseStringEnumConverter<EventLogLevel>))]
+public enum EventLogLevel : byte
 {
     /// <summary>
     /// Log everything including debug messages

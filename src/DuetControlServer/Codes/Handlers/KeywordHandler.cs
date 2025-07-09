@@ -4,10 +4,12 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Codes.Meta;
 using DuetControlServer.Files;
 using DuetControlServer.Link;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Codes.Handlers;
@@ -19,26 +21,22 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="expressions">Meta G-code expression parser</param>
 /// <param name="filePathResolver">File path resolver</param>
 /// <param name="linkInterface">Link interface</param>
+/// <param name="logger">Logger</param>
 /// <param name="settings">Settings</param>
-public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expressions, FilePathResolver filePathResolver, LinkInterface linkInterface, IOptions<Settings> settings) : ICodeHandler
+public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expressions, FilePathResolver filePathResolver, LinkInterface linkInterface, ILogger<KeywordHandler> logger, IOptions<Settings> settings) : ICodeHandler
 {
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
-    /// <summary>
-    /// Settings instance
-    /// </summary>
+    // Private fields
+    private readonly ILogger<KeywordHandler> _logger = logger;
     private readonly Settings _settings = settings.Value;
 
     /// <summary>
     /// Process a non-branching meta G-code statement
     /// </summary>
     /// <param name="code">Code to process</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result of the code if the code completed</returns>
     /// <exception cref="OperationCanceledException">The code was cancelled</exception>
-    public async ValueTask<Message?> ProcessAsync(Commands.Code code)
+    public async ValueTask<Message?> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.KeywordArgument is null)
         {
@@ -50,9 +48,9 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
         {
             case KeywordType.Echo:
             case KeywordType.Abort:
-                if (!await codeProcessor.FlushAsync(code, false))
+                if (!await codeProcessor.FlushAsync(code, false, cancellationToken: cancellationToken))
                 {
-                    if (!code.CancellationToken.IsCancellationRequested)
+                    if (!cancellationToken.IsCancellationRequested)
                     {
                         // echo and abort may be executed only if the channel is active
                         return new Message();
@@ -131,12 +129,12 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                         }
 
                         // Evaluate the filename and result to write
-                        string filename = await expressions.EvaluateExpression(code, filenameExpression, false, false);
-                        string physicalFilename = await filePathResolver.ToPhysicalAsync(filename, FileDirectory.System), parentDirectory = Path.GetDirectoryName(physicalFilename)!;
-                        result = await expressions.EvaluateAsync(code, true);
+                        string filename = await expressions.EvaluateExpressionAsync(code, filenameExpression, false, false, cancellationToken);
+                        string physicalFilename = await filePathResolver.ToPhysicalAsync(filename, FileDirectory.System, cancellationToken), parentDirectory = Path.GetDirectoryName(physicalFilename)!;
+                        result = await expressions.EvaluateAsync(code, true, cancellationToken);
 
                         // Write it to the designated file
-                        _logger.Debug("{0} '{1}' to {2}", append ? "Appending" : "Writing", result, filename);
+                        _logger.LogDebug("{Operation} '{Expression}' to {File}", append ? "Appending" : "Writing", result, filename);
 
                         if (!Directory.Exists(parentDirectory))
                         {
@@ -160,7 +158,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                         return new Message();
                     }
                 }
-                result = await expressions.EvaluateAsync(code, true);
+                result = await expressions.EvaluateAsync(code, true, cancellationToken);
 
                 if (code.Keyword == KeywordType.Abort)
                 {
@@ -172,7 +170,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
             case KeywordType.Var:
             case KeywordType.Set:
                 // Do not attempt to process cancelled codes
-                code.CancellationToken.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
 
                 // Validate the keyword and expression first
                 string varName = string.Empty, expression = string.Empty;
@@ -223,7 +221,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                         // Permit only a certain subset of chars for variable names
                         if (!char.IsLetterOrDigit(c) && c != '_' && (c != '.' || code.Keyword != KeywordType.Set) || wantExpression)
                         {
-                            if (!await codeProcessor.FlushAsync(code, false, ifExecuting: code.Keyword == KeywordType.Global))
+                            if (!await codeProcessor.FlushAsync(code, false, ifExecuting: code.Keyword == KeywordType.Global, cancellationToken: cancellationToken))
                             {
                                 throw new OperationCanceledException();
                             }
@@ -238,7 +236,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                     }
                 }
 
-                if (!await codeProcessor.FlushAsync(code, false, ifExecuting: code.Keyword == KeywordType.Global || (code.Keyword == KeywordType.Set && varName.StartsWith("global."))))
+                if (!await codeProcessor.FlushAsync(code, false, ifExecuting: code.Keyword == KeywordType.Global || (code.Keyword == KeywordType.Set && varName.StartsWith("global.")), cancellationToken: cancellationToken))
                 {
                     // global and set global.* may be only executed if the corresponding channel is active
                     throw new OperationCanceledException();
@@ -255,11 +253,11 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                 }
 
                 // Replace SBC fields and prepare the variable name
-                expression = await expressions.EvaluateAsync(code, false) ?? string.Empty;
+                expression = await expressions.EvaluateAsync(code, false, cancellationToken) ?? string.Empty;
                 string fullVarName = varName;
                 if (code.Keyword == KeywordType.Set)
                 {
-                    fullVarName = await expressions.EvaluateExpression(code, fullVarName, true, false);
+                    fullVarName = await expressions.EvaluateExpressionAsync(code, fullVarName, true, false, cancellationToken);
                 }
                 else
                 {
@@ -267,13 +265,13 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                 }
 
                 // Assign the variable
-                object? varContent = await linkInterface.SetVariableAsync(code.Channel, code.Keyword != KeywordType.Set, fullVarName, expression);
-                _logger.Debug("Set variable {0} to {1}", fullVarName, varContent);
+                object? value = await linkInterface.SetVariableAsync(code.Channel, code.Keyword != KeywordType.Set, fullVarName, expression, cancellationToken);
+                _logger.LogDebug("Set variable {Variable} to {Value}", fullVarName, value);
 
                 // Keep track of it
                 if (code.Keyword == KeywordType.Var && code.File is not null)
                 {
-                    using (await code.File.LockAsync())
+                    using (await code.File.LockAsync(cancellationToken))
                     {
                         code.File.AddLocalVariable(varName);
                     }
@@ -288,6 +286,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
     /// React to an executed T-code before its result is returned
     /// </summary>
     /// <param name="code">Code processed by RepRapFirmware</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result to output</returns>
-    public ValueTask CodeExecutedAsync(Commands.Code code) => ValueTask.CompletedTask;
+    public ValueTask CodeExecutedAsync(Commands.Code code, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }

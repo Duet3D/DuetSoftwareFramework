@@ -4,6 +4,7 @@ using DuetAPI.Connection.InitMessages;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Commands;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 using System;
@@ -19,11 +20,6 @@ namespace DuetControlServer.IPC.Processors;
 /// </summary>
 public sealed class PluginService : IProcessor
 {
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
     /// <summary>
     /// Monitor for the service interfaces
     /// </summary>
@@ -111,11 +107,13 @@ public sealed class PluginService : IProcessor
     /// <param name="initMessage">Initialization message from the client</param>
     /// <param name="commandFactory">Command factory to create commands</param>
     /// <param name="model">Object model instance</param>
+    /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
     public PluginService(Connection conn,
         ClientInitMessage initMessage,
         CommandFactory commandFactory,
         Model.ObjectModel model,
+        ILogger<PluginService> logger,
         IOptions<Settings> settings)
     {
         Connection = conn;
@@ -123,7 +121,7 @@ public sealed class PluginService : IProcessor
         _model = model;
         _settings = settings.Value;
 
-        _logger.Debug("PluginService processor added for IPC#{0}", conn.Id);
+        logger.LogDebug("PluginService processor added for IPC#{Id}", conn.Id);
     }
 
     /// <summary>

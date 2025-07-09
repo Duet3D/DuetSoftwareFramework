@@ -16,71 +16,71 @@ using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Codes.Meta;
 using DuetControlServer.Link;
+using Microsoft.Extensions.Logging;
 
 namespace DuetControlServer.Files;
 
 /// <summary>
 /// Main class dealing with job files
 /// </summary>
-[DiagnosticsPriority(-9)]
+[DiagnosticsPriority(-1)]
 public class JobProcessor : BackgroundService, IAsyncDiagnostics
 {
     // Private fields
     private readonly CodeProcessor _codeProcessor;
     private readonly CodeFactory _codeFactory;
-    private readonly Logger _dsfLogger;
+    private readonly EventLogger _eventLogger;
     private readonly Expressions _expressions;
     private readonly FileFactory _fileFactory;
     private readonly Parser.FileInfoParser _fileInfoParser;
     private readonly LinkInterface _linkInterface;
     private readonly Model.ObjectModel _model;
-    private readonly IOptions<Settings> _settings;
+    private readonly ILogger<JobProcessor> _logger;
     private readonly IHostApplicationLifetime _lifetime;
+    private readonly IOptions<Settings> _settings;
 
     /// <summary>
     /// Constructor of this class
     /// </summary>
     /// <param name="codeFactory">Code factory</param>
     /// <param name="codeProcessor">Code processor</param>
-    /// <param name="dsfLogger">Internal logger</param>
+    /// <param name="eventLogger">Event logger</param>
     /// <param name="expressions">Expressions</param>
     /// <param name="fileFactory">File factory</param>
     /// <param name="fileInfoParser">File info parser</param>
     /// <param name="linkInterface">Link interface</param>
     /// <param name="model">Object Model</param>
-    /// <param name="settings">Settings</param>
     /// <param name="lifetime">Host application lifetime</param>
+    /// <param name="logger">Logger</param>
+    /// <param name="settings">Settings</param>
     public JobProcessor(CodeFactory codeFactory,
         CodeProcessor codeProcessor,
-        Logger dsfLogger,
+        EventLogger eventLogger,
         Expressions expressions,
         FileFactory fileFactory,
         Parser.FileInfoParser fileInfoParser,
         LinkInterface linkInterface,
         Model.ObjectModel model,
-        IOptions<Settings> settings,
-        IHostApplicationLifetime lifetime)
+        IHostApplicationLifetime lifetime,
+        ILogger<JobProcessor> logger,
+        IOptions<Settings> settings)
     {
         _codeFactory = codeFactory;
         _codeProcessor = codeProcessor;
-        _dsfLogger = dsfLogger;
+        _eventLogger = eventLogger;
         _expressions = expressions;
         _fileFactory = fileFactory;
         _fileInfoParser = fileInfoParser;
         _linkInterface = linkInterface;
         _model = model;
-        _settings = settings;
         _lifetime = lifetime;
+        _logger = logger;
+        _settings = settings;
 
         _resume = new(_lock);
         _finished = new(_lock);
         _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.ApplicationStopping);
     }
-
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
     /// <summary>
     /// Lock around the print class
@@ -195,12 +195,13 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// Get the current file position
     /// </summary>
     /// <param name="motionSystem">Motion system</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>File position</returns>
-    public async Task<long> GetFilePositionAsync(int motionSystem)
+    public async Task<long> GetFilePositionAsync(int motionSystem, CancellationToken cancellationToken)
     {
         if (_file is not null && motionSystem == 0)
         {
-            using (await _file.LockAsync())
+            using (await _file.LockAsync(cancellationToken))
             {
                 return _file.Position;
             }
@@ -208,7 +209,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
 
         if (_file2 is not null && motionSystem == 1)
         {
-            using (await _file2.LockAsync())
+            using (await _file2.LockAsync(cancellationToken))
             {
                 return _file2.Position;
             }
@@ -223,11 +224,11 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// <param name="motionSystem">Motion system</param>
     /// <param name="filePosition">New file position</param>
     /// <returns>File position</returns>
-    public async Task SetFilePositionAsync(int motionSystem, long filePosition)
+    public async Task SetFilePositionAsync(int motionSystem, long filePosition, CancellationToken cancellationToken = default)
     {
         if (_file is not null && motionSystem == 0)
         {
-            using (await _file.LockAsync())
+            using (await _file.LockAsync(cancellationToken))
             {
                 _file.Position = filePosition;
             }
@@ -235,7 +236,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
 
         if (_file2 is not null && motionSystem == 1)
         {
-            using (await _file2.LockAsync())
+            using (await _file2.LockAsync(cancellationToken))
             {
                 _file2.Position = filePosition;
             }
@@ -285,14 +286,15 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
 
         // Notify RepRapFirmware and start processing the file in the background
         await _linkInterface.SetPrintFileInfo();
-        _logger.Info("Selected file {0}", virtualFile);
+        _logger.LogInformation("Selected file {File}", virtualFile);
     }
 
     /// <summary>
     /// Fork the file being processed to execute concurrently
     /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Message result</returns>
-    public async Task<Message> ForkAsync()
+    public async Task<Message> ForkAsync(CancellationToken cancellationToken)
     {
         if (_file is null)
         {
@@ -308,9 +310,9 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
 
             // Start printing using the second file channel if applicable.
             // Lock the file here because the copy constructor accesses file.NextFilePosition
-            using (await _file.LockAsync())
+            using (await _file.LockAsync(cancellationToken))
             {
-                _file2 = new(_file, CodeChannel.File2, _codeFactory, _codeProcessor, _expressions, _linkInterface, _model, _lifetime, _settings);
+                _file2 = _fileFactory.Create(_file, CodeChannel.File2);
             }
         }
         return new Message();
@@ -408,8 +410,8 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                                 {
                                     e = ae.InnerException!;
                                 }
-                                await _dsfLogger.LogOutputAsync(MessageType.Error, $"in job file (channel {file.Channel}) line {readCode?.LineNumber ?? file.LineNumber}: {e.Message}");
-                                _logger.Error(e);
+                                await _eventLogger.LogOutputAsync(MessageType.Error, $"in job file (channel {file.Channel}) line {readCode?.LineNumber ?? file.LineNumber}: {e.Message}");
+                                _logger.LogError(e, "Error in job file (channel {Channel}) line {LineNumber}: {Message}", file.Channel, readCode?.LineNumber ?? file.LineNumber, e.Message);
                             }
                             Abort();
                         }
@@ -441,8 +443,8 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                         {
                             e = ae.InnerException!;
                         }
-                        await _dsfLogger.LogOutputAsync(MessageType.Error, $"in job file (channel {file.Channel}) line {code.LineNumber ?? 0}: {e.Message}");
-                        _logger.Warn(e);
+                        await _eventLogger.LogOutputAsync(MessageType.Error, $"in job file (channel {file.Channel}) line {code.LineNumber ?? 0}: {e.Message}");
+                        _logger.LogError(e, "Error in job file (channel {Channel}) line {LineNumber}: {Message}", file.Channel, code.LineNumber ?? 0, e.Message);
                     }
                 }
                 finally
@@ -474,7 +476,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                         // Adjust the file position
                         long newFilePosition = _pausePosition ?? currentFilePosition;
                         await SetFilePositionAsync(file.Channel == CodeChannel.File ? 0 : 1, newFilePosition);
-                        _logger.Info("Job on {0} has been paused at byte {1}, reason {2}", file.Channel, (_pausePosition == null) ? $"{newFilePosition} (no fpos from firmware)" : newFilePosition.ToString(), _pauseReason);
+                        _logger.LogInformation("Job on {Channel} has been paused at byte {Offset}, reason {PauseReason}", file.Channel, (_pausePosition == null) ? $"{newFilePosition} (no fpos from firmware)" : newFilePosition.ToString(), _pauseReason);
 
                         // Wait for the print to be resumed
                         IsProcessing = false;
@@ -514,7 +516,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
             // Deal with the file print
             if (startingNewPrint)
             {
-                _logger.Info("Starting file print");
+                _logger.LogInformation("Starting file print");
 
                 // Start the main job
                 Task fileTask = DoFilePrint(_file);
@@ -561,17 +563,17 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                     if (isCancelled)
                     {
                         // Prints are cancelled by M0/M1/M2 which is processed by RRF
-                        _logger.Info("Cancelled job file");
+                        _logger.LogInformation("Cancelled job file");
                     }
                     else if (isAborted)
                     {
                         await _linkInterface.StopPrintAsync(PrintStoppedReason.Abort);
-                        _logger.Info("Aborted job file");
+                        _logger.LogInformation("Aborted job file");
                     }
                     else
                     {
                         await _linkInterface.StopPrintAsync(PrintStoppedReason.NormalCompletion);
-                        _logger.Info("Finished job file");
+                        _logger.LogInformation("Finished job file");
                     }
                 }
                 catch (OperationCanceledException)
@@ -616,7 +618,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                     }
                     else
                     {
-                        _logger.Warn("Failed to update simulation time because it was not set in the object model");
+                        _logger.LogWarning("Failed to update simulation time because it was not set in the object model");
                     }
                 }
             }

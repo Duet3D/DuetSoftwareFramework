@@ -1,5 +1,4 @@
-﻿using System;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using DuetAPI.Utility;
 
 namespace DuetAPI.ObjectModel;

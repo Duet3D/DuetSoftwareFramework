@@ -102,12 +102,12 @@ public partial class State : ModelObject, IStaticModelObject
     /// Current log level
     /// </summary>
     [SbcProperty(true)]
-    public LogLevel LogLevel
+    public EventLogLevel LogLevel
     {
         get => _logLevel;
         set => SetPropertyValue(ref _logLevel, value);
     }
-    private LogLevel _logLevel = LogLevel.Off;
+    private EventLogLevel _logLevel = EventLogLevel.Off;
 
     /// <summary>
     /// Details about a requested message box or null if none is requested

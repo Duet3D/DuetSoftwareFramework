@@ -17,6 +17,7 @@ public static partial class ServiceCollectionExtensions
         return services
             .AddSingleton<Processors.ProcessorFactory>()
             .AddSingleton<LockManager>()
-            .AddHostedService<Server>();
+            .AddSingleton<Server>()
+            .AddHostedService(services => services.GetRequiredService<Server>());
     }
 }

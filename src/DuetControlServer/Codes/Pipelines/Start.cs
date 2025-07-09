@@ -1,6 +1,7 @@
 ﻿using DuetAPI.Commands;
 using DuetControlServer.Link.Channel;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 using System;
@@ -48,19 +49,19 @@ public sealed class Start(Manager channelManager, ChannelProcessor channelProces
             // Log it
             if (code.Flags.HasFlag(CodeFlags.IsPrioritized))
             {
-                ChannelProcessor.Logger.Debug("Starting code {0} (prioritized)", code);
+                ChannelProcessor.Logger.LogDebug("Starting code {Code} (prioritized)", code);
             }
             else if (code.Flags.HasFlag(CodeFlags.IsFromMacro))
             {
-                ChannelProcessor.Logger.Debug("Starting code {0} (macro code)", code);
+                ChannelProcessor.Logger.LogDebug("Starting code {Code} (macro code)", code);
             }
             else if (channelManager.IsWaitingForAcknowledgment(code.Channel))
             {
-                ChannelProcessor.Logger.Debug("Starting code {0} (acknowledgment)", code);
+                ChannelProcessor.Logger.LogDebug("Starting code {Code} (acknowledgment)", code);
             }
             else
             {
-                ChannelProcessor.Logger.Debug("Starting code {0}", code);
+                ChannelProcessor.Logger.LogDebug("Starting code {Code}", code);
             }
 
             // Code execution may begin, send it to the Pre stage

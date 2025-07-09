@@ -15,6 +15,7 @@ using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Commands;
 using DuetSharedLibrary;
+using Microsoft.Extensions.Logging;
 
 namespace DuetControlServer.IPC;
 
@@ -26,17 +27,13 @@ namespace DuetControlServer.IPC;
 /// </remarks>
 /// <param name="socket">New UNIX socket</param>
 /// <param name="commandFactory">Command factory to create commands</param>
-public sealed class Connection(Socket socket, CommandFactory commandFactory) : IDisposable
+/// <param name="logger">Logger instance</param>
+public sealed class Connection(Socket socket, CommandFactory commandFactory, ILogger logger) : IDisposable
 {
     /// <summary>
     /// Counter for new connections
     /// </summary>
     private static int _idCounter = 1;
-
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
     /// <summary>
     /// Identifier of this connection
@@ -106,13 +103,13 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
             string remoteDirectory = Path.GetDirectoryName(Process.GetProcessById(pid)?.MainModule?.FileName)!;
             if (dcsDirectory != remoteDirectory)
             {
-                _logger.Error("IPC#{0}: Failed to find plugin permissions for pid #{1}", Id, pid);
+                logger.LogError("IPC#{Id}: Failed to find plugin permissions for pid #{Pid}", Id, pid);
                 return false;
             }
         }
 
         // Grant full permissions to other programs
-        _logger.Debug("IPC#{0}: Granting full DSF permissions to external plugin", Id);
+        logger.LogDebug("IPC#{Id}: Granting full DSF permissions to external plugin", Id);
         foreach (Enum permission in Enum.GetValues<SbcPermissions>())
         {
             if (!permission.Equals(SbcPermissions.SuperUser))
@@ -198,7 +195,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
             try
             {
                 using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(UnixSocket, cancellationToken);
-                _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
+                logger.LogTrace("IPC#{Id}: Received {Json}", Id, Encoding.UTF8.GetString(jsonStream.ToArray()));
 
                 BaseResponse DeserializeResponse()
                 {
@@ -216,11 +213,11 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
                             {
                                 if (reader.TokenType == JsonTokenType.True)
                                 {
-                                    return JsonSerializer.Deserialize(jsonSpan, DuetAPI.Commands.CommandContext.Default.BaseResponse)!;
+                                    return JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.BaseResponse)!;
                                 }
                                 else if (reader.TokenType == JsonTokenType.False)
                                 {
-                                    return JsonSerializer.Deserialize(jsonSpan, DuetAPI.Commands.CommandContext.Default.ErrorResponse)!;
+                                    return JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.ErrorResponse)!;
                                 }
                                 else
                                 {
@@ -243,7 +240,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
             }
             catch (JsonException e)
             {
-                _logger.Error(e, "IPC#{0}: Received malformed JSON", Id);
+                logger.LogError(e, "IPC#{Id}: Received malformed JSON", Id);
                 await SendResponseAsync(e);
             }
         }
@@ -264,7 +261,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
             try
             {
                 using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(UnixSocket, cancellationToken);
-                _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(jsonStream.ToArray())}");
+                logger.LogTrace("IPC#{Id}: Received {Json}", Id, Encoding.UTF8.GetString(jsonStream.ToArray()));
 
                 ClientInitMessage DeserializeInitMessage()
                 {
@@ -312,7 +309,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
             }
             catch (JsonException e)
             {
-                _logger.Error(e, "IPC#{0}: Received malformed JSON", Id);
+                logger.LogError(e, "IPC#{Id}: Received malformed JSON", Id);
                 await SendResponseAsync(e);
             }
         }
@@ -342,7 +339,10 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
     public async ValueTask<BaseCommand> ReceiveCommandAsync(Type[] supportedCommands, CancellationToken cancellationToken)
     {
         using MemoryStream receivedJson = await JsonHelper.ReceiveUtf8JsonAsync(UnixSocket, cancellationToken);
-        _logger.Trace(() => $"IPC#{Id}: Received {Encoding.UTF8.GetString(receivedJson.ToArray())}");
+        if (logger.IsEnabled(LogLevel.Trace))
+        {
+            logger.LogTrace("IPC#{Id}: Received {JSON}", Id, Encoding.UTF8.GetString(receivedJson.ToArray()));
+        }
 
         BaseCommand DeserializeCommand()
         {
@@ -383,11 +383,11 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
                         // Log this
                         if (commandType == typeof(Acknowledge))
                         {
-                            _logger.Trace("IPC#{0}: Received command {1}", Id, commandName);
+                            logger.LogTrace("IPC#{Id}: Received command {Command}", Id, commandName);
                         }
                         else
                         {
-                            _logger.Debug("IPC#{0}: Received command {1}", Id, commandName);
+                            logger.LogDebug("IPC#{Id}: Received command {Command}", Id, commandName);
                         }
 
                         // Perform final deserialization and assign source identifier to this command
@@ -423,7 +423,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
     {
         if (result == null)
         {
-            _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(_successResponse)}");
+            logger.LogTrace("IPC#{Id}: Sending success response", Id);
             await UnixSocket.SendAsync(_successResponse, SocketFlags.None);
         }
         else
@@ -454,7 +454,11 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
             e = ae.InnerException!;
         }
         byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(new ErrorResponse(e), CommandContext.Default.ErrorResponse);
-        _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(toSend)}");
+        if (logger.IsEnabled(LogLevel.Trace))
+        {
+            logger.LogTrace("IPC#{Id}: Sending {JSON}", Id, Encoding.UTF8.GetString(toSend));
+        }
+        
         return UnixSocket.SendAsync(toSend, SocketFlags.None);
     }
 
@@ -483,7 +487,10 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
 
         // Serialize and send the command
         byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(command, baseType, CommandContext.Default);
-        _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(toSend)}");
+        if (logger.IsEnabled(LogLevel.Trace))
+        {
+            logger.LogTrace("IPC#{Id}: Sending {JSON}", Id, Encoding.UTF8.GetString(toSend));
+        }
         return UnixSocket.SendAsync(toSend, SocketFlags.None);
     }
 
@@ -495,7 +502,10 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
     /// <exception cref="SocketException">Message could not be sent</exception>
     public Task SendRawDataAsync(byte[] data)
     {
-        _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(data)}");
+        if (logger.IsEnabled(LogLevel.Trace))
+        {
+            logger.LogTrace("IPC#{Id}: Sending {JSON}", Id, Encoding.UTF8.GetString(data));
+        }
         return UnixSocket.SendAsync(data, SocketFlags.None);
     }
 
@@ -508,7 +518,10 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory) : I
     public Task SendInitMessageAsync(InitMessage msg)
     {
         byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(msg, msg.GetType(), ConnectionContext.Default);
-        _logger.Trace(() => $"IPC#{Id}: Sending {Encoding.UTF8.GetString(toSend)}");
+        if (logger.IsEnabled(LogLevel.Trace))
+        {
+            logger.LogTrace("IPC#{Id}: Sending {JSON}", Id, Encoding.UTF8.GetString(toSend));
+        }
         return UnixSocket.SendAsync(toSend, SocketFlags.None);
     }
 

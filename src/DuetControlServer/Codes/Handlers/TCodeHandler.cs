@@ -1,10 +1,11 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 
 namespace DuetControlServer.Codes.Handlers;
 
 /// <summary>
-/// Static class that processes T-codes in the control server
+/// Class that processes T-codes in the control server
 /// </summary>
 public sealed class TCodeHandler : ICodeHandler
 {
@@ -12,13 +13,15 @@ public sealed class TCodeHandler : ICodeHandler
     /// Process a T-code that should be interpreted by the control server
     /// </summary>
     /// <param name="code">Code to process</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result of the code if the code completed, else null</returns>
-    public ValueTask<Message?> ProcessAsync(Commands.Code code) => ValueTask.FromResult<Message?>(null);
+    public ValueTask<Message?> ProcessAsync(Commands.Code code, CancellationToken cancellationToken) => ValueTask.FromResult<Message?>(null);
 
     /// <summary>
     /// React to an executed T-code before its result is returned
     /// </summary>
     /// <param name="code">Code processed by RepRapFirmware</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result to output</returns>
-    public ValueTask CodeExecutedAsync(Commands.Code code) => ValueTask.CompletedTask;
+    public ValueTask CodeExecutedAsync(Commands.Code code, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }

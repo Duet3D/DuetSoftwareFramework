@@ -35,5 +35,5 @@ public partial class WriteMessage : Command
     /// <summary>
     /// Log level of this message
     /// </summary>
-    public LogLevel? LogLevel { get; set; }
+    public EventLogLevel? LogLevel { get; set; }
 }

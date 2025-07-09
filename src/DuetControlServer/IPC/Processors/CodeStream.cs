@@ -13,6 +13,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 using DuetControlServer.Link.Protocol.Shared;
+using Microsoft.Extensions.Logging;
 
 namespace DuetControlServer.IPC.Processors;
 
@@ -29,11 +30,6 @@ public sealed class CodeStream : IProcessor, IDisposable
     [
         typeof(Code)
     ];
-
-    /// <summary>
-    /// Logger instance
-    /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
     /// <summary>
     /// List of active subscribers
@@ -63,54 +59,27 @@ public sealed class CodeStream : IProcessor, IDisposable
     }
 
     /// <summary>
-    /// Maximum number of codes to execute simultaneously
-    /// </summary>
-    private readonly int _bufferSize;
-
-    /// <summary>
-    /// Code channel for incoming codes
-    /// </summary>
-    private readonly CodeChannel _channel;
-
-    /// <summary>
     /// Lock for outputting data
     /// </summary>
     private readonly AsyncLock _outputLock = new();
 
     /// <summary>
-    /// Stream for communication with a client
-    /// </summary>
-    private readonly NetworkStream _stream;
-
-    /// <summary>
-    /// Stream reader for reading from a client
-    /// </summary>
-    private readonly StreamReader _streamReader;
-
-    /// <summary>
-    /// Stream for writing to a client
-    /// </summary>
-    private readonly StreamWriter _streamWriter;
-
-    /// <summary>
-    /// Code factory
-    /// </summary>
-    private readonly Codes.CodeFactory _codeFactory;
-
-    /// <summary>
-    /// Object model
-    /// </summary>
-    private readonly Model.ObjectModel _model;
-
-    /// <summary>
-    /// Settings
-    /// </summary>
-    private readonly Settings _settings;
-
-    /// <summary>
     /// Connection to the IPC client served by this processor
     /// </summary>
     public Connection Connection { get; }
+
+    // Stream I/O
+    private readonly int _bufferSize;
+    private readonly CodeChannel _channel;
+    private readonly NetworkStream _stream;
+    private readonly StreamReader _streamReader;
+    private readonly StreamWriter _streamWriter;
+
+    // Private fields
+    private readonly Codes.CodeFactory _codeFactory;
+    private readonly Model.ObjectModel _model;
+    private readonly ILogger _logger;
+    private readonly Settings _settings;
 
     /// <summary>
     /// Constructor of the code stream interpreter
@@ -120,7 +89,7 @@ public sealed class CodeStream : IProcessor, IDisposable
     /// <param name="codeFactory">Code factory to create code instances</param>
     /// <param name="model">Object model</param>
     /// <param name="settings">Settings</param>
-    public CodeStream(Connection conn, ClientInitMessage initMessage, Codes.CodeFactory codeFactory, Model.ObjectModel model, IOptions<Settings> settings)
+    public CodeStream(Connection conn, ClientInitMessage initMessage, Codes.CodeFactory codeFactory, Model.ObjectModel model, ILogger<CodeStream> logger, IOptions<Settings> settings)
     {
         Connection = conn;
         _stream = new NetworkStream(conn.UnixSocket);
@@ -141,9 +110,10 @@ public sealed class CodeStream : IProcessor, IDisposable
 
         _codeFactory = codeFactory;
         _model = model;
+        _logger = logger;
         _settings = settings.Value;
 
-        _logger.Debug("CodeStream processor added for IPC#{0}", conn.Id);
+        logger.LogDebug("CodeStream processor added for IPC#{Id}", conn.Id);
     }
 
     /// <summary>
@@ -264,7 +234,7 @@ public sealed class CodeStream : IProcessor, IDisposable
                         catch (CodeParserException cpe)
                         {
                             parserBuffer.Invalidate();
-                            _logger.Warn(cpe, "IPC#{0}: Failed to parse code from code stream", Connection.Id);
+                            _logger.LogWarning(cpe, "IPC#{Id}: Failed to parse code from code stream", Connection.Id);
 
                             using (await codeLock.EnterAsync(cancellationToken))
                             {
@@ -306,7 +276,7 @@ public sealed class CodeStream : IProcessor, IDisposable
                     // Send errors back to the client
                     if (e is not OperationCanceledException)
                     {
-                        _logger.Error(e, "IPC#{0}: Failed to execute stream code", Connection.Id);
+                        _logger.LogError(e, "IPC#{Id}: Failed to execute stream code", Connection.Id);
                     }
                     await Connection.SendResponseAsync(e);
                 }

@@ -9,6 +9,7 @@ using DuetControlServer.Link;
 using DuetControlServer.Model;
 using DuetControlServer.Utility;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NLog.Config;
 using System;
@@ -16,57 +17,51 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Codes.Handlers;
 
 /// <summary>
-/// Static class that processes M-codes in the control server
+/// Class that processes M-codes in the control server
 /// </summary>
 /// <param name="codeProcessor">Code processor</param>
 /// <param name="commandFactory">Command factory</param>
+/// <param name="eventLogger">Event logger</param>
 /// <param name="fileInfoParser">File info parser</param>
 /// <param name="filePathResolver">File path resolver</param>
 /// <param name="filter">Filter for JSON queries</param>
 /// <param name="diagnosticsProvider">Diagnostics provider</param>
 /// <param name="jobProcessor">Job processor</param>
 /// <param name="linkInterface">Link interface</param>
-/// <param name="logger">Logging manager</param>
 /// <param name="model">Object model</param>
 /// <param name="mqtt">MQTT provider</param>
+/// <param name="logger">Logger</param>
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="settings">Settings</param>
 public class MCodeHandler(
     CodeProcessor codeProcessor,
     CommandFactory commandFactory,
     DiagnosticsProvider diagnosticsProvider,
+    EventLogger eventLogger,
     FileInfoParser fileInfoParser,
     FilePathResolver filePathResolver,
     Filter filter,
     LinkInterface linkInterface,
-    Logger logger,
     Model.ObjectModel model,
     MQTT mqtt,
     JobProcessor jobProcessor,
+    ILogger<MCodeHandler> logger,
     IHostApplicationLifetime lifetime,
     IOptions<Settings> settings) : ICodeHandler
 {
     /// <summary>
-    /// Logger instance
-    /// </summary>
-    private readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
-
-    /// <summary>
-    /// Settings instance
-    /// </summary>
-    private readonly Settings _settings = settings.Value;
-
-    /// <summary>
     /// Process an M-code that should be interpreted by the control server
     /// </summary>
     /// <param name="code">Code to process</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result of the code if the code completed, else null</returns>
-    public async ValueTask<Message?> ProcessAsync(Commands.Code code)
+    public async ValueTask<Message?> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.IsFromFileChannel && jobProcessor.IsSimulating && code.MajorNumber is not 0 and not 1 and not 2)
         {
@@ -82,12 +77,12 @@ public class MCodeHandler(
             case 0:
             case 1:
             case 2:
-                if (await codeProcessor.FlushAsync(code, syncFileStreams: true))
+                if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
                 {
                     // Attempt to cancel the print from any channel other than File2
                     if (code.Channel != CodeChannel.File2)
                     {
-                        using (await jobProcessor.LockAsync(code.CancellationToken))
+                        using (await jobProcessor.LockAsync(cancellationToken))
                         {
                             if (jobProcessor.IsFileSelected)
                             {
@@ -114,23 +109,23 @@ public class MCodeHandler(
 
             // List SD card
             case 20:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     // Resolve the directory
                     if (!code.TryGetString('P', out string? virtualDirectory))
                     {
-                        using (await model.AccessReadOnlyAsync(code.CancellationToken))
+                        using (await model.AccessReadOnlyAsync(cancellationToken))
                         {
                             virtualDirectory = model.Directories.GCodes;
                         }
                     }
-                    string physicalDirectory = await filePathResolver.ToPhysicalAsync(virtualDirectory);
+                    string physicalDirectory = await filePathResolver.ToPhysicalAsync(virtualDirectory, cancellationToken: cancellationToken);
 
                     // Make sure to stay within limits if it is a request from the firmware
                     int maxSize = -1;
                     if (code.Flags.HasFlag(CodeFlags.IsFromFirmware))
                     {
-                        maxSize = _settings.MaxMessageLength;
+                        maxSize = settings.Value.MaxMessageLength;
                     }
 
                     // Check if JSON file lists were requested
@@ -148,7 +143,7 @@ public class MCodeHandler(
 
                     // Print standard G-code response
                     Compatibility compatibility;
-                    using (await model.AccessReadOnlyAsync(code.CancellationToken))
+                    using (await model.AccessReadOnlyAsync(cancellationToken))
                     {
                         compatibility = model.Inputs[code.Channel]?.Compatibility ?? Compatibility.RepRapFirmware;
                     }
@@ -203,7 +198,7 @@ public class MCodeHandler(
 
             // Initialize SD card
             case 21:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     if (code.GetInt('P', 0) == 0)
                     {
@@ -221,7 +216,7 @@ public class MCodeHandler(
             // Select a file to print
             case 23:
             case 32:
-                if (await codeProcessor.FlushAsync(code, syncFileStreams: true))
+                if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
                 {
                     if (code.Channel != CodeChannel.File2)
                     {
@@ -231,13 +226,13 @@ public class MCodeHandler(
                             return new Message(MessageType.Error, "Filename expected");
                         }
 
-                        string physicalFile = await filePathResolver.ToPhysicalAsync(fileName, FileDirectory.GCodes);
+                        string physicalFile = await filePathResolver.ToPhysicalAsync(fileName, FileDirectory.GCodes, cancellationToken);
                         if (!File.Exists(physicalFile))
                         {
                             return new Message(MessageType.Error, $"Could not find file {fileName}");
                         }
 
-                        using (await jobProcessor.LockAsync(code.CancellationToken))
+                        using (await jobProcessor.LockAsync(cancellationToken))
                         {
                             if (!code.IsFromFileChannel && (jobProcessor.IsProcessing || jobProcessor.IsPaused))
                             {
@@ -254,11 +249,11 @@ public class MCodeHandler(
 
             // Resume a file print
             case 24:
-                if (await codeProcessor.FlushAsync(code, syncFileStreams: true))
+                if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
                 {
                     if (code.Channel != CodeChannel.File2)
                     {
-                        using (await jobProcessor.LockAsync(code.CancellationToken))
+                        using (await jobProcessor.LockAsync(cancellationToken))
                         {
                             if (!jobProcessor.IsFileSelected)
                             {
@@ -274,18 +269,18 @@ public class MCodeHandler(
 
             // Set SD position
             case 26:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     // Wait for inputs[].motionSystem to be up-to-date
-                    await model.WaitForFullUpdateAsync(code.CancellationToken);
+                    await model.WaitForFullUpdateAsync(cancellationToken);
 
                     int motionSystem;
-                    using (await model.AccessReadOnlyAsync(code.CancellationToken))
+                    using (await model.AccessReadOnlyAsync(cancellationToken))
                     {
                         motionSystem = model.Inputs[code.Channel]?.MotionSystem ?? 0;
                     }
 
-                    using (await jobProcessor.LockAsync(code.CancellationToken))
+                    using (await jobProcessor.LockAsync(cancellationToken))
                     {
                         if (!jobProcessor.IsFileSelected)
                         {
@@ -299,7 +294,7 @@ public class MCodeHandler(
                                 return new Message(MessageType.Error, "Position is out of range");
                             }
 
-                            await jobProcessor.SetFilePositionAsync(motionSystem, newPosition);
+                            await jobProcessor.SetFilePositionAsync(motionSystem, newPosition, cancellationToken);
                         }
                     }
 
@@ -310,21 +305,21 @@ public class MCodeHandler(
 
             // Report SD print status
             case 27:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     // Wait for inputs[].motionSystem to be up-to-date
-                    await model.WaitForFullUpdateAsync(code.CancellationToken);
+                    await model.WaitForFullUpdateAsync(cancellationToken);
                     int motionSystem;
-                    using (await model.AccessReadOnlyAsync(code.CancellationToken))
+                    using (await model.AccessReadOnlyAsync(cancellationToken))
                     {
                         motionSystem = model.Inputs[code.Channel]?.MotionSystem ?? 0;
                     }
 
-                    using (await jobProcessor.LockAsync(code.CancellationToken))
+                    using (await jobProcessor.LockAsync(cancellationToken))
                     {
                         if (jobProcessor.IsFileSelected)
                         {
-                            long filePosition = await jobProcessor.GetFilePositionAsync(motionSystem);
+                            long filePosition = await jobProcessor.GetFilePositionAsync(motionSystem, cancellationToken);
                             return new Message(MessageType.Success, $"SD printing byte {filePosition}/{jobProcessor.FileLength}");
                         }
                         return new Message(MessageType.Success, "Not SD printing.");
@@ -334,7 +329,7 @@ public class MCodeHandler(
 
             // Begin write to SD card
             case 28:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     int numChannel = (int)code.Channel;
                     using (await codeProcessor.FileLocks[numChannel].LockAsync(lifetime.ApplicationStopping))
@@ -350,8 +345,8 @@ public class MCodeHandler(
                             return new Message(MessageType.Error, "Filename expected");
                         }
 
-                        string prefix = await model.IsEmulatingMarlinAsync(code.Channel, code.CancellationToken) ? "ok\n" : string.Empty;
-                        string physicalFile = await filePathResolver.ToPhysicalAsync(file, FileDirectory.GCodes), parentDirectory = Path.GetDirectoryName(physicalFile)!;
+                        string prefix = await model.IsEmulatingMarlinAsync(code.Channel, cancellationToken) ? "ok\n" : string.Empty;
+                        string physicalFile = await filePathResolver.ToPhysicalAsync(file, FileDirectory.GCodes, cancellationToken), parentDirectory = Path.GetDirectoryName(physicalFile)!;
                         try
                         {
                             if (!Directory.Exists(parentDirectory))
@@ -359,14 +354,14 @@ public class MCodeHandler(
                                 Directory.CreateDirectory(parentDirectory);
                             }
 
-                            FileStream fileStream = new(physicalFile, FileMode.Create, FileAccess.Write, FileShare.Read, _settings.FileBufferSize);
-                            StreamWriter writer = new(fileStream, Encoding.UTF8, _settings.FileBufferSize);
+                            FileStream fileStream = new(physicalFile, FileMode.Create, FileAccess.Write, FileShare.Read, settings.Value.FileBufferSize);
+                            StreamWriter writer = new(fileStream, Encoding.UTF8, settings.Value.FileBufferSize);
                             codeProcessor.FilesBeingWritten[numChannel] = writer;
                             return new Message(MessageType.Success, prefix + $"Writing to file: {file}");
                         }
                         catch (Exception e)
                         {
-                            _logger.Debug(e, "Failed to open file for writing");
+                            logger.LogDebug(e, "Failed to open file for writing");
                             return new Message(MessageType.Error, prefix + $"Can't open file {file} for writing.");
                         }
                     }
@@ -375,7 +370,7 @@ public class MCodeHandler(
 
             // End write to SD card
             case 29:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     int numChannel = (int)code.Channel;
                     using (await codeProcessor.FileLocks[numChannel].LockAsync(lifetime.ApplicationStopping))
@@ -388,7 +383,7 @@ public class MCodeHandler(
                             codeProcessor.FilesBeingWritten[numChannel] = null;
                             await stream.DisposeAsync();
 
-                            if (await model.IsEmulatingMarlinAsync(code.Channel, code.CancellationToken))
+                            if (await model.IsEmulatingMarlinAsync(code.Channel, cancellationToken))
                             {
                                 return new Message(MessageType.Success, "Done saving file.");
                             }
@@ -401,10 +396,10 @@ public class MCodeHandler(
 
             // Delete a file on the SD card
             case 30:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     string file = code.GetUnprecedentedString();
-                    string physicalFile = await filePathResolver.ToPhysicalAsync(file);
+                    string physicalFile = await filePathResolver.ToPhysicalAsync(file, cancellationToken: cancellationToken);
 
                     try
                     {
@@ -413,7 +408,7 @@ public class MCodeHandler(
                     }
                     catch (Exception e)
                     {
-                        _logger.Debug(e, "Failed to delete file");
+                        logger.LogDebug(e, "Failed to delete file");
                         return new Message(MessageType.Error, $"Failed to delete file {file}: {e.Message}");
                     }
                 }
@@ -423,7 +418,7 @@ public class MCodeHandler(
 
             // Return file information
             case 36:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     if (code.Parameters.Count > 0)
                     {
@@ -432,27 +427,27 @@ public class MCodeHandler(
                             // Get fileinfo
                             if (code.MinorNumber != 1)
                             {
-                                string file = await filePathResolver.ToPhysicalAsync(code.GetUnprecedentedString(), FileDirectory.GCodes);
-                                GCodeFileInfo info = await fileInfoParser.ParseAsync(file, false);
+                                string file = await filePathResolver.ToPhysicalAsync(code.GetUnprecedentedString(), FileDirectory.GCodes, cancellationToken);
+                                GCodeFileInfo info = await fileInfoParser.ParseAsync(file, false, cancellationToken);
 
                                 string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
                                 return new Message(MessageType.Success, "{\"err\":0," + json[1..]);
                             }
 
                             // Get thumbnail
-                            string filename = await filePathResolver.ToPhysicalAsync(code.GetString('P'), FileDirectory.GCodes);
+                            string filename = await filePathResolver.ToPhysicalAsync(code.GetString('P'), FileDirectory.GCodes, cancellationToken);
                             string thumbnailJson = await fileInfoParser.ParseThumbnail(filename, code.GetLong('S'));
                             return new Message(MessageType.Success, thumbnailJson);
                         }
                         catch (Exception e)
                         {
-                            _logger.Debug(e, "Failed to return file information");
+                            logger.LogDebug(e, "Failed to return file information");
                             return new Message(MessageType.Warning, $"{{\"err\":1,\"fileName:{JsonSerializer.Serialize(code.GetUnprecedentedString(), JsonHelper.DefaultJsonOptions)}}}");
                         }
                     }
                     else
                     {
-                        using (await model.AccessReadOnlyAsync(code.CancellationToken))
+                        using (await model.AccessReadOnlyAsync(cancellationToken))
                         {
                             if (model.Job.File.FileName != null)
                             {
@@ -467,18 +462,18 @@ public class MCodeHandler(
 
             // Simulate file
             case 37:
-                if (await codeProcessor.FlushAsync(code, syncFileStreams: true))
+                if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
                 {
                     if (code.Channel != CodeChannel.File2)
                     {
                         string fileName = code.GetString('P');
-                        string physicalFile = await filePathResolver.ToPhysicalAsync(fileName, FileDirectory.GCodes);
+                        string physicalFile = await filePathResolver.ToPhysicalAsync(fileName, FileDirectory.GCodes, cancellationToken);
                         if (!File.Exists(physicalFile))
                         {
                             return new Message(MessageType.Error, $"GCode file \"{fileName}\" not found");
                         }
 
-                        using (await jobProcessor.LockAsync(code.CancellationToken))
+                        using (await jobProcessor.LockAsync(cancellationToken))
                         {
                             if (!code.IsFromFileChannel && (jobProcessor.IsProcessing || jobProcessor.IsPaused))
                             {
@@ -497,18 +492,18 @@ public class MCodeHandler(
 
             // Compute CRC32 checksum of target file
             case 38:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
-                    string file = code.GetUnprecedentedString(), physicalFile = await filePathResolver.ToPhysicalAsync(file);
+                    string file = code.GetUnprecedentedString(), physicalFile = await filePathResolver.ToPhysicalAsync(file, cancellationToken: cancellationToken);
                     try
                     {
-                        await using FileStream stream = new(physicalFile, FileMode.Open, FileAccess.Read, FileShare.Read, _settings.FileBufferSize);
-                        uint checksum = await CRC32.CalculateAsync(stream, _settings.FileBufferSize, code.CancellationToken);
+                        await using FileStream stream = new(physicalFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
+                        uint checksum = await CRC32.CalculateAsync(stream, settings.Value.FileBufferSize, cancellationToken);
                         return new Message(MessageType.Success, checksum.ToString("x8"));
                     }
                     catch (Exception e)
                     {
-                        _logger.Debug(e, "Failed to compute CRC32 checksum");
+                        logger.LogDebug(e, "Failed to compute CRC32 checksum");
                         if (e is AggregateException ae)
                         {
                             e = ae.InnerException!;
@@ -520,9 +515,9 @@ public class MCodeHandler(
 
             // Report SD card information
             case 39:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
-                    using (await model.AccessReadOnlyAsync(code.CancellationToken))
+                    using (await model.AccessReadOnlyAsync(cancellationToken))
                     {
                         int index = code.GetInt('P', 0);
                         if (code.GetInt('S', 0) == 2)
@@ -566,9 +561,9 @@ public class MCodeHandler(
                 {
                     if (code.TryGetInt('R', out int rParam))
                     {
-                        if (await codeProcessor.FlushAsync(code))
+                        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                         {
-                            await linkInterface.SetMacroPausableAsync(code.Channel, rParam == 1);
+                            await linkInterface.SetMacroPausableAsync(code.Channel, rParam == 1, cancellationToken);
                         }
                         else
                         {
@@ -586,7 +581,7 @@ public class MCodeHandler(
                 {
                     if (code.TryGetInt('P', out int pParam) && pParam == -1)
                     {
-                        if (await codeProcessor.FlushAsync(code))
+                        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                         {
                             bool seen = false;
                             if (code.TryGetString('S', out string? levelString))
@@ -596,7 +591,7 @@ public class MCodeHandler(
                                 {
                                     rule?.SetLoggingLevels(level, NLog.LogLevel.Fatal);
                                 }
-                                _settings.LogLevel = level;
+                                settings.Value.LogLevel = level;
                                 seen = true;
                             }
                             if (code.TryGetBool('O', out bool oParam))
@@ -608,7 +603,7 @@ public class MCodeHandler(
                                         // Only add this target once and don't allow higher log level than debug, else we may get recursion
                                         MessageLogTarget logTarget = new(model);
                                         NLog.LogManager.Configuration?.AddTarget("MessageLogTarget", logTarget);
-                                        NLog.LogManager.Configuration?.AddRule(_settings.LogLevel > NLog.LogLevel.Trace ? _settings.LogLevel : NLog.LogLevel.Debug, NLog.LogLevel.Fatal, logTarget);
+                                        NLog.LogManager.Configuration?.AddRule(settings.Value.LogLevel > NLog.LogLevel.Trace ? settings.Value.LogLevel : NLog.LogLevel.Debug, NLog.LogLevel.Fatal, logTarget);
                                     }
                                 }
                                 else
@@ -623,7 +618,7 @@ public class MCodeHandler(
                                 NLog.LogManager.ReconfigExistingLoggers();
                                 return new Message();
                             }
-                            return new Message(MessageType.Success, $"Current DCS log level: {_settings.LogLevel}");
+                            return new Message(MessageType.Success, $"Current DCS log level: {settings.Value.LogLevel}");
                         }
                     }
                     break;
@@ -631,24 +626,23 @@ public class MCodeHandler(
 
             // Emergency Stop
             case 112:
-                if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await codeProcessor.FlushAsync(code))
+                if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     // Wait for potential firmware updates to complete first
                     await linkInterface.WaitForUpdateAsync();
 
                     // Perform emergency stop but don't wait longer than 4.5s
-                    Task stopTask = linkInterface.EmergencyStopAsync();
+                    Task stopTask = linkInterface.EmergencyStopAsync(cancellationToken);
                     Task completedTask = await Task.WhenAny(stopTask, Task.Delay(4500, lifetime.ApplicationStopped));
                     if (stopTask != completedTask)
                     {
-                        // Halt timed out, kill this program
-                        #warning fixme
+                        // Halt timed out, shut down this program
                         lifetime.StopApplication();
-                        return new Message(MessageType.Error, "Halt timed out, killing DCS");
+                        return new Message(MessageType.Error, "Halt timed out, stopping DCS");
                     }
 
                     // RRF halted
-                    using (await model.AccessReadWriteAsync(code.CancellationToken))
+                    using (await model.AccessReadWriteAsync(cancellationToken))
                     {
                         model.State.Status = MachineStatus.Halted;
                     }
@@ -661,7 +655,7 @@ public class MCodeHandler(
                 {
                     if (code.TryGetInt('P', out int pParam) && pParam == 6)
                     {
-                        if (await codeProcessor.FlushAsync(code))
+                        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                         {
                             return await mqtt.PublishAsync(code);
                         }
@@ -696,7 +690,7 @@ public class MCodeHandler(
                         }
 
                         // Wait until pending codes have finished
-                        if (!await codeProcessor.FlushAsync(code))
+                        if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                         {
                             throw new OperationCanceledException();
                         }
@@ -753,9 +747,9 @@ public class MCodeHandler(
 
             // Create Directory on SD-Card
             case 470:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
-                    string path = code.GetString('P'), physicalPath = await filePathResolver.ToPhysicalAsync(path);
+                    string path = code.GetString('P'), physicalPath = await filePathResolver.ToPhysicalAsync(path, cancellationToken: cancellationToken);
                     try
                     {
                         Directory.CreateDirectory(physicalPath);
@@ -763,7 +757,7 @@ public class MCodeHandler(
                     }
                     catch (Exception e)
                     {
-                        _logger.Debug(e, "Failed to create directory");
+                        logger.LogDebug(e, "Failed to create directory");
                         return new Message(MessageType.Error, $"Failed to create directory {path}: {e.Message}");
                     }
                 }
@@ -771,12 +765,12 @@ public class MCodeHandler(
 
             // Rename File/Directory on SD-Card
             case 471:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     string from = code.GetString('S'), to = code.GetString('T');
                     try
                     {
-                        string source = await filePathResolver.ToPhysicalAsync(from), destination = await filePathResolver.ToPhysicalAsync(to);
+                        string source = await filePathResolver.ToPhysicalAsync(from, cancellationToken: cancellationToken), destination = await filePathResolver.ToPhysicalAsync(to, cancellationToken: cancellationToken);
                         if (File.Exists(source))
                         {
                             if (File.Exists(destination) && code.GetBool('D', false))
@@ -802,7 +796,7 @@ public class MCodeHandler(
                     }
                     catch (Exception e)
                     {
-                        _logger.Debug(e, "Failed to rename file or directory");
+                        logger.LogDebug(e, "Failed to rename file or directory");
                         return new Message(MessageType.Error, $"Failed to rename file or directory {from} to {to}: {e.Message}");
                     }
                 }
@@ -810,9 +804,9 @@ public class MCodeHandler(
 
             // Delete file/directory
             case 472:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
-                    string path = code.GetString('P'), physicalPath = await filePathResolver.ToPhysicalAsync(path);
+                    string path = code.GetString('P'), physicalPath = await filePathResolver.ToPhysicalAsync(path, cancellationToken: cancellationToken);
                     try
                     {
                         if (Directory.Exists(physicalPath))
@@ -828,7 +822,7 @@ public class MCodeHandler(
                     }
                     catch (Exception e)
                     {
-                        _logger.Debug(e, "Failed to delete file or directory");
+                        logger.LogDebug(e, "Failed to delete file or directory");
                         return new Message(MessageType.Error, $"Failed to delete file or directory {path}: {e.Message}");
                     }
                 }
@@ -836,19 +830,19 @@ public class MCodeHandler(
 
             // Print settings
             case 503:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
-                    string configFile = await filePathResolver.ToPhysicalAsync(FilePathResolver.ConfigFile, FileDirectory.System);
+                    string configFile = await filePathResolver.ToPhysicalAsync(FilePathResolver.ConfigFile, FileDirectory.System, cancellationToken);
                     if (File.Exists(configFile))
                     {
-                        string content = await File.ReadAllTextAsync(configFile);
+                        string content = await File.ReadAllTextAsync(configFile, cancellationToken);
                         return new Message(MessageType.Success, content);
                     }
 
-                    string configFileFallback = await filePathResolver.ToPhysicalAsync(FilePathResolver.ConfigFileFallback, FileDirectory.System);
+                    string configFileFallback = await filePathResolver.ToPhysicalAsync(FilePathResolver.ConfigFileFallback, FileDirectory.System, cancellationToken);
                     if (File.Exists(configFileFallback))
                     {
-                        string content = await File.ReadAllTextAsync(configFileFallback);
+                        string content = await File.ReadAllTextAsync(configFileFallback, cancellationToken);
                         return new Message(MessageType.Success, content);
                     }
                     return new Message(MessageType.Error, "Configuration file not found");
@@ -857,17 +851,17 @@ public class MCodeHandler(
 
             // Set configuration file folder
             case 505:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     if (code.TryGetString('P', out string? directory))
                     {
                         await using (await linkInterface.LockAllMovementSystemsAndWaitForStandstill(code.Channel))
                         {
-                            string physicalDirectory = await filePathResolver.ToPhysicalAsync(directory, "sys");
+                            string physicalDirectory = await filePathResolver.ToPhysicalAsync(directory, "sys", cancellationToken);
                             if (Directory.Exists(physicalDirectory))
                             {
-                                string virtualDirectory = await filePathResolver.ToVirtualAsync(physicalDirectory);
-                                using (await model.AccessReadWriteAsync(code.CancellationToken))
+                                string virtualDirectory = await filePathResolver.ToVirtualAsync(physicalDirectory, cancellationToken);
+                                using (await model.AccessReadWriteAsync(cancellationToken))
                                 {
                                     model.Directories.System = virtualDirectory;
                                 }
@@ -877,7 +871,7 @@ public class MCodeHandler(
                         return new Message(MessageType.Error, "Directory not found");
                     }
 
-                    using (await model.AccessReadOnlyAsync())
+                    using (await model.AccessReadOnlyAsync(cancellationToken))
                     {
                         return new Message(MessageType.Success, $"Sys file path is {model.Directories.System}");
                     }
@@ -886,7 +880,7 @@ public class MCodeHandler(
 
             // Set Name
             case 550:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     if (code.TryGetString('P', out string? newName))
                     {
@@ -929,11 +923,11 @@ public class MCodeHandler(
 
             // Set Password
             case 551:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     if (code.TryGetString('P', out string? password))
                     {
-                        using (await model.AccessReadWriteAsync())
+                        using (await model.AccessReadWriteAsync(cancellationToken))
                         {
                             model.Password = password;
                         }
@@ -944,7 +938,7 @@ public class MCodeHandler(
 
             // Configure network protocols
             case 586:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     // Configure MQTT
                     if (code.MinorNumber == 4)
@@ -959,7 +953,7 @@ public class MCodeHandler(
                     // Set CORS site
                     if (code.TryGetString('C', out string? corsSite))
                     {
-                        using (await model.AccessReadWriteAsync())
+                        using (await model.AccessReadWriteAsync(cancellationToken))
                         {
                             model.Network.CorsSite = string.IsNullOrWhiteSpace(corsSite) ? null : corsSite;
                         }
@@ -967,7 +961,7 @@ public class MCodeHandler(
                     }
 
                     // Report CORS state
-                    using (await model.AccessReadOnlyAsync())
+                    using (await model.AccessReadOnlyAsync(cancellationToken))
                     {
                         if (string.IsNullOrEmpty(model.Network.CorsSite))
                         {
@@ -980,7 +974,7 @@ public class MCodeHandler(
 
             // Set IP address (reserved in SBC mode)
             case 552:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     return new Message(MessageType.Error, "M552 is reserved for SBC mode");
                 }
@@ -988,11 +982,11 @@ public class MCodeHandler(
 
             // Fork input reader
             case 606:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     if (code.TryGetInt('S', out int sParam) && sParam == 1)
                     {
-                        using (await model.AccessReadOnlyAsync())
+                        using (await model.AccessReadOnlyAsync(cancellationToken))
                         {
                             if (model.Inputs[CodeChannel.File2] is null)
                             {
@@ -1002,9 +996,9 @@ public class MCodeHandler(
                         }
 
                         // Try to fork the file and report an error if anything went wrong
-                        using (await jobProcessor.LockAsync(code.CancellationToken))
+                        using (await jobProcessor.LockAsync(cancellationToken))
                         {
-                            Message result = await jobProcessor.ForkAsync();
+                            Message result = await jobProcessor.ForkAsync(cancellationToken);
                             if (result.Type != MessageType.Success)
                             {
                                 return result;
@@ -1019,13 +1013,13 @@ public class MCodeHandler(
 
             // Start/stop event logging to SD card
             case 929:
-                if (await codeProcessor.FlushAsync(code))
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     if (!code.TryGetInt('S', out int sParam))
                     {
-                        using (await model.AccessReadOnlyAsync())
+                        using (await model.AccessReadOnlyAsync(cancellationToken))
                         {
-                            if (model.State.LogLevel == LogLevel.Off)
+                            if (model.State.LogLevel == EventLogLevel.Off)
                             {
                                 return new Message(MessageType.Success, "Event logging is disabled");
                             }
@@ -1035,16 +1029,16 @@ public class MCodeHandler(
 
                     if (sParam > 0 && sParam < 4)
                     {
-                        LogLevel logLevel = sParam switch
+                        EventLogLevel logLevel = sParam switch
                         {
-                            1 => LogLevel.Warn,
-                            2 => LogLevel.Info,
-                            3 => LogLevel.Debug,
-                            _ => LogLevel.Off
+                            1 => EventLogLevel.Warn,
+                            2 => EventLogLevel.Info,
+                            3 => EventLogLevel.Debug,
+                            _ => EventLogLevel.Off
                         };
 
-                        string defaultLogFile = Logger.DefaultLogFile;
-                        using (await model.AccessReadOnlyAsync())
+                        string defaultLogFile = EventLogger.DefaultLogFile;
+                        using (await model.AccessReadOnlyAsync(cancellationToken))
                         {
                             if (!string.IsNullOrEmpty(model.State.LogFile))
                             {
@@ -1052,11 +1046,11 @@ public class MCodeHandler(
                             }
                         }
 
-                        await logger.StartAsync(code.GetString('P', defaultLogFile), logLevel);
+                        await eventLogger.StartAsync(code.GetString('P', defaultLogFile), logLevel);
                     }
                     else
                     {
-                        await logger.StopAsync();
+                        await eventLogger.StopAsync();
                     }
                     return new Message();
                 }
@@ -1066,11 +1060,11 @@ public class MCodeHandler(
             case 997:
                 if (code.GetIntArray('S', [0]).Contains(0) && code.GetInt('B', 0) == 0)
                 {
-                    if (await codeProcessor.FlushAsync(code))
+                    if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                     {
                         // Get the IAP and Firmware files
                         string? iapFile, firmwareFile;
-                        using (await model.AccessReadOnlyAsync())
+                        using (await model.AccessReadOnlyAsync(cancellationToken))
                         {
                             if (model.Boards.Count == 0)
                             {
@@ -1090,45 +1084,45 @@ public class MCodeHandler(
                             return new Message(MessageType.Error, "Cannot update firmware because IAP and firmware filenames are unknown");
                         }
 
-                        string physicalIapFile = await filePathResolver.ToPhysicalAsync(iapFile, FileDirectory.Firmware);
+                        string physicalIapFile = await filePathResolver.ToPhysicalAsync(iapFile, FileDirectory.Firmware, cancellationToken);
                         if (!File.Exists(physicalIapFile))
                         {
-                            string fallbackIapFile = await filePathResolver.ToPhysicalAsync($"0:/firmware/{iapFile}");
+                            string fallbackIapFile = await filePathResolver.ToPhysicalAsync($"0:/firmware/{iapFile}", cancellationToken: cancellationToken);
                             if (!File.Exists(fallbackIapFile))
                             {
-                                fallbackIapFile = await filePathResolver.ToPhysicalAsync(iapFile, FileDirectory.System);
+                                fallbackIapFile = await filePathResolver.ToPhysicalAsync(iapFile, FileDirectory.System, cancellationToken);
                                 if (!File.Exists(fallbackIapFile))
                                 {
                                     return new Message(MessageType.Error, $"Failed to find IAP file {iapFile}");
                                 }
                             }
-                            _logger.Warn("Using fallback IAP file {0}", fallbackIapFile);
+                            logger.LogWarning("Using fallback IAP file {File}", fallbackIapFile);
                             physicalIapFile = fallbackIapFile;
                         }
 
-                        string physicalFirmwareFile = await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.Firmware);
+                        string physicalFirmwareFile = await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.Firmware, cancellationToken);
                         if (!File.Exists(physicalFirmwareFile))
                         {
-                            string fallbackFirmwareFile = await filePathResolver.ToPhysicalAsync($"0:/firmware/{firmwareFile}");
+                            string fallbackFirmwareFile = await filePathResolver.ToPhysicalAsync($"0:/firmware/{firmwareFile}", cancellationToken: cancellationToken);
                             if (!File.Exists(fallbackFirmwareFile))
                             {
-                                fallbackFirmwareFile = await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.System);
+                                fallbackFirmwareFile = await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.System, cancellationToken);
                                 if (!File.Exists(fallbackFirmwareFile))
                                 {
                                     return new Message(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
                                 }
                             }
-                            _logger.Warn("Using fallback firmware file {0}", fallbackFirmwareFile);
+                            logger.LogWarning("Using fallback firmware file {File}", fallbackFirmwareFile);
                             physicalFirmwareFile = fallbackFirmwareFile;
                         }
 
                         // Stop all the plugins
                         Commands.StopPlugins stopCommand = commandFactory.Create<Commands.StopPlugins>();
-                        await stopCommand.ExecuteAsync();
+                        await stopCommand.ExecuteAsync(cancellationToken);
 
                         // Flash the firmware
-                        await using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read, FileShare.Read, _settings.FileBufferSize);
-                        await using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read, FileShare.Read, _settings.FileBufferSize);
+                        await using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
+                        await using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
                         if (Path.GetExtension(firmwareFile) == ".uf2")
                         {
                             await using MemoryStream unpackedFirmwareStream = await Firmware.UnpackUF2Async(firmwareStream);
@@ -1140,7 +1134,7 @@ public class MCodeHandler(
                         }
 
                         // Terminate the program - or - restart the plugins when done
-                        if (_settings.UpdateOnly)
+                        if (settings.Value.UpdateOnly)
                         {
                             _ = code.Task.ContinueWith(async task =>
                             {
@@ -1150,10 +1144,10 @@ public class MCodeHandler(
                         }
                         else
                         {
-                            await model.WaitForFullUpdateAsync(code.CancellationToken);
+                            await model.WaitForFullUpdateAsync(cancellationToken);
 
                             Commands.StartPlugins startCommand = commandFactory.Create<Commands.StartPlugins>();
-                            await startCommand.ExecuteAsync();
+                            await startCommand.ExecuteAsync(cancellationToken);
                         }
                         return new Message();
                     }
@@ -1169,20 +1163,19 @@ public class MCodeHandler(
             case 999:
                 if (code.Parameters.Count == 0)
                 {
-                    if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await codeProcessor.FlushAsync(code))
+                    if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                     {
                         // Wait for potential firmware updates to complete first
                         await linkInterface.WaitForUpdateAsync();
 
                         // Perform firmware reset but don't wait longer than 4.5s
-                        Task resetTask = linkInterface.ResetFirmwareAsync();
+                        Task resetTask = linkInterface.ResetFirmwareAsync(cancellationToken);
                         Task completedTask = await Task.WhenAny(resetTask, Task.Delay(4500, lifetime.ApplicationStopped));
                         if (resetTask != completedTask)
                         {
-                            // Reset timed out, kill this program
-#warning fixme
+                            // Reset timed out, stop this program
                             lifetime.StopApplication();
-                            return new Message(MessageType.Error, "Reset timed out, killing DCS");
+                            return new Message(MessageType.Error, "Reset timed out, stopping DCS");
                         }
 
                         // Firmware reset
@@ -1199,9 +1192,10 @@ public class MCodeHandler(
     /// React to an executed M-code before its result is returned
     /// </summary>
     /// <param name="code">Code processed by RepRapFirmware</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result to output</returns>
     /// <remarks>This method shall be used only to update values that are time-critical. Others are supposed to be updated via the object model</remarks>
-    public async ValueTask CodeExecutedAsync(Commands.Code code)
+    public async ValueTask CodeExecutedAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.Result is null || code.Result.Type != MessageType.Success)
         {
@@ -1220,7 +1214,7 @@ public class MCodeHandler(
             case 24:
             case 32:
             case 37:
-                using (await jobProcessor.LockAsync(code.CancellationToken))
+                using (await jobProcessor.LockAsync(cancellationToken))
                 {
                     // Start sending file instructions to RepRapFirmware or finish the cancellation process
                     jobProcessor.Resume();
@@ -1229,7 +1223,7 @@ public class MCodeHandler(
 
             // Pop
             case 121:
-                await model.WaitForFullUpdateAsync(code.CancellationToken);        // This may change inputs[].active, so sync the OM here
+                await model.WaitForFullUpdateAsync(cancellationToken);        // This may change inputs[].active, so sync the OM here
                 break;
 
             // Diagnostics
@@ -1248,7 +1242,7 @@ public class MCodeHandler(
                 if (code.File != null && code.TryGetString('V', out string? varName))
                 {
                     // These codes can create local variables, so keep track of them
-                    using (await code.File.LockAsync())
+                    using (await code.File.LockAsync(cancellationToken))
                     {
                         code.File.AddLocalVariable(varName);
                     }
@@ -1266,21 +1260,21 @@ public class MCodeHandler(
 
             // Select movement queue number
             case 596:
-                _logger.Debug("Requesting full model update after M596");
-                await model.WaitForFullUpdateAsync(code.CancellationToken);        // This changes inputs[].active, so sync the OM here
-                _logger.Debug("Requested full model update after M596");
+                logger.LogDebug("Requesting full model update after M596");
+                await model.WaitForFullUpdateAsync(cancellationToken);        // This changes inputs[].active, so sync the OM here
+                logger.LogDebug("Requested full model update after M596");
                 break;
 
             // Fork input reader
             case 606:
                 if (code.TryGetInt('S', out int sParam) && sParam == 1)
                 {
-                    _logger.Debug("Requesting full model update after M606 S1");
-                    await model.WaitForFullUpdateAsync(code.CancellationToken);    // This changes inputs[].active, so sync the OM here
-                    _logger.Debug("Requested full model update after M606 S1");
+                    logger.LogDebug("Requesting full model update after M606 S1");
+                    await model.WaitForFullUpdateAsync(cancellationToken);    // This changes inputs[].active, so sync the OM here
+                    logger.LogDebug("Requested full model update after M606 S1");
 
                     Link.Channel.Processor.StartCopiedMacros();
-                    using (await jobProcessor.LockAsync())
+                    using (await jobProcessor.LockAsync(cancellationToken))
                     {
                         jobProcessor.StartSecondJob();
                     }

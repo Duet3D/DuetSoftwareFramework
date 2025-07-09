@@ -12,14 +12,13 @@ namespace DuetControlServer.Utility;
 [Target("MessageLogTarget")] 
 public sealed class MessageLogTarget : AsyncTaskTarget
 {
-    /// <summary>
-    /// Object model
-    /// </summary>
-    private Model.ObjectModel _model;
+    // Private fields
+    private readonly Model.ObjectModel _model;
 
     /// <summary>
     /// Constructor of this class
     /// </summary>
+    /// <param name="model">Object model</param>
     public MessageLogTarget(Model.ObjectModel model)
     {
         _model = model;
@@ -36,11 +35,11 @@ public sealed class MessageLogTarget : AsyncTaskTarget
     {
         // Determine message type
         MessageType messageType = MessageType.Success;
-        if (logEvent.Level == NLog.LogLevel.Error)
+        if (logEvent.Level == LogLevel.Error)
         {
             messageType = MessageType.Error;
         }
-        else if (logEvent.Level == NLog.LogLevel.Warn)
+        else if (logEvent.Level == LogLevel.Warn)
         {
             messageType = MessageType.Warning;
         }
