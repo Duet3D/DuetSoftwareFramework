@@ -95,7 +95,7 @@ rootCommand.SetAction((parserResult) =>
     IHost host;
     try
     {
-        host = Host.CreateDefaultBuilder([.. parserResult.UnmatchedTokens])
+        host = Host.CreateDefaultBuilder()
             .UseNLog()
             .UseSystemd()
             .ConfigureAppConfiguration((hostingContext, config) =>
@@ -104,7 +104,7 @@ rootCommand.SetAction((parserResult) =>
                 {
                     config
                         .AddJsonFile(configFileValue.FullName, optional: true)
-                        .AddCommandLine(args);
+                        .AddCommandLine([.. parserResult.UnmatchedTokens]);
                 }
                 catch (JsonException je)
                 {

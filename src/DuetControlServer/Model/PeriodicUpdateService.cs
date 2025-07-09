@@ -13,6 +13,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -72,6 +73,44 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel 
         {
             _activeProtocols.Remove(protocol);
         }
+    }
+
+    /// <summary>
+    /// Start the periodic update service
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public override async Task StartAsync(CancellationToken cancellationToken)
+    {
+        // Load plugin manifests
+        if (settings.Value.PluginSupport)
+        {
+            foreach (string file in Directory.GetFiles(settings.Value.PluginDirectory))
+            {
+                if (file.EndsWith(".json"))
+                {
+                    try
+                    {
+                        await using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
+                        using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream, cancellationToken: cancellationToken);
+                        Plugin plugin = new();
+                        plugin.UpdateFromJson(manifestJson.RootElement, false);
+                        plugin.Pid = -1;
+                        using (await model.AccessReadWriteAsync(cancellationToken))
+                        {
+                            model.Plugins.Add(plugin.Id, plugin);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        logger.LogError(e, "Failed to load plugin manifest {File}", Path.GetFileName(file));
+                    }
+                }
+            }
+        }
+
+        // Start service
+        await base.StartAsync(cancellationToken);
     }
 
     /// <summary>
