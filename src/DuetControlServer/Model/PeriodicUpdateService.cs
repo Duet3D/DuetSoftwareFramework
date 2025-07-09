@@ -67,7 +67,7 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel 
     /// Called when a network protocol has been disabled
     /// </summary>
     /// <param name="protocol">Disabled protocol</param>
-    internal void ProtocolDisabled(NetworkProtocol protocol)
+    public void ProtocolDisabled(NetworkProtocol protocol)
     {
         lock (_activeProtocols)
         {
