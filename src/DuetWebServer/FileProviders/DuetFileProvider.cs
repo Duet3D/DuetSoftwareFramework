@@ -2,88 +2,87 @@ using DuetWebServer.Singletons;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Primitives;
 
-namespace DuetWebServer.FileProviders
+namespace DuetWebServer.FileProviders;
+
+/// <summary>
+/// File provider that uses DCS to resolve file paths
+/// </summary>
+public class DuetFileProvider : IFileProvider
 {
     /// <summary>
-    /// Static file provider that uses DCS to resolve file paths
+    /// Physical file provider
     /// </summary>
-    public class DuetFileProvider : IFileProvider
+    private PhysicalFileProvider _provider;
+
+    /// <summary>
+    /// Object model provider
+    /// </summary>
+    private readonly IModelProvider _modelProvider;
+
+    /// <summary>
+    /// Creates a new file resolver instance
+    /// </summary>
+    public DuetFileProvider(IModelProvider modelProvider)
     {
-        /// <summary>
-        /// Physical file provider
-        /// </summary>
-        private PhysicalFileProvider _provider;
+        _modelProvider = modelProvider;
+        _modelProvider.OnWebDirectoryChanged += SetWebDirectory;
+        _provider = new PhysicalFileProvider(_modelProvider.WebDirectory!);
+    }
 
-        /// <summary>
-        /// Object model provider
-        /// </summary>
-        private readonly IModelProvider _modelProvider;
+    /// <summary>
+    /// Finalizer of this instance
+    /// </summary>
+    ~DuetFileProvider() => _modelProvider.OnWebDirectoryChanged -= SetWebDirectory;
 
-        /// <summary>
-        /// Creates a new file resolver instance
-        /// </summary>
-        public DuetFileProvider(IModelProvider modelProvider)
+    /// <summary>
+    /// Gets the file info of the specified path
+    /// </summary>
+    /// <param name="subpath">Target path</param>
+    /// <returns>File info</returns>
+    public IFileInfo GetFileInfo(string subpath)
+    {
+        lock (this)
         {
-            _modelProvider = modelProvider;
-            _modelProvider.OnWebDirectoryChanged += SetWebDirectory;
-            _provider = new PhysicalFileProvider(_modelProvider.WebDirectory!);
+            return _provider.GetFileInfo(subpath);
         }
+    }
 
-        /// <summary>
-        /// Finalizer of this instance
-        /// </summary>
-        ~DuetFileProvider() => _modelProvider.OnWebDirectoryChanged -= SetWebDirectory;
-
-        /// <summary>
-        /// Gets the file info of the specified path
-        /// </summary>
-        /// <param name="subpath">Target path</param>
-        /// <returns>File info</returns>
-        public IFileInfo GetFileInfo(string subpath)
+    /// <summary>
+    /// Returns the contents of the given directory
+    /// </summary>
+    /// <param name="subpath">Target path</param>
+    /// <returns>Directory contents</returns>
+    public IDirectoryContents GetDirectoryContents(string subpath)
+    {
+        lock (this)
         {
-            lock (this)
-            {
-                return _provider.GetFileInfo(subpath);
-            }
+            return _provider.GetDirectoryContents(subpath);
         }
+    }
 
-        /// <summary>
-        /// Returns the contents of the given directory
-        /// </summary>
-        /// <param name="subpath">Target path</param>
-        /// <returns>Directory contents</returns>
-        public IDirectoryContents GetDirectoryContents(string subpath)
+    /// <summary>
+    /// Creates a token that watches for changes
+    /// </summary>
+    /// <param name="filter">Watch filter</param>
+    /// <returns>Change token</returns>
+    public IChangeToken Watch(string filter)
+    {
+        lock (this)
         {
-            lock (this)
-            {
-                return _provider.GetDirectoryContents(subpath);
-            }
+            return _provider.Watch(filter);
         }
+    }
 
-        /// <summary>
-        /// Creates a token that watches for changes
-        /// </summary>
-        /// <param name="filter">Watch filter</param>
-        /// <returns>Change token</returns>
-        public IChangeToken Watch(string filter)
+    /// <summary>
+    /// Set the directory of the file provider
+    /// </summary>
+    /// <param name="webDirectory">New web directory</param>
+    private void SetWebDirectory(string webDirectory)
+    {
+        lock (this)
         {
-            lock (this)
-            {
-                return _provider.Watch(filter);
-            }
-        }
-
-        /// <summary>
-        /// Set the directory of the file provider
-        /// </summary>
-        /// <param name="webDirectory">New web directory</param>
-        private void SetWebDirectory(string webDirectory)
-        {
-            lock (this)
-            {
-                _provider.Dispose();
-                _provider = new PhysicalFileProvider(webDirectory);
-            }
+            _provider.Dispose();
+            _provider = new PhysicalFileProvider(webDirectory);
         }
     }
 }
