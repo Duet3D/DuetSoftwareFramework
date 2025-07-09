@@ -13,9 +13,8 @@ namespace DuetPluginService.IPC;
 /// Implementation of the <see cref="DuetAPI.Commands.ReloadPlugin"/> command
 /// </summary>
 /// <param name="pluginStore">Plugin store</param>
-/// <param name="hostEnvironment">Host environment</param>
 /// <param name="settings">Application settings</param>
-public sealed class ReloadPlugin(PluginStore pluginStore, IHostEnvironment hostEnvironment, IOptions<Settings> settings) : DuetAPI.Commands.ReloadPlugin
+public sealed class ReloadPlugin(PluginStore pluginStore, IOptions<Settings> settings) : DuetAPI.Commands.ReloadPlugin
 {
     private readonly Settings _settings = settings.Value;
 
@@ -41,7 +40,7 @@ public sealed class ReloadPlugin(PluginStore pluginStore, IHostEnvironment hostE
             }
 
             // Update the plugin manifest
-            string file = Path.Combine(hostEnvironment.ContentRootPath, Plugin + ".json");
+            string file = Path.Combine(settings.Value.PluginDirectory, Plugin + ".json");
             if (File.Exists(file))
             {
                 if (plugin is null)

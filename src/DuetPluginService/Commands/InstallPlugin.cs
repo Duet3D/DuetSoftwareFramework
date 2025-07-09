@@ -24,10 +24,9 @@ namespace DuetPluginService.IPC;
 /// </summary>
 /// <param name="permissionManager">Permission manager</param>
 /// <param name="pluginStore">Plugin store</param>
-/// <param name="hostEnvironment">Host environment</param>
 /// <param name="loggerFactory">Logger factory</param>
 /// <param name="settings">Application settings</param>
-public sealed class InstallPlugin(IPermissionManager permissionManager, PluginStore pluginStore, IHostEnvironment hostEnvironment, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.InstallPlugin
+public sealed class InstallPlugin(IPermissionManager permissionManager, PluginStore pluginStore, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.InstallPlugin
 {
     private readonly Settings _settings = settings.Value;
 
@@ -80,14 +79,14 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
             {
 
                 // Install security profile
-                await permissionManager.InstallProfileAsync(plugin, hostEnvironment.ContentRootPath, sdPath, cancellationToken);
+                await permissionManager.InstallProfileAsync(plugin, settings.Value.PluginDirectory, sdPath, cancellationToken);
                 logger.LogInformation("Security profile installed");
             }
         }
         else
         {
             // Delete old files
-            string pluginBase = Path.Combine(hostEnvironment.ContentRootPath, plugin.Id);
+            string pluginBase = Path.Combine(settings.Value.PluginDirectory, plugin.Id);
             if (!Upgrade && Directory.Exists(pluginBase))
             {
                 try
@@ -150,7 +149,7 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
                 else if (entry.FullName.StartsWith("sd/"))
                 {
                     // Put SD files into 0:/
-                    fileName = Path.Combine(hostEnvironment.ContentRootPath, entry.FullName[3..]);
+                    fileName = Path.Combine(settings.Value.PluginDirectory, entry.FullName[3..]);
                     plugin.SdFiles.Add(entry.FullName[3..]);
                 }
                 else
@@ -212,7 +211,7 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
             foreach (string dwcFile in plugin.DwcFiles)
             {
                 string pluginWwwPath = Path.Combine(pluginBase, "dwc", dwcFile);
-                string installWwwPath = Path.Combine(hostEnvironment.ContentRootPath, "www", dwcFile);
+                string installWwwPath = Path.Combine(settings.Value.PluginDirectory, "www", dwcFile);
 
                 // Create parent directory first
                 string directory = Path.GetDirectoryName(installWwwPath)!;
@@ -250,7 +249,7 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
 
             // Install refreshed plugin manifest
             logger.LogDebug("Installing plugin manifest");
-            string manifestFilename = Path.Combine(hostEnvironment.ContentRootPath, $"{plugin.Id}.json");
+            string manifestFilename = Path.Combine(settings.Value.PluginDirectory, $"{plugin.Id}.json");
             await using (FileStream manifestFile = new(manifestFilename, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 await JsonSerializer.SerializeAsync(manifestFile, plugin, JsonHelper.DefaultJsonOptions);
@@ -360,8 +359,8 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
             {
                 FileName = _settings.InstallPythonPackageCommand,
                 Arguments = _settings.InstallPythonPackageArguments
-                    .Replace("{manifestFile}", Path.Combine(hostEnvironment.ContentRootPath, plugin + ".json"))
-                    .Replace("{pluginPath}", Path.Combine(hostEnvironment.ContentRootPath, plugin))
+                    .Replace("{manifestFile}", Path.Combine(settings.Value.PluginDirectory, plugin + ".json"))
+                    .Replace("{pluginPath}", Path.Combine(settings.Value.PluginDirectory, plugin))
             };
             foreach (var kv in _settings.InstallPackageEnvironment)
             {

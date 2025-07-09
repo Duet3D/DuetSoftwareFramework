@@ -10,8 +10,9 @@ namespace DuetPluginService;
 /// <summary>
 /// Main storage class for registered plugins
 /// </summary>
-public class PluginStore
+public sealed class PluginStore
 {
+    // Private fields
     private readonly AsyncLock _lock = new();
 
     /// <summary>

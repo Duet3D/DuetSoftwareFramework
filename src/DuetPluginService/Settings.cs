@@ -5,7 +5,7 @@ namespace DuetPluginService;
 /// <summary>
 /// Settings class
 /// </summary>
-public class Settings
+public sealed class Settings
 {
     /// <summary>
     /// Default path to the configuration file
@@ -16,6 +16,11 @@ public class Settings
     /// Path to the UNIX socket provided by DuetControlServer
     /// </summary>
     public string SocketPath { get; set; } = DuetAPI.Connection.Defaults.FullSocketPath;
+
+    /// <summary>
+    /// Directory holding DSF plugins
+    /// </summary>
+    public string PluginDirectory { get; set; } = "/opt/dsf/plugins";
 
     /// <summary>
     /// Disable AppArmor security policy generation (not recommended, potential security hazard)

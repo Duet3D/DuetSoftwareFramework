@@ -20,10 +20,9 @@ namespace DuetPluginService.IPC;
 /// </summary>
 /// <param name="pluginStore">Plugin store</param>
 /// <param name="lifetime">Application lifetime</param>
-/// <param name="hostEnvironment">Host environment</param>
 /// <param name="loggerFactory">Logger factory</param>
 /// <param name="settings">Application settings</param>
-public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetime lifetime, IHostEnvironment hostEnvironment, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.StartPlugin
+public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetime lifetime, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.StartPlugin
 {
     private readonly Settings _settings = settings.Value;
 
@@ -71,10 +70,10 @@ public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetim
             _ => "unknown"
         };
 
-        string sbcExecutable = Path.Combine(hostEnvironment.ContentRootPath, plugin.Id, "dsf", architecture, plugin.SbcExecutable!);
+        string sbcExecutable = Path.Combine(settings.Value.PluginDirectory, plugin.Id, "dsf", architecture, plugin.SbcExecutable!);
         if (!File.Exists(sbcExecutable))
         {
-            sbcExecutable = Path.Combine(hostEnvironment.ContentRootPath, plugin.Id, "dsf", plugin.SbcExecutable!);
+            sbcExecutable = Path.Combine(settings.Value.PluginDirectory, plugin.Id, "dsf", plugin.SbcExecutable!);
             if (!File.Exists(sbcExecutable))
             {
                 throw new ArgumentException($"Cannot find executable {sbcExecutable}");
@@ -94,7 +93,7 @@ public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetim
             {
                 FileName = (plugin.SbcPythonDependencies.Count == 0) ? sbcExecutable : _settings.PythonLaunchCommand,
                 Arguments = (plugin.SbcPythonDependencies.Count == 0) ? plugin.SbcExecutableArguments : _settings.PythonLaunchArguments
-                    .Replace("{pluginDir}", Path.Combine(hostEnvironment.ContentRootPath, plugin.Id))
+                    .Replace("{pluginDir}", Path.Combine(settings.Value.PluginDirectory, plugin.Id))
                     .Replace("{command}", sbcExecutable)
                     .Replace("{args}", (plugin.SbcExecutableArguments ?? string.Empty).Replace("'", "\\'")),
                 EnvironmentVariables =

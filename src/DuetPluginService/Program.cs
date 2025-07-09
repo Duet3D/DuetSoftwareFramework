@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.CommandLine;
+using System.IO;
 
 Option<string> configOption = new("-c", "--config")
 {
@@ -21,22 +22,23 @@ RootCommand rootCommand = new("Duet Plugin Service")
 rootCommand.SetAction((parserResult) =>
 {
     string configValue = parserResult.GetValue(configOption) ?? Settings.DefaultConfigFile;
-    new HostBuilder()
+    Host.CreateDefaultBuilder()
         .UseSystemd()
         .ConfigureAppConfiguration((hostingContext, config) =>
         {
             config
                 .AddJsonFile(configValue, optional: true)
-                .AddCommandLine(args);
+                .AddCommandLine([.. parserResult.UnmatchedTokens]);
         })
         .ConfigureServices((context, services) => services
-            .Configure<Settings>(context.Configuration)
-            .AddSingleton<CommandFactory>()
-            .AddSingleton<IPermissionManager, AppArmorPermissionManager>()
-            .AddSingleton<PluginStore>()
-            .AddSingleton<PluginServiceConnection>()
-            .AddHostedService<CommandService>()
-        )
+                .Configure<Settings>(context.Configuration)
+                .AddSingleton<CommandFactory>()
+                .AddSingleton<IPermissionManager, AppArmorPermissionManager>()
+                .AddSingleton<PluginStore>()
+                .AddHostedService<PluginService>()
+                .AddSingleton<PluginServiceConnection>()
+                .AddHostedService<CommandService>()
+            )
         .Build()
         .Run();
 });

@@ -4,11 +4,6 @@ using System.Threading.Tasks;
 using System.Threading;
 using System;
 using System.Net.Sockets;
-using DuetAPI.ObjectModel;
-using System.Collections.Generic;
-using System.IO;
-using System.Text.Json;
-using DuetPluginService.Commands;
 
 namespace DuetPluginService.IPC;
 
@@ -16,10 +11,8 @@ namespace DuetPluginService.IPC;
 /// Service which interacts with DCS to perform plugin-specific tasks
 /// </summary>
 /// <param name="connection">Plugin service connection</param>
-/// <param name="pluginStore">Plugin store</param>
-/// <param name="hostEnvironment">Host environment</param>
 /// <param name="logger">Logger</param>
-public class CommandService(CommandFactory commandFactory, PluginServiceConnection connection, PluginStore pluginStore, IHostEnvironment hostEnvironment, ILogger<CommandService> logger) : BackgroundService
+public class CommandService(PluginServiceConnection connection, ILogger<CommandService> logger) : BackgroundService
 {
     /// <summary>
     /// Start the main service
@@ -28,28 +21,6 @@ public class CommandService(CommandFactory commandFactory, PluginServiceConnecti
     /// <returns>Asynchronous task</returns>
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
-        // Load available plugin manifests
-        foreach (string file in Directory.GetFiles(hostEnvironment.ContentRootPath, "*.json"))
-        {
-            try
-            {
-                await using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
-                using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream, cancellationToken: cancellationToken);
-                Plugin plugin = new();
-                plugin.UpdateFromJson(manifestJson.RootElement, false);
-                plugin.Pid = -1;
-                using (await pluginStore.LockAsync(cancellationToken))
-                {
-                    pluginStore.Plugins.Add(plugin);
-                }
-                logger.LogInformation("Plugin {Id} loaded", plugin.Id);
-            }
-            catch (Exception e)
-            {
-                logger.LogError(e, "Failed to load plugin manifest {File}", Path.GetFileName(file));
-            }
-        }
-
         // Connect to DCS
         await connection.ConnectAsync(cancellationToken);
 
@@ -67,7 +38,7 @@ public class CommandService(CommandFactory commandFactory, PluginServiceConnecti
         DuetAPI.Commands.BaseCommand? command = null;
         Type commandType;
 
-        for (;;)
+        for (; ; )
         {
             try
             {
@@ -115,32 +86,5 @@ public class CommandService(CommandFactory commandFactory, PluginServiceConnecti
                 await connection.SendResponseAsync(e, stoppingToken);
             }
         }
-    }
-
-    /// <summary>
-    /// Stop the main service and all started plugins
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public override async Task StopAsync(CancellationToken cancellationToken)
-    {
-        // Stop the main service
-        await base.StopAsync(cancellationToken);
-
-        // Stop all started plugins
-        List<Task> stopTasks = [];
-        using (await pluginStore.LockAsync(cancellationToken))
-        {
-            foreach (Plugin plugin in pluginStore.Plugins)
-            {
-                if (pluginStore.Processes.ContainsKey(plugin.Id))
-                {
-                    StopPlugin stopPlugin = commandFactory.Create<StopPlugin>();
-                    stopPlugin.Plugin = plugin.Id;
-                    stopTasks.Add(stopPlugin.ExecuteAsync(cancellationToken));
-                }
-            }
-        }
-        await Task.WhenAll(stopTasks);
     }
 }

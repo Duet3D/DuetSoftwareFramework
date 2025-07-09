@@ -19,10 +19,9 @@ namespace DuetPluginService.IPC;
 /// </summary>
 /// <param name="permissionManager">Permission manager</param>
 /// <param name="pluginStore">Plugin store</param>
-/// <param name="hostEnvironment">Host environment</param>
 /// <param name="loggerFactory">Logger factory</param>
 /// <param name="settings">Application settings</param>
-public sealed class UninstallPlugin(IPermissionManager permissionManager, PluginStore pluginStore, IHostEnvironment hostEnvironment, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.UninstallPlugin
+public sealed class UninstallPlugin(IPermissionManager permissionManager, PluginStore pluginStore, ILoggerFactory loggerFactory, IOptions<Settings> settings) : DuetAPI.Commands.UninstallPlugin
 {
     private readonly Settings _settings = settings.Value;
 
@@ -73,7 +72,7 @@ public sealed class UninstallPlugin(IPermissionManager permissionManager, Plugin
         // Root plugins are deleted by the root service to avoid potential permission issues
         if (plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser) == Environment.IsPrivilegedProcess)
         {
-            string manifestFile = Path.Combine(hostEnvironment.ContentRootPath, $"{Plugin}.json");
+            string manifestFile = Path.Combine(settings.Value.PluginDirectory, $"{Plugin}.json");
 
             // Check if the manifest is writable
             UnixFileMode fileMode = File.GetUnixFileMode(manifestFile);
@@ -121,7 +120,7 @@ public sealed class UninstallPlugin(IPermissionManager permissionManager, Plugin
                 // Remove only installed files
                 foreach (string dsfFile in plugin.DsfFiles)
                 {
-                    string file = Path.Combine(hostEnvironment.ContentRootPath, Plugin, "dsf", dsfFile);
+                    string file = Path.Combine(settings.Value.PluginDirectory, Plugin, "dsf", dsfFile);
                     if (File.Exists(file))
                     {
                         logger.LogDebug("Deleting file {File}", file);
@@ -131,7 +130,7 @@ public sealed class UninstallPlugin(IPermissionManager permissionManager, Plugin
 
                 foreach (string dwcFile in plugin.DwcFiles)
                 {
-                    string file = Path.Combine(hostEnvironment.ContentRootPath, Plugin, "dwc", dwcFile);
+                    string file = Path.Combine(settings.Value.PluginDirectory, Plugin, "dwc", dwcFile);
                     if (File.Exists(file))
                     {
                         logger.LogDebug("Deleting file {File}", file);
@@ -161,7 +160,7 @@ public sealed class UninstallPlugin(IPermissionManager permissionManager, Plugin
             else
             {
                 // Remove the full plugin directory
-                string pluginDirectory = Path.Combine(hostEnvironment.ContentRootPath, Plugin);
+                string pluginDirectory = Path.Combine(settings.Value.PluginDirectory, Plugin);
                 if (Directory.Exists(pluginDirectory))
                 {
                     logger.LogDebug("Removing plugin directory {Directory}", pluginDirectory);
