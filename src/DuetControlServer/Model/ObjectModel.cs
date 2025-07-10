@@ -7,7 +7,6 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
-using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Utility;
 using DuetSharedLibrary;

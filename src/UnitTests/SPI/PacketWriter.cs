@@ -5,7 +5,7 @@ using DuetAPI.ObjectModel;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using Code = DuetControlServer.Commands.Code;
-using CodeFlags = DuetControlServer.Link.Communication.SbcRequests.CodeFlags;
+using CodeFlags = DuetControlServer.Link.Protocol.SbcRequests.CodeFlags;
 
 namespace UnitTests.SPI
 {

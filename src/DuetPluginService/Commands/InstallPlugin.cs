@@ -2,7 +2,6 @@
 using DuetAPI.Utility;
 using DuetAPIClient;
 using DuetPluginService.PermissionManagers;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;

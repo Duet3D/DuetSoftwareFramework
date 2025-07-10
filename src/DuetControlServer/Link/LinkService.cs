@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -30,7 +29,7 @@ namespace DuetControlServer.Link;
 /// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model</param>
 /// <param name="settings">Settings</param>
-public sealed partial class LinkService(
+public sealed class LinkService(
     Channel.Manager channels,
     EventLogger eventLogger,
     FilePathResolver filePathResolver,

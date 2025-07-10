@@ -1,5 +1,4 @@
 ﻿using DuetAPI.ObjectModel;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using System;
 using System.IO;

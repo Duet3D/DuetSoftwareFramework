@@ -145,7 +145,7 @@ rootCommand.SetAction((parserResult) =>
             }
             catch (Exception e)
             {
-                LogManager.GetCurrentClassLogger().Warn(e, "Failed to delete start error file {0}", startErrorFile);
+                LogManager.GetCurrentClassLogger().Warn(e, "Failed to delete start error file {File}", startErrorFile);
             }
         }
     });
