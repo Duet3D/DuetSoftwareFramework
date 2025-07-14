@@ -1291,12 +1291,12 @@ public class SPI : IDiagnostics, ILinkAdapter
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (stopwatch.ElapsedMilliseconds > timeout + 500)
+                if (stopwatch.ElapsedMilliseconds > timeout + 125)
                 {
-                    // In case this application does not seem to get enough CPU time, log a different message
+                    // In case the CTS is triggered very late, this application may not have gotten enough CPU time. Log this
                     _eventLogger.LogOutput(MessageType.Warning, "Did not get enough CPU time during SPI transfer, your SBC may be overloaded");
                 }
-                throw new OperationCanceledException("Timeout while waiting for transfer ready pin");
+                throw new OperationCanceledException($"{(inTransfer ? "Transfer" : "Connection")} timeout while waiting for TfrRdy pin");
             }
 
             // Keep track of the maximum wait times
