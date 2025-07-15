@@ -298,6 +298,8 @@ namespace DuetControlServer.Model
                     {
                         if (_lastSeqs.IsEmpty)
                         {
+                            _logger.Debug("Requesting initial limits");
+
                             await RequestModel("limits", "d99vno");
                             using (await Provider.AccessReadWriteAsync())
                             {
@@ -330,7 +332,7 @@ namespace DuetControlServer.Model
                         string key = _updatedKeys[i];
                         if (key != "reply" && (!Settings.UpdateOnly || key is "boards" or "directories" or "state"))
                         {
-                            _logger.Debug(() => $"Requesting update of key {key}, new seq {_lastSeqs[key]}");
+                            _logger.Debug(() => $"Requesting update of key {key}, new seq {(_lastSeqs.TryGetValue(key, out int seqValue) ? seqValue.ToString() : "n/a")}");
 
                             int next = 0;
                             do
