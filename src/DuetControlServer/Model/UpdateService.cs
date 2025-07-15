@@ -221,6 +221,8 @@ public class UpdateService : BackgroundService
                 // Request the limits if no sequence numbers have been set yet
                 if (_lastSeqs.IsEmpty)
                 {
+                    _logger.LogDebug("Requesting initial limits");
+
                     await RequestModelAsync("limits", "d99vno");
                     using (await _model.AccessReadWriteAsync(stoppingToken))
                     {
@@ -252,7 +254,7 @@ public class UpdateService : BackgroundService
                     string key = _updatedKeys[i];
                     if (key != "reply" && (!_settings.UpdateOnly || key is "boards" or "directories" or "state"))
                     {
-                        _logger.LogDebug("Requesting update of key {Key}, new seq {Seq}", key, _lastSeqs[key]);
+                        _logger.LogDebug("Requesting update of key {Key}, new seq {Seq}", key, _lastSeqs.TryGetValue(key, out int seqValue) ? seqValue : -1);
 
                         int next = 0;
                         do
