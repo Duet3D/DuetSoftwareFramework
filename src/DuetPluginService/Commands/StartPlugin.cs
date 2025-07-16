@@ -133,7 +133,7 @@ public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetim
                 try
                 {
                     // Wait for it to be terminated
-                    await process.WaitForExitAsync();
+                    await process.WaitForExitAsync(lifetime.ApplicationStopped);
                     if (plugin.SbcOutputRedirected)
                     {
                         process.ErrorDataReceived -= errorHandler;
@@ -141,7 +141,7 @@ public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetim
                     }
 
                     // Update the PID again
-                    using (await pluginStore.LockAsync(cancellationToken))
+                    using (await pluginStore.LockAsync(lifetime.ApplicationStopped))
                     {
                         foreach (Plugin item in pluginStore.Plugins)
                         {
@@ -150,7 +150,7 @@ public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetim
                                 logger.LogInformation("Process stopped with exit code {ExitCode}", process.ExitCode);
                                 item.Pid = -1;
 
-                                if (!lifetime.ApplicationStopping.IsCancellationRequested)
+                                if (!cancellationToken.IsCancellationRequested)
                                 {
                                     using InternalCommandConnection connection = new();
                                     await connection.ConnectAsync(_settings.SocketPath, cancellationToken);
@@ -166,7 +166,7 @@ public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetim
                 }
                 finally
                 {
-                    using (await pluginStore.LockAsync(cancellationToken))
+                    using (await pluginStore.LockAsync(lifetime.ApplicationStopped))
                     {
                         pluginStore.Processes.Remove(plugin.Id);
                     }
