@@ -122,7 +122,7 @@ namespace DuetPluginService.Commands
                     try
                     {
                         // Wait for it to be terminated
-                        await process.WaitForExitAsync(Program.CancellationToken);
+                        await process.WaitForExitAsync();
                         if (plugin.SbcOutputRedirected)
                         {
                             process.ErrorDataReceived -= errorHandler;
