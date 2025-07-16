@@ -121,7 +121,7 @@ namespace DuetPluginService.Commands
                     try
                     {
                         // Wait for it to be terminated
-                        await process.WaitForExitAsync(Program.CancellationToken);
+                        await process.WaitForExitAsync();
                         if (plugin.SbcOutputRedirected)
                         {
                             process.ErrorDataReceived -= errorHandler;
@@ -156,6 +156,7 @@ namespace DuetPluginService.Commands
                     {
                         using (await Plugins.LockAsync())
                         {
+                            Console.WriteLine("Removing plugin {0} from process list", plugin.Id);
                             Plugins.Processes.Remove(plugin.Id);
                         }
                         process.Dispose();
@@ -172,7 +173,7 @@ namespace DuetPluginService.Commands
         /// <returns>Event handler</returns>
         private DataReceivedEventHandler MakeOutputHandler(string pluginName, MessageType messageType)
         {
-            return (object sender, DataReceivedEventArgs e) =>
+            return (sender, e) =>
             {
                 if (!string.IsNullOrWhiteSpace(e.Data))
                 {
