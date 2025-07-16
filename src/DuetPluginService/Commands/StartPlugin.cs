@@ -133,7 +133,7 @@ public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetim
                 try
                 {
                     // Wait for it to be terminated
-                    await process.WaitForExitAsync(lifetime.ApplicationStopped);
+                    await process.WaitForExitAsync();
                     if (plugin.SbcOutputRedirected)
                     {
                         process.ErrorDataReceived -= errorHandler;
