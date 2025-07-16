@@ -34,7 +34,7 @@ namespace DuetPiManagementPlugin
         /// </summary>
         /// <param name="iface">Ethernet interface name</param>
         /// <returns>Profile UUID or null if not active</returns>
-        private static async Task<string?> GetActiveProfile(string iface)
+        public static async Task<string?> GetActiveProfile(string iface)
         {
             string output = await Command.Execute("nmcli", "-c no -t connection show --active");
             using StringReader reader = new(output);

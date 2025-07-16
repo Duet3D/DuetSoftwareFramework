@@ -226,6 +226,20 @@ namespace DuetPiManagementPlugin.Network
             else
             {
                 // Ethernet interface
+                if (await NetworkManager.IsActive())
+                {
+                    if (sParam is not null && (await NetworkManager.GetActiveProfile(iface.Name) != null) != (sParam > 0))
+                    {
+                        // Enable or disable the adapter via nmcli
+                        result.AppendLine((sParam > 0) ? await NetworkManager.Connect(iface.Name) : await NetworkManager.Disconnect(iface.Name));
+                    }
+                }
+                else if (sParam is not null && (iface.OperationalStatus == OperationalStatus.Up) != (sParam > 0))
+                {
+                    // Enable or disable the adapter if required
+                    result.AppendLine(await Command.Execute("ip", $"link set {iface.Name} {(sParam > 0 ? "up" : "down")}"));
+                }
+
                 if (pParam is not null)
                 {
                     // Set IP address
@@ -233,22 +247,6 @@ namespace DuetPiManagementPlugin.Network
                     string setResult = (await NetworkManager.IsActive()) ? await NetworkManager.SetIPAddress(iface.Name, ip, null, null, null) : await DHCP.SetIPAddress(iface.Name, ip, null, null, null);
                     result.AppendLine(setResult);
                 }
-
-                if (sParam is not null && (iface.OperationalStatus == OperationalStatus.Up) != (sParam > 0))
-                {
-                    if (await NetworkManager.IsActive())
-                    {
-                        // Enable or disable the adapter via nmcli
-                        result.AppendLine((sParam > 0) ? await NetworkManager.Connect(iface.Name) : await NetworkManager.Disconnect(iface.Name));
-                    }
-                    else
-                    {
-                        // Enable or disable the adapter if required
-                        result.AppendLine(await Command.Execute("ip", $"link set {iface.Name} {(sParam > 0 ? "up" : "down")}"));
-                    }
-                }
-
-                // We never get here if neither P nor S is present
             }
             return new Message(MessageType.Success, result.ToString().Trim());
         }
