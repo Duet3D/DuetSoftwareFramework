@@ -93,7 +93,7 @@ namespace DuetWebServer.Services
                         using SubscribeConnection subscribeConnection = new();
                         using CommandConnection commandConnection = new();
                         await subscribeConnection.Connect(DuetAPI.Connection.SubscriptionMode.Patch, [
-                            "directories/www",
+                            "directories/web",
                             "messages/**",
                             "network/corsSite",
                             "sbc/dsf/httpEndpoints/**"
@@ -209,6 +209,8 @@ namespace DuetWebServer.Services
             {
                 Directories directories = (Directories)sender!;
                 modelProvider.WebDirectory = await _commandConnection!.ResolvePath(directories.Web);
+
+                logger.LogInformation("Web directory changed to {webDirectory}", modelProvider.WebDirectory);
             }
         }
     }

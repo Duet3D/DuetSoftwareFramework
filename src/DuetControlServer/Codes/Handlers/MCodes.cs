@@ -827,13 +827,23 @@ namespace DuetControlServer.Codes.Handlers
                         {
                             await using (await SPI.Interface.LockAllMovementSystemsAndWaitForStandstill(code.Channel))
                             {
-                                string physicalDirectory = await FilePath.ToPhysicalAsync(directory, "sys");
+                                string physicalDirectory = (code.MinorNumber != 1)
+                                    ? await FilePath.ToPhysicalAsync(directory, "sys")
+                                    : await FilePath.ToPhysicalAsync(directory, "www");
+
                                 if (Directory.Exists(physicalDirectory))
                                 {
                                     string virtualDirectory = await FilePath.ToVirtualAsync(physicalDirectory);
                                     using (await Provider.AccessReadWriteAsync())
                                     {
-                                        Provider.Get.Directories.System = virtualDirectory;
+                                        if (code.MinorNumber != 1)
+                                        {
+                                            Provider.Get.Directories.System = virtualDirectory;
+                                        }
+                                        else
+                                        {
+                                            Provider.Get.Directories.Web = virtualDirectory;
+                                        }
                                     }
                                     return new Message();
                                 }
@@ -843,7 +853,7 @@ namespace DuetControlServer.Codes.Handlers
 
                         using (await Provider.AccessReadOnlyAsync())
                         {
-                            return new Message(MessageType.Success, $"Sys file path is {Provider.Get.Directories.System}");
+                            return new Message(MessageType.Success, $"{((code.MinorNumber != 1) ? "Sys" : "HTTP")} file path is {((code.MinorNumber != 1) ? Provider.Get.Directories.System : Provider.Get.Directories.Web)}");
                         }
                     }
                     throw new OperationCanceledException();

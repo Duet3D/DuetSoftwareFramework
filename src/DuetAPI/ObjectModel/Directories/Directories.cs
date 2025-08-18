@@ -72,6 +72,7 @@
         /// <summary>
         /// Path to the web directory
         /// </summary>
+        [SbcProperty(true)]
         public string Web
         {
             get => _web;
