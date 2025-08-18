@@ -155,4 +155,4 @@ rootCommand.SetAction((parserResult) =>
     LogManager.Shutdown();
 });
 
-new CommandLineConfiguration(rootCommand).Invoke(args);
+return rootCommand.Parse(args).Invoke();

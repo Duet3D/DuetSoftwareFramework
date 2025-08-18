@@ -42,4 +42,4 @@ rootCommand.SetAction((parserResult) =>
         .Run();
 });
 
-new CommandLineConfiguration(rootCommand).Invoke(args);
+return rootCommand.Parse(args).Invoke();

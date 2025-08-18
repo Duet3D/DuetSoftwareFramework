@@ -1,4 +1,5 @@
-﻿using System.Text.Encodings.Web;
+﻿using System;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -8,10 +9,11 @@ namespace DuetAPI.Commands;
 /// Context for JSON handling of IPC commands
 /// </summary>
 // Supported command types
-[JsonSerializable(typeof(Code))]
+[JsonSerializable(typeof(Code), TypeInfoPropertyName = "dcsCode")]
 [JsonSerializable(typeof(Cancel))]
 [JsonSerializable(typeof(Ignore))]
 [JsonSerializable(typeof(Resolve))]
+[JsonSerializable(typeof(Rewrite))]
 [JsonSerializable(typeof(GetFileInfo))]
 [JsonSerializable(typeof(ResolvePath))]
 [JsonSerializable(typeof(CheckPassword))]

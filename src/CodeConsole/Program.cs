@@ -49,4 +49,4 @@ execCommand.SetAction((parseResult, token) =>
 });
 
 rootCommand.Subcommands.Add(execCommand);
-return new CommandLineConfiguration(rootCommand).Invoke(args);
+return rootCommand.Parse(args).Invoke();

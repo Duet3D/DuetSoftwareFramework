@@ -35,11 +35,12 @@ RootCommand rootCommand = new("Code stream to send G/M/T-codes to DuetControlSer
     quietOption,
     bufferSizeOption
 };
-rootCommand.SetAction((parseResult, token) => {
+rootCommand.SetAction((parseResult, token) =>
+{
     FileInfo socketPathValue = parseResult.GetRequiredValue(socketPathOption)!;
     bool quietValue = parseResult.GetValue(quietOption);
     int bufferSizeValue = parseResult.GetRequiredValue(bufferSizeOption);
     return Commands.MainAsync(socketPathValue, quietValue, bufferSizeValue, token);
 });
 
-return new CommandLineConfiguration(rootCommand).Invoke(args);
+return rootCommand.Parse(args).Invoke();

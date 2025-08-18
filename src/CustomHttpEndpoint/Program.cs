@@ -69,4 +69,4 @@ rootCommand.SetAction((parserResult, token) => {
     return Commands.MainAsync(socketPathValue, quietValue, methodValue, namespaceValue, pathValue, execValue, execArgsValue, token);
 });
 
-return new CommandLineConfiguration(rootCommand).Invoke(args);
+return rootCommand.Parse(args).Invoke();

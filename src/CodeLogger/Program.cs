@@ -60,4 +60,4 @@ rootCommand.SetAction((parseResult, token) =>
     return Commands.MainAsync(socketPathValue, quietValue, typesValue, channelsValue, filtersValue, priorityCodesValue, token);
 });
 
-return new CommandLineConfiguration(rootCommand).Invoke(args);
+return rootCommand.Parse(args).Invoke();
