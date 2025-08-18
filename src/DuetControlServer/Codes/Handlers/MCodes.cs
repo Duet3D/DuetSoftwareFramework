@@ -556,7 +556,7 @@ namespace DuetControlServer.Codes.Handlers
                             if (code.TryGetString('S', out string? levelString))
                             {
                                 NLog.LogLevel level = NLog.LogLevel.FromString(levelString);
-                                foreach (var rule in LogManager.Configuration.LoggingRules)
+                                foreach (var rule in LogManager.Configuration?.LoggingRules ?? [])
                                 {
                                     rule.SetLoggingLevels(level, NLog.LogLevel.Fatal);
                                 }
@@ -567,17 +567,17 @@ namespace DuetControlServer.Codes.Handlers
                             {
                                 if (oParam)
                                 {
-                                    if (LogManager.Configuration.FindTargetByName("MessageLogTarget") == null)
+                                    if (LogManager.Configuration?.FindTargetByName("MessageLogTarget") == null)
                                     {
                                         // Only add this target once and don't allow higher log level than debug, else we may get recursion
                                         MessageLogTarget logTarget = new();
-                                        LogManager.Configuration.AddTarget("MessageLogTarget", logTarget);
-                                        LogManager.Configuration.AddRule(Settings.LogLevel > NLog.LogLevel.Trace ? Settings.LogLevel : NLog.LogLevel.Debug, NLog.LogLevel.Fatal, logTarget);
+                                        LogManager.Configuration?.AddTarget("MessageLogTarget", logTarget);
+                                        LogManager.Configuration?.AddRule(Settings.LogLevel > NLog.LogLevel.Trace ? Settings.LogLevel : NLog.LogLevel.Debug, NLog.LogLevel.Fatal, logTarget);
                                     }
                                 }
                                 else
                                 {
-                                    LogManager.Configuration.RemoveTarget("MessageLogTarget");
+                                    LogManager.Configuration?.RemoveTarget("MessageLogTarget");
                                 }
                                 seen = true;
                             }

@@ -12,6 +12,7 @@ namespace DuetAPI.Commands
     [JsonSerializable(typeof(Cancel))]
     [JsonSerializable(typeof(Ignore))]
     [JsonSerializable(typeof(Resolve))]
+    [JsonSerializable(typeof(Rewrite))]
     [JsonSerializable(typeof(GetFileInfo))]
     [JsonSerializable(typeof(ResolvePath))]
     [JsonSerializable(typeof(CheckPassword))]

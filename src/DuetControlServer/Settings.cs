@@ -554,7 +554,7 @@ namespace DuetControlServer
                         }
                         else if (property?.PropertyType == typeof(LogLevel))
                         {
-                            property.SetValue(null, LogLevel.FromString(reader.GetString()));
+                            property.SetValue(null, LogLevel.FromString(reader.GetString()!));
                         }
                         else
                         {

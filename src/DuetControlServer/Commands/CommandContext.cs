@@ -7,10 +7,11 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Context for JSON handling of incoming IPC commands
     /// </summary>
-    [JsonSerializable(typeof(Code))]
+    [JsonSerializable(typeof(Code), TypeInfoPropertyName ="dcsCode")]
     [JsonSerializable(typeof(DuetAPI.Commands.Cancel))]
     [JsonSerializable(typeof(DuetAPI.Commands.Ignore))]
     [JsonSerializable(typeof(DuetAPI.Commands.Resolve))]
+    [JsonSerializable(typeof(DuetAPI.Commands.Rewrite))]
     [JsonSerializable(typeof(GetFileInfo))]
     [JsonSerializable(typeof(ResolvePath))]
     [JsonSerializable(typeof(CheckPassword))]

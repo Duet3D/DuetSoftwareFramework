@@ -110,7 +110,7 @@ namespace DuetControlServer.Files.ImageProcessing
                     memoryStream.TryGetBuffer(out ArraySegment<byte> buffer);
                     data = Convert.ToBase64String(buffer.Array!, 0, (int)memoryStream.Length);
                 }
-                _logger.Debug(data);
+                _logger.Debug(data ?? string.Empty);
 
                 return new()
                 {
