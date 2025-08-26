@@ -78,6 +78,11 @@ namespace DuetHttpClient.Connector
         public DuetHttpOptions Options { get; }
 
         /// <summary>
+        /// Last connection error (if any)
+        /// </summary>
+        public Exception? LastConnectionError { get; protected set; }
+
+        /// <summary>
         /// Object model of the remote board
         /// </summary>
         public ObjectModel Model { get; } = new ObjectModel();

@@ -439,6 +439,10 @@ namespace DuetHttpClient.Connector
                             Model.State.Status = MachineStatus.Disconnected;
                             Model.Global.Clear();
                         }
+                        lock (this)
+                        {
+                            LastConnectionError = e;
+                        }
                     }
 
                     // Wait a moment before attempting to reconnect
