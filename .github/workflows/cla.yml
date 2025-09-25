@@ -16,15 +16,17 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: "CLA Assistant"
-        if: (github.event.comment.body == 'recheck' || github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA') || github.event_name == 'pull_request_target'
+        if: (github.event.comment.body == 'recheck' || github.event.comment.body == "I have read the Duet3D CLA v${{ vars.CLA_MAJOR_VERSION }}.${{ vars.CLA_MINOR_VERSION }} and I hereby sign it") || github.event_name == 'pull_request_target'
         uses: contributor-assistant/github-action@v2.6.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PERSONAL_ACCESS_TOKEN: ${{ secrets.CLA_TOKEN }}
         with:
-          path-to-signatures: "signatures_v${{ vars.CLA_MAJOR_VERSION }}.${{ vars.CLA_MINOR_VERSION }}.json"
+          path-to-signatures: "signatures_v${{ vars.CLA_MAJOR_VERSION }}.json"
           path-to-document: "https://github.com/Duet3D/cla/blob/master/Duet3D%20Contributor%20License%20Agreement%20v${{ vars.CLA_MAJOR_VERSION }}.${{ vars.CLA_MINOR_VERSION }}.pdf"
           remote-organization-name: 'Duet3D'
           remote-repository-name: 'CLA'
           branch: 'master'
+          custom-pr-sign-comment: "I have read the Duet3D CLA v${{ vars.CLA_MAJOR_VERSION }}.${{ vars.CLA_MINOR_VERSION }} and I hereby sign it"
+
 
