@@ -81,6 +81,16 @@ public enum AnalogSensorType
     CurrentLoop,
 
     /// <summary>
+    /// ADS131 channel 0
+    /// </summary>
+    ADS131Chan0,
+
+    /// <summary>
+    /// ADS131 channel 1
+    /// </summary>
+    ADS131Chan1,
+
+    /// <summary>
     /// MCU temperature
     /// </summary>
     McuTemp,
@@ -133,6 +143,8 @@ public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
                 "bmehumidity" => AnalogSensorType.BME280Humidity,
                 "dhthumidity" => AnalogSensorType.DHTHumidity,
                 "currentlooppyro" => AnalogSensorType.CurrentLoop,
+                "ads131.chan0" => AnalogSensorType.ADS131Chan0,
+                "ads131.chan1" => AnalogSensorType.ADS131Chan1,
                 "mcutemp" => AnalogSensorType.McuTemp,
                 "drivers" => AnalogSensorType.Drivers,
                 "driversduex" => AnalogSensorType.DriversDuex,
@@ -193,6 +205,12 @@ public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
                 break;
             case AnalogSensorType.CurrentLoop:
                 writer.WriteStringValue("currentlooppyro");
+                break;
+            case AnalogSensorType.ADS131Chan0:
+                writer.WriteStringValue("ads131.chan0");
+                break;
+            case AnalogSensorType.ADS131Chan1:
+                writer.WriteStringValue("ads131.chan1");
                 break;
             case AnalogSensorType.McuTemp:
                 writer.WriteStringValue("mcutemp");
