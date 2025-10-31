@@ -4,10 +4,10 @@ chown dsf:dsf /opt/dsf/conf/http.json
 chmod 664 /opt/dsf/conf/http.json
 
 # Update systemd services
-systemctl -q daemon-reload
+systemctl -q --no-ask-password daemon-reload
 
 # Start DWS again if it is enabled via systemd
 if (systemctl -q is-enabled duetwebserver); then
-    systemctl -q start duetwebserver
+    systemctl -q --no-ask-password start duetwebserver
 fi
 

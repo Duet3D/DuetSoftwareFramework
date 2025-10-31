@@ -15,11 +15,11 @@ chmod -R g+wX /opt/dsf/conf
 chmod 755 /opt/dsf/plugins
 
 # Update systemd services
-systemctl -q daemon-reload
+systemctl -q --no-ask-password daemon-reload
 
 # Start DCS again if it is enabled via systemd
 if (systemctl -q is-enabled duetcontrolserver); then
-    systemctl -q start duetcontrolserver
+    systemctl -q --no-ask-password start duetcontrolserver
 fi
 
 # Ignore the return code of the DCS start request in case no board is connected
