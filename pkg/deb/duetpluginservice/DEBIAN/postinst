@@ -7,15 +7,15 @@ chmod 755 /opt/dsf/plugins
 chmod 744 /opt/dsf/bin/pipInstall2.py
 
 # Update systemd services
-systemctl -q daemon-reload
+systemctl -q --no-ask-password daemon-reload
 
 # Start DPS instances again if it is enabled via systemd
 if (systemctl -q is-enabled duetpluginservice); then
-    systemctl -q start duetpluginservice || true
+    systemctl -q --no-ask-password start duetpluginservice || true
 fi
 
 if (systemctl -q is-enabled duetpluginservice-root); then
-    systemctl -q start duetpluginservice-root || true
+    systemctl -q --no-ask-password start duetpluginservice-root || true
 fi
 
 # Don't block the configuration of other packages if DPS failed to start

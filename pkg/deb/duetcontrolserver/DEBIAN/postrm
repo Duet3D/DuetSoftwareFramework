@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Reload systemd services
-systemctl -q daemon-reload
+systemctl -q --no-ask-password daemon-reload
 
 # Show group info only on package removal
 if [[ "$1" == "remove" ]]; then
