@@ -395,24 +395,27 @@ namespace DuetControlServer.Codes.Handlers
                         {
                             try
                             {
-                                // Get fileinfo
-                                if (code.MinorNumber != 1)
+
+                                if ((code.MinorNumber ?? 0) <= 0)
                                 {
+                                    // Get fileinfo
                                     string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString(), FileDirectory.GCodes);
                                     GCodeFileInfo info = await InfoParser.Parse(file, false);
 
                                     string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
                                     return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":0," : "{\"err\":0,") + json[1..]);
                                 }
-
-                                // Get thumbnail
-                                string filename = await FilePath.ToPhysicalAsync(code.GetString('P'), FileDirectory.GCodes);
-                                string thumbnailJson = await InfoParser.ParseThumbnail(filename, code.GetLong('S'));
-                                if (code.ExplicitLineNumber != null)
+                                else if (code.MinorNumber == 1 || code.MinorNumber == 2)
                                 {
-                                    return new Message(MessageType.Success, $"{{\"line\":{code.ExplicitLineNumber}," + thumbnailJson[1..]);
+                                    // Get thumbnail or file fragment
+                                    string filename = await FilePath.ToPhysicalAsync(code.GetString('P'), FileDirectory.GCodes);
+                                    string thumbnailJson = await InfoParser.ParseFileFragment(filename, code.GetLong('S'), code.MinorNumber == 1, code.ExplicitLineNumber);
+                                    return new Message(MessageType.Success, thumbnailJson);
                                 }
-                                return new Message(MessageType.Success, thumbnailJson);
+                                else
+                                {
+                                    throw new NotSupportedException();
+                                }
                             }
                             catch (Exception e)
                             {

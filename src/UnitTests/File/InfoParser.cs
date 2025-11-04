@@ -51,7 +51,7 @@ namespace UnitTests.File
             string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes", fileName);
             GCodeFileInfo info = await DuetControlServer.Files.InfoParser.Parse(filePath, true);
 
-            string thumbnailResponse = await DuetControlServer.Files.InfoParser.ParseThumbnail(filePath, info.Thumbnails[0].Offset);
+            string thumbnailResponse = await DuetControlServer.Files.InfoParser.ParseFileFragment(filePath, info.Thumbnails[0].Offset, true);
             ClassicAssert.IsTrue(thumbnailResponse.Contains(info.Thumbnails[0].Data![..1024]));
 
             TestContext.Out.Write(thumbnailResponse);
