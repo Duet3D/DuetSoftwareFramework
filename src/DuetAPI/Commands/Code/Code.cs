@@ -73,6 +73,11 @@ namespace DuetAPI.Commands
         public long? LineNumber { get; set; }
 
         /// <summary>
+        /// Explicit line number of this code (if any, e.g. 12 as in N12 G1 X10)
+        /// </summary>
+        public long? ExplicitLineNumber { get => Flags.HasFlag(CodeFlags.HasExplicitLineNumber) ? LineNumber : null; }
+
+        /// <summary>
         /// Number of whitespaces prefixing the command content
         /// </summary>
         public byte Indent { get; set; }

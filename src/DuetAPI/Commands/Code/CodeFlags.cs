@@ -89,6 +89,11 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Indicates if this is the last code on the line
         /// </summary>
-        IsLastCode = 2048
+        IsLastCode = 2048,
+
+        /// <summary>
+        /// Indicates if this code has an explicit line number (e.g. N1 G1 X10)
+        /// </summary>
+        HasExplicitLineNumber = 8192
     }
 }

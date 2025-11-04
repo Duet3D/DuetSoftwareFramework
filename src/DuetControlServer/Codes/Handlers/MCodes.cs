@@ -7,10 +7,12 @@ using DuetControlServer.Model;
 using DuetControlServer.Utility;
 using NLog;
 using System;
+using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Codes.Handlers
@@ -101,12 +103,12 @@ namespace DuetControlServer.Codes.Handlers
                         int startAt = Math.Max(code.GetInt('R', 0), 0), type = code.GetInt('S', 0), maxItems = code.GetInt('C', -1);
                         if (type == 2)
                         {
-                            string json = FileLists.GetFiles(virtualDirectory, physicalDirectory, startAt, true, maxSize, maxItems);
+                            string json = FileLists.GetFiles(virtualDirectory, physicalDirectory, startAt, true, maxSize, maxItems, code.ExplicitLineNumber);
                             return new Message(MessageType.Success, json);
                         }
                         if (type == 3)
                         {
-                            string json = FileLists.GetFileList(virtualDirectory, physicalDirectory, startAt, maxSize, maxItems);
+                            string json = FileLists.GetFileList(virtualDirectory, physicalDirectory, startAt, maxSize, maxItems, code.ExplicitLineNumber);
                             return new Message(MessageType.Success, json);
                         }
 
@@ -400,7 +402,7 @@ namespace DuetControlServer.Codes.Handlers
                                     GCodeFileInfo info = await InfoParser.Parse(file, false);
 
                                     string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
-                                    return new Message(MessageType.Success, "{\"err\":0," + json[1..]);
+                                    return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":0," : "{\"err\":0,") + json[1..]);
                                 }
 
                                 // Get thumbnail
@@ -411,7 +413,7 @@ namespace DuetControlServer.Codes.Handlers
                             catch (Exception e)
                             {
                                 _logger.Debug(e, "Failed to return file information");
-                                return new Message(MessageType.Warning, $"{{\"err\":1,\"fileName:{JsonSerializer.Serialize(code.GetUnprecedentedString(), JsonHelper.DefaultJsonOptions)}}}");
+                                return new Message(MessageType.Warning, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1,\"fileName:" : "{\"err\":1,\"fileName:") + JsonSerializer.Serialize(code.GetUnprecedentedString(), JsonHelper.DefaultJsonOptions) + "}");
                             }
                         }
                         else
@@ -421,10 +423,10 @@ namespace DuetControlServer.Codes.Handlers
                                 if (Provider.Get.Job.File.FileName != null)
                                 {
                                     string json = JsonSerializer.Serialize(Provider.Get.Job.File, JsonHelper.DefaultJsonOptions);
-                                    return new Message(MessageType.Success, "{\"err\":0," + json[1..]);
+                                    return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":0," : "{\"err\":0,") + json[1..]);
                                 }
                             }
-                            return new Message(MessageType.Warning, "{\"err\":1}");
+                            return new Message(MessageType.Warning, (code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1}}" : "{\"err\":1}");
                         }
                     }
                     throw new OperationCanceledException();
@@ -493,7 +495,7 @@ namespace DuetControlServer.Codes.Handlers
                             {
                                 if (index < 0 || index >= Provider.Get.Volumes.Count)
                                 {
-                                    return new Message(MessageType.Success, $"{{\"SDinfo\":{{\"slot\":{index},present:0}}}}");
+                                    return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," : "{") + $"\"SDinfo\":{{\"slot\":{index},present:0}}}}");
                                 }
 
                                 Volume storage = Provider.Get.Volumes[index];
@@ -509,7 +511,12 @@ namespace DuetControlServer.Codes.Handlers
                                         speed = storage.Speed
                                     }
                                 };
-                                return new Message(MessageType.Success, JsonSerializer.Serialize(output, JsonHelper.DefaultJsonOptions));
+
+                                if (code.ExplicitLineNumber != null)
+                                {
+                                    return new Message(MessageType.Success, $"{{\"line\":{code.ExplicitLineNumber},{JsonSerializer.Serialize(output)[1..]}");
+                                }
+                                return new Message(MessageType.Success, JsonSerializer.Serialize(output));
                             }
                             else
                             {

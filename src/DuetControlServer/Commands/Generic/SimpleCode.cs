@@ -44,7 +44,7 @@ namespace DuetControlServer.Commands
         public async IAsyncEnumerable<Code> ParseAsync()
         {
             await using MemoryStream stream = new(Encoding.UTF8.GetBytes(Code));
-            CodeParserBuffer buffer = new((int)stream.Length, Code.Contains('\n'));
+            CodeParserBuffer buffer = new((int)stream.Length, false);
 
             while (buffer.GetPosition(stream) < stream.Length)
             {

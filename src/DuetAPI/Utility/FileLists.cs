@@ -19,13 +19,19 @@ namespace DuetAPI.Utility
         /// <param name="flagDirs">Prefix directories with an asterisk</param>
         /// <param name="maxSize">Maximum size of the file list in bytes or -1 if unset</param>
         /// <param name="maxItems">Maximum number of items to send or -1 if unset</param>
+        /// <param name="explicitLineNumber">Explicit line number (if any)</param>
         /// <returns>UTF8-encoded JSON file list</returns>
-        public static byte[] GetFilesUtf8(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1, int maxItems = -1)
+        public static byte[] GetFilesUtf8(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1, int maxItems = -1, long? explicitLineNumber = null)
         {
             using MemoryStream fileList = new();
             using Utf8JsonWriter writer = new(fileList);
 
             writer.WriteStartObject();
+
+            if (explicitLineNumber != null)
+            {
+                writer.WriteNumber("line", explicitLineNumber.Value);
+            }
             writer.WriteString("dir", directory);
             writer.WriteNumber("first", Math.Max(startAt, 0));
             writer.WriteStartArray("files");
@@ -114,10 +120,11 @@ namespace DuetAPI.Utility
         /// <param name="flagDirs">Prefix directories with an asterisk</param>
         /// <param name="maxSize">Maximum size of the file list in bytes or -1 if unset</param>
         /// <param name="maxItems">Maximum number of items to send or -1 if unset</param>
+        /// <param name="explicitLineNumber">Explicit line number (if any). Ignored if startAt is negative</param>
         /// <returns>JSON file list</returns>
-        public static string GetFiles(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1, int maxItems = -1)
+        public static string GetFiles(string directory, string physicalDirectory, int startAt = 0, bool flagDirs = false, int maxSize = -1, int maxItems = -1, long? explicitLineNumber = null)
         {
-            return Encoding.UTF8.GetString(GetFilesUtf8(directory, physicalDirectory, startAt, flagDirs, maxSize, maxItems));
+            return Encoding.UTF8.GetString(GetFilesUtf8(directory, physicalDirectory, startAt, flagDirs, maxSize, maxItems, explicitLineNumber));
         }
 
         /// <summary>
@@ -128,8 +135,9 @@ namespace DuetAPI.Utility
         /// <param name="startAt">First file index to return. Set startAt to -1 to omit error handling and the JSON object container</param>
         /// <param name="maxSize">Maximum size of the file list in bytes or -1 if unset</param>
         /// <param name="maxItems">Maximum number of items to send or -1 if unset</param>
+        /// <param name="explicitLineNumber">Explicit line number (if any). Ignored if startAt is negative</param>
         /// <returns>UTF8-encoded JSON list</returns>
-        public static byte[] GetFileListUtf8(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1, int maxItems = -1)
+        public static byte[] GetFileListUtf8(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1, int maxItems = -1, long? explicitLineNumber = null)
         {
             using MemoryStream fileList = new();
             using Utf8JsonWriter writer = new(fileList);
@@ -138,6 +146,10 @@ namespace DuetAPI.Utility
             if (startAt >= 0)
             {
                 writer.WriteStartObject();
+                if (explicitLineNumber != null)
+                {
+                    writer.WriteNumber("line", explicitLineNumber.Value);
+                }
                 writer.WriteString("dir", directory);
                 writer.WriteNumber("first", Math.Max(startAt, 0));
                 writer.WriteStartArray("files");
@@ -262,10 +274,11 @@ namespace DuetAPI.Utility
         /// <param name="startAt">First file index to return. Set startAt to -1 to omit error handling and the JSON object container</param>
         /// <param name="maxSize">Maximum size of the file list in bytes or -1 if unset</param>
         /// <param name="maxItems">Maximum number of items to send or -1 if unset</param>
+        /// <param name="explicitLineNumber">Explicit line number (if any)</param>
         /// <returns>JSON list</returns>
-        public static string GetFileList(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1, int maxItems = -1)
+        public static string GetFileList(string directory, string physicalDirectory, int startAt = -1, int maxSize = -1, int maxItems = -1, long? explicitLineNumber = null)
         {
-            return Encoding.UTF8.GetString(GetFileListUtf8(directory, physicalDirectory, startAt, maxSize, maxItems));
+            return Encoding.UTF8.GetString(GetFileListUtf8(directory, physicalDirectory, startAt, maxSize, maxItems, explicitLineNumber));
         }
     }
 }
