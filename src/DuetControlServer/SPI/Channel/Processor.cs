@@ -886,7 +886,9 @@ namespace DuetControlServer.SPI.Channel
             try
             {
                 _logger.Debug("Running code from firmware '{0}' on channel {1}", code, Channel);
-                Code codeObj = new(code) { Channel = Channel, Flags = CodeFlags.IsFromFirmware | CodeFlags.IsLastCode };
+
+                Code codeObj = new(code) { Channel = Channel };
+                codeObj.Flags |= CodeFlags.IsFromFirmware | CodeFlags.IsLastCode;
                 _ = codeObj.Execute().ContinueWith(async task =>
                 {
                     try
