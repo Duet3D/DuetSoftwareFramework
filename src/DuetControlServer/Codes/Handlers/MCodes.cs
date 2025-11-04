@@ -408,6 +408,10 @@ namespace DuetControlServer.Codes.Handlers
                                 // Get thumbnail
                                 string filename = await FilePath.ToPhysicalAsync(code.GetString('P'), FileDirectory.GCodes);
                                 string thumbnailJson = await InfoParser.ParseThumbnail(filename, code.GetLong('S'));
+                                if (code.ExplicitLineNumber != null)
+                                {
+                                    return new Message(MessageType.Success, $"{{\"line\":{code.ExplicitLineNumber}," + thumbnailJson[1..]);
+                                }
                                 return new Message(MessageType.Success, thumbnailJson);
                             }
                             catch (Exception e)
