@@ -2,5 +2,5 @@
 
 # Stop DWS
 if (systemctl -q is-active duetwebserver); then
-    systemctl -q stop duetwebserver
+    systemctl -q --no-ask-password stop duetwebserver
 fi

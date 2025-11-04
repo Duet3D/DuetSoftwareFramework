@@ -2,5 +2,5 @@
 
 # Stop DCS
 if (systemctl -q is-active duetcontrolserver); then
-    systemctl -q stop duetcontrolserver
+    systemctl -q --no-ask-password stop duetcontrolserver
 fi
