@@ -424,24 +424,26 @@ public class MCodeHandler(
                     {
                         try
                         {
-                            // Get fileinfo
-                            if (code.MinorNumber != 1)
+                            if ((code.MinorNumber ?? 0) <= 0)
                             {
+                                // Get fileinfo
                                 string file = await filePathResolver.ToPhysicalAsync(code.GetUnprecedentedString(), FileDirectory.GCodes, cancellationToken);
                                 GCodeFileInfo info = await fileInfoParser.ParseAsync(file, false, cancellationToken);
 
                                 string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
                                 return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":0," : "{\"err\":0,") + json[1..]);
                             }
-
-                            // Get thumbnail
-                            string filename = await filePathResolver.ToPhysicalAsync(code.GetString('P'), FileDirectory.GCodes, cancellationToken);
-                            string thumbnailJson = await fileInfoParser.ParseThumbnail(filename, code.GetLong('S'));
-                            if (code.ExplicitLineNumber != null)
+                            else if (code.MinorNumber == 1 || code.MinorNumber == 2)
                             {
-                                return new Message(MessageType.Success, $"{{\"line\":{code.ExplicitLineNumber}," + thumbnailJson[1..]);
+                                // Get thumbnail or file fragment
+                                string filename = await filePathResolver.ToPhysicalAsync(code.GetString('P'), FileDirectory.GCodes);
+                                string thumbnailJson = await fileInfoParser.ParseFileFragment(filename, code.GetLong('S'), code.MinorNumber == 1, code.ExplicitLineNumber);
+                                return new Message(MessageType.Success, thumbnailJson);
                             }
-                            return new Message(MessageType.Success, thumbnailJson);
+                            else
+                            {
+                                throw new NotSupportedException();
+                            }
                         }
                         catch (Exception e)
                         {

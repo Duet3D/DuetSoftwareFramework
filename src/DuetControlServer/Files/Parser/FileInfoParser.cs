@@ -660,15 +660,22 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
     private const int MaxThumbnailLength = 1024;
 
     /// <summary>
-    /// Retrieve a chunk of a thumbnail for PanelDue compatibility
+    /// Retrieve a chunk of a thumbnail or a file fragment
     /// </summary>
     /// <param name="filename">G-code file to parse</param>
     /// <param name="offset">File offset to start from</param>
+    /// <param name="isThumbnail">Whether this is a thumbnail request</param>
+    /// <param name="explicitLineNumber">Explicit line number if present</param
     /// <returns>JSON response</returns>
-    public async ValueTask<string> ParseThumbnail(string filename, long offset)
+    public async ValueTask<string> ParseFileFragment(string filename, long offset, bool isThumbnail, long? explicitLineNumber = null)
     {
         StringBuilder jsonResult = new();
-        jsonResult.Append("{\"thumbnail\":{\"fileName\":");
+        jsonResult.Append('{');
+        if (explicitLineNumber != null)
+        {
+            jsonResult.Append($"\"line\":{explicitLineNumber.Value},");
+        }
+        jsonResult.Append($"\"{(isThumbnail ? "thumbnail" : "fragment")}\":{{\"fileName\":");
         jsonResult.Append(JsonSerializer.Serialize(await filePath.ToVirtualAsync(filename)));
         jsonResult.Append(",\"offset\":");
         jsonResult.Append(offset);
