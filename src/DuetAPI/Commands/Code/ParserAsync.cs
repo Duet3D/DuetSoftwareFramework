@@ -556,8 +556,9 @@ public partial class Code
                         // Process line number
                         if (long.TryParse(value, out long lineNumber))
                         {
-                            result.LineNumber = lineNumber;
                             buffer.LineNumber = lineNumber;
+                            result.LineNumber = lineNumber;
+                            result.Flags |= CodeFlags.HasExplicitLineNumber;
                         }
                         isLineNumber = false;
                         hadLineNumber = true;

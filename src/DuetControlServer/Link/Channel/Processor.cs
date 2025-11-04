@@ -966,9 +966,10 @@ public sealed class Processor
         try
         {
             _logger.LogDebug("Running code from firmware '{Code}' on channel {Channel}", code, Channel);
+
             Code codeObj = _codeFactory.Create();
             codeObj.Channel = Channel;
-            codeObj.Flags = CodeFlags.IsFromFirmware | CodeFlags.IsLastCode;
+            codeObj.Flags |= CodeFlags.IsFromFirmware | CodeFlags.IsLastCode;
             _ = codeObj.ExecuteAsync().ContinueWith(async task =>
             {
                 try

@@ -93,6 +93,10 @@ public static class Writer
         {
             header.Flags |= CodeFlags.EnforceAbsolutePosition;
         }
+        if (code.Flags.HasFlag(DuetAPI.Commands.CodeFlags.HasExplicitLineNumber))
+        {
+            header.Flags |= CodeFlags.HasExplicitLineNumber;
+        }
 
         MemoryMarshal.Write(to, in header);
         bytesWritten += Marshal.SizeOf<CodeHeader>();

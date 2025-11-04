@@ -420,6 +420,7 @@ public partial class Code
                         if (long.TryParse(value, out long lineNumber))
                         {
                             result.LineNumber = lineNumber;
+                            result.Flags |= CodeFlags.HasExplicitLineNumber;
                         }
                         isLineNumber = false;
                     }

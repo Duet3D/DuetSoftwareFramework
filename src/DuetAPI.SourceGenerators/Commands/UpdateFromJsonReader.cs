@@ -238,7 +238,7 @@ internal static class UpdateFromJsonReader
                         writer.WriteLine("}");
                     }
                 }
-                else
+                else if (prop.HasSetter())
                 {
                     // assignment
                     if (propType is "DriverId")

@@ -282,7 +282,7 @@ internal static class UpdateFromJson
                             writer.WriteLine($"{prop.Identifier.ValueText} = new(jsonProperty.Value.GetString()!);");
                         }
                     }
-                    else
+                    else if (prop.HasSetter())
                     {
                         string? getter = propType switch
                         {

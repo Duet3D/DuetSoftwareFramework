@@ -26,5 +26,10 @@ public enum CodeFlags : byte
     /// <summary>
     /// Indicates that G53 was used with this code (absolute positioning)
     /// </summary>
-    EnforceAbsolutePosition = 8
+    EnforceAbsolutePosition = 8,
+
+    /// <summary>
+    /// Indicates if this code has an explicit line number (e.g. N1 G1 X10)
+    /// </summary>
+    HasExplicitLineNumber = 16
 }

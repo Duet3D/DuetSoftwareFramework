@@ -132,12 +132,12 @@ public class MCodeHandler(
                     int startAt = Math.Max(code.GetInt('R', 0), 0), type = code.GetInt('S', 0), maxItems = code.GetInt('C', -1);
                     if (type == 2)
                     {
-                        string json = FileLists.GetFiles(virtualDirectory, physicalDirectory, startAt, true, maxSize, maxItems);
+                        string json = FileLists.GetFiles(virtualDirectory, physicalDirectory, startAt, true, maxSize, maxItems, code.ExplicitLineNumber);
                         return new Message(MessageType.Success, json);
                     }
                     if (type == 3)
                     {
-                        string json = FileLists.GetFileList(virtualDirectory, physicalDirectory, startAt, maxSize, maxItems);
+                        string json = FileLists.GetFileList(virtualDirectory, physicalDirectory, startAt, maxSize, maxItems, code.ExplicitLineNumber);
                         return new Message(MessageType.Success, json);
                     }
 
@@ -431,18 +431,22 @@ public class MCodeHandler(
                                 GCodeFileInfo info = await fileInfoParser.ParseAsync(file, false, cancellationToken);
 
                                 string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
-                                return new Message(MessageType.Success, "{\"err\":0," + json[1..]);
+                                return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":0," : "{\"err\":0,") + json[1..]);
                             }
 
                             // Get thumbnail
                             string filename = await filePathResolver.ToPhysicalAsync(code.GetString('P'), FileDirectory.GCodes, cancellationToken);
                             string thumbnailJson = await fileInfoParser.ParseThumbnail(filename, code.GetLong('S'));
+                            if (code.ExplicitLineNumber != null)
+                            {
+                                return new Message(MessageType.Success, $"{{\"line\":{code.ExplicitLineNumber}," + thumbnailJson[1..]);
+                            }
                             return new Message(MessageType.Success, thumbnailJson);
                         }
                         catch (Exception e)
                         {
                             logger.LogDebug(e, "Failed to return file information");
-                            return new Message(MessageType.Warning, $"{{\"err\":1,\"fileName:{JsonSerializer.Serialize(code.GetUnprecedentedString(), JsonHelper.DefaultJsonOptions)}}}");
+                            return new Message(MessageType.Warning, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1,\"fileName:" : "{\"err\":1,\"fileName:") + JsonSerializer.Serialize(code.GetUnprecedentedString(), JsonHelper.DefaultJsonOptions) + "}");
                         }
                     }
                     else
@@ -452,10 +456,10 @@ public class MCodeHandler(
                             if (model.Job.File.FileName != null)
                             {
                                 string json = JsonSerializer.Serialize(model.Job.File, JsonHelper.DefaultJsonOptions);
-                                return new Message(MessageType.Success, "{\"err\":0," + json[1..]);
+                                return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":0," : "{\"err\":0,") + json[1..]);
                             }
                         }
-                        return new Message(MessageType.Warning, "{\"err\":1}");
+                        return new Message(MessageType.Warning, (code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1}}" : "{\"err\":1}");
                     }
                 }
                 throw new OperationCanceledException();
@@ -524,7 +528,7 @@ public class MCodeHandler(
                         {
                             if (index < 0 || index >= model.Volumes.Count)
                             {
-                                return new Message(MessageType.Success, $"{{\"SDinfo\":{{\"slot\":{index},present:0}}}}");
+                                return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," : "{") + $"\"SDinfo\":{{\"slot\":{index},present:0}}}}");
                             }
 
                             Volume storage = model.Volumes[index];
@@ -540,7 +544,12 @@ public class MCodeHandler(
                                     speed = storage.Speed
                                 }
                             };
-                            return new Message(MessageType.Success, JsonSerializer.Serialize(output, JsonHelper.DefaultJsonOptions));
+
+                            if (code.ExplicitLineNumber != null)
+                            {
+                                return new Message(MessageType.Success, $"{{\"line\":{code.ExplicitLineNumber},{JsonSerializer.Serialize(output)[1..]}");
+                            }
+                            return new Message(MessageType.Success, JsonSerializer.Serialize(output));
                         }
                         else
                         {

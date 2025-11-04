@@ -361,8 +361,6 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
             // Fill up the code buffer
             while (codePool.TryDequeue(out Code? sharedCode))
             {
-                sharedCode.Reset();
-
                 // Stop reading codes if the print has been paused or aborted
                 using (await LockAsync())
                 {
