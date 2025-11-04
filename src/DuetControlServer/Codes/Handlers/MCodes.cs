@@ -393,14 +393,15 @@ namespace DuetControlServer.Codes.Handlers
                     {
                         if (code.Parameters.Count > 0)
                         {
+                            string virtualFilename = string.Empty;
                             try
                             {
-
                                 if ((code.MinorNumber ?? 0) <= 0)
                                 {
                                     // Get fileinfo
-                                    string file = await FilePath.ToPhysicalAsync(code.GetUnprecedentedString(), FileDirectory.GCodes);
-                                    GCodeFileInfo info = await InfoParser.Parse(file, false);
+                                    virtualFilename = code.GetUnprecedentedString();
+                                    string physicalFilename = await FilePath.ToPhysicalAsync(virtualFilename, FileDirectory.GCodes);
+                                    GCodeFileInfo info = await InfoParser.Parse(physicalFilename, false);
 
                                     string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
                                     return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":0," : "{\"err\":0,") + json[1..]);
@@ -408,9 +409,11 @@ namespace DuetControlServer.Codes.Handlers
                                 else if (code.MinorNumber == 1 || code.MinorNumber == 2)
                                 {
                                     // Get thumbnail or file fragment
-                                    string filename = await FilePath.ToPhysicalAsync(code.GetString('P'), FileDirectory.GCodes);
-                                    string thumbnailJson = await InfoParser.ParseFileFragment(filename, code.GetLong('S'), code.MinorNumber == 1, code.ExplicitLineNumber);
-                                    return new Message(MessageType.Success, thumbnailJson);
+                                    virtualFilename = code.GetString('P');
+                                    string physicalFilename = await FilePath.ToPhysicalAsync(virtualFilename, FileDirectory.GCodes);
+
+                                    string json = await InfoParser.ParseFileFragment(physicalFilename, code.GetLong('S'), code.MinorNumber == 1, code.ExplicitLineNumber);
+                                    return new Message(MessageType.Success, json);
                                 }
                                 else
                                 {
@@ -420,7 +423,7 @@ namespace DuetControlServer.Codes.Handlers
                             catch (Exception e)
                             {
                                 _logger.Debug(e, "Failed to return file information");
-                                return new Message(MessageType.Warning, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1,\"fileName:" : "{\"err\":1,\"fileName:") + JsonSerializer.Serialize(code.GetUnprecedentedString(), JsonHelper.DefaultJsonOptions) + "}");
+                                return new Message(MessageType.Warning, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1,\"fileName:" : "{\"err\":1,\"fileName:") + JsonSerializer.Serialize(virtualFilename, JsonHelper.DefaultJsonOptions) + "}");
                             }
                         }
                         else

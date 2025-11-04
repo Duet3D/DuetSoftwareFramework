@@ -675,7 +675,7 @@ namespace DuetControlServer.Files
 
                 byte[] data = new byte[Settings.FileBufferSize];
                 int bytesRead = await fs.ReadAsync(data);
-                if (bytesRead < 2)
+                if (isThumbnail && bytesRead < 2)
                 {
                     throw new ArgumentException("EOF or line too short");
                 }
@@ -685,51 +685,79 @@ namespace DuetControlServer.Files
                 try
                 {
                     int charsWritten = 0;
-                    while (charsWritten < MaxThumbnailLength)
-                    {
-                        // Read the next line comment
-                        bool isLineStart = true;
-                        int lineStart = bytesProcessed, lineLength = 0;
-                        while (bytesProcessed < bytesRead && charsWritten + lineLength < MaxThumbnailLength)
-                        {
-                            char c = (char)data[bytesProcessed++];
 
-                            if (isLineStart)
+                    if (isThumbnail)
+                    {
+                        while (charsWritten < MaxThumbnailLength)
+                        {
+                            // Read the next line comment
+                            bool isLineStart = true;
+                            int lineStart = bytesProcessed, lineLength = 0;
+                            while (bytesProcessed < bytesRead && charsWritten + lineLength < MaxThumbnailLength)
                             {
-                                if (c == ';' || char.IsWhiteSpace(c))
+                                char c = (char)data[bytesProcessed++];
+
+                                if (isLineStart)
                                 {
-                                    lineStart++;
-                                    continue;
+                                    if (c == ';' || char.IsWhiteSpace(c))
+                                    {
+                                        lineStart++;
+                                        continue;
+                                    }
+                                    else
+                                    {
+                                        isLineStart = false;
+                                    }
                                 }
-                                else
+
+                                if (c == '\r' || c == '\n')
                                 {
-                                    isLineStart = false;
+                                    break;
                                 }
+                                lineLength++;
                             }
 
-                            if (c == '\r' || c == '\n')
+                            // Is it the end of this thumbnail?
+                            string content = Encoding.ASCII.GetString(data, lineStart, lineLength);
+                            if ((charsWritten + lineLength < MaxThumbnailLength && lineLength == 0) ||
+                                content.StartsWith("thumbnail end") ||
+                                content.StartsWith("thumbnail_JPG end") ||
+                                content.StartsWith("thumbnail_QOI end"))
                             {
+                                offset = 0;
                                 break;
                             }
-                            lineLength++;
-                        }
 
-                        // Is it the end of this thumbnail?
-                        string content = Encoding.ASCII.GetString(data, lineStart, lineLength);
-                        if ((charsWritten + lineLength < MaxThumbnailLength && lineLength == 0) ||
-                            content.StartsWith("thumbnail end") ||
-                            content.StartsWith("thumbnail_JPG end") ||
-                            content.StartsWith("thumbnail_QOI end"))
+                            // Copy the data
+                            jsonResult.Append(content);
+                            charsWritten += lineLength;
+                        }
+                    }
+                    else
+                    {
+                        while (bytesProcessed < bytesRead && charsWritten + 1 < MaxThumbnailLength)
+                        {
+                            // Read the next char and append it
+                            char c = (char)data[bytesProcessed++];
+                            if (c == '\n')
+                            {
+                                jsonResult.Append("\\n");
+                                charsWritten += 2;
+                            }
+                            else if (c != '\r')
+                            {
+                                jsonResult.Append(c);
+                                charsWritten++;
+                            }
+                        }
+                        offset += bytesProcessed;
+
+                        // Report EOF if we reached the end of the file
+                        if (fs.Position == fs.Length)
                         {
                             offset = 0;
-                            break;
                         }
-
-                        // Copy the data
-                        jsonResult.Append(content);
-                        charsWritten += lineLength;
                     }
-                    offset += bytesProcessed;
                 }
                 finally
                 {
