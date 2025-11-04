@@ -422,13 +422,15 @@ public class MCodeHandler(
                 {
                     if (code.Parameters.Count > 0)
                     {
+                        string virtualFilename = string.Empty;
                         try
                         {
                             if ((code.MinorNumber ?? 0) <= 0)
                             {
                                 // Get fileinfo
-                                string file = await filePathResolver.ToPhysicalAsync(code.GetUnprecedentedString(), FileDirectory.GCodes, cancellationToken);
-                                GCodeFileInfo info = await fileInfoParser.ParseAsync(file, false, cancellationToken);
+                                virtualFilename = code.GetUnprecedentedString();
+                                string physicalFilename = await filePathResolver.ToPhysicalAsync(virtualFilename, FileDirectory.GCodes, cancellationToken);
+                                GCodeFileInfo info = await fileInfoParser.ParseAsync(physicalFilename, false, cancellationToken);
 
                                 string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
                                 return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":0," : "{\"err\":0,") + json[1..]);
@@ -436,9 +438,11 @@ public class MCodeHandler(
                             else if (code.MinorNumber == 1 || code.MinorNumber == 2)
                             {
                                 // Get thumbnail or file fragment
-                                string filename = await filePathResolver.ToPhysicalAsync(code.GetString('P'), FileDirectory.GCodes);
-                                string thumbnailJson = await fileInfoParser.ParseFileFragment(filename, code.GetLong('S'), code.MinorNumber == 1, code.ExplicitLineNumber);
-                                return new Message(MessageType.Success, thumbnailJson);
+                                virtualFilename = code.GetString('P');
+                                string physicalFilename = await filePathResolver.ToPhysicalAsync(virtualFilename, FileDirectory.GCodes, cancellationToken);
+
+                                string json = await fileInfoParser.ParseFileFragment(physicalFilename, code.GetLong('S'), code.MinorNumber == 1, code.ExplicitLineNumber);
+                                return new Message(MessageType.Success, json);
                             }
                             else
                             {
@@ -448,7 +452,7 @@ public class MCodeHandler(
                         catch (Exception e)
                         {
                             logger.LogDebug(e, "Failed to return file information");
-                            return new Message(MessageType.Warning, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1,\"fileName:" : "{\"err\":1,\"fileName:") + JsonSerializer.Serialize(code.GetUnprecedentedString(), JsonHelper.DefaultJsonOptions) + "}");
+                            return new Message(MessageType.Warning, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1,\"fileName:" : "{\"err\":1,\"fileName:") + JsonSerializer.Serialize(virtualFilename, JsonHelper.DefaultJsonOptions) + "}");
                         }
                     }
                     else
