@@ -685,7 +685,6 @@ namespace DuetControlServer.Files
                 try
                 {
                     int charsWritten = 0;
-
                     if (isThumbnail)
                     {
                         while (charsWritten < MaxThumbnailLength)
@@ -732,6 +731,7 @@ namespace DuetControlServer.Files
                             jsonResult.Append(content);
                             charsWritten += lineLength;
                         }
+                        offset += bytesProcessed;
                     }
                     else
                     {
