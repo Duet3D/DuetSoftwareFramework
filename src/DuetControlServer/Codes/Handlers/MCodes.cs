@@ -7,12 +7,10 @@ using DuetControlServer.Model;
 using DuetControlServer.Utility;
 using NLog;
 using System;
-using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Codes.Handlers
@@ -420,7 +418,7 @@ namespace DuetControlServer.Codes.Handlers
                                     throw new NotSupportedException();
                                 }
                             }
-                            catch (Exception e)
+                            catch (Exception e) when (e is not MissingParameterException and not InvalidParameterTypeException)
                             {
                                 _logger.Debug(e, "Failed to return file information");
                                 return new Message(MessageType.Warning, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1,\"fileName:" : "{\"err\":1,\"fileName:") + JsonSerializer.Serialize(virtualFilename, JsonHelper.DefaultJsonOptions) + "}");
