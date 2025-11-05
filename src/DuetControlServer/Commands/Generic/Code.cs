@@ -264,7 +264,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         }
         catch (Exception e) when (e is MissingParameterException or InvalidParameterTypeException)
         {
-            Result = new(MessageType.Error, $"{ToShortString()}: {e.Message}");
+            Result = new(MessageType.Error, e.Message);
             return true;
         }
 

@@ -657,7 +657,15 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
     /// <remarks>
     /// See RepRapFirmware -> RepRap.cpp -> GetThumbnailResponse
     /// </remarks>
-    private const int MaxThumbnailLength = 1024;
+    private const int MaxThumbnailLength = 2600;
+
+    /// <summary>
+    /// Maximum length of file fragment data in a fragment response
+    /// </summary>
+    /// <remarks>
+    /// See RepRapFirmware -> RepRap.cpp -> GetFileFragmentResponse
+    /// </remarks>
+    private const int MaxFileFragmentLength = 1024;
 
     /// <summary>
     /// Retrieve a chunk of a thumbnail or a file fragment
@@ -747,7 +755,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
                 }
                 else
                 {
-                    while (charsWritten + 1 < MaxThumbnailLength)
+                    while (bytesProcessed < bytesRead && charsWritten + 1 < MaxFileFragmentLength)
                     {
                         // Read the next char and append it
                         char c = (char)data[bytesProcessed++];
@@ -765,7 +773,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
                     offset += bytesProcessed;
 
                     // Report EOF if we reached the end of the file
-                    if (fs.Position == fs.Length)
+                    if (bytesProcessed == bytesRead && fs.Position == fs.Length)
                     {
                         offset = 0;
                     }
