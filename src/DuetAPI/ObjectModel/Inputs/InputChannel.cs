@@ -60,7 +60,7 @@
         private bool _drivesRelative = true;
 
         /// <summary>
-        /// Current feedrate in mm/s
+        /// Current feedrate as passed by the last G0/G1 F... command
         /// </summary>
         public float FeedRate
         {
