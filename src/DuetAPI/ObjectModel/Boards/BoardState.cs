@@ -32,6 +32,11 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Board is up and running
         /// </summary>
-        Running
+        Running,
+
+        /// <summary>
+        /// Board timed out
+        /// </summary>
+        TimedOut
     }
 }
