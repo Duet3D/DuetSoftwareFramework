@@ -85,6 +85,7 @@ public class AppArmorPermissionManager(IOptions<Settings> settings) : IPermissio
                         rules.AppendLine("  /usr/bin/libcamerify rm,");
                         rules.AppendLine("  /usr/libexec/libcamera/* rm,");
                         rules.AppendLine("  /usr/share/libcamera/** r,");
+                        rules.AppendLine("  /usr/share/libpisp/** r,");
                         break;
                     case SbcPermissions.ReadFilaments:
                         rules.AppendLine($"  {Path.Combine(sdDirectory, "filaments")}/ r,");
