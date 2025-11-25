@@ -76,7 +76,12 @@ namespace DuetPiManagementPlugin
         /// <returns>Disable result</returns>
         public static async Task<string> Disconnect(string iface)
         {
-            return await Command.ExecuteAsync("nmcli", $"-c no -t device disconnect {iface}");
+            string? activeProfile = await GetActiveProfile(iface);
+            if (activeProfile is not null)
+            {
+                return await Command.ExecuteAsync("nmcli", $"-c no -t device disconnect {iface}");
+            }
+            return string.Empty;
         }
 
         private static async Task<string?> GetProfileProperty(string iface, string property)
