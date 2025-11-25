@@ -433,11 +433,14 @@ namespace DuetPiManagementPlugin
             }
             result.AppendLine(await Command.Execute("nmcli", nmcliArgs));
 
-            // Change the IP address
+            // Configure IP sharing (enables dnsmasq automatically)
+            string modifyArgs = "-c no -t connection modify Hotspot ipv4.method shared";
             if (!IPAddress.Any.Equals(_ipAddress))
             {
-                result.AppendLine(await SetIPAddress("wlan0", _ipAddress, null, null, null));
+                modifyArgs += $" ipv4.addresses {_ipAddress}/24";
             }
+            result.AppendLine(await Command.Execute("nmcli", modifyArgs));
+            result.AppendLine(await Command.Execute("nmcli", "-c no -t connection up Hotspot"));
 
             return result.ToString().Trim();
         }
