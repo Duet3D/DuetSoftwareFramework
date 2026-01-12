@@ -158,7 +158,7 @@ public partial class Extruder : ModelObject, IStaticModelObject
     private float _rawPosition;
 
     /// <summary>
-    /// Maximum speed (in mm/s)
+    /// Maximum speed (in mm/min)
     /// </summary>
     public float Speed
     {
