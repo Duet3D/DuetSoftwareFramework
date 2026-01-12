@@ -38,17 +38,25 @@ See class ExitCodes below.
 Verson:
 1.0.0
 Initial Release
-Version 1.1.0
-Modified by Andy at Duet3d
-Version 1.1.1
+Version 1.1.0 - Modified by Andy at Duet3d
+Version 1.1.1 - MOdified by Stuart Strolin
 Fixed issue handling modules with no version number e.e shlex
+Version 1.1.2 - Modified by Stuart Strolin
+Added flags so venv has upgraded pip and is cleared each time
+changed pip list to pip freeze to get version numbers
+added --force-reinstall to pip install command as a safety measure
+added quotes around module name in pip install to avoid redirects e.g. module>2
+added logfile
+added --verbose flag - first (dummy) entry in manifest file 'sbcPythonDependencies'
+replaced pkg_resources (deprecated) version parsing with packaging.version
 """
 
 
 import subprocess
 import sys
 import logging
-from pkg_resources import parse_version as version
+#from pkg_resources import parse_version as version
+from packaging.version import Version as version  
 import re
 import os
 import sysconfig
@@ -58,10 +66,14 @@ import json
 from enum import Enum, auto
 from typing import Optional
 
+
 # CONSTANTS
+THIS_VERSION = '1.1.2'
 VENV_FOLDER = 'venv'
 MANIFEST_KEY = 'sbcPythonDependencies'
 PIP = 'pip'
+LOGFILENAME = 'pipInstall2.log'
+
 
 if os.name == 'nt':  # Windows
     BIN_DIR = 'Scripts'
@@ -103,6 +115,7 @@ class Dependency:
         VERSION_DEV = 11
         GIT = 12
 
+
     class DepTypes(Enum):
         PYPI = auto()
         GIT = auto()
@@ -124,7 +137,6 @@ class Dependency:
     @classmethod
     def parse(cls, text: str) -> Optional['Dependency']:
         """Convert text from plugin.json sbcPythonDependencies into object
-
         Args:
             text (str): line from sbcPythonDependencies
         """
@@ -169,16 +181,44 @@ class Dependency:
         return dep
 
 
-def createLogger(logname):  # Create a custom logger so messages go to journalctl#####
+def createLogger(progname):  # Create a custom logger so messages go to journalctl
     global logger
-    logger = logging.getLogger(logname)
+    logger = logging.getLogger(progname)
     logger.propagate = False
     # Create handler for console output
     c_handler = logging.StreamHandler()
     c_format = logging.Formatter('%(message)s')
     c_handler.setFormatter(c_format)
     logger.addHandler(c_handler)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.DEBUG) #Initial Setting
+
+
+def createLogfile(logfilename): 
+	global logger
+	filehandler = None
+	for handler in logger.handlers:
+		if handler.__class__.__name__ == "FileHandler":
+			filehandler = handler
+			break # There is only ever one
+	
+	if filehandler != None:  #  Get rid of it
+		filehandler.flush()
+		filehandler.close()
+		logger.removeHandler(filehandler)
+
+	f_handler = logging.FileHandler(logfilename, mode='w', encoding='utf-8')
+	f_format = logging.Formatter(f'''"%(asctime)s [%(levelname)s] %(message)s"''')
+	f_handler.setFormatter(f_format)
+	logger.addHandler(f_handler)
+
+
+def setLoggingLevel(verbose = False):
+    global logger
+    if verbose:
+        logger.setLevel(logging.DEBUG)
+        logger.debug('Verbose logging enabled')
+    else:
+        logger.setLevel(logging.INFO)
 
 
 def validateParams():
@@ -199,14 +239,14 @@ def validateParams():
         logger.info('Exiting: No manifest file (-m) was provided')
         sys.exit(ExitCodes.NO_MANIFEST_PROVIDED)
     elif not os.path.isfile(mFile):
-        logger.info('Exiting: Manifest file ' + mFile + ' does not exist')
+        logger.info(f'Exiting: Manifest file "{mFile}" does not exist')
         sys.exit(ExitCodes.MANIFEST_DOES_NOT_EXIST)
 
     if pPath is None:
         logger.info('Exiting: No plugin path (-p) was provided')
         sys.exit(ExitCodes.NO_PLUGIN_PROVIDED)
     elif not os.path.isdir(pPath):
-        logger.info('Exiting: Plugin file ' + mFile + ' does not exist')
+        logger.info(f'Exiting: Plugin file "{mFile}" does not exist')
         sys.exit(ExitCodes.PLUGIN_DOES_NOT_EXIST)
 
     return mFile, pPath
@@ -215,7 +255,7 @@ def validateParams():
 def parseVersion(request) -> Dependency:
     # Get the module name any conditional and version
     if ',' in request:
-        logger.info('Unsupported Conditional in: ' + str(request))
+        logger.info(f'Unsupported Conditional in: {request}')
         sys.exit(ExitCodes.UNSUPPORTED_CONDITIONAL)
 
     dep = Dependency.parse(request)
@@ -231,30 +271,32 @@ def runsubprocess(cmd):
         result = subprocess.run(cmd, capture_output=True, text=True, check=True, shell=True)
         if result.returncode != 0:
             if str(result.stderr) != '' and '[Error]' in str(result.stderr):
-                logger.info('Command Failure: ' + str(cmd))
-                logger.debug('Error = ' + str(result.stderr))
-                logger.debug('Output = ' + str(result.stdout))
+                logger.info(f'Command Failure: {cmd}')
+                logger.info(f'Error = {result.stderr}')
+                logger.info(f'Output = {result.stdout}')
                 return False
         return result.stdout
     except subprocess.CalledProcessError as e1:
-        pass
-        # logger.info('ProcessError -- ' + str(e1))  #  Supress this error
+        logger.debug(f'ProcessError -- ##########\n{e1}')
     except OSError as e2:
-        logger.info('OSError -- ' + str(e2))
+        logger.info(f'OSError      -- ##########\n{e2}')
     return False
 
 
 def createPythonEnv(envPath):
+    """
+    Added --clear below so no need to check pythonFile existence
     pythonFile = os.path.normpath(os.path.join(envPath, BIN_DIR, PYTHON_VERSION))
     if os.path.isfile(pythonFile):  # No need to recreate
         return
-
-    cmd = PYTHON_VERSION + ' -m venv --system-site-packages  ' + envPath
-    logger.info('Creating Python Virtual Environment at: ' + envPath)
+    """
+    # Create a new virtual environment with updated pip
+    cmd = PYTHON_VERSION + ' -m venv ' + envPath + ' --clear --system-site-packages --upgrade-deps'
+    logger.info(f'Creating Python Virtual Environment at: {envPath}')
     result = runsubprocess(cmd)
     if result != '':
         logger.info('Problem creating Virtual Environment')
-        logger.info(result)
+        logger.info(f'{result}')
         sys.exit(ExitCodes.PROBLEM_CREATING_VENV)
     return
 
@@ -264,17 +306,23 @@ def getModuleList(mFile):
         try:
             config = json.load(jsonfile)
         except ValueError as e:
-            logger.info(mFile + ' is not a properly formatted json file')
-            logger.info(str(e))
+            logger.info(f'"{mFile}" is not a properly formatted json file')
+            logger.info(f'{e}')
             sys.exit(ExitCodes.MANIFEST_ERROR)
 
     mList = config[MANIFEST_KEY]
+    if mList[0] == '--verbose':
+        verbose = True
+        mList = mList[1:]  # Remove the verbose flag
+    else:
+        verbose = False
 
-    return mList
+    return mList, verbose
 
 
 def getInstalledVersion(m, envPath):
-    if (m in sys.builtin_module_names): # Returns compiled modules will miss some std modules
+    if (m in sys.builtin_module_names): # Returns compiled modules. Will miss some std modules
+        logger.debug(f'Module {m} is built-in')
         return 'Built-In'
 
     try:
@@ -283,13 +331,14 @@ def getInstalledVersion(m, envPath):
         return result
     except (AttributeError): # No version information
         if globals()[m].__name__ == m: # Module is installed so treat it as a builtin
+            logger.debug(f'Module {m} is built-in (no version info)')
             return 'Built-In'
     except (ImportError, ModuleNotFoundError):  # Check to see if pip thinks its installed
         pythonFile = os.path.normpath(os.path.join(envPath, BIN_DIR, PYTHON_VERSION))
-        cmd = pythonFile + ' -m ' + PIP + ' list'
+        cmd = pythonFile + ' -m ' + PIP + ' freeze' # Gives version prefixed by ==
         request = runsubprocess(cmd)
         if request is False:
-            logger.info('Aborting: Failed to get pip list')
+            logger.info('Aborting: Failed to get pip freeze')
             sys.exit(ExitCodes.PIP_LIST_ERROR)
         # Normalise to lower case and underscore
         request = request.lower()
@@ -297,22 +346,31 @@ def getInstalledVersion(m, envPath):
 
         if m in request:  # The module exists
             # Try to get version number
-            regex = '^' + m + '\s+(.*)'
+            #regex = '^' + m + '\s+(.*)'
+            regex = f'^{m}==(.+)$'
             result = re.findall(regex, request, flags=re.MULTILINE)
+            logger.debug(f'module {m} requested version was {result}')
             if result and result[0] != '':  # version number found
+                logger.debug(f'Version number "{result[0]}" was found for module "{m}"')
                 return result[0]
             else:
-                logger.info('Module ' + m + ' exists but does not have a version number.')
+                logger.info(f'Module "{m}" exists but does not have a version number.')
                 return('0') # Set version number to 0
         else:
-            logger.info('Module ' + m + ' is not installed')
+            logger.debug(f'Module "{m}" is not installed')
             return('None')
 
 
 def installModule(dep: Dependency, envPath: str):
     pythonFile = os.path.normpath(os.path.join(envPath, BIN_DIR, PYTHON_VERSION))
-    cmd = pythonFile + ' -m ' + PIP + ' install --no-cache-dir --upgrade ' + '"' + dep.uri + '"'
+    
+    if dep.comparator == '':
+        cmd = f'{pythonFile} -m {PIP} install "{dep.uri}" --no-cache-dir --upgrade --force-reinstall'
+    else:
+        cmd = f'{pythonFile} -m {PIP} install "{dep.uri}" --no-cache-dir --force-reinstall'
+    logger.debug(f'cmd    =   ################### \n{cmd}')
     result = runsubprocess(cmd)
+    logger.debug(f'result = ################### \n{result}')
     
     if result == False:  # module could not be installed
         return False
@@ -327,7 +385,7 @@ def installModules(mList, envPath):
         # Get the elements of the requested module - parseVersion may modify
         dep = parseVersion(requestedVersion)
 
-        logger.info('Checking for python module: ' + dep.uri)
+        logger.info(f'Checking for python module: {dep.uri}')
 
         # Check to see what is installed
         installedVersion = getInstalledVersion(dep.package, envPath)
@@ -344,40 +402,49 @@ def installModules(mList, envPath):
             else:
                 resultCode = 3
 
-        # Exit the program with appropriate log entries
+        # Gather appropriate log entries
         if resultCode == 0:
-            sList.append('Module "' + dep.uri + '" is already installed')
+            sList.append(f'Module "{dep.uri} is already installed')
         elif resultCode == 1:
-            sList.append('Module "' + dep.package + '" was installed or updated to version ' +
-                         getInstalledVersion(dep.package, envPath))
+            sList.append(f'Module "{dep.package}" was installed or updated to version {getInstalledVersion(dep.package, envPath)}')
         elif resultCode == 2:
-            sList.append('Module "' + dep.package + '" is a built-in.')
+            sList.append(f'Module "{dep.package}" is a built-in.')
         elif resultCode == 3:
-            fList.append('Module "' + dep.uri + '"')
+            fList.append(f'"{dep.uri}"')
         elif resultCode == 4:
-            sList.append('Module "' + dep.package + '" was not updated from version ' + installedVersion)
+            sList.append(f'Module "{dep.package}" was not updated from version {installedVersion}')
         else:
             logger.info('An unexpected error occured')
             sys.exit(ExitCodes.UNEXPECTED_ERROR)
 
     return sList, fList
 
-
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def main(progName):
     #  Set up logging so journalc can be used
     createLogger(progName)
     logger.info('---------------------------------------------------')
-    logger.info(os.path.basename(sys.argv[0]) + ' is attempting to install python modules')
+    logger.info(f'{progName} Version {THIS_VERSION} is attempting to install python modules')
 
-    #  Validate that the call was well formed and get the arguments
-    manifestFile, pluginPath = validateParams()
+    #  Validate calling arguments
+    manifestFile, pluginPath= validateParams()
     venvPath = os.path.normpath(os.path.join(pluginPath, VENV_FOLDER))
+    logfilePath =  os.path.normpath(os.path.join(pluginPath, LOGFILENAME))
+
+    #add log file
+    createLogfile(logfilePath)
+    logger.info(f'Starting Log file for {progName} Version {THIS_VERSION}')
+
+    # parse the manifestfile
+    verbose = True
+    moduleList, verbose = getModuleList(manifestFile)
+
+    # if --verbose flag set adjust logging level
+    setLoggingLevel(verbose)
 
     #  Create virtual environment
     createPythonEnv(venvPath)
-
-    # parse the manifestfile
-    moduleList = getModuleList(manifestFile)
 
     # Install the modules
     successList = []
@@ -389,13 +456,13 @@ def main(progName):
         logger.info('-----------------------------------------------')
         logger.info('The following modules were installed or updated:')
         for entry in successList:
-            logger.info(entry)
+            logger.info(f'{entry}')
 
     if len(failList) > 0:
         logger.info('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         logger.info('The following modules could not be installed:')
         for entry in failList:
-            logger.info(entry)
+            logger.info(f'{entry}')
         logger.info('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         sys.exit(ExitCodes.FAILED_TO_INSTALL_MODULE)
 
@@ -403,7 +470,8 @@ def main(progName):
     logger.info('All modules were successfully installed')
     logger.info('---------------------------------------')
 
+#-------------------------------------------------------------------------------
 
 if __name__ == "__main__":  # Do not run anything below if the file is imported by another program
-    programName = sys.argv[0]
+    programName = os.path.basename(sys.argv[0])
     main(programName)
