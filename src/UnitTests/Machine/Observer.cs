@@ -1,10 +1,3 @@
-using DuetAPI.ObjectModel;
-using DuetControlServer.Model;
-using NUnit.Framework;
-using System;
-using System.Collections;
-using System.Text.Json;
-
 namespace UnitTests.Machine
 {
     // DISABLED: Observer and Provider now require dependency injection - needs complete refactoring

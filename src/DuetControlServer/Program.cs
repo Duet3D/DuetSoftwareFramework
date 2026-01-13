@@ -11,8 +11,7 @@ using DuetSharedLibrary;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using NLog;
-using NLog.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System;
 using System.CommandLine;
 using System.IO;
@@ -21,14 +20,43 @@ using System.Text.Json;
 string? startErrorFile = Defaults.StartErrorFile;
 
 /// <summary>
+/// Parse a log level string, handling NLog level names and shorter versions
+/// </summary>
+/// <param name="logLevelString">The log level string to parse</param>
+/// <returns>The parsed LogLevel</returns>
+LogLevel ParseLogLevel(string logLevelString)
+{
+    return logLevelString.ToLowerInvariant() switch
+    {
+        "trace" => LogLevel.Trace,
+        "debug" => LogLevel.Debug,
+        "info" or "information" => LogLevel.Information,
+        "warn" or "warning" => LogLevel.Warning,
+        "error" => LogLevel.Error,
+        "fatal" or "critical" => LogLevel.Critical,
+        "off" or "none" => LogLevel.None,
+        _ => LogLevel.Information
+    };
+}
+
+/// <summary>
 /// Print the reason for the start error, write it to the start error file, and exit this application
 /// </summary>
 /// <param name="e">Exception that caused the termination</param>
 /// <param name="reason">Reason for the program termination</param>
 /// <param name="exitCode">Exit code</param>
-void Terminate(Exception e, string reason, int exitCode)
+/// <param name="loggerFactory">Optional logger factory for logging</param>
+void Terminate(Exception e, string reason, int exitCode, ILoggerFactory? loggerFactory = null)
 {
-    LogManager.GetCurrentClassLogger().Fatal(e, reason);
+    if (loggerFactory != null)
+    {
+        loggerFactory.CreateLogger("DuetControlServer").LogCritical(e, reason);
+    }
+    else
+    {
+        Console.Error.WriteLine($"[fatal] {reason}");
+        Console.Error.WriteLine($"   {e}");
+    }
     File.WriteAllText(startErrorFile, reason);
     Environment.Exit(exitCode);
 }
@@ -37,9 +65,9 @@ Option<bool> updateOnlyOption = new("--update", "-u")
 {
     Description = "Update RepRapFirmware and exit. This works even if another instance is already started"
 };
-Option<LogLevel> logLevelOption = new("--log-level", "-l")
+Option<string> logLevelOption = new("--log-level", "-l")
 {
-    Description = "Set the log level for the application"
+    Description = "Set the log level for the application (trace, debug, info/information, warn/warning, error, fatal/critical, off/none)"
 };
 Option<FileInfo> configFileOption = new("--config", "-c")
 {
@@ -56,7 +84,7 @@ Option<string> socketFileOption = new("--socket-file", "-s")
 };
 Option<DirectoryInfo> baseDirectoryOption = new("--base-directory", "-b")
 {
-    Description = "Base directory for the application, used to resolve relative paths"
+    Description = "Base directory for the emulated SD card (0:/ on Duet controllers)"
 };
 
 RootCommand rootCommand = new("Duet Control Server")
@@ -72,7 +100,8 @@ rootCommand.SetAction((parserResult) =>
 {
     bool updateOnlyValue = parserResult.GetValue(updateOnlyOption);
     FileInfo configFileValue = parserResult.GetValue(configFileOption) ?? new(Settings.DefaultConfigFile);
-    LogLevel? logLevelValue = parserResult.GetValue(logLevelOption);
+    string? logLevelString = parserResult.GetValue(logLevelOption);
+    LogLevel? logLevelValue = logLevelString != null ? ParseLogLevel(logLevelString) : null;
     DirectoryInfo? socketDirectoryValue = parserResult.GetValue(socketDirectoryOption);
     string? socketFileValue = parserResult.GetValue(socketFileOption);
     DirectoryInfo? baseDirectoryValue = parserResult.GetValue(baseDirectoryOption);
@@ -93,10 +122,36 @@ rootCommand.SetAction((parserResult) =>
 
     // Set up the host application
     IHost host;
+    ILoggerFactory? loggerFactory = null;
     try
     {
         host = Host.CreateDefaultBuilder()
-            .UseNLog()
+            .ConfigureLogging((context, logging) =>
+            {
+                // Clear default logging providers
+                logging.ClearProviders();
+                
+                // Get the log level from command line parameter first, then from configuration
+                LogLevel logLevel;
+                if (logLevelValue.HasValue)
+                {
+                    logLevel = logLevelValue.Value;
+                }
+                else
+                {
+                    // Get the log level from configuration, handling NLog level names and shorter versions
+                    string configLogLevelString = context.Configuration.GetValue<string>("LogLevel") ?? "Information";
+                    logLevel = ParseLogLevel(configLogLevelString);
+                }
+                
+                // Add console logging with custom formatter
+                logging.AddConsole(options =>
+                {
+                    options.FormatterName = nameof(CommonLogFormatter);
+                })
+                .AddConsoleFormatter<CommonLogFormatter, CommonLogFormatterOptions>()
+                .SetMinimumLevel(logLevel);
+            })
             .UseSystemd()
             .ConfigureAppConfiguration((hostingContext, config) =>
             {
@@ -108,11 +163,11 @@ rootCommand.SetAction((parserResult) =>
                 }
                 catch (JsonException je)
                 {
-                    Terminate(je, $"Failed to load settings: {je.Message}", ExitCode.Configuration);
+                    Terminate(je, $"Failed to load settings: {je.Message}", ExitCode.Configuration, loggerFactory);
                 }
                 catch (Exception e)
                 {
-                    Terminate(e, $"Failed to initialize settings: {e.Message}", ExitCode.Usage);
+                    Terminate(e, $"Failed to initialize settings: {e.Message}", ExitCode.Usage, loggerFactory);
                 }
             })
             .ConfigureServices((context, services) => services
@@ -127,10 +182,13 @@ rootCommand.SetAction((parserResult) =>
                 .AddUtility()
             )
             .Build();
+        
+        // Capture logger factory for error logging
+        loggerFactory = host.Services.GetRequiredService<ILoggerFactory>();
     }
     catch (Exception e)
     {
-        Terminate(e, $"Failed to initialize environment: {e.Message}", ExitCode.OsError);
+        Terminate(e, $"Failed to initialize environment: {e.Message}", ExitCode.OsError, loggerFactory);
         return;
     }
 
@@ -145,14 +203,13 @@ rootCommand.SetAction((parserResult) =>
             }
             catch (Exception e)
             {
-                LogManager.GetCurrentClassLogger().Warn(e, "Failed to delete start error file {File}", startErrorFile);
+                host.Services.GetRequiredService<ILogger<Program>>().LogWarning(e, "Failed to delete start error file {File}", startErrorFile);
             }
         }
     });
 
     // Run the host application
     host.Run();
-    LogManager.Shutdown();
 });
 
 return rootCommand.Parse(args).Invoke();

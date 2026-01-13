@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace DuetControlServer.IPC;
 
@@ -14,6 +15,11 @@ public static partial class ServiceCollectionExtensions
     /// <returns>Service collection</returns>
     public static IServiceCollection AddIPC(this IServiceCollection services)
     {
+        // Initialize static loggers
+        var serviceProvider = services.BuildServiceProvider();
+        var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+        Processors.CodeInterception.SetLogger(loggerFactory.CreateLogger<Processors.CodeInterception>());
+        
         return services
             .AddSingleton<Processors.ProcessorFactory>()
             .AddSingleton<LockManager>()

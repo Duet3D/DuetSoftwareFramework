@@ -364,7 +364,7 @@ internal static class UpdateFromJson
                             writer.Indent++;
                             writer.WriteLine($"{prop.Identifier.ValueText} = jsonProperty.Value.GetRawText();");
                             writer.WriteLineNoTabs("#if VERIFY_OBJECT_MODEL");
-                            writer.WriteLine($"Console.WriteLine($\"[warn] Unsupported object type {{jsonProperty.Value.ValueKind}} for property {jsonPropertyName} in {cls}\");");
+                            writer.WriteLine($"Console.WriteLine($\"[\\x1b[33mwarn\\x1b[0m] Unsupported object type {{jsonProperty.Value.ValueKind}} for property {jsonPropertyName} in {cls}\");");
                             writer.WriteLineNoTabs("#endif");
                             writer.Indent--;
                             writer.WriteLine("}");
@@ -407,7 +407,7 @@ internal static class UpdateFromJson
 #if VERIFY_OBJECT_MODEL
             {((properties.Count > 0) ? "else if (jsonProperty.Name != \"command\")" : "// no properties")}
             {{
-                Console.WriteLine(""[warn] Missing property {{0}} = {{1}} in {cls}"", jsonProperty.Name, jsonProperty.Value.GetRawText());
+                Console.WriteLine(""[\x1b[33mwarn\x1b[0m] Missing property {{0}} = {{1}} in {cls}"", jsonProperty.Name, jsonProperty.Value.GetRawText());
             }}
 #endif 
         }}

@@ -1,10 +1,4 @@
-﻿using DuetAPI.Commands;
-using DuetControlServer.Files;
-using NUnit.Framework;
-using System.IO;
-using System.Threading.Tasks;
-
-namespace UnitTests.File
+﻿namespace UnitTests.File
 {
     // DISABLED: CodeFile now requires dependency injection - needs refactoring
     /*

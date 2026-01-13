@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace DuetControlServer.Files;
 
@@ -14,6 +15,11 @@ public static partial class ServiceCollectionExtensions
     /// <returns>Service collection</returns>
     public static IServiceCollection AddFiles(this IServiceCollection services)
     {
+        // Initialize static loggers
+        var serviceProvider = services.BuildServiceProvider();
+        var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+        Parser.ImageProcessing.IconImageParser.SetLogger(loggerFactory.CreateLogger<Parser.FileInfoParser>());
+        
         return services
             .AddSingleton<Parser.FileInfoParser>()
             .AddSingleton<FilePathResolver>()

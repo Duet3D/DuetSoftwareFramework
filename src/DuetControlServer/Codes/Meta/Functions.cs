@@ -2,42 +2,37 @@
 using DuetControlServer.Files;
 using DuetControlServer.Link;
 using DuetControlServer.Model;
+using Microsoft.Extensions.Hosting;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Codes.Meta;
 
 /// <summary>
-/// SBC-dependent meta G-code function implementations
+/// Service to provide SBC-dependent meta G-code function implementations
 /// </summary>
-public class Functions
+public class Functions(Expressions expressions, FilePathResolver filePathResolver, Filter filter, LinkInterface linkInterface) : IHostedService
 {
-    // Private fields
-    private readonly FilePathResolver _filePathResolver;
-    private readonly Filter _filter;
-    private readonly LinkInterface _linkInterface;
-
     /// <summary>
-    /// Initializer function to register custom meta G-code functions
+    /// Start the hosted service and register custom functions
     /// </summary>
-    /// <param name="expressions">Expressions to register the functions with</param>
-    /// <param name="filePathResolver">File path resolver</param>
-    /// <param name="filter">Object model filter</param>
-    /// <param name="linkInterface">Link interface</param>
-    public Functions(Expressions expressions, FilePathResolver filePathResolver, Filter filter, LinkInterface linkInterface)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
         expressions.CustomFunctions.Add("exists", Exists);
         expressions.CustomFunctions.Add("fileexists", FileExists);
         expressions.CustomFunctions.Add("fileread", FileRead);
-
-        _filePathResolver = filePathResolver;
-        _filter = filter;
-        _linkInterface = linkInterface;
+        return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// Stop the hosted service
+    /// </summary>
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     /// <summary>
     /// Implementation for exists() meta G-code call
@@ -51,11 +46,11 @@ public class Functions
         if (arguments.Length == 1 && arguments[0] is string stringArgument)
         {
             stringArgument = stringArgument.Trim();
-            if (_filter.GetSpecific(stringArgument, true, out _))
+            if (filter.GetSpecific(stringArgument, true, out _))
             {
                 return true;
             }
-            return await _linkInterface.EvaluateExpressionAsync(channel, $"exists({stringArgument})");
+            return await linkInterface.EvaluateExpressionAsync(channel, $"exists({stringArgument})");
         }
         throw new ArgumentException("exists requires an argument");
     }
@@ -71,7 +66,7 @@ public class Functions
     {
         if (arguments.Length == 1 && arguments[0] is string stringArgument)
         {
-            string resolvedPath = await _filePathResolver.ToPhysicalAsync(stringArgument);
+            string resolvedPath = await filePathResolver.ToPhysicalAsync(stringArgument);
             return File.Exists(resolvedPath);
         }
         throw new ArgumentException("fileexists requires a string argument");
@@ -112,7 +107,7 @@ public class Functions
         }
 
         // Get the first line of the file
-        string resolvedPath = await _filePathResolver.ToPhysicalAsync(filePath);
+        string resolvedPath = await filePathResolver.ToPhysicalAsync(filePath);
         using StreamReader reader = File.OpenText(resolvedPath);
         string firstLine = await reader.ReadLineAsync() ?? string.Empty;
 

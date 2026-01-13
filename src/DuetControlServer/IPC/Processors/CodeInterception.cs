@@ -11,6 +11,7 @@ using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Codes;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 using Code = DuetControlServer.Commands.Code;
@@ -39,7 +40,15 @@ public sealed class CodeInterception : IProcessor
     /// <summary>
     /// Logger instance
     /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+    private static ILogger? _logger;
+
+    /// <summary>
+    /// Set the logger (called during initialization)
+    /// </summary>
+    public static void SetLogger(ILogger<CodeInterception> logger)
+    {
+        _logger = logger;
+    }
 
     /// <summary>
     /// Dictionary of interception mode vs item containers (connection vs queue of codes being intercepted)
@@ -150,7 +159,7 @@ public sealed class CodeInterception : IProcessor
         {
             _connections[_mode].Add(this);
         }
-        _logger.Debug("Interception processor registered for IPC#{0}", Connection.Id);
+        _logger?.LogDebug("Interception processor registered for IPC#{0}", Connection.Id);
 
         using (await _codeMonitor.EnterAsync(cancellationToken))
         {
@@ -234,7 +243,7 @@ public sealed class CodeInterception : IProcessor
                 {
                     _connections[_mode].Remove(this);
                 }
-                _logger.Debug("Interception processor unregistered for IPC#{0}", Connection.Id);
+                _logger?.LogDebug("Interception processor unregistered for IPC#{0}", Connection.Id);
             }
         }
     }
@@ -327,7 +336,7 @@ public sealed class CodeInterception : IProcessor
                     }
                     catch (Exception e) when (e is not OperationCanceledException)
                     {
-                        _logger.Error(e, "Interception processor for IPC#{0} caught an exception", Connection.Id);
+                        _logger?.LogError(e, "Interception processor for IPC#{0} caught an exception", Connection.Id);
                     }
                 }
                 finally
@@ -369,17 +378,17 @@ public sealed class CodeInterception : IProcessor
             {
                 try
                 {
-                    _logger.Debug("Intercepting code {0} ({1}) via IPC#{2}", code, type, processor.Connection.Id);
+                    _logger?.LogDebug("Intercepting code {0} ({1}) via IPC#{2}", code, type, processor.Connection.Id);
                     if (await processor.InterceptAsync(code, cancellationToken))
                     {
-                        _logger.Debug("Code has been resolved by IPC#{0}", processor.Connection.Id);
+                        _logger?.LogDebug("Code has been resolved by IPC#{0}", processor.Connection.Id);
                         return true;
                     }
-                    _logger.Debug("Code has been ignored by IPC#{0}", processor.Connection.Id);
+                    _logger?.LogDebug("Code has been ignored by IPC#{0}", processor.Connection.Id);
                 }
                 catch (OperationCanceledException)
                 {
-                    _logger.Debug("Code has been cancelled by IPC#{0}", processor.Connection.Id);
+                    _logger?.LogDebug("Code has been cancelled by IPC#{0}", processor.Connection.Id);
                     throw;
                 }
             }

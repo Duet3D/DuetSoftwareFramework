@@ -1,10 +1,4 @@
-﻿using System.IO;
-using System.Text.Json;
-using System.Threading.Tasks;
-using DuetAPI.ObjectModel;
-using NUnit.Framework;
-
-namespace UnitTests.File
+﻿namespace UnitTests.File
 {
     // DISABLED: InfoParser class no longer exists - needs refactoring
     /*

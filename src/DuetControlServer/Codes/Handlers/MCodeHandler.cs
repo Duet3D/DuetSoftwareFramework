@@ -11,7 +11,6 @@ using DuetControlServer.Utility;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using NLog.Config;
 using System;
 using System.IO;
 using System.Linq;
@@ -52,9 +51,11 @@ public class MCodeHandler(
     MQTT mqtt,
     JobProcessor jobProcessor,
     ILogger<MCodeHandler> logger,
+    ILoggerFactory loggerFactory,
     IHostApplicationLifetime lifetime,
     IOptions<Settings> settings) : ICodeHandler
 {
+    private MessageLoggerProvider? _messageLoggerProvider;
     /// <summary>
     /// Process an M-code that should be interpreted by the control server
     /// </summary>
@@ -590,7 +591,7 @@ public class MCodeHandler(
 
             // Set Debug Level
             // We only support some options for M111 P-1:
-            // - S"<level>" sets the log level where the level corresponds to the available NLog log levels
+            // - S"<level>" sets the log level where the level corresponds to the available log levels (Trace, Debug, Information, Warning, Error, Critical)
             // - Onnn can be used to turn on/off logging via generic messages (accessible then e.g. via web UI)
             case 111:
                 {
@@ -601,36 +602,44 @@ public class MCodeHandler(
                             bool seen = false;
                             if (code.TryGetString('S', out string? levelString))
                             {
-                                NLog.LogLevel level = NLog.LogLevel.FromString(levelString);
-                                foreach (LoggingRule? rule in NLog.LogManager.Configuration?.LoggingRules ?? [])
+                                // Parse the log level
+                                if (Enum.TryParse<LogLevel>(levelString, true, out LogLevel level))
                                 {
-                                    rule?.SetLoggingLevels(level, NLog.LogLevel.Fatal);
+                                    settings.Value.LogLevel = level;
+                                    // Note: Changing log level at runtime requires restarting DCS or using a configuration reload mechanism
+                                    logger.LogInformation("Log level changed to {0}. Some changes may require a restart to take effect.", level);
+                                    seen = true;
                                 }
-                                settings.Value.LogLevel = level;
-                                seen = true;
+                                else
+                                {
+                                    return new Message(MessageType.Error, $"Invalid log level: {levelString}. Valid levels are: Trace, Debug, Information, Warning, Error, Critical");
+                                }
                             }
                             if (code.TryGetBool('O', out bool oParam))
                             {
                                 if (oParam)
                                 {
-                                    if (NLog.LogManager.Configuration?.FindTargetByName("MessageLogTarget") == null)
+                                    if (_messageLoggerProvider == null)
                                     {
-                                        // Only add this target once and don't allow higher log level than debug, else we may get recursion
-                                        MessageLogTarget logTarget = new(model);
-                                        NLog.LogManager.Configuration?.AddTarget("MessageLogTarget", logTarget);
-                                        NLog.LogManager.Configuration?.AddRule(settings.Value.LogLevel > NLog.LogLevel.Trace ? settings.Value.LogLevel : NLog.LogLevel.Debug, NLog.LogLevel.Fatal, logTarget);
+                                        // Only add this provider once and don't allow higher log level than debug, else we may get recursion
+                                        LogLevel minimumLevel = settings.Value.LogLevel > LogLevel.Trace ? settings.Value.LogLevel : LogLevel.Debug;
+                                        _messageLoggerProvider = new MessageLoggerProvider(model, minimumLevel);
+                                        loggerFactory.AddProvider(_messageLoggerProvider);
                                     }
                                 }
                                 else
                                 {
-                                    NLog.LogManager.Configuration?.RemoveTarget("MessageLogTarget");
+                                    if (_messageLoggerProvider != null)
+                                    {
+                                        _messageLoggerProvider.Dispose();
+                                        _messageLoggerProvider = null;
+                                    }
                                 }
                                 seen = true;
                             }
 
                             if (seen)
                             {
-                                NLog.LogManager.ReconfigExistingLoggers();
                                 return new Message();
                             }
                             return new Message(MessageType.Success, $"Current DCS log level: {settings.Value.LogLevel}");

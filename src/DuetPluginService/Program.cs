@@ -29,7 +29,8 @@ rootCommand.SetAction((parserResult) =>
                 .AddJsonFile(configValue, optional: true)
                 .AddCommandLine([.. parserResult.UnmatchedTokens]);
         })
-        .ConfigureServices((context, services) => services
+        .ConfigureServices((context, services) =>
+            services
                 .Configure<Settings>(context.Configuration)
                 .AddSingleton<CommandFactory>()
                 .AddSingleton<IPermissionManager, AppArmorPermissionManager>()
@@ -37,7 +38,7 @@ rootCommand.SetAction((parserResult) =>
                 .AddHostedService<PluginService>()
                 .AddSingleton<PluginServiceConnection>()
                 .AddHostedService<CommandService>()
-            )
+        )
         .Build()
         .Run();
 });

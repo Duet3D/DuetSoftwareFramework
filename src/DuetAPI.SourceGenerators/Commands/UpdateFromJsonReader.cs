@@ -356,7 +356,7 @@ internal static class UpdateFromJsonReader
                             writer.Indent++;
                             writer.WriteLine($"{prop.Identifier.ValueText} = System.Text.Encoding.UTF8.GetString(reader.ValueSpan.ToArray());");
                             writer.WriteLineNoTabs("#if VERIFY_OBJECT_MODEL");
-                            writer.WriteLine($"Console.WriteLine($\"[warn] Unsupported token type {{reader.TokenType}} for property {jsonPropertyName} in {cls}\");");
+                            writer.WriteLine($"Console.WriteLine($\"[\\x1b[33mwarn\\x1b[0m] Unsupported token type {{reader.TokenType}} for property {jsonPropertyName} in {cls}\");");
                             writer.WriteLineNoTabs("#endif");
                             writer.Indent--;
                             writer.WriteLine("}");
@@ -413,7 +413,7 @@ internal static class UpdateFromJsonReader
                     else
                     {{
                         JsonElement jsonProperty = JsonDocument.ParseValue(ref reader).RootElement;
-                        Console.WriteLine(""[warn] Missing property {{0}} = {{1}} in {cls}"", propertyName, jsonProperty.GetRawText());
+                        Console.WriteLine(""[\x1b[33mwarn\x1b[0m] Missing property {{0}} = {{1}} in {cls}"", propertyName, jsonProperty.GetRawText());
                     }}
 #else
                     reader.Skip();

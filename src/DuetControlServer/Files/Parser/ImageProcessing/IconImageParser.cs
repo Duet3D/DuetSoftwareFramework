@@ -1,5 +1,6 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
 using System.Text;
@@ -19,7 +20,15 @@ public static class IconImageParser
     /// <summary>
     /// Logger instance
     /// </summary>
-    private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+    private static ILogger? _logger;
+
+    /// <summary>
+    /// Set the logger (called during initialization)
+    /// </summary>
+    public static void SetLogger(ILogger<FileInfoParser> logger)
+    {
+        _logger = logger;
+    }
 
     /// <summary>
     /// Try to extract thumbnails from a given file
@@ -33,7 +42,7 @@ public static class IconImageParser
     /// <returns>Asynchronous task</returns>
     public static async ValueTask ProcessAsync(Stream stream, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, Code code, bool readThumbnailContent, CancellationToken cancellationToken)
     {
-        _logger.Info($"Processing Image {parsedFileInfo.FileName}");
+        _logger?.LogInformation($"Processing Image {parsedFileInfo.FileName}");
         bool offsetAdjusted = false;
         long offset = codeParserBuffer.GetPosition(stream);
         code.Reset();
@@ -76,7 +85,7 @@ public static class IconImageParser
                     ThumbnailInfo thumbnail = ReadImage(imageBuffer.ToString(), readThumbnailContent);
                     thumbnail.Offset = offset;
                     parsedFileInfo.Thumbnails.Add(thumbnail);
-                    _logger.Error("Icon Thumbnails Found");
+                    _logger?.LogInformation("Icon Thumbnails Found");
                 }
                 catch
                 {
@@ -99,7 +108,7 @@ public static class IconImageParser
 
         using MemoryStream ms = new(Convert.FromBase64String(finalString));
         using MemoryStream bitmapSource = new();
-        _logger.Debug("Encoding Image");
+        _logger?.LogDebug("Encoding Image");
         try
         {
             using Image image = BinaryToImage(ms, out int width, out int height);
@@ -110,7 +119,7 @@ public static class IconImageParser
                 image.Save(memoryStream, PngFormat.Instance);
                 memoryStream.TryGetBuffer(out ArraySegment<byte> buffer);
                 data = Convert.ToBase64String(buffer.Array!, 0, (int)memoryStream.Length);
-                _logger.Debug(data);
+                _logger?.LogDebug(data);
             }
 
             return new()
@@ -125,7 +134,7 @@ public static class IconImageParser
         catch (Exception ex)
         {
             var imageProcessingException = new ImageProcessingException("Error processing Icon image", ex);
-            _logger.Error(imageProcessingException);
+            _logger?.LogError(imageProcessingException, "Error processing Icon image");
             throw imageProcessingException;
         }
     }

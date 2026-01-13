@@ -1,9 +1,7 @@
 ﻿using DuetAPI.Connection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using NLog;
-using NLog.Config;
-using NLog.Targets;
+using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Encodings.Web;
@@ -83,7 +81,7 @@ public sealed class Settings
     /// <summary>
     /// Minimum log level for console output
     /// </summary>
-    public LogLevel LogLevel { get; set; } = LogLevel.Info;
+    public LogLevel LogLevel { get; set; } = LogLevel.Information;
 
     /// <summary>
     /// Directory in which DSF-related UNIX sockets reside
@@ -373,29 +371,6 @@ public sealed class Settings
             // Save default settings to the config file
             SaveToFile(ConfigFile);
         }
-
-        // Initialize logging
-        LoggingConfiguration logConfig = new();
-        ColoredConsoleTarget logConsoleTarget = new()
-        {
-            // Create a layout for messages like:
-            // [trace] Really verbose stuff
-            // [debug] Verbose debugging stuff
-            // [info] This is a regular log message
-            // [warning] Something not too nice
-            // [error] IPC#3: This is an IPC error message
-            //         System.Exception: Foobar
-            //         at { ... }
-            // [error] That is some other error message
-            //         System.Exception: Yada yada
-            //         at { ... }
-            // [fatal] System.Exception: Blah blah
-            //         at { ... }
-            Layout = @"[${level:lowercase=true}] ${when:when=!contains('${logger}','.') and !ends-with('${logger}','.g'):inner=${logger}${literal:text=\:} }${message}${onexception:when='${message}'!='${exception:format=ToString}'):${newline}   ${exception:format=ToString}}"
-        };
-        logConfig.AddRule(LogLevel, LogLevel.Fatal, logConsoleTarget);
-        LogManager.AutoShutdown = false;
-        LogManager.Configuration = logConfig;
     }
 
     /// <summary>
@@ -436,12 +411,40 @@ public static class ServiceCollectionExtensions
         out string startErrorFile)
     {
         startErrorFile = configuration.GetValue(nameof(Settings.StartErrorFile), Defaults.StartErrorFile);
+        
+        // Get log level string and convert it manually
+        string logLevelString = configuration.GetValue<string>("LogLevel") ?? "Information";
+        LogLevel parsedLogLevel = logLevelString.ToLowerInvariant() switch
+        {
+            "trace" => LogLevel.Trace,
+            "debug" => LogLevel.Debug,
+            "info" or "information" => LogLevel.Information,
+            "warn" or "warning" => LogLevel.Warning,
+            "error" => LogLevel.Error,
+            "fatal" or "critical" => LogLevel.Critical,
+            "off" or "none" => LogLevel.None,
+            _ => LogLevel.Information
+        };
+        
+        // Create a memory configuration source that excludes LogLevel
+        var configData = new Dictionary<string, string?>();
+        foreach (var kvp in configuration.AsEnumerable())
+        {
+            if (kvp.Key != "LogLevel" && kvp.Value != null)
+            {
+                configData[kvp.Key] = kvp.Value;
+            }
+        }
+        var filteredConfig = new ConfigurationBuilder()
+            .AddInMemoryCollection(configData)
+            .Build();
+        
         return services
-            .Configure<Settings>(configuration)
+            .Configure<Settings>(filteredConfig)
             .PostConfigure<Settings>(settings =>
             {
                 settings.UpdateOnly = updateOnly;
-                if (logLevel != null) settings.LogLevel = logLevel;
+                settings.LogLevel = logLevel ?? parsedLogLevel;
                 if (configFile != null) settings.ConfigFile = configFile.FullName;
                 if (socketDirectory != null) settings.SocketDirectory = socketDirectory.FullName;
                 if (socketFile != null) settings.SocketFile = socketFile;

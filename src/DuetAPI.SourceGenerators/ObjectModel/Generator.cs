@@ -238,7 +238,7 @@ public partial class ObjectModel
         if (key != ""seqs"")
         {{
             // Failed to find a property
-            Console.WriteLine(""[warn] Missing property {{0}} = {{1}} in ObjectModel"", key, jsonElement.GetRawText());
+            Console.WriteLine(""[\x1b[33mwarn\x1b[0m] Missing property {{0}} = {{1}} in ObjectModel"", key, jsonElement.GetRawText());
         }}
 #endif
         return false;

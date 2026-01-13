@@ -1,8 +1,4 @@
-﻿using DuetAPI;
-using NUnit.Framework;
-using System.Threading.Tasks;
-
-namespace UnitTests.Machine
+﻿namespace UnitTests.Machine
 {
     // DISABLED: These tests require extensive dependency injection setup
     // 

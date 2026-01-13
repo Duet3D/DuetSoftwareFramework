@@ -2,7 +2,6 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 using DuetAPI.ObjectModel;
-using DuetAPI.Utility;
 using DuetControlServer.Link.Protocol;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link.Protocol.SbcRequests;

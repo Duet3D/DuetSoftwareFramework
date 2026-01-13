@@ -1,7 +1,5 @@
 using DuetControlServer.Model;
 using NUnit.Framework;
-using System.Collections;
-using System.Collections.Generic;
 
 namespace UnitTests.Machine
 {

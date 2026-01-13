@@ -233,13 +233,12 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
                 {
                     try
                     {
-                        _logger.Debug("Trying to create symlink {0} -> {1}", pluginWwwPath, installWwwPath);
-                        LinuxApi.Commands.Symlink(pluginWwwPath, installWwwPath);
+                        logger.LogDebug("Trying to create symlink {0} -> {1}", pluginWwwPath, installWwwPath);
+                        File.CreateSymbolicLink(installWwwPath, pluginWwwPath);
                     }
                     catch (IOException e)
                     {
-                        _logger.Debug(e);
-                        _logger.Warn("Failed to create symlink to web directory, trying to copy web file instead...");
+                        logger.LogWarning(e, "Failed to create symlink to web directory, trying to copy web file instead...");
                         File.Copy(pluginWwwPath, installWwwPath);
                     }
                 }
