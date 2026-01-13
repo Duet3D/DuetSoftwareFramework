@@ -170,17 +170,25 @@ rootCommand.SetAction((parserResult) =>
                     Terminate(e, $"Failed to initialize settings: {e.Message}", ExitCode.Usage, loggerFactory);
                 }
             })
-            .ConfigureServices((context, services) => services
-                .AddSettings(context.Configuration, updateOnlyValue, logLevelValue, configFileValue, socketDirectoryValue, socketFileValue, baseDirectoryValue, out startErrorFile)
-                .AddCodes()
-                .AddCommands()
-                .AddFiles()
-                .AddIPC()
-                .AddLink()
-                .AddModel()
-                .AddSPILink()
-                .AddUtility()
-            )
+            .ConfigureServices((context, services) =>
+            {
+                // Ensure systemd console logging uses our custom formatter (must be after UseSystemd)
+                services.Configure<Microsoft.Extensions.Logging.Console.ConsoleLoggerOptions>(options =>
+                {
+                    options.FormatterName = nameof(CommonLogFormatter);
+                });
+
+                services
+                    .AddSettings(context.Configuration, updateOnlyValue, logLevelValue, configFileValue, socketDirectoryValue, socketFileValue, baseDirectoryValue, out startErrorFile)
+                    .AddCodes()
+                    .AddCommands()
+                    .AddFiles()
+                    .AddIPC()
+                    .AddLink()
+                    .AddModel()
+                    .AddSPILink()
+                    .AddUtility();
+            })
             .Build();
         
         // Capture logger factory for error logging
