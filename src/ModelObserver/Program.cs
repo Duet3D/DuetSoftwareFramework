@@ -42,4 +42,4 @@ rootCommand.SetAction((parserResult, token) => {
     return Commands.MainAsync(socketPathValue, quietValue, filterValue, confirmValue, token);
 });
 
-return new CommandLineConfiguration(rootCommand).Invoke(args);
+rootCommand.Parse(args).Invoke();

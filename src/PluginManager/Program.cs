@@ -195,4 +195,4 @@ rootCommand.SetAction((parseResult) =>
     return 1;
 });
 
-return new CommandLineConfiguration(rootCommand).Invoke(args);
+return rootCommand.Parse(args).Invoke();

@@ -1,7 +1,7 @@
 <Project>
 	<PropertyGroup>
 		<Nullable>enable</Nullable>
-		<LangVersion>12</LangVersion>
+		<LangVersion>14</LangVersion>
 		<Version>3.7.0-alpha.1</Version>
 		<Authors>Christian Hammacher</Authors>
 		<Company>Duet3D Ltd</Company>
