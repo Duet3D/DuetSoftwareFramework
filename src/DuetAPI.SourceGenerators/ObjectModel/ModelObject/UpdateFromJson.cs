@@ -18,11 +18,11 @@ internal static class UpdateFromJson
     /// <summary>
     /// Generate the UpdateFromJson method for a given ModelObject class
     /// </summary>
-    /// <param name="context">Generator context</param>
+    /// <param name="context">Source production context</param>
     /// <param name="receiver">Syntax receiver</param>
     /// <param name="cls">Class name</param>
     /// <returns>Generated method</returns>
-    public static SourceText Generate(GeneratorExecutionContext context, SourceGeneratorSyntaxReceiver receiver, string cls)
+    public static SourceText Generate(SourceProductionContext context, SourceGeneratorSyntaxReceiver receiver, string cls)
     {
         List<PropertyDeclarationSyntax> properties = receiver.ModelObjectMembers[cls];
         List<MethodDeclarationSyntax> methods = receiver.ModelObjectMethods[cls];

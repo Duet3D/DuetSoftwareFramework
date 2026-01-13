@@ -11,25 +11,24 @@ internal static class Generator
     /// <summary>
     /// Function to generate the additional ObjectModel source file
     /// </summary>
-    /// <param name="context">Generator context</param>
-    public static void Execute(GeneratorExecutionContext context)
+    /// <param name="context">Source production context</param>
+    /// <param name="receiver">Syntax receiver</param>
+    public static void Execute(SourceProductionContext context, SourceGeneratorSyntaxReceiver receiver)
     {
-        if (context.SyntaxReceiver is SourceGeneratorSyntaxReceiver receiver)
+        foreach (string cls in receiver.ModelObjectMembers.Keys)
         {
-            foreach (string cls in receiver.ModelObjectMembers.Keys)
+            if (cls == "ObjectModel")
             {
-                if (cls == "ObjectModel")
-                {
-                    // This one has its own generator
-                    continue;
-                }
-                if (receiver.IncompleteModelObjectClasses.TryGetValue(cls, out Location? location))
-                {
-                    context.ReportDiagnostic(Diagnostic.Create(Descriptors.IncompleteModelObjectClass, location, cls));
-                    continue;
-                }
+                // This one has its own generator
+                continue;
+            }
+            if (receiver.IncompleteModelObjectClasses.TryGetValue(cls, out Location? location))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(Descriptors.IncompleteModelObjectClass, location, cls));
+                continue;
+            }
 
-                SourceText sourceText = SourceText.From($@"using System;
+            SourceText sourceText = SourceText.From($@"using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -46,19 +45,18 @@ public partial class {cls}
     {GenerateMethods(context, receiver, cls)}
 }}", Encoding.UTF8);
 
-                context.AddSource($"{cls}.g.cs", sourceText);
-            }
+            context.AddSource($"{cls}.g.cs", sourceText);
         }
     }
 
     /// <summary>
     /// Generate ModelObject methods
     /// </summary>
-    /// <param name="context">Generator context</param>
+    /// <param name="context">Source production context</param>
     /// <param name="receiver">Syntax receiver</param>
     /// <param name="cls">Class name</param>
     /// <returns>Generated methods</returns>
-    public static string GenerateMethods(GeneratorExecutionContext context, SourceGeneratorSyntaxReceiver receiver, string cls)
+    public static string GenerateMethods(SourceProductionContext context, SourceGeneratorSyntaxReceiver receiver, string cls)
     {
         using StringWriter stringWriter = new();
         using IndentedTextWriter writer = new(stringWriter)

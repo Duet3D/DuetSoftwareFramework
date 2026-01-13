@@ -13,10 +13,11 @@ internal static class Generator
     /// <summary>
     /// Function to generate the additional ObjectModel source file
     /// </summary>
-    /// <param name="context">Generator context</param>
-    public static void Execute(GeneratorExecutionContext context)
+    /// <param name="context">Source production context</param>
+    /// <param name="receiver">Syntax receiver</param>
+    public static void Execute(SourceProductionContext context, SourceGeneratorSyntaxReceiver receiver)
     {
-        if (context.SyntaxReceiver is SourceGeneratorSyntaxReceiver receiver && receiver.ModelObjectMembers.TryGetValue("ObjectModel", out List<PropertyDeclarationSyntax> properties))
+        if (receiver.ModelObjectMembers.TryGetValue("ObjectModel", out List<PropertyDeclarationSyntax> properties))
         {
             string GeneratePropertyUpdateCalls()
             {
