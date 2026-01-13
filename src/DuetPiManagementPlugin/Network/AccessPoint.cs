@@ -132,14 +132,9 @@ namespace DuetPiManagementPlugin.Network
                     await using FileStream hostapdConfigStream = new("/etc/hostapd/wlan0.conf", FileMode.Create, FileAccess.Write);
                     await using StreamWriter writer = new(hostapdConfigStream);
 
-                    while (!reader.EndOfStream)
+                    string? line;
+                    while ((line = await reader.ReadLineAsync()) is not null)
                     {
-                        string? line = await reader.ReadLineAsync();
-                        if (line is null)
-                        {
-                            break;
-                        }
-
                         line = line.Replace("{ssid}", ssid);
                         line = line.Replace("{psk}", psk);
                         line = line.Replace("{channel}", channel.ToString());
@@ -159,14 +154,9 @@ namespace DuetPiManagementPlugin.Network
                     string ipRangeStart = $"{ip[0]}.{ip[1]}.{ip[2]}.{((ip[3] < 100 || ip[3] > 150) ? 100 : 151)}";
                     string ipRangeEnd = $"{ip[0]}.{ip[1]}.{ip[2]}.{((ip[3] < 100 || ip[3] > 150) ? 150 : 200)}";
 
-                    while (!reader.EndOfStream)
+                    string? line;
+                    while ((line = await reader.ReadLineAsync()) is not null)
                     {
-                        string? line = await reader.ReadLineAsync();
-                        if (line is null)
-                        {
-                            break;
-                        }
-
                         line = line.Replace("{ipRangeStart}", ipRangeStart);
                         line = line.Replace("{ipRangeEnd}", ipRangeEnd);
                         line = line.Replace("{ipAddress}", ipAddress.ToString());

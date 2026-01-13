@@ -65,14 +65,10 @@ public sealed class StartPlugins(CodeFactory codeFactory,
             {
                 await using FileStream fileStream = new(settings.Value.PluginsFilename, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
                 using StreamReader reader = new(fileStream, Encoding.UTF8, false, settings.Value.FileBufferSize);
-                while (!reader.EndOfStream)
-                {
-                    string? pluginName = await reader.ReadLineAsync(cancellationToken);
-                    if (pluginName is null)
-                    {
-                        break;
-                    }
 
+                string? pluginName;
+                while ((pluginName = await reader.ReadLineAsync(cancellationToken)) is not null)
+                {
                     try
                     {
                         StartPlugin startCommand = commandFactory.Create<StartPlugin>();

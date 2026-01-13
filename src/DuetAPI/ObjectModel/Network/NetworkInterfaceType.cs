@@ -5,6 +5,7 @@ namespace DuetAPI.ObjectModel;
 /// <summary>
 /// Supported types of network interfaces
 /// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter<NetworkInterfaceType>))]
 public enum NetworkInterfaceType
 {
     /// <summary>

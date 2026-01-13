@@ -148,14 +148,9 @@ namespace DuetPiManagementPlugin.Network.Protocols
                 await using FileStream configStream = new("/opt/dsf/conf/http.json", FileMode.Create, FileAccess.Write);
                 await using StreamWriter writer = new(configStream);
 
-                while (!reader.EndOfStream)
+                string? line;
+                while ((line = await reader.ReadLineAsync()) is not null)
                 {
-                    string? line = await reader.ReadLineAsync();
-                    if (line is null)
-                    {
-                        break;
-                    }
-
                     line = line.Replace("{httpPort}", _httpPort.ToString());
                     line = line.Replace("{httpsPort}", _httpsPort.ToString());
                     await writer.WriteLineAsync(line);

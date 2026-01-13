@@ -8,7 +8,6 @@ using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Link.Protocol.SbcRequests;
 using DuetControlServer.Link.Protocol.Shared;
-using Code = DuetControlServer.Commands.Code;
 using CodeFlags = DuetControlServer.Link.Protocol.SbcRequests.CodeFlags;
 using CodeParameter = DuetControlServer.Link.Protocol.SbcRequests.CodeParameter;
 
@@ -62,7 +61,7 @@ public static class Writer
     /// <param name="protocolVersion">Protocol version</param>
     /// <returns>Number of bytes written</returns>
     /// <exception cref="ArgumentException">Unsupported data type</exception>
-    public static int WriteCode(Span<byte> to, Code code, int protocolVersion)
+    public static int WriteCode(Span<byte> to, DuetAPI.Commands.Code code, int protocolVersion)
     {
         int bytesWritten = 0;
 

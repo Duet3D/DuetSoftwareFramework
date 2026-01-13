@@ -58,14 +58,10 @@ namespace DuetPiManagementPlugin.Network.Protocols
                 bool sshEnabled = true, sftpEnabled = false;
                 await using FileStream sshdConfig = new("/etc/ssh/sshd_config", FileMode.Open, FileAccess.Read);
                 using StreamReader reader = new(sshdConfig);
-                while (!reader.EndOfStream)
-                {
-                    string? line = await reader.ReadLineAsync();
-                    if (line == null)
-                    {
-                        break;
-                    }
 
+                string? line;
+                while ((line = await reader.ReadLineAsync()) is not null)
+                {
                     Match match = _portRegex.Match(line);
                     if (match.Success)
                     {
@@ -160,14 +156,10 @@ namespace DuetPiManagementPlugin.Network.Protocols
 
                     // Read the old config line by line and modify it as needed
                     bool portWritten = false, sshDisabled = false, sftpEnabled = false;
-                    while (!reader.EndOfStream)
-                    {
-                        string? line = await reader.ReadLineAsync();
-                        if (line is null)
-                        {
-                            break;
-                        }
 
+                    string? line;
+                    while ((line = await reader.ReadLineAsync()) is not null)
+                    {
                         if (_genericPortRegex.IsMatch(line))
                         {
                             if (portChanged)

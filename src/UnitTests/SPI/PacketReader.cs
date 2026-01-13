@@ -3,6 +3,9 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using DuetAPI;
+using DuetControlServer.Link.Protocol;
+using DuetControlServer.Link.Protocol.FirmwareRequests;
+using DuetControlServer.Link.Protocol.Shared;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 
@@ -222,7 +225,7 @@ namespace UnitTests.SPI
         {
             FileStream stream = new(Path.Combine(Directory.GetCurrentDirectory(), "../../../SPI/Blobs", filename), FileMode.Open, FileAccess.Read);
             Span<byte> content = new byte[stream.Length];
-            stream.Read(content);
+            stream.ReadExactly(content);
             stream.Close();
             return content;
         }

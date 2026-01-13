@@ -6,6 +6,16 @@
 public partial class Move : ModelObject, IStaticModelObject
 {
     /// <summary>
+    /// Value of the M201 T parameter. Only present in builds that support S-curve acceleration
+    /// </summary>
+    public float? AccelerationTime
+    {
+        get => _accelerationTime;
+        set => SetPropertyValue(ref _accelerationTime, value);
+    }
+    private float? _accelerationTime;
+
+    /// <summary>
     /// List of the configured axes
     /// </summary>
     /// <seealso cref="Axis"/>

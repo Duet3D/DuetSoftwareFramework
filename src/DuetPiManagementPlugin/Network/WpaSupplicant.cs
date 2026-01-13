@@ -60,15 +60,9 @@ namespace DuetPiManagementPlugin.Network
                 using StreamReader reader = new(configStream);
 
                 bool inNetworkSection = false;
-                string? ssid = null;
-                while (!reader.EndOfStream)
+                string? ssid = null, line;
+                while ((line = await reader.ReadLineAsync()) is not null)
                 {
-                    string? line = await reader.ReadLineAsync();
-                    if (line == null)
-                    {
-                        break;
-                    }
-
                     string trimmedLine = line.Trim();
                     if (inNetworkSection)
                     {
@@ -162,14 +156,9 @@ namespace DuetPiManagementPlugin.Network
                 await using FileStream configStream = new("/etc/wpa_supplicant/wpa_supplicant.conf", FileMode.Open, FileAccess.Read);
                 using StreamReader reader = new(configStream);
 
-                while (!reader.EndOfStream)
+                string? line;
+                while ((line = await reader.ReadLineAsync()) is not null)
                 {
-                    string? line = await reader.ReadLineAsync();
-                    if (line == null)
-                    {
-                        break;
-                    }
-
                     string trimmedLine = line.Trim();
                     if (trimmedLine.StartsWith("country="))
                     {
@@ -219,14 +208,9 @@ namespace DuetPiManagementPlugin.Network
                     string? parsedSsid = null;
                     bool networkUpdated = false;
 
-                    while (!reader.EndOfStream)
+                    string? line;
+                    while ((line = await reader.ReadLineAsync()) is not null)
                     {
-                        string? line = await reader.ReadLineAsync();
-                        if (line == null)
-                        {
-                            break;
-                        }
-
                         string trimmedLine = line.TrimStart();
                         if (trimmedLine.StartsWith("country=") && !countrySeen)
                         {

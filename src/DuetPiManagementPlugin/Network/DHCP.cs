@@ -128,16 +128,11 @@ namespace DuetPiManagementPlugin.Network
             {
                 await using FileStream configStream = new("/etc/dhcpcd.conf", FileMode.Open, FileAccess.Read);
                 using StreamReader reader = new(configStream);
-
                 IPConfig? item = null;
-                while (!reader.EndOfStream)
-                {
-                    string? line = await reader.ReadLineAsync();
-                    if (line is null)
-                    {
-                        break;
-                    }
 
+                string? line;
+                while ((line = await reader.ReadLineAsync()) is not null)
+                {
                     Match match = _ifaceRegex.Match(line);
                     if (match.Success)
                     {
@@ -273,14 +268,8 @@ namespace DuetPiManagementPlugin.Network
                 // Rewrite the config line by line
                 bool lastLineEmpty = true, profileWritten = false;
                 string? line = null, currentInterface = null;
-                while (!reader.EndOfStream)
+                while ((line = await reader.ReadLineAsync()) is not null)
                 {
-                    line = await reader.ReadLineAsync();
-                    if (line is null)
-                    {
-                        break;
-                    }
-
                     // Is this the first line of a new profile?
                     Match match = _ifaceRegex.Match(line);
                     if (match.Success)

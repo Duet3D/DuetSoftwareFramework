@@ -2,9 +2,12 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 using DuetAPI.ObjectModel;
+using DuetAPI.Utility;
+using DuetControlServer.Link.Protocol;
+using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Link.Protocol.SbcRequests;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
-using Code = DuetControlServer.Commands.Code;
 using CodeFlags = DuetControlServer.Link.Protocol.SbcRequests.CodeFlags;
 
 namespace UnitTests.SPI
@@ -59,13 +62,13 @@ namespace UnitTests.SPI
         {
             Span<byte> span = new byte[128];
 
-            Code code = new("G53 G10")
+            var code = new DuetAPI.Commands.Code("G53 G10")
             {
                 Channel = DuetAPI.CodeChannel.HTTP
             };
 
-            int bytesWritten = Writer.WriteCode(span, code);
-            ClassicAssert.AreEqual(16, bytesWritten);
+            int bytesWritten = Writer.WriteCode(span, code, Consts.ProtocolVersion);
+            ClassicAssert.AreEqual(20, bytesWritten);
 
             // Header
             ClassicAssert.AreEqual((byte)DuetAPI.CodeChannel.HTTP, span[0]);
@@ -80,6 +83,10 @@ namespace UnitTests.SPI
             uint filePosition = MemoryMarshal.Read<uint>(span.Slice(12, 4));
             ClassicAssert.AreEqual(0xFFFFFFFF, filePosition);
 
+            // Line number (protocol v2+)
+            int lineNumber = MemoryMarshal.Read<int>(span.Slice(16, 4));
+            ClassicAssert.AreEqual(0, lineNumber);
+
             // No padding
         }
 
@@ -89,13 +96,13 @@ namespace UnitTests.SPI
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
 
-            Code code = new("G1 X4 Y23.5 Z12.2 J\"testok\" E12:3.45:5.67")
+            var code = new DuetAPI.Commands.Code("G1 X4 Y23.5 Z12.2 J\"testok\" E12:3.45:5.67")
             {
                 Channel = DuetAPI.CodeChannel.File
             };
 
-            int bytesWritten = Writer.WriteCode(span, code);
-            ClassicAssert.AreEqual(76, bytesWritten);
+            int bytesWritten = Writer.WriteCode(span, code, Consts.ProtocolVersion);
+            ClassicAssert.AreEqual(80, bytesWritten);
 
             // Header
             ClassicAssert.AreEqual((byte)DuetAPI.CodeChannel.File, span[0]);
@@ -109,48 +116,52 @@ namespace UnitTests.SPI
             uint filePosition = MemoryMarshal.Read<uint>(span.Slice(12, 4));
             ClassicAssert.AreEqual(0xFFFFFFFF, filePosition);
 
+            // Line number (protocol v2+)
+            int lineNumber = MemoryMarshal.Read<int>(span.Slice(16, 4));
+            ClassicAssert.AreEqual(0, lineNumber);
+
             // First parameter (X4)
-            ClassicAssert.AreEqual((byte)'X', span[16]);
-            ClassicAssert.AreEqual((byte)DataType.Int, span[17]);
-            int intValue = MemoryMarshal.Read<int>(span.Slice(20, 4));
+            ClassicAssert.AreEqual((byte)'X', span[20]);
+            ClassicAssert.AreEqual((byte)DataType.Int, span[21]);
+            int intValue = MemoryMarshal.Read<int>(span.Slice(24, 4));
             ClassicAssert.AreEqual(4, intValue);
 
             // Second parameter (Y23.5)
-            ClassicAssert.AreEqual((byte)'Y', span[24]);
-            ClassicAssert.AreEqual((byte)DataType.Float, span[25]);
-            float floatValue = MemoryMarshal.Read<float>(span.Slice(28, 4));
+            ClassicAssert.AreEqual((byte)'Y', span[28]);
+            ClassicAssert.AreEqual((byte)DataType.Float, span[29]);
+            float floatValue = MemoryMarshal.Read<float>(span.Slice(32, 4));
             ClassicAssert.AreEqual(23.5, floatValue, 0.00001);
 
             // Third parameter (Z12.2)
-            ClassicAssert.AreEqual((byte)'Z', span[32]);
-            ClassicAssert.AreEqual((byte)DataType.Float, span[33]);
-            floatValue = MemoryMarshal.Read<float>(span.Slice(36, 4));
+            ClassicAssert.AreEqual((byte)'Z', span[36]);
+            ClassicAssert.AreEqual((byte)DataType.Float, span[37]);
+            floatValue = MemoryMarshal.Read<float>(span.Slice(40, 4));
             ClassicAssert.AreEqual(12.2, floatValue, 0.00001);
 
             // Fourth parameter (J"testok")
-            ClassicAssert.AreEqual((byte)'J', span[40]);
-            ClassicAssert.AreEqual((byte)DataType.String, span[41]);
-            intValue = MemoryMarshal.Read<int>(span.Slice(44, 4));
+            ClassicAssert.AreEqual((byte)'J', span[44]);
+            ClassicAssert.AreEqual((byte)DataType.String, span[45]);
+            intValue = MemoryMarshal.Read<int>(span.Slice(48, 4));
             ClassicAssert.AreEqual(6, intValue);
 
             // Fifth parameter (E12:3.45:5.67)
-            ClassicAssert.AreEqual((byte)'E', span[48]);
-            ClassicAssert.AreEqual((byte)DataType.FloatArray, span[49]);
-            intValue = MemoryMarshal.Read<int>(span.Slice(52, 4));
+            ClassicAssert.AreEqual((byte)'E', span[52]);
+            ClassicAssert.AreEqual((byte)DataType.FloatArray, span[53]);
+            intValue = MemoryMarshal.Read<int>(span.Slice(56, 4));
             ClassicAssert.AreEqual(3, intValue);
 
             // Payload of fourth parameter ("test")
-            string stringValue = Encoding.UTF8.GetString(span.Slice(56, 6));
+            string stringValue = Encoding.UTF8.GetString(span.Slice(60, 6));
             ClassicAssert.AreEqual("testok", stringValue);
-            ClassicAssert.AreEqual(0, span[62]);
-            ClassicAssert.AreEqual(0, span[63]);
+            ClassicAssert.AreEqual(0, span[66]);
+            ClassicAssert.AreEqual(0, span[67]);
 
             // Payload of fifth parameter (12:3.45:5.67)
-            floatValue = MemoryMarshal.Read<float>(span.Slice(64, 4));
-            ClassicAssert.AreEqual(12, floatValue, 0.00001);
             floatValue = MemoryMarshal.Read<float>(span.Slice(68, 4));
-            ClassicAssert.AreEqual(3.45, floatValue, 0.00001);
+            ClassicAssert.AreEqual(12, floatValue, 0.00001);
             floatValue = MemoryMarshal.Read<float>(span.Slice(72, 4));
+            ClassicAssert.AreEqual(3.45, floatValue, 0.00001);
+            floatValue = MemoryMarshal.Read<float>(span.Slice(76, 4));
             ClassicAssert.AreEqual(5.67, floatValue, 0.00001);
         }
 
@@ -160,13 +171,13 @@ namespace UnitTests.SPI
             Span<byte> span = new byte[128];
             span.Fill(0xFF);
 
-            Code code = new("; Hello world")
+            var code = new DuetAPI.Commands.Code("; Hello world")
             {
                 Channel = DuetAPI.CodeChannel.Telnet
             };
 
-            int bytesWritten = Writer.WriteCode(span, code);
-            ClassicAssert.AreEqual(36, bytesWritten);
+            int bytesWritten = Writer.WriteCode(span, code, Consts.ProtocolVersion);
+            ClassicAssert.AreEqual(40, bytesWritten);
 
             // Header
             ClassicAssert.AreEqual((byte)DuetAPI.CodeChannel.Telnet, span[0]);
@@ -180,16 +191,20 @@ namespace UnitTests.SPI
             uint filePosition = MemoryMarshal.Read<uint>(span.Slice(12, 4));
             ClassicAssert.AreEqual(0xFFFFFFFF, filePosition);
 
+            // Line number (protocol v2+)
+            int lineNumber = MemoryMarshal.Read<int>(span.Slice(16, 4));
+            ClassicAssert.AreEqual(0, lineNumber);
+
             // Comment parameter
-            ClassicAssert.AreEqual((byte)'@', span[16]);
-            ClassicAssert.AreEqual((byte)DataType.String, span[17]);
-            int intValue = MemoryMarshal.Read<int>(span.Slice(20, 4));
+            ClassicAssert.AreEqual((byte)'@', span[20]);
+            ClassicAssert.AreEqual((byte)DataType.String, span[21]);
+            int intValue = MemoryMarshal.Read<int>(span.Slice(24, 4));
             ClassicAssert.AreEqual(11, intValue);
 
             // Comment payload ("Hello world")
-            string stringValue = Encoding.UTF8.GetString(span.Slice(24, 11));
+            string stringValue = Encoding.UTF8.GetString(span.Slice(28, 11));
             ClassicAssert.AreEqual("Hello world", stringValue);
-            ClassicAssert.AreEqual(0, span[35]);
+            ClassicAssert.AreEqual(0, span[39]);
         }
 
         [Test]

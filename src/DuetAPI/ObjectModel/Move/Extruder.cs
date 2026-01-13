@@ -120,12 +120,12 @@ public partial class Extruder : ModelObject, IStaticModelObject
     /// <summary>
     /// Whether or not the extruder is currently using phase stepping
     /// </summary>
-    public bool PhaseStep
+    public bool? PhaseStep
     {
         get => _phaseStep;
         set => SetPropertyValue(ref _phaseStep, value);
     }
-    private bool _phaseStep;
+    private bool? _phaseStep;
 
     /// <summary>
     /// Extruder position (in mm)

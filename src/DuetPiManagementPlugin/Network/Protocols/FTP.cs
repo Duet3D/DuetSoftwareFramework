@@ -32,14 +32,9 @@ namespace DuetPiManagementPlugin.Network.Protocols
                 await using FileStream inetdConfig = new("/etc/proftpd/proftpd.conf", FileMode.Open, FileAccess.Read);
                 using StreamReader reader = new(inetdConfig);
 
-                while (!reader.EndOfStream)
+                string? line;
+                while ((line = await reader.ReadLineAsync()) is not null)
                 {
-                    string? line = await reader.ReadLineAsync();
-                    if (line is null)
-                    {
-                        break;
-                    }
-
                     Match match = _portRegex.Match(line);
                     if (match.Success)
                     {
@@ -79,14 +74,10 @@ namespace DuetPiManagementPlugin.Network.Protocols
 
                     // Read the old config line by line and replace the Port argument
                     bool portWritten = false;
-                    while (!reader.EndOfStream)
-                    {
-                        string? line = await reader.ReadLineAsync();
-                        if (line is null)
-                        {
-                            break;
-                        }
 
+                    string? line;
+                    while ((line = await reader.ReadLineAsync()) is not null)
+                    {
                         if (!portWritten && _portRegex.IsMatch(line))
                         {
                             // Replace Port line with the new Port argument
