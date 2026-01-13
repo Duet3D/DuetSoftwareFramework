@@ -466,7 +466,18 @@ public sealed class ModelSubscription : IProcessor
                             Dictionary<string, object?> objectCollectionNode = (Dictionary<string, object?>)node;
                             if (objectCollectionNode.TryGetValue(pathNode.Name, out object? objectCollection))
                             {
-                                collection = (List<object?>)objectCollection!;
+                                if (objectCollection is List<object?> list)
+                                {
+                                    collection = list;
+                                }
+                                else if (objectCollection is IEnumerable enumerable)
+                                {
+                                    collection = [enumerable];
+                                }
+                                else
+                                {
+                                    throw new ArgumentException($"Invalid collection type {objectCollection?.GetType().Name}");
+                                }
 
                                 for (int k = collection.Count; k > pathNode.List.Count; k--)
                                 {
