@@ -38,7 +38,7 @@ public class CommandService(PluginServiceConnection connection, ILogger<CommandS
         DuetAPI.Commands.BaseCommand? command = null;
         Type commandType;
 
-        for (; ; )
+        while (!stoppingToken.IsCancellationRequested)
         {
             try
             {

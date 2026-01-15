@@ -178,7 +178,7 @@ public sealed class CodeStream : IProcessor, IDisposable
                                 code.Connection = Connection;
                                 code.SourceConnection = Connection.Id;
                                 _ = code
-                                    .ExecuteAsync(cancellationToken)
+                                    .ExecuteAsync()
                                     .ContinueWith(async task =>
                                     {
                                         try

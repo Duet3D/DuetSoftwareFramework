@@ -35,6 +35,6 @@ public sealed class InvalidateChannel(LinkInterface linkInterface, Model.ObjectM
         }
 
         // Wait for all codes and files to be invalidated
-        await linkInterface.AbortAllAsync(Channel);
+        await linkInterface.AbortAllAsync(Channel, cancellationToken);
     }
 }

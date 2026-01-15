@@ -13,6 +13,7 @@ using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -219,7 +220,7 @@ public sealed class Processor
         // Deal with macro files
         if (oldState.File is MacroFile macro)
         {
-            using (macro.Lock(_lifetime.ApplicationStopping))
+            using (macro.Lock(_lifetime.ApplicationStopped))
             {
                 if (macro.IsExecuting)
                 {
@@ -507,8 +508,7 @@ public sealed class Processor
         // Need to wait for the SPI connector to finish other operations first
         TaskCompletionSource<bool> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         state.FlushRequests.Enqueue(tcs);
-        #warning add ct support
-        return tcs.Task;
+        return tcs.Task.WaitAsync(cancellationToken);
     }
 
     /// <summary>

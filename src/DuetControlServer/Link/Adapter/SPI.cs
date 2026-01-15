@@ -14,6 +14,8 @@ using Microsoft.Extensions.Options;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
+using System.Threading.Tasks;
 
 namespace DuetControlServer.Link.Adapter;
 
@@ -98,7 +100,8 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <summary>
     /// Attempt to connect to the firmware
     /// </summary>
-    public void Connect()
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    public void Connect(CancellationToken cancellationToken = default)
     {
         // Check if large transfers can be performed
         try
@@ -115,7 +118,7 @@ public class SPI : IDiagnostics, ILinkAdapter
         }
 
         // Perform the first transfer
-        PerformFullTransfer(true);
+        PerformFullTransfer(true, cancellationToken);
     }
 
     /// <summary>
@@ -840,8 +843,9 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// Write another segment of the IAP binary
     /// </summary>
     /// <param name="stream">IAP binary</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether another segment could be written</returns>
-    public bool WriteIapSegment(Stream stream)
+    public bool WriteIapSegment(Stream stream, CancellationToken cancellationToken = default)
     {
         Span<byte> data = stackalloc byte[Consts.IapSegmentSize];
         int bytesRead = stream.Read(data);
@@ -852,18 +856,19 @@ public class SPI : IDiagnostics, ILinkAdapter
 
         WritePacket(Protocol.SbcRequests.Request.WriteIap, bytesRead);
         data[..bytesRead].CopyTo(GetWriteBuffer(bytesRead));
-        PerformFullTransfer();
+        PerformFullTransfer(cancellationToken: cancellationToken);
         return true;
     }
 
     /// <summary>
     /// Instruct the firmware to start the IAP binary
     /// </summary>
-    public void StartIap()
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    public void StartIap(CancellationToken cancellationToken = default)
     {
         // Tell the firmware to boot the IAP program
         WritePacket(Protocol.SbcRequests.Request.StartIap);
-        PerformFullTransfer();
+        PerformFullTransfer(cancellationToken: cancellationToken);
 
         // Wait for the first transfer.
         // The IAP firmware will pull the transfer ready pin to high when it is ready to receive data
@@ -875,7 +880,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// </summary>
     /// <param name="stream">Stream of the firmware binary</param>
     /// <returns>Whether another segment could be sent</returns>
-    public bool FlashFirmwareSegment(Stream stream)
+    public bool FlashFirmwareSegment(Stream stream, CancellationToken cancellationToken = default)
     {
         Span<byte> readBuffer = stackalloc byte[Consts.FirmwareSegmentSize];
         Span<byte> writeBuffer = stackalloc byte[Consts.FirmwareSegmentSize];
@@ -892,7 +897,7 @@ public class SPI : IDiagnostics, ILinkAdapter
             writeBuffer[bytesRead..].Fill(0xFF);
         }
 
-        WaitForTransfer();
+        WaitForTransfer(cancellationToken: cancellationToken);
         _spiDevice.TransferFullDuplex(writeBuffer, readBuffer);
         return true;
     }
@@ -903,10 +908,10 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <param name="firmwareLength">Length of the written firmware in bytes</param>
     /// <param name="crc16">CRC16 checksum of the firmware</param>
     /// <returns>Whether the firmware has been written successfully</returns>
-    public bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16)
+    public bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16, CancellationToken cancellationToken = default)
     {
         // At this point IAP expects another segment so wait for it to be ready first. After that, wait a moment for IAP to acknowledge we're done
-        WaitForTransfer();
+        WaitForTransfer(cancellationToken: cancellationToken);
         Thread.Sleep(Consts.FirmwareFinishedDelay);
 
         // Send the final firmware size plus CRC16 checksum to IAP
@@ -917,23 +922,23 @@ public class SPI : IDiagnostics, ILinkAdapter
         };
         Span<byte> transferData = stackalloc byte[Marshal.SizeOf<Protocol.SbcRequests.FlashVerify>()];
         MemoryMarshal.Write(transferData, verifyRequest);
-        WaitForTransfer();
+        WaitForTransfer(cancellationToken: cancellationToken);
         _spiDevice.TransferFullDuplex(transferData, transferData);
 
         // Check if the IAP can confirm our CRC16 checksum
         Span<byte> writeOk = stackalloc byte[1];
         WaitForTransfer();
         _spiDevice.TransferFullDuplex(writeOk, writeOk);
-        return (writeOk[0] == 0x0C);
+        return writeOk[0] == 0x0C;
     }
 
     /// <summary>
     /// Wait for the IAP program to reset the controller
     /// </summary>
-    public void WaitForIapReset()
+    public void WaitForIapReset(CancellationToken cancellationToken = default)
     {
         // Wait a moment for the firmware to start
-        Thread.Sleep(Consts.IapRebootDelay);
+        Task.Delay(Consts.IapRebootDelay, cancellationToken).Wait(cancellationToken);
 
         // Wait for the first data transfer from the firmware
         _updating = _connected = false;

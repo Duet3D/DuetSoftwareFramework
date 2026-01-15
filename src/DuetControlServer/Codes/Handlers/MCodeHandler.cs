@@ -239,7 +239,7 @@ public class MCodeHandler(
                             {
                                 return new Message(MessageType.Error, "Cannot set file to print, because a file is already being printed");
                             }
-                            await jobProcessor.SelectFile(fileName, physicalFile);
+                            await jobProcessor.SelectFileAsync(fileName, physicalFile, false, cancellationToken);
                         }
                     }
 
@@ -333,7 +333,7 @@ public class MCodeHandler(
                 if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     int numChannel = (int)code.Channel;
-                    using (await codeProcessor.FileLocks[numChannel].LockAsync(lifetime.ApplicationStopping))
+                    using (await codeProcessor.FileLocks[numChannel].LockAsync(cancellationToken))
                     {
                         if (codeProcessor.FilesBeingWritten[numChannel] is not null)
                         {
@@ -374,7 +374,7 @@ public class MCodeHandler(
                 if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     int numChannel = (int)code.Channel;
-                    using (await codeProcessor.FileLocks[numChannel].LockAsync(lifetime.ApplicationStopping))
+                    using (await codeProcessor.FileLocks[numChannel].LockAsync(cancellationToken))
                     {
                         StreamWriter? writer = codeProcessor.FilesBeingWritten[numChannel];
                         if (writer is not null)
@@ -491,7 +491,7 @@ public class MCodeHandler(
                                 return new Message(MessageType.Error, "Cannot set file to simulate, because a file is already being printed");
                             }
 
-                            await jobProcessor.SelectFile(fileName, physicalFile, true);
+                            await jobProcessor.SelectFileAsync(fileName, physicalFile, true, cancellationToken);
                             // Simulation is started when M37 has been processed by the firmware
                         }
                     }
@@ -653,7 +653,7 @@ public class MCodeHandler(
                 if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     // Wait for potential firmware updates to complete first
-                    await linkInterface.WaitForUpdateAsync();
+                    await linkInterface.WaitForUpdateAsync(cancellationToken);
 
                     // Perform emergency stop but don't wait longer than 4.5s
                     Task stopTask = linkInterface.EmergencyStopAsync(cancellationToken);
@@ -1144,35 +1144,27 @@ public class MCodeHandler(
                         Commands.StopPlugins stopCommand = commandFactory.Create<Commands.StopPlugins>();
                         await stopCommand.ExecuteAsync(cancellationToken);
 
-                        // Flash the firmware
+                        // Update the firmware
                         await using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
                         await using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
                         if (Path.GetExtension(firmwareFile) == ".uf2")
                         {
                             await using MemoryStream unpackedFirmwareStream = await Firmware.UnpackUF2Async(firmwareStream);
-                            await linkInterface.UpdateFirmware(iapStream, unpackedFirmwareStream);
+                            await linkInterface.UpdateFirmware(iapStream, unpackedFirmwareStream, lifetime.ApplicationStopped);
                         }
                         else
                         {
-                            await linkInterface.UpdateFirmware(iapStream, firmwareStream);
+                            await linkInterface.UpdateFirmware(iapStream, firmwareStream, lifetime.ApplicationStopped);
                         }
 
-                        // Terminate the program - or - restart the plugins when done
-                        if (settings.Value.UpdateOnly)
+                        // Terminate the program once this code has finished
+                        _ = code.Task.ContinueWith(async task =>
                         {
-                            _ = code.Task.ContinueWith(async task =>
-                            {
-                                await task;
-                                lifetime.StopApplication();
-                            }, TaskContinuationOptions.RunContinuationsAsynchronously);
-                        }
-                        else
-                        {
-                            await model.WaitForFullUpdateAsync(cancellationToken);
+                            await task;
+                            lifetime.StopApplication();
+                        }, TaskContinuationOptions.RunContinuationsAsynchronously);
 
-                            Commands.StartPlugins startCommand = commandFactory.Create<Commands.StartPlugins>();
-                            await startCommand.ExecuteAsync(cancellationToken);
-                        }
+                        // Done
                         return new Message();
                     }
                     throw new OperationCanceledException();
@@ -1193,7 +1185,7 @@ public class MCodeHandler(
                         await linkInterface.WaitForUpdateAsync();
 
                         // Perform firmware reset but don't wait longer than 4.5s
-                        Task resetTask = linkInterface.ResetFirmwareAsync(cancellationToken);
+                        Task resetTask = linkInterface.ResetFirmwareAsync(lifetime.ApplicationStopping);
                         Task completedTask = await Task.WhenAny(resetTask, Task.Delay(4500, lifetime.ApplicationStopped));
                         if (resetTask != completedTask)
                         {
@@ -1201,6 +1193,13 @@ public class MCodeHandler(
                             lifetime.StopApplication();
                             return new Message(MessageType.Error, "Reset timed out, stopping DCS");
                         }
+
+                        // Terminate the program once this code has finished
+                        _ = code.Task.ContinueWith(async task =>
+                        {
+                            await task;
+                            lifetime.StopApplication();
+                        }, TaskContinuationOptions.RunContinuationsAsynchronously);
 
                         // Firmware reset
                         return new Message();
@@ -1302,19 +1301,6 @@ public class MCodeHandler(
                     {
                         jobProcessor.StartSecondJob();
                     }
-                }
-                break;
-
-            // Reset controller
-            case 999:
-                if (code.Parameters.Count == 0)
-                {
-                    // DCS is supposed to terminate via M999. Do this when M999 has finished executing
-                    _ = code.Task.ContinueWith(async task =>
-                    {
-                        await task;
-                        lifetime.StopApplication();
-                    }, TaskContinuationOptions.RunContinuationsAsynchronously);
                 }
                 break;
         }

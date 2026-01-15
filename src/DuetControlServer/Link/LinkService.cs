@@ -28,6 +28,8 @@ namespace DuetControlServer.Link;
 /// <param name="linkAdapter">Firmware link adapter</param>
 /// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model</param>
+/// <param name="lifetime">Host application lifetime</param>
+/// <param name="logger">Logger</param>
 /// <param name="settings">Settings</param>
 public sealed class LinkService(
     Channel.Manager channels,
@@ -37,6 +39,7 @@ public sealed class LinkService(
     ILinkAdapter linkAdapter,
     LinkInterface linkInterface,
     Model.ObjectModel model,
+    IHostApplicationLifetime lifetime,
     ILogger<LinkService> logger,
     IOptions<Settings> settings) : BackgroundService
 {
@@ -53,10 +56,11 @@ public sealed class LinkService(
     /// <summary>
     /// Perform the firmware update internally
     /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    private void PerformFirmwareUpdate()
+    private void PerformFirmwareUpdate(CancellationToken cancellationToken = default)
     {
-        using (model.AccessReadWrite())
+        using (model.AccessReadWrite(cancellationToken))
         {
             model.State.Status = MachineStatus.Updating;
         }
@@ -65,11 +69,11 @@ public sealed class LinkService(
         ushort crc16 = CRC16.Calculate(linkInterface.FirmwareStream!);
 
         // Send the IAP binary to the firmware
-        logger.LogInformation("Flashing IAP binary");
+        logger.LogInformation("Sending IAP binary");
         bool dataSent;
         do
         {
-            dataSent = linkAdapter.WriteIapSegment(linkInterface.IapStream!);
+            dataSent = linkAdapter.WriteIapSegment(linkInterface.IapStream!, cancellationToken);
             if (logger.IsEnabled(LogLevel.Debug))
             {
                 Console.Write('.');
@@ -82,7 +86,7 @@ public sealed class LinkService(
         }
 
         // Start the IAP binary
-        linkAdapter.StartIap();
+        linkAdapter.StartIap(cancellationToken);
 
         // Send the firmware binary to the IAP program
         int numRetries = 0;
@@ -93,7 +97,7 @@ public sealed class LinkService(
                 logger.LogError("Firmware checksum verification failed");
             }
 
-            logger.LogInformation("Flashing RepRapFirmware");
+            logger.LogInformation("Updating RepRapFirmware");
             linkInterface.FirmwareStream!.Seek(0, SeekOrigin.Begin);
 
             try
@@ -112,24 +116,24 @@ public sealed class LinkService(
             }
             catch (Exception e)
             {
-                eventLogger.LogOutput(MessageType.Error, "Failed to flash flash firmware. Please install it manually.");
-                logger.LogError(e, "Failed to flash firmware");
+                eventLogger.LogOutput(MessageType.Error, "Failed to update firmware. Please install it manually.");
+                logger.LogError(e, "Failed to update firmware");
                 throw;
             }
 
             logger.LogInformation("Verifying checksum");
         }
-        while (!linkAdapter.VerifyFirmwareChecksum(linkInterface.FirmwareStream.Length, crc16) && ++numRetries < 3);
+        while (!linkAdapter.VerifyFirmwareChecksum(linkInterface.FirmwareStream.Length, crc16, cancellationToken) && ++numRetries < 3);
 
         if (numRetries == 3)
         {
             // Failed to flash the firmware
-            eventLogger.LogOutput(MessageType.Error, "Could not flash firmware after 3 attempts. Please install it manually.");
-            throw new OperationCanceledException("Failed to flash firmware after 3 attempts");
+            eventLogger.LogOutput(MessageType.Error, "Could not update firmware after 3 attempts. Please install it manually.");
+            throw new OperationCanceledException("Failed to update firmware after 3 attempts");
         }
 
         // Wait for the IAP binary to restart the controller
-        linkAdapter.WaitForIapReset();
+        linkAdapter.WaitForIapReset(cancellationToken);
         logger.LogInformation("Firmware update successful");
     }
 
@@ -141,7 +145,7 @@ public sealed class LinkService(
     public override Task StartAsync(CancellationToken cancellationToken)
     {
         // Initialize the link interface
-        linkAdapter.Connect();
+        linkAdapter.Connect(cancellationToken);
 
         // Run this service
         return base.StartAsync(cancellationToken);
@@ -171,7 +175,14 @@ public sealed class LinkService(
                 {
                     if (ae.InnerException is OperationCanceledException)
                     {
-                        tcs.SetCanceled();
+                        if (stoppingToken.IsCancellationRequested)
+                        {
+                            tcs.SetResult();
+                        }
+                        else
+                        {
+                            tcs.SetCanceled();
+                        }
                     }
                     else
                     {
@@ -180,7 +191,14 @@ public sealed class LinkService(
                 }
                 else if (e is OperationCanceledException)
                 {
-                    tcs.SetCanceled();
+                    if (stoppingToken.IsCancellationRequested)
+                    {
+                        tcs.SetResult();
+                    }
+                    else
+                    {
+                        tcs.SetCanceled();
+                    }
                 }
                 else
                 {
@@ -231,7 +249,7 @@ public sealed class LinkService(
     {
         do
         {
-            bool blockTask = false, skipChannels = false;
+            bool skipChannels = false;
             using (linkInterface.FirmwareActionLock.Lock(stoppingToken))
             {
                 // Check if an emergency stop has been requested
@@ -254,11 +272,10 @@ public sealed class LinkService(
                     if (linkAdapter.WriteReset())
                     {
                         logger.LogWarning("Resetting controller");
-                        linkAdapter.PerformFullTransfer(cancellationToken: stoppingToken);
+                        linkAdapter.PerformFullTransfer(cancellationToken: lifetime.ApplicationStopped);
                         linkInterface.FirmwareResetRequest.SetResult();
                         linkInterface.FirmwareResetRequest = null;
-
-                        blockTask = true;
+                        break;
                     }
                     skipChannels = true;
                 }
@@ -273,7 +290,7 @@ public sealed class LinkService(
 
                     try
                     {
-                        PerformFirmwareUpdate();
+                        PerformFirmwareUpdate(lifetime.ApplicationStopped);
                         linkInterface.FirmwareUpdateRequest?.SetResult();
                         linkInterface.FirmwareUpdateRequest = null;
                     }
@@ -285,13 +302,8 @@ public sealed class LinkService(
                     }
 
                     linkInterface.IapStream = linkInterface.FirmwareStream = null;
-                    blockTask = true;
+                    break;
                 }
-            }
-            if (blockTask)
-            {
-                // Wait for the requesting task to complete, it will terminate DCS next
-                Task.Delay(-1, stoppingToken).Wait(stoppingToken);
             }
 
             // Invalidate data if a controller reset has been performed
@@ -444,7 +456,7 @@ public sealed class LinkService(
             }
 
             // Do another full SPI transfer
-            linkAdapter.PerformFullTransfer(cancellationToken: stoppingToken);
+            linkAdapter.PerformFullTransfer(cancellationToken: lifetime.ApplicationStopped);
         }
         while (!stoppingToken.IsCancellationRequested);
     }

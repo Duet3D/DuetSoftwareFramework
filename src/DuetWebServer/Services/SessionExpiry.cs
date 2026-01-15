@@ -36,7 +36,7 @@ public class SessionExpiry(IConfiguration configuration, ISessionStorage session
         }
         catch (OperationCanceledException)
         {
-            // suppressed
+            // expected on shutdown
         }
     }
 }

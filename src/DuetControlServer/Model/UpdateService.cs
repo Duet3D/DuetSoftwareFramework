@@ -1,4 +1,5 @@
-﻿using DuetAPI.ObjectModel;
+﻿using DuetAPI.Commands;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link;
 using DuetControlServer.Utility;
 using Microsoft.Extensions.Hosting;
@@ -46,6 +47,13 @@ public class UpdateService : BackgroundService
         model.OnConnectionLost += (sender, e) => _lastSeqs.Clear();
     }
 
+    /// <summary>
+    /// Stop the update service
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public override Task StopAsync(CancellationToken cancellationToken) => base.StopAsync(cancellationToken);
+
     // Data for object model updates
     private readonly ConcurrentDictionary<string, int> _lastSeqs = new();
 
@@ -59,11 +67,12 @@ public class UpdateService : BackgroundService
     /// </summary>
     /// <param name="key">Key to query</param>
     /// <param name="flags">Query flags</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    private async Task RequestModelAsync(string key, string flags)
+    private async Task RequestModelAsync(string key, string flags, CancellationToken cancellationToken = default)
     {
         _requestedKey = key;
-        _jsonData = await _linkInterface.RequestObjectModel(key, flags);
+        _jsonData = await _linkInterface.RequestObjectModel(key, flags, cancellationToken);
     }
 
     /// <summary>
@@ -223,7 +232,7 @@ public class UpdateService : BackgroundService
                 {
                     _logger.LogDebug("Requesting initial limits");
 
-                    await RequestModelAsync("limits", "d99vno");
+                    await RequestModelAsync("limits", "d99vno", stoppingToken);
                     using (await _model.AccessReadWriteAsync(stoppingToken))
                     {
                         UpdateModel();
@@ -235,7 +244,7 @@ public class UpdateService : BackgroundService
                 }
 
                 // Request the next status update
-                await RequestModelAsync(string.Empty, "d99fno");
+                await RequestModelAsync(string.Empty, "d99fno", stoppingToken);
 
                 // Update frequently changing properties
                 using (await _model.AccessReadWriteAsync(stoppingToken))
@@ -259,7 +268,7 @@ public class UpdateService : BackgroundService
                         int next = 0;
                         do
                         {
-                            await RequestModelAsync(key, (next == 0) ? "d99vno" : $"d99vnoa{next}");
+                            await RequestModelAsync(key, (next == 0) ? "d99vno" : $"d99vnoa{next}", stoppingToken);
 
                             int offset = next;
                             using (await _model.AccessReadWriteAsync(stoppingToken))
@@ -294,6 +303,9 @@ public class UpdateService : BackgroundService
                     _updatingFirmware = true;
                     _ = Task.Run(async () => await _firmwareUpdater.UpdateFirmwareAsync(stoppingToken), stoppingToken);
                 }
+
+                // Wait a moment
+                await Task.Delay(_settings.ModelUpdateInterval, stoppingToken);
             }
             catch (InvalidOperationException e)
             {
@@ -301,11 +313,8 @@ public class UpdateService : BackgroundService
             }
             catch (OperationCanceledException)
             {
-                // RRF has disconnected, try again later
+                // expected on shutdown
             }
-
-            // Wait a moment
-            await Task.Delay(_settings.ModelUpdateInterval, stoppingToken);
         }
         while (!stoppingToken.IsCancellationRequested);
     }

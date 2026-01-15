@@ -131,7 +131,7 @@ public sealed class StartPlugins(CodeFactory codeFactory,
                 dsfConfigCode.Parameters = [
                     new('P', FilePathResolver.DsfConfigFile)
                 ];
-                await dsfConfigCode.ExecuteAsync(cancellationToken);
+                await dsfConfigCode.ExecuteAsync();
             }
         }
     }

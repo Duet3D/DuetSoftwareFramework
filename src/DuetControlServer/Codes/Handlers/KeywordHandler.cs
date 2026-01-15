@@ -162,7 +162,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
 
                 if (code.Keyword == KeywordType.Abort)
                 {
-                    await linkInterface.AbortAllAsync(code.Channel);
+                    await linkInterface.AbortAllAsync(code.Channel, cancellationToken);
                 }
                 return new Message(MessageType.Success, result ?? string.Empty);
 

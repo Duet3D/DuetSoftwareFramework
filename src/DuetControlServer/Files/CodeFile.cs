@@ -329,7 +329,7 @@ public class CodeFile(
                                     state.ProcessBlock = true;
                                     state.ContinueLoop = false;
                                     state.Iterations++;
-                                    varDeletionTask = DeleteLocalVariables(state);
+                                    varDeletionTask = DeleteLocalVariablesAsync(state);
                                     readAgain = true;
                                     if (!IsClosed)
                                     {
@@ -534,16 +534,16 @@ public class CodeFile(
     }
 
     /// <summary>
-    /// Delete local variables from a given code block
+    /// Delete local variables from a given code block asynchronously
     /// </summary>
     /// <param name="codeBlock">Code block</param>
     /// <returns>Asynchronous task</returns>
-    private async Task DeleteLocalVariables(CodeBlock codeBlock)
+    private async Task DeleteLocalVariablesAsync(CodeBlock codeBlock, CancellationToken cancellationToken = default)
     {
         Task[] deletionTasks = new Task[codeBlock.LocalVariables.Count];
         for (int i = 0; i < codeBlock.LocalVariables.Count; i++)
         {
-            deletionTasks[i] = linkInterface.SetVariableAsync(Channel, false, codeBlock.LocalVariables[i], null);
+            deletionTasks[i] = linkInterface.SetVariableAsync(Channel, false, codeBlock.LocalVariables[i], null, cancellationToken);
         }
         await Task.WhenAll(deletionTasks);
         codeBlock.LocalVariables.Clear();
@@ -583,7 +583,7 @@ public class CodeFile(
                 }
 
                 // Delete previously created local variables
-                varDeletionTask = DeleteLocalVariables(codeBlock);
+                varDeletionTask = DeleteLocalVariablesAsync(codeBlock, cancellationToken);
 
                 // End
                 _lastCodeBlock = codeBlock;

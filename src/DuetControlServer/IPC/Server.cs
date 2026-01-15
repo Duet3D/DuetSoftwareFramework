@@ -91,7 +91,14 @@ public sealed class Server(CommandFactory commandFactory,
         // Don't listen for incoming connections if only the firmware is being updated
         if (settings.Value.UpdateOnly)
         {
-            await Task.Delay(-1, stoppingToken);
+            try
+            {
+                await Task.Delay(-1, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // expected on shutdown
+            }
             return;
         }
 
@@ -118,13 +125,13 @@ public sealed class Server(CommandFactory commandFactory,
             }
             while (!stoppingToken.IsCancellationRequested);
         }
-        catch (SocketException)
+        catch (Exception e) when (e is OperationCanceledException or SocketException)
         {
-            // expected when the program terminates
+            // expected on shutdown
         }
 
         // Wait for pending connections to go
-        await Task.WhenAll(connectionTasks);
+        await Task.WhenAll(connectionTasks).WaitAsync(lifetime.ApplicationStopped);
     }
 
     /// <summary>

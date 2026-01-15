@@ -48,6 +48,8 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel 
         }
     }
 
+
+
     /// <summary>
     /// Called when a network protocol has been enabled
     /// </summary>
@@ -121,117 +123,123 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel 
     /// <returns>Asynchronous task</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        TimeSpan measuredDelay = TimeSpan.Zero;
-        string lastHostname = Environment.MachineName;
-        bool updateNetworkSeq, updateVolumesSeq;
-        string? lastIPAddress = null;
-
-        do
+        try
         {
-            // Prefetch the network and volume devices because this can take quite a while (> 1.5s)
-            System.Net.NetworkInformation.NetworkInterface[] networkInterfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
-            DriveInfo[] drives = DriveInfo.GetDrives();
+            TimeSpan measuredDelay = TimeSpan.Zero;
+            string lastHostname = Environment.MachineName;
+            bool updateNetworkSeq, updateVolumesSeq;
+            string? lastIPAddress = null;
 
-            // Run another update cycle
-            string currentIPAddress;
-            using (await model.AccessReadWriteAsync(stoppingToken))
+            do
             {
-                updateNetworkSeq = await UpdateNetworkAsync(networkInterfaces, stoppingToken);
-                currentIPAddress = model.Network.Interfaces.FirstOrDefault(iface => iface.ActualIP != null)?.ActualIP ?? "0.0.0.0";
-                UpdateSbc();
-                updateVolumesSeq = UpdateVolumes(drives);
-                CleanMessages();
-            }
+                // Prefetch the network and volume devices because this can take quite a while (> 1.5s)
+                System.Net.NetworkInformation.NetworkInterface[] networkInterfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
+                DriveInfo[] drives = DriveInfo.GetDrives();
 
-            // Check if the system time has to be updated
-            if (measuredDelay > TimeSpan.FromMilliseconds(settings.Value.HostUpdateInterval + 2000) && !Debugger.IsAttached)
-            {
-                logger.LogInformation("System time has been changed");
-                Code code = codeFactory.Create();
-                code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
-                code.Channel = CodeChannel.Trigger;
-                code.Type = CodeType.MCode;
-                code.MajorNumber = 905;
-                code.Parameters =
-                [
-                    new('P', DateTime.Now.ToString("yyyy-MM-dd")),
-                    new('S', DateTime.Now.ToString("HH:mm:ss"))
-                ];
-                await code.ExecuteAsync(stoppingToken);
-            }
-
-            // Check if the hostname has to be updated
-            if (lastHostname != Environment.MachineName)
-            {
-                logger.LogInformation("Hostname has been changed");
-                lastHostname = Environment.MachineName;
-                Code code = codeFactory.Create();
-                code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
-                code.Channel = CodeChannel.Trigger;
-                code.Type = CodeType.MCode;
-                code.MajorNumber = 550;
-                code.Parameters =
-                [
-                    new('P', lastHostname)
-                ];
-                await code.ExecuteAsync(stoppingToken);
-            }
-
-            // Check if the network key has been updated
-            if (updateNetworkSeq)
-            {
-                // Update the network seq value
-                Code code = codeFactory.Create();
-                code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
-                code.Channel = CodeChannel.Trigger;
-                code.Type = CodeType.MCode;
-                code.MajorNumber = 409;
-                code.Parameters =
-                [
-                    new('K', "network"),
-                    new('I', 1)
-                ];
-                await code.ExecuteAsync(stoppingToken);
-
-                // Update the IP address to report on 12864 displays
-                if (currentIPAddress != lastIPAddress)
+                // Run another update cycle
+                string currentIPAddress;
+                using (await model.AccessReadWriteAsync(stoppingToken))
                 {
-                    lastIPAddress = currentIPAddress;
+                    updateNetworkSeq = await UpdateNetworkAsync(networkInterfaces, stoppingToken);
+                    currentIPAddress = model.Network.Interfaces.FirstOrDefault(iface => iface.ActualIP != null)?.ActualIP ?? "0.0.0.0";
+                    UpdateSbc();
+                    updateVolumesSeq = UpdateVolumes(drives);
+                    CleanMessages();
+                }
 
-                    code = codeFactory.Create();
+                // Check if the system time has to be updated
+                if (measuredDelay > TimeSpan.FromMilliseconds(settings.Value.HostUpdateInterval + 2000) && !Debugger.IsAttached)
+                {
+                    logger.LogInformation("System time has been changed");
+                    Code code = codeFactory.Create();
                     code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
                     code.Channel = CodeChannel.Trigger;
                     code.Type = CodeType.MCode;
-                    code.MajorNumber = 552;
+                    code.MajorNumber = 905;
                     code.Parameters =
                     [
-                        new('P', currentIPAddress ?? "0.0.0.0")
+                        new('P', DateTime.Now.ToString("yyyy-MM-dd")),
+                    new('S', DateTime.Now.ToString("HH:mm:ss"))
                     ];
-                    await code.ExecuteAsync(stoppingToken);
+                    await code.ExecuteAsync();
                 }
-            }
 
-            if (updateVolumesSeq)
-            {
-                Code code = codeFactory.Create();
-                code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
-                code.Channel = CodeChannel.Trigger;
-                code.Type = CodeType.MCode;
-                code.MajorNumber = 409;
-                code.Parameters =
-                [
-                    new('K', "volumes"),
+                // Check if the hostname has to be updated
+                if (lastHostname != Environment.MachineName)
+                {
+                    logger.LogInformation("Hostname has been changed");
+                    lastHostname = Environment.MachineName;
+                    Code code = codeFactory.Create();
+                    code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
+                    code.Channel = CodeChannel.Trigger;
+                    code.Type = CodeType.MCode;
+                    code.MajorNumber = 550;
+                    code.Parameters =
+                    [
+                        new('P', lastHostname)
+                    ];
+                    await code.ExecuteAsync();
+                }
+
+                // Check if the network key has been updated
+                if (updateNetworkSeq)
+                {
+                    // Update the network seq value
+                    Code code = codeFactory.Create();
+                    code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
+                    code.Channel = CodeChannel.Trigger;
+                    code.Type = CodeType.MCode;
+                    code.MajorNumber = 409;
+                    code.Parameters =
+                    [
+                        new('K', "network"),
                     new('I', 1)
-                ];
-                await code.ExecuteAsync(stoppingToken);
-            }
+                    ];
+                    await code.ExecuteAsync();
 
-            // Wait for next scheduled update check
-            DateTime lastUpdateTime = DateTime.Now;
-            await Task.Delay(settings.Value.HostUpdateInterval, stoppingToken);
-            measuredDelay = DateTime.Now - lastUpdateTime;
+                    // Update the IP address to report on 12864 displays
+                    if (currentIPAddress != lastIPAddress)
+                    {
+                        lastIPAddress = currentIPAddress;
+
+                        code = codeFactory.Create();
+                        code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
+                        code.Channel = CodeChannel.Trigger;
+                        code.Type = CodeType.MCode;
+                        code.MajorNumber = 552;
+                        code.Parameters =
+                        [
+                            new('P', currentIPAddress ?? "0.0.0.0")
+                        ];
+                        await code.ExecuteAsync();
+                    }
+                }
+
+                if (updateVolumesSeq)
+                {
+                    Code code = codeFactory.Create();
+                    code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
+                    code.Channel = CodeChannel.Trigger;
+                    code.Type = CodeType.MCode;
+                    code.MajorNumber = 409;
+                    code.Parameters =
+                    [
+                        new('K', "volumes"),
+                    new('I', 1)
+                    ];
+                    await code.ExecuteAsync();
+                }
+
+                // Wait for next scheduled update check
+                DateTime lastUpdateTime = DateTime.Now;
+                await Task.Delay(settings.Value.HostUpdateInterval, stoppingToken);
+                measuredDelay = DateTime.Now - lastUpdateTime;
+            } while (!stoppingToken.IsCancellationRequested);
         }
-        while (!stoppingToken.IsCancellationRequested);
+        catch (OperationCanceledException)
+        {
+            // expected on shutdown
+        }
     }
 
     /// <summary>

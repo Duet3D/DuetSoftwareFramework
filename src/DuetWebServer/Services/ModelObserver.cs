@@ -194,7 +194,7 @@ public sealed class ModelObserver(IConfiguration configuration, ILogger<ModelObs
         }
         catch (OperationCanceledException)
         {
-            // suppressed
+            // expected on shutdown
         }
     }
 

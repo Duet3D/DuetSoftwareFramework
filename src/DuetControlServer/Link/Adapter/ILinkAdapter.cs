@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading;
 using DuetAPI;
+using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
@@ -16,7 +17,8 @@ public interface ILinkAdapter
     /// <summary>
     /// Attempt to connect to the firmware
     /// </summary>
-    void Connect();
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    void Connect(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Currently-used protocol version
@@ -27,7 +29,7 @@ public interface ILinkAdapter
     /// Perform a full data transfer synchronously
     /// </summary>
     /// <param name="connecting">Whether this an initial connection is being established</param>
-    /// <param name="cancellationToken">Cancellation token to cancel the transfer</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     void PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -200,33 +202,38 @@ public interface ILinkAdapter
     /// Write another segment of the IAP binary
     /// </summary>
     /// <param name="stream">IAP binary</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Whether another segment could be written</returns>
-    bool WriteIapSegment(Stream stream);
+    bool WriteIapSegment(Stream stream, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Instruct the firmware to start the IAP binary
     /// </summary>
-    void StartIap();
+    /// <param name="cancellationToken">Cancellation token</param>
+    void StartIap(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Flash another segment of the firmware via the IAP binary
     /// </summary>
     /// <param name="stream">Stream of the firmware binary</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Whether another segment could be sent</returns>
-    bool FlashFirmwareSegment(Stream stream);
+    bool FlashFirmwareSegment(Stream stream, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Send the CRC16 checksum of the firmware binary to the IAP program and verify the written data
     /// </summary>
     /// <param name="firmwareLength">Length of the written firmware in bytes</param>
     /// <param name="crc16">CRC16 checksum of the firmware</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Whether the firmware has been written successfully</returns>
-    bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16);
+    bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Wait for the IAP program to reset the controller
     /// </summary>
-    void WaitForIapReset();
+    /// <param name="cancellationToken">Cancellation token</param>
+    void WaitForIapReset(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Request an emergency stop

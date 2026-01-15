@@ -132,10 +132,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     public override async Task<Message?> ExecuteAsync(CancellationToken cancellationToken = default)
     {
         // Assign a cancellation token when the execution starts
-        if (CancellationToken == default)
-        {
-            CancellationToken = _codeProcessor.CancellationTokenSources[(int)Channel].Token;
-        }
+        CancellationToken = (cancellationToken == default) ? _codeProcessor.CancellationTokenSources[(int)Channel].Token : cancellationToken;
 
         // Send it to the code pipeline
         await _codeProcessor.StartCodeAsync(this);

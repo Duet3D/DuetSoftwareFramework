@@ -250,7 +250,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     public long FileLength => _file is not null ? _file.Length : 0;
 
     /// <summary>
-    /// Start a new file print
+    /// Select a new file to print asynchronously
     /// </summary>
     /// <param name="virtualFile">File to print</param>
     /// <param name="physicalFile">Physical file to print</param>
@@ -259,7 +259,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// <remarks>
     /// This class has to be locked when this method is called
     /// </remarks>
-    public async Task SelectFile(string virtualFile, string physicalFile, bool simulating = false)
+    public async Task SelectFileAsync(string virtualFile, string physicalFile, bool simulating = false, CancellationToken cancellationToken = default)
     {
         // Analyze and open the file
         GCodeFileInfo info = await _fileInfoParser.ParseAsync(physicalFile, true);
@@ -285,7 +285,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
         }
 
         // Notify RepRapFirmware and start processing the file in the background
-        await _linkInterface.SetPrintFileInfo();
+        await _linkInterface.SetPrintFileInfo(cancellationToken);
         _logger.LogInformation("Selected file {File}", virtualFile);
     }
 
@@ -306,7 +306,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
         {
             // Copy the stack in case this is invoked from a macro file.
             // We need to pass the macro file position as well if applicable to resume the second macro file from the right position
-            await _linkInterface.CopyStateAsync(CodeChannel.File, CodeChannel.File2);
+            await _linkInterface.CopyStateAsync(CodeChannel.File, CodeChannel.File2, cancellationToken);
 
             // Start printing using the second file channel if applicable.
             // Lock the file here because the copy constructor accesses file.NextFilePosition
@@ -500,142 +500,148 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        do
+        try
         {
-            // Wait for the next print to start
-            bool startingNewPrint;
-            using (await LockAsync(stoppingToken))
+            do
             {
-                await _resume.WaitAsync(stoppingToken);
-                startingNewPrint = !_file!.IsClosed;
-                IsProcessing = startingNewPrint;
-            }
-
-            // Deal with the file print
-            if (startingNewPrint)
-            {
-                _logger.LogInformation("Starting file print");
-
-                // Start the main job
-                Task fileTask = DoFilePrint(_file);
-
-                // In case a forked print is supposed to start, start it here
+                // Wait for the next print to start
+                bool startingNewPrint;
                 using (await LockAsync(stoppingToken))
                 {
-                    if (_file2 is not null && _secondFileTask is null)
+                    await _resume.WaitAsync(stoppingToken);
+                    startingNewPrint = !_file!.IsClosed;
+                    IsProcessing = startingNewPrint;
+                }
+
+                // Deal with the file print
+                if (startingNewPrint)
+                {
+                    _logger.LogInformation("Starting file print");
+
+                    // Start the main job
+                    Task fileTask = DoFilePrint(_file);
+
+                    // In case a forked print is supposed to start, start it here
+                    using (await LockAsync(stoppingToken))
                     {
-                        _secondFileTask = DoFilePrint(_file2);
-                    }
-                }
-
-                // Run the main job
-                await fileTask;
-
-                // Wait for the forked job to complete (if any)
-                Task? secondFileTask;
-                using (await LockAsync(stoppingToken))
-                {
-                    secondFileTask = _secondFileTask;
-                    _secondFileTask = null;
-                }
-
-                if (secondFileTask is not null)
-                {
-                    await secondFileTask;
-                }
-
-                // Get the last print result
-                bool isCancelled, isAborted, isSimulating;
-                string physicalFileName;
-                using (await LockAsync(stoppingToken))
-                {
-                    isCancelled = IsCancelled;
-                    isAborted = IsAborted;
-                    isSimulating = IsSimulating;
-                    physicalFileName = _file.FilePath.Physical;
-                }
-
-                // Notify RRF
-                try
-                {
-                    if (isCancelled)
-                    {
-                        // Prints are cancelled by M0/M1/M2 which is processed by RRF
-                        _logger.LogInformation("Cancelled job file");
-                    }
-                    else if (isAborted)
-                    {
-                        await _linkInterface.StopPrintAsync(PrintStoppedReason.Abort);
-                        _logger.LogInformation("Aborted job file");
-                    }
-                    else
-                    {
-                        await _linkInterface.StopPrintAsync(PrintStoppedReason.NormalCompletion);
-                        _logger.LogInformation("Finished job file");
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    // SPI link lost while attempting to notify RRF, don't attempt anything else next
-                    isAborted = true;
-                }
-
-                // Update special fields that are not available in RRF
-                using (await _model.AccessReadWriteAsync(stoppingToken))
-                {
-                    _model.Job.File.CustomInfo.Clear();
-                    _model.Job.LastFileAborted = isAborted;
-                    _model.Job.LastFileCancelled = isCancelled;
-                    _model.Job.LastFileSimulated = isSimulating;
-                }
-
-                // Update the last simulated time
-                if (isSimulating && !isAborted && !isCancelled)
-                {
-                    // Wait for the simulation time to be available
-                    int? lastDuration = null;
-                    int upTime = 0;
-                    while (!_lifetime.ApplicationStopping.IsCancellationRequested)
-                    {
-                        await _model.WaitForFullUpdateAsync(stoppingToken);
-                        using (await _model.AccessReadOnlyAsync(stoppingToken))
+                        if (_file2 is not null && _secondFileTask is null)
                         {
-                            if (_model.State.UpTime < upTime || _model.Job.LastDuration is not null)
-                            {
-                                lastDuration = _model.Job.LastDuration;
-                                break;
-                            }
-                            upTime = _model.State.UpTime;
+                            _secondFileTask = DoFilePrint(_file2);
                         }
                     }
 
-                    // Try to update the last simulated time
-                    if (lastDuration > 0)
+                    // Run the main job
+                    await fileTask;
+
+                    // Wait for the forked job to complete (if any)
+                    Task? secondFileTask;
+                    using (await LockAsync(stoppingToken))
                     {
-                        await _fileInfoParser.UpdateSimulatedTimeAsync(physicalFileName, lastDuration.Value, stoppingToken);
+                        secondFileTask = _secondFileTask;
+                        _secondFileTask = null;
                     }
-                    else
+
+                    if (secondFileTask is not null)
                     {
-                        _logger.LogWarning("Failed to update simulation time because it was not set in the object model");
+                        await secondFileTask;
+                    }
+
+                    // Get the last print result
+                    bool isCancelled, isAborted, isSimulating;
+                    string physicalFileName;
+                    using (await LockAsync(stoppingToken))
+                    {
+                        isCancelled = IsCancelled;
+                        isAborted = IsAborted;
+                        isSimulating = IsSimulating;
+                        physicalFileName = _file.FilePath.Physical;
+                    }
+
+                    // Notify RRF
+                    try
+                    {
+                        if (isCancelled)
+                        {
+                            // Prints are cancelled by M0/M1/M2 which is processed by RRF
+                            _logger.LogInformation("Cancelled job file");
+                        }
+                        else if (isAborted)
+                        {
+                            await _linkInterface.StopPrintAsync(PrintStoppedReason.Abort, stoppingToken);
+                            _logger.LogInformation("Aborted job file");
+                        }
+                        else
+                        {
+                            await _linkInterface.StopPrintAsync(PrintStoppedReason.NormalCompletion, stoppingToken);
+                            _logger.LogInformation("Finished job file");
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // SPI link lost while attempting to notify RRF, don't attempt anything else next
+                        isAborted = true;
+                    }
+
+                    // Update special fields that are not available in RRF
+                    using (await _model.AccessReadWriteAsync(stoppingToken))
+                    {
+                        _model.Job.File.CustomInfo.Clear();
+                        _model.Job.LastFileAborted = isAborted;
+                        _model.Job.LastFileCancelled = isCancelled;
+                        _model.Job.LastFileSimulated = isSimulating;
+                    }
+
+                    // Update the last simulated time
+                    if (isSimulating && !isAborted && !isCancelled)
+                    {
+                        // Wait for the simulation time to be available
+                        int? lastDuration = null;
+                        int upTime = 0;
+                        while (!_lifetime.ApplicationStopping.IsCancellationRequested)
+                        {
+                            await _model.WaitForFullUpdateAsync(stoppingToken);
+                            using (await _model.AccessReadOnlyAsync(stoppingToken))
+                            {
+                                if (_model.State.UpTime < upTime || _model.Job.LastDuration is not null)
+                                {
+                                    lastDuration = _model.Job.LastDuration;
+                                    break;
+                                }
+                                upTime = _model.State.UpTime;
+                            }
+                        }
+
+                        // Try to update the last simulated time
+                        if (lastDuration > 0)
+                        {
+                            await _fileInfoParser.UpdateSimulatedTimeAsync(physicalFileName, lastDuration.Value, stoppingToken);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Failed to update simulation time because it was not set in the object model");
+                        }
                     }
                 }
-            }
 
-            using (await LockAsync(stoppingToken))
-            {
-                // We are no longer printing a file...
-                _finished.NotifyAll();
+                using (await LockAsync(stoppingToken))
+                {
+                    // We are no longer printing a file...
+                    _finished.NotifyAll();
 
-                // Dispose of the files
-                _file!.Dispose();
-                _file2?.Dispose();
-                _file = _file2 = null;
+                    // Dispose of the files
+                    _file!.Dispose();
+                    _file2?.Dispose();
+                    _file = _file2 = null;
 
-                // End
-                IsProcessing = IsSimulating = IsPaused = false;
-            }
+                    // End
+                    IsProcessing = IsSimulating = IsPaused = false;
+                }
+            } while (!stoppingToken.IsCancellationRequested);
         }
-        while (!stoppingToken.IsCancellationRequested);
+        catch (OperationCanceledException)
+        {
+            // expected on shutdown
+        }
     }
 
     /// <summary>

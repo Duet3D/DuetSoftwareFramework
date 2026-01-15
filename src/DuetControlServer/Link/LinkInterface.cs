@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
+using DuetAPI.Commands;
 using DuetControlServer.Files;
 using DuetControlServer.Link.Adapter;
 using DuetControlServer.Link.Protocol.Shared;
@@ -86,7 +87,7 @@ public sealed partial class LinkInterface(
         {
             ModelQueryRequests.Enqueue(request);
         }
-        return request.Tcs.Task;
+        return request.Tcs.Task.WaitAsync(cancellationToken);
     }
 
     /// <summary>
@@ -129,8 +130,7 @@ public sealed partial class LinkInterface(
             EvaluateExpressionRequest request = new(channel, expression);
             EvaluateExpressionRequests.Add(request);
             logger.LogDebug("Evaluating {Expression} on channel {Channel}", expression, channel);
-#warning add ct support
-            return request.Task;
+            return request.Task.WaitAsync(cancellationToken);
         }
     }
 
@@ -180,7 +180,7 @@ public sealed partial class LinkInterface(
                 logger.LogDebug("Deleting local variable {Variable} on channel {Channel}", varName, channel);
             }
         }
-        return request.Task;
+        return request.Task.WaitAsync(cancellationToken);
     }
 
     /// <summary>
@@ -238,12 +238,13 @@ public sealed partial class LinkInterface(
     /// </summary>
     /// <param name="from">Source channel</param>
     /// <param name="to">Target channel</param>
-    /// <exception cref="NotImplementedException"></exception>
-    public async Task CopyStateAsync(CodeChannel from, CodeChannel to)
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public async Task CopyStateAsync(CodeChannel from, CodeChannel to, CancellationToken cancellationToken = default)
     {
-        using (await channels[to].LockAsync())
+        using (await channels[to].LockAsync(cancellationToken))
         {
-            using (await channels[from].LockAsync())
+            using (await channels[from].LockAsync(cancellationToken))
             {
                 channels[to].CopyState(channels[from]);
             }
@@ -265,7 +266,7 @@ public sealed partial class LinkInterface(
             FirmwareHaltRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             onFirmwareHalted = FirmwareHaltRequest.Task;
         }
-        await onFirmwareHalted;
+        await onFirmwareHalted.WaitAsync(cancellationToken);
     }
 
     /// <summary>
@@ -297,43 +298,45 @@ public sealed partial class LinkInterface(
     {
         using (await channels[channel].LockAsync(cancellationToken))
         {
-            await channels[channel].SetMacroPausable(isPausable);
+            await channels[channel].SetMacroPausable(isPausable).WaitAsync(cancellationToken);
         }
     }
 
     /// <summary>
     /// Update the print file info in the firmware
     /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    public async Task SetPrintFileInfo()
+    public async Task SetPrintFileInfo(CancellationToken cancellationToken = default)
     {
         Task task;
-        using (await PrintStateLock.LockAsync())
+        using (await PrintStateLock.LockAsync(cancellationToken))
         {
             SetPrintInfoRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             task = SetPrintInfoRequest.Task;
         }
-        await task;
+        await task.WaitAsync(cancellationToken);
     }
 
     /// <summary>
     /// Notify the firmware that the file print has been stopped
     /// </summary>
     /// <param name="reason">Reason why the print has stopped</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
     /// <exception cref="OperationCanceledException">Connection lost while trying to notify RRF</exception>
-    public async Task StopPrintAsync(PrintStoppedReason reason)
+    public async Task StopPrintAsync(PrintStoppedReason reason, CancellationToken cancellationToken = default)
     {
         Task onPrintStopped;
-        using (await PrintStateLock.LockAsync())
+        using (await PrintStateLock.LockAsync(cancellationToken))
         {
             StopPrintReason = reason;
             StopPrintRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             onPrintStopped = StopPrintRequest.Task;
         }
-        await onPrintStopped;
+        await onPrintStopped.WaitAsync(cancellationToken);
     }
 
     /// <summary>
@@ -361,15 +364,15 @@ public sealed partial class LinkInterface(
     /// <returns>Disposable lock object that releases the lock when disposed</returns>
     /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
     /// <exception cref="OperationCanceledException">Failed to get movement lock</exception>
-    public async Task<IAsyncDisposable> LockAllMovementSystemsAndWaitForStandstill(CodeChannel channel)
+    public async Task<IAsyncDisposable> LockAllMovementSystemsAndWaitForStandstill(CodeChannel channel, CancellationToken cancellationToken = default)
     {
         Task<bool> lockTask;
-        using (await channels[channel].LockAsync())
+        using (await channels[channel].LockAsync(cancellationToken))
         {
             lockTask = channels[channel].LockAllMovementSystemsAndWaitForStandstill();
         }
 
-        if (await lockTask)
+        if (await lockTask.WaitAsync(cancellationToken))
         {
             return new MovementLock(channel, this);
         }
@@ -380,16 +383,17 @@ public sealed partial class LinkInterface(
     /// Unlock all resources occupied by the given channel
     /// </summary>
     /// <param name="channel">Channel holding the resources</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    internal async Task UnlockAll(CodeChannel channel)
+    internal async Task UnlockAll(CodeChannel channel, CancellationToken cancellationToken = default)
     {
         Task unlockTask;
-        using (await channels[channel].LockAsync())
+        using (await channels[channel].LockAsync(cancellationToken))
         {
             unlockTask = channels[channel].UnlockAll();
         }
-        await unlockTask;
+        await unlockTask.WaitAsync(cancellationToken);
     }
 
     /// <summary>
@@ -406,10 +410,11 @@ public sealed partial class LinkInterface(
     /// <summary>
     /// Wait for potential firmware update to finish
     /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public async Task WaitForUpdateAsync()
+    public async Task WaitForUpdateAsync(CancellationToken cancellationToken = default)
     {
-        using (await FirmwareUpdateLock.LockAsync())
+        using (await FirmwareUpdateLock.LockAsync(cancellationToken))
         {
             // This lock is acquired as long as a firmware update is in progress; no need to do anything else
         }
@@ -420,12 +425,13 @@ public sealed partial class LinkInterface(
     /// </summary>
     /// <param name="iapStream">IAP binary</param>
     /// <param name="firmwareStream">Firmware binary</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     /// <exception cref="InvalidOperationException">Firmware is already being updated or not connected over SPI</exception>
     /// <returns>Asynchronous task</returns>
-    public async Task UpdateFirmware(Stream iapStream, Stream firmwareStream)
+    public async Task UpdateFirmware(Stream iapStream, Stream firmwareStream, CancellationToken cancellationToken = default)
     {
         TaskCompletionSource tcs;
-        using (await FirmwareUpdateLock.LockAsync())
+        using (await FirmwareUpdateLock.LockAsync(cancellationToken))
         {
             if (FirmwareUpdateRequest is not null)
             {
@@ -437,7 +443,7 @@ public sealed partial class LinkInterface(
             FirmwareStream = firmwareStream;
             FirmwareUpdateRequest = tcs;
         }
-        await tcs.Task;
+        await tcs.Task.WaitAsync(cancellationToken);
     }
 
     /// <summary>
@@ -469,13 +475,14 @@ public sealed partial class LinkInterface(
     /// Abort all files in RRF on the given channel asynchronously
     /// </summary>
     /// <param name="channel">Channel where all the files have been aborted</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    public async Task AbortAllAsync(CodeChannel channel)
+    public async Task AbortAllAsync(CodeChannel channel, CancellationToken cancellationToken = default)
     {
-        using (await channels[channel].LockAsync())
+        using (await channels[channel].LockAsync(cancellationToken))
         {
-            await channels[channel].AbortAllFilesAsync();
+            await channels[channel].AbortAllFilesAsync().WaitAsync(cancellationToken);
         }
     }
 

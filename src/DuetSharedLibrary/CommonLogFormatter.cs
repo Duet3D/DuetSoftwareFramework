@@ -91,6 +91,7 @@ public sealed class CommonLogFormatter : ConsoleFormatter, IDisposable
         }
 
         textWriter.WriteLine();
+        textWriter.Flush();
     }
 
     /// <summary>

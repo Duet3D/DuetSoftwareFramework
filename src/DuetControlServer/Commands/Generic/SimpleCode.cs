@@ -133,7 +133,7 @@ public sealed class SimpleCode(Codes.CodeFactory codeFactory, Model.ObjectModel 
             // Execute priority codes first
             foreach (Code priorityCode in priorityCodes)
             {
-                Message? codeResult = await priorityCode.ExecuteAsync(cancellationToken);
+                Message? codeResult = await priorityCode.ExecuteAsync();
                 try
                 {
                     if (codeResult is not null && !string.IsNullOrEmpty(codeResult.Content))
@@ -155,7 +155,7 @@ public sealed class SimpleCode(Codes.CodeFactory codeFactory, Model.ObjectModel 
                 {
                     for (int i = 0; i < codes.Count; i++)
                     {
-                        codeTasks[i] = codes[i].ExecuteAsync(cancellationToken);
+                        codeTasks[i] = codes[i].ExecuteAsync();
                     }
                 }
 
