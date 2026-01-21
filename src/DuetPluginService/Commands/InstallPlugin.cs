@@ -220,8 +220,8 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
                 }
 
 #if true
-# if NET10_0_OR_GREATER
-#  warning check if this is fixed in ASP.NET 10
+# if NET11_0_OR_GREATER
+#  warning check if this is fixed in ASP.NET 11
 # endif
                 // Copy the file. ASP.NET does not perform lstat on symlinks so files served from symlinks are always truncated.
                 // It seems like .NET 6 also treats symlinks as open files for some reason
