@@ -710,7 +710,7 @@ public class MCodeHandler(
                         string trimmedKey = key.TrimStart('#');
                         if (!trimmedKey.StartsWith("network") && !trimmedKey.StartsWith("plugins") && !trimmedKey.StartsWith("sbc") && !trimmedKey.StartsWith("volumes"))
                         {
-                            // Only return query results for network and volume keys as part of M409
+                            // Only return query results for network/plugins/sbc/volume keys as part of M409
                             break;
                         }
 
