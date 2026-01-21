@@ -201,10 +201,18 @@ namespace DuetControlServer.SPI
             _txHeader.DataLength = (ushort)_txPointer;
             WriteCRC();
 
-            do
+            // Perform the transfer
+            int retry = 0;
+            while (!Program.CancellationToken.IsCancellationRequested)
             {
                 try
                 {
+                    // Don't retry forever
+                    if (retry > Settings.MaxSpiRetries)
+                    {
+                        throw new OperationCanceledException("Maximum number of SPI transfer retries exceeded");
+                    }
+
                     // Keep track of the maximum times between regular full transfers
                     if (!connecting && !_waitingForFirstTransfer && _connected && !_hadTimeout && !_updating && !_resetting)
                     {
@@ -226,12 +234,14 @@ namespace DuetControlServer.SPI
                     // Exchange transfer headers. This also deals with transfer responses
                     if (!ExchangeHeader())
                     {
+                        retry++;
                         continue;
                     }
 
                     // Exchange data if there is anything to transfer
                     if ((_rxHeader.DataLength != 0 || _txPointer != 0) && !ExchangeData())
                     {
+                        retry++;
                         continue;
                     }
 
@@ -297,7 +307,6 @@ namespace DuetControlServer.SPI
                     _connected = false;
                 }
             }
-            while (!Program.CancellationToken.IsCancellationRequested);
         }
 
         /// <summary>
