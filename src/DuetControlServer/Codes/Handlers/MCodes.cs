@@ -668,9 +668,10 @@ namespace DuetControlServer.Codes.Handlers
 
                         if (code.TryGetString('K', out string? key) && (!code.TryGetInt('R', out int rParam) || rParam == 0))
                         {
-                            if (!key.TrimStart('#').StartsWith("network") && !key.TrimStart('#').StartsWith("volumes"))
+                            string trimmedKey = key.TrimStart('#');
+                            if (!trimmedKey.StartsWith("network") && !trimmedKey.StartsWith("plugins") && !trimmedKey.StartsWith("sbc") && !trimmedKey.StartsWith("volumes"))
                             {
-                                // Only return query results for network and volume keys as part of M409
+                                // Only return query results for network/plugins/sbc/volume keys as part of M409
                                 break;
                             }
 
