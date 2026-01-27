@@ -3,6 +3,7 @@ using Nito.AsyncEx;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -376,6 +377,11 @@ namespace DuetControlServer.Model
                 catch (InvalidOperationException e)
                 {
                     _logger.Error(e, "Failed to merge JSON due to internal error: {0}", Encoding.UTF8.GetString(_jsonData));
+                }
+                catch (JsonException je)
+                {
+                    _logger.Error(je, "Failed to parse received JSON from key {0}: {1}", _requestedKey, Encoding.UTF8.GetString(_jsonData));
+                    throw;
                 }
                 catch (OperationCanceledException)
                 {
