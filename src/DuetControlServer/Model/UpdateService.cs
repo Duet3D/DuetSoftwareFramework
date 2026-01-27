@@ -311,6 +311,11 @@ public class UpdateService : BackgroundService
             {
                 _logger.LogError(e, "Failed to merge JSON due to internal error: {JSON}", Encoding.UTF8.GetString(_jsonData));
             }
+            catch (JsonException je)
+            {
+                _logger.LogError(je, "Failed to parse received JSON from key {0}: {1}", _requestedKey, Encoding.UTF8.GetString(_jsonData));
+                throw;
+            }
             catch (OperationCanceledException)
             {
                 // expected on shutdown
