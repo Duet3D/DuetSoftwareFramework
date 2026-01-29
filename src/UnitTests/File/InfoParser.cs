@@ -16,15 +16,15 @@
 
             TestContext.Out.Write(JsonSerializer.Serialize(info, typeof(GCodeFileInfo), new JsonSerializerOptions { WriteIndented = true }));
 
-            ClassicAssert.IsNotNull(info.FileName);
-            ClassicAssert.AreNotEqual(0, info.Size);
-            ClassicAssert.AreNotEqual(0, info.Height);
-            ClassicAssert.AreNotEqual(0, info.LayerHeight);
-            ClassicAssert.AreNotEqual(0, info.NumLayers);
-            ClassicAssert.AreNotEqual(0, info.Filament.Count);
-            ClassicAssert.IsNotEmpty(info.GeneratedBy);
-            // ClassicAssert.AreNotEqual(0, info.PrintTime);
-            // ClassicAssert.AreNotEqual(0, info.SimulatedTime);
+            Assert.That(info.FileName, Is.Not.Null);
+            Assert.That(info.Size, Is.Not.EqualTo(0));
+            Assert.That(info.Height, Is.Not.EqualTo(0));
+            Assert.That(info.LayerHeight, Is.Not.EqualTo(0));
+            Assert.That(info.NumLayers, Is.Not.EqualTo(0));
+            Assert.That(info.Filament.Count, Is.Not.EqualTo(0));
+            Assert.That(info.GeneratedBy, Is.Not.Empty);
+            // Assert.That(info.PrintTime, Is.Not.EqualTo(0));
+            // Assert.That(info.SimulatedTime, Is.Not.EqualTo(0));
         }
 
         [TestCase("Thumbnail.gcode", 2)]
@@ -36,7 +36,7 @@
             string filePath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes", fileName);
             GCodeFileInfo info = await DuetControlServer.Files.InfoParser.ParseAsync(filePath, true);
             TestContext.Out.Write(JsonSerializer.Serialize(info, typeof(GCodeFileInfo), new JsonSerializerOptions { WriteIndented = true }));
-            ClassicAssert.AreEqual(info.Thumbnails.Count, thumbnailCount);
+            Assert.That(info.Thumbnails.Count, Is.EqualTo(thumbnailCount));
         }
 
         [TestCase("Thumbnail.gcode")]
@@ -46,7 +46,7 @@
             GCodeFileInfo info = await DuetControlServer.Files.InfoParser.ParseAsync(filePath, true);
 
             string thumbnailResponse = await DuetControlServer.Files.InfoParser.ParseFileFragment(filePath, info.Thumbnails[0].Offset, true);
-            ClassicAssert.IsTrue(thumbnailResponse.Contains(info.Thumbnails[0].Data![..1024]));
+            Assert.That(thumbnailResponse.Contains(info.Thumbnails[0].Data![..1024]), Is.True);
 
             TestContext.Out.Write(thumbnailResponse);
         }
@@ -59,14 +59,14 @@
 
             TestContext.Out.Write(JsonSerializer.Serialize(info, typeof(GCodeFileInfo), new JsonSerializerOptions { WriteIndented = true }));
 
-            ClassicAssert.IsNotNull(info.FileName);
-            ClassicAssert.AreNotEqual(0, info.Size);
-            ClassicAssert.AreEqual(0.5, info.Height);
-            ClassicAssert.AreEqual(0, info.LayerHeight);
-            ClassicAssert.AreEqual(0, info.Filament.Count);
-            ClassicAssert.IsNull(info.GeneratedBy);
-            ClassicAssert.IsNull(info.PrintTime);
-            ClassicAssert.IsNull(info.SimulatedTime);
+            Assert.That(info.FileName, Is.Not.Null);
+            Assert.That(info.Size, Is.Not.EqualTo(0));
+            Assert.That(info.Height, Is.EqualTo(0.5));
+            Assert.That(info.LayerHeight, Is.EqualTo(0));
+            Assert.That(info.Filament.Count, Is.EqualTo(0));
+            Assert.That(info.GeneratedBy, Is.Null);
+            Assert.That(info.PrintTime, Is.Null);
+            Assert.That(info.SimulatedTime, Is.Null);
         }
     }
     */
