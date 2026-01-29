@@ -112,16 +112,34 @@ public static class Reader
     }
 
     /// <summary>
+    /// Read a legacy print pause event
+    /// </summary>
+    /// <param name="from">Origin</param>
+    /// <param name="filePosition">Position at which the print has been paused</param>
+    /// <param name="filePosition2">Position at which the second open file has been paused (if applicable)</param>
+    /// <param name="reason">Reason why the print has been paused</param>
+    /// <returns>Number of bytes read</returns>
+    public static int ReadLegacyPrintPaused(ReadOnlySpan<byte> from, out uint filePosition, out PrintPausedReason reason)
+    {
+        LegacyPrintPausedHeader header = MemoryMarshal.Read<LegacyPrintPausedHeader>(from);
+        filePosition = header.FilePosition;
+        reason = (PrintPausedReason)header.PauseReason;
+        return Marshal.SizeOf<LegacyPrintPausedHeader>();
+    }
+
+    /// <summary>
     /// Read a print pause event
     /// </summary>
     /// <param name="from">Origin</param>
     /// <param name="filePosition">Position at which the print has been paused</param>
+    /// <param name="filePosition2">Position at which the second open file has been paused (if applicable)</param>
     /// <param name="reason">Reason why the print has been paused</param>
     /// <returns>Number of bytes read</returns>
-    public static int ReadPrintPaused(ReadOnlySpan<byte> from, out uint filePosition, out PrintPausedReason reason)
+    public static int ReadPrintPaused(ReadOnlySpan<byte> from, out uint filePosition, out uint filePosition2, out PrintPausedReason reason)
     {
         PrintPausedHeader header = MemoryMarshal.Read<PrintPausedHeader>(from);
         filePosition = header.FilePosition;
+        filePosition2 = header.FilePosition2;
         reason = (PrintPausedReason)header.PauseReason;
         return Marshal.SizeOf<PrintPausedHeader>();
     }
@@ -168,13 +186,17 @@ public static class Reader
     /// Read a <see cref="Request.EvaluationResult"/> request
     /// </summary>
     /// <param name="from">Origin</param>
+    /// <param name="channel">Channel where the evaluation was performed</param>
     /// <param name="expression">Expression</param>
     /// <param name="result">Evaluation result</param>
     /// <returns>Number of bytes read</returns>
-    public static int ReadEvaluationResult(ReadOnlySpan<byte> from, out string expression, out object? result)
+    public static int ReadEvaluationResult(ReadOnlySpan<byte> from, out CodeChannel channel, out string expression, out object? result)
     {
         EvaluationResultHeader header = MemoryMarshal.Read<EvaluationResultHeader>(from);
         int bytesRead = Marshal.SizeOf<EvaluationResultHeader>();
+
+        // Read channel
+        channel = header.Channel;
 
         // Read expression
         ReadOnlySpan<byte> unicodeExpression = from.Slice(bytesRead, header.ExpressionLength);
@@ -188,12 +210,15 @@ public static class Reader
                 result = header.IntValue;
                 break;
             case DataType.UInt:
+            case DataType.Bitmap16:
+            case DataType.Bitmap32:
                 result = header.UIntValue;
                 break;
             case DataType.Float:
                 result = header.FloatValue;
                 break;
             case DataType.ULong:
+            case DataType.Bitmap64:
                 bytesRead = AddPadding(bytesRead);
                 result = MemoryMarshal.Read<ulong>(from[bytesRead..]);
                 break;

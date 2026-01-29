@@ -22,7 +22,7 @@ public enum Request : ushort
     /// </summary>
     /// <seealso cref="CodeBufferUpdateHeader"/>
     CodeBufferUpdate = 2,
-    
+
     /// <summary>
     /// Message from the firmware
     /// </summary>
@@ -40,7 +40,7 @@ public enum Request : ushort
     /// </summary>
     /// <seealso cref="AbortFileHeader"/>
     AbortFile = 5,
-    
+
     /// <summary>
     /// Stack has been changed. This is no longer used
     /// </summary>
@@ -51,7 +51,7 @@ public enum Request : ushort
     /// </summary>
     /// <seealso cref="PrintPausedHeader"/>
     PrintPaused = 7,
-    
+
     /// <summary>
     /// Response to a heightmap request. This is no longer used
     /// </summary>
@@ -129,23 +129,23 @@ public enum Request : ushort
     /// </summary>
     WriteFile = 21,
 
-        /// <summary>
-        /// Seek in a file
-        /// </summary>
-        SeekFile = 22,
+    /// <summary>
+    /// Seek in a file
+    /// </summary>
+    SeekFile = 22,
 
-        /// <summary>
-        /// Truncate a file
-        /// </summary>
-        TruncateFile = 23,
+    /// <summary>
+    /// Truncate a file
+    /// </summary>
+    TruncateFile = 23,
 
-        /// <summary>
-        /// Close a file again
-        /// </summary>
-        CloseFile = 24,
+    /// <summary>
+    /// Close a file again
+    /// </summary>
+    CloseFile = 24,
 
-        /// <summary>
-        /// Delete a file or directory recursively
-        /// </summary>
-        DeleteFileOrDirectoryRecursively = 25
-    }
+    /// <summary>
+    /// Delete a file or directory recursively
+    /// </summary>
+    DeleteFileOrDirectoryRecursively = 25
+}

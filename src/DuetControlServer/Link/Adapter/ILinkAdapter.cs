@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Threading;
 using DuetAPI;
-using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
@@ -100,8 +99,9 @@ public interface ILinkAdapter
     /// Read the content of a <see cref="PrintPausedHeader"/> packet
     /// </summary>
     /// <param name="filePosition">Position where the print has been paused</param>
+    /// <param name="filePosition2">Secondary file position where the print has been paused</param>
     /// <param name="reason">Reason why the print has been paused</param>
-    void ReadPrintPaused(out uint filePosition, out PrintPausedReason reason);
+    void ReadPrintPaused(out uint filePosition, out uint filePosition2, out PrintPausedReason reason);
 
     /// <summary>
     /// Read a code channel
@@ -121,9 +121,10 @@ public interface ILinkAdapter
     /// <summary>
     /// Read the result of an expression evaluation request
     /// </summary>
+    /// <param name="channel">Channel where the evaluation was performed</param>
     /// <param name="expression">Evaluated expression</param>
     /// <param name="result">Result</param>
-    void ReadEvaluationResult(out string expression, out object? result);
+    void ReadEvaluationResult(out CodeChannel? channel, out string expression, out object? result);
 
     /// <summary>
     /// Read a code request
@@ -404,4 +405,19 @@ public interface ILinkAdapter
     /// <param name="success">If the seek operation succeeded</param>
     /// <returns>If the packet could be written</returns>
     bool WriteFileTruncateResult(bool success);
+
+    /// <summary>
+    /// Write the last code result for a specific code channel
+    /// </summary>
+    /// <param name="channel">Code channel</param>
+    /// <param name="result">Last code result</param>
+    /// <returns>If the packet could be written</returns>
+    bool WriteSetLastCodeResult(CodeChannel channel, CodeResult result);
+
+    /// <summary>
+    /// Notify RRF that an object model key has changed
+    /// </summary>
+    /// <param name="key">Key that has changed</param>
+    /// <returns>If the packet could be written</returns>
+    bool WriteObjectModelKeyChanged(string key);
 }

@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
 using DuetControlServer.Link.Adapter;
 using DuetControlServer.Link.Protocol.Shared;
@@ -34,8 +36,10 @@ public sealed partial class LinkInterface(
     // Information about the code channels
     internal int BytesReserved, BufferSpace;
     internal readonly Queue<ModelQueryRequest> ModelQueryRequests = new();
+    internal readonly List<string> UpdatedObjectModelKeys = [];
 
     // Expression evaluation and variable requests
+    internal readonly List<SetLastCodeResultRequest> SetLastCodeResultRequests = [];
     internal readonly List<EvaluateExpressionRequest> EvaluateExpressionRequests = [];
     internal readonly List<VariableRequest> VariableRequests = [];
 
@@ -181,6 +185,54 @@ public sealed partial class LinkInterface(
             }
         }
         return request.Task.WaitAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Set the last code result for a specific code channel
+    /// </summary>
+    /// <param name="channel">Code channel</param>
+    /// <param name="result">Code result</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public Task SetLastCodeResultAsync(Code code, CancellationToken cancellationToken = default)
+    {
+        if (code.Result == null)
+        {
+            // No result to update the code from. Most likely the code was cancelled
+            return Task.CompletedTask;
+        }
+
+        CodeResult result = code.Result.Type switch
+        {
+            MessageType.Success => CodeResult.Ok,
+            MessageType.Warning => CodeResult.Warning,
+            MessageType.Error => CodeResult.Error,
+            _ => throw new ArgumentOutOfRangeException(nameof(code.Result), "Unknown message type"),
+        };
+
+        SetLastCodeResultRequest request;
+        lock (SetLastCodeResultRequests)
+        {
+            request = new(code.Channel, result);
+            SetLastCodeResultRequests.Add(request);
+            logger.LogDebug("Setting last code result to {Result} on channel {Channel}", result, code.Channel);
+        }
+        return request.Task.WaitAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Notify that an object model key has changed
+    /// </summary>
+    /// <param name="key">Changed key</param>
+    public void ObjectModelKeyChanged(string key)
+    {
+        lock (UpdatedObjectModelKeys)
+        {
+            if (!UpdatedObjectModelKeys.Contains(key))
+            {
+                UpdatedObjectModelKeys.Add(key);
+            }
+        }
     }
 
     /// <summary>
@@ -543,7 +595,21 @@ public sealed partial class LinkInterface(
             ModelQueryRequests.Clear();
         }
 
-        // Resolve pending expression evaluation and variable requests
+        lock (UpdatedObjectModelKeys)
+        {
+            UpdatedObjectModelKeys.Clear();
+        }
+
+        // Resolve pending code result, expression evaluation, and variable requests
+        lock (SetLastCodeResultRequests)
+        {
+            foreach (SetLastCodeResultRequest request in SetLastCodeResultRequests)
+            {
+                request.SetCanceled();
+            }
+            SetLastCodeResultRequests.Clear();
+        }
+
         lock (EvaluateExpressionRequests)
         {
             foreach (EvaluateExpressionRequest request in EvaluateExpressionRequests)
@@ -610,7 +676,21 @@ public sealed partial class LinkInterface(
             ModelQueryRequests.Clear();
         }
 
-        // Resolve pending expression evaluation and variable requests
+        lock (UpdatedObjectModelKeys)
+        {
+            UpdatedObjectModelKeys.Clear();
+        }
+
+        // Resolve pending code result, expression evaluation, and variable requests
+        lock (SetLastCodeResultRequests)
+        {
+            foreach (SetLastCodeResultRequest request in SetLastCodeResultRequests)
+            {
+                request.SetCanceled();
+            }
+            SetLastCodeResultRequests.Clear();
+        }
+
         lock (EvaluateExpressionRequests)
         {
             foreach (EvaluateExpressionRequest request in EvaluateExpressionRequests)

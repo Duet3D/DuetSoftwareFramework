@@ -83,7 +83,12 @@ public enum CodeChannel : byte
     Queue2 = 13,
 
     /// <summary>
+    /// Code channel for the secondary USB channel
+    /// </summary>
+    USB2 = 14,
+
+    /// <summary>
     /// Unknown code channel
     /// </summary>
-    Unknown = 14
+    Unknown = 15
 }

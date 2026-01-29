@@ -26,6 +26,26 @@ public partial class CurrentMove : ModelObject, IStaticModelObject
     private float _deceleration;
 
     /// <summary>
+    /// Total distance of the current move (in mm)
+    /// </summary>
+    public float Distance
+    {
+        get => _distance;
+        set => SetPropertyValue(ref _distance, value);
+    }
+    private float _distance;
+
+    /// <summary>
+    /// Duration of the current move (in s)
+    /// </summary>
+    public float Duration
+    {
+        get => _duration;
+        set => SetPropertyValue(ref _duration, value);
+    }
+    private float _duration;
+
+    /// <summary>
     /// Current extrusion rate (in mm/s)
     /// </summary>
     public float ExtrusionRate

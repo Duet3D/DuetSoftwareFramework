@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Console;
-using Microsoft.Extensions.Options;
 using System;
 using System.IO;
 
@@ -10,20 +9,16 @@ namespace DuetSharedLibrary;
 /// <summary>
 /// Custom console formatter that provides a common log output format
 /// </summary>
-public sealed class CommonLogFormatter : ConsoleFormatter, IDisposable
+public sealed class CommonLogFormatter : ConsoleFormatter
 {
-    private readonly IDisposable? _optionsReloadToken;
-    private CommonLogFormatterOptions _options;
-
     /// <summary>
     /// Constructor
     /// </summary>
-    /// <param name="options">Formatter options</param>
-    public CommonLogFormatter(IOptionsMonitor<CommonLogFormatterOptions> options)
-        : base(nameof(CommonLogFormatter))
+    public CommonLogFormatter() : base(nameof(CommonLogFormatter))
     {
-        _options = options.CurrentValue;
-        _optionsReloadToken = options.OnChange(updatedOptions => _options = updatedOptions);
+        // Disable console output buffering to ensure journalctl -f works correctly
+        // When stdout is not a terminal (e.g., systemd service), it's fully buffered by default
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true });
     }
 
     /// <summary>
@@ -91,7 +86,6 @@ public sealed class CommonLogFormatter : ConsoleFormatter, IDisposable
         }
 
         textWriter.WriteLine();
-        textWriter.Flush();
     }
 
     /// <summary>
@@ -126,14 +120,6 @@ public sealed class CommonLogFormatter : ConsoleFormatter, IDisposable
             LogLevel.Critical => "fatal",
             _ => logLevel.ToString().ToLowerInvariant()
         };
-    }
-
-    /// <summary>
-    /// Dispose of resources
-    /// </summary>
-    public void Dispose()
-    {
-        _optionsReloadToken?.Dispose();
     }
 }
 

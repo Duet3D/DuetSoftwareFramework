@@ -10,6 +10,7 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Codes.Handlers;
 using DuetControlServer.IPC;
 using DuetControlServer.IPC.Processors;
+using DuetControlServer.Link;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -28,6 +29,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     private readonly ICodeHandler _mCodes;
     private readonly ICodeHandler _tCodes;
     private readonly ICodeHandler _keywords;
+    private readonly LinkInterface _linkInterface;
     private readonly ILogger<Code> _logger;
     private readonly Settings _settings;
 
@@ -40,6 +42,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="mCodes">M-code handler</param>
     /// <param name="tCodes">T-code handler</param>
     /// <param name="keywords">Keyword handler</param>
+    /// <param name="linkInterface">Link interface</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
     public Code(Codes.CodeProcessor codeProcessor,
@@ -48,6 +51,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         [FromKeyedServices(Keys.MCodes)] ICodeHandler mCodes,
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
         [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
+        LinkInterface linkInterface,
         ILogger<Code> logger,
         IOptions<Settings> settings) : base()
     {
@@ -57,6 +61,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _mCodes = mCodes;
         _tCodes = tCodes;
         _keywords = keywords;
+        _linkInterface = linkInterface;
         _logger = logger;
         _settings = settings.Value;
     }
@@ -71,6 +76,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="mCodes">M-code handler</param>
     /// <param name="tCodes">T-code handler</param>
     /// <param name="keywords">Keyword handler</param>
+    /// <param name="linkInterface">Link interface</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
     public Code(string code,
@@ -80,6 +86,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         [FromKeyedServices(Keys.MCodes)] ICodeHandler mCodes,
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
         [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
+        LinkInterface linkInterface,
         ILogger<Code> logger,
         IOptions<Settings> settings) : base(code)
     {
@@ -89,6 +96,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _mCodes = mCodes;
         _tCodes = tCodes;
         _keywords = keywords;
+        _linkInterface = linkInterface;
         _logger = logger;
         _settings = settings.Value;
     }
@@ -256,12 +264,18 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
 
             if (Result is not null)
             {
+                if (Type is CodeType.GCode or CodeType.MCode or CodeType.TCode && (Type != CodeType.MCode || MajorNumber is not 997 and not 999))
+                {
+                    // Update the last result but only if this code is no comment and if it is not shutting down the application
+                    await _linkInterface.SetLastCodeResultAsync(this, CancellationToken);
+                }
                 return true;
             }
         }
         catch (Exception e) when (e is MissingParameterException or InvalidParameterTypeException)
         {
             Result = new(MessageType.Error, e.Message);
+            await _linkInterface.SetLastCodeResultAsync(this, CancellationToken);
             return true;
         }
 
@@ -273,6 +287,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
             Flags |= CodeFlags.IsPostProcessed;
             if (resolved)
             {
+                await _linkInterface.SetLastCodeResultAsync(this, CancellationToken);
                 return true;
             }
         }

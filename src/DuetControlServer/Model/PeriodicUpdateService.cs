@@ -2,6 +2,7 @@
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Codes;
+using DuetControlServer.Link;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -25,10 +26,11 @@ namespace DuetControlServer.Model;
 /// Static class that updates the machine model in certain intervals
 /// </summary>
 /// <param name="codeFactory">Code factory to create codes</param>
+/// <param name="linkInterface">Link interface to the machine</param>
 /// <param name="model">Object model</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings of the application</param>
-public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel model, ILogger<PeriodicUpdateService> logger, IOptions<Settings> settings) : BackgroundService
+public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterface linkInterface, ObjectModel model, ILogger<PeriodicUpdateService> logger, IOptions<Settings> settings) : BackgroundService
 {
     /// <summary>
     /// List of enabled protocols
@@ -159,7 +161,7 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel 
                     code.Parameters =
                     [
                         new('P', DateTime.Now.ToString("yyyy-MM-dd")),
-                    new('S', DateTime.Now.ToString("HH:mm:ss"))
+                        new('S', DateTime.Now.ToString("HH:mm:ss"))
                     ];
                     await code.ExecuteAsync();
                 }
@@ -181,28 +183,18 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel 
                     await code.ExecuteAsync();
                 }
 
-                // Check if the network key has been updated
+                // Check if the network or volume keys have been updated
                 if (updateNetworkSeq)
                 {
                     // Update the network seq value
-                    Code code = codeFactory.Create();
-                    code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
-                    code.Channel = CodeChannel.Trigger;
-                    code.Type = CodeType.MCode;
-                    code.MajorNumber = 409;
-                    code.Parameters =
-                    [
-                        new('K', "network"),
-                    new('I', 1)
-                    ];
-                    await code.ExecuteAsync();
+                    linkInterface.ObjectModelKeyChanged("network");
 
                     // Update the IP address to report on 12864 displays
                     if (currentIPAddress != lastIPAddress)
                     {
                         lastIPAddress = currentIPAddress;
 
-                        code = codeFactory.Create();
+                        Code code = codeFactory.Create();
                         code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
                         code.Channel = CodeChannel.Trigger;
                         code.Type = CodeType.MCode;
@@ -217,17 +209,7 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, ObjectModel 
 
                 if (updateVolumesSeq)
                 {
-                    Code code = codeFactory.Create();
-                    code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
-                    code.Channel = CodeChannel.Trigger;
-                    code.Type = CodeType.MCode;
-                    code.MajorNumber = 409;
-                    code.Parameters =
-                    [
-                        new('K', "volumes"),
-                    new('I', 1)
-                    ];
-                    await code.ExecuteAsync();
+                    linkInterface.ObjectModelKeyChanged("volumes");
                 }
 
                 // Wait for next scheduled update check

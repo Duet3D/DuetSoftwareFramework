@@ -47,4 +47,6 @@ public struct CodeHeader
     /// File position after the read code. This is used for pausing and resuming
     /// </summary>
     public uint FilePosition;
+
+    // Line number goes here in protocol version >= 2 (int32)
 }

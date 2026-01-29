@@ -9,37 +9,37 @@ public enum DataType : byte
     /// Parameter is a signed integer
     /// </summary>
     Int = 0,
-    
+
     /// <summary>
     /// Parameter is an unsigned integer
     /// </summary>
     UInt = 1,
-    
+
     /// <summary>
     /// Parameter is a float
     /// </summary>
     Float = 2,
-    
+
     /// <summary>
     /// Parameter is a signed integer array
     /// </summary>
     IntArray = 3,
-    
+
     /// <summary>
     /// Parameter is an unsigned integer array
     /// </summary>
     UIntArray = 4,
-    
+
     /// <summary>
     /// Parameter is a float array
     /// </summary>
     FloatArray = 5,
-    
+
     /// <summary>
     /// Parameter is a UTF-8 string
     /// </summary>
     String = 6,
-    
+
     /// <summary>
     /// Parameter is an expression
     /// </summary>
@@ -85,5 +85,23 @@ public enum DataType : byte
     /// <summary>
     /// Parameter is a char value
     /// </summary>
-    Char = 15
+    Char = 15,
+
+    /// <summary>
+    /// Parameter is a 16-bit bitmap
+    /// </summary>
+    Bitmap16 = 16,
+
+    /// <summary>
+    /// Parameter is a 32-bit bitmap
+    /// </summary>
+    Bitmap32 = 17,
+
+    /// <summary>
+    /// Parameter is a 64-bit bitmap
+    /// </summary>
+    /// <remarks>
+    /// Only 56 bits are actually available for use
+    /// </remarks>
+    Bitmap64 = 18
 }

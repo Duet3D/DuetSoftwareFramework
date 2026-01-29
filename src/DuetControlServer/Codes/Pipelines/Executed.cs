@@ -3,6 +3,7 @@ using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Codes.Handlers;
 using DuetControlServer.Files;
+using DuetControlServer.Link;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -22,6 +23,7 @@ public sealed class Executed : PipelineBase
     // Private fields
     private readonly ChannelProcessor _channelProcessor;
     private readonly Utility.EventLogger _eventLogger;
+    private readonly LinkInterface _linkInterface;
     private readonly Model.ObjectModel _model;
     private readonly ICodeHandler _gCodes;
     private readonly ICodeHandler _mCodes;
@@ -44,6 +46,7 @@ public sealed class Executed : PipelineBase
     public Executed(ChannelProcessor channelProcessor,
         CodeProcessor codeProcessor,
         Utility.EventLogger eventLogger,
+        LinkInterface linkInterface,
         Model.ObjectModel model,
         [FromKeyedServices(Keys.GCodes)] ICodeHandler gCodes,
         [FromKeyedServices(Keys.MCodes)] ICodeHandler mCodes,
@@ -53,6 +56,7 @@ public sealed class Executed : PipelineBase
     {
         _channelProcessor = channelProcessor;
         _eventLogger = eventLogger;
+        _linkInterface = linkInterface;
         _model = model;
         _gCodes = gCodes;
         _mCodes = mCodes;

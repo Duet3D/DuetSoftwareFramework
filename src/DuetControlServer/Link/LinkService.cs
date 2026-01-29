@@ -374,10 +374,45 @@ public sealed class LinkService(
                 }
             }
 
+            // Notify RRF about changed object model keys
+            lock (linkInterface.UpdatedObjectModelKeys)
             {
+                foreach (string key in linkInterface.UpdatedObjectModelKeys.ToList())
+                {
+                    if (linkAdapter.WriteObjectModelKeyChanged(key))
+                    {
+                        linkInterface.UpdatedObjectModelKeys.Remove(key);
+                    }
+                    else
+                    {
+                        // Cannot write any more object model key changes, stop here
+                        break;
+                    }
+                }
+            }
+
+            // Update code result(s) where needed
+            lock (linkInterface.SetLastCodeResultRequests)
+            {
+                foreach (SetLastCodeResultRequest request in linkInterface.SetLastCodeResultRequests.ToList())
+                {
+                    if (linkAdapter.WriteSetLastCodeResult(request.Channel, request.Result))
+                    {
+                        request.SetResult();
+                        linkInterface.SetLastCodeResultRequests.Remove(request);
+                    }
+                    else
+                    {
+                        // Cannot write any more code result requests, stop here
+                        break;
+                    }
+                }
+            }
+
+            {
+                // Ask for expressions to be evaluated
                 int numEvaluationsSent = 0;
 
-                // Ask for expressions to be evaluated
                 lock (linkInterface.EvaluateExpressionRequests)
                 {
                     foreach (EvaluateExpressionRequest request in linkInterface.EvaluateExpressionRequests)
@@ -396,7 +431,7 @@ public sealed class LinkService(
                             }
                             else
                             {
-                                // Don't attempt to write any more evaluation requests, else we risk getting out of order
+                                // Cannot write any more evaluation requests, stop here
                                 break;
                             }
                         }
@@ -699,8 +734,8 @@ public sealed class LinkService(
     /// <returns>Asynchronous task</returns>
     private void HandlePrintPaused()
     {
-        linkAdapter.ReadPrintPaused(out uint filePosition, out PrintPausedReason pauseReason);
-        logger.LogDebug("Received print pause notification for file position {Offset}, reason {PauseReason}", (filePosition == Consts.NoFilePosition) ? "(none)" : filePosition.ToString(), pauseReason);
+        linkAdapter.ReadPrintPaused(out uint filePosition, out uint filePosition2, out PrintPausedReason pauseReason);
+        logger.LogDebug("Received print pause notification for file position {Offset}/{Offset2}, reason {PauseReason}", (filePosition == Consts.NoFilePosition) ? "(none)" : filePosition.ToString(), (filePosition2 == Consts.NoFilePosition) ? "(none)" : filePosition2.ToString(), pauseReason);
 
         // Update the object model
         using (model.AccessReadWrite())
@@ -713,7 +748,8 @@ public sealed class LinkService(
         {
             // Do NOT supply a file position if this is a pause request initiated from G-code because that would lead to an endless loop
             bool filePositionValid = (filePosition != Consts.NoFilePosition) && (pauseReason != PrintPausedReason.GCode) && (pauseReason != PrintPausedReason.FilamentChange);
-            jobProcessor.Pause(filePositionValid ? filePosition : null, pauseReason);
+            bool filePosition2Valid = (filePosition2 != Consts.NoFilePosition) && (pauseReason != PrintPausedReason.GCode) && (pauseReason != PrintPausedReason.FilamentChange);
+            jobProcessor.Pause(filePositionValid ? filePosition : null, filePosition2Valid ? filePosition2 : null, pauseReason);
         }
 
         // Resolve pending and buffered codes on the file channels
@@ -789,16 +825,14 @@ public sealed class LinkService(
     /// </summary>
     private void HandleEvaluationResult()
     {
-        linkAdapter.ReadEvaluationResult(out string expression, out object? result);
-        logger.LogDebug("Received evaluation result for expression {Expression} = {Result}", expression, result);
+        linkAdapter.ReadEvaluationResult(out CodeChannel? channel, out string expression, out object? result);
+        logger.LogDebug("Received evaluation result for expression via {Channel}: {Expression} = {Result}", channel, expression, result);
 
         lock (linkInterface.EvaluateExpressionRequests)
         {
             foreach (EvaluateExpressionRequest request in linkInterface.EvaluateExpressionRequests)
             {
-                // FIXME This should continue to work, but the next time the protocol is
-                // updated, the evaluation response should include the channel as well
-                if (request.Written && /*request.Channel == channel &&*/ request.Expression == expression)
+                if (request.Written && (channel == null || request.Channel == channel) && request.Expression == expression)
                 {
                     if (result is Exception exception)
                     {
@@ -878,14 +912,14 @@ public sealed class LinkService(
     /// </summary>
     private void HandleVariableResult()
     {
-        linkAdapter.ReadEvaluationResult(out string varName, out object? result);
-        logger.LogTrace("Received variable assignment result for {Variable} = {Result}", varName, result);
+        linkAdapter.ReadEvaluationResult(out CodeChannel? channel, out string varName, out object? result);
+        logger.LogTrace("Received variable assignment result for {Channel}: {Variable} = {Result}", channel, varName, result);
 
         lock (linkInterface.VariableRequests)
         {
             foreach (VariableRequest request in linkInterface.VariableRequests)
             {
-                if (request.VariableName == varName)
+                if (request.VariableName == varName && (channel == null || request.Channel == channel))
                 {
                     if (result is Exception exception)
                     {
@@ -901,7 +935,7 @@ public sealed class LinkService(
             }
         }
 
-        logger.LogWarning("Unresolved variable set result for variable {Variable} = {Result}", varName, result);
+        logger.LogWarning("Unresolved variable set result for {Channel}: {Variable} = {Result}", channel, varName, result);
     }
 
     /// <summary>

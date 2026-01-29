@@ -70,6 +70,16 @@ public enum MessageTypeFlags : uint
     /// A message that is to be sent to an auto-pause processor
     /// </summary>
     AutoPauseMessage = 0x800,
+
+    /// <summary>
+    /// A message that is to be published by the MQTT client
+    /// </summary>
+    MqttMessage = 0x1000,
+
+    /// <summary>
+    /// A message that is to be sent to the second USB channel
+    /// </summary>
+    Usb2Message = 0x2000,
     #endregion
 
     #region Special destinations (byte 3)

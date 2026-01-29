@@ -24,7 +24,7 @@ public static class Consts
     /// <summary>
     /// Used protocol version. This is incremented whenever the protocol details change
     /// </summary>
-    public const ushort ProtocolVersion = 6;
+    public const ushort ProtocolVersion = 7;
 
     /// <summary>
     /// Default size of a data transfer buffer

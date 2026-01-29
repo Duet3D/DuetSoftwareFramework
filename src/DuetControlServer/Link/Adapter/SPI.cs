@@ -412,10 +412,19 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// Read the content of a <see cref="PrintPausedHeader"/> packet
     /// </summary>
     /// <param name="filePosition">Position where the print has been paused</param>
+    /// <param name="filePosition2">Position where the second open file has been paused (if applicable)</param>
     /// <param name="reason">Reason why the print has been paused</param>
-    public void ReadPrintPaused(out uint filePosition, out PrintPausedReason reason)
+    public void ReadPrintPaused(out uint filePosition, out uint filePosition2, out PrintPausedReason reason)
     {
-        Protocol.Reader.ReadPrintPaused(_packetData.Span, out filePosition, out reason);
+        if (ProtocolVersion >= 7)
+        {
+            Protocol.Reader.ReadPrintPaused(_packetData.Span, out filePosition, out filePosition2, out reason);
+        }
+        else
+        {
+            Protocol.Reader.ReadLegacyPrintPaused(_packetData.Span, out filePosition, out reason);
+            filePosition2 = Consts.NoFilePosition;
+        }
     }
 
     /// <summary>
@@ -442,11 +451,13 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <summary>
     /// Read the result of an expression evaluation request
     /// </summary>
+    /// <param name="channel">Channel where the evaluation was performed</param>
     /// <param name="expression">Evaluated expression</param>
     /// <param name="result">Result</param>
-    public void ReadEvaluationResult(out string expression, out object? result)
+    public void ReadEvaluationResult(out CodeChannel? channel, out string expression, out object? result)
     {
-        Protocol.Reader.ReadEvaluationResult(_packetData.Span, out expression, out result);
+        Protocol.Reader.ReadEvaluationResult(_packetData.Span, out CodeChannel actualChannel, out expression, out result);
+        channel = (ProtocolVersion >= 7) ? actualChannel : null;
     }
 
     /// <summary>
@@ -1239,6 +1250,55 @@ public class SPI : IDiagnostics, ILinkAdapter
 
         WritePacket(Protocol.SbcRequests.Request.FileTruncateResult, dataLength);
         Protocol.Writer.WriteBoolean(GetWriteBuffer(dataLength), success);
+        return true;
+    }
+
+    /// <summary>
+    /// Write the last code result for a specific code channel
+    /// </summary>
+    /// <param name="channel">Code channel</param>
+    /// <param name="result">Last code result</param>
+    /// <returns>If the packet could be written</returns>
+    public bool WriteSetLastCodeResult(CodeChannel channel, CodeResult result)
+    {
+        if (ProtocolVersion < 7)
+        {
+            // not supported
+            return true;
+        }
+
+        int dataLength = Marshal.SizeOf<Protocol.SbcRequests.SetLastCodeResultHeader>();
+        if (!CanWritePacket(dataLength))
+        {
+            return false;
+        }
+
+        WritePacket(Protocol.SbcRequests.Request.SetLastCodeResult, dataLength);
+        Protocol.Writer.WriteSetLastCodeResult(GetWriteBuffer(dataLength), channel, result);
+        return true;
+    }
+
+    /// <summary>
+    /// Notify RRF that an object model key has changed
+    /// </summary>
+    /// <param name="key">Key that has changed</param>
+    /// <returns>If the packet could be written</returns>
+    public bool WriteObjectModelKeyChanged(string key)
+    {
+        if (ProtocolVersion < 7)
+        {
+            // not supported
+            return true;
+        }
+
+        int dataLength = Marshal.SizeOf<StringHeader>() + Encoding.UTF8.GetByteCount(key);
+        if (!CanWritePacket(dataLength))
+        {
+            return false;
+        }
+
+        WritePacket(Protocol.SbcRequests.Request.ObjectModelKeyChanged, dataLength);
+        Protocol.Writer.WriteStringRequest(GetWriteBuffer(dataLength), key);
         return true;
     }
 

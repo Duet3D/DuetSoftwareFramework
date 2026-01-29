@@ -11,12 +11,12 @@ public enum Request : ushort
     /// Perform an immediate emergency stop
     /// </summary>
     EmergencyStop = 0,
-    
+
     /// <summary>
     /// Reset the controller
     /// </summary>
     Reset = 1,
-    
+
     /// <summary>
     /// Request the execution of a G/M/T-code
     /// </summary>
@@ -175,5 +175,15 @@ public enum Request : ushort
     /// <summary>
     /// Result of a file seek request
     /// </summary>
-    FileTruncateResult = 28
+    FileTruncateResult = 28,
+
+    /// <summary>
+    /// Set the result of the last executed code
+    /// </summary>
+    SetLastCodeResult = 29,
+
+    /// <summary>
+    /// Increment the sequence number of an object model key provided exclusively by DSF
+    /// </summary>
+    ObjectModelKeyChanged = 30
 }

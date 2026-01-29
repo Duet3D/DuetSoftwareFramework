@@ -182,9 +182,14 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     public bool IsAborted { get; private set; }
 
     /// <summary>
-    /// Defines if the file position is supposed to be set by the Print task
+    /// Defines the file position to be set by the Print task on pause
     /// </summary>
     private long? _pausePosition;
+
+    /// <summary>
+    /// Defines the second file position to be set by the Print task on pause
+    /// </summary>
+    private long? _pausePosition2;
 
     /// <summary>
     /// Reason why the print has been paused
@@ -276,7 +281,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
         IsCancelled = IsAborted = false;
         IsSimulating = simulating;
         _file = file;
-        _pausePosition = null;
+        _pausePosition = _pausePosition2 = null;
 
         // Update the object model
         using (await _model.AccessReadWriteAsync())
@@ -472,6 +477,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                     if (IsPaused)
                     {
                         // Adjust the file position
+                        #warning This needs more work
                         long newFilePosition = _pausePosition ?? currentFilePosition;
                         await SetFilePositionAsync(file.Channel == CodeChannel.File ? 0 : 1, newFilePosition);
                         _logger.LogInformation("Job on {Channel} has been paused at byte {Offset}, reason {PauseReason}", file.Channel, (_pausePosition == null) ? $"{newFilePosition} (no fpos from firmware)" : newFilePosition.ToString(), _pauseReason);
@@ -649,7 +655,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// </summary>
     /// <param name="filePosition">File position where the print was paused</param>
     /// <param name="pauseReason">Reason why the print has been paused</param>
-    public void Pause(long? filePosition, PrintPausedReason pauseReason)
+    public void Pause(long? filePosition, long? filePosition2, PrintPausedReason pauseReason)
     {
         if (IsFileSelected)
         {
@@ -659,6 +665,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
 
             IsPaused = true;
             _pausePosition = filePosition;
+            _pausePosition = filePosition2;
             _pauseReason = pauseReason;
         }
     }

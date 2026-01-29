@@ -1,4 +1,5 @@
-﻿using DuetControlServer.Link.Protocol.Shared;
+﻿using DuetAPI;
+using DuetControlServer.Link.Protocol.Shared;
 using System.Runtime.InteropServices;
 
 namespace DuetControlServer.Link.Protocol.FirmwareRequests;
@@ -14,6 +15,12 @@ public struct EvaluationResultHeader
     /// </summary>
     [FieldOffset(0)]
     public DataType Type;
+
+    /// <summary>
+    /// Channel where the evaluation was performed
+    /// </summary>
+    [FieldOffset(1)]
+    public CodeChannel Channel;
 
     /// <summary>
     /// Length of the following expression
@@ -39,3 +46,4 @@ public struct EvaluationResultHeader
     [FieldOffset(4)]
     public float FloatValue;
 }
+

@@ -831,6 +831,24 @@ else {              // Character parameters are not supported yet, they are wrap
     }
 
     /// <summary>
+    /// Write the last result of a code executed by the SBC
+    /// </summary>
+    /// <param name="to">Destination</param>
+    /// <param name="channel">Code channel</param>
+    /// <param name="result">Code result</param>
+    /// <returns>Number of bytes written</returns>
+    public static int WriteSetLastCodeResult(Span<byte> to, CodeChannel channel, CodeResult result)
+    {
+        SetLastCodeResultHeader header = new()
+        {
+            Channel = channel,
+            Result = result
+        };
+        MemoryMarshal.Write(to, in header);
+        return Marshal.SizeOf<SetLastCodeResultHeader>();
+    }
+
+    /// <summary>
     /// Add padding bytes to maintain alignment on a 4-byte boundary
     /// </summary>
     /// <param name="to">Target buffer</param>

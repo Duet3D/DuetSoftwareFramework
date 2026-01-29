@@ -116,6 +116,15 @@ public partial class Inputs : StaticModelCollection<InputChannel?>
     public InputChannel? Queue2 => this[CodeChannel.Queue2];
 
     /// <summary>
+    /// G/M/T-code channel for the secondary USB channel
+    /// </summary>
+    /// <remarks>
+    /// May not be available if async moves are not supported
+    /// </remarks>
+    [JsonIgnore]
+    public InputChannel? USB2 => this[CodeChannel.USB2];
+
+    /// <summary>
     /// Index operator for easy access via an <see cref="CodeChannel"/> value
     /// </summary>
     /// <param name="channel">Channel to retrieve information about</param>
