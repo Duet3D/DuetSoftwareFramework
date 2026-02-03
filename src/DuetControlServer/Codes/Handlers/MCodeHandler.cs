@@ -603,7 +603,7 @@ public class MCodeHandler(
                             if (code.TryGetString('S', out string? levelString))
                             {
                                 // Parse the log level
-                                if (Enum.TryParse<LogLevel>(levelString, true, out LogLevel level))
+                                if (Enum.TryParse(levelString, true, out LogLevel level))
                                 {
                                     settings.Value.LogLevel = level;
                                     // Note: Changing log level at runtime requires restarting DCS or using a configuration reload mechanism
@@ -629,11 +629,8 @@ public class MCodeHandler(
                                 }
                                 else
                                 {
-                                    if (_messageLoggerProvider != null)
-                                    {
-                                        _messageLoggerProvider.Dispose();
-                                        _messageLoggerProvider = null;
-                                    }
+                                    _messageLoggerProvider?.Dispose();
+                                    _messageLoggerProvider = null;
                                 }
                                 seen = true;
                             }

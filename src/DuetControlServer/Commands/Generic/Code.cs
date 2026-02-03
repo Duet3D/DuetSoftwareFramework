@@ -264,7 +264,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
 
             if (Result is not null)
             {
-                if (Type is CodeType.GCode or CodeType.MCode or CodeType.TCode && (Type != CodeType.MCode || MajorNumber is not 997 and not 999))
+                if (Type is CodeType.GCode or CodeType.MCode or CodeType.TCode && (Type != CodeType.MCode || MajorNumber is not 112 and not 997 and not 999))
                 {
                     // Update the last result but only if this code is no comment and if it is not shutting down the application
                     await _linkInterface.SetLastCodeResultAsync(this, CancellationToken);
