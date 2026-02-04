@@ -103,5 +103,10 @@ public enum DataType : byte
     /// <remarks>
     /// Only 56 bits are actually available for use
     /// </remarks>
-    Bitmap64 = 18
+    Bitmap64 = 18,
+
+    /// <summary>
+    /// Parameter is a float with specific number of digits
+    /// </summary>
+    FloatWithDigits = 19
 }

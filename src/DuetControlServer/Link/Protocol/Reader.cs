@@ -198,6 +198,13 @@ public static class Reader
         // Read channel
         channel = header.Channel;
 
+        // Read number of digits in case of float
+        int numDigits = 0;
+        if (header.Type == DataType.FloatWithDigits)
+        {
+            numDigits = MemoryMarshal.Read<byte>(from.Slice(bytesRead++, 1));
+        }
+
         // Read expression
         ReadOnlySpan<byte> unicodeExpression = from.Slice(bytesRead, header.ExpressionLength);
         expression = Encoding.UTF8.GetString(unicodeExpression);
@@ -216,6 +223,9 @@ public static class Reader
                 break;
             case DataType.Float:
                 result = header.FloatValue;
+                break;
+            case DataType.FloatWithDigits:
+                result = Math.Round((decimal)header.FloatValue, numDigits, MidpointRounding.AwayFromZero);
                 break;
             case DataType.ULong:
             case DataType.Bitmap64:

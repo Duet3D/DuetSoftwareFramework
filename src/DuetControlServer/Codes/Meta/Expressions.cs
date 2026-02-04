@@ -750,7 +750,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                return await linkInterface.EvaluateExpressionAsync(code.Channel, subExpression, cancellationToken: cancellationToken);
+                return await linkInterface.EvaluateExpressionAsync(code.Channel, subExpression, cancellationToken);
             }
             catch (CodeParserException) when (cancellationToken.IsCancellationRequested)
             {
