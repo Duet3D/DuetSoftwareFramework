@@ -225,7 +225,10 @@ public sealed class Processor
                 {
                     if (!macro.IsAborted)
                     {
-                        _logger.LogWarning("Aborting orphaned macro file {File}", macro.FilePath.Virtual);
+                        if (!_lifetime.ApplicationStopping.IsCancellationRequested)
+                        {
+                            _logger.LogWarning("Aborting orphaned macro file {File}", macro.FilePath.Virtual);
+                        }
                         macro.Abort();
                     }
                 }
@@ -302,7 +305,10 @@ public sealed class Processor
                 {
                     if (!macro.IsAborted)
                     {
-                        _logger.LogWarning("Aborting orphaned macro file {File}", macro.FilePath.Virtual);
+                        if (!_lifetime.ApplicationStopping.IsCancellationRequested)
+                        {
+                            _logger.LogWarning("Aborting orphaned macro file {File}", macro.FilePath.Virtual);
+                        }
                         macro.Abort();
                     }
                 }
