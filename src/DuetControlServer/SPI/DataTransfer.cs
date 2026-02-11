@@ -55,6 +55,9 @@ namespace DuetControlServer.SPI
         private static PacketHeader _lastPacket;
         private static ReadOnlyMemory<byte> _packetData;
 
+        // Keep track of packets being resent to avoid getting out-of-order
+        private static List<Communication.SbcRequests.Request> _packetsBeingResent = [];
+
         /// <summary>
         /// Currently-used protocol version
         /// </summary>
@@ -185,6 +188,7 @@ namespace DuetControlServer.SPI
         /// <param name="connecting">Whether this an initial connection is being established</param>
         public static void PerformFullTransfer(bool connecting = false)
         {
+            _packetsBeingResent.Clear();
             _lastTransferNumber = _rxHeader.SequenceNumber;
 
             // Reset RX transfer header
@@ -574,7 +578,6 @@ namespace DuetControlServer.SPI
                 Length = (ushort)dataLength,
                 ResendPacketId = 0
             };
-
             Span<byte> span = _txBuffer.Value[_txPointer..].Span;
             MemoryMarshal.Write(span, header);
             _txPointer += Marshal.SizeOf<PacketHeader>();
@@ -619,14 +622,20 @@ namespace DuetControlServer.SPI
                     sbcRequest = (Communication.SbcRequests.Request)header.Request;
                     WritePacket(sbcRequest, header.Length);
                     buffer.Slice(headerSize, header.Length).CopyTo(GetWriteBuffer(header.Length));
+
+                    // Keep track of it
+                    if (sbcRequest != Communication.SbcRequests.Request.LockAllMovementSystemsAndWaitForStandstill &&
+                        !_packetsBeingResent.Contains(sbcRequest))
+                    {
+                        _packetsBeingResent.Add(sbcRequest);
+                    }
                     return;
                 }
 
                 // Move on to the next one
                 int padding = 4 - (header.Length % 4);
                 buffer = buffer[(headerSize + header.Length + ((padding == 4) ? 0 : padding))..];
-            }
-            while (header.Id < packet.ResendPacketId && buffer.Length > 0);
+            } while (header.Id < packet.ResendPacketId && buffer.Length > 0);
 
             throw new ArgumentException($"Firmware requested resend for invalid packet #{packet.ResendPacketId}");
         }
@@ -637,6 +646,7 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteEmergencyStop()
         {
+            // E-STOP is unconditional
             if (!CanWritePacket())
             {
                 return false;
@@ -652,6 +662,7 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteReset()
         {
+            // Reset is unconditional
             if (!CanWritePacket())
             {
                 return false;
@@ -688,6 +699,12 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteCode(Code code)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.Code))
+            {
+                return false;
+            }
+
             // Attempt to serialize the code first
             Span<byte> span = stackalloc byte[Settings.MaxCodeBufferSize];
             int codeLength;
@@ -719,6 +736,13 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteGetLegacyConfigResponse()
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.GetObjectModel))
+            {
+                return false;
+            }
+
+            // Check if we can write it at all
             if (!CanWritePacket(sizeof(int)))
             {
                 return false;
@@ -742,6 +766,12 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteGetObjectModel(string key, string flags)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.GetObjectModel))
+            {
+                return false;
+            }
+
             // Serialize the request first to see how much space it requires
             Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
             int dataLength = Serialization.Writer.WriteGetObjectModel(span, key, flags);
@@ -767,6 +797,12 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteSetObjectModel(string field, object value)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.SetObjectModel))
+            {
+                return false;
+            }
+
             // Serialize the request first to see how much space it requires
             Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
             int dataLength = Serialization.Writer.WriteSetObjectModel(span, field, value);
@@ -791,6 +827,12 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WritePrintFileInfo(GCodeFileInfo info)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.SetPrintFileInfo))
+            {
+                return false;
+            }
+
             // Serialize the request first to see how much space it requires
             Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
             int dataLength = Serialization.Writer.WritePrintFileInfo(span, info);
@@ -814,6 +856,12 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WritePrintStopped(PrintStoppedReason reason)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.PrintStopped))
+            {
+                return false;
+            }
+
             int dataLength = Marshal.SizeOf<Communication.SbcRequests.PrintStoppedHeader>();
             if (!CanWritePacket(dataLength))
             {
@@ -834,6 +882,12 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteMacroCompleted(CodeChannel channel, bool error)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.MacroCompleted))
+            {
+                return false;
+            }
+
             int dataLength = Marshal.SizeOf<Communication.SbcRequests.MacroCompleteHeader>();
             if (!CanWritePacket(dataLength))
             {
@@ -852,6 +906,8 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteLockAllMovementSystemsAndWaitForStandstill(CodeChannel channel)
         {
+            // Resends of this request are expected as it may take a moment before the lock is acquired
+
             int dataLength = Marshal.SizeOf<CodeChannelHeader>();
             if (!CanWritePacket(dataLength))
             {
@@ -870,6 +926,12 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteUnlock(CodeChannel channel)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.Unlock))
+            {
+                return false;
+            }
+
             int dataLength = Marshal.SizeOf<CodeChannelHeader>();
             if (!CanWritePacket(dataLength))
             {
@@ -995,6 +1057,12 @@ namespace DuetControlServer.SPI
         /// <returns>Whether the firmware has been written successfully</returns>
         public static bool WriteFileChunk(Span<byte> data, long fileLength)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.FileChunk))
+            {
+                return false;
+            }
+
             // Serialize the request first to see how much space it requires
             Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
             int dataLength = Serialization.Writer.WriteFileChunk(span, data, fileLength);
@@ -1019,6 +1087,12 @@ namespace DuetControlServer.SPI
         /// <returns>Whether the evaluation request has been written successfully</returns>
         public static bool WriteEvaluateExpression(CodeChannel channel, string expression)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.EvaluateExpression))
+            {
+                return false;
+            }
+
             // Serialize the request first to see how much space it requires
             Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
             int dataLength = Serialization.Writer.WriteEvaluateExpression(span, channel, expression);
@@ -1043,6 +1117,12 @@ namespace DuetControlServer.SPI
         /// <returns>Whether the firmware has been written successfully</returns>
         public static bool WriteMessage(MessageTypeFlags flags, string message)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.Message))
+            {
+                return false;
+            }
+
             // Serialize the request first to see how much space it requires
             Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
             int dataLength = Serialization.Writer.WriteMessage(span, flags, message);
@@ -1066,6 +1146,12 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteMacroStarted(CodeChannel channel)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.MacroStarted))
+            {
+                return false;
+            }
+
             int dataLength = Marshal.SizeOf<CodeChannelHeader>();
             if (!CanWritePacket(dataLength))
             {
@@ -1084,6 +1170,12 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteInvalidateChannel(CodeChannel channel)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.InvalidateChannel))
+            {
+                return false;
+            }
+
             int dataLength = Marshal.SizeOf<CodeChannelHeader>();
             if (!CanWritePacket(dataLength))
             {
@@ -1105,6 +1197,12 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteSetVariable(CodeChannel channel, bool createVariable, string varName, string expression)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.SetVariable))
+            {
+                return false;
+            }
+
             // Serialize the request first to see how much space it requires
             Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
             int dataLength = Serialization.Writer.WriteSetVariable(span, channel, createVariable, varName, expression);
@@ -1129,6 +1227,12 @@ namespace DuetControlServer.SPI
         /// <returns>True if the packet could be written</returns>
         public static bool WriteDeleteLocalVariable(CodeChannel channel, string varName)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.DeleteLocalVariable))
+            {
+                return false;
+            }
+
             // Serialize the request first to see how much space it requires
             Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
             int dataLength = Serialization.Writer.WriteDeleteLocalVariable(span, channel, varName);
@@ -1152,6 +1256,12 @@ namespace DuetControlServer.SPI
         /// <returns>If the packet could be written</returns>
         public static bool WriteCheckFileExistsResult(bool exists)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.CheckFileExistsResult))
+            {
+                return false;
+            }
+
             int dataLength = Marshal.SizeOf<Communication.SbcRequests.BooleanHeader>();
             if (!CanWritePacket(dataLength))
             {
@@ -1170,6 +1280,12 @@ namespace DuetControlServer.SPI
         /// <returns>If the packet could be written</returns>
         public static bool WriteFileDeleteResult(bool success)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.FileDeleteResult))
+            {
+                return false;
+            }
+
             int dataLength = Marshal.SizeOf<Communication.SbcRequests.BooleanHeader>();
             if (!CanWritePacket(dataLength))
             {
@@ -1189,6 +1305,12 @@ namespace DuetControlServer.SPI
         /// <returns>If the packet could be written</returns>
         public static bool WriteOpenFileResult(uint fileHandle, long length)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.OpenFileResult))
+            {
+                return false;
+            }
+
             int dataLength = Marshal.SizeOf<Communication.SbcRequests.OpenFileResult>();
             if (!CanWritePacket(dataLength))
             {
@@ -1208,6 +1330,12 @@ namespace DuetControlServer.SPI
         /// <returns>If the packet could be written</returns>
         public static bool WriteFileReadResult(Span<byte> data, int bytesRead)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.FileReadResult))
+            {
+                return false;
+            }
+
             int dataLength = Marshal.SizeOf<Communication.SbcRequests.FileDataHeader>() + data.Length;
             if (!CanWritePacket(dataLength))
             {
@@ -1226,6 +1354,12 @@ namespace DuetControlServer.SPI
         /// <returns>If the packet could be written</returns>
         public static bool WriteFileWriteResult(bool success)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.FileWriteResult))
+            {
+                return false;
+            }
+
             int dataLength = Marshal.SizeOf<Communication.SbcRequests.BooleanHeader>();
             if (!CanWritePacket(dataLength))
             {
@@ -1244,6 +1378,12 @@ namespace DuetControlServer.SPI
         /// <returns>If the packet could be written</returns>
         public static bool WriteFileSeekResult(bool success)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.FileSeekResult))
+            {
+                return false;
+            }
+
             int dataLength = Marshal.SizeOf<Communication.SbcRequests.BooleanHeader>();
             if (!CanWritePacket(dataLength))
             {
@@ -1262,6 +1402,12 @@ namespace DuetControlServer.SPI
         /// <returns>If the packet could be written</returns>
         public static bool WriteFileTruncateResult(bool success)
         {
+            // Don't send a new request if another one is still pending
+            if (_packetsBeingResent.Contains(Communication.SbcRequests.Request.FileTruncateResult))
+            {
+                return false;
+            }
+
             int dataLength = Marshal.SizeOf<Communication.SbcRequests.BooleanHeader>();
             if (!CanWritePacket(dataLength))
             {

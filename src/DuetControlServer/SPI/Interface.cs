@@ -824,6 +824,7 @@ namespace DuetControlServer.SPI
                 }
                 else
                 {
+                    // Only allow one object model query per transfer because the response is usually quite large
                     lock (_pendingModelQueries)
                     {
                         if (_pendingModelQueries.TryPeek(out PendingModelQuery? query) &&
