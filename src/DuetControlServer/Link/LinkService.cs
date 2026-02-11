@@ -365,6 +365,7 @@ public sealed class LinkService(
                 throw new Exception("Unsupported firmware version. Upgrade your firmware manually");
             }
 
+            // Only allow one object model query per transfer because the response is usually quite large
             lock (linkInterface.ModelQueryRequests)
             {
                 if (linkInterface.ModelQueryRequests.TryPeek(out ModelQueryRequest? request) &&

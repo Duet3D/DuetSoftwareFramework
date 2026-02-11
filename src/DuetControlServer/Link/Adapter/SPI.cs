@@ -59,6 +59,9 @@ public class SPI : IDiagnostics, ILinkAdapter
     private PacketHeader _lastPacket;
     private ReadOnlyMemory<byte> _packetData;
 
+    // Keep track of packets being resent to avoid getting out-of-order
+    private List<Protocol.SbcRequests.Request> _packetsBeingResent = [];
+
     /// <summary>
     /// Currently-used protocol version
     /// </summary>
@@ -209,6 +212,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <param name="cancellationToken">Cancellation token to cancel the transfer</param>
     public void PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default)
     {
+        _packetsBeingResent.Clear();
         _lastTransferNumber = _rxHeader.SequenceNumber;
 
         // Reset RX transfer header
@@ -636,6 +640,13 @@ public class SPI : IDiagnostics, ILinkAdapter
                 sbcRequest = (Protocol.SbcRequests.Request)header.Request;
                 WritePacket(sbcRequest, header.Length);
                 buffer.Slice(headerSize, header.Length).CopyTo(GetWriteBuffer(header.Length));
+
+                // Keep track of it
+                if (sbcRequest != Protocol.SbcRequests.Request.LockAllMovementSystemsAndWaitForStandstill &&
+                    !_packetsBeingResent.Contains(sbcRequest))
+                {
+                    _packetsBeingResent.Add(sbcRequest);
+                }
                 return;
             }
 
@@ -654,6 +665,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteEmergencyStop()
     {
+        // E-STOP is unconditional
         if (!CanWritePacket())
         {
             return false;
@@ -669,6 +681,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteReset()
     {
+        // Reset is unconditional
         if (!CanWritePacket())
         {
             return false;
@@ -687,6 +700,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteCode(Code code)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.Code))
+        {
+            return false;
+        }
+
         // Attempt to serialize the code first
         Span<byte> span = stackalloc byte[_settings.MaxCodeBufferSize];
         int codeLength;
@@ -720,6 +739,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteGetObjectModel(string key, string flags)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.GetObjectModel))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteGetObjectModel(span, key, flags);
@@ -745,6 +770,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteSetObjectModel(string field, object value)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.SetObjectModel))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Serialization.Writer.WriteSetObjectModel(span, field, value);
@@ -769,6 +800,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WritePrintFileInfo(GCodeFileInfo info)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.SetPrintFileInfo))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WritePrintFileInfo(span, info);
@@ -792,6 +829,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WritePrintStopped(PrintStoppedReason reason)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.PrintStopped))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.PrintStoppedHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -812,6 +855,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteMacroCompleted(CodeChannel channel, bool error)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.MacroCompleted))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.MacroCompleteHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -830,6 +879,8 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteLockAllMovementSystemsAndWaitForStandstill(CodeChannel channel)
     {
+        // Resends of this request are expected as it may take a moment before the lock is acquired
+
         int dataLength = Marshal.SizeOf<CodeChannelHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -848,6 +899,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteUnlock(CodeChannel channel)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.Unlock))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<CodeChannelHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -975,6 +1032,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>Whether the firmware has been written successfully</returns>
     public bool WriteFileChunk(Span<byte> data, long fileLength)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileChunk))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteFileChunk(span, data, fileLength);
@@ -999,6 +1062,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>Whether the evaluation request has been written successfully</returns>
     public bool WriteEvaluateExpression(CodeChannel channel, string expression)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.EvaluateExpression))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteEvaluateExpression(span, channel, expression);
@@ -1023,6 +1092,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>Whether the firmware has been written successfully</returns>
     public bool WriteMessage(MessageTypeFlags flags, string message)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.Message))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteMessage(span, flags, message);
@@ -1046,6 +1121,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteMacroStarted(CodeChannel channel)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.MacroStarted))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<CodeChannelHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1064,6 +1145,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteInvalidateChannel(CodeChannel channel)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.InvalidateChannel))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<CodeChannelHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1085,6 +1172,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteSetVariable(CodeChannel channel, bool createVariable, string varName, string expression)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.SetVariable))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteSetVariable(span, channel, createVariable, varName, expression);
@@ -1109,6 +1202,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteDeleteLocalVariable(CodeChannel channel, string varName)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.DeleteLocalVariable))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteDeleteLocalVariable(span, channel, varName);
@@ -1132,6 +1231,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteCheckFileExistsResult(bool exists)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.CheckFileExistsResult))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.BooleanHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1150,6 +1255,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteFileDeleteResult(bool success)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileDeleteResult))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.BooleanHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1169,6 +1280,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteOpenFileResult(uint fileHandle, long length)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.OpenFileResult))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.OpenFileResult>();
         if (!CanWritePacket(dataLength))
         {
@@ -1188,6 +1305,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteFileReadResult(Span<byte> data, int bytesRead)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileReadResult))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.FileDataHeader>() + data.Length;
         if (!CanWritePacket(dataLength))
         {
@@ -1206,6 +1329,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteFileWriteResult(bool success)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileWriteResult))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.BooleanHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1224,6 +1353,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteFileSeekResult(bool success)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileSeekResult))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.BooleanHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1242,6 +1377,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteFileTruncateResult(bool success)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileTruncateResult))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.BooleanHeader>();
         if (!CanWritePacket(dataLength))
         {

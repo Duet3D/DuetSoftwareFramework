@@ -26,7 +26,7 @@ public struct PacketHeader
     public ushort Length;
 
     /// <summary>
-    /// Identifier of the packet that is supposed to be resend (defaults to 0)
+    /// Identifier of the packet that is supposed to be resent (defaults to 0)
     /// </summary>
     public ushort ResendPacketId;
 }
