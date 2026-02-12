@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.ObjectModel;
 
 namespace DuetAPI.ObjectModel;
 
@@ -20,7 +21,18 @@ public partial class Layer : ModelObject, IStaticModelObject
     /// <summary>
     /// Actual amount of filament extruded during this layer (in mm)
     /// </summary>
+    [Obsolete("use FilamentUsage instead")]
     public ObservableCollection<float> Filament { get; } = [];
+
+    /// <summary>
+    /// Amount of total filament extruded during this layer (in mm)
+    /// </summary>
+    public float FilamentUsage
+    {
+        get => _filamentUsage;
+        set => SetPropertyValue(ref _filamentUsage, value);
+    }
+    private float _filamentUsage;
 
     /// <summary>
     /// Fraction of the file printed during this layer (0..1)

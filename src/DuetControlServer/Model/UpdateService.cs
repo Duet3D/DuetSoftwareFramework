@@ -342,7 +342,12 @@ public class UpdateService : BackgroundService
     /// <summary>
     /// Filament usage at the time of the last layer change
     /// </summary>
-    private List<float> _lastFilamentUsage = [];
+    private static List<float> _lastFilamentUsage = [];
+
+    /// <summary>
+    /// Filament usage at the time of the last layer change
+    /// </summary>
+    private float _lastTotalFilamentUsage = 0F;
 
     /// <summary>
     /// Last file position at the time of the last layer change
@@ -367,6 +372,7 @@ public class UpdateService : BackgroundService
                 _lastLayer = -1;
                 _lastDuration = 0;
                 _lastFilamentUsage.Clear();
+                _lastTotalFilamentUsage = 0F;
                 _lastFilePosition = 0L;
                 _lastHeight = 0F;
             }
@@ -392,9 +398,10 @@ public class UpdateService : BackgroundService
             int numChangedLayers = (_model.Job.Layer.Value > _lastLayer) ? Math.Abs(_model.Job.Layer.Value - _lastLayer) : 1;
             int printDuration = _model.Job.Duration.Value - (_model.Job.WarmUpDuration is not null ? _model.Job.WarmUpDuration.Value : 0);
             float avgLayerDuration = (printDuration - _lastDuration) / numChangedLayers;
-            List<float> totalFilamentUsage = [], avgFilamentUsage = [];
             long bytesPrinted = (_model.Job.FilePosition is not null) ? (_model.Job.FilePosition.Value - _lastFilePosition) : 0L;
             float avgFractionPrinted = (_model.Job.File.Size > 0) ? (float)bytesPrinted / (_model.Job.File.Size * numChangedLayers) : 0F;
+            #region deprecated, to be removed in v3.8
+            List<float> totalFilamentUsage = [], avgFilamentUsage = [];
             for (int i = 0; i < _model.Move.Extruders.Count; i++)
             {
                 if (_model.Move.Extruders[i] is not null)
@@ -404,6 +411,8 @@ public class UpdateService : BackgroundService
                     avgFilamentUsage.Add((_model.Move.Extruders[i].RawPosition - lastFilamentUsage) / numChangedLayers);
                 }
             }
+            #endregion
+            float totalAvgFilamentUsage = (_model.Job.RawExtrusion != null) ? (_model.Job.RawExtrusion.Value - _lastTotalFilamentUsage) / numChangedLayers : 0F;
 
             // Get layer height
             float currentHeight = 0F;
@@ -424,11 +433,14 @@ public class UpdateService : BackgroundService
                 {
                     Layer newLayer = new()
                     {
-                        Duration = avgLayerDuration
+                        Duration = avgLayerDuration,
+                        FilamentUsage = totalAvgFilamentUsage
                     };
                     foreach (float filamentUsage in avgFilamentUsage)
                     {
+#pragma warning disable CS0618 // Type or member is obsolete
                         newLayer.Filament.Add(filamentUsage);
+#pragma warning restore CS0618 // Type or member is obsolete
                     }
                     newLayer.FractionPrinted = avgFractionPrinted;
                     newLayer.Height = avgLayerHeight;
@@ -469,6 +481,7 @@ public class UpdateService : BackgroundService
                 lastLayer.Duration += avgLayerDuration;
                 for (int i = 0; i < avgFilamentUsage.Count; i++)
                 {
+#pragma warning disable CS0618 // Type or member is obsolete
                     if (i >= lastLayer.Filament.Count)
                     {
                         lastLayer.Filament.Add(avgFilamentUsage[i]);
@@ -477,6 +490,7 @@ public class UpdateService : BackgroundService
                     {
                         lastLayer.Filament[i] += avgFilamentUsage[i];
                     }
+#pragma warning restore CS0618 // Type or member is obsolete
                 }
                 lastLayer.FractionPrinted += avgFractionPrinted;
             }
@@ -484,6 +498,7 @@ public class UpdateService : BackgroundService
             // Record values for the next layer change
             _lastDuration = printDuration;
             _lastFilamentUsage = totalFilamentUsage;
+            _lastTotalFilamentUsage = _model.Job.RawExtrusion ?? 0F;
             _lastFilePosition = _model.Job.FilePosition ?? 0L;
             _lastHeight = currentHeight;
             _lastLayer = _model.Job.Layer.Value;

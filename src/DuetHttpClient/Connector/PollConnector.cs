@@ -479,6 +479,11 @@ internal partial class PollConnector : BaseConnector
     private List<float> _lastFilamentUsage = [];
 
     /// <summary>
+    /// Total filament usage at the time of the last layer change
+    /// </summary>
+    private float _lastTotalFilamentUsage = 0F;
+
+    /// <summary>
     /// Last file position at the time of the last layer change
     /// </summary>
     private long _lastFilePosition;
@@ -529,6 +534,7 @@ internal partial class PollConnector : BaseConnector
             List<float> totalFilamentUsage = [], avgFilamentUsage = [];
             long bytesPrinted = (Model.Job.FilePosition is not null) ? (Model.Job.FilePosition.Value - _lastFilePosition) : 0L;
             float avgFractionPrinted = (Model.Job.File.Size > 0) ? (float)bytesPrinted / (Model.Job.File.Size * numChangedLayers) : 0F;
+            #region deprecated, to be removed in v3.8
             for (int i = 0; i < Model.Move.Extruders.Count; i++)
             {
                 Extruder? extruder = Model.Move.Extruders[i];
@@ -539,6 +545,8 @@ internal partial class PollConnector : BaseConnector
                     avgFilamentUsage.Add((extruder.RawPosition - lastFilamentUsage) / numChangedLayers);
                 }
             }
+            #endregion
+            float totalAvgFilamentUsage = (Model.Job.RawExtrusion != null) ? (Model.Job.RawExtrusion.Value - _lastTotalFilamentUsage) / numChangedLayers : 0F;
             float currentHeight = 0F;
             foreach (Axis axis in Model.Move.Axes)
             {
@@ -553,7 +561,10 @@ internal partial class PollConnector : BaseConnector
             // Add missing layers
             for (int i = Model.Job.Layers.Count; i < Model.Job.Layer.Value - 1; i++)
             {
-                Layer newLayer = new();
+                Layer newLayer = new()
+                {
+                    FilamentUsage = totalAvgFilamentUsage
+                };
                 foreach (AnalogSensor? sensor in Model.Sensors.Analog)
                 {
                     if (sensor is not null)
@@ -587,6 +598,7 @@ internal partial class PollConnector : BaseConnector
             // Record values for the next layer change
             _lastDuration = printDuration;
             _lastFilamentUsage = totalFilamentUsage;
+            _lastTotalFilamentUsage = Model.Job.RawExtrusion ?? 0F;
             _lastFilePosition = Model.Job.FilePosition ?? 0L;
             _lastHeight = currentHeight;
         }

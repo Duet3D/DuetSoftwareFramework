@@ -4,6 +4,7 @@
 		<PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
 		<AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
 		<ServerGarbageCollection>false</ServerGarbageCollection>
+		<AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
 	</PropertyGroup>
 
 	<ItemGroup>
