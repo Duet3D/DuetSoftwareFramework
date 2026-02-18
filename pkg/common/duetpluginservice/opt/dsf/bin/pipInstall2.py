@@ -66,6 +66,9 @@ improved logging messages
 modules can be specified as one of more  txt file(s) (e.g requirements.txt) in plugin.json
 requirements files need to be located in the dsf folder (i.e. same folder as python files)
 supports modules from git e.e. git+https://github.com/pallets/flask.git
+
+Version 2.0.1 - Modified by Stuart Strolin
+Added defensive code for unexpected error in output from import test script
 """
 
 
@@ -90,7 +93,7 @@ from typing import Optional
 
 
 # CONSTANTS
-THIS_VERSION = '2.0.0'
+THIS_VERSION = '2.0.1'
 VENV_FOLDER = 'venv'
 MANIFEST_KEY = 'sbcPythonDependencies'
 NAME_KEY = 'name'
@@ -281,9 +284,13 @@ def createImportTestFile(sitePackagesPath):
 	f'''\t\treturn result, 'INSTALLEDWITHVERSION'\n'''
 	f'''\texcept (AttributeError): # No version information\n'''
 	f'''\t\tif globals()[m].__name__ == m: # Module is installed so treat it as a builtin\n'''
-	f'''\t\t\treturn 'None', 'INSTALLEDNOVERSION'\n'''
+	f'''\t\t\treturn 'No version information', 'INSTALLEDNOVERSION'\n'''
+	f'''\t\telse:\n'''
+	f'''\t\t\treturn 'Attribute error with no name match', 'NOTINSTALLED'\n'''
 	f'''\texcept (ImportError, ModuleNotFoundError):\n'''
-	f'''\t\treturn 'None', 'NOTINSTALLED'\n'''
+	f'''\t\treturn 'Module not able to be imported', 'NOTINSTALLED'\n'''
+	f'''\texcept Exception as e:\n'''
+	f'''\t\treturn f'Exception trying to import module: {{e}}', 'NOTINSTALLED'\n'''
 	f'''\n\n'''
 	f'''m = sys.argv[1]\n'''\
 	f'''result, resultType = importTest(m)\n'''
@@ -479,21 +486,25 @@ def getModuleVersion(m, pythonFile, sitePath, freezeList):
 	cmd = f'{pythonFile} {sitePath}/{IMPORTTESTFILE} {m}'
 	request = runsubprocess(cmd)
 
-	lines = request.splitlines()
-	last_line = lines[-1] # Get last line only
-	last_line = last_line.split(',')#comma separated values as list
-	result = last_line[0].strip()
-	resultType = last_line[1].strip()
-	
-	#Check if module can be imported (i.e. is installed)
-	if  resultType == 'INSTALLEDWITHVERSION':
-		logger.debug(f'Module {m} is installed with version {result}')
-		return result, modType.INSTALLEDWITHVERSION.value
-	elif resultType == 'INSTALLEDNOVERSION':
-		logger.debug(f'Module {m} is installed (no version info)')
-		return 'None', modType.INSTALLEDNOVERSION.value
-	elif resultType == 'NOTINSTALLED':
-		logger.debug(f'Module {m} is not installed')
+	if not isinstance(request, str):
+		logger.info(f'Unexpected type for import test result: {type(request)}')
+		logger.info(f'Import test result for module "{m}" was ==> \n{request}')
+	else:
+		lines = request.splitlines()
+		last_line = lines[-1] # Get last line only
+		last_line = last_line.split(',')#comma separated values as list
+		result = last_line[0].strip()
+		resultType = last_line[1].strip()
+		
+		#Check if module can be imported (i.e. is installed)
+		if  resultType == 'INSTALLEDWITHVERSION':
+			logger.debug(f'Module {m} is installed with version {result}')
+			return result, modType.INSTALLEDWITHVERSION.value
+		elif resultType == 'INSTALLEDNOVERSION':
+			logger.debug(f'Module {m} is installed (no version info)')
+			return 'None', modType.INSTALLEDNOVERSION.value
+		elif resultType == 'NOTINSTALLED':
+			logger.debug(f'Module {m} is not installed because {result}')
 
 	#Also check if module is installed in pip
 	#Sometimes module cannot be imported with same name as pip package
@@ -729,11 +740,14 @@ def main(progName):
 	# Resolve the requested modules to a name and version
 	# Create a list of modules to instal and their current versions
 	moduleRequests = []
+	logger.info('\n\nChecking installed versions before install:')
 	freezeList = getFreezeList(pythonFile) # Get initial freeze list
 	moduleRequests = parseRequests(moduleList, pythonFile, sitePath,freezeList)
 
 	# Process the requests and install modules as required
-	moduleRequests = processRequests(moduleRequests, pythonFile, sitePath)	
+	moduleRequests = processRequests(moduleRequests, pythonFile, sitePath)
+
+	logger.info('\n\nChecking installed versions after install:')	
 	freezeList = getFreezeList(pythonFile)  # Get updated freeze list after parsing requests
 	moduleRequests = getUpdatedVersions(moduleRequests,pythonFile, sitePath,freezeList)	
 
