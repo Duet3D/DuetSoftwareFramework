@@ -10,12 +10,12 @@ on:
         type: choice
         options:
         - dev
-        - unstable-3.6
-        - stable-3.6
+        - unstable-3.7
+        - stable-3.7
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
@@ -24,13 +24,13 @@ jobs:
       - name: Set up NodeJS
         uses: actions/setup-node@v3
         with:
-          node-version: 22
+          node-version: 25
 
       # Install .NET environment
       - name: Set up .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: 8
+          dotnet-version: 10
 
       # Install required tools
       - name: Install dependencies
