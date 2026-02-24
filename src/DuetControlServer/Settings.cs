@@ -147,6 +147,11 @@ public sealed class Settings
     public string SpiDevice { get; set; } = "/dev/spidev0.0";
 
     /// <summary>
+    /// Communication method to use for connection to RepRapFirmware ("spi" or "usb")
+    /// </summary>
+    public string CommunicationMethod { get; set; } = "spi";
+
+    /// <summary>
     /// SPI Tx and Rx buffer size
     /// Should not be greater than the kernel spidev buffer size
     /// </summary>
@@ -191,6 +196,26 @@ public sealed class Settings
     /// Number of the GPIO pin that is used by RepRapFirmware to flag its ready state
     /// </summary>
     public int TransferReadyPin { get; set; } = 25;      // Pin 22 on the RaspPi expansion header
+
+    /// <summary>
+    /// USB device that is connected to RepRapFirmware (e.g., /dev/ttyACM0)
+    /// </summary>
+    public string UsbDevice { get; set; } = "/dev/ttyACM0";
+
+    /// <summary>
+    /// Baud rate for USB serial communication
+    /// </summary>
+    public int UsbBaudRate { get; set; } = 115200;
+
+    /// <summary>
+    /// Read timeout for USB serial communication in milliseconds
+    /// </summary>
+    public int UsbReadTimeout { get; set; } = 2000;
+
+    /// <summary>
+    /// Write timeout for USB serial communication in milliseconds
+    /// </summary>
+    public int UsbWriteTimeout { get; set; } = 2000;
 
     /// <summary>
     /// File containing the current CPU temperature

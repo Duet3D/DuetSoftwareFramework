@@ -54,14 +54,6 @@ public sealed class Server(CommandFactory commandFactory,
     /// </summary>
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
-        // Check if the firmware needs to be updated remotely
-        if (settings.Value.UpdateOnly && await firmwareUpdater.TryRemoteFirmwareUpdateAsync(cancellationToken))
-        {
-            // Firmware has been update remotely. Stop here
-            lifetime.StopApplication();
-            return;
-        }
-
         // Make sure the parent directory exists but the socket file does not
         if (File.Exists(settings.Value.FullSocketPath))
         {

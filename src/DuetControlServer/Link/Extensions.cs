@@ -1,4 +1,6 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
+using DuetControlServer.Utility;
 
 namespace DuetControlServer.Link;
 
@@ -8,7 +10,7 @@ namespace DuetControlServer.Link;
 public static partial class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Add command functionality to the service collection
+    /// Add link functionality to the service collection
     /// </summary>
     /// <param name="services">Service collection</param>
     /// <returns>Service collection</returns>
@@ -19,16 +21,36 @@ public static partial class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Add command functionality to the service collection
+    /// Add link adapter to the service collection based on configured communication method
     /// </summary>
     /// <param name="services">Service collection</param>
     /// <returns>Service collection</returns>
-    public static IServiceCollection AddSPILink(this IServiceCollection services)
+    public static IServiceCollection AddLinkAdapter(this IServiceCollection services)
     {
-        return services
-            .AddSingleton<Adapter.SPI>()
-            .AddSingleton<Adapter.ILinkAdapter, Adapter.SPI>(services => services.GetRequiredService<Adapter.SPI>())
-            .AddSingleton<LinkInterface>()
-            .AddHostedService<LinkService>();
+        // Register both adapters (for diagnostics discovery)
+        services
+            .AddSingleton<Adapter.USB>()
+            .AddSingleton<Adapter.SPI>();
+
+        // Determine which communication method to use
+        var serviceProvider = services.BuildServiceProvider();
+        var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Settings>>().Value;
+
+        if (settings.CommunicationMethod.Equals("usb", StringComparison.OrdinalIgnoreCase))
+        {
+            return services
+                .AddSingleton<Adapter.ILinkAdapter, Adapter.USB>(services => services.GetRequiredService<Adapter.USB>())
+                .AddSingleton<IDiagnostics, Adapter.USB>(services => services.GetRequiredService<Adapter.USB>())
+                .AddSingleton<LinkInterface>()
+                .AddHostedService<LinkService>();
+        }
+        else
+        {
+            return services
+                .AddSingleton<Adapter.ILinkAdapter, Adapter.SPI>(services => services.GetRequiredService<Adapter.SPI>())
+                .AddSingleton<IDiagnostics, Adapter.SPI>(services => services.GetRequiredService<Adapter.SPI>())
+                .AddSingleton<LinkInterface>()
+                .AddHostedService<LinkService>();
+        }
     }
 }

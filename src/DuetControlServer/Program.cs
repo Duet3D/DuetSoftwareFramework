@@ -96,7 +96,7 @@ RootCommand rootCommand = new("Duet Control Server")
     socketFileOption,
     baseDirectoryOption
 };
-rootCommand.SetAction((parserResult) =>
+rootCommand.SetAction(async (parserResult) =>
 {
     bool updateOnlyValue = parserResult.GetValue(updateOnlyOption);
     FileInfo configFileValue = parserResult.GetValue(configFileOption) ?? new(Settings.DefaultConfigFile);
@@ -186,7 +186,7 @@ rootCommand.SetAction((parserResult) =>
                     .AddIPC()
                     .AddLink()
                     .AddModel()
-                    .AddSPILink()
+                    .AddLinkAdapter()
                     .AddUtility();
             })
             .Build();
@@ -198,6 +198,25 @@ rootCommand.SetAction((parserResult) =>
     {
         Terminate(e, $"Failed to initialize environment: {e.Message}", ExitCode.OsError, loggerFactory);
         return;
+    }
+
+    // Check if the firmware is supposed to be updated only
+    if (updateOnlyValue)
+    {
+        try
+        {
+            var firmwareUpdater = host.Services.GetRequiredService<FirmwareUpdater>();
+            var cancellationToken = host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopped;
+            if (await firmwareUpdater.TryRemoteFirmwareUpdateAsync(cancellationToken))
+            {
+                Environment.Exit(ExitCode.Success);
+                return;
+            }
+        }
+        catch (Exception e)
+        {
+            Terminate(e, $"Failed to update firmware remotely: {e.Message}", ExitCode.IoError, loggerFactory);
+        }
     }
 
     // Delete the startup error file when the application has been fully started

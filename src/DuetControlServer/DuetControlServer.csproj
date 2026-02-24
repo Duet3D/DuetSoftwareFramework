@@ -33,6 +33,8 @@
 		<PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
 		<PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
 		<PackageReference Include="System.CommandLine" Version="2.0.1" />
+		<PackageReference Include="System.Device.Gpio" Version="3.2.0" />
+		<PackageReference Include="System.IO.Ports" Version="10.0.0" />
 	</ItemGroup>
 
 	<ItemGroup>

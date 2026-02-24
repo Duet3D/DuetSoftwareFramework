@@ -1,10 +1,10 @@
-﻿using DuetAPI;
+using DuetAPI;
 using DuetAPI.ObjectModel;
 using Code = DuetControlServer.Commands.Code;
 using DuetControlServer.Utility;
-using DuetSharedLibrary;
 using System;
 using System.IO;
+using System.IO.Ports;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -14,39 +14,29 @@ using Microsoft.Extensions.Options;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using Microsoft.Extensions.Logging;
-using System.Threading.Tasks;
-using System.Device.Spi;
-using SpiDevice = System.Device.Spi.SpiDevice;
-using System.Device.Gpio;
-using System.Device.Gpio.Drivers;
 
 namespace DuetControlServer.Link.Adapter;
 
 /// <summary>
-/// Class to handle the SPI link to the firmware
+/// Class to handle the USB link to the firmware over ttyACM
 /// </summary>
 [DiagnosticsPriority(-4)]
-public class SPI : IDiagnostics, ILinkAdapter
+public class USB : IDiagnostics, ILinkAdapter
 {
     // General variables
     private readonly EventLogger _eventLogger;
     private readonly Model.ObjectModel _model;
-    private readonly ILogger<SPI> _logger;
+    private readonly ILogger<USB> _logger;
     private readonly Settings _settings;
 
     // General transfer variables
-    private readonly GpioController _gpioController;
-    private readonly int _transferReadyPin;
-    private readonly ManualResetEventSlim _transferReadyEvent = new(false);
-    private PinValue _expectedTfrRdyPinValue;
-    private volatile int _lastPinValueFromCallback;
-    private readonly SpiDevice _spiDevice;
+    private readonly SerialPort _serialPort;
     private bool _waitingForFirstTransfer = true, _connected, _hadTimeout, _resetting, _updating;
     private ushort _lastTransferNumber;
 
     private DateTime _lastTransferMeasureTime = DateTime.Now, _lastCodesMeasureTime = DateTime.Now;
-    private volatile int _numMeasuredTransfers, _numMeasuredCodes, _maxRxSize, _maxTxSize, _numTfrPinGlitches;
-    private TimeSpan _maxFullTransferDelay = TimeSpan.Zero, _maxPinWaitDurationFull = TimeSpan.Zero, _maxPinWaitDuration = TimeSpan.Zero;
+    private volatile int _numMeasuredTransfers, _numMeasuredCodes, _maxRxSize, _maxTxSize;
+    private TimeSpan _maxFullTransferDelay = TimeSpan.Zero;
 
     // Transfer headers
     private readonly Memory<byte> _rxHeaderBuffer = new byte[Marshal.SizeOf<TransferHeader>()];
@@ -65,9 +55,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     private PacketHeader _lastPacket;
     private ReadOnlyMemory<byte> _packetData;
 
-    // Keep track of packets being resent to avoid getting out-of-order
-    private List<Protocol.SbcRequests.Request> _packetsBeingResent = [];
-
     /// <summary>
     /// Currently-used protocol version
     /// </summary>
@@ -76,12 +63,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <summary>
     /// Constructor of this class
     /// </summary>
-    /// <param name="eventLogger">EVent logger</param>
+    /// <param name="eventLogger">Event logger</param>
     /// <param name="model">Object model</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
     /// <exception cref="OperationCanceledException">Failed to connect to board</exception>
-    public SPI(EventLogger eventLogger, Model.ObjectModel model, ILogger<SPI> logger, IOptions<Settings> settings)
+    public USB(EventLogger eventLogger, Model.ObjectModel model, ILogger<USB> logger, IOptions<Settings> settings)
     {
         // Initialize variables
         _eventLogger = eventLogger;
@@ -101,32 +88,13 @@ public class SPI : IDiagnostics, ILinkAdapter
         }
         _txBuffer = _txBuffers.First!;
 
-        // Initialize transfer ready pin
-        _transferReadyPin = settings.Value.TransferReadyPin;
-        int chipNumber = int.Parse(settings.Value.GpioChipDevice.Replace("/dev/gpiochip", ""));
-        _gpioController = new GpioController(PinNumberingScheme.Logical, new LibGpiodDriver(chipNumber));
-        _gpioController.OpenPin(_transferReadyPin, PinMode.Input);
-        _lastPinValueFromCallback = (int)_gpioController.Read(_transferReadyPin);
-        _gpioController.RegisterCallbackForPinValueChangedEvent(_transferReadyPin, PinEventTypes.Rising | PinEventTypes.Falling, (sender, args) =>
+        // Initialize serial port
+        _serialPort = new SerialPort(settings.Value.UsbDevice, settings.Value.UsbBaudRate, Parity.None, 8, StopBits.One)
         {
-            // Read pin value in callback to capture the state at the time of the interrupt
-            _lastPinValueFromCallback = (int)_gpioController.Read(_transferReadyPin);
-            _transferReadyEvent.Set();
-        });
-
-        // Parse SPI device path (e.g., /dev/spidev0.0 -> busId=0, chipSelectLine=0)
-        string spiPath = settings.Value.SpiDevice;
-        string[] parts = Path.GetFileName(spiPath).Replace("spidev", "").Split('.');
-        int busId = int.Parse(parts[0]);
-        int chipSelectLine = int.Parse(parts[1]);
-
-        var spiSettings = new SpiConnectionSettings(busId, chipSelectLine)
-        {
-            ClockFrequency = settings.Value.SpiFrequency,
-            Mode = (SpiMode)settings.Value.SpiTransferMode,
-            DataBitLength = 8
+            ReadTimeout = settings.Value.UsbReadTimeout,
+            WriteTimeout = settings.Value.UsbWriteTimeout,
+            Handshake = Handshake.None
         };
-        _spiDevice = SpiDevice.Create(spiSettings);
     }
 
     /// <summary>
@@ -135,18 +103,10 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <param name="cancellationToken">Optional cancellation token</param>
     public void Connect(CancellationToken cancellationToken = default)
     {
-        // Check if large transfers can be performed
-        try
+        // Open the serial port
+        if (!_serialPort.IsOpen)
         {
-            int maxSpiBufferSize = int.Parse(File.ReadAllText("/sys/module/spidev/parameters/bufsiz"));
-            if (maxSpiBufferSize < _bufferSize)
-            {
-                _logger.LogWarning("Kernel SPI buffer size is smaller than RepRapFirmware buffer size ({MaxBufferSize} configured vs {RequiredMaxBufferSize} required)", maxSpiBufferSize, Consts.BufferSize);
-            }
-        }
-        catch (Exception e)
-        {
-            _logger.LogWarning(e, "Failed to retrieve Kernel SPI buffer size");
+            _serialPort.Open();
         }
 
         // Perform the first transfer
@@ -199,37 +159,18 @@ public class SPI : IDiagnostics, ILinkAdapter
     }
 
     /// <summary>
-    /// Get the maximum time to wait for the transfer ready pin to be toggled and reset the counter
-    /// </summary>
-    /// <param name="fullTransferCounter">Query and reset the full transfer duration</param>
-    /// <returns>Time in ms</returns>
-    public double GetMaxPinWaitDuration(bool fullTransferCounter)
-    {
-        if (fullTransferCounter)
-        {
-            double fullResult = _maxPinWaitDurationFull.TotalMilliseconds;
-            _maxPinWaitDurationFull = TimeSpan.Zero;
-            return fullResult;
-        }
-
-        double result = _maxPinWaitDuration.TotalMilliseconds;
-        _maxPinWaitDuration = TimeSpan.Zero;
-        return result;
-    }
-
-    /// <summary>
     /// Print diagnostics to the given string builder
     /// </summary>
     /// <param name="builder">Target to write to</param>
     public void PrintDiagnostics(StringBuilder builder)
     {
-        if (!_settings.CommunicationMethod.Equals("spi", StringComparison.OrdinalIgnoreCase))
+        if (!_settings.CommunicationMethod.Equals("usb", StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
-        builder.AppendLine($"Configured SPI speed: {_settings.SpiFrequency}Hz, TfrRdy pin glitches: {_numTfrPinGlitches}");
-        builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}, max time between full transfers: {GetMaxFullTransferDelay():0.0}ms, max pin wait times: {GetMaxPinWaitDuration(true):0.0}ms/{GetMaxPinWaitDuration(false):0.0}ms");
+        builder.AppendLine($"Configured USB baud rate: {_settings.UsbBaudRate}");
+        builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}, max time between full transfers: {GetMaxFullTransferDelay():0.0}ms");
         builder.AppendLine($"Codes per second: {GetCodesPerSecond():F2}");
         builder.AppendLine($"Maximum length of RX/TX data transfers: {_maxRxSize}/{_maxTxSize}");
     }
@@ -246,7 +187,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <param name="cancellationToken">Cancellation token to cancel the transfer</param>
     public void PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default)
     {
-        _packetsBeingResent.Clear();
         _lastTransferNumber = _rxHeader.SequenceNumber;
 
         // Reset RX transfer header
@@ -272,7 +212,7 @@ public class SPI : IDiagnostics, ILinkAdapter
                 // Don't retry forever
                 if (retry > _settings.MaxSpiRetries)
                 {
-                    throw new OperationCanceledException("Maximum number of SPI transfer retries exceeded");
+                    throw new OperationCanceledException("Maximum number of USB transfer retries exceeded");
                 }
 
                 // Keep track of the maximum times between regular full transfers
@@ -293,7 +233,7 @@ public class SPI : IDiagnostics, ILinkAdapter
                     }
                 }
 
-                // Exchange transfer headers. This also deals with transfer responses
+                // Exchange transfer headers
                 if (!ExchangeHeader())
                 {
                     retry++;
@@ -454,15 +394,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <param name="reason">Reason why the print has been paused</param>
     public void ReadPrintPaused(out uint filePosition, out uint filePosition2, out PrintPausedReason reason)
     {
-        if (ProtocolVersion >= 7)
-        {
-            Protocol.Reader.ReadPrintPaused(_packetData.Span, out filePosition, out filePosition2, out reason);
-        }
-        else
-        {
-            Protocol.Reader.ReadLegacyPrintPaused(_packetData.Span, out filePosition, out reason);
-            filePosition2 = Consts.NoFilePosition;
-        }
+        Protocol.Reader.ReadPrintPaused(_packetData.Span, out filePosition, out filePosition2, out reason);
     }
 
     /// <summary>
@@ -495,7 +427,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     public void ReadEvaluationResult(out CodeChannel? channel, out string expression, out object? result)
     {
         Protocol.Reader.ReadEvaluationResult(_packetData.Span, out CodeChannel actualChannel, out expression, out result);
-        channel = (ProtocolVersion >= 7) ? actualChannel : null;
+        channel = actualChannel;
     }
 
     /// <summary>
@@ -610,7 +542,7 @@ public class SPI : IDiagnostics, ILinkAdapter
         }
         dump += "\n";
         dump += "====================";
-        _logger.LogError("Received malformed packet: {SpiDump}", dump);
+        _logger.LogError("Received malformed packet: {UsbDump}", dump);
     }
     #endregion
 
@@ -674,13 +606,6 @@ public class SPI : IDiagnostics, ILinkAdapter
                 sbcRequest = (Protocol.SbcRequests.Request)header.Request;
                 WritePacket(sbcRequest, header.Length);
                 buffer.Slice(headerSize, header.Length).CopyTo(GetWriteBuffer(header.Length));
-
-                // Keep track of it
-                if (sbcRequest != Protocol.SbcRequests.Request.LockAllMovementSystemsAndWaitForStandstill &&
-                    !_packetsBeingResent.Contains(sbcRequest))
-                {
-                    _packetsBeingResent.Add(sbcRequest);
-                }
                 return;
             }
 
@@ -699,7 +624,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteEmergencyStop()
     {
-        // E-STOP is unconditional
         if (!CanWritePacket())
         {
             return false;
@@ -715,7 +639,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteReset()
     {
-        // Reset is unconditional
         if (!CanWritePacket())
         {
             return false;
@@ -734,12 +657,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteCode(Code code)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.Code))
-        {
-            return false;
-        }
-
         // Attempt to serialize the code first
         Span<byte> span = stackalloc byte[_settings.MaxCodeBufferSize];
         int codeLength;
@@ -773,12 +690,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteGetObjectModel(string key, string flags)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.GetObjectModel))
-        {
-            return false;
-        }
-
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteGetObjectModel(span, key, flags);
@@ -795,38 +706,6 @@ public class SPI : IDiagnostics, ILinkAdapter
         return true;
     }
 
-#if false
-    /// <summary>
-    /// Set a specific value in the object model of RepRapFirmware
-    /// </summary>
-    /// <param name="field">Path to the field</param>
-    /// <param name="value">New value</param>
-    /// <returns>True if the packet could be written</returns>
-    public bool WriteSetObjectModel(string field, object value)
-    {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.SetObjectModel))
-        {
-            return false;
-        }
-
-        // Serialize the request first to see how much space it requires
-        Span<byte> span = stackalloc byte[bufferSize - Marshal.SizeOf<PacketHeader>()];
-        int dataLength = Serialization.Writer.WriteSetObjectModel(span, field, value);
-
-        // See if the request fits into the buffer
-        if (!CanWritePacket(dataLength))
-        {
-            return false;
-        }
-
-        // Write it
-        WritePacket(Communication.SbcRequests.Request.SetObjectModel, dataLength);
-        span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
-        return true;
-    }
-#endif
-
     /// <summary>
     /// Notify the firmware that a file print has started
     /// </summary>
@@ -834,12 +713,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WritePrintFileInfo(GCodeFileInfo info)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.SetPrintFileInfo))
-        {
-            return false;
-        }
-
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WritePrintFileInfo(span, info);
@@ -863,12 +736,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WritePrintStopped(PrintStoppedReason reason)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.PrintStopped))
-        {
-            return false;
-        }
-
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.PrintStoppedHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -889,12 +756,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteMacroCompleted(CodeChannel channel, bool error)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.MacroCompleted))
-        {
-            return false;
-        }
-
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.MacroCompleteHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -913,8 +774,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteLockAllMovementSystemsAndWaitForStandstill(CodeChannel channel)
     {
-        // Resends of this request are expected as it may take a moment before the lock is acquired
-
         int dataLength = Marshal.SizeOf<CodeChannelHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -933,12 +792,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteUnlock(CodeChannel channel)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.Unlock))
-        {
-            return false;
-        }
-
         int dataLength = Marshal.SizeOf<CodeChannelHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -981,8 +834,7 @@ public class SPI : IDiagnostics, ILinkAdapter
         WritePacket(Protocol.SbcRequests.Request.StartIap);
         PerformFullTransfer(cancellationToken: cancellationToken);
 
-        // Wait for the first transfer.
-        // The IAP firmware will pull the transfer ready pin to high when it is ready to receive data
+        // Wait for the first transfer
         _waitingForFirstTransfer = _updating = true;
     }
 
@@ -990,6 +842,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// Flash another segment of the firmware via the IAP binary
     /// </summary>
     /// <param name="stream">Stream of the firmware binary</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Whether another segment could be sent</returns>
     public bool FlashFirmwareSegment(Stream stream, CancellationToken cancellationToken = default)
     {
@@ -1008,8 +861,8 @@ public class SPI : IDiagnostics, ILinkAdapter
             writeBuffer[bytesRead..].Fill(0xFF);
         }
 
-        WaitForTransfer(cancellationToken: cancellationToken);
-        _spiDevice.TransferFullDuplex(writeBuffer, readBuffer);
+        _serialPort.Write(writeBuffer.ToArray(), 0, writeBuffer.Length);
+        ReadExactly(readBuffer);
         return true;
     }
 
@@ -1018,11 +871,11 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// </summary>
     /// <param name="firmwareLength">Length of the written firmware in bytes</param>
     /// <param name="crc16">CRC16 checksum of the firmware</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Whether the firmware has been written successfully</returns>
     public bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16, CancellationToken cancellationToken = default)
     {
-        // At this point IAP expects another segment so wait for it to be ready first. After that, wait a moment for IAP to acknowledge we're done
-        WaitForTransfer(cancellationToken: cancellationToken);
+        // At this point IAP expects another segment so wait a moment for IAP to acknowledge we're done
         Thread.Sleep(Consts.FirmwareFinishedDelay);
 
         // Send the final firmware size plus CRC16 checksum to IAP
@@ -1033,29 +886,25 @@ public class SPI : IDiagnostics, ILinkAdapter
         };
         Span<byte> transferData = stackalloc byte[Marshal.SizeOf<Protocol.SbcRequests.FlashVerify>()];
         MemoryMarshal.Write(transferData, verifyRequest);
-        WaitForTransfer(cancellationToken: cancellationToken);
-        _spiDevice.TransferFullDuplex(transferData, transferData);
+        byte[] transferDataArray = transferData.ToArray();
+        _serialPort.Write(transferDataArray, 0, transferDataArray.Length);
+        ReadExactly(transferData);
 
         // Check if the IAP can confirm our CRC16 checksum
         Span<byte> writeOk = stackalloc byte[1];
-        WaitForTransfer();
-        _spiDevice.TransferFullDuplex(writeOk, writeOk);
+        byte[] writeOkArray = writeOk.ToArray();
+        _serialPort.Write(writeOkArray, 0, writeOkArray.Length);
+        ReadExactly(writeOk);
         return writeOk[0] == 0x0C;
     }
-
     /// <summary>
     /// Wait for the IAP program to reset the controller
     /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
     public void WaitForIapReset(CancellationToken cancellationToken = default)
     {
-        // Wait a moment for the firmware to start
-        Task.Delay(Consts.IapRebootDelay, cancellationToken).Wait(cancellationToken);
-
-        // Wait for the first data transfer from the firmware
-        _updating = _connected = false;
-        _waitingForFirstTransfer = true;
-        _rxHeader.SequenceNumber = 1;
-        _txHeader.SequenceNumber = 0;
+        _resetting = _waitingForFirstTransfer = true;
+        _updating = false;
     }
 
     /// <summary>
@@ -1066,12 +915,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>Whether the firmware has been written successfully</returns>
     public bool WriteFileChunk(Span<byte> data, long fileLength)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileChunk))
-        {
-            return false;
-        }
-
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteFileChunk(span, data, fileLength);
@@ -1096,12 +939,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>Whether the evaluation request has been written successfully</returns>
     public bool WriteEvaluateExpression(CodeChannel channel, string expression)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.EvaluateExpression))
-        {
-            return false;
-        }
-
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteEvaluateExpression(span, channel, expression);
@@ -1126,12 +963,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>Whether the firmware has been written successfully</returns>
     public bool WriteMessage(MessageTypeFlags flags, string message)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.Message))
-        {
-            return false;
-        }
-
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteMessage(span, flags, message);
@@ -1155,12 +986,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteMacroStarted(CodeChannel channel)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.MacroStarted))
-        {
-            return false;
-        }
-
         int dataLength = Marshal.SizeOf<CodeChannelHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1179,12 +1004,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteInvalidateChannel(CodeChannel channel)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.InvalidateChannel))
-        {
-            return false;
-        }
-
         int dataLength = Marshal.SizeOf<CodeChannelHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1206,12 +1025,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteSetVariable(CodeChannel channel, bool createVariable, string varName, string expression)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.SetVariable))
-        {
-            return false;
-        }
-
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteSetVariable(span, channel, createVariable, varName, expression);
@@ -1236,12 +1049,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteDeleteLocalVariable(CodeChannel channel, string varName)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.DeleteLocalVariable))
-        {
-            return false;
-        }
-
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteDeleteLocalVariable(span, channel, varName);
@@ -1265,12 +1072,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteCheckFileExistsResult(bool exists)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.CheckFileExistsResult))
-        {
-            return false;
-        }
-
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.BooleanHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1289,12 +1090,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteFileDeleteResult(bool success)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileDeleteResult))
-        {
-            return false;
-        }
-
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.BooleanHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1314,20 +1109,19 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteOpenFileResult(uint fileHandle, long length)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.OpenFileResult))
-        {
-            return false;
-        }
+        // Serialize the request first to see how much space it requires
+        Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
+        int dataLength = Protocol.Writer.WriteOpenFileResult(span, fileHandle, length);
 
-        int dataLength = Marshal.SizeOf<Protocol.SbcRequests.OpenFileResult>();
+        // See if the request fits into the buffer
         if (!CanWritePacket(dataLength))
         {
             return false;
         }
 
+        // Write it
         WritePacket(Protocol.SbcRequests.Request.OpenFileResult, dataLength);
-        Protocol.Writer.WriteOpenFileResult(GetWriteBuffer(dataLength), fileHandle, length);
+        span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
         return true;
     }
 
@@ -1339,20 +1133,19 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteFileReadResult(Span<byte> data, int bytesRead)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileReadResult))
-        {
-            return false;
-        }
+        // Serialize the request first to see how much space it requires
+        Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
+        int dataLength = Protocol.Writer.WriteFileReadResult(span, data, bytesRead);
 
-        int dataLength = Marshal.SizeOf<Protocol.SbcRequests.FileDataHeader>() + data.Length;
+        // See if the request fits into the buffer
         if (!CanWritePacket(dataLength))
         {
             return false;
         }
 
+        // Write it
         WritePacket(Protocol.SbcRequests.Request.FileReadResult, dataLength);
-        Protocol.Writer.WriteFileReadResult(GetWriteBuffer(dataLength), data, bytesRead);
+        span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
         return true;
     }
 
@@ -1363,12 +1156,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteFileWriteResult(bool success)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileWriteResult))
-        {
-            return false;
-        }
-
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.BooleanHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1387,12 +1174,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteFileSeekResult(bool success)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileSeekResult))
-        {
-            return false;
-        }
-
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.BooleanHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1411,12 +1192,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteFileTruncateResult(bool success)
     {
-        // Don't send a new request if another one is still pending
-        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileTruncateResult))
-        {
-            return false;
-        }
-
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.BooleanHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1436,12 +1211,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteSetLastCodeResult(CodeChannel channel, CodeResult result)
     {
-        if (ProtocolVersion < 7)
-        {
-            // not supported
-            return true;
-        }
-
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.SetLastCodeResultHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1460,12 +1229,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteObjectModelKeyChanged(string key)
     {
-        if (ProtocolVersion < 7)
-        {
-            // not supported
-            return true;
-        }
-
         int dataLength = Marshal.SizeOf<StringHeader>() + Encoding.UTF8.GetByteCount(key);
         if (!CanWritePacket(dataLength))
         {
@@ -1489,115 +1252,6 @@ public class SPI : IDiagnostics, ILinkAdapter
     #endregion
 
     #region Functions for data transfers
-    /// <summary>
-    /// Wait for the Duet to flag when it is ready to transfer data
-    /// </summary>
-    /// <param name="inTransfer">Whether a full transfer is being performed</param>
-    /// <param name="cancellationToken">Cancellation token to cancel the wait</param>
-    private void WaitForTransfer(bool inTransfer = true, CancellationToken cancellationToken = default)
-    {
-        if (_waitingForFirstTransfer)
-        {
-            // When a connection is established for the first time, the TfrRdy pin must be high
-            _expectedTfrRdyPinValue = PinValue.High;
-        }
-
-        // Flush pending events by consuming them until the event stays reset
-        while (_transferReadyEvent.Wait(0))
-        {
-            _transferReadyEvent.Reset();
-        }
-        
-        // Check if the pin is already at the expected value
-        PinValue currentValue = _gpioController.Read(_transferReadyPin);
-        if (currentValue != _expectedTfrRdyPinValue)
-        {
-            // Determine how long to wait for the pin level transition
-            int timeout;
-            if (_waitingForFirstTransfer)
-            {
-                timeout = _updating ? Consts.IapTimeout : _settings.SpiConnectTimeout;
-                _expectedTfrRdyPinValue = PinValue.High;
-            }
-            else
-            {
-                timeout = _updating ? Consts.IapTimeout : (inTransfer ? _settings.SpiTransferTimeout : _settings.SpiConnectionTimeout);
-            }
-
-            // Wait for the expected pin level, ignoring glitches
-            Stopwatch stopwatch = Stopwatch.StartNew();
-            try
-            {
-                do
-                {
-                    int timeToWait = timeout - (int)stopwatch.ElapsedMilliseconds;
-                    if (timeToWait <= 0 || cancellationToken.IsCancellationRequested)
-                    {
-                        throw new OperationCanceledException();
-                    }
-
-                    // Wait for any pin change event
-                    if (_transferReadyEvent.Wait(timeToWait))
-                    {
-                        _transferReadyEvent.Reset();
-                        
-                        // Use the pin value captured in the callback
-                        currentValue = (PinValue)_lastPinValueFromCallback;
-                        
-                        // Check if this is the transition we're waiting for
-                        if (currentValue == _expectedTfrRdyPinValue)
-                        {
-                            // Verify by reading again to ensure it's stable
-                            PinValue verifyValue = _gpioController.Read(_transferReadyPin);
-                            if (verifyValue == _expectedTfrRdyPinValue)
-                            {
-                                break;
-                            }
-                            // Pin changed again between callback and now, count as glitch
-                            _numTfrPinGlitches++;
-                        }
-                        else
-                        {
-                            // This was a transition in the wrong direction, ignore it
-                            // Don't count as glitch since this is expected with both edges registered
-                        }
-                    }
-                } while (true);
-            }
-            catch (OperationCanceledException)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (stopwatch.ElapsedMilliseconds > timeout + 125)
-                {
-                    // In case the CTS is triggered very late, this application may not have gotten enough CPU time. Log this
-                    _eventLogger.LogOutput(MessageType.Warning, "Did not get enough CPU time during SPI transfer, your SBC may be overloaded");
-                }
-                throw new OperationCanceledException($"{(inTransfer ? "Transfer" : "Connection")} timeout while waiting for TfrRdy pin");
-            }
-
-            // Keep track of the maximum wait times
-            if (inTransfer)
-            {
-                if (stopwatch.Elapsed > _maxPinWaitDuration)
-                {
-                    _maxPinWaitDuration = stopwatch.Elapsed;
-                }
-            }
-            else if (!_waitingForFirstTransfer)
-            {
-                if (stopwatch.Elapsed > _maxPinWaitDurationFull)
-                {
-                    _maxPinWaitDurationFull = stopwatch.Elapsed;
-                }
-            }
-        }
-
-        // Transition complete
-        _expectedTfrRdyPinValue = (_expectedTfrRdyPinValue == PinValue.High) ? PinValue.Low : PinValue.High;
-        _waitingForFirstTransfer = false;
-    }
-
     /// <summary>
     /// Write the CRC16 or CRC32 checksums
     /// </summary>
@@ -1627,15 +1281,20 @@ public class SPI : IDiagnostics, ILinkAdapter
     {
         for (int retry = 0; retry < _settings.MaxSpiRetries; retry++)
         {
-            // Perform SPI header exchange
-            WaitForTransfer(false);
-            if (_txHeader.ProtocolVersion >= 4)
+            // Send header
+            int headerSize = (_txHeader.ProtocolVersion >= 4) ? Marshal.SizeOf<TransferHeader>() : 12;
+            _serialPort.Write(_txHeaderBuffer.ToArray(), 0, headerSize);
+
+            // Receive header
+            try
             {
-                _spiDevice.TransferFullDuplex(_txHeaderBuffer.Span, _rxHeaderBuffer.Span);
+                ReadExactly(_rxHeaderBuffer[..headerSize].Span);
             }
-            else
+            catch (OperationCanceledException)
             {
-                _spiDevice.TransferFullDuplex(_txHeaderBuffer[..12].Span, _rxHeaderBuffer[..12].Span);
+                _logger.LogWarning("Timeout reading header from USB device");
+                ExchangeResponse(TransferResponse.BadResponse);
+                return false;
             }
 
             // Check for possible response code
@@ -1647,7 +1306,7 @@ public class SPI : IDiagnostics, ILinkAdapter
                 {
                     continue;
                 }
-                throw new OperationCanceledException("SPI data transfer failed");
+                throw new OperationCanceledException("USB data transfer failed");
             }
 
             // Read received header and verify the format code
@@ -1802,10 +1461,33 @@ public class SPI : IDiagnostics, ILinkAdapter
         Span<byte> txResponseBuffer = stackalloc byte[sizeof(uint)], rxResponseBuffer = stackalloc byte[sizeof(uint)];
         MemoryMarshal.Write(txResponseBuffer, response);
 
-        WaitForTransfer();
-        _spiDevice.TransferFullDuplex(txResponseBuffer, rxResponseBuffer);
+        byte[] txResponseArray = txResponseBuffer.ToArray();
+        _serialPort.Write(txResponseArray, 0, txResponseArray.Length);
+        ReadExactly(rxResponseBuffer);
 
         return MemoryMarshal.Read<uint>(rxResponseBuffer);
+    }
+
+    /// <summary>
+    /// Read exactly the specified number of bytes from the serial port
+    /// </summary>
+    /// <param name="buffer">Buffer to read into</param>
+    private void ReadExactly(Span<byte> buffer)
+    {
+        int totalRead = 0;
+        byte[] tempBuffer = new byte[buffer.Length];
+
+        while (totalRead < buffer.Length)
+        {
+            int bytesRead = _serialPort.Read(tempBuffer, totalRead, buffer.Length - totalRead);
+            if (bytesRead == 0)
+            {
+                throw new OperationCanceledException("Timeout reading from USB device");
+            }
+            totalRead += bytesRead;
+        }
+
+        tempBuffer.AsSpan().CopyTo(buffer);
     }
 
     /// <summary>
@@ -1817,8 +1499,19 @@ public class SPI : IDiagnostics, ILinkAdapter
         int bytesToTransfer = Math.Max(_rxHeader.DataLength, _txPointer);
         for (int retry = 0; retry < _settings.MaxSpiRetries; retry++)
         {
-            WaitForTransfer();
-            _spiDevice.TransferFullDuplex(_txBuffer.Value[..bytesToTransfer].Span, _rxBuffer[..bytesToTransfer].Span);
+            // Send data
+            _serialPort.Write(_txBuffer.Value.ToArray(), 0, bytesToTransfer);
+
+            // Receive data
+            try
+            {
+                ReadExactly(_rxBuffer[..bytesToTransfer].Span);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Timeout reading data from USB device");
+                return false;
+            }
 
             // Check for possible response code
             uint responseCode = MemoryMarshal.Read<uint>(_rxBuffer.Span);
@@ -1882,7 +1575,7 @@ public class SPI : IDiagnostics, ILinkAdapter
                 return success;
             }
         }
-        throw new OperationCanceledException("SPI connection reset because the number of maximum retries has been exceeded");
+        throw new OperationCanceledException("USB connection reset because the number of maximum retries has been exceeded");
     }
 
     /// <summary>
@@ -1914,7 +1607,7 @@ public class SPI : IDiagnostics, ILinkAdapter
                     continue;
             }
         }
-        throw new OperationCanceledException("SPI connection reset because the number of maximum retries has been exceeded");
+        throw new OperationCanceledException("USB connection reset because the number of maximum retries has been exceeded");
     }
     #endregion
 }

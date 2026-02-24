@@ -38,13 +38,6 @@ public interface ILinkAdapter
     double GetMaxFullTransferDelay();
 
     /// <summary>
-    /// Get the maximum time to wait for the transfer ready pin to be toggled and reset the counter
-    /// </summary>
-    /// <param name="fullTransferCounter">Query and reset the full transfer duration</param>
-    /// <returns>Time in ms</returns>
-    double GetMaxPinWaitDuration(bool fullTransferCounter);
-
-    /// <summary>
     /// Check if the controller has been reset
     /// </summary>
     /// <returns>Whether the controller has been reset</returns>
