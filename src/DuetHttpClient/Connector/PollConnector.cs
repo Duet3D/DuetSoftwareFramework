@@ -583,6 +583,7 @@ internal partial class PollConnector : BaseConnector
                 layer.Duration += avgLayerDuration;
                 for (int k = 0; k < avgFilamentUsage.Count; k++)
                 {
+#pragma warning disable CS0618 // Type or member is obsolete
                     if (k >= layer.Filament.Count)
                     {
                         layer.Filament.Add(avgFilamentUsage[k]);
@@ -591,6 +592,7 @@ internal partial class PollConnector : BaseConnector
                     {
                         layer.Filament[k] += avgFilamentUsage[k];
                     }
+#pragma warning restore CS0618 // Type or member is obsolete
                 }
                 layer.FractionPrinted += avgFractionPrinted;
             }
