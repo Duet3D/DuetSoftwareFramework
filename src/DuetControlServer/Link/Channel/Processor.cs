@@ -972,7 +972,7 @@ public sealed class Processor
         {
             _logger.LogDebug("Running code from firmware '{Code}' on channel {Channel}", code, Channel);
 
-            Code codeObj = _codeFactory.Create();
+            Code codeObj = _codeFactory.Create(code);
             codeObj.Channel = Channel;
             codeObj.Flags |= CodeFlags.IsFromFirmware | CodeFlags.IsLastCode;
             _ = codeObj.ExecuteAsync().ContinueWith(async task =>

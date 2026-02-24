@@ -12,6 +12,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System;
 using System.CommandLine;
 using System.IO;
@@ -120,6 +121,10 @@ rootCommand.SetAction(async (parserResult) =>
         Console.WriteLine();
     }
 
+    // Resolved from the DI container after host.Build(); the logging filter below reads
+    // Settings.LogLevel on every IsEnabled() call, so M111 P-1 S"level" takes effect immediately.
+    Settings? capturedSettings = null;
+
     // Set up the host application
     IHost host;
     ILoggerFactory? loggerFactory = null;
@@ -143,14 +148,19 @@ rootCommand.SetAction(async (parserResult) =>
                     string configLogLevelString = context.Configuration.GetValue<string>("LogLevel") ?? "Information";
                     logLevel = ParseLogLevel(configLogLevelString);
                 }
-                
-                // Add console logging with custom formatter
+
+                // Add console logging with custom formatter.
+                // The floor is Trace so the dynamic filter below can lower the effective level
+                // at runtime (e.g. via M111 P-1 S"debug") without a restart.
+                // capturedSettings is null during very early startup, so fall back to the
+                // configured initial level until the host is built and the DI container resolves it.
                 logging.AddConsole(options =>
                 {
                     options.FormatterName = nameof(CommonLogFormatter);
                 })
                 .AddConsoleFormatter<CommonLogFormatter, CommonLogFormatterOptions>()
-                .SetMinimumLevel(logLevel);
+                .SetMinimumLevel(LogLevel.Trace)
+                .AddFilter((_, level) => level >= (capturedSettings?.LogLevel ?? logLevel));
             })
             .UseSystemd()
             .ConfigureAppConfiguration((hostingContext, config) =>
@@ -190,9 +200,10 @@ rootCommand.SetAction(async (parserResult) =>
                     .AddUtility();
             })
             .Build();
-        
-        // Capture logger factory for error logging
+
+        // Capture logger factory and settings for error logging and dynamic log-level filtering
         loggerFactory = host.Services.GetRequiredService<ILoggerFactory>();
+        capturedSettings = host.Services.GetRequiredService<IOptions<Settings>>().Value;
     }
     catch (Exception e)
     {

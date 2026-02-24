@@ -605,9 +605,10 @@ public class MCodeHandler(
                                 // Parse the log level
                                 if (Enum.TryParse(levelString, true, out LogLevel level))
                                 {
+                                    // Writing settings.Value.LogLevel is all that's needed: the dynamic
+                                    // logging filter in Program.cs reads it directly on every IsEnabled() call.
                                     settings.Value.LogLevel = level;
-                                    // Note: Changing log level at runtime requires restarting DCS or using a configuration reload mechanism
-                                    logger.LogInformation("Log level changed to {0}. Some changes may require a restart to take effect.", level);
+                                    logger.LogInformation("Log level changed to {Level}", level);
                                     seen = true;
                                 }
                                 else

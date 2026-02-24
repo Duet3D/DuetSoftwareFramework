@@ -708,6 +708,11 @@ public sealed class LinkService(
     {
         linkAdapter.ReadMacroRequest(out CodeChannel channel, out bool fromCode, out string filename);
         logger.LogTrace("Received macro request for file {File} on channel {Channel}", filename, channel);
+        if (channel < 0 || channel >= CodeChannel.Unknown)
+        {
+            logger.LogError("Received macro request for invalid channel {Channel}", channel);
+            return;
+        }
 
         using (channels[channel].Lock())
         {
