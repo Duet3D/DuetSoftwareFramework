@@ -95,13 +95,13 @@ public sealed class CommonLogFormatter : ConsoleFormatter
     {
         return logLevel switch
         {
-            LogLevel.Trace => "\x1b[90m",        // Gray
-            LogLevel.Debug => "\x1b[36m",        // Cyan
-            LogLevel.Information => "\x1b[32m",   // Green
-            LogLevel.Warning => "\x1b[33m",      // Yellow
-            LogLevel.Error => "\x1b[31m",        // Red
+            LogLevel.Trace => "\x1b[90m",           // Gray
+            LogLevel.Debug => "\x1b[2;37m",         // Dim Gray
+            LogLevel.Information => "\x1b[32m",     // Green
+            LogLevel.Warning => "\x1b[33m",         // Yellow
+            LogLevel.Error => "\x1b[31m",           // Red
             LogLevel.Critical => "\x1b[1m\x1b[31m", // Bold Red
-            _ => "\x1b[0m"                       // Default/Reset
+            _ => "\x1b[0m"                          // Default/Reset
         };
     }
 
