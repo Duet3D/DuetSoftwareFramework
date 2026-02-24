@@ -591,7 +591,7 @@ public class MCodeHandler(
 
             // Set Debug Level
             // We only support some options for M111 P-1:
-            // - S"<level>" sets the log level where the level corresponds to the available log levels (Trace, Debug, Information, Warning, Error, Critical)
+            // - S"<level>" sets the log level; accepted values are trace, debug, info, warn, error, fatal, off (and their long forms)
             // - Onnn can be used to turn on/off logging via generic messages (accessible then e.g. via web UI)
             case 111:
                 {
@@ -602,8 +602,8 @@ public class MCodeHandler(
                             bool seen = false;
                             if (code.TryGetString('S', out string? levelString))
                             {
-                                // Parse the log level
-                                if (Enum.TryParse(levelString, true, out LogLevel level))
+                                // Parse the log level using shared helper that supports short aliases
+                                if (LogLevelHelper.TryParseLogLevel(levelString, out LogLevel level))
                                 {
                                     // Writing settings.Value.LogLevel is all that's needed: the dynamic
                                     // logging filter in Program.cs reads it directly on every IsEnabled() call.
@@ -613,7 +613,7 @@ public class MCodeHandler(
                                 }
                                 else
                                 {
-                                    return new Message(MessageType.Error, $"Invalid log level: {levelString}. Valid levels are: Trace, Debug, Information, Warning, Error, Critical");
+                                    return new Message(MessageType.Error, $"Invalid log level '{levelString}'. Valid values: {LogLevelHelper.ValidLogLevels}");
                                 }
                             }
                             if (code.TryGetBool('O', out bool oParam))

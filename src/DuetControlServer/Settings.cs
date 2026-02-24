@@ -1,4 +1,5 @@
 ﻿using DuetAPI.Connection;
+using DuetControlServer.Utility;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -437,19 +438,9 @@ public static class ServiceCollectionExtensions
     {
         startErrorFile = configuration.GetValue(nameof(Settings.StartErrorFile), Defaults.StartErrorFile);
         
-        // Get log level string and convert it manually
+        // Get log level string and convert it (supports canonical names and short aliases)
         string logLevelString = configuration.GetValue<string>("LogLevel") ?? "Information";
-        LogLevel parsedLogLevel = logLevelString.ToLowerInvariant() switch
-        {
-            "trace" => LogLevel.Trace,
-            "debug" => LogLevel.Debug,
-            "info" or "information" => LogLevel.Information,
-            "warn" or "warning" => LogLevel.Warning,
-            "error" => LogLevel.Error,
-            "fatal" or "critical" => LogLevel.Critical,
-            "off" or "none" => LogLevel.None,
-            _ => LogLevel.Information
-        };
+        LogLevel parsedLogLevel = LogLevelHelper.ParseLogLevel(logLevelString);
         
         // Create a memory configuration source that excludes LogLevel
         var configData = new Dictionary<string, string?>();
