@@ -139,6 +139,17 @@ public partial class Move : ModelObject, IStaticModelObject
     private float _travelAcceleration = 10000F;
 
     /// <summary>
+    /// Indicates if third-order S-curve acceleration is enabled.
+    /// Only present in builds that support S-curve acceleration
+    /// </summary>
+    public bool UsingSCurve
+    {
+        get => _usingSCurve;
+        set => SetPropertyValue(ref _usingSCurve, value);
+    }
+    private bool _usingSCurve;
+
+    /// <summary>
     /// Virtual total extruder position
     /// </summary>
     public float VirtualEPos
