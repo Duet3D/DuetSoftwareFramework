@@ -69,6 +69,10 @@ supports modules from git e.e. git+https://github.com/pallets/flask.git
 
 Version 2.0.1 - Modified by Stuart Strolin
 Added defensive code for unexpected error in output from import test script
+
+Version 2.0.2 - Modified by Stuart Strolin
+Added support for extras in module names (use of square brackets) e.g. package[standard]
+
 """
 
 
@@ -93,7 +97,7 @@ from typing import Optional
 
 
 # CONSTANTS
-THIS_VERSION = '2.0.1'
+THIS_VERSION = '2.0.2'
 VENV_FOLDER = 'venv'
 MANIFEST_KEY = 'sbcPythonDependencies'
 NAME_KEY = 'name'
@@ -135,9 +139,11 @@ class modType(Enum):
 	NOTINSTALLED = 'Not Installed'
 
 class Dependency:
-	regex = r'(^([\w\-_]+)((==|~=|>=|<=|>|<)((\d+!)?(\d)+(\.\d+)*(-?(a|b|rc)\d+)?(\.post\d+)?(\.dev\d+)?))?$)|(^git\+.*$)'	
-	# NOTE THAT THIS DOES NOT WORK WITH PACKAGE NAMES THAT CONTAIN [] (which are illegal)
+	regex = r'(^([\w\-_\[\]]+)((==|~=|>=|<=|>|<)((\d+!)?(\d)+(\.\d+)*(-?(a|b|rc)\d+)?(\.post\d+)?(\.dev\d+)?))?$)|(^git\+.*$)'	
+	# Supports package[extra] and git dependencies but does not support environment markers or multiple conditions
+	# (e.g. package1; python_version < "3.8", package2; python_version >= "3.8")
 
+	#fOLLOWING ARE THE GROUP INDICES FOR THE REGEX
 	class RegexGroups(Enum):
 		PYPI = 0
 		PACKAGE_NAME = 1
