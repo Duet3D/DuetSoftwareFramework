@@ -115,7 +115,7 @@ public sealed class CommonLogFormatter : ConsoleFormatter
             LogLevel.Trace => "trace",
             LogLevel.Debug => "debug",
             LogLevel.Information => "info",
-            LogLevel.Warning => "warning",
+            LogLevel.Warning => "warn",
             LogLevel.Error => "error",
             LogLevel.Critical => "fatal",
             _ => logLevel.ToString().ToLowerInvariant()
