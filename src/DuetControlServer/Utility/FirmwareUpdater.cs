@@ -366,15 +366,16 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
                 try
                 {
                     // Start the update process
-                    Code updateCode = codeFactory.Create();
-                    updateCode.Channel = DuetAPI.CodeChannel.Trigger;
-                    updateCode.Type = CodeType.MCode;
-                    updateCode.MajorNumber = 997;
-                    updateCode.Parameters =
-                    [
-                        new('B', board.CanAddress)
-                    ];
-
+                    Code updateCode = new()
+                    {
+                        Channel = DuetAPI.CodeChannel.Trigger,
+                        Type = CodeType.MCode,
+                        MajorNumber = 997,
+                        Parameters =
+                        [
+                            new('B', board.CanAddress)
+                        ]
+                    };
                     Message result = await commandConnection.PerformCodeAsync(updateCode, cancellationToken);
 
                     // Unlike with M997, we need to wait for RRF to complete the update process
@@ -408,10 +409,12 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
             Console.Write("Updating firmware on mainboard... ");
             try
             {
-                Code updateCode = codeFactory.Create();
-                updateCode.Channel = DuetAPI.CodeChannel.Trigger;
-                updateCode.Type = CodeType.MCode;
-                updateCode.MajorNumber = 997;
+                Code updateCode = new()
+                {
+                    Channel = DuetAPI.CodeChannel.Trigger,
+                    Type = CodeType.MCode,
+                    MajorNumber = 997
+                };
 
                 Message result = await commandConnection.PerformCodeAsync(updateCode, cancellationToken);
                 Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
