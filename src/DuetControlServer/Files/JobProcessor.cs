@@ -477,7 +477,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                     if (IsPaused)
                     {
                         // Adjust the file position
-                        #warning This needs more work
+#warning This needs more work
                         long newFilePosition = _pausePosition ?? currentFilePosition;
                         await SetFilePositionAsync(file.Channel == CodeChannel.File ? 0 : 1, newFilePosition);
                         _logger.LogInformation("Job on {Channel} has been paused at byte {Offset}, reason {PauseReason}", file.Channel, (_pausePosition == null) ? $"{newFilePosition} (no fpos from firmware)" : newFilePosition.ToString(), _pauseReason);
@@ -485,7 +485,13 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                         // Wait for the print to be resumed
                         IsProcessing = false;
                         await _resume.WaitAsync(_lifetime.ApplicationStopping);
-                        IsProcessing = !IsAborted && !IsCancelled;
+
+                        // Reassign the file being printed unless the print is aborted
+                        if (!IsAborted || !IsCancelled)
+                        {
+                            IsProcessing = true;
+                            _codeProcessor.SetJobFile(file.Channel, file);
+                        }
                     }
                     else
                     {
@@ -494,8 +500,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                     }
                 }
             }
-        }
-        while (!_lifetime.ApplicationStopping.IsCancellationRequested);
+        } while (!_lifetime.ApplicationStopping.IsCancellationRequested);
 
         // No longer printing
         _codeProcessor.SetJobFile(file.Channel, null);

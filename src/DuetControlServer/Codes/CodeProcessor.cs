@@ -287,7 +287,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     /// <summary>
     /// Dictionary of codes vs. synchronization tasks
     /// </summary>
-    private readonly Dictionary<Code, TaskCompletionSource<bool>> _syncRequests = [];
+    private readonly Dictionary<Commands.Code, TaskCompletionSource<bool>> _syncRequests = [];
 
     /// <summary>
     /// Synchronize the File and File2 code streams, may only be called when a job is live
@@ -299,7 +299,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     /// This must be called while the Job class is NOT locked and it must be called from the same
     /// code on File *AND* File2, else the sync request is never resolved (or at least not before the file is cancelled)
     /// </remarks>
-    public async Task<bool> DoSyncAsync(Code code, CancellationToken cancellationToken = default)
+    public async Task<bool> DoSyncAsync(Commands.Code code, CancellationToken cancellationToken = default)
     {
         if (!code.IsFromFileChannel)
         {
@@ -319,7 +319,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
         Task<bool> syncTask;
         lock (_syncRequests)
         {
-            foreach (Code item in _syncRequests.Keys)
+            foreach (Commands.Code item in _syncRequests.Keys)
             {
                 if (code.Channel != item.Channel && code.FilePosition == item.FilePosition)
                 {
@@ -343,7 +343,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     {
         lock (_syncRequests)
         {
-            foreach (Code code in _syncRequests.Keys.ToList())
+            foreach (Commands.Code code in _syncRequests.Keys.ToList())
             {
                 if (code.FilePosition >= filePosition)
                 {
