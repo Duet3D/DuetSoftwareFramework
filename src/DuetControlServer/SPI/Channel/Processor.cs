@@ -888,55 +888,8 @@ namespace DuetControlServer.SPI.Channel
                 _logger.Debug("Running code from firmware '{0}' on channel {1}", code, Channel);
 
                 Code codeObj = new(code) { Channel = Channel };
-                codeObj.Flags |= CodeFlags.IsFromFirmware | CodeFlags.IsLastCode;
-                _ = codeObj.Execute().ContinueWith(async task =>
-                {
-                    try
-                    {
-                        Message? result = await task;
-                        if (result is null)
-                        {
-                            return;
-                        }
-
-                        // Check what kind of message this is
-                        MessageTypeFlags flags = (MessageTypeFlags)(1 << (int)Channel);
-                        if (result.Type != MessageType.Success)
-                        {
-                            flags |= (result.Type == MessageType.Error) ? MessageTypeFlags.ErrorMessageFlag : MessageTypeFlags.WarningMessageFlag;
-                        }
-
-                        // Split the message into multiple chunks so RRF can output it
-                        Memory<byte> encodedMessage = Encoding.UTF8.GetBytes(result.ToString());
-                        for (int i = 0; i < encodedMessage.Length; i += Settings.MaxMessageLength)
-                        {
-                            if (i + Settings.MaxMessageLength >= encodedMessage.Length)
-                            {
-                                Memory<byte> partialMessage = encodedMessage[i..];
-                                Interface.SendMessage(flags, Encoding.UTF8.GetString(partialMessage.ToArray()));
-                            }
-                            else
-                            {
-                                Memory<byte> partialMessage = encodedMessage.Slice(i, Math.Min(encodedMessage.Length - i, Settings.MaxMessageLength));
-                                Interface.SendMessage(flags | MessageTypeFlags.PushFlag, Encoding.UTF8.GetString(partialMessage.ToArray()));
-                            }
-                        }
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        // Code has been cancelled. Don't log this
-                    }
-                    catch (AggregateException ae)
-                    {
-                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to execute {code} from firmware: [{ae.InnerException!.GetType().Name}] {ae.InnerException.Message}");
-                        _logger.Warn(ae);
-                    }
-                    catch (Exception e)
-                    {
-                        await Logger.LogOutputAsync(MessageType.Error, $"Failed to execute {code} from firmware: [{e.GetType().Name}] {e.Message}");
-                        _logger.Warn(e);
-                    }
-                }, TaskContinuationOptions.RunContinuationsAsynchronously);
+                codeObj.Flags |= CodeFlags.Asynchronous | CodeFlags.IsFromFirmware | CodeFlags.IsLastCode;
+                _ = codeObj.Execute();
             }
             catch (CodeParserException cpe)
             {

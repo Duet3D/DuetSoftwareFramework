@@ -1,9 +1,12 @@
-﻿using DuetAPI.Commands;
+﻿using DuetAPI;
+using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Codes.Handlers;
 using DuetControlServer.Files;
+using DuetControlServer.SPI.Communication.Shared;
 using System;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace DuetControlServer.Codes.Pipelines
@@ -113,7 +116,33 @@ namespace DuetControlServer.Codes.Pipelines
                     // Output and log the result from async codes
                     if (code.Flags.HasFlag(CodeFlags.Asynchronous))
                     {
-                        if (code.IsFromFileChannel)
+                        if (code.Flags.HasFlag(CodeFlags.IsFromFirmware) ||
+                            code.Channel is CodeChannel.USB or CodeChannel.Aux or CodeChannel.Aux2)
+                        {
+                            // Check what kind of message this is
+                            MessageTypeFlags flags = (MessageTypeFlags)(1 << (int)code.Channel);
+                            if (code.Result.Type != MessageType.Success)
+                            {
+                                flags |= (code.Result.Type == MessageType.Error) ? MessageTypeFlags.ErrorMessageFlag : MessageTypeFlags.WarningMessageFlag;
+                            }
+
+                            // Split the message into multiple chunks so RRF can output it
+                            Memory<byte> encodedMessage = Encoding.UTF8.GetBytes(code.Result.ToString());
+                            for (int i = 0; i < encodedMessage.Length; i += Settings.MaxMessageLength)
+                            {
+                                if (i + Settings.MaxMessageLength >= encodedMessage.Length)
+                                {
+                                    Memory<byte> partialMessage = encodedMessage[i..];
+                                    SPI.Interface.SendMessage(flags, Encoding.UTF8.GetString(partialMessage.ToArray()));
+                                }
+                                else
+                                {
+                                    Memory<byte> partialMessage = encodedMessage.Slice(i, Math.Min(encodedMessage.Length - i, Settings.MaxMessageLength));
+                                    SPI.Interface.SendMessage(flags | MessageTypeFlags.PushFlag, Encoding.UTF8.GetString(partialMessage.ToArray()));
+                                }
+                            }
+                        }
+                        else if (code.IsFromFileChannel)
                         {
                             await Utility.Logger.LogOutputAsync(code.Result);
                         }

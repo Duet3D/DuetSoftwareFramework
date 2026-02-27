@@ -10,7 +10,6 @@ using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files.ImageProcessing;
-using SixLabors.ImageSharp.Processing;
 using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.Files
