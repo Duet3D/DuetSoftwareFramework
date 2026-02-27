@@ -731,7 +731,7 @@ namespace DuetControlServer.Files
                                 content.StartsWith("thumbnail_JPG end") ||
                                 content.StartsWith("thumbnail_QOI end"))
                             {
-                                offset = 0;
+                                offset = bytesProcessed = 0;
                                 break;
                             }
 

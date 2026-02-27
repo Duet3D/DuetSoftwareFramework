@@ -723,7 +723,9 @@ namespace DuetControlServer.Codes.Handlers
                                     result
                                 };
                             }
-                            return new Message(MessageType.Success, JsonSerializer.Serialize(finalResult, JsonHelper.DefaultJsonOptions));
+
+                            string json = JsonSerializer.Serialize(finalResult, JsonHelper.DefaultJsonOptions);
+                            return new Message(MessageType.Success, (code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," + json : json);
                         }
                         else
                         {
