@@ -47,24 +47,21 @@ public sealed class Message : ICloneable
     /// <param name="line">Line content</param>
     public void AppendLine(string line)
     {
-        if (!string.IsNullOrWhiteSpace(line))
+        if (string.IsNullOrEmpty(Content))
         {
-            if (string.IsNullOrEmpty(Content))
-            {
-                Content = line;
-            }
-            else
-            {
+            Content = string.IsNullOrEmpty(line) ? "\n" : line;
+        }
+        else
+        {
 #if NET6_0_OR_GREATER
-                if (!Content.EndsWith('\n'))
+            if (!Content.EndsWith('\n'))
 #else
-                if (!Content.EndsWith("\n"))
+            if (!Content.EndsWith("\n"))
 #endif
-                {
-                    Content += '\n';
-                }
-                Content += line;
+            {
+                Content += '\n';
             }
+            Content += line;
         }
     }
 
