@@ -104,7 +104,7 @@ public class SPI : IDiagnostics, ILinkAdapter
         // Initialize transfer ready pin
         _transferReadyPin = settings.Value.TransferReadyPin;
         int chipNumber = int.Parse(settings.Value.GpioChipDevice.Replace("/dev/gpiochip", ""));
-        _gpioController = new GpioController(PinNumberingScheme.Logical, new LibGpiodDriver(chipNumber));
+        _gpioController = new GpioController(new LibGpiodDriver(chipNumber));
         _gpioController.OpenPin(_transferReadyPin, PinMode.Input);
         _lastPinValueFromCallback = (int)_gpioController.Read(_transferReadyPin);
         _gpioController.RegisterCallbackForPinValueChangedEvent(_transferReadyPin, PinEventTypes.Rising | PinEventTypes.Falling, (sender, args) =>

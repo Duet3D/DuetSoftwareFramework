@@ -24,7 +24,7 @@ namespace DuetControlServer.IPC.Processors;
 public sealed class CodeInterception : IProcessor
 {
     /// <summary>
-    /// List of supported commands in this mode
+    /// List of specific commands supported in this mode
     /// </summary>
     /// <remarks>
     /// In addition to these commands, commands of the <see cref="Command"/> interpreter are supported while a code is being intercepted
@@ -36,6 +36,11 @@ public sealed class CodeInterception : IProcessor
         typeof(Resolve),
         typeof(Rewrite)
     ];
+
+    /// <summary>
+    /// List of all supported commands
+    /// </summary>
+    public static Type[] AllSupportedCommands { get; } = [.. Command.SupportedCommands, .. SupportedCommands];
 
     /// <summary>
     /// Logger instance
@@ -198,7 +203,7 @@ public sealed class CodeInterception : IProcessor
                         do
                         {
                             // Read another command from the IPC connection
-                            BaseCommand command = await Connection.ReceiveCommandAsync(SupportedCommands, cancellationToken);
+                            BaseCommand command = await Connection.ReceiveCommandAsync(AllSupportedCommands, cancellationToken);
                             Type commandType = command.GetType();
                             if (Command.SupportedCommands.Contains(commandType))
                             {

@@ -21,7 +21,6 @@ namespace DuetControlServer.IPC;
 /// Class that holds main functionality for inter-process communication
 /// </summary>
 /// <param name="commandFactory">Factory to create commands</param>
-/// <param name="firmwareUpdater">Firmware updater</param>
 /// <param name="processorFactory">Factory to create connection processors</param>
 /// <param name="lockManager">Lock manager to handle read/write locks</param>
 /// <param name="model">Object model</param>
@@ -30,7 +29,6 @@ namespace DuetControlServer.IPC;
 /// <param name="settings">Settings</param>
 [DiagnosticsPriority(-2)]
 public sealed class Server(CommandFactory commandFactory,
-    FirmwareUpdater firmwareUpdater,
     ProcessorFactory processorFactory,
     LockManager lockManager,
     Model.ObjectModel model,
