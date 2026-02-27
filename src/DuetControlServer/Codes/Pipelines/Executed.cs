@@ -1,14 +1,17 @@
-﻿using DuetAPI.Commands;
+﻿using DuetAPI;
+using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Codes.Handlers;
 using DuetControlServer.Files;
 using DuetControlServer.Link;
+using DuetControlServer.Link.Protocol.Shared;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -29,6 +32,7 @@ public sealed class Executed : PipelineBase
     private readonly ICodeHandler _mCodes;
     private readonly ICodeHandler _tCodes;
     private readonly IHostApplicationLifetime _lifetime;
+    private readonly IOptions<Settings> _settings;
     private readonly PipelineStackItem _stackItem;
 
     /// <summary>
@@ -62,6 +66,7 @@ public sealed class Executed : PipelineBase
         _mCodes = mCodes;
         _tCodes = tCodes;
         _lifetime = lifetime;
+        _settings = settings;
 
         _stackItem = _stack.Peek();
     }
@@ -154,7 +159,33 @@ public sealed class Executed : PipelineBase
                 // Output and log the result from async codes
                 if (code.Flags.HasFlag(CodeFlags.Asynchronous))
                 {
-                    if (code.IsFromFileChannel)
+                    if (code.Flags.HasFlag(CodeFlags.IsFromFirmware) ||
+                        code.Channel is CodeChannel.USB or CodeChannel.USB2 or CodeChannel.Aux or CodeChannel.Aux2)
+                    {
+                        // Check what kind of message this is
+                        MessageTypeFlags flags = (MessageTypeFlags)(1 << (int)code.Channel);
+                        if (code.Result.Type != MessageType.Success)
+                        {
+                            flags |= (code.Result.Type == MessageType.Error) ? MessageTypeFlags.ErrorMessageFlag : MessageTypeFlags.WarningMessageFlag;
+                        }
+
+                        // Split the message into multiple chunks so RRF can output it
+                        Memory<byte> encodedMessage = Encoding.UTF8.GetBytes(code.Result.ToString());
+                        for (int i = 0; i < encodedMessage.Length; i += _settings.Value.MaxMessageLength)
+                        {
+                            if (i + _settings.Value.MaxMessageLength >= encodedMessage.Length)
+                            {
+                                Memory<byte> partialMessage = encodedMessage[i..];
+                                _linkInterface.SendMessage(flags, Encoding.UTF8.GetString(partialMessage.ToArray()));
+                            }
+                            else
+                            {
+                                Memory<byte> partialMessage = encodedMessage.Slice(i, Math.Min(encodedMessage.Length - i, _settings.Value.MaxMessageLength));
+                                _linkInterface.SendMessage(flags | MessageTypeFlags.PushFlag, Encoding.UTF8.GetString(partialMessage.ToArray()));
+                            }
+                        }
+                    }
+                    else if (code.IsFromFileChannel)
                     {
                         await _eventLogger.LogOutputAsync(code.Result);
                     }
