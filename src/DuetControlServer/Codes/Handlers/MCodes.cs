@@ -421,7 +421,7 @@ namespace DuetControlServer.Codes.Handlers
                             catch (Exception e) when (e is not MissingParameterException and not InvalidParameterTypeException)
                             {
                                 _logger.Debug(e, "Failed to return file information");
-                                return new Message(MessageType.Warning, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1,\"fileName:" : "{\"err\":1,\"fileName:") + JsonSerializer.Serialize(virtualFilename, JsonHelper.DefaultJsonOptions) + "}");
+                                return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1,\"fileName:" : "{\"err\":1,\"fileName:") + JsonSerializer.Serialize(virtualFilename, JsonHelper.DefaultJsonOptions) + "}");
                             }
                         }
                         else
@@ -434,7 +434,7 @@ namespace DuetControlServer.Codes.Handlers
                                     return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":0," : "{\"err\":0,") + json[1..]);
                                 }
                             }
-                            return new Message(MessageType.Warning, (code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1}}" : "{\"err\":1}");
+                            return new Message(MessageType.Success, (code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1}}" : "{\"err\":1}");
                         }
                     }
                     throw new OperationCanceledException();
