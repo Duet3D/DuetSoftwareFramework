@@ -681,9 +681,11 @@ namespace DuetControlServer.Codes.Handlers
                                 throw new OperationCanceledException();
                             }
 
-                            // Retrieve filtered OM data. At present, flags are ignored
+                            // Retrieve filtered OM data
                             code.TryGetString('F', out string? flags);
-                            using JsonDocument queryResult = JsonSerializer.SerializeToDocument(Filter.GetFiltered(key + ".**"), JsonHelper.DefaultJsonOptions);
+                            bool includeNulls = flags is not null && flags.Contains('n');
+                            JsonSerializerOptions jsonOptions = includeNulls ? JsonHelper.DefaultJsonOptions : JsonHelper.NoNullJsonOptions;
+                            using JsonDocument queryResult = JsonSerializer.SerializeToDocument(Filter.GetFiltered(key + ".**"), jsonOptions);
 
                             // Get down to the requested depth
                             JsonElement result = queryResult.RootElement;
@@ -724,7 +726,7 @@ namespace DuetControlServer.Codes.Handlers
                                 };
                             }
 
-                            string json = JsonSerializer.Serialize(finalResult, JsonHelper.DefaultJsonOptions);
+                            string json = JsonSerializer.Serialize(finalResult, jsonOptions);
                             return new Message(MessageType.Success, (code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," + json : json);
                         }
                         else

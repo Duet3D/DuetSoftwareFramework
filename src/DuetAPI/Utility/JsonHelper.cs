@@ -116,6 +116,17 @@ namespace DuetAPI.Utility
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
 
+        /// <summary>
+        /// JSON (de-)serialization options that omit null values
+        /// </summary>
+        public static readonly JsonSerializerOptions NoNullJsonOptions = new()
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
 #if NETSTANDARD2_1_OR_GREATER || NET6_0_OR_GREATER
         /// <summary>
         /// Receive a serialized JSON object from a socket in UTF-8 format
