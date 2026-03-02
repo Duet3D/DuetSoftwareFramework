@@ -41,18 +41,21 @@ namespace DuetPiManagementPlugin.Network.Protocols
                 if (config?.Kestrel?.Endpoints?.Http?.Url is not null && Uri.TryCreate(config.Kestrel.Endpoints.Http.Url.Replace('*', 'x'), UriKind.Absolute, out Uri? url))
                 {
                     _httpPort = url.Port;
-                    if (dwsEnabled)
-                    {
-                        await Manager.SetProtocol(NetworkProtocol.HTTP, true);
-                    }
+                    await Manager.SetProtocol(NetworkProtocol.HTTP, true);
                 }
+                else
+                {
+                    await Manager.SetProtocol(NetworkProtocol.HTTP, false);
+                }
+
                 if (config?.Kestrel?.Endpoints?.Https?.Url is not null && Uri.TryCreate(config.Kestrel.Endpoints.Https.Url.Replace('*', 'x'), UriKind.Absolute, out url))
                 {
                     _httpsPort = url.Port;
-                    if (dwsEnabled)
-                    {
-                        await Manager.SetProtocol(NetworkProtocol.HTTPS, true);
-                    }
+                    await Manager.SetProtocol(NetworkProtocol.HTTPS, dwsEnabled);
+                }
+                else
+                {
+                    await Manager.SetProtocol(NetworkProtocol.HTTPS, false);
                 }
             }
         }

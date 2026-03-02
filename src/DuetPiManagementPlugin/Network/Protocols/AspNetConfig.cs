@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace DuetPiManagementPlugin.Network.Protocols
 {
     /// <summary>
@@ -11,14 +13,22 @@ namespace DuetPiManagementPlugin.Network.Protocols
             {
                 public sealed class HttpConfig
                 {
+                    [JsonPropertyName("Url")]
                     public string? Url { get; set; }
                 }
 
+                [JsonPropertyName("Http")]
                 public HttpConfig Http { get; set; } = new HttpConfig();
+
+                [JsonPropertyName("Https")]
                 public HttpConfig Https { get; set; } = new HttpConfig();
             }
+
+            [JsonPropertyName("Endpoints")]
             public EndpointsConfig Endpoints { get; set; } = new EndpointsConfig();
         }
+
+        [JsonPropertyName("Kestrel")]
         public KestrelConfig Kestrel { get; set; } = new KestrelConfig();
     }
 }

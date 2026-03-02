@@ -402,6 +402,7 @@ namespace DuetPiManagementPlugin
                         case 587:
                             try
                             {
+                                await Network.Protocols.HTTP.Init();
                                 if (code.MinorNumber is null || code.MinorNumber == 0)
                                 {
                                     code.TryGetString('S', out string? ssid);
