@@ -696,10 +696,10 @@ namespace DuetControlServer.Files
                     {
                         while (charsWritten < MaxThumbnailLength)
                         {
-                            // Read the next line comment
+                            // Read the next full line comment (always consume to end-of-line so bytesProcessed stays on a line boundary)
                             bool isLineStart = true;
                             int lineStart = bytesProcessed, lineLength = 0;
-                            while (bytesProcessed < bytesRead && charsWritten + lineLength < MaxThumbnailLength)
+                            while (bytesProcessed < bytesRead)
                             {
                                 char c = (char)data[bytesProcessed++];
 
@@ -725,7 +725,7 @@ namespace DuetControlServer.Files
 
                             // Is it the end of this thumbnail?
                             string content = Encoding.ASCII.GetString(data, lineStart, lineLength);
-                            if ((charsWritten + lineLength < MaxThumbnailLength && lineLength == 0) ||
+                            if (lineLength == 0 ||
                                 content.StartsWith("thumbnail end") ||
                                 content.StartsWith("thumbnail_JPG end") ||
                                 content.StartsWith("thumbnail_QOI end"))
@@ -734,9 +734,10 @@ namespace DuetControlServer.Files
                                 break;
                             }
 
-                            // Copy the data
-                            jsonResult.Append(content);
-                            charsWritten += lineLength;
+                            // Copy the data, respecting the output length limit
+                            int charsToWrite = Math.Min(lineLength, MaxThumbnailLength - charsWritten);
+                            jsonResult.Append(content, 0, charsToWrite);
+                            charsWritten += charsToWrite;
                         }
                         offset += bytesProcessed;
                     }
