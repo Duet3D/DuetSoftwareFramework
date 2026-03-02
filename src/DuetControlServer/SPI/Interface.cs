@@ -1159,9 +1159,16 @@ namespace DuetControlServer.SPI
             DataTransfer.ReadMacroRequest(out CodeChannel channel, out bool fromCode, out string filename);
             _logger.Trace("Received macro request for file {0} on channel {1}", filename, channel);
 
-            using (_channels[channel].Lock())
+            if (channel < CodeChannel.Unknown)
             {
-                _channels[channel].DoMacroFile(filename, fromCode);
+                using (_channels[channel].Lock())
+                {
+                    _channels[channel].DoMacroFile(filename, fromCode);
+                }
+            }
+            else if (!Settings.UpdateOnly)
+            {
+                _logger.Error("Received macro request for file {0} on invalid channel {1}", filename, channel);
             }
         }
 
@@ -1173,9 +1180,16 @@ namespace DuetControlServer.SPI
             DataTransfer.ReadAbortFile(out CodeChannel channel, out bool abortAll);
             _logger.Info("Received file abort request on channel {0} for {1}", channel, abortAll ? "all files" : "the last file");
 
-            using (_channels[channel].Lock())
+            if (channel < CodeChannel.Unknown)
             {
-                _channels[channel].FilesAborted(abortAll);
+                using (_channels[channel].Lock())
+                {
+                    _channels[channel].FilesAborted(abortAll);
+                }
+            }
+            else if (!Settings.UpdateOnly)
+            {
+                _logger.Error("Received file abort request on channel {0} for {1}", channel, abortAll ? "all files" : "the last file");
             }
         }
 
@@ -1223,9 +1237,16 @@ namespace DuetControlServer.SPI
             DataTransfer.ReadCodeChannel(out CodeChannel channel);
             _logger.Trace("Received resource locked notification for channel {0}", channel);
 
-            using (_channels[channel].Lock())
+            if (channel < CodeChannel.Unknown)
             {
-                _channels[channel].ResourceLocked();
+                using (_channels[channel].Lock())
+                {
+                    _channels[channel].ResourceLocked();
+                }
+            }
+            else if (!Settings.UpdateOnly)
+            {
+                _logger.Error("Received resource locked notification for invalid channel {0}", channel);
             }
         }
 
@@ -1311,9 +1332,16 @@ namespace DuetControlServer.SPI
             DataTransfer.ReadDoCode(out CodeChannel channel, out string code);
             _logger.Trace("Received firmware code request on channel {0} => {1}", channel, code);
 
-            using (_channels[channel].Lock())
+            if (channel < CodeChannel.Unknown)
             {
-                _channels[channel].DoFirmwareCode(code);
+                using (_channels[channel].Lock())
+                {
+                    _channels[channel].DoFirmwareCode(code);
+                }
+            }
+            else if (!Settings.UpdateOnly)
+            {
+                _logger.Error("Received firmware code request for invalid channel {0} => {1}", channel, code);
             }
         }
 
@@ -1325,9 +1353,16 @@ namespace DuetControlServer.SPI
             DataTransfer.ReadCodeChannel(out CodeChannel channel);
             _logger.Trace("Received wait for message acknowledgement on channel {0}", channel);
 
-            using (_channels[channel].Lock())
+            if (channel < CodeChannel.Unknown)
             {
-                _channels[channel].WaitForAcknowledgement();
+                using (_channels[channel].Lock())
+                {
+                    _channels[channel].WaitForAcknowledgement();
+                }
+            }
+            else if (!Settings.UpdateOnly)
+            {
+                _logger.Error("Received wait for message acknowledgement on invalid channel {0}", channel);
             }
         }
 
@@ -1339,9 +1374,16 @@ namespace DuetControlServer.SPI
             DataTransfer.ReadCodeChannel(out CodeChannel channel);
             _logger.Trace("Received file closal on channel {0}", channel);
 
-            using (_channels[channel].Lock())
+            if (channel < CodeChannel.Unknown)
             {
-                _channels[channel].MacroFileClosed();
+                using (_channels[channel].Lock())
+                {
+                    _channels[channel].MacroFileClosed();
+                }
+            }
+            else if (!Settings.UpdateOnly)
+            {
+                _logger.Error("Received file closal on invalid channel {0}", channel);
             }
         }
 
@@ -1353,9 +1395,16 @@ namespace DuetControlServer.SPI
             DataTransfer.ReadCodeChannel(out CodeChannel channel);
             _logger.Trace("Received message acknowledgement on channel {0}", channel);
 
-            using (_channels[channel].Lock())
+            if (channel < CodeChannel.Unknown)
             {
-                _channels[channel].MessageAcknowledged();
+                using (_channels[channel].Lock())
+                {
+                    _channels[channel].MessageAcknowledged();
+                }
+            }
+            else if (!Settings.UpdateOnly)
+            {
+                _logger.Error("Received message acknowledgement on invalid channel {0}", channel);
             }
         }
 
