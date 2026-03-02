@@ -748,7 +748,18 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
                         }
 
                         // Copy the data, respecting the output length limit
-                        int charsToWrite = Math.Min(lineLength, MaxThumbnailLength - charsWritten);
+                        int charsToWrite;
+                        if (lineLength <= MaxThumbnailLength - charsWritten)
+                        {
+                            charsToWrite = lineLength;
+                        }
+                        else
+                        {
+                            // Line was only partially consumed - point bytesProcessed to where we stopped
+                            // so the returned offset resumes from the unwritten remainder of this line
+                            charsToWrite = MaxThumbnailLength - charsWritten;
+                            bytesProcessed = lineStart + charsToWrite;
+                        }
                         jsonResult.Append(content, 0, charsToWrite);
                         charsWritten += charsToWrite;
                     }
