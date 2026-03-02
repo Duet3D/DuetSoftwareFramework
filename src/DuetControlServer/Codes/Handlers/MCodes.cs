@@ -727,7 +727,7 @@ namespace DuetControlServer.Codes.Handlers
                             }
 
                             string json = JsonSerializer.Serialize(finalResult, jsonOptions);
-                            return new Message(MessageType.Success, (code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," + json : json);
+                            return new Message(MessageType.Success, (code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," + json[1..] : json);
                         }
                         else
                         {
