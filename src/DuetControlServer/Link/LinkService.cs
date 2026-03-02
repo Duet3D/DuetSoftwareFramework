@@ -837,7 +837,10 @@ public sealed class LinkService(
         }
         catch (Exception e)
         {
-            logger.LogError(e, "Failed to send requested file chunk of {File}", filename);
+            if (!settings.Value.UpdateOnly)
+            {
+                logger.LogError(e, "Failed to send requested file chunk of {File}", filename);
+            }
             linkAdapter.WriteFileChunk(null, 0);
         }
     }
@@ -870,7 +873,10 @@ public sealed class LinkService(
             }
         }
 
-        logger.LogWarning("Unresolved evaluation result for expression {Expression} = {Result}", expression, result);
+        if (!settings.Value.UpdateOnly)
+        {
+            logger.LogWarning("Unresolved evaluation result for expression {Expression} = {Result}", expression, result);
+        }
     }
 
     /// <summary>
@@ -985,7 +991,10 @@ public sealed class LinkService(
             }
         }
 
-        logger.LogWarning("Unresolved variable set result for {Channel}: {Variable} = {Result}", channel, varName, result);
+        if (!settings.Value.UpdateOnly)
+        {
+            logger.LogWarning("Unresolved variable set result for {Channel}: {Variable} = {Result}", channel, varName, result);
+        }
     }
 
     /// <summary>
@@ -1004,7 +1013,10 @@ public sealed class LinkService(
         }
         catch (Exception e)
         {
-            logger.LogError(e, "Failed to check if file {File} exists", filename);
+            if (!settings.Value.UpdateOnly)
+            {
+                logger.LogError(e, "Failed to check if file {File} exists", filename);
+            }
             linkAdapter.WriteCheckFileExistsResult(false);
         }
     }
@@ -1033,7 +1045,10 @@ public sealed class LinkService(
         }
         catch (Exception e)
         {
-            logger.LogError(e, "Failed to delete file or directory {File}", filename);
+            if (!settings.Value.UpdateOnly)
+            {
+                logger.LogError(e, "Failed to delete file or directory {File}", filename);
+            }
             linkAdapter.WriteFileDeleteResult(false);
         }
     }
@@ -1077,7 +1092,10 @@ public sealed class LinkService(
         }
         catch (Exception e)
         {
-            logger.LogError(e, "Failed to open {File} for {Operation}", filename, forWriting ? "writing" : "reading");
+            if (!settings.Value.UpdateOnly)
+            {
+                logger.LogError(e, "Failed to open {File} for {Operation}", filename, forWriting ? "writing" : "reading");
+            }
             linkAdapter.WriteOpenFileResult(Consts.NoFileHandle, 0);
         }
     }
@@ -1103,7 +1121,10 @@ public sealed class LinkService(
         }
         catch (Exception e)
         {
-            logger.LogError(e, "Failed to read {MaxLength} bytes from file #{Handle}", maxLength, handle);
+            if (!settings.Value.UpdateOnly)
+            {
+                logger.LogError(e, "Failed to read {MaxLength} bytes from file #{Handle}", maxLength, handle);
+            }
             linkAdapter.WriteFileReadResult([], -1);
         }
     }
@@ -1128,7 +1149,10 @@ public sealed class LinkService(
         }
         catch (Exception e)
         {
-            logger.LogError(e, "Failed to write {DataLength} bytes to file #{Handle}", data.Length, handle);
+            if (!settings.Value.UpdateOnly)
+            {
+                logger.LogError(e, "Failed to write {DataLength} bytes to file #{Handle}", data.Length, handle);
+            }
             linkAdapter.WriteFileWriteResult(false);
         }
     }
@@ -1152,7 +1176,10 @@ public sealed class LinkService(
         }
         catch (Exception e)
         {
-            logger.LogError(e, "Failed to go to position {Offset} in file #{Handle}", offset, handle);
+            if (!settings.Value.UpdateOnly)
+            {
+                logger.LogError(e, "Failed to go to position {Offset} in file #{Handle}", offset, handle);
+            }
             linkAdapter.WriteFileSeekResult(false);
         }
     }
@@ -1177,7 +1204,10 @@ public sealed class LinkService(
         }
         catch (Exception e)
         {
-            logger.LogError(e, "Failed to truncate file #{Handle}", handle);
+            if (!settings.Value.UpdateOnly)
+            {
+                logger.LogError(e, "Failed to truncate file #{Handle}", handle);
+            }
             linkAdapter.WriteFileTruncateResult(false);
         }
     }
@@ -1203,7 +1233,10 @@ public sealed class LinkService(
         }
         catch (Exception e)
         {
-            logger.LogError(e, "Failed to close file #{Handle}", handle);
+            if (!settings.Value.UpdateOnly)
+            {
+                logger.LogError(e, "Failed to close file #{Handle}", handle);
+            }
         }
     }
     
