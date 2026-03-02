@@ -709,9 +709,16 @@ public sealed class LinkService(
         linkAdapter.ReadMacroRequest(out CodeChannel channel, out bool fromCode, out string filename);
         logger.LogTrace("Received macro request for file {File} on channel {Channel}", filename, channel);
 
-        using (channels[channel].Lock())
+        if (channel < CodeChannel.Unknown)
         {
-            channels[channel].DoMacroFile(filename, fromCode);
+            using (channels[channel].Lock())
+            {
+                channels[channel].DoMacroFile(filename, fromCode);
+            }
+        }
+        else if (!settings.Value.UpdateOnly)
+        {
+            logger.LogError("Received macro request for file {File} on invalid channel {Channel}", filename, channel);
         }
     }
 
@@ -723,9 +730,16 @@ public sealed class LinkService(
         linkAdapter.ReadAbortFile(out CodeChannel channel, out bool abortAll);
         logger.LogInformation("Received file abort request on channel {Channel} for {FileType}", channel, abortAll ? "all files" : "the last file");
 
-        using (channels[channel].Lock())
+        if (channel < CodeChannel.Unknown)
         {
-            channels[channel].FilesAborted(abortAll);
+            using (channels[channel].Lock())
+            {
+                channels[channel].FilesAborted(abortAll);
+            }
+        }
+        else if (!settings.Value.UpdateOnly)
+        {
+            logger.LogError("Received file abort request on channel {Channel} for {FileType}", channel, abortAll ? "all files" : "the last file");
         }
     }
 
@@ -774,9 +788,16 @@ public sealed class LinkService(
         linkAdapter.ReadCodeChannel(out CodeChannel channel);
         logger.LogTrace("Received resource locked notification for channel {Channel}", channel);
 
-        using (channels[channel].Lock())
+        if (channel < CodeChannel.Unknown)
         {
-            channels[channel].ResourceLocked();
+            using (channels[channel].Lock())
+            {
+                channels[channel].ResourceLocked();
+            }
+        }
+        else if (!settings.Value.UpdateOnly)
+        {
+            logger.LogError("Received resource locked notification for invalid channel {Channel}", channel);
         }
     }
 
@@ -860,9 +881,16 @@ public sealed class LinkService(
         linkAdapter.ReadDoCode(out CodeChannel channel, out string code);
         logger.LogTrace("Received firmware code request on channel {Channel} => {Code}", channel, code);
 
-        using (channels[channel].Lock())
+        if (channel < CodeChannel.Unknown)
         {
-            channels[channel].DoFirmwareCode(code);
+            using (channels[channel].Lock())
+            {
+                channels[channel].DoFirmwareCode(code);
+            }
+        }
+        else if (!settings.Value.UpdateOnly)
+        {
+            logger.LogError("Received firmware code request for invalid channel {Channel} => {Code}", channel, code);
         }
     }
 
@@ -874,9 +902,16 @@ public sealed class LinkService(
         linkAdapter.ReadCodeChannel(out CodeChannel channel);
         logger.LogTrace("Received wait for message acknowledgement on channel {Channel}", channel);
 
-        using (channels[channel].Lock())
+        if (channel < CodeChannel.Unknown)
         {
-            channels[channel].WaitForAcknowledgement();
+            using (channels[channel].Lock())
+            {
+                channels[channel].WaitForAcknowledgement();
+            }
+        }
+        else if (!settings.Value.UpdateOnly)
+        {
+            logger.LogError("Received wait for message acknowledgement on invalid channel {Channel}", channel);
         }
     }
 
@@ -888,9 +923,16 @@ public sealed class LinkService(
         linkAdapter.ReadCodeChannel(out CodeChannel channel);
         logger.LogTrace("Received file closal on channel {Channel}", channel);
 
-        using (channels[channel].Lock())
+        if (channel < CodeChannel.Unknown)
         {
-            channels[channel].MacroFileClosed();
+            using (channels[channel].Lock())
+            {
+                channels[channel].MacroFileClosed();
+            }
+        }
+        else if (!settings.Value.UpdateOnly)
+        {
+            logger.LogError("Received file closal on invalid channel {Channel}", channel);
         }
     }
 
@@ -902,9 +944,16 @@ public sealed class LinkService(
         linkAdapter.ReadCodeChannel(out CodeChannel channel);
         logger.LogTrace("Received message acknowledgement on channel {Channel}", channel);
 
-        using (channels[channel].Lock())
+        if (channel < CodeChannel.Unknown)
         {
-            channels[channel].MessageAcknowledged();
+            using (channels[channel].Lock())
+            {
+                channels[channel].MessageAcknowledged();
+            }
+        }
+        else if (!settings.Value.UpdateOnly)
+        {
+            logger.LogError("Received message acknowledgement on invalid channel {Channel}", channel);
         }
     }
 
