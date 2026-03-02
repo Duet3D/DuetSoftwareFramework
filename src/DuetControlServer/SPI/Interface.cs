@@ -1286,7 +1286,10 @@ namespace DuetControlServer.SPI
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to send requested file chunk of {0}", filename);
+                if (!Settings.UpdateOnly)
+                {
+                    _logger.Error(e, "Failed to send requested file chunk of {0}", filename);
+                }
                 DataTransfer.WriteFileChunk(null, 0);
             }
         }
@@ -1321,7 +1324,10 @@ namespace DuetControlServer.SPI
                 }
             }
 
-            _logger.Warn("Unresolved evaluation result for expression {0} = {1}", expression, result);
+            if (!Settings.UpdateOnly)
+            {
+                _logger.Warn("Unresolved evaluation result for expression {0} = {1}", expression, result);
+            }
         }
 
         /// <summary>
@@ -1436,7 +1442,10 @@ namespace DuetControlServer.SPI
                 }
             }
 
-            _logger.Warn("Unresolved variable set result for variable {0} = {1}", varName, result);
+            if (!Settings.UpdateOnly)
+            {
+                _logger.Warn("Unresolved variable set result for variable {0} = {1}", varName, result);
+            }
         }
 
         /// <summary>
@@ -1455,7 +1464,10 @@ namespace DuetControlServer.SPI
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to check if file {0} exists", filename);
+                if (!Settings.UpdateOnly)
+                {
+                    _logger.Error(e, "Failed to check if file {0} exists", filename);
+                }
                 DataTransfer.WriteCheckFileExistsResult(false);
             }
         }
@@ -1485,7 +1497,10 @@ namespace DuetControlServer.SPI
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to delete file or directory {0}", filename);
+                if (!Settings.UpdateOnly)
+                {
+                    _logger.Error(e, "Failed to delete file or directory {0}", filename);
+                }
                 DataTransfer.WriteFileDeleteResult(false);
             }
         }
@@ -1529,7 +1544,10 @@ namespace DuetControlServer.SPI
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to open {0} for {1}", filename, forWriting ? "writing" : "reading");
+                if (!Settings.UpdateOnly)
+                {
+                    _logger.Error(e, "Failed to open {0} for {1}", filename, forWriting ? "writing" : "reading");
+                }
                 DataTransfer.WriteOpenFileResult(Consts.NoFileHandle, 0);
             }
         }
@@ -1555,7 +1573,10 @@ namespace DuetControlServer.SPI
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to read {0} bytes from file #{1}", maxLength, handle);
+                if (!Settings.UpdateOnly)
+                {
+                    _logger.Error(e, "Failed to read {0} bytes from file #{1}", maxLength, handle);
+                }
                 DataTransfer.WriteFileReadResult([], -1);
             }
         }
@@ -1580,7 +1601,10 @@ namespace DuetControlServer.SPI
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to write {0} bytes to file #{1}", data.Length, handle);
+                if (!Settings.UpdateOnly)
+                {
+                    _logger.Error(e, "Failed to write {0} bytes to file #{1}", data.Length, handle);
+                }
                 DataTransfer.WriteFileWriteResult(false);
             }
         }
@@ -1604,7 +1628,10 @@ namespace DuetControlServer.SPI
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to go to position {0} in file #{1}", offset, handle);
+                if (!Settings.UpdateOnly)
+                {
+                    _logger.Error(e, "Failed to go to position {0} in file #{1}", offset, handle);
+                }
                 DataTransfer.WriteFileSeekResult(false);
             }
         }
@@ -1629,7 +1656,10 @@ namespace DuetControlServer.SPI
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to truncate file #{0}", handle);
+                if (!Settings.UpdateOnly)
+                {
+                    _logger.Error(e, "Failed to truncate file #{0}", handle);
+                }
                 DataTransfer.WriteFileTruncateResult(false);
             }
         }
@@ -1655,7 +1685,10 @@ namespace DuetControlServer.SPI
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to close file #{0}", handle);
+                if (!Settings.UpdateOnly)
+                {
+                    _logger.Error(e, "Failed to close file #{0}", handle);
+                }
             }
         }
 
