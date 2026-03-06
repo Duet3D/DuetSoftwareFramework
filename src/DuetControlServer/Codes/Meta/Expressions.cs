@@ -207,7 +207,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
     /// <param name="expression">Expression to check</param>
     /// <returns>Whether the expressions contains any SBC object model fields</returns>
     /// <exception cref="CodeParserException">Failed to parse expression</exception>
-    private bool ContainsSbcFields(string expression)
+    public bool ContainsSbcFields(string expression)
     {
         bool inQuotes = false, clearToken = false;
         StringBuilder lastExpression = new();

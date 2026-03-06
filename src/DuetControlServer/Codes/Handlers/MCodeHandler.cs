@@ -35,6 +35,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model</param>
 /// <param name="mqtt">MQTT provider</param>
+/// <param name="sbcTriggerService">SBC trigger service</param>
 /// <param name="logger">Logger</param>
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="settings">Settings</param>
@@ -49,6 +50,7 @@ public class MCodeHandler(
     LinkInterface linkInterface,
     Model.ObjectModel model,
     MQTT mqtt,
+    SbcTriggerService sbcTriggerService,
     JobProcessor jobProcessor,
     ILogger<MCodeHandler> logger,
     ILoggerFactory loggerFactory,
@@ -963,6 +965,30 @@ public class MCodeHandler(
                 }
                 throw new OperationCanceledException();
 
+            // Configure external trigger (expression-based, SBC fields only)
+            case 581:
+                if (code.MinorNumber == 1)
+                {
+                    if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+                    {
+                        Message? result = await sbcTriggerService.ConfigureAsync(code, cancellationToken);
+                        if (result != null)
+                        {
+                            // Expression was handled by SbcTriggerService (contains SBC fields)
+                            return result;
+                        }
+                        // No SBC fields in the expression — let RRF handle M581.1 natively
+                        break;
+                    }
+                    throw new OperationCanceledException();
+                }
+                // Plain M581 hands ownership back to RRF — clear any DSF-managed trigger for this slot
+                if (code.TryGetInt('T', out int m581TriggerNumber))
+                {
+                    sbcTriggerService.Remove(m581TriggerNumber);
+                }
+                break;
+
             // Configure network protocols
             case 586:
                 if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
@@ -1308,4 +1334,5 @@ public class MCodeHandler(
                 break;
         }
     }
+
 }
