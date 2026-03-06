@@ -73,12 +73,13 @@ public sealed class SbcTriggerService(
             return new Message(MessageType.Error, "T parameter must be between 0 and 31");
         }
 
-        if (!code.TryGetString('P', out string? triggerExpression))
+        if (!code.TryGetParameter('P', out CodeParameter? pParam))
         {
             return new Message(MessageType.Error, "P parameter (expression) is required");
         }
 
-        if (triggerExpression == "-1")
+        // P-1 (integer) means delete/clear the trigger
+        if (pParam.Type == typeof(int) && (int)pParam == -1)
         {
             lock (_triggersLock)
             {
@@ -86,6 +87,12 @@ public sealed class SbcTriggerService(
             }
             return new Message();
         }
+
+        if (pParam.Type != typeof(string))
+        {
+            return new Message(MessageType.Error, "P parameter must be a quoted expression string");
+        }
+        string triggerExpression = (string)pParam!;
 
         if (!expressions.ContainsSbcFields(triggerExpression))
         {
