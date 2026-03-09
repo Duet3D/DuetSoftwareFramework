@@ -179,7 +179,7 @@ public sealed class SbcTriggerService(
             };
         }
 
-        logger.LogDebug("Registered SBC trigger {Number} with expression '{Expression}' (condition {Condition})", triggerNumber, triggerExpression, condition);
+        logger.LogInformation("Registered SBC trigger {Number} with expression '{Expression}' (condition {Condition})", triggerNumber, triggerExpression, condition);
         return new Message();
     }
 
@@ -194,7 +194,7 @@ public sealed class SbcTriggerService(
         {
             if (_triggers.Remove(triggerNumber))
             {
-                logger.LogDebug("Removed SBC trigger {Number} (superseded by M581)", triggerNumber);
+                logger.LogInformation("Removed SBC trigger {Number} (superseded by M581)", triggerNumber);
             }
         }
     }
