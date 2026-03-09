@@ -250,6 +250,90 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
     }
 
     /// <summary>
+    /// Extracts all object model field paths referenced in the given expression string.
+    /// The returned paths use dot-notation (e.g. "heat.heaters", "state.status").
+    /// Both SBC and non-SBC OM fields are included so that any change to a referenced
+    /// field triggers re-evaluation of the expression.
+    /// </summary>
+    /// <param name="expression">Expression to analyse</param>
+    /// <returns>Set of field paths referenced in the expression</returns>
+    public IReadOnlySet<string> ExtractFieldPaths(string expression)
+    {
+        // Strip bracketed index expressions first so that e.g. tools[0].current becomes tools.current
+        StringBuilder stripped = new(expression.Length);
+        int bracketDepth = 0;
+        bool inQuotes = false;
+        foreach (char c in expression)
+        {
+            if (inQuotes)
+            {
+                inQuotes = c != '"';
+            }
+            else if (c == '"')
+            {
+                inQuotes = true;
+            }
+            else if (c == '[')
+            {
+                bracketDepth++;
+            }
+            else if (c == ']')
+            {
+                if (bracketDepth > 0) bracketDepth--;
+            }
+            else if (bracketDepth == 0)
+            {
+                stripped.Append(c);
+            }
+        }
+
+        // Collect dot-separated identifier tokens — any token that starts with a letter and
+        // contains at least one dot is treated as an OM field path to watch
+        HashSet<string> result = [];
+        StringBuilder token = new();
+        bool clearToken = false;
+        foreach (char c in stripped.ToString())
+        {
+            if (char.IsLetterOrDigit(c) || c == '.' || c == '_')
+            {
+                if (clearToken)
+                {
+                    token.Clear();
+                    clearToken = false;
+                }
+                token.Append(c);
+            }
+            else if (char.IsWhiteSpace(c))
+            {
+                clearToken = true;
+            }
+            else
+            {
+                if (token.Length > 0)
+                {
+                    string t = token.ToString();
+                    if (char.IsLetter(t[0]) && t.Contains('.'))
+                    {
+                        result.Add(t);
+                    }
+                    token.Clear();
+                }
+            }
+        }
+
+        if (token.Length > 0)
+        {
+            string t = token.ToString();
+            if (char.IsLetter(t[0]) && t.Contains('.'))
+            {
+                result.Add(t);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Checks if the given expression without indices is a SBC object model field
     /// </summary>
     /// <param name="expression">Expression without indices to check</param>
@@ -269,34 +353,59 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
             return true;
         }
 
+        // Strip bracketed index expressions (e.g. tools[0].current -> tools.current) before splitting
+        StringBuilder strippedExpression = new(expression.Length);
+        int bracketDepth = 0;
+        foreach (char c in expression)
+        {
+            if (c == '[') bracketDepth++;
+            else if (c == ']') { if (bracketDepth > 0) bracketDepth--; }
+            else if (bracketDepth == 0) strippedExpression.Append(c);
+        }
+
         // We neither read from nor write data to the OM so don't care about locking it
         ModelObject modelItem = model;
-        foreach (string pathItem in expression.Split('.', '['))
+        foreach (string pathItem in strippedExpression.ToString().Split('.'))
         {
-            PropertyInfo? property = modelItem.GetType().GetProperty(pathItem, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
-            if (property is not null)
+            if (string.IsNullOrEmpty(pathItem))
             {
-                if (Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
-                {
-                    return true;
-                }
+                return false;
+            }
 
-                if (property.PropertyType.IsSubclassOf(typeof(ModelObject)))
+            PropertyInfo? property = modelItem.GetType().GetProperty(pathItem, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
+            if (property is null)
+            {
+                return false;
+            }
+
+            if (Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
+            {
+                return true;
+            }
+
+            Type propType = property.PropertyType;
+            if (propType.IsSubclassOf(typeof(ModelObject)))
+            {
+                modelItem = (ModelObject)Activator.CreateInstance(propType)!;
+            }
+            else if (propType.IsGenericType)
+            {
+                // For collections/dictionaries the item/value type is the last generic argument
+                Type itemType = propType.GetGenericArguments()[^1];
+                if (itemType.IsSubclassOf(typeof(ModelObject)))
                 {
-                    modelItem = (ModelObject)Activator.CreateInstance(property.PropertyType)!;
+                    modelItem = (ModelObject)Activator.CreateInstance(itemType)!;
                 }
-                else if (property.PropertyType.IsGenericType)
+                else
                 {
-                    Type itemType = property.PropertyType.GetGenericArguments()[0];
-                    if (itemType.IsSubclassOf(typeof(ModelObject)))
-                    {
-                        modelItem = (ModelObject)Activator.CreateInstance(itemType)!;
-                    }
-                    else
-                    {
-                        break;
-                    }
+                    // Reached a leaf generic type (e.g. List<float>); no SBC property here
+                    break;
                 }
+            }
+            else
+            {
+                // Reached a scalar leaf; no SBC property found along this path
+                break;
             }
         }
         return false;

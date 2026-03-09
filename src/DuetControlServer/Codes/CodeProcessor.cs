@@ -231,8 +231,14 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
             }
         }
 
-        // Forward the code to the requested pipeline. If it is marked to bypass the internal processing, send it straight to the firmware
-        code.Stage = code.Flags.HasFlag(CodeFlags.IsInternallyProcessed) ? PipelineStage.Post : stage;
+        // Forward the code to the requested pipeline.
+        // If it is marked to bypass the internal processing, send it straight to the Post stage to avoid
+        // a potential deadlock when this code is started from within an internal processing handler
+        if (code.Flags.HasFlag(CodeFlags.IsInternallyProcessed))
+        {
+            stage = PipelineStage.Post;
+        }
+        code.Stage = stage;
         await processor.WriteCodeAsync(code, stage);
     }
 

@@ -32,12 +32,53 @@ public sealed class SbcTriggerService(
     private sealed class TriggerState
     {
         public required string Expression { get; init; }
+        public required string[] WatchedPaths { get; init; }
         public int Condition { get; init; }
         public bool LastResult { get; set; }
     }
 
-    private readonly Dictionary<int, TriggerState> _triggers = new();
-    private readonly object _triggersLock = new();
+    /// <summary>
+    /// Builds a dot-notation path string from an observer path array (uses property names and collection names).
+    /// </summary>
+    private static string BuildObservedPath(object[] path)
+    {
+        return string.Join('.', path.Select(static e => e switch
+        {
+            string s => s,
+            ItemPathNode node => node.Name,
+            _ => string.Empty
+        }).Where(static s => s.Length > 0));
+    }
+
+    /// <summary>
+    /// Returns true when the observer-reported path is related to at least one of the watched expression paths.
+    /// </summary>
+    private static bool IsPathRelevant(object[] changedPath, string[] watchedPaths)
+    {
+        if (watchedPaths.Length == 0)
+        {
+            return false;
+        }
+
+        string observed = BuildObservedPath(changedPath);
+        if (observed.Length == 0)
+        {
+            return false;
+        }
+
+        foreach (string watched in watchedPaths)
+        {
+            if (string.Equals(observed, watched, StringComparison.OrdinalIgnoreCase) ||
+                observed.StartsWith(watched + '.', StringComparison.OrdinalIgnoreCase) ||
+                watched.StartsWith(observed + '.', StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private readonly Dictionary<int, TriggerState> _triggers = [];
     private readonly AsyncAutoResetEvent _signal = new(false);
 
     /// <summary>
@@ -81,7 +122,7 @@ public sealed class SbcTriggerService(
         // P-1 (integer) means delete/clear the trigger
         if (pParam.Type == typeof(int) && (int)pParam == -1)
         {
-            lock (_triggersLock)
+            lock (_triggers)
             {
                 _triggers.Remove(triggerNumber);
             }
@@ -126,17 +167,19 @@ public sealed class SbcTriggerService(
             logger.LogWarning(e, "Failed to evaluate initial state of M581.1 expression '{Expression}'", triggerExpression);
         }
 
-        lock (_triggersLock)
+        string[] watchedPaths = [.. expressions.ExtractFieldPaths(triggerExpression)];
+        lock (_triggers)
         {
             _triggers[triggerNumber] = new TriggerState
             {
                 Expression = triggerExpression,
+                WatchedPaths = watchedPaths,
                 Condition = condition,
                 LastResult = initialResult
             };
         }
 
-        logger.LogInformation("Registered SBC trigger {Number} with expression '{Expression}' (condition {Condition})", triggerNumber, triggerExpression, condition);
+        logger.LogDebug("Registered SBC trigger {Number} with expression '{Expression}' (condition {Condition})", triggerNumber, triggerExpression, condition);
         return new Message();
     }
 
@@ -147,22 +190,28 @@ public sealed class SbcTriggerService(
     /// <param name="triggerNumber">Trigger number (0–31)</param>
     public void Remove(int triggerNumber)
     {
-        lock (_triggersLock)
+        lock (_triggers)
         {
             if (_triggers.Remove(triggerNumber))
             {
-                logger.LogInformation("Removed SBC trigger {Number} (superseded by M581)", triggerNumber);
+                logger.LogDebug("Removed SBC trigger {Number} (superseded by M581)", triggerNumber);
             }
         }
     }
 
     /// <summary>
     /// Called by the OM observer whenever any property changes.
-    /// Signals the evaluation loop to run a new cycle.
+    /// Signals the evaluation loop only when the changed path is referenced by at least one registered trigger expression
     /// </summary>
     private void OnObservedPropertyChanged(object[] path, PropertyChangeType changeType, object? value)
     {
-        _signal.Set();
+        lock (_triggers)
+        {
+            if (_triggers.Values.Any(state => IsPathRelevant(path, state.WatchedPaths)))
+            {
+                _signal.Set();
+            }
+        }
     }
 
     /// <summary>
@@ -186,7 +235,7 @@ public sealed class SbcTriggerService(
 
             // Snapshot the current trigger map before evaluating
             (int number, TriggerState state)[] snapshot;
-            lock (_triggersLock)
+            lock (_triggers)
             {
                 snapshot = [.. _triggers.Select(kvp => (kvp.Key, kvp.Value))];
             }
@@ -201,7 +250,7 @@ public sealed class SbcTriggerService(
                     bool newResult = result is bool b && b;
 
                     bool fire;
-                    lock (_triggersLock)
+                    lock (_triggers)
                     {
                         fire = newResult && !state.LastResult;
                         state.LastResult = newResult;
