@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.ObjectModel;
 
 namespace DuetAPI.ObjectModel;
 
@@ -14,8 +15,17 @@ public partial class Heat : ModelObject, IStaticModelObject
     /// <remarks>
     /// Items may be -1 if unconfigured
     /// </remarks>
+    [Obsolete("Use bedHeaterMapping instead")]
     public ObservableCollection<int> BedHeaters { get; } = [];
-    
+
+    /// <summary>
+    /// List of configured bed heaters (indices), grouped by bed (first dimension)
+    /// </summary>
+    /// <remarks>
+    /// Items may be -1 if unconfigured
+    /// </remarks>
+    public ObservableCollection<int[]> BedHeaterMapping { get; } = [];
+
     /// <summary>
     /// List of configured chamber heaters (indices)
     /// </summary>
@@ -23,7 +33,16 @@ public partial class Heat : ModelObject, IStaticModelObject
     /// <remarks>
     /// Items may be -1 if unconfigured
     /// </remarks>
-    public ObservableCollection<int> ChamberHeaters { get; } = [];
+    [Obsolete("Use chamberHeaterMapping instead")]
+    public ObservableCollection<int[]> ChamberHeaters { get; } = [];
+    
+    /// <summary>
+    /// List of configured chamber heaters (indices), grouped by chamber (first dimension)
+    /// </summary>
+    /// <remarks>
+    /// Items may be -1 if unconfigured
+    /// </remarks>
+    public ObservableCollection<int[]> ChamberHeaterMapping { get; } = [];
     
     /// <summary>
     /// Minimum required temperature for extrusion moves (in C)
