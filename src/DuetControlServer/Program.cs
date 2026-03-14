@@ -21,26 +21,6 @@ using System.Text.Json;
 string? startErrorFile = Defaults.StartErrorFile;
 
 /// <summary>
-/// Parse a log level string, handling NLog level names and shorter versions
-/// </summary>
-/// <param name="logLevelString">The log level string to parse</param>
-/// <returns>The parsed LogLevel</returns>
-LogLevel ParseLogLevel(string logLevelString)
-{
-    return logLevelString.ToLowerInvariant() switch
-    {
-        "trace" => LogLevel.Trace,
-        "debug" => LogLevel.Debug,
-        "info" or "information" => LogLevel.Information,
-        "warn" or "warning" => LogLevel.Warning,
-        "error" => LogLevel.Error,
-        "fatal" or "critical" => LogLevel.Critical,
-        "off" or "none" => LogLevel.None,
-        _ => LogLevel.Information
-    };
-}
-
-/// <summary>
 /// Print the reason for the start error, write it to the start error file, and exit this application
 /// </summary>
 /// <param name="e">Exception that caused the termination</param>
@@ -102,7 +82,7 @@ rootCommand.SetAction(async (parserResult) =>
     bool updateOnlyValue = parserResult.GetValue(updateOnlyOption);
     FileInfo configFileValue = parserResult.GetValue(configFileOption) ?? new(Settings.DefaultConfigFile);
     string? logLevelString = parserResult.GetValue(logLevelOption);
-    LogLevel? logLevelValue = logLevelString != null ? ParseLogLevel(logLevelString) : null;
+    LogLevel? logLevelValue = (logLevelString != null) ? LogLevelHelper.ParseLogLevel(logLevelString) : null;
     DirectoryInfo? socketDirectoryValue = parserResult.GetValue(socketDirectoryOption);
     string? socketFileValue = parserResult.GetValue(socketFileOption);
     DirectoryInfo? baseDirectoryValue = parserResult.GetValue(baseDirectoryOption);
@@ -146,7 +126,7 @@ rootCommand.SetAction(async (parserResult) =>
                 {
                     // Get the log level from configuration, handling NLog level names and shorter versions
                     string configLogLevelString = context.Configuration.GetValue<string>("LogLevel") ?? "Information";
-                    logLevel = ParseLogLevel(configLogLevelString);
+                    logLevel = LogLevelHelper.ParseLogLevel(configLogLevelString);
                 }
 
                 // Add console logging with custom formatter.

@@ -34,7 +34,7 @@ public partial class Heat : ModelObject, IStaticModelObject
     /// Items may be -1 if unconfigured
     /// </remarks>
     [Obsolete("Use chamberHeaterMapping instead")]
-    public ObservableCollection<int[]> ChamberHeaters { get; } = [];
+    public ObservableCollection<int> ChamberHeaters { get; } = [];
     
     /// <summary>
     /// List of configured chamber heaters (indices), grouped by chamber (first dimension)
