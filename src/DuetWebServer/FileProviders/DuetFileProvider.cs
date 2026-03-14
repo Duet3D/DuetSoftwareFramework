@@ -1,6 +1,7 @@
 using DuetWebServer.Singletons;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Primitives;
+using System.IO;
 
 namespace DuetWebServer.FileProviders;
 
@@ -43,7 +44,30 @@ public class DuetFileProvider : IFileProvider
     {
         lock (this)
         {
-            return _provider.GetFileInfo(subpath);
+            var fileInfo = _provider.GetFileInfo(subpath);
+
+            // On Linux, FileInfo.Length for a symlink returns the length of the target path
+            // string (via lstat) rather than the actual file content size. Resolve the symlink
+            // to the final target so the correct Content-Length is reported to clients.
+            if (fileInfo.Exists && fileInfo.PhysicalPath is not null)
+            {
+                try
+                {
+                    var fi = new FileInfo(fileInfo.PhysicalPath);
+                    if ((fi.Attributes & FileAttributes.ReparsePoint) != 0 &&
+                        fi.ResolveLinkTarget(returnFinalTarget: true) is FileInfo resolvedTarget &&
+                        resolvedTarget.Exists)
+                    {
+                        return new SymlinkFileInfo(resolvedTarget, fileInfo.Name);
+                    }
+                }
+                catch
+                {
+                    // Ignore errors and fall through to return the original file info
+                }
+            }
+
+            return fileInfo;
         }
     }
 

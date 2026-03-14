@@ -100,7 +100,7 @@ public sealed class UninstallPlugin(IPermissionManager permissionManager, Plugin
             foreach (string dwcFile in plugin.DwcFiles)
             {
                 string installWwwPath = Path.Combine(sdPath, "www", dwcFile);
-                if (File.Exists(installWwwPath))
+                if (Path.Exists(installWwwPath))
                 {
                     logger.LogDebug("Removing {File}", installWwwPath);
                     File.Delete(installWwwPath);

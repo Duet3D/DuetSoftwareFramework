@@ -219,30 +219,24 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
                     Directory.CreateDirectory(directory);
                 }
 
-#if true
-# if NET11_0_OR_GREATER
-#  warning check if this is fixed in ASP.NET 11
-# endif
-                // Copy the file. ASP.NET does not perform lstat on symlinks so files served from symlinks are always truncated.
-                // It seems like .NET 6 also treats symlinks as open files for some reason
-                logger.LogDebug("Copying {SourceFile} -> {File}", pluginWwwPath, installWwwPath);
-                File.Copy(pluginWwwPath, installWwwPath, true);
-#else
-                // Attempt to symlink or copy the file
-                if (!File.Exists(installWwwPath))
+                // Remove any left-over file that may be blocking the path before creating a new one.
+                // Path.Exists (unlike File.Exists) returns true for dead symlinks too
+                if (Path.Exists(installWwwPath))
                 {
-                    try
-                    {
-                        logger.LogDebug("Trying to create symlink {0} -> {1}", pluginWwwPath, installWwwPath);
-                        File.CreateSymbolicLink(installWwwPath, pluginWwwPath);
-                    }
-                    catch (IOException e)
-                    {
-                        logger.LogWarning(e, "Failed to create symlink to web directory, trying to copy web file instead...");
-                        File.Copy(pluginWwwPath, installWwwPath);
-                    }
+                    File.Delete(installWwwPath);
                 }
-#endif
+
+                // Attempt to symlink or copy the file
+                try
+                {
+                    logger.LogDebug("Trying to create symlink {SourceFile} -> {File}", pluginWwwPath, installWwwPath);
+                    File.CreateSymbolicLink(installWwwPath, pluginWwwPath);
+                }
+                catch (IOException e)
+                {
+                    logger.LogWarning(e, "Failed to create symlink to web directory, trying to copy web file instead...");
+                    File.Copy(pluginWwwPath, installWwwPath, true);
+                }
             }
 
             // Install refreshed plugin manifest
