@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace DuetControlServer.Utility;
+namespace DuetSharedLibrary;
 
 /// <summary>
 /// Helper methods for parsing log level strings

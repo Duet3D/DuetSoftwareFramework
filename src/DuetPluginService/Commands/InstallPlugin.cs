@@ -148,7 +148,7 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
                 else if (entry.FullName.StartsWith("sd/"))
                 {
                     // Put SD files into 0:/
-                    fileName = Path.Combine(settings.Value.PluginDirectory, entry.FullName[3..]);
+                    fileName = Path.Combine(sdPath, entry.FullName[3..]);
                     plugin.SdFiles.Add(entry.FullName[3..]);
                 }
                 else
@@ -210,7 +210,7 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
             foreach (string dwcFile in plugin.DwcFiles)
             {
                 string pluginWwwPath = Path.Combine(pluginBase, "dwc", dwcFile);
-                string installWwwPath = Path.Combine(settings.Value.PluginDirectory, "www", dwcFile);
+                string installWwwPath = Path.Combine(sdPath, "www", dwcFile);
 
                 // Create parent directory first
                 string directory = Path.GetDirectoryName(installWwwPath)!;

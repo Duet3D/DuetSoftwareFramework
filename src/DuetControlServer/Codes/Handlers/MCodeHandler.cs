@@ -8,6 +8,7 @@ using DuetControlServer.Files.Parser;
 using DuetControlServer.Link;
 using DuetControlServer.Model;
 using DuetControlServer.Utility;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

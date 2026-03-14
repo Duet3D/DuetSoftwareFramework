@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
 
 namespace DuetPluginService;
 
@@ -11,6 +12,11 @@ public sealed class Settings
     /// Default path to the configuration file
     /// </summary>
     public const string DefaultConfigFile = "/opt/dsf/conf/plugins.json";
+
+    /// <summary>
+    /// Minimum log level for console output
+    /// </summary>
+    public LogLevel LogLevel { get; set; } = LogLevel.Information;
 
     /// <summary>
     /// Path to the UNIX socket provided by DuetControlServer
