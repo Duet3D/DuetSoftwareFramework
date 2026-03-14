@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Options;
+using System.Collections.Generic;
 using System.CommandLine;
 
 Option<string> configOption = new("-c", "--config")
@@ -75,8 +76,20 @@ rootCommand.SetAction((parserResult) =>
                 options.FormatterName = nameof(CommonLogFormatter);
             });
 
+            // Exclude LogLevel from the configuration before binding to Settings:
+            // the standard binder uses Enum.Parse which rejects short aliases like 'info'
+            var configData = new Dictionary<string, string?>();
+            foreach (var kvp in context.Configuration.AsEnumerable())
+            {
+                if (kvp.Key != "LogLevel" && kvp.Value != null)
+                {
+                    configData[kvp.Key] = kvp.Value;
+                }
+            }
+            var filteredConfig = new ConfigurationBuilder().AddInMemoryCollection(configData).Build();
+
             services
-                .Configure<Settings>(context.Configuration)
+                .Configure<Settings>(filteredConfig)
                 .AddSingleton<CommandFactory>()
                 .AddSingleton<IPermissionManager, AppArmorPermissionManager>()
                 .AddSingleton<PluginStore>()

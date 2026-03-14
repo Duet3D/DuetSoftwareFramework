@@ -689,8 +689,7 @@ namespace DuetPiManagementPlugin
                 {
                     await Connection.ResolveCodeAsync(MessageType.Error, $"{code.ToShortString()}: {e.Message}");
                 }
-            }
-            while (!CancellationToken.IsCancellationRequested);
+            } while (!CancellationToken.IsCancellationRequested);
         }
     }
 }

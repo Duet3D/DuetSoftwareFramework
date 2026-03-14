@@ -88,7 +88,7 @@ public sealed class StartPlugins(CodeFactory codeFactory,
             bool waitingForStart;
             do
             {
-                waitingForStart = true;
+                waitingForStart = false;
                 using (await model.AccessReadOnlyAsync(cancellationToken))
                 {
                     foreach (Plugin item in model.Plugins.Values)
@@ -103,15 +103,17 @@ public sealed class StartPlugins(CodeFactory codeFactory,
 
                 if (waitingForStart)
                 {
-                    // Wait for the next plugin to start or to stop, in case the plugin we're waiting for failed during start-up
+                    // Wait for the next plugin to start or to stop, in case the plugin we're waiting for failed during start-up.
+                    // Cancel the leftover WaitAsync task after Task.WhenAny returns so it does not steal future signals from
+                    // the AsyncAutoResetEvent on the next loop iteration.
                     using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.ApplicationStopping);
                     await Task.WhenAny(
                         NotifyPluginStarted.PluginStartedEvent.WaitAsync(cts.Token),
                         SetPluginProcess.PluginStoppedEvent.WaitAsync(cts.Token)
                     );
+                    await cts.CancelAsync();
                 }
-            }
-            while (waitingForStart);
+            } while (waitingForStart);
 
             // Plugins have been started...
             using (await model.AccessReadWriteAsync(cancellationToken))
