@@ -3,6 +3,7 @@ Description=Duet Control Server
 StartLimitIntervalSec=0
 
 [Service]
+WorkingDirectory=/opt/dsf/bin
 ExecStart=/opt/dsf/bin/DuetControlServer
 TimeoutStopSec=15
 Restart=always

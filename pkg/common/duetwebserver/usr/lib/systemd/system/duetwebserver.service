@@ -4,7 +4,7 @@ Wants=duetcontrolserver.service
 After=network.target duetcontrolserver.service
 
 [Service]
-WorkingDirectory=/opt/dsf/sd/www
+WorkingDirectory=/opt/dsf/bin
 ExecStart=/opt/dsf/bin/DuetWebServer
 TimeoutStopSec=15
 Type=notify

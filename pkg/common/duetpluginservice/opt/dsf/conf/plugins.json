@@ -1,5 +1,7 @@
 {
+  "LogLevel": "info",
   "SocketPath": "/run/dsf/dcs.sock",
+  "PluginDirectory": "/opt/dsf/plugins",
   "DisableAppArmor": false,
   "AppArmorParser": "/usr/sbin/apparmor_parser",
   "AppArmorTemplate": "/opt/dsf/conf/apparmor.conf",

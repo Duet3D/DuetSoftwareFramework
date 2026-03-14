@@ -6,7 +6,7 @@ StartLimitIntervalSec=0
 
 [Service]
 ExecStart=/opt/dsf/bin/DuetPluginService
-WorkingDirectory=/opt/dsf/plugins
+WorkingDirectory=/opt/dsf/bin
 TimeoutStopSec=15
 Restart=always
 Type=notify
