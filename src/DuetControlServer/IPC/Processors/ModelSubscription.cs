@@ -130,12 +130,6 @@ public sealed class ModelSubscription : IProcessor
         {
             _filters = Model.Filter.ConvertFilters(subscribeInitMessage.Filters);
         }
-#pragma warning disable CS0618 // Type or member is obsolete
-        else if (!string.IsNullOrEmpty(subscribeInitMessage.Filter))
-        {
-            _filters = Model.Filter.ConvertFilters(subscribeInitMessage.Filter);
-        }
-#pragma warning restore CS0618 // Type or member is obsolete
         else
         {
             _filters = [];

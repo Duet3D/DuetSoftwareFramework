@@ -15,7 +15,7 @@ public partial class Heat : ModelObject, IStaticModelObject
     /// <remarks>
     /// Items may be -1 if unconfigured
     /// </remarks>
-    [Obsolete("Use bedHeaterMapping instead")]
+    [Obsolete("use bedHeaterMapping instead")]
     public ObservableCollection<int> BedHeaters { get; } = [];
 
     /// <summary>
@@ -33,7 +33,7 @@ public partial class Heat : ModelObject, IStaticModelObject
     /// <remarks>
     /// Items may be -1 if unconfigured
     /// </remarks>
-    [Obsolete("Use chamberHeaterMapping instead")]
+    [Obsolete("use chamberHeaterMapping instead")]
     public ObservableCollection<int> ChamberHeaters { get; } = [];
     
     /// <summary>

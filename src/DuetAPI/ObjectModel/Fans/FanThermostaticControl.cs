@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 
 namespace DuetAPI.ObjectModel;
 
@@ -8,15 +7,6 @@ namespace DuetAPI.ObjectModel;
 /// </summary>
 public partial class FanThermostaticControl : ModelObject, IStaticModelObject
 {
-    /// <summary>
-    /// List of heaters to monitor (indices)
-    /// </summary>
-    /// <remarks>
-    /// This is a bitmap represented as an array
-    /// </remarks>
-    [Obsolete("Use Sensors instead")]
-    public ObservableCollection<int> Heaters { get; } = [];
-    
     /// <summary>
     /// Upper temperature range required to turn on the fan (in C)
     /// </summary>

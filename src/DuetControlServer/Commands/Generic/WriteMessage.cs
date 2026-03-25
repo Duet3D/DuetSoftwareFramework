@@ -28,13 +28,6 @@ public sealed class WriteMessage(Utility.EventLogger eventLogger, Model.ObjectMo
             _ => throw new NotImplementedException()
         };
 
-#pragma warning disable CS0618 // Type or member is obsolete
-        if (LogMessage)
-        {
-            LogLevel = EventLogLevel.Warn;
-        }
-#pragma warning restore CS0618 // Type or member is obsolete
-
         Message msg = new(Type, Content);
         await eventLogger.LogAsync(LogLevel.Value, msg);
         if (OutputMessage)

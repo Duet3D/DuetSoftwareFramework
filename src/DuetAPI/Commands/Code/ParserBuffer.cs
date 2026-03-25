@@ -84,14 +84,6 @@ public sealed class CodeParserBuffer(int bufferSize, bool isFile)
     /// <summary>
     /// Get the actual byte position when reading from a stream
     /// </summary>
-    /// <param name="reader">Stream reader to read from</param>
-    /// <returns>Actual position in bytes</returns>
-    [Obsolete("This call is deprecated because the buffer position of a StreamReader is not accessible. Pass your stream directly instead")]
-    public long GetPosition(StreamReader reader) => reader.BaseStream.Position - Size + Pointer;
-
-    /// <summary>
-    /// Get the actual byte position when reading from a stream
-    /// </summary>
     /// <param name="stream">Stream to read from</param>
     /// <returns>Actual position in bytes</returns>
     public long GetPosition(Stream stream) => stream.Position - Size + Pointer;

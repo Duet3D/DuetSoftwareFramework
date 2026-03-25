@@ -214,16 +214,6 @@ public partial class Board : ModelObject, IStaticModelObject
     private BoardState _state;
 
     /// <summary>
-    /// Indicates if this board supports external 12864 displays
-    /// </summary>
-    [Obsolete("Replaced with SupportsDirectDisplay")]
-    public bool Supports12864
-    {
-        get => _supportsDirectDisplay;
-        set => SetPropertyValue(ref _supportsDirectDisplay, value);
-    }
-
-    /// <summary>
     /// Indicates if this board supports external displays
     /// </summary>
     public bool SupportsDirectDisplay

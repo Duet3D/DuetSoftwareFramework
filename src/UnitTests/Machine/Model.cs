@@ -136,7 +136,7 @@ namespace UnitTests.Machine
             Assert.That(success, Is.True);
         }
 
-        private static readonly int[] expectedBedHeaters = [0, 1];
+        private static readonly int[][] expectedBedHeaterMapping = [[0], [1]];
 
         [Test]
         public void UpdateFromOther()
@@ -146,9 +146,9 @@ namespace UnitTests.Machine
             {
                 FirmwareName = "Foobar"
             });
-            modelToUpdate.Heat.BedHeaters.Add(-1);
-            modelToUpdate.Heat.BedHeaters.Add(1);
-            modelToUpdate.Heat.BedHeaters.Add(2);
+            modelToUpdate.Heat.BedHeaterMapping.Add([-1]);
+            modelToUpdate.Heat.BedHeaterMapping.Add([1]);
+            modelToUpdate.Heat.BedHeaterMapping.Add([2]);
             modelToUpdate.Heat.Heaters.Add(null);
             modelToUpdate.Heat.Heaters.Add(new Heater
             {
@@ -165,8 +165,8 @@ namespace UnitTests.Machine
             {
                 FirmwareName = "Yum"
             });
-            updatedModel.Heat.BedHeaters.Add(0);
-            updatedModel.Heat.BedHeaters.Add(1);
+            updatedModel.Heat.BedHeaterMapping.Add([0]);
+            updatedModel.Heat.BedHeaterMapping.Add([1]);
             updatedModel.Heat.Heaters.Add(new Heater
             {
                 Active = 90F,
@@ -188,7 +188,7 @@ namespace UnitTests.Machine
             modelToUpdate.UpdateFromJson(jsonPatch.RootElement, false);
 
             Assert.That(modelToUpdate.Boards[0].FirmwareName, Is.EqualTo("Yum"));
-            Assert.That(modelToUpdate.Heat.BedHeaters, Is.EquivalentTo(expectedBedHeaters));
+            Assert.That(modelToUpdate.Heat.BedHeaterMapping, Is.EquivalentTo(expectedBedHeaterMapping));
             Assert.That(modelToUpdate.Heat.Heaters[0].Active, Is.EqualTo(90F));
             Assert.That(modelToUpdate.Heat.Heaters[0].Standby, Is.EqualTo(21F));
             Assert.That(modelToUpdate.Heat.Heaters[1].Standby, Is.EqualTo(20F));

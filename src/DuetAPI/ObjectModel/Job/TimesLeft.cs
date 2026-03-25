@@ -1,7 +1,4 @@
-﻿using System;
-using System.Text.Json.Serialization;
-
-namespace DuetAPI.ObjectModel;
+﻿namespace DuetAPI.ObjectModel;
 
 /// <summary>
 /// Estimations about the times left
@@ -27,18 +24,6 @@ public partial class TimesLeft : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _file, value);
     }
     private int? _file;
-
-    /// <summary>
-    /// Time left based on the layer progress (in s or null)
-    /// </summary>
-    [JsonIgnore]
-    [Obsolete("No longer used, will always return null")]
-    public int? Layer
-    {
-        get => _layer;
-        set => SetPropertyValue(ref _layer, value);
-    }
-    private int? _layer;
 
     /// <summary>
     /// Time left based on the slicer reports (see M73 R, in s or null)

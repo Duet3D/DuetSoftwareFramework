@@ -97,7 +97,7 @@ public enum Request : ushort
     /// Assign filament to a given extruder drive
     /// </summary>
     /// <seealso cref="AssignFilamentHeader"/>
-    [Obsolete("No longer used")]
+    [Obsolete("no longer used")]
     AssignFilament_deprecated = 14,
 
     /// <summary>

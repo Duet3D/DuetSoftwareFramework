@@ -174,23 +174,6 @@ public partial class Code : Command<Message?>
     }
 
     /// <summary>
-    /// Retrieve the parameter whose letter equals c
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <returns>The parsed parameter instance or null if none could be found</returns>
-    [Obsolete("Use GetParameter or one of the typed getter methods instead")]
-    public CodeParameter? Parameter(char letter) => GetParameter(letter);
-
-    /// <summary>
-    /// Retrieve the parameter whose letter equals c or generate a default parameter
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="defaultValue">Default parameter value (no expression)</param>
-    /// <returns>The parsed parameter instance or null if none could be found</returns>
-    [Obsolete("Use GetParameter or one of the typed getter methods instead")]
-    public CodeParameter Parameter(char letter, object defaultValue) => GetParameter(letter, defaultValue);
-
-    /// <summary>
     /// Check if a given parameter exists
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>

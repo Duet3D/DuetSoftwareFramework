@@ -41,7 +41,7 @@ public sealed class SubscribeConnection : BaseConnection
     /// <summary>
     /// Filter expressions
     /// </summary>
-    /// <seealso cref="SubscribeInitMessage.Filter"/>
+    /// <seealso cref="SubscribeInitMessage.Filters"/>
     public List<string> Filters { get; } = [];
 
     /// <summary>

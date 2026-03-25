@@ -1,5 +1,4 @@
-﻿using System;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace DuetAPI.ObjectModel;
@@ -12,17 +11,6 @@ namespace DuetAPI.ObjectModel;
 [JsonDerivedType(typeof(RotatingMagnetFilamentMonitor))]
 public partial class FilamentMonitor : ModelObject, IDynamicModelObject
 {
-    /// <summary>
-    /// Indicates if this filament monitor is enabled
-    /// </summary>
-    [Obsolete("Use EnableMode instead")]
-    public bool Enabled
-    {
-        get => _enabled;
-        set => SetPropertyValue(ref _enabled, value);
-    }
-    private bool _enabled;
-
     /// <summary>
     /// Enable mode of this filament monitor
     /// </summary>

@@ -11,17 +11,6 @@ namespace DuetAPI.Commands;
 public partial class Code
 {
     /// <summary>
-    /// Parse the next available G/M/T-code from the given stream reader asynchronously
-    /// </summary>
-    /// <param name="reader">Stream reader to read from</param>
-    /// <param name="result">Code to fill</param>
-    /// <param name="buffer">Internal buffer for parsing codes</param>
-    /// <returns>Whether anything could be read</returns>
-    /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or unterminated comments</exception>
-    [Obsolete("This call is deprecated because the buffer position of a StreamReader is not accessible. Pass your stream directly instead")]
-    public static ValueTask<bool> ParseAsync(StreamReader reader, Code result, CodeParserBuffer buffer) => ParseAsync(reader.BaseStream, result, buffer);
-
-    /// <summary>
     /// Parse the next available G/M/T-code from the given stream asynchronously
     /// </summary>
     /// <param name="stream">Stream to read from</param>

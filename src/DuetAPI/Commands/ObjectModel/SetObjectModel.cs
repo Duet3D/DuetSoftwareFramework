@@ -17,7 +17,7 @@ public partial class SetObjectModel : Command<bool>
     /// <summary>
     /// Path to the property in the machine model
     /// </summary>
-    /// <seealso cref="Connection.InitMessages.SubscribeInitMessage.Filter"/>
+    /// <seealso cref="Connection.InitMessages.SubscribeInitMessage.Filters"/>
     public string PropertyPath { get; set; } = string.Empty;
 
     /// <summary>

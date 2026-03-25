@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Text.Json.Serialization;
 
+
 namespace DuetAPI.ObjectModel;
 
 /// <summary>
@@ -152,6 +153,7 @@ public partial class State : ModelObject, IStaticModelObject
     /// <summary>
     /// Number of the next tool to be selected
     /// </summary>
+    [Obsolete("use move.motionSystems[].nextTool instead")]
     public int NextTool
     {
         get => _nextTool;
@@ -183,6 +185,7 @@ public partial class State : ModelObject, IStaticModelObject
     /// <summary>
     /// Number of the previous tool
     /// </summary>
+    [Obsolete("use move.motionSystems[].previousTool instead")]
     public int PreviousTool
     {
         get => _previousTool;
@@ -193,6 +196,7 @@ public partial class State : ModelObject, IStaticModelObject
     /// <summary>
     /// List of restore points
     /// </summary>
+    [Obsolete("use move.motionSystems[].restorePoints instead")]
     public StaticModelCollection<RestorePoint> RestorePoints { get; } = [];
 
     /// <summary>

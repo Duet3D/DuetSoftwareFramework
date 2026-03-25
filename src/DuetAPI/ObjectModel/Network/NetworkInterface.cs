@@ -100,17 +100,6 @@ public partial class NetworkInterface : ModelObject, IStaticModelObject
     private int? _rssi;
 
     /// <summary>
-    /// Signal of the WiFi adapter (only WiFi, in dBm, or null if unknown)
-    /// </summary>
-    [Obsolete("Use RSSI instead")]
-    [SbcProperty(false)]
-    public int? Signal
-    {
-        get => _rssi;
-        set => SetPropertyValue(ref _rssi, value);
-    }
-
-    /// <summary>
     /// Speed of the network interface (in MBit, null if unknown, 0 if not connected)
     /// </summary>
     [SbcProperty(false)]

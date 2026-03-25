@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.ObjectModel;
+﻿using System;
+
+namespace DuetAPI.ObjectModel;
 
 /// <summary>
 /// Information about the move subsystem
@@ -94,8 +96,14 @@ public partial class Move : ModelObject, IStaticModelObject
     private bool _noMovesBeforeHoming = true;
 
     /// <summary>
+    /// List of configured motion systems
+    /// </summary>
+    public StaticModelCollection<MotionSystem> MotionSystems { get; } = [];
+
+    /// <summary>
     /// Maximum acceleration allowed while printing (in mm/s^2)
     /// </summary>
+    [Obsolete("use motionSystems[].printingAcceleration instead")]
     public float PrintingAcceleration
     {
         get => _printingAcceleration;
@@ -111,6 +119,7 @@ public partial class Move : ModelObject, IStaticModelObject
     /// <summary>
     /// Parameters for centre rotation
     /// </summary>
+    [Obsolete("use motionSystems[].rotation instead")]
     public MoveRotation Rotation { get; } = new MoveRotation();
 
     /// <summary>
@@ -131,6 +140,7 @@ public partial class Move : ModelObject, IStaticModelObject
     /// <summary>
     /// Maximum acceleration allowed while travelling (in mm/s^2)
     /// </summary>
+    [Obsolete("use motionSystems[].travelAcceleration instead")]
     public float TravelAcceleration
     {
         get => _travelAcceleration;
@@ -152,6 +162,7 @@ public partial class Move : ModelObject, IStaticModelObject
     /// <summary>
     /// Virtual total extruder position
     /// </summary>
+    [Obsolete("use motionSystems[].virtualEPos instead")]
     public float VirtualEPos
     {
         get => _virtualEPos;
@@ -162,6 +173,7 @@ public partial class Move : ModelObject, IStaticModelObject
     /// <summary>
     /// Index of the currently selected workplace
     /// </summary>
+    [Obsolete("use motionSystems[].workplaceNumber instead")]
     public int WorkplaceNumber
     {
         get => _workplaceNumber;

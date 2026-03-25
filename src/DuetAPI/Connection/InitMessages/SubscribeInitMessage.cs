@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 
 namespace DuetAPI.Connection.InitMessages;
@@ -22,16 +21,6 @@ public class SubscribeInitMessage : ClientInitMessage
     /// Optional code channel to receive messages from or null if only generic messages are supposed to be received
     /// </summary>
     public CodeChannel? Channel { get; set; }
-
-    /// <summary>
-    /// Optional filter path for <see cref="SubscriptionMode.Patch"/> mode
-    /// </summary>
-    /// <remarks>
-    /// Multiple filters can be used on one connection and they have to be delimited by one of these charaters: ['|', ',', ' ', '\r', '\n']
-    /// </remarks>
-    /// <seealso cref="Filters"/>
-    [Obsolete("Use Filters instead")]
-    public string? Filter { get; set; }
 
     /// <summary>
     /// Optional list of filter paths for <see cref="SubscriptionMode.Patch"/> mode

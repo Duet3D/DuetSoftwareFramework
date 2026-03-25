@@ -1,13 +1,12 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
-using System;
 
 namespace DuetAPI.Commands;
 
 /// <summary>
 /// Write an arbitrary generic message
 /// </summary>
-/// <remarks>If neither <c>OutputMessage</c> nor <c>LogMessage</c> is true, the message is written to the console output</remarks>
+/// <remarks>If neither <c>OutputMessage</c> is true, the message is written to the console output</remarks>
 [RequiredPermissions(SbcPermissions.CommandExecution | SbcPermissions.ObjectModelReadWrite)]
 public partial class WriteMessage : Command
 {
@@ -25,12 +24,6 @@ public partial class WriteMessage : Command
     /// Output the message on the console and via the object model
     /// </summary>
     public bool OutputMessage { get; set; } = true;
-
-    /// <summary>
-    /// Write the message to the log file (if applicable)
-    /// </summary>
-    [Obsolete("Deprecated in favor of LogLevel")]
-    public bool LogMessage { get; set; }
 
     /// <summary>
     /// Log level of this message
