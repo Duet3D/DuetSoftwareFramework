@@ -61,5 +61,10 @@ public enum ProbeType
     /// <summary>
     /// Z motor stall detection
     /// </summary>
-    ZMotorStall = 10
+    ZMotorStall = 10,
+
+    /// <summary>
+    /// Analog scanning probe
+    /// </summary>
+    scanningAnalog = 11
 }
