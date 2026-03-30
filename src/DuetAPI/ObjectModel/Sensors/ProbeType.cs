@@ -66,5 +66,5 @@ public enum ProbeType
     /// <summary>
     /// Analog scanning probe
     /// </summary>
-    scanningAnalog = 11
+    ScanningAnalog = 11
 }
