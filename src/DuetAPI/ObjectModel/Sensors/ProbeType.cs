@@ -61,6 +61,11 @@
         /// <summary>
         /// Z motor stall detection
         /// </summary>
-        ZMotorStall = 10
+        ZMotorStall = 10,
+
+        /// <summary>
+        /// Analog scanning probe 
+        /// </summary>
+        ScanningAnalog = 11 
     }
 }
