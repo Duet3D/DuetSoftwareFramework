@@ -374,6 +374,10 @@ namespace DuetControlServer.Model
                         _ = Task.Run(Utility.Firmware.UpdateFirmware);
                     }
                 }
+                catch (ArgumentException ae)
+                {
+                    _logger.Warn("Ignored object model response for key {0}: {1}", _requestedKey, ae.Message);
+                }
                 catch (InvalidOperationException e)
                 {
                     _logger.Error(e, "Failed to merge JSON due to internal error: {0}", Encoding.UTF8.GetString(_jsonData));

@@ -1040,7 +1040,14 @@ namespace DuetControlServer.SPI
                 {
                     if (_pendingModelQueries.TryDequeue(out PendingModelQuery? query))
                     {
-                        query.Tcs.SetResult(json.ToArray());
+                        if (json.IsEmpty)
+                        {
+                            query.Tcs.SetException(new ArgumentException("Object model response was too big"));
+                        }
+                        else
+                        {
+                            query.Tcs.SetResult(json.ToArray());
+                        }
                     }
                     else if (!Program.CancellationToken.IsCancellationRequested)
                     {
