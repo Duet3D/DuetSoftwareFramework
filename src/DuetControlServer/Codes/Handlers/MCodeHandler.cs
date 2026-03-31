@@ -1276,7 +1276,19 @@ public class MCodeHandler(
 
             // Pop
             case 121:
-                await model.WaitForFullUpdateAsync(cancellationToken);        // This may change inputs[].active, so sync the OM here
+                {
+                    bool usingMMS;
+                    using (await model.AccessReadOnlyAsync(cancellationToken))
+                    {
+                        usingMMS = model.Move.MotionSystems.Count > 1;
+                    }
+
+                    if (usingMMS)
+                    {
+                        // This may change inputs[].active, so sync the OM here
+                        await model.WaitForFullUpdateAsync(cancellationToken);
+                    }
+                }
                 break;
 
             // Diagnostics

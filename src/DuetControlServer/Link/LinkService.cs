@@ -596,7 +596,14 @@ public sealed class LinkService(
         {
             if (linkInterface.ModelQueryRequests.TryDequeue(out ModelQueryRequest? query))
             {
-                query.Tcs.SetResult(json.ToArray());
+                if (json.IsEmpty)
+                {
+                    query.Tcs.SetException(new ArgumentException("Object model response was too big"));
+                }
+                else
+                {
+                    query.Tcs.SetResult(json.ToArray());
+                }
             }
             else
             {

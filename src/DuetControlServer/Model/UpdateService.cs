@@ -307,6 +307,10 @@ public class UpdateService : BackgroundService
                 // Wait a moment
                 await Task.Delay(_settings.ModelUpdateInterval, stoppingToken);
             }
+            catch (ArgumentException ae)
+            {
+                _logger.LogWarning("Ignored object model response for key {Key}: {Message}", _requestedKey, ae.Message);
+            }
             catch (InvalidOperationException e)
             {
                 _logger.LogError(e, "Failed to merge JSON due to internal error: {JSON}", Encoding.UTF8.GetString(_jsonData));
