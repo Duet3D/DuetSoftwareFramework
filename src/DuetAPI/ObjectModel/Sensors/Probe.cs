@@ -59,6 +59,17 @@ public partial class Probe : ModelObject, IStaticModelObject
     private bool _disablesHeaters;
 
     /// <summary>
+    /// Dive height of the probe (in mm)
+    /// </summary>
+    [Obsolete("Use DiveHeights instead")]
+    public float DiveHeight
+    {
+        get => _diveHeight;
+        set => SetPropertyValue(ref _diveHeight, value);
+    }
+    private float _diveHeight;
+
+    /// <summary>
     /// Dive heights of the probe.
     /// The first element is the regular dive height, the second element may be used by scanning Z-probes
     /// </summary>

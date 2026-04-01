@@ -41,6 +41,12 @@ public partial class Tool : ModelObject, IStaticModelObject
     public ObservableCollection<int> Fans { get; } = [];
 
     /// <summary>
+    /// Feedforward coefficients to apply to the mapped heaters during extrusions
+    /// </summary>
+    [Obsolete("Use FeedForwardPwm instead")]
+    public ObservableCollection<float> FeedForward { get; } = [];
+
+    /// <summary>
     /// Time advance for applying feedforward in milliseconds
     /// </summary>
     public float FeedForwardAdvance
