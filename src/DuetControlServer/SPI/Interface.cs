@@ -692,7 +692,7 @@ namespace DuetControlServer.SPI
                     // Check if an emergency stop has been requested
                     if (_firmwareHaltRequest is not null)
                     {
-                        Invalidate();
+                        InvalidateCodes();
                         if (DataTransfer.WriteEmergencyStop())
                         {
                             _logger.Warn("Emergency stop");
@@ -1700,9 +1700,9 @@ namespace DuetControlServer.SPI
         }
 
         /// <summary>
-        /// Invalidate every resource due to a critical event
+        /// Invalidate pending codes and code-relevant requests due to an emergency stop
         /// </summary>
-        private static void Invalidate()
+        private static void InvalidateCodes()
         {
             // No longer starting or stopping a print. Must do this before aborting the print
             using (_printStateLock.Lock(Program.CancellationToken))
@@ -1735,16 +1735,6 @@ namespace DuetControlServer.SPI
             }
             _bytesReserved = _bufferSpace = 0;
 
-            // Resolve pending object model requests
-            lock (_pendingModelQueries)
-            {
-                foreach (PendingModelQuery query in _pendingModelQueries)
-                {
-                    query.Tcs.SetCanceled();
-                }
-                _pendingModelQueries.Clear();
-            }
-
             // Resolve pending expression evaluation and variable requests
             lock (_evaluateExpressionRequests)
             {
@@ -1762,6 +1752,25 @@ namespace DuetControlServer.SPI
                     request.SetCanceled();
                 }
                 _variableRequests.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Invalidate every resource due to a disconnect or reset
+        /// </summary>
+        private static void Invalidate()
+        {
+            // Invalidate codes and code-relevant requests
+            InvalidateCodes();
+
+            // Resolve pending object model requests
+            lock (_pendingModelQueries)
+            {
+                foreach (PendingModelQuery query in _pendingModelQueries)
+                {
+                    query.Tcs.SetCanceled();
+                }
+                _pendingModelQueries.Clear();
             }
 
             // Clear messages to send to the firmware

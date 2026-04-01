@@ -883,19 +883,16 @@ namespace DuetControlServer.SPI.Channel
         /// <param name="code">Code to perform</param>
         public void DoFirmwareCode(string code)
         {
-            try
-            {
-                _logger.Debug("Running code from firmware '{0}' on channel {1}", code, Channel);
+            _logger.Debug("Running code from firmware '{0}'", code);
 
-                Code codeObj = new(code) { Channel = Channel };
-                codeObj.Flags |= CodeFlags.Asynchronous | CodeFlags.IsFromFirmware | CodeFlags.IsLastCode;
-                _ = codeObj.Execute();
-            }
-            catch (CodeParserException cpe)
+            DuetControlServer.Commands.SimpleCode simpleCode = new()
             {
-                MessageTypeFlags flags = (MessageTypeFlags)(1 << (int)Channel) | MessageTypeFlags.ErrorMessageFlag;
-                Interface.SendMessage(flags, "Failed to parse firmware code: " + cpe.Message);
-            }
+                Code = code,
+                Channel = Channel,
+                IsFromFirmware = true,
+                ExecuteAsynchronously = true
+            };
+            _ = simpleCode.Execute();
         }
 
         /// <summary>

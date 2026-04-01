@@ -135,10 +135,18 @@ namespace DuetControlServer.Commands
         /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
         public override async Task<Message?> Execute()
         {
-            // Assign a cancellation token when the execution starts
+            // Assign a cancellation token when the execution starts.
+            // Prioritized firmware codes use the application cancellation token so they survive channel resets (e.g. emergency stop)
             if (CancellationToken == default)
             {
-                CancellationToken = _cancellationTokenSources[(int)Channel].Token;
+                if (Flags.HasFlag(CodeFlags.IsFromFirmware | CodeFlags.IsPrioritized))
+                {
+                    CancellationToken = Program.CancellationToken;
+                }
+                else
+                {
+                    CancellationToken = _cancellationTokenSources[(int)Channel].Token;
+                }
             }
 
             // Send it to the code pipeline
