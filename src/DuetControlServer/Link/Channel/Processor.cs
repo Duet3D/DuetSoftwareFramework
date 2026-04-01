@@ -6,7 +6,7 @@ using DuetControlServer.Files;
 using DuetControlServer.Link.Adapter;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link.Requests;
-using DuetControlServer.Utility;
+
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -35,10 +35,9 @@ public sealed class Processor
     public CodeChannel Channel { get; }
 
     // Private variables
-    private readonly CodeFactory _codeFactory;
+    private readonly Commands.CommandFactory _commandFactory;
     private readonly CodeProcessor _codeProcessor;
     private readonly FilePathResolver _filePathResolver;
-    private readonly EventLogger _eventLogger;
     private readonly ILinkAdapter _linkAdapter;
     private readonly LinkInterface _linkInterface;
     private readonly JobProcessor _jobProcessor;
@@ -66,9 +65,8 @@ public sealed class Processor
     /// <param name="settings">Settings</param>
     public Processor(
         CodeChannel channel,
-        CodeFactory codeFactory,
+        Commands.CommandFactory commandFactory,
         CodeProcessor codeProcessor,
-        EventLogger eventLogger,
         FilePathResolver filePathResolver,
         ILinkAdapter linkAdapter,
         LinkInterface linkInterface,
@@ -80,9 +78,8 @@ public sealed class Processor
         IOptions<Settings> settings)
     {
         Channel = channel;
-        _codeFactory = codeFactory;
+        _commandFactory = commandFactory;
         _codeProcessor = codeProcessor;
-        _eventLogger = eventLogger;
         _filePathResolver = filePathResolver;
         _jobProcessor = jobProcessor;
         _linkAdapter = linkAdapter;
@@ -968,67 +965,14 @@ public sealed class Processor
     /// <param name="code">Code to perform</param>
     public void DoFirmwareCode(string code)
     {
-        try
-        {
-            _logger.LogDebug("Running code from firmware '{Code}' on channel {Channel}", code, Channel);
+        _logger.LogDebug("Running code from firmware '{Code}'", code);
 
-            Code codeObj = _codeFactory.Create(code);
-            codeObj.Channel = Channel;
-            codeObj.Flags |= CodeFlags.IsFromFirmware | CodeFlags.IsLastCode;
-            _ = codeObj.ExecuteAsync().ContinueWith(async task =>
-            {
-                try
-                {
-                    Message? result = await task;
-                    if (result is null)
-                    {
-                        return;
-                    }
-
-                    // Check what kind of message this is
-                    MessageTypeFlags flags = (MessageTypeFlags)(1 << (int)Channel);
-                    if (result.Type != MessageType.Success)
-                    {
-                        flags |= (result.Type == MessageType.Error) ? MessageTypeFlags.ErrorMessageFlag : MessageTypeFlags.WarningMessageFlag;
-                    }
-
-                    // Split the message into multiple chunks so RRF can output it
-                    Memory<byte> encodedMessage = Encoding.UTF8.GetBytes(result.ToString());
-                    for (int i = 0; i < encodedMessage.Length; i += _settings.MaxMessageLength)
-                    {
-                        if (i + _settings.MaxMessageLength >= encodedMessage.Length)
-                        {
-                            Memory<byte> partialMessage = encodedMessage[i..];
-                            _linkInterface.SendMessage(flags, Encoding.UTF8.GetString(partialMessage.ToArray()));
-                        }
-                        else
-                        {
-                            Memory<byte> partialMessage = encodedMessage.Slice(i, Math.Min(encodedMessage.Length - i, _settings.MaxMessageLength));
-                            _linkInterface.SendMessage(flags | MessageTypeFlags.PushFlag, Encoding.UTF8.GetString(partialMessage.ToArray()));
-                        }
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    // Code has been cancelled. Don't log this
-                }
-                catch (AggregateException ae)
-                {
-                    await _eventLogger.LogOutputAsync(MessageType.Error, $"Failed to execute {code} from firmware: [{ae.InnerException!.GetType().Name}] {ae.InnerException.Message}");
-                    _logger.LogError(ae, "Failed to execute {Code} from firmware", code);
-                }
-                catch (Exception e)
-                {
-                    await _eventLogger.LogOutputAsync(MessageType.Error, $"Failed to execute {code} from firmware: [{e.GetType().Name}] {e.Message}");
-                    _logger.LogError(e, "Failed to execute {Code} from firmware", code);
-                }
-            }, TaskContinuationOptions.RunContinuationsAsynchronously);
-        }
-        catch (CodeParserException cpe)
-        {
-            MessageTypeFlags flags = (MessageTypeFlags)(1 << (int)Channel) | MessageTypeFlags.ErrorMessageFlag;
-            _linkInterface.SendMessage(flags, "Failed to parse firmware code: " + cpe.Message);
-        }
+        Commands.SimpleCode simpleCode = _commandFactory.Create<Commands.SimpleCode>();
+        simpleCode.Code = code;
+        simpleCode.Channel = Channel;
+        simpleCode.IsFromFirmware = true;
+        simpleCode.ExecuteAsynchronously = true;
+        _ = simpleCode.ExecuteAsync();
     }
 
     /// <summary>

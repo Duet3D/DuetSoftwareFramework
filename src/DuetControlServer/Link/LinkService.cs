@@ -255,7 +255,7 @@ public sealed class LinkService(
                 // Check if an emergency stop has been requested
                 if (linkInterface.FirmwareHaltRequest is not null)
                 {
-                    Invalidate();
+                    InvalidateCodes();
                     if (linkAdapter.WriteEmergencyStop())
                     {
                         logger.LogWarning("Emergency stop");
@@ -1248,12 +1248,12 @@ public sealed class LinkService(
     }
     
     /// <summary>
-    /// Invalidate every resource due to a critical event
+    /// Invalidate pending codes and code-relevant requests due to an emergency stop
     /// </summary>
-    private void Invalidate()
+    private void InvalidateCodes()
     {
-        // Invalidate pending link interface requests
-        linkInterface.Invalidate();
+        // Invalidate pending codes and code-relevant requests
+        linkInterface.InvalidateCodes();
 
         // Cancel the file being printed (if any)
         using (jobProcessor.Lock())
@@ -1269,6 +1269,18 @@ public sealed class LinkService(
                 channel.Invalidate();
             }
         }
+    }
+
+    /// <summary>
+    /// Invalidate every resource due to a disconnect or reset
+    /// </summary>
+    private void Invalidate()
+    {
+        // Invalidate codes and code-relevant requests
+        InvalidateCodes();
+
+        // Invalidate remaining link interface requests
+        linkInterface.Invalidate();
 
         // Close all the files
         foreach (var kv in _openFiles)

@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -42,6 +43,12 @@ public sealed class SimpleCode(Codes.CodeFactory codeFactory, Model.ObjectModel 
     /// Source connection of this command
     /// </summary>
     public Connection? Connection { get; set; }
+
+    /// <summary>
+    /// Indicates if the code comes from the firmware. Only used internally
+    /// </summary>
+    [JsonIgnore]
+    public bool IsFromFirmware { get; set; }
 
     /// <summary>
     /// Parse codes from the given input string asynchronously
@@ -96,8 +103,14 @@ public sealed class SimpleCode(Codes.CodeFactory codeFactory, Model.ObjectModel 
                     code.Flags |= CodeFlags.Asynchronous;
                 }
 
+                // Codes from the firmware bypass the interception logic
+                if (IsFromFirmware)
+                {
+                    code.Flags |= CodeFlags.IsPrioritized | CodeFlags.IsFromFirmware;
+                    priorityCodes.Add(code);
+                }
                 // M108, M112, M122, M292, and M999 (B0) always go to an idle channel so we (hopefully) get a low-latency response
-                if (code.Type == CodeType.MCode &&
+                else if (code.Type == CodeType.MCode &&
                     (code.MajorNumber is 108 or 112 or 122 or 292 || (code.MajorNumber == 999 && code.GetInt('B', 0) == 0)))
                 {
                     code.Flags |= CodeFlags.IsPrioritized;

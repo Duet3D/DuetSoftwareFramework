@@ -12,6 +12,7 @@ using DuetControlServer.IPC;
 using DuetControlServer.IPC.Processors;
 using DuetControlServer.Link;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -29,6 +30,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     private readonly ICodeHandler _mCodes;
     private readonly ICodeHandler _tCodes;
     private readonly ICodeHandler _keywords;
+    private readonly IHostApplicationLifetime _lifetime;
     private readonly LinkInterface _linkInterface;
     private readonly ILogger<Code> _logger;
     private readonly Settings _settings;
@@ -42,6 +44,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="mCodes">M-code handler</param>
     /// <param name="tCodes">T-code handler</param>
     /// <param name="keywords">Keyword handler</param>
+    /// <param name="lifetime">Host application lifetime</param>
     /// <param name="linkInterface">Link interface</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
@@ -51,6 +54,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         [FromKeyedServices(Keys.MCodes)] ICodeHandler mCodes,
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
         [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
+        IHostApplicationLifetime lifetime,
         LinkInterface linkInterface,
         ILogger<Code> logger,
         IOptions<Settings> settings) : base()
@@ -61,6 +65,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _mCodes = mCodes;
         _tCodes = tCodes;
         _keywords = keywords;
+        _lifetime = lifetime;
         _linkInterface = linkInterface;
         _logger = logger;
         _settings = settings.Value;
@@ -76,6 +81,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="mCodes">M-code handler</param>
     /// <param name="tCodes">T-code handler</param>
     /// <param name="keywords">Keyword handler</param>
+    /// <param name="lifetime">Host application lifetime</param>
     /// <param name="linkInterface">Link interface</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
@@ -86,6 +92,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         [FromKeyedServices(Keys.MCodes)] ICodeHandler mCodes,
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
         [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
+        IHostApplicationLifetime lifetime,
         LinkInterface linkInterface,
         ILogger<Code> logger,
         IOptions<Settings> settings) : base(code)
@@ -96,6 +103,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _mCodes = mCodes;
         _tCodes = tCodes;
         _keywords = keywords;
+        _lifetime = lifetime;
         _linkInterface = linkInterface;
         _logger = logger;
         _settings = settings.Value;
@@ -139,8 +147,20 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
     public override async Task<Message?> ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        // Assign a cancellation token when the execution starts
-        CancellationToken = (cancellationToken == default) ? _codeProcessor.CancellationTokenSources[(int)Channel].Token : cancellationToken;
+        // Assign a cancellation token when the execution starts.
+        // Prioritized firmware codes use the application stopping token so they survive channel resets (e.g. emergency stop)
+        if (cancellationToken != default)
+        {
+            CancellationToken = cancellationToken;
+        }
+        else if (Flags.HasFlag(CodeFlags.IsFromFirmware | CodeFlags.IsPrioritized))
+        {
+            CancellationToken = _lifetime.ApplicationStopping;
+        }
+        else
+        {
+            CancellationToken = _codeProcessor.CancellationTokenSources[(int)Channel].Token;
+        }
 
         // Send it to the code pipeline
         await _codeProcessor.StartCodeAsync(this);

@@ -556,9 +556,9 @@ public sealed partial class LinkInterface(
     }
 
     /// <summary>
-    /// Invalidate every resource due to a critical event
+    /// Invalidate pending codes and code-relevant requests due to an emergency stop
     /// </summary>
-    internal void Invalidate()
+    internal void InvalidateCodes()
     {
         // No longer starting or stopping a print. Must do this before aborting the print
         using (PrintStateLock.Lock())
@@ -585,21 +585,6 @@ public sealed partial class LinkInterface(
         }
         BytesReserved = BufferSpace = 0;
 
-        // Resolve pending object model requests
-        lock (ModelQueryRequests)
-        {
-            foreach (ModelQueryRequest request in ModelQueryRequests)
-            {
-                request.Tcs.SetCanceled();
-            }
-            ModelQueryRequests.Clear();
-        }
-
-        lock (UpdatedObjectModelKeys)
-        {
-            UpdatedObjectModelKeys.Clear();
-        }
-
         // Resolve pending code result, expression evaluation, and variable requests
         lock (SetLastCodeResultRequests)
         {
@@ -627,6 +612,30 @@ public sealed partial class LinkInterface(
             }
             VariableRequests.Clear();
         }
+    }
+
+    /// <summary>
+    /// Invalidate every resource due to a disconnect or reset
+    /// </summary>
+    internal void Invalidate()
+    {
+        // Invalidate codes and code-relevant requests
+        InvalidateCodes();
+
+        // Resolve pending object model requests
+        lock (ModelQueryRequests)
+        {
+            foreach (ModelQueryRequest request in ModelQueryRequests)
+            {
+                request.Tcs.SetCanceled();
+            }
+            ModelQueryRequests.Clear();
+        }
+
+        lock (UpdatedObjectModelKeys)
+        {
+            UpdatedObjectModelKeys.Clear();
+        }
 
         // Clear messages to send to the firmware
         lock (MessagesToSend)
@@ -636,10 +645,10 @@ public sealed partial class LinkInterface(
     }
 
     /// <summary>
-    /// Invalidate every resource due to a critical event asynchronously
+    /// Invalidate pending codes and code-relevant requests due to an emergency stop asynchronously
     /// </summary>
     /// <returns>Asynchronous task</returns>
-    internal async Task InvalidateAsync(CancellationToken cancellationToken)
+    internal async Task InvalidateCodesAsync(CancellationToken cancellationToken)
     {
         // No longer starting or stopping a print. Must do this before aborting the print
         using (await PrintStateLock.LockAsync(cancellationToken))
@@ -666,21 +675,6 @@ public sealed partial class LinkInterface(
         }
         BytesReserved = BufferSpace = 0;
 
-        // Resolve pending object model requests
-        lock (ModelQueryRequests)
-        {
-            foreach (ModelQueryRequest request in ModelQueryRequests)
-            {
-                request.Tcs.SetCanceled(cancellationToken);
-            }
-            ModelQueryRequests.Clear();
-        }
-
-        lock (UpdatedObjectModelKeys)
-        {
-            UpdatedObjectModelKeys.Clear();
-        }
-
         // Resolve pending code result, expression evaluation, and variable requests
         lock (SetLastCodeResultRequests)
         {
@@ -707,6 +701,31 @@ public sealed partial class LinkInterface(
                 request.SetCanceled();
             }
             VariableRequests.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Invalidate every resource due to a disconnect or reset asynchronously
+    /// </summary>
+    /// <returns>Asynchronous task</returns>
+    internal async Task InvalidateAsync(CancellationToken cancellationToken)
+    {
+        // Invalidate codes and code-relevant requests
+        await InvalidateCodesAsync(cancellationToken);
+
+        // Resolve pending object model requests
+        lock (ModelQueryRequests)
+        {
+            foreach (ModelQueryRequest request in ModelQueryRequests)
+            {
+                request.Tcs.SetCanceled(cancellationToken);
+            }
+            ModelQueryRequests.Clear();
+        }
+
+        lock (UpdatedObjectModelKeys)
+        {
+            UpdatedObjectModelKeys.Clear();
         }
 
         // Clear messages to send to the firmware

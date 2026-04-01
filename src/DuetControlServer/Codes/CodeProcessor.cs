@@ -166,8 +166,8 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
         // Deal with priority codes
         if (code.Flags.HasFlag(CodeFlags.IsPrioritized))
         {
-            // Process this priority code here if it is idle
-            if (processor.IsIdle(code))
+            // Process this priority code here if it is idle or from the firmware (firmware codes must not change channel)
+            if (code.Flags.HasFlag(CodeFlags.IsFromFirmware) || processor.IsIdle(code))
             {
                 await processor.WriteCodeAsync(code, stage);
                 return;
