@@ -68,5 +68,6 @@ public partial class Heat : ModelObject, IStaticModelObject
     /// List of configured heaters
     /// </summary>
     /// <seealso cref="Heater"/>
+    [Live]
     public StaticModelCollection<Heater?> Heaters { get; } = [];
 }

@@ -108,6 +108,7 @@ public partial class Probe : ModelObject, IStaticModelObject
     /// <summary>
     /// Measured height (only applicable for scanning probes, in mm or null)
     /// </summary>
+    [Live]
     public float? MeasuredHeight
     {
         get => _measuredHeight;
@@ -215,5 +216,6 @@ public partial class Probe : ModelObject, IStaticModelObject
     /// <summary>
     /// Current analog values of the probe
     /// </summary>
+    [Live]
     public ObservableCollection<int> Value { get; } = [];
 }

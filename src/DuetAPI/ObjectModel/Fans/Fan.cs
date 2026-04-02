@@ -8,6 +8,7 @@ public partial class Fan : ModelObject, IStaticModelObject
     /// <summary>
     /// Value of this fan (0..1 or -1 if unknown)
     /// </summary>
+    [Live]
     public float ActualValue
     {
         get => _actualValue;
@@ -68,6 +69,7 @@ public partial class Fan : ModelObject, IStaticModelObject
     /// <summary>
     /// Requested value for this fan on a scale between 0 to 1
     /// </summary>
+    [Live]
     public float RequestedValue
     {
         get => _requestedValue;
@@ -78,6 +80,7 @@ public partial class Fan : ModelObject, IStaticModelObject
     /// <summary>
     /// Current RPM of this fan or -1 if unknown/unset
     /// </summary>
+    [Live]
     public int Rpm
     {
         get => _rpm;

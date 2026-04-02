@@ -99,6 +99,7 @@ public partial class Axis : ModelObject, IStaticModelObject
     /// <remarks>
     /// This value reflects the machine position of the move being performed or of the last one if the machine is not moving
     /// </remarks>
+    [Live]
     public float? MachinePosition
     {
         get => _machinePosition;
@@ -224,6 +225,7 @@ public partial class Axis : ModelObject, IStaticModelObject
     /// <summary>
     /// Current step position of the axis (in steps)
     /// </summary>
+    [Live]
     public int StepPos
     {
         get => _stepPos;
@@ -237,6 +239,7 @@ public partial class Axis : ModelObject, IStaticModelObject
     /// <remarks>
     /// This value reflects the target position of the last move fed into the look-ahead buffer
     /// </remarks>
+    [Live]
     public float? UserPosition
     {
         get => _userPosition;

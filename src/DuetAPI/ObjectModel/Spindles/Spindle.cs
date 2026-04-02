@@ -28,6 +28,7 @@ public partial class Spindle : ModelObject, IStaticModelObject
     /// <summary>
     /// Current RPM, negative if anticlockwise direction
     /// </summary>
+    [Live]
     public int? Current
     {
         get => _current;
@@ -38,6 +39,7 @@ public partial class Spindle : ModelObject, IStaticModelObject
     /// <summary>
     /// Frequency (in Hz)
     /// </summary>
+    [Verbose]
     public int? Frequency
     {
         get => _frequency;
@@ -48,6 +50,7 @@ public partial class Spindle : ModelObject, IStaticModelObject
     /// <summary>
     /// Idle PWM value (0..1)
     /// </summary>
+    [Verbose]
     public float? IdlePwm
     {
         get => _idlePwm;
@@ -58,6 +61,7 @@ public partial class Spindle : ModelObject, IStaticModelObject
     /// <summary>
     /// Maximum RPM
     /// </summary>
+    [Verbose]
     public int? Max
     {
         get => _max;
@@ -68,6 +72,7 @@ public partial class Spindle : ModelObject, IStaticModelObject
     /// <summary>
     /// Maximum PWM value when turned on (0..1)
     /// </summary>
+    [Verbose]
     public float? MaxPwm
     {
         get => _maxPwm;
@@ -78,6 +83,7 @@ public partial class Spindle : ModelObject, IStaticModelObject
     /// <summary>
     /// Minimum RPM when turned on
     /// </summary>
+    [Verbose]
     public int? Min
     {
         get => _min;
@@ -88,6 +94,7 @@ public partial class Spindle : ModelObject, IStaticModelObject
     /// <summary>
     /// Minimum PWM value when turned on (0..1)
     /// </summary>
+    [Verbose]
     public float? MinPwm
     {
         get => _minPwm;
@@ -98,6 +105,7 @@ public partial class Spindle : ModelObject, IStaticModelObject
     /// <summary>
     /// Current state
     /// </summary>
+    [Live]
     public SpindleState State
     {
         get => _state;
@@ -108,6 +116,7 @@ public partial class Spindle : ModelObject, IStaticModelObject
     /// <summary>
     /// Spindle type
     /// </summary>
+    [Verbose]
     public SpindleType? Type
     {
         get => _type;

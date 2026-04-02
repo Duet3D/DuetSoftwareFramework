@@ -6,7 +6,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
@@ -42,9 +41,6 @@ public class UpdateService : BackgroundService
         _model = model;
         _logger = logger;
         _settings = settings.Value;
-
-        // Make sure we request the full object model again when the connection is lost
-        model.OnConnectionLost += (sender, e) => _lastSeqs.Clear();
     }
 
     /// <summary>
@@ -55,8 +51,6 @@ public class UpdateService : BackgroundService
     public override Task StopAsync(CancellationToken cancellationToken) => base.StopAsync(cancellationToken);
 
     // Data for object model updates
-    private readonly ConcurrentDictionary<string, int> _lastSeqs = new();
-
     private byte[] _jsonData = [];
     private string _requestedKey = string.Empty;
     private bool _keyUpdated = false;
@@ -184,10 +178,10 @@ public class UpdateService : BackgroundService
                                 if (readerCopy.Read() && readerCopy.TokenType == JsonTokenType.Number)
                                 {
                                     int seq = readerCopy.GetInt32();
-                                    if (!_lastSeqs.TryGetValue(seqKey, out int lastSeq) || lastSeq != seq)
+                                    if (!_model.Seqs.TryGetValue(seqKey, out int lastSeq) || lastSeq != seq)
                                     {
                                         _updatedKeys.Add(seqKey);
-                                        _lastSeqs[seqKey] = seq;
+                                        _model.Seqs[seqKey] = seq;
                                     }
                                 }
                                 else
@@ -228,7 +222,7 @@ public class UpdateService : BackgroundService
 #endif
 
                 // Request the limits if no sequence numbers have been set yet
-                if (_lastSeqs.IsEmpty)
+                if (_model.Seqs.Count == 0)
                 {
                     _logger.LogDebug("Requesting initial limits");
 
@@ -263,7 +257,7 @@ public class UpdateService : BackgroundService
                     string key = _updatedKeys[i];
                     if (key != "reply" && (!_settings.UpdateOnly || key is "boards" or "directories" or "state"))
                     {
-                        _logger.LogDebug("Requesting update of key {Key}, new seq {Seq}", key, _lastSeqs.TryGetValue(key, out int seqValue) ? seqValue : -1);
+                        _logger.LogDebug("Requesting update of key {Key}, new seq {Seq}", key, _model.Seqs.TryGetValue(key, out int seqValue) ? seqValue : -1);
 
                         int next = 0;
                         do

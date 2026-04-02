@@ -158,6 +158,16 @@ async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property
             }
             writeNL = true;
         }
+        else if (Attribute.IsDefined(property, typeof(LiveAttribute)))
+        {
+            await writer.WriteLineAsync("*This field is live and can be queried using the 'f' flag*");
+            writeNL = true;
+        }
+        else if (Attribute.IsDefined(property, typeof(VerboseAttribute)))
+        {
+            await writer.WriteLineAsync("*This field is verbose and can be queried using the 'v' flag*");
+            writeNL = true;
+        }
         if (Attribute.IsDefined(property, typeof(LimitedResponseCountAttribute)))
         {
             LimitedResponseCountAttribute attribute = (LimitedResponseCountAttribute)Attribute.GetCustomAttribute(property, typeof(LimitedResponseCountAttribute))!;

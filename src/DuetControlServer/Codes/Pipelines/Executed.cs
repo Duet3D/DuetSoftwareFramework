@@ -112,7 +112,23 @@ public sealed class Executed : PipelineBase
                 // so we only need to log internal code replies that are not part of file prints
                 if (code.File is null || !code.IsFromFileChannel)
                 {
-                    await _eventLogger.LogAsync(code.Result);
+                    if (code.ReplyLogLevel is not null)
+                    {
+                        // Use the log level specified by the firmware
+                        await _eventLogger.LogAsync(code.ReplyLogLevel.Value, code.Result);
+                    }
+                    else
+                    {
+                        await _eventLogger.LogAsync(code.Result);
+                    }
+                }
+            }
+            else if (code.ReplyLogLevel is not null and not EventLogLevel.Off)
+            {
+                // Firmware-handled code with explicit log level - respect it
+                if (code.File is null || !code.IsFromFileChannel)
+                {
+                    await _eventLogger.LogAsync(code.ReplyLogLevel.Value, code.Result);
                 }
             }
 

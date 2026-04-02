@@ -28,6 +28,7 @@ namespace DuetAPI.Commands;
 [JsonSerializable(typeof(RemoveHttpEndpoint))]
 [JsonSerializable(typeof(Acknowledge))]
 [JsonSerializable(typeof(GetObjectModel))]
+[JsonSerializable(typeof(QueryObjectModel))]
 [JsonSerializable(typeof(LockObjectModel))]
 [JsonSerializable(typeof(PatchObjectModel))]
 [JsonSerializable(typeof(SetNetworkProtocol))]

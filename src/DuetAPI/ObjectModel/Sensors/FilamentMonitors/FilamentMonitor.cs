@@ -36,6 +36,7 @@ public partial class FilamentMonitor : ModelObject, IDynamicModelObject
     /// <summary>
     /// Last reported status of this filament monitor
     /// </summary>
+    [Live]
     public FilamentMonitorStatus Status
     {
         get => _status;

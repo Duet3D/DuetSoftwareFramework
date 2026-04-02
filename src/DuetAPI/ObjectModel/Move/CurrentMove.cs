@@ -1,4 +1,4 @@
-﻿namespace DuetAPI.ObjectModel;
+namespace DuetAPI.ObjectModel;
 
 /// <summary>
 /// Information about the current move
@@ -8,6 +8,7 @@ public partial class CurrentMove : ModelObject, IStaticModelObject
     /// <summary>
     /// Acceleration of the current move (in mm/s^2)
     /// </summary>
+    [Live]
     public float Acceleration
     {
         get => _acceleration;
@@ -18,6 +19,7 @@ public partial class CurrentMove : ModelObject, IStaticModelObject
     /// <summary>
     /// Deceleration of the current move (in mm/s^2)
     /// </summary>
+    [Live]
     public float Deceleration
     {
         get => _deceleration;
@@ -28,6 +30,7 @@ public partial class CurrentMove : ModelObject, IStaticModelObject
     /// <summary>
     /// Total distance of the current move (in mm)
     /// </summary>
+    [Live]
     public float Distance
     {
         get => _distance;
@@ -38,6 +41,7 @@ public partial class CurrentMove : ModelObject, IStaticModelObject
     /// <summary>
     /// Duration of the current move (in s)
     /// </summary>
+    [Live]
     public float Duration
     {
         get => _duration;
@@ -48,6 +52,7 @@ public partial class CurrentMove : ModelObject, IStaticModelObject
     /// <summary>
     /// Current extrusion rate (in mm/s)
     /// </summary>
+    [Live]
     public float ExtrusionRate
     {
         get => _extrusionRate;
@@ -58,6 +63,7 @@ public partial class CurrentMove : ModelObject, IStaticModelObject
     /// <summary>
     /// Laser PWM of the current move (0..1) or null if not applicable
     /// </summary>
+    [Live]
     public float? LaserPwm
     {
         get => _laserPwm;
@@ -68,16 +74,18 @@ public partial class CurrentMove : ModelObject, IStaticModelObject
     /// <summary>
     /// Requested speed of the current move (in mm/s)
     /// </summary>
+    [Live]
     public float RequestedSpeed
     {
         get => _requestedSpeed;
         set => SetPropertyValue(ref _requestedSpeed, value);
     }
     private float _requestedSpeed;
-    
+
     /// <summary>
     /// Top speed of the current move (in mm/s)
     /// </summary>
+    [Live]
     public float TopSpeed
     {
         get => _topSpeed;

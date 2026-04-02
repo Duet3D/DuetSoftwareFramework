@@ -8,6 +8,7 @@ public partial class Job : ModelObject, IStaticModelObject
     /// <summary>
     /// Information about the current build or null if not available
     /// </summary>
+    [Live]
     public Build? Build
     {
         get => _build;
@@ -18,6 +19,7 @@ public partial class Job : ModelObject, IStaticModelObject
     /// <summary>
     /// Total active duration of the current job file (in s or null)
     /// </summary>
+    [Live]
     public int? Duration
     {
         get => _duration;
@@ -33,6 +35,7 @@ public partial class Job : ModelObject, IStaticModelObject
     /// <summary>
     /// Current position in the file being processed (in bytes or null)
     /// </summary>
+    [Live]
     public long? FilePosition
     {
         get => _filePosition;
@@ -107,6 +110,7 @@ public partial class Job : ModelObject, IStaticModelObject
     /// <summary>
     /// Number of the current layer or null not available
     /// </summary>
+    [Live]
     public int? Layer
     {
         get => _layer;
@@ -129,6 +133,7 @@ public partial class Job : ModelObject, IStaticModelObject
     /// <summary>
     /// Time elapsed since the last layer change (in s or null)
     /// </summary>
+    [Live]
     public float? LayerTime
     {
         get => _layerTime;
@@ -139,6 +144,7 @@ public partial class Job : ModelObject, IStaticModelObject
     /// <summary>
     /// Total pause time since the job started
     /// </summary>
+    [Live]
     public int? PauseDuration
     {
         get => _pauseDuration;
@@ -149,6 +155,7 @@ public partial class Job : ModelObject, IStaticModelObject
     /// <summary>
     /// Total extrusion amount without extrusion factors applied (in mm)
     /// </summary>
+    [Live]
     public float? RawExtrusion
     {
         get => _rawExtrusion;
@@ -159,11 +166,13 @@ public partial class Job : ModelObject, IStaticModelObject
     /// <summary>
     /// Estimated times left
     /// </summary>
+    [Live]
     public TimesLeft TimesLeft { get; } = new TimesLeft();
 
     /// <summary>
     /// Time needed to heat up the heaters (in s or null)
     /// </summary>
+    [Live]
     public int? WarmUpDuration
     {
         get => _warmUpDuration;

@@ -21,6 +21,7 @@ public partial class Move : ModelObject, IStaticModelObject
     /// List of the configured axes
     /// </summary>
     /// <seealso cref="Axis"/>
+    [Live]
     [LimitedResponseCount(9)]
     public StaticModelCollection<Axis> Axes { get; } = [];
 
@@ -47,12 +48,14 @@ public partial class Move : ModelObject, IStaticModelObject
     /// <summary>
     /// Information about the current move
     /// </summary>
+    [Live]
     public CurrentMove CurrentMove { get; } = new CurrentMove();
 
     /// <summary>
     /// List of configured extruders
     /// </summary>
     /// <seealso cref="Extruder"/>
+    [Live]
     public StaticModelCollection<Extruder> Extruders { get; } = [];
     
     /// <summary>
@@ -98,6 +101,7 @@ public partial class Move : ModelObject, IStaticModelObject
     /// <summary>
     /// List of configured motion systems
     /// </summary>
+    [Live]
     public StaticModelCollection<MotionSystem> MotionSystems { get; } = [];
 
     /// <summary>

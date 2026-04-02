@@ -9,29 +9,34 @@ public partial class Sensors : ModelObject, IStaticModelObject
     /// List of analog sensors
     /// </summary>
     /// <seealso cref="AnalogSensor"/>
+    [Live]
     public StaticModelCollection<AnalogSensor?> Analog { get; } = [];
 
     /// <summary>
     /// List of configured endstops
     /// </summary>
     /// <seealso cref="Endstop"/>
+    [Live]
     public StaticModelCollection<Endstop?> Endstops { get; } = [];
 
     /// <summary>
     /// List of configured filament monitors
     /// </summary>
     /// <seealso cref="FilamentMonitor"/>
+    [Live]
     public DynamicModelCollection<FilamentMonitor?> FilamentMonitors { get; } = [];
 
     /// <summary>
     /// List of general-purpose input ports
     /// </summary>
     /// <seealso cref="GpInputPort"/>
+    [Live]
     public StaticModelCollection<GpInputPort?> GpIn { get; } = [];
 
     /// <summary>
     /// List of configured probes
     /// </summary>
     /// <seealso cref="Probe"/>
+    [Live]
     public StaticModelCollection<Probe?> Probes { get; } = [];
 }

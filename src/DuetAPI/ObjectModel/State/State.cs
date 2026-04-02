@@ -42,6 +42,7 @@ public partial class State : ModelObject, IStaticModelObject
     /// <summary>
     /// Number of the currently selected tool or -1 if none is selected
     /// </summary>
+    [Live]
     public int CurrentTool
     {
         get => _currentTool;
@@ -81,6 +82,7 @@ public partial class State : ModelObject, IStaticModelObject
     /// <summary>
     /// Laser PWM of the next commanded move (0..1) or null if not applicable
     /// </summary>
+    [Live]
     public float? LaserPwm
     {
         get => _laserPwm;
@@ -143,6 +145,7 @@ public partial class State : ModelObject, IStaticModelObject
     /// <summary>
     /// Millisecond fraction of <see cref="UpTime"/>
     /// </summary>
+    [Live]
     public int MsUpTime
     {
         get => _msUpTime;
@@ -213,6 +216,7 @@ public partial class State : ModelObject, IStaticModelObject
     /// <summary>
     /// Current state of the machine
     /// </summary>
+    [Live]
     public MachineStatus Status
     {
         get => _status;
@@ -223,6 +227,7 @@ public partial class State : ModelObject, IStaticModelObject
     /// <summary>
     /// Shorthand for inputs[state.thisInput].active
     /// </summary>
+    [Verbose]
     public bool? ThisActive
     {
         get => _thisActive;
@@ -237,6 +242,7 @@ public partial class State : ModelObject, IStaticModelObject
     /// This is primarily intended for macro files to determine on which G-code channel it is running.
     /// The value of this property is always null in object model queries
     /// </remarks>
+    [Verbose]
     public int? ThisInput
     {
         get => _thisInput;
@@ -247,6 +253,7 @@ public partial class State : ModelObject, IStaticModelObject
     /// <summary>
     /// Internal date and time in RepRapFirmware or null if unknown
     /// </summary>
+    [Live]
     [JsonConverter(typeof(Utility.JsonOptionalShortDateTimeConverter))]
     public DateTime? Time
     {
@@ -258,6 +265,7 @@ public partial class State : ModelObject, IStaticModelObject
     /// <summary>
     /// How long the machine has been running (in s)
     /// </summary>
+    [Live]
     public int UpTime
     {
         get => _upTime;

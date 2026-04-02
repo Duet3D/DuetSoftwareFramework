@@ -98,14 +98,21 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     }
 
     /// <summary>
+    /// Current sequence numbers for each object model section as reported by the firmware.
+    /// Keys are section names (e.g. "heat", "move"), values are sequence counters.
+    /// Internal so it doesn't leak into filtered object model queries via reflection
+    /// </summary>
+    internal Dictionary<string, int> Seqs { get; } = [];
+
+    /// <summary>
     /// Configured password (see M551)
     /// </summary>
-    public string Password { get; set; } = DuetAPI.Connection.Defaults.Password;
+    internal string Password { get; set; } = DuetAPI.Connection.Defaults.Password;
 
     /// <summary>
     /// Whether the current machine status is overridden because an update is in progress
     /// </summary>
-    public bool IsUpdating
+    internal bool IsUpdating
     {
         get => _isUpdating;
         set
@@ -742,6 +749,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
         {
             Boards.Clear();
             Global.Clear();
+            Seqs.Clear();
             if (State.Status != MachineStatus.Halted && State.Status != MachineStatus.Updating)
             {
                 State.Status = MachineStatus.Disconnected;

@@ -544,45 +544,36 @@ public class RepRapFirmwareController(IConfiguration configuration, ILogger<RepR
             }
 
             using CommandConnection connection = await BuildConnection();
-            string response;
 
             if (string.IsNullOrWhiteSpace(key) && flags?.Contains('f') == true)
             {
-                // Update special "seqs" values in common live query resul
-                response = await connection.PerformSimpleCodeAsync($"M409 F\"{flags}\"");
+                // Live query with sequence numbers
+                JsonElement response = await connection.QueryObjectModelAsync(key ?? string.Empty, flags);
 
-                // Update sequence numbers where applicable
-                using JsonDocument jsonDoc = JsonDocument.Parse(response);
-                if (jsonDoc.RootElement.TryGetProperty("result", out JsonElement resultElement) && resultElement.TryGetProperty("seqs", out JsonElement seqsElement))
+                // Patch seqs.reply with DWS-managed reply sequence number
+                if (response.TryGetProperty("result", out JsonElement resultElement) &&
+                    resultElement.TryGetProperty("seqs", out JsonElement seqsElement))
                 {
+                    Dictionary<string, object> responseDict = JsonSerializer.Deserialize<Dictionary<string, object>>(response.GetRawText())!;
                     Dictionary<string, object> result = JsonSerializer.Deserialize<Dictionary<string, object>>(resultElement.GetRawText())!;
+                    Dictionary<string, object> seqs = JsonSerializer.Deserialize<Dictionary<string, object>>(seqsElement.GetRawText())!;
+                    lock (modelProvider)
                     {
-                        Dictionary<string, object> seqs = JsonSerializer.Deserialize<Dictionary<string, object>>(seqsElement.GetRawText())!;
-                        lock (modelProvider)
-                        {
-                            if (seqs.ContainsKey("reply"))
-                            {
-                                seqs["reply"] = modelProvider.ReplySeq;
-                            }
-                        }
-                        result["seqs"] = seqs;
+                        seqs["reply"] = modelProvider.ReplySeq;
                     }
-
-                    return Content(JsonSerializer.Serialize(new
-                    {
-                        key,
-                        flags,
-                        result
-                    }, JsonHelper.DefaultJsonOptions), "application/json");
+                    result["seqs"] = seqs;
+                    responseDict["result"] = result;
+                    return Content(JsonSerializer.Serialize(responseDict, JsonHelper.DefaultJsonOptions), "application/json");
                 }
+
+                return Content(response.GetRawText(), "application/json");
             }
             else
             {
-                // Fall back to M409
-                response = await connection.PerformSimpleCodeAsync($"M409 K\"{key}\" F\"{flags}\"");
+                // Standard query
+                JsonElement response = await connection.QueryObjectModelAsync(key ?? string.Empty, flags ?? string.Empty);
+                return Content(response.GetRawText(), "application/json");
             }
-
-            return Content(response, "application/json");
         }
         catch (Exception e)
         {

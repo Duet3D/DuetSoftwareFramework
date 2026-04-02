@@ -11,6 +11,7 @@ public partial class Tool : ModelObject, IStaticModelObject
     /// <summary>
     /// Active temperatures of the associated heaters (in C)
     /// </summary>
+    [Live]
     public ObservableCollection<float> Active { get; } = [];
 
     /// <summary>
@@ -84,6 +85,7 @@ public partial class Tool : ModelObject, IStaticModelObject
     /// <summary>
     /// True if the filament has been firmware-retracted
     /// </summary>
+    [Live]
     public bool IsRetracted
     {
         get => _isRetracted;
@@ -161,11 +163,13 @@ public partial class Tool : ModelObject, IStaticModelObject
     /// <summary>
     /// Standby temperatures of the associated heaters (in C)
     /// </summary>
+    [Live]
     public ObservableCollection<float> Standby { get; } = [];
 
     /// <summary>
     /// Current state of this tool
     /// </summary>
+    [Live]
     public ToolState State
     {
         get => _state;

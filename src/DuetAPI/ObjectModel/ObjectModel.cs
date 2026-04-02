@@ -29,6 +29,7 @@ public partial class ObjectModel : ModelObject, IStaticModelObject
     /// List of configured fans
     /// </summary>
     /// <seealso cref="Fan"/>
+    [Live]
     public StaticModelCollection<Fan?> Fans { get; } = [];
 
     /// <summary>
@@ -42,6 +43,7 @@ public partial class ObjectModel : ModelObject, IStaticModelObject
     /// <summary>
     /// Information about the heat subsystem
     /// </summary>
+    [Live]
     public Heat Heat { get; } = new Heat();
 
     /// <summary>
@@ -52,6 +54,7 @@ public partial class ObjectModel : ModelObject, IStaticModelObject
     /// <summary>
     /// Information about the current job
     /// </summary>
+    [Live]
     public Job Job { get; } = new Job();
 
     /// <summary>
@@ -63,6 +66,7 @@ public partial class ObjectModel : ModelObject, IStaticModelObject
     /// <summary>
     /// Machine configuration limits
     /// </summary>
+    [Verbose]
     public Limits Limits { get; } = new Limits();
 
     /// <summary>
@@ -76,6 +80,7 @@ public partial class ObjectModel : ModelObject, IStaticModelObject
     /// <summary>
     /// Information about the move subsystem
     /// </summary>
+    [Live]
     public Move Move { get; } = new Move();
 
     /// <summary>
@@ -108,23 +113,27 @@ public partial class ObjectModel : ModelObject, IStaticModelObject
     /// <summary>
     /// Information about connected sensors including Z-probes and endstops
     /// </summary>
+    [Live]
     public Sensors Sensors { get; } = new Sensors();
     
     /// <summary>
     /// List of configured CNC spindles
     /// </summary>
     /// <seealso cref="Spindle"/>
+    [Live]
     public StaticModelCollection<Spindle?> Spindles { get; } = [];
     
     /// <summary>
     /// Information about the machine state
     /// </summary>
+    [Live]
     public State State { get; } = new State();
     
     /// <summary>
     /// List of configured tools
     /// </summary>
     /// <seealso cref="Tool"/>
+    [Live]
     public StaticModelCollection<Tool?> Tools { get; } = [];
 
     /// <summary>

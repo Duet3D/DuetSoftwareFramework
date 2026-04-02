@@ -8,6 +8,7 @@ public partial class Directories : ModelObject, IStaticModelObject
     /// <summary>
     /// Path to the filaments directory
     /// </summary>
+    [Verbose]
     public string Filaments
     {
         get => _filaments;
@@ -18,6 +19,7 @@ public partial class Directories : ModelObject, IStaticModelObject
     /// <summary>
     /// Path to the firmware directory
     /// </summary>
+    [Verbose]
     public string Firmware
     {
         get => _firmware;
@@ -28,6 +30,7 @@ public partial class Directories : ModelObject, IStaticModelObject
     /// <summary>
     /// Path to the G-Codes directory
     /// </summary>
+    [Verbose]
     public string GCodes
     {
         get => _gCodes;
@@ -38,6 +41,7 @@ public partial class Directories : ModelObject, IStaticModelObject
     /// <summary>
     /// Path to the macros directory
     /// </summary>
+    [Verbose]
     public string Macros
     {
         get => _macros;
@@ -51,6 +55,7 @@ public partial class Directories : ModelObject, IStaticModelObject
     /// <remarks>
     /// Intended for 12864 displays but currently unused in DSF. It is only needed for the Duet Maestro + DWC
     /// </remarks>
+    [Verbose]
     public string Menu
     {
         get => _menu;

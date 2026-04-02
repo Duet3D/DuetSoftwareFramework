@@ -276,6 +276,36 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     }
 
     /// <summary>
+    /// Query the object model using a key and flags, returning a response compatible with M409 format
+    /// </summary>
+    /// <param name="key">Object model key path (e.g. "heat", "move.axes")</param>
+    /// <param name="flags">RRF-compatible flags string (e.g. "f", "fn", "d99vn")</param>
+    /// <returns>JSON response</returns>
+    /// <exception cref="SocketException">Command could not be processed</exception>
+    /// <seealso cref="SbcPermissions.ObjectModelRead"/>
+    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+    public JsonElement QueryObjectModel(string key, string flags)
+    {
+        return PerformCommand<JsonElement>(new QueryObjectModel { Key = key, Flags = flags });
+    }
+
+    /// <summary>
+    /// Query the object model using a key and flags, returning a response compatible with M409 format
+    /// </summary>
+    /// <param name="key">Object model key path (e.g. "heat", "move.axes")</param>
+    /// <param name="flags">RRF-compatible flags string (e.g. "f", "fn", "d99vn")</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>JSON response</returns>
+    /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+    /// <exception cref="SocketException">Command could not be processed</exception>
+    /// <seealso cref="SbcPermissions.ObjectModelRead"/>
+    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+    public async Task<JsonElement> QueryObjectModelAsync(string key, string flags, CancellationToken cancellationToken = default)
+    {
+        return await PerformCommandAsync<JsonElement>(new QueryObjectModel { Key = key, Flags = flags }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Optimized method to directly query the machine model JSON
     /// </summary>
     /// <returns>Machine model JSON</returns>

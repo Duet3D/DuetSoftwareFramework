@@ -30,7 +30,6 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="eventLogger">Event logger</param>
 /// <param name="fileInfoParser">File info parser</param>
 /// <param name="filePathResolver">File path resolver</param>
-/// <param name="filter">Filter for JSON queries</param>
 /// <param name="diagnosticsProvider">Diagnostics provider</param>
 /// <param name="jobProcessor">Job processor</param>
 /// <param name="linkInterface">Link interface</param>
@@ -47,7 +46,6 @@ public class MCodeHandler(
     EventLogger eventLogger,
     FileInfoParser fileInfoParser,
     FilePathResolver filePathResolver,
-    Filter filter,
     LinkInterface linkInterface,
     Model.ObjectModel model,
     MQTT mqtt,
@@ -701,11 +699,6 @@ public class MCodeHandler(
             // Query object model
             case 409:
                 {
-                    if (code.TryGetInt('I', out int iVal) && iVal > 0)
-                    {
-                        return new Message(MessageType.Error, "M409 I1 is reserved for internal purposes only");
-                    }
-
                     if (code.TryGetString('K', out string? key) && (!code.TryGetInt('R', out int rParam) || rParam == 0))
                     {
                         string trimmedKey = key.TrimStart('#');
@@ -721,52 +714,14 @@ public class MCodeHandler(
                             throw new OperationCanceledException();
                         }
 
-                        // Retrieve filtered OM data
+                        // Query the object model using the new command
                         code.TryGetString('F', out string? flags);
-                        bool includeNulls = flags is not null && flags.Contains('n');
-                        JsonSerializerOptions jsonOptions = includeNulls ? JsonHelper.DefaultJsonOptions : JsonHelper.NoNullJsonOptions;
-                        using JsonDocument queryResult = JsonSerializer.SerializeToDocument(filter.GetFiltered(key + ".**"), jsonOptions);
+                        Commands.QueryObjectModel queryCommand = commandFactory.Create<Commands.QueryObjectModel>();
+                        queryCommand.Key = key;
+                        queryCommand.Flags = flags ?? string.Empty;
+                        JsonElement queryResult = await queryCommand.ExecuteAsync(cancellationToken);
 
-                        // Get down to the requested depth
-                        JsonElement result = queryResult.RootElement;
-                        if (key is not null)
-                        {
-                            foreach (string depth in key.Split('.'))
-                            {
-                                if (result.ValueKind == JsonValueKind.Object)
-                                {
-                                    foreach (var subItem in result.EnumerateObject())
-                                    {
-                                        result = subItem.Value;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        // Generate final OM response
-                        object finalResult;
-                        if (result.ValueKind == JsonValueKind.Array)
-                        {
-                            finalResult = new
-                            {
-                                key,
-                                flags = flags ?? string.Empty,
-                                result,
-                                next = 0
-                            };
-                        }
-                        else
-                        {
-                            finalResult = new
-                            {
-                                key,
-                                flags = flags ?? string.Empty,
-                                result
-                            };
-                        }
-
-                        string json = JsonSerializer.Serialize(finalResult, jsonOptions);
+                        string json = queryResult.GetRawText();
                         return new Message(MessageType.Success, (code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," + json[1..] : json);
                     }
                     else

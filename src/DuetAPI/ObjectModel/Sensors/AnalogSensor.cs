@@ -38,6 +38,7 @@ public partial class AnalogSensor : ModelObject, IStaticModelObject
     /// <summary>
     /// Last sensor reading (in C) or null if invalid
     /// </summary>
+    [Live]
     public float? LastReading
     {
         get => _lastReading;

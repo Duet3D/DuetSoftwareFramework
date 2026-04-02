@@ -8,6 +8,7 @@ public partial class Heater : ModelObject, IStaticModelObject
     /// <summary>
     /// Active temperature of the heater (in C)
     /// </summary>
+    [Live]
     public float Active
     {
         get => _active;
@@ -18,6 +19,7 @@ public partial class Heater : ModelObject, IStaticModelObject
     /// <summary>
     /// Average heater PWM value (0..1)
     /// </summary>
+    [Live]
     public float AvgPwm
     {
         get => _avgPwm;
@@ -28,6 +30,7 @@ public partial class Heater : ModelObject, IStaticModelObject
     /// <summary>
     /// Current temperature of the heater (in C)
     /// </summary>
+    [Live]
     public float Current
     {
         get => _current;
@@ -134,6 +137,7 @@ public partial class Heater : ModelObject, IStaticModelObject
     /// <summary>
     /// Standby temperature of the heater (in C)
     /// </summary>
+    [Live]
     public float Standby
     {
         get => _standby;
@@ -144,6 +148,7 @@ public partial class Heater : ModelObject, IStaticModelObject
     /// <summary>
     /// State of the heater
     /// </summary>
+    [Live]
     public HeaterState State
     {
         get => _state;

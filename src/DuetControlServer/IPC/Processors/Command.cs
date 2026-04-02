@@ -30,6 +30,7 @@ public sealed class Command : IProcessor
         typeof(RemoveHttpEndpoint),
         typeof(CheckPassword),
         typeof(GetObjectModel),
+        typeof(QueryObjectModel),
         typeof(LockObjectModel),
         typeof(PatchObjectModel),
         typeof(SetObjectModel),

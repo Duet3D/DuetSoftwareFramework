@@ -1141,6 +1141,13 @@ public sealed class Processor
             {
                 code.Result.Append(type, reply);
             }
+
+            // Preserve the log level from the firmware reply flags
+            code.ReplyLogLevel = (flags & MessageTypeFlags.LogOff) == MessageTypeFlags.LogOff ? EventLogLevel.Off
+                : flags.HasFlag(MessageTypeFlags.LogWarn) ? EventLogLevel.Warn
+                : flags.HasFlag(MessageTypeFlags.LogInfo) ? EventLogLevel.Info
+                : EventLogLevel.Debug;
+
             _codeProcessor.CodeCompleted(code);
         }
         else

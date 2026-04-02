@@ -28,6 +28,7 @@ public partial class Endstop : ModelObject, IStaticModelObject
     /// <summary>
     /// Whether or not the endstop is hit
     /// </summary>
+    [Live]
     public bool Triggered
     {
         get => _triggered;
