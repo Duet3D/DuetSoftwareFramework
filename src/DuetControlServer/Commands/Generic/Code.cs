@@ -66,6 +66,13 @@ namespace DuetControlServer.Commands
         }
 
         /// <summary>
+        /// Log level for the reply as specified by the firmware via MessageTypeFlags.
+        /// Null means no explicit level was set (DSF-internal code), in which case
+        /// the default behavior applies (Success: Info, Warning/Error: Warn)
+        /// </summary>
+        internal LogLevel? ReplyLogLevel { get; set; }
+
+        /// <summary>
         /// Cancellation token that may be used to cancel this code
         /// </summary>
         internal CancellationToken CancellationToken { get; set; }

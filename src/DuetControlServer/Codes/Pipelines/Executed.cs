@@ -69,7 +69,23 @@ namespace DuetControlServer.Codes.Pipelines
                     // so we only need to log internal code replies that are not part of file prints
                     if (code.File is null || !code.IsFromFileChannel)
                     {
-                        await Utility.Logger.LogAsync(code.Result);
+                        if (code.ReplyLogLevel is not null)
+                        {
+                            // Use the log level specified by the firmware
+                            await Utility.Logger.LogAsync(code.ReplyLogLevel.Value, code.Result);
+                        }
+                        else
+                        {
+                            await Utility.Logger.LogAsync(code.Result);
+                        }
+                    }
+                }
+                else if (code.ReplyLogLevel is not null and not LogLevel.Off)
+                {
+                    // Firmware-handled code with explicit log level - respect it
+                    if (code.File is null || !code.IsFromFileChannel)
+                    {
+                        await Utility.Logger.LogAsync(code.ReplyLogLevel.Value, code.Result);
                     }
                 }
 

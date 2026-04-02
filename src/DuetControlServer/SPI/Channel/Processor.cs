@@ -1060,6 +1060,13 @@ namespace DuetControlServer.SPI.Channel
                 {
                     code.Result.Append(type, reply);
                 }
+
+                // Preserve the log level from the firmware reply flags
+                code.ReplyLogLevel = (flags & MessageTypeFlags.LogOff) == MessageTypeFlags.LogOff ? LogLevel.Off
+                    : flags.HasFlag(MessageTypeFlags.LogWarn) ? LogLevel.Warn
+                    : flags.HasFlag(MessageTypeFlags.LogInfo) ? LogLevel.Info
+                    : LogLevel.Debug;
+
                 Codes.Processor.CodeCompleted(code);
             }
             else
