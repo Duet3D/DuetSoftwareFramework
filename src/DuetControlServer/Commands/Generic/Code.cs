@@ -143,10 +143,10 @@ namespace DuetControlServer.Commands
         public override async Task<Message?> Execute()
         {
             // Assign a cancellation token when the execution starts.
-            // Prioritized firmware codes use the application cancellation token so they survive channel resets (e.g. emergency stop)
+            // Prioritized codes use the application cancellation token so they survive channel resets (e.g. emergency stop)
             if (CancellationToken == default)
             {
-                if (Flags.HasFlag(CodeFlags.IsFromFirmware | CodeFlags.IsPrioritized))
+                if (Flags.HasFlag(CodeFlags.IsPrioritized))
                 {
                     CancellationToken = Program.CancellationToken;
                 }
