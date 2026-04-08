@@ -702,7 +702,8 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
             _file2?.Close();
 
             IsCancelled = IsPaused;
-            Resume();
+            IsPaused = false;
+            _resume.NotifyAll();
         }
     }
 
@@ -722,7 +723,8 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
             _file2?.Close();
 
             IsAborted = true;
-            Resume();
+            IsPaused = false;
+            _resume.NotifyAll();
         }
     }
 
