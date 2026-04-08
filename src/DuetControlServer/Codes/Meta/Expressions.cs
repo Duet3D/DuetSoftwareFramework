@@ -348,7 +348,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
         }
 
         // Check for special variables
-        if (expression == "iterations" || expression == "line" || expression == "result")
+        if (expression == "iterations" || expression == "line")
         {
             return true;
         }
