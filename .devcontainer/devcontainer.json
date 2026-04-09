@@ -1,0 +1,20 @@
+{
+  "name": "DuetSoftwareFramework Dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "root",
+  "updateRemoteUserUID": false,
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.csdevkit",
+        "editorconfig.editorconfig"
+      ]
+    }
+  },
+  "postCreateCommand": "dotnet --info && cd src && dotnet restore DuetSoftwareFramework.sln",
+  "postStartCommand": "echo 'Ready: run make build or cd src && dotnet build DuetSoftwareFramework.sln'"
+}

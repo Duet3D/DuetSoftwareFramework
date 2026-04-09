@@ -1,0 +1,147 @@
+{
+    "version": "2.0.0",
+    "inputs": [
+        {
+            "id": "ip_address",
+            "type": "promptString",
+            "description": "IP address of SBC to deploy to"
+        }
+    ],
+    "tasks": [
+        {
+            "label": "Make Build Directory",
+            "command": "mkdir -p build",
+            "type": "shell",
+            "args": [],
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent"
+            }
+        },
+        {
+            "label": "Build CodeConsole",
+            "type": "shell",
+            "command": "dotnet build -r linux-arm --self-contained ./src/CodeConsole -o ./build",
+            "args": [],
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "dependsOn": "Make Build Directory",
+        },
+        {
+            "label": "Build CodeLogger",
+            "type": "shell",
+            "command": "dotnet build -r linux-arm --self-contained ./src/CodeLogger -o ./build",
+            "args": [],
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "dependsOn": "Make Build Directory",
+        },
+        {
+            "label": "Build CodeStream",
+            "type": "shell",
+            "command": "dotnet build -r linux-arm --self-contained ./src/CodeStream -o ./build",
+            "args": [],
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "dependsOn": "Make Build Directory",
+        },
+        {
+            "label": "Build CustomHttpEndpoint",
+            "type": "shell",
+            "command": "dotnet build -r linux-arm --self-contained ./src/CustomHttpEndpoint -o ./build",
+            "args": [],
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "dependsOn": "Make Build Directory",
+        },
+        {
+            "label": "Build DuetControlServer",
+            "type": "shell",
+            "command": "dotnet build -r linux-arm --self-contained ./src/DuetControlServer -o ./build",
+            "args": [],
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "dependsOn": "Make Build Directory",
+        },
+        {
+            "label": "Build DuetPiManagementPlugin",
+            "type": "shell",
+            "command": "dotnet build -r linux-arm --self-contained ./src/DuetPiManagementPlugin -o ./build",
+            "args": [],
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "dependsOn": "Make Build Directory",
+        },
+        {
+            "label": "Build DuetPluginService",
+            "type": "shell",
+            "command": "dotnet build -r linux-arm --self-contained ./src/DuetPluginService -o ./build",
+            "args": [],
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "dependsOn": "Make Build Directory",
+        },
+        {
+            "label": "Build DuetWebServer",
+            "type": "shell",
+            "command": "dotnet build -r linux-arm --self-contained ./src/DuetWebServer -o ./build",
+            "args": [],
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "dependsOn": "Make Build Directory",
+        },
+        {
+            "label": "Build ModelObserver",
+            "type": "shell",
+            "command": "dotnet build -r linux-arm --self-contained ./src/ModelObserver -o ./build",
+            "args": [],
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "dependsOn": "Make Build Directory",
+        },
+        {
+            "label": "Build PluginManager",
+            "type": "shell",
+            "command": "dotnet build -r linux-arm --self-contained ./src/PluginManager -o ./build",
+            "args": [],
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "dependsOn": "Make Build Directory",
+        },
+        {
+            "label": "Build All",
+            "type": "shell",
+            "command": "echo Build Complete",
+            "args": [],
+            "problemMatcher": [],
+            "dependsOn": [
+                "Build CodeConsole",
+                "Build CodeLogger",
+                "Build CodeStream",
+                "Build CustomHttpEndpoint",
+                "Build DuetControlServer",
+                "Build DuetPiManagementPlugin",
+                "Build DuetPluginService",
+                "Build DuetWebServer",
+                "Build ModelObserver",
+                "Build PluginManager"
+            ],
+        },
+        {
+            "label": "Deploy To",
+            "type": "shell",
+            "command": "ssh root@${input:ip_address} 'systemctl stop duetcontrolserver duetwebserver' && scp -r ./build/ root@${input:ip_address}:/opt/dsf/bin/ && ssh root@${input:ip_address} 'systemctl start duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
+            "problemMatcher": []
+        }
+    ]
+}
