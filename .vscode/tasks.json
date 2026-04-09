@@ -20,6 +20,9 @@
             "type": "shell",
             "args": [],
             "problemMatcher": [],
+            "runOptions": {
+                "instanceLimit": 1
+            }
         },
         {
             "label": "Make Build Directory",
@@ -27,6 +30,9 @@
             "type": "shell",
             "args": [],
             "problemMatcher": [],
+            "runOptions": {
+                "instanceLimit": 1
+            },
             "presentation": {
                 "reveal": "silent"
             }
@@ -39,6 +45,9 @@
             "problemMatcher": [
                 "$msCompile"
             ],
+            "runOptions": {
+                "instanceLimit": 1
+            },
             "dependsOn": "Make Build Directory",
         },
         {
@@ -49,6 +58,9 @@
             "problemMatcher": [
                 "$msCompile"
             ],
+            "runOptions": {
+                "instanceLimit": 1
+            },
             "dependsOn": "Make Build Directory",
         },
         {
@@ -59,6 +71,9 @@
             "problemMatcher": [
                 "$msCompile"
             ],
+            "runOptions": {
+                "instanceLimit": 1
+            },
             "dependsOn": "Make Build Directory",
         },
         {
@@ -69,6 +84,9 @@
             "problemMatcher": [
                 "$msCompile"
             ],
+            "runOptions": {
+                "instanceLimit": 1
+            },
             "dependsOn": "Make Build Directory",
         },
         {
@@ -79,6 +97,9 @@
             "problemMatcher": [
                 "$msCompile"
             ],
+            "runOptions": {
+                "instanceLimit": 1
+            },
             "dependsOn": "Make Build Directory",
         },
         {
@@ -89,6 +110,9 @@
             "problemMatcher": [
                 "$msCompile"
             ],
+            "runOptions": {
+                "instanceLimit": 1
+            },
             "dependsOn": "Make Build Directory",
         },
         {
@@ -99,6 +123,9 @@
             "problemMatcher": [
                 "$msCompile"
             ],
+            "runOptions": {
+                "instanceLimit": 1
+            },
             "dependsOn": "Make Build Directory",
         },
         {
@@ -109,6 +136,9 @@
             "problemMatcher": [
                 "$msCompile"
             ],
+            "runOptions": {
+                "instanceLimit": 1
+            },
             "dependsOn": "Make Build Directory",
         },
         {
@@ -119,6 +149,9 @@
             "problemMatcher": [
                 "$msCompile"
             ],
+            "runOptions": {
+                "instanceLimit": 1
+            },
             "dependsOn": "Make Build Directory",
         },
         {
@@ -129,6 +162,9 @@
             "problemMatcher": [
                 "$msCompile"
             ],
+            "runOptions": {
+                "instanceLimit": 1
+            },
             "dependsOn": "Make Build Directory",
         },
         {
@@ -150,6 +186,9 @@
                 "Build ModelObserver",
                 "Build PluginManager"
             ],
+            "runOptions": {
+                "instanceLimit": 1
+            },
             "dependsOrder": "sequence"
         },
         {
@@ -161,8 +200,14 @@
         {
             "label": "Deploy To",
             "type": "shell",
-            "command": "ssh root@${input:ip_address} 'systemctl stop duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root' && rsync -rav --delete ./build/ root@${input:ip_address}:/opt/dsf/bin/ && ssh root@${input:ip_address} 'systemctl start duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
-            "problemMatcher": []
+            "command": "rsync -rav --delete ./build/ root@${input:ip_address}:/opt/dsf/bin/ && ssh root@${input:ip_address} 'systemctl start duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
+            "problemMatcher": [],
+            "runOptions": {
+                "instanceLimit": 1
+            },
+            "dependsOn": [
+                "Stop DSF Services"
+            ],
         },
         {
             "label": "Build and Deploy",
@@ -174,7 +219,31 @@
                 "Build All",
                 "Deploy To"
             ],
+            "runOptions": {
+                "instanceLimit": 1
+            },
             "dependsOrder": "sequence"
+        },
+        {
+            "label": "Stop DSF Services",
+            "type": "shell",
+            "command": "ssh root@${input:ip_address} 'systemctl stop duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
+            "problemMatcher": [],
+            "runOptions": {
+                "instanceLimit": 1
+            },
+            "presentation": {
+                "reveal": "silent"
+            }
+        },
+        {
+            "label": "Restart DSF Services",
+            "type": "shell",
+            "command": "ssh root@${input:ip_address} 'systemctl restart duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
+            "problemMatcher": [],
+            "runOptions": {
+                "instanceLimit": 1
+            }
         }
     ]
 }
