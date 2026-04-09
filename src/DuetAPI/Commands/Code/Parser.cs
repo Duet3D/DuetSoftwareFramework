@@ -551,6 +551,13 @@ public partial class Code
                             result.KeywordArgument = string.Empty;
                             inKeywordArgument = true;
                         }
+                        else if (keyword == "exec")
+                        {
+                            result.Type = CodeType.Keyword;
+                            result.Keyword = KeywordType.Exec;
+                            result.KeywordArgument = string.Empty;
+                            inKeywordArgument = true;
+                        }
                         else if (!result.HasParameter(letter))
                         {
                             AddParameter(result, letter, value, false, unprecedentedParameter || isNumericParameter);

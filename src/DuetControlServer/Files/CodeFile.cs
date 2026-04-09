@@ -499,6 +499,7 @@ public class CodeFile(
                         return code;
 
                     case KeywordType.Echo:
+                    case KeywordType.Exec:
                     case KeywordType.Global:
                     case KeywordType.None:
                     case KeywordType.Set:
