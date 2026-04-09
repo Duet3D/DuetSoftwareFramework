@@ -1,0 +1,44 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "inputs": [
+        {
+            "id": "ip_address",
+            "type": "promptString",
+            "description": "IP address of SBC to deploy to"
+        },
+        {
+            "id": "ssh_user",
+            "type": "promptString",
+            "description": "SSH user for remote debug target",
+            "default": "root"
+        },
+        {
+            "id": "debugger_path",
+            "type": "promptString",
+            "description": "Path to vsdbg on remote target",
+            "default": "/root/vsdbg/vsdbg"
+        }
+    ],
+    "configurations": [
+        {
+            "name": "Attach Remote DuetControlServer",
+            "type": "coreclr",
+            "request": "attach",
+            "processName": "DuetControlServer",
+            "pipeTransport": {
+                "pipeCwd": "${workspaceFolder}",
+                "pipeProgram": "ssh",
+                "pipeArgs": [
+                    "-T",
+                    "${input:ssh_user}@${input:ip_address}"
+                ],
+                "debuggerPath": "${input:debugger_path}",
+                "quoteArgs": true
+            },
+            "justMyCode": false
+        }
+    ]
+}

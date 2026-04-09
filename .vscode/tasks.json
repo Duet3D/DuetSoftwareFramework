@@ -5,6 +5,12 @@
             "id": "ip_address",
             "type": "promptString",
             "description": "IP address of SBC to deploy to"
+        },
+        {
+            "id": "ssh_user",
+            "type": "promptString",
+            "description": "SSH user for remote target",
+            "default": "root"
         }
     ],
     "tasks": [
@@ -136,12 +142,31 @@
                 "Build ModelObserver",
                 "Build PluginManager"
             ],
+            "dependsOrder": "sequence"
+        },
+        {
+            "label": "Install vsdbg on Remote",
+            "type": "shell",
+            "command": "ssh -o StrictHostKeyChecking=no ${input:ssh_user}@${input:ip_address} 'mkdir -p ~/vsdbg && curl -fsSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l ~/vsdbg && ~/vsdbg/vsdbg --version'",
+            "problemMatcher": []
         },
         {
             "label": "Deploy To",
             "type": "shell",
-            "command": "ssh root@${input:ip_address} 'systemctl stop duetcontrolserver duetwebserver' && scp -r ./build/ root@${input:ip_address}:/opt/dsf/bin/ && ssh root@${input:ip_address} 'systemctl start duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
+            "command": "ssh root@${input:ip_address} 'systemctl stop duetcontrolserver duetwebserver' && rsync -ruv ./build/* root@${input:ip_address}:/opt/dsf/bin/ && ssh root@${input:ip_address} 'systemctl start duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
             "problemMatcher": []
+        },
+        {
+            "label": "Build and Deploy",
+            "type": "shell",
+            "command": "echo Build and Deploy Complete",
+            "args": [],
+            "problemMatcher": [],
+            "dependsOn": [
+                "Build All",
+                "Deploy To"
+            ],
+            "dependsOrder": "sequence"
         }
     ]
 }
