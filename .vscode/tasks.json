@@ -174,7 +174,6 @@
             "args": [],
             "problemMatcher": [],
             "dependsOn": [
-                "Clean Build Directory",
                 "Build CodeConsole",
                 "Build CodeLogger",
                 "Build CodeStream",

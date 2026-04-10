@@ -7,6 +7,7 @@ RUN apt-get update \
         ca-certificates \
         curl \
         git \
+        gnupg \
         jq \
         libxml2-utils \
         make \
@@ -14,4 +15,6 @@ RUN apt-get update \
         rsync \
         unzip \
         zip \
+        openssh-client \
+
     && rm -rf /var/lib/apt/lists/*
