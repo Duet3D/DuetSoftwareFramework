@@ -4,8 +4,6 @@
     "dockerfile": "Dockerfile",
     "context": ".."
   },
-  "remoteUser": "root",
-  "updateRemoteUserUID": false,
   "customizations": {
     "vscode": {
       "extensions": [
@@ -16,5 +14,5 @@
     }
   },
   "postCreateCommand": "dotnet --info && cd src && dotnet restore DuetSoftwareFramework.sln",
-  "postStartCommand": "echo 'Ready: run make build or cd src && dotnet build DuetSoftwareFramework.sln'"
+  "postStartCommand": "echo 'Ready: run the `Build and Deploy` task or `cd src && dotnet build DuetSoftwareFramework.sln`'"
 }
