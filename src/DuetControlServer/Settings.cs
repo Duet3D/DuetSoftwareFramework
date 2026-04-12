@@ -83,6 +83,7 @@ public sealed class Settings
     /// <summary>
     /// Minimum log level for console output
     /// </summary>
+    [JsonConverter(typeof(LogLevelJsonConverter))]
     public LogLevel LogLevel { get; set; } = LogLevel.Information;
 
     /// <summary>
@@ -154,10 +155,10 @@ public sealed class Settings
     public string CommunicationMethod { get; set; } = "spi";
 
     /// <summary>
-    /// SPI Tx and Rx buffer size
-    /// Should not be greater than the kernel spidev buffer size
+    /// Tx and Rx buffer size for SBC protocol transfers.
+    /// Only respected in SPI mode and must not exceed the kernel spidev buffer size
     /// </summary>
-    public int SpiBufferSize { get; set; } = Link.Protocol.Shared.Consts.BufferSize;
+    public int SbcBufferSize { get; set; } = Link.Protocol.Shared.Consts.BufferSize;
 
     /// <summary>
     /// SPI Transfer Mode 0-3
@@ -170,24 +171,24 @@ public sealed class Settings
     public int SpiFrequency { get; set; } = 8_000_000;
 
     /// <summary>
-    /// Maximum allowed time when waiting for the first SPI transfer (in ms)
+    /// Maximum allowed time when waiting for the first transfer (in ms)
     /// </summary>
-    public int SpiConnectTimeout { get; set; } = 500;
+    public int SbcConnectTimeout { get; set; } = 500;
 
     /// <summary>
     /// Maximum allowed delay between data exchanges during a full transfer (in ms)
     /// </summary>
-    public int SpiTransferTimeout { get; set; } = 500;
+    public int SbcTransferTimeout { get; set; } = 500;
 
     /// <summary>
     /// Maximum allowed delay between full transfers (in ms)
     /// </summary>
-    public int SpiConnectionTimeout { get; set; } = 4000;
+    public int SbcConnectionTimeout { get; set; } = 4000;
 
     /// <summary>
     /// Maximum number of sequential transfer retries
     /// </summary>
-    public int MaxSpiRetries { get; set; } = 3;
+    public int MaxSbcRetries { get; set; } = 3;
 
     /// <summary>
     /// Path to the GPIO chip device node
@@ -200,14 +201,9 @@ public sealed class Settings
     public int TransferReadyPin { get; set; } = 25;      // Pin 22 on the RaspPi expansion header
 
     /// <summary>
-    /// USB device that is connected to RepRapFirmware (e.g., /dev/ttyACM0)
+    /// USB device that is connected to RepRapFirmware (e.g., /dev/ttyACM1)
     /// </summary>
-    public string UsbDevice { get; set; } = "/dev/ttyACM0";
-
-    /// <summary>
-    /// Baud rate for USB serial communication
-    /// </summary>
-    public int UsbBaudRate { get; set; } = 115200;
+    public string UsbDevice { get; set; } = "/dev/ttyACM1";
 
     /// <summary>
     /// Read timeout for USB serial communication in milliseconds
@@ -410,7 +406,8 @@ public sealed class Settings
         JsonSerializer.Serialize(fileStream, this, new JsonSerializerOptions()
         {
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-            WriteIndented = true
+            WriteIndented = true,
+            Converters = { new RegexJsonConverter() }
         });
     }
 }
@@ -462,10 +459,31 @@ public static class ServiceCollectionExtensions
             {
                 settings.UpdateOnly = updateOnly;
                 settings.LogLevel = logLevel ?? parsedLogLevel;
-                if (configFile != null) settings.ConfigFile = configFile.FullName;
-                if (socketDirectory != null) settings.SocketDirectory = socketDirectory.FullName;
-                if (socketFile != null) settings.SocketFile = socketFile;
-                if (baseDirectory != null) settings.BaseDirectory = baseDirectory.FullName;
+                if (configFile != null)
+                {
+                    settings.ConfigFile = configFile.FullName;
+                }
+                if (socketDirectory != null)
+                {
+                    settings.SocketDirectory = socketDirectory.FullName;
+                }
+                if (socketFile != null)
+                {
+                    // Accept either a bare filename or a full path (CLI advertises the latter)
+                    if (Path.IsPathRooted(socketFile))
+                    {
+                        settings.SocketDirectory = Path.GetDirectoryName(socketFile)!;
+                        settings.SocketFile = Path.GetFileName(socketFile);
+                    }
+                    else
+                    {
+                        settings.SocketFile = socketFile;
+                    }
+                }
+                if (baseDirectory != null)
+                {
+                    settings.BaseDirectory = baseDirectory.FullName;
+                }
                 settings.PostConfigure();
             });
     }

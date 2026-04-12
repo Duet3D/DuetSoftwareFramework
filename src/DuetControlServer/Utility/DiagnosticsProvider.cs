@@ -85,7 +85,8 @@ public sealed class DiagnosticsProvider(ILogger<DiagnosticsProvider> logger, ISe
                 }
                 else
                 {
-                    logger.LogWarning("Type {Type} implements IDiagnostics but failed to retrieve corresponding service", type);
+                    // This is expected when only one link adapter is registered (e.g. USB vs SPI)
+                    logger.LogTrace("Type {Type} implements IDiagnostics but failed to retrieve corresponding service", type);
                 }
             }
             else if (type != typeof(IAsyncDiagnostics) && typeof(IAsyncDiagnostics).IsAssignableFrom(type))

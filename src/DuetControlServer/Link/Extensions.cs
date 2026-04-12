@@ -27,11 +27,6 @@ public static partial class ServiceCollectionExtensions
     /// <returns>Service collection</returns>
     public static IServiceCollection AddLinkAdapter(this IServiceCollection services)
     {
-        // Register both adapters (for diagnostics discovery)
-        services
-            .AddSingleton<Adapter.USB>()
-            .AddSingleton<Adapter.SPI>();
-
         // Determine which communication method to use
         var serviceProvider = services.BuildServiceProvider();
         var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Settings>>().Value;
@@ -39,6 +34,7 @@ public static partial class ServiceCollectionExtensions
         if (settings.CommunicationMethod.Equals("usb", StringComparison.OrdinalIgnoreCase))
         {
             return services
+                .AddSingleton<Adapter.USB>()
                 .AddSingleton<Adapter.ILinkAdapter, Adapter.USB>(services => services.GetRequiredService<Adapter.USB>())
                 .AddSingleton<IDiagnostics, Adapter.USB>(services => services.GetRequiredService<Adapter.USB>())
                 .AddSingleton<LinkInterface>()
@@ -47,6 +43,7 @@ public static partial class ServiceCollectionExtensions
         else
         {
             return services
+                .AddSingleton<Adapter.SPI>()
                 .AddSingleton<Adapter.ILinkAdapter, Adapter.SPI>(services => services.GetRequiredService<Adapter.SPI>())
                 .AddSingleton<IDiagnostics, Adapter.SPI>(services => services.GetRequiredService<Adapter.SPI>())
                 .AddSingleton<LinkInterface>()

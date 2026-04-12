@@ -88,7 +88,7 @@ public class SPI : IDiagnostics, ILinkAdapter
         _model = model;
         _logger = logger;
         _settings = settings.Value;
-        _bufferSize = settings.Value.SpiBufferSize;
+        _bufferSize = settings.Value.SbcBufferSize;
         _rxBuffer = new byte[_bufferSize];
 
         // Initialize TX header. This only needs to happen once
@@ -151,6 +151,7 @@ public class SPI : IDiagnostics, ILinkAdapter
 
         // Perform the first transfer
         PerformFullTransfer(true, cancellationToken);
+        _logger.LogInformation("Connected to controller over SPI");
     }
 
     /// <summary>
@@ -270,7 +271,7 @@ public class SPI : IDiagnostics, ILinkAdapter
             try
             {
                 // Don't retry forever
-                if (retry > _settings.MaxSpiRetries)
+                if (retry > _settings.MaxSbcRetries)
                 {
                     throw new OperationCanceledException("Maximum number of SPI transfer retries exceeded");
                 }
@@ -974,14 +975,17 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <summary>
     /// Instruct the firmware to start the IAP binary
     /// </summary>
+    /// <param name="firmwareLength">Firmware length (unused by SPI IAP but present for interface parity with USB)</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
-    public void StartIap(CancellationToken cancellationToken = default)
+    public void StartIap(uint firmwareLength, CancellationToken cancellationToken = default)
     {
+        _ = firmwareLength;
+
         // Tell the firmware to boot the IAP program
         WritePacket(Protocol.SbcRequests.Request.StartIap);
         PerformFullTransfer(cancellationToken: cancellationToken);
 
-        // Wait for the first transfer.
+        // Wait for the first transfer
         // The IAP firmware will pull the transfer ready pin to high when it is ready to receive data
         _waitingForFirstTransfer = _updating = true;
     }
@@ -991,7 +995,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// </summary>
     /// <param name="stream">Stream of the firmware binary</param>
     /// <returns>Whether another segment could be sent</returns>
-    public bool FlashFirmwareSegment(Stream stream, CancellationToken cancellationToken = default)
+    public bool FlashFirmwareSegment(Stream stream)
     {
         Span<byte> readBuffer = stackalloc byte[Consts.FirmwareSegmentSize];
         Span<byte> writeBuffer = stackalloc byte[Consts.FirmwareSegmentSize];
@@ -1008,7 +1012,7 @@ public class SPI : IDiagnostics, ILinkAdapter
             writeBuffer[bytesRead..].Fill(0xFF);
         }
 
-        WaitForTransfer(cancellationToken: cancellationToken);
+        WaitForTransfer();
         _spiDevice.TransferFullDuplex(writeBuffer, readBuffer);
         return true;
     }
@@ -1019,10 +1023,10 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <param name="firmwareLength">Length of the written firmware in bytes</param>
     /// <param name="crc16">CRC16 checksum of the firmware</param>
     /// <returns>Whether the firmware has been written successfully</returns>
-    public bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16, CancellationToken cancellationToken = default)
+    public bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16)
     {
         // At this point IAP expects another segment so wait for it to be ready first. After that, wait a moment for IAP to acknowledge we're done
-        WaitForTransfer(cancellationToken: cancellationToken);
+        WaitForTransfer();
         Thread.Sleep(Consts.FirmwareFinishedDelay);
 
         // Send the final firmware size plus CRC16 checksum to IAP
@@ -1033,7 +1037,7 @@ public class SPI : IDiagnostics, ILinkAdapter
         };
         Span<byte> transferData = stackalloc byte[Marshal.SizeOf<Protocol.SbcRequests.FlashVerify>()];
         MemoryMarshal.Write(transferData, verifyRequest);
-        WaitForTransfer(cancellationToken: cancellationToken);
+        WaitForTransfer();
         _spiDevice.TransferFullDuplex(transferData, transferData);
 
         // Check if the IAP can confirm our CRC16 checksum
@@ -1046,10 +1050,10 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <summary>
     /// Wait for the IAP program to reset the controller
     /// </summary>
-    public void WaitForIapReset(CancellationToken cancellationToken = default)
+    public void WaitForIapReset()
     {
         // Wait a moment for the firmware to start
-        Task.Delay(Consts.IapRebootDelay, cancellationToken).Wait(cancellationToken);
+        Thread.Sleep(Consts.IapRebootDelay);
 
         // Wait for the first data transfer from the firmware
         _updating = _connected = false;
@@ -1516,12 +1520,12 @@ public class SPI : IDiagnostics, ILinkAdapter
             int timeout;
             if (_waitingForFirstTransfer)
             {
-                timeout = _updating ? Consts.IapTimeout : _settings.SpiConnectTimeout;
+                timeout = _updating ? Consts.IapTimeout : _settings.SbcConnectTimeout;
                 _expectedTfrRdyPinValue = PinValue.High;
             }
             else
             {
-                timeout = _updating ? Consts.IapTimeout : (inTransfer ? _settings.SpiTransferTimeout : _settings.SpiConnectionTimeout);
+                timeout = _updating ? Consts.IapTimeout : (inTransfer ? _settings.SbcTransferTimeout : _settings.SbcConnectionTimeout);
             }
 
             // Wait for the expected pin level, ignoring glitches
@@ -1625,7 +1629,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True on success</returns>
     private bool ExchangeHeader()
     {
-        for (int retry = 0; retry < _settings.MaxSpiRetries; retry++)
+        for (int retry = 0; retry < _settings.MaxSbcRetries; retry++)
         {
             // Perform SPI header exchange
             WaitForTransfer(false);
@@ -1815,7 +1819,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     private bool ExchangeData()
     {
         int bytesToTransfer = Math.Max(_rxHeader.DataLength, _txPointer);
-        for (int retry = 0; retry < _settings.MaxSpiRetries; retry++)
+        for (int retry = 0; retry < _settings.MaxSbcRetries; retry++)
         {
             WaitForTransfer();
             _spiDevice.TransferFullDuplex(_txBuffer.Value[..bytesToTransfer].Span, _rxBuffer[..bytesToTransfer].Span);
@@ -1892,7 +1896,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True when done</returns>
     private bool ExchangeDataResponse(out bool success)
     {
-        for (int retry = 0; retry < _settings.MaxSpiRetries; retry++)
+        for (int retry = 0; retry < _settings.MaxSbcRetries; retry++)
         {
             uint responseCode = ExchangeResponse(TransferResponse.Success);
             switch (responseCode)

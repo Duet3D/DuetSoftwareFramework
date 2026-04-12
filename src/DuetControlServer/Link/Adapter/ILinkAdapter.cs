@@ -203,31 +203,29 @@ public interface ILinkAdapter
     /// <summary>
     /// Instruct the firmware to start the IAP binary
     /// </summary>
+    /// <param name="firmwareLength">Length of the firmware binary in bytes (used by USB IAP for end-of-transfer detection; ignored by SPI)</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    void StartIap(CancellationToken cancellationToken = default);
+    void StartIap(uint firmwareLength, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Flash another segment of the firmware via the IAP binary
     /// </summary>
     /// <param name="stream">Stream of the firmware binary</param>
-    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Whether another segment could be sent</returns>
-    bool FlashFirmwareSegment(Stream stream, CancellationToken cancellationToken = default);
+    bool FlashFirmwareSegment(Stream stream);
 
     /// <summary>
     /// Send the CRC16 checksum of the firmware binary to the IAP program and verify the written data
     /// </summary>
     /// <param name="firmwareLength">Length of the written firmware in bytes</param>
     /// <param name="crc16">CRC16 checksum of the firmware</param>
-    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Whether the firmware has been written successfully</returns>
-    bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16, CancellationToken cancellationToken = default);
+    bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16);
 
     /// <summary>
     /// Wait for the IAP program to reset the controller
     /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    void WaitForIapReset(CancellationToken cancellationToken = default);
+    void WaitForIapReset();
 
     /// <summary>
     /// Request an emergency stop

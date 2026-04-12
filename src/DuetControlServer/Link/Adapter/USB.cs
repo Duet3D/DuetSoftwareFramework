@@ -7,13 +7,16 @@ using System.IO;
 using System.IO.Ports;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Logging;
+using System.ComponentModel.DataAnnotations;
 
 namespace DuetControlServer.Link.Adapter;
 
@@ -31,18 +34,19 @@ public class USB : IDiagnostics, ILinkAdapter
 
     // General transfer variables
     private readonly SerialPort _serialPort;
-    private bool _waitingForFirstTransfer = true, _connected, _hadTimeout, _resetting, _updating;
-    private ushort _lastTransferNumber;
+    private SerialPort? _iapSerialPort;
+    private bool _connected, _hadTimeout, _resetting, _updating, _needsReconnect;
+    private int _consecutiveFailures;
 
     private DateTime _lastTransferMeasureTime = DateTime.Now, _lastCodesMeasureTime = DateTime.Now;
     private volatile int _numMeasuredTransfers, _numMeasuredCodes, _maxRxSize, _maxTxSize;
     private TimeSpan _maxFullTransferDelay = TimeSpan.Zero;
 
     // Transfer headers
-    private readonly Memory<byte> _rxHeaderBuffer = new byte[Marshal.SizeOf<TransferHeader>()];
-    private readonly Memory<byte> _txHeaderBuffer = new byte[Marshal.SizeOf<TransferHeader>()];
-    private TransferHeader _rxHeader;
-    private TransferHeader _txHeader;
+    private readonly Memory<byte> _rxHeaderBuffer = new byte[Marshal.SizeOf<UsbTransferHeader>()];
+    private readonly Memory<byte> _txHeaderBuffer = new byte[Marshal.SizeOf<UsbTransferHeader>()];
+    private UsbTransferHeader _rxHeader;
+    private UsbTransferHeader _txHeader;
     private byte _packetId;
 
     // Transfer data. Keep three TX buffers so resend requests can be processed
@@ -75,11 +79,8 @@ public class USB : IDiagnostics, ILinkAdapter
         _model = model;
         _logger = logger;
         _settings = settings.Value;
-        _bufferSize = settings.Value.SpiBufferSize;
+        _bufferSize = settings.Value.SbcBufferSize;
         _rxBuffer = new byte[_bufferSize];
-
-        // Initialize TX header. This only needs to happen once
-        Protocol.Writer.InitTransferHeader(ref _txHeader);
 
         // Initialize TX buffers
         for (int i = 0; i < NumTxBuffers; i++)
@@ -89,28 +90,89 @@ public class USB : IDiagnostics, ILinkAdapter
         _txBuffer = _txBuffers.First!;
 
         // Initialize serial port
-        _serialPort = new SerialPort(settings.Value.UsbDevice, settings.Value.UsbBaudRate, Parity.None, 8, StopBits.One)
+        _serialPort = new SerialPort(settings.Value.UsbDevice, 115200, Parity.None, 8, StopBits.One)
         {
             ReadTimeout = settings.Value.UsbReadTimeout,
             WriteTimeout = settings.Value.UsbWriteTimeout,
-            Handshake = Handshake.None
+            DtrEnable = true
         };
     }
 
     /// <summary>
-    /// Attempt to connect to the firmware
+    /// Attempt to connect to the firmware by sending M576.1 and parsing the init response
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
     public void Connect(CancellationToken cancellationToken = default)
     {
-        // Open the serial port
+        // Open the serial port or discard any pending data
         if (!_serialPort.IsOpen)
         {
             _serialPort.Open();
         }
+        else
+        {
+            _serialPort.DiscardInBuffer();
+            _serialPort.DiscardOutBuffer();
+        }
 
-        // Perform the first transfer
+        // Flush any stale partial command in RRF's input buffer, then drain responses
+        _serialPort.Write("\n");
+        Thread.Sleep(100);
+
+        // Send M576.1 to switch RRF to USB SBC mode
+        _logger.LogDebug("USB: Sending M576.1 P{Version}", Consts.ProtocolVersion);
+        _serialPort.Write($"M576.1 P{Consts.ProtocolVersion}\n");
+
+        // Read lines until we find the init response (skip boot messages and empty lines)
+        while (true)
+        {
+            string? statusLine = _serialPort.ReadLine();
+            if (string.IsNullOrWhiteSpace(statusLine))
+            {
+                continue;
+            }
+            if (statusLine.StartsWith("Switching to binary SBC mode", StringComparison.Ordinal))
+            {
+                break;
+            }
+            _logger.LogDebug("USB: Skipping line: {Line}", statusLine);
+        }
+
+        // Read init response line 2: JSON with protocol details and buffer sizes
+        string? jsonLine = _serialPort.ReadLine();
+        if (string.IsNullOrWhiteSpace(jsonLine))
+        {
+            throw new IOException("Missing protocol details in M576.1 response");
+        }
+
+        // Parse JSON: {"protocol":7,"rxBuffer":8192,"txBuffer":8192}
+        _logger.LogDebug("USB: Init JSON: {Json}", jsonLine);
+        using JsonDocument doc = JsonDocument.Parse(jsonLine);
+        JsonElement root = doc.RootElement;
+
+        int protocol = root.GetProperty("protocol").GetInt32();
+        if (protocol != Consts.ProtocolVersion)
+        {
+            throw new IOException($"Incompatible protocol version {protocol} (expected {Consts.ProtocolVersion})");
+        }
+        ProtocolVersion = protocol;
+
+        int rxBuffer = root.GetProperty("rxBuffer").GetInt32();
+        int txBuffer = root.GetProperty("txBuffer").GetInt32();
+        if (rxBuffer < _bufferSize || txBuffer < _bufferSize)
+        {
+            _logger.LogWarning("Firmware buffer sizes (rx={RxBuffer}, tx={TxBuffer}) are smaller than configured buffer size ({BufferSize})", rxBuffer, txBuffer, _bufferSize);
+        }
+
+        // Send handover packet to complete BeginDirectMode on the RRF side
+        // These 8 bytes are consumed by the CDC OUT completion hook and never
+        // reach DoTransferUsb - they just unblock BeginDirectMode
+        _serialPort.Write(new byte[8], 0, 8);
+        _serialPort.BaseStream.Flush();
+
+        // RRF is now in binary mode, start transfers
         PerformFullTransfer(true, cancellationToken);
+        _logger.LogInformation("Connected to controller over USB");
     }
 
     /// <summary>
@@ -169,7 +231,7 @@ public class USB : IDiagnostics, ILinkAdapter
             return;
         }
 
-        builder.AppendLine($"Configured USB baud rate: {_settings.UsbBaudRate}");
+        builder.AppendLine($"USB device: {_settings.UsbDevice}");
         builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}, max time between full transfers: {GetMaxFullTransferDelay():0.0}ms");
         builder.AppendLine($"Codes per second: {GetCodesPerSecond():F2}");
         builder.AppendLine($"Maximum length of RX/TX data transfers: {_maxRxSize}/{_maxTxSize}");
@@ -187,127 +249,147 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <param name="cancellationToken">Cancellation token to cancel the transfer</param>
     public void PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default)
     {
-        _lastTransferNumber = _rxHeader.SequenceNumber;
-
-        // Reset RX transfer header
-        _rxHeader.FormatCode = Consts.InvalidFormatCode;
-        _rxHeader.NumPackets = 0;
-        _rxHeader.ProtocolVersion = 0;
-        _rxHeader.DataLength = 0;
-        _rxHeader.ChecksumData32 = 0;
-        _rxHeader.ChecksumHeader32 = 0;
-
-        // Set up TX transfer header
-        _txHeader.NumPackets = _packetId;
-        _txHeader.SequenceNumber++;
-        _txHeader.DataLength = (ushort)_txPointer;
-        WriteCRC();
-
-        // Perform the transfer
-        int retry = 0;
-        while (!cancellationToken.IsCancellationRequested)
+        // Attempt reconnection if needed (but not during initial connection)
+        if (_needsReconnect && !connecting)
         {
             try
             {
-                // Don't retry forever
-                if (retry > _settings.MaxSpiRetries)
+                _logger.LogDebug("USB: Attempting reconnection...");
+                if (_serialPort.IsOpen)
+                {
+                    _serialPort.Close();
+                }
+                _txPointer = 0;
+                _packetId = 0;
+                _needsReconnect = false;
+                Connect(cancellationToken);
+                // Connect succeeded and performed the first transfer already
+                _consecutiveFailures = 0;
+                return;
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                _needsReconnect = true;
+                _connected = false;
+                _consecutiveFailures++;
+                if (_consecutiveFailures > _settings.MaxSbcRetries)
                 {
                     throw new OperationCanceledException("Maximum number of USB transfer retries exceeded");
                 }
-
-                // Keep track of the maximum times between regular full transfers
-                if (!connecting && !_waitingForFirstTransfer && _connected && !_hadTimeout && !_updating && !_resetting)
-                {
-                    if (_fullTransferStopwatch.IsRunning)
-                    {
-                        TimeSpan timeElapsed = _fullTransferStopwatch.Elapsed;
-                        if (timeElapsed > _maxFullTransferDelay)
-                        {
-                            _maxFullTransferDelay = timeElapsed;
-                        }
-                        _fullTransferStopwatch.Reset();
-                    }
-                    else
-                    {
-                        _fullTransferStopwatch.Start();
-                    }
-                }
-
-                // Exchange transfer headers
-                if (!ExchangeHeader())
-                {
-                    retry++;
-                    continue;
-                }
-
-                // Exchange data if there is anything to transfer
-                if ((_rxHeader.DataLength != 0 || _txPointer != 0) && !ExchangeData())
-                {
-                    retry++;
-                    continue;
-                }
-
-                // Verify the protocol version
-                ProtocolVersion = _rxHeader.ProtocolVersion;
-                if ((_hadTimeout || !_connected) && ProtocolVersion != Consts.ProtocolVersion)
-                {
-                    _eventLogger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
-                }
-
-                // Deal with timeouts and the first transmission
-                if (_hadTimeout)
-                {
-                    _eventLogger.LogOutput(MessageType.Success, "Connection to Duet established");
-                    _hadTimeout = _resetting = false;
-                }
-                else if (!_connected)
-                {
-                    _lastTransferNumber = (ushort)(_rxHeader.SequenceNumber - 1);
-                }
-                _connected = true;
-
-                // Transfer OK
-                _numMeasuredTransfers++;
-                if (_maxRxSize < _rxHeader.DataLength)
-                {
-                    _maxRxSize = _rxHeader.DataLength;
-                }
-                if (_maxTxSize < _txHeader.DataLength)
-                {
-                    _maxTxSize = _txHeader.DataLength;
-                }
-                _txBuffer = _txBuffer.Next ?? _txBuffers.First!;
-                _rxPointer = _txPointer = 0;
-                _packetId = 0;
-                break;
+                _logger.LogDebug("USB: Reconnection failed ({Error}), will retry ({Attempt}/{Max})", ex.Message, _consecutiveFailures, _settings.MaxSbcRetries);
+                Thread.Sleep(500);
+                return;
             }
-            catch (OperationCanceledException e)
+        }
+
+        // Reset RX transfer header
+        _rxHeader.NumPackets = 0;
+        _rxHeader.DataLength = 0;
+
+        // Set up TX transfer header
+        _txHeader.NumPackets = _packetId;
+        _txHeader.DataLength = (ushort)_txPointer;
+
+        try
+        {
+            // Keep track of the maximum times between regular full transfers
+            if (!connecting && _connected && !_hadTimeout && !_updating && !_resetting)
             {
-                if (connecting || cancellationToken.IsCancellationRequested)
+                if (_fullTransferStopwatch.IsRunning)
                 {
-                    throw;
+                    TimeSpan timeElapsed = _fullTransferStopwatch.Elapsed;
+                    if (timeElapsed > _maxFullTransferDelay)
+                    {
+                        _maxFullTransferDelay = timeElapsed;
+                    }
+                    _fullTransferStopwatch.Reset();
                 }
-
-                _logger.LogDebug(e, "Lost connection to Duet");
-                _txHeader.ProtocolVersion = Consts.ProtocolVersion;
-                _waitingForFirstTransfer = true;
-
-                if (!_hadTimeout && _connected)
+                else
                 {
-                    _hadTimeout = true;
-                    _model.ConnectionLost();
-                    _eventLogger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({e.Message})");
+                    _fullTransferStopwatch.Start();
                 }
-                _connected = false;
+            }
+
+            // Exchange transfer headers
+            ExchangeHeader();
+
+            // Validate data length
+            if (_rxHeader.DataLength > _bufferSize)
+            {
+                throw new IOException($"Received data too long ({_rxHeader.DataLength} bytes, max {_bufferSize})");
+            }
+
+            // Exchange data if there is anything to transfer
+            if (_rxHeader.DataLength != 0 || _txPointer != 0)
+            {
+                ExchangeData();
+            }
+
+            // Deal with timeouts
+            if (_hadTimeout)
+            {
+                _eventLogger.LogOutput(MessageType.Success, "Connection to Duet established");
+                _hadTimeout = _resetting = false;
+            }
+            _connected = true;
+
+            // Transfer OK
+            _consecutiveFailures = 0;
+            _numMeasuredTransfers++;
+            if (_maxRxSize < _rxHeader.DataLength)
+            {
+                _maxRxSize = _rxHeader.DataLength;
+            }
+            if (_maxTxSize < _txHeader.DataLength)
+            {
+                _maxTxSize = _txHeader.DataLength;
+            }
+            _txBuffer = _txBuffer.Next ?? _txBuffers.First!;
+            _rxPointer = _txPointer = 0;
+            _packetId = 0;
+        }
+        catch (Exception e) when (e is OperationCanceledException or TimeoutException or IOException or InvalidOperationException)
+        {
+            if (connecting || cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+
+            _logger.LogDebug(e, "Lost USB connection to Duet");
+
+            if (!_hadTimeout && _connected)
+            {
+                _hadTimeout = true;
+                _model.ConnectionLost();
+                _eventLogger.LogOutput(MessageType.Warning, $"Lost USB connection to Duet ({e.Message})");
+            }
+            _connected = false;
+            _needsReconnect = true;
+
+            // Close the port to ensure clean state for reconnection
+            try
+            {
+                _serialPort.Close();
+            }
+            catch
+            {
+                // Best effort
+            }
+
+            _consecutiveFailures++;
+            if (_consecutiveFailures > _settings.MaxSbcRetries)
+            {
+                throw new OperationCanceledException("Maximum number of USB transfer retries exceeded");
             }
         }
     }
 
     /// <summary>
-    /// Check if the controller has been reset
+    /// Check if the controller has been reset or disconnected.
+    /// Unlike SPI (which uses sequence numbers), USB detects this via communication failure.
     /// </summary>
     /// <returns>Whether the controller has been reset</returns>
-    public bool HadReset() => _connected && ((ushort)(_lastTransferNumber + 1) != _rxHeader.SequenceNumber);
+    public bool HadReset() => _needsReconnect;
 
     #region Read functions
     /// <summary>
@@ -827,26 +909,226 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <summary>
     /// Instruct the firmware to start the IAP binary
     /// </summary>
+    /// <param name="firmwareLength">Length of the firmware binary in bytes; sent to IAP as part of the USB handshake</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
-    public void StartIap(CancellationToken cancellationToken = default)
+    public void StartIap(uint firmwareLength, CancellationToken cancellationToken = default)
     {
         // Tell the firmware to boot the IAP program
         WritePacket(Protocol.SbcRequests.Request.StartIap);
         PerformFullTransfer(cancellationToken: cancellationToken);
 
-        // Wait for the first transfer
-        _waitingForFirstTransfer = _updating = true;
+        // The board will shut down TinyUSB and reboot into IAP, which re-initializes
+        // USB with a bare-metal CDC driver. This causes a USB disconnect + reconnect
+        _updating = true;
+
+        // Remember the current port so we don't try the IAPR handshake on the RRF port
+        // (which would inject garbage into RRF's G-code input buffer if the board reboots into RRF)
+        string mainPortName = _serialPort.PortName;
+        _serialPort.Close();
+
+        try
+        {
+            _logger.LogDebug("IAP: Scanning for IAP USB device (firmware length {Length} bytes)...", firmwareLength);
+            _iapSerialPort = FindIapDevice(mainPortName, Consts.IapTimeout, firmwareLength, cancellationToken);
+            if (_iapSerialPort == null)
+            {
+                throw new OperationCanceledException("IAP: Timed out waiting for IAP USB device to appear");
+            }
+            _logger.LogDebug("IAP: Connected to IAP device on {Port}", _iapSerialPort.PortName);
+        }
+        catch
+        {
+            // Recovery: try to reopen the main RRF port so reconnection can work
+            try
+            {
+                _serialPort.Open();
+                _logger.LogWarning("IAP: Recovered main port after IAP device scan failure");
+            }
+            catch
+            {
+                // If we can't reopen, flag for full reconnection
+                _needsReconnect = true;
+                _logger.LogWarning("IAP: Could not recover main port, will attempt full reconnection");
+            }
+            _updating = false;
+            throw;
+        }
     }
 
     /// <summary>
-    /// Flash another segment of the firmware via the IAP binary
+    /// Scan for the IAP serial port by trying the IAPR handshake on each available ttyACM port.
+    /// Ports are retried each scan cycle since the IAP device may reappear on the same path.
+    /// </summary>
+    /// <param name="excludePort">Port name to skip (the original RRF port)</param>
+    /// <param name="timeoutMs">Maximum time to wait in milliseconds</param>
+    /// <param name="firmwareLength">Length of the firmware binary, sent as part of the handshake</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The opened serial port, or null if not found</returns>
+    private SerialPort? FindIapDevice(string excludePort, int timeoutMs, uint firmwareLength, CancellationToken cancellationToken)
+    {
+        Stopwatch sw = Stopwatch.StartNew();
+
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Thread.Sleep(500);
+
+            string[] ports = SerialPort.GetPortNames();
+            if (ports.Length == 0)
+            {
+                continue;
+            }
+
+            foreach (string port in ports)
+            {
+                // Only try CDC ACM ports
+                if (!Path.GetFileName(port).StartsWith("ttyACM"))
+                {
+                    continue;
+                }
+
+                // Abort if we've used up our time budget
+                if (sw.ElapsedMilliseconds >= timeoutMs)
+                {
+                    break;
+                }
+
+                // Never send the handshake to the original RRF port -- if the board
+                // rebooted back into RRF instead of IAP, this would inject garbage
+                if (port == excludePort)
+                {
+                    continue;
+                }
+
+                // Check the USB product string via sysfs -- only try ports that
+                // identify as "IAP". This avoids sending the handshake to unrelated
+                // CDC devices or to RRF if it re-enumerated on a different port
+                string? product = GetUsbProductString(port);
+                if (product == null || !product.Equals("IAP", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogDebug("IAP: Skipping {Port} (product={Product})", port, product ?? "(none)");
+                    continue;
+                }
+
+                _logger.LogDebug("IAP: Trying handshake on {Port} (product={Product})", port, product);
+                if (TryIapHandshake(port, firmwareLength) is SerialPort sp)
+                {
+                    return sp;
+                }
+            }
+        }
+        _logger.LogWarning("IAP: Device not found after {Elapsed}ms (excluded: {ExcludePort})", sw.ElapsedMilliseconds, excludePort);
+        return null;
+    }
+
+    /// <summary>
+    /// Try to open a serial port and perform the IAPR handshake.
+    /// Sends "IAPR" followed by the 4-byte firmware length (little-endian), then waits for the IAPR echo.
+    /// Returns quickly (within ~500ms) if the device doesn't respond.
+    /// </summary>
+    /// <param name="portName">Serial port to try</param>
+    /// <param name="firmwareLength">Firmware length to send as part of the handshake</param>
+    /// <returns>The opened serial port if handshake succeeded, null otherwise</returns>
+    private SerialPort? TryIapHandshake(string portName, uint firmwareLength)
+    {
+        SerialPort? sp = null;
+        try
+        {
+            sp = new SerialPort(portName, 115200, Parity.None, 8, StopBits.One)
+            {
+                ReadTimeout = 500,
+                WriteTimeout = 500,
+                DtrEnable = true
+            };
+            sp.Open();
+            sp.DiscardInBuffer();
+
+            // Send "IAPR" + 4-byte firmware length as one 8-byte header, then expect IAPR echo
+            byte[] header = new byte[8];
+            header[0] = (byte)'I';
+            header[1] = (byte)'A';
+            header[2] = (byte)'P';
+            header[3] = (byte)'R';
+            header[4] = (byte)(firmwareLength & 0xFF);
+            header[5] = (byte)((firmwareLength >> 8) & 0xFF);
+            header[6] = (byte)((firmwareLength >> 16) & 0xFF);
+            header[7] = (byte)((firmwareLength >> 24) & 0xFF);
+            sp.Write(header, 0, header.Length);
+
+            byte[] echo = new byte[4];
+            int totalRead = 0;
+            while (totalRead < 4)
+            {
+                try
+                {
+                    int n = sp.Read(echo, totalRead, 4 - totalRead);
+                    if (n == 0) break;
+                    totalRead += n;
+                }
+                catch (TimeoutException)
+                {
+                    break;
+                }
+            }
+
+            if (totalRead == 4 && echo[0] == 'I' && echo[1] == 'A' && echo[2] == 'P' && echo[3] == 'R')
+            {
+                _logger.LogDebug("IAP: Handshake successful on {Port}", portName);
+                return sp;
+            }
+
+            _logger.LogDebug("IAP: Handshake failed on {Port} (got {Bytes} bytes)", portName, totalRead);
+            sp.Close();
+            sp.Dispose();
+            sp = null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug("IAP: Could not open {Port}: {Error}", portName, ex.Message);
+            if (sp != null)
+            {
+                try
+                {
+                    sp.Close();
+                    sp.Dispose();
+                }
+                catch
+                {
+                    // Best effort
+                }
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Read the USB product string for a ttyACM device from sysfs
+    /// </summary>
+    /// <param name="portName">Serial port path (e.g., /dev/ttyACM0)</param>
+    /// <returns>Product string, or null if not available</returns>
+    private static string? GetUsbProductString(string portName)
+    {
+        // Resolve the sysfs path through symlinks using POSIX realpath(),
+        // because .NET's Path.GetFullPath normalizes ".." lexically
+        string productPath = $"/sys/class/tty/{Path.GetFileName(portName)}/device/../product";
+        string? resolvedProductPath = Path.GetRealPath(productPath);
+        return File.Exists(resolvedProductPath) ? File.ReadAllText(resolvedProductPath).Trim() : null;
+    }
+
+    /// <summary>
+    /// Flash another segment of the firmware via the IAP binary.
+    /// The IAP sends a 0x1A ready byte before each block.
     /// </summary>
     /// <param name="stream">Stream of the firmware binary</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Whether another segment could be sent</returns>
-    public bool FlashFirmwareSegment(Stream stream, CancellationToken cancellationToken = default)
+    public bool FlashFirmwareSegment(Stream stream)
     {
-        Span<byte> readBuffer = stackalloc byte[Consts.FirmwareSegmentSize];
+        if (_iapSerialPort == null)
+        {
+            throw new InvalidOperationException("IAP serial port not connected");
+        }
+
         Span<byte> writeBuffer = stackalloc byte[Consts.FirmwareSegmentSize];
 
         int bytesRead = stream.Read(writeBuffer);
@@ -861,22 +1143,63 @@ public class USB : IDiagnostics, ILinkAdapter
             writeBuffer[bytesRead..].Fill(0xFF);
         }
 
-        _serialPort.Write(writeBuffer.ToArray(), 0, writeBuffer.Length);
-        ReadExactly(readBuffer);
+        // Wait for the 0x1A ready byte from IAP
+        WaitForIapReady();
+
+        // Send the firmware block followed by a short packet to flush the device's
+        // USB DMA buffer (the ASF UDI CDC DMA only commits on buffer-full or short packet)
+        _iapSerialPort.Write(writeBuffer.ToArray(), 0, writeBuffer.Length);
+        _iapSerialPort.BaseStream.Flush();
         return true;
     }
 
     /// <summary>
-    /// Send the CRC16 checksum of the firmware binary to the IAP program and verify the written data
+    /// Wait for the IAP ready byte (0x1A) from the IAP device
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    private void WaitForIapReady()
+    {
+        byte[] buf = new byte[1];
+        Stopwatch sw = Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < Consts.IapTimeout)
+        {
+            try
+            {
+                int n = _iapSerialPort!.Read(buf, 0, 1);
+                if (n == 1 && buf[0] == 0x1A)
+                {
+                    return;
+                }
+            }
+            catch (TimeoutException)
+            {
+                // Keep trying
+            }
+        }
+        throw new TimeoutException("Timed out waiting for IAP ready signal");
+    }
+
+    /// <summary>
+    /// Send the CRC16 checksum of the firmware binary to the IAP program and verify the written data.
+    /// Uses timing-based end-of-transfer detection (matching SPI IAP protocol).
     /// </summary>
     /// <param name="firmwareLength">Length of the written firmware in bytes</param>
     /// <param name="crc16">CRC16 checksum of the firmware</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Whether the firmware has been written successfully</returns>
-    public bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16, CancellationToken cancellationToken = default)
+    public bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16)
     {
-        // At this point IAP expects another segment so wait a moment for IAP to acknowledge we're done
+        if (_iapSerialPort == null)
+        {
+            throw new InvalidOperationException("IAP serial port not connected");
+        }
+
+        // IAP detects end-of-transfer by a timing gap (TransferCompleteDelay = 400ms)
+        // We wait FirmwareFinishedDelay (750ms) so IAP recognizes we're done sending blocks
+        // By now IAP has sent two ready bytes (one for "next block", one for verify phase)
+        // and is waiting for the FlashVerifyRequest. Just drain any stale data and send it
         Thread.Sleep(Consts.FirmwareFinishedDelay);
+        _iapSerialPort.DiscardInBuffer();
 
         // Send the final firmware size plus CRC16 checksum to IAP
         Protocol.SbcRequests.FlashVerify verifyRequest = new()
@@ -886,25 +1209,61 @@ public class USB : IDiagnostics, ILinkAdapter
         };
         Span<byte> transferData = stackalloc byte[Marshal.SizeOf<Protocol.SbcRequests.FlashVerify>()];
         MemoryMarshal.Write(transferData, verifyRequest);
-        byte[] transferDataArray = transferData.ToArray();
-        _serialPort.Write(transferDataArray, 0, transferDataArray.Length);
-        ReadExactly(transferData);
+        _iapSerialPort.Write(transferData.ToArray(), 0, transferData.Length);
 
-        // Check if the IAP can confirm our CRC16 checksum
-        Span<byte> writeOk = stackalloc byte[1];
-        byte[] writeOkArray = writeOk.ToArray();
-        _serialPort.Write(writeOkArray, 0, writeOkArray.Length);
-        ReadExactly(writeOk);
-        return writeOk[0] == 0x0C;
+        // Read the 1-byte verification result from IAP (0x0C = success, 0xFF = failure)
+        byte[] result = new byte[1];
+        int totalRead = 0;
+        Stopwatch sw = Stopwatch.StartNew();
+        while (totalRead < 1 && sw.ElapsedMilliseconds < Consts.IapTimeout)
+        {
+            try
+            {
+                totalRead += _iapSerialPort.Read(result, totalRead, 1 - totalRead);
+            }
+            catch (TimeoutException)
+            {
+                // Keep trying
+            }
+        }
+
+        if (totalRead < 1)
+        {
+            _logger.LogError("IAP: Timed out waiting for verification response");
+            return false;
+        }
+
+        _logger.LogDebug("IAP: Verification response: 0x{Response:X2}", result[0]);
+        return result[0] == 0x0C;
     }
     /// <summary>
-    /// Wait for the IAP program to reset the controller
+    /// Wait for the IAP program to reset the controller.
+    /// Close the IAP serial port and flag for reconnection to the main firmware.
     /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    public void WaitForIapReset(CancellationToken cancellationToken = default)
+    public void WaitForIapReset()
     {
-        _resetting = _waitingForFirstTransfer = true;
+        // Close the IAP serial port
+        if (_iapSerialPort != null)
+        {
+            try
+            {
+                _iapSerialPort.Close();
+            }
+            catch
+            {
+                // Ignore close errors
+            }
+            _iapSerialPort.Dispose();
+            _iapSerialPort = null;
+        }
+
+        // Wait for the board to reboot
+        Thread.Sleep(Consts.IapRebootDelay);
+
+        // Flag for reconnection - the main loop will re-establish the normal SBC connection
+        _resetting = true;
         _updating = false;
+        _needsReconnect = true;
     }
 
     /// <summary>
@@ -1253,219 +1612,20 @@ public class USB : IDiagnostics, ILinkAdapter
 
     #region Functions for data transfers
     /// <summary>
-    /// Write the CRC16 or CRC32 checksums
+    /// Exchange the transfer header. No CRC, format code, or response exchange over USB.
     /// </summary>
-    private void WriteCRC()
+    private void ExchangeHeader()
     {
-        if (_txHeader.ProtocolVersion >= 4)
-        {
-            _txHeader.ChecksumData32 = CRC32.Calculate(_txBuffer.Value[.._txPointer].Span);
-            MemoryMarshal.Write(_txHeaderBuffer.Span, _txHeader);
-            _txHeader.ChecksumHeader32 = CRC32.Calculate(_txHeaderBuffer[..12].Span);
-            MemoryMarshal.Write(_txHeaderBuffer.Span, _txHeader);
-        }
-        else
-        {
-            _txHeader.ChecksumData16 = CRC16.Calculate(_txBuffer.Value[.._txPointer].Span);
-            MemoryMarshal.Write(_txHeaderBuffer.Span, _txHeader);
-            _txHeader.ChecksumHeader16 = CRC16.Calculate(_txHeaderBuffer[..10].Span);
-            MemoryMarshal.Write(_txHeaderBuffer.Span, _txHeader);
-        }
-    }
+        int headerSize = Marshal.SizeOf<UsbTransferHeader>();
 
-    /// <summary>
-    /// Exchange the transfer header
-    /// </summary>
-    /// <returns>True on success</returns>
-    private bool ExchangeHeader()
-    {
-        for (int retry = 0; retry < _settings.MaxSpiRetries; retry++)
-        {
-            // Send header
-            int headerSize = (_txHeader.ProtocolVersion >= 4) ? Marshal.SizeOf<TransferHeader>() : 12;
-            _serialPort.Write(_txHeaderBuffer.ToArray(), 0, headerSize);
+        // Send TX header
+        MemoryMarshal.Write(_txHeaderBuffer.Span, _txHeader);
+        _serialPort.Write(_txHeaderBuffer.ToArray(), 0, headerSize);
+        _serialPort.BaseStream.Flush();
 
-            // Receive header
-            try
-            {
-                ReadExactly(_rxHeaderBuffer[..headerSize].Span);
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogWarning("Timeout reading header from USB device");
-                ExchangeResponse(TransferResponse.BadResponse);
-                return false;
-            }
-
-            // Check for possible response code
-            uint responseCode = MemoryMarshal.Read<uint>(_rxHeaderBuffer.Span);
-            if (responseCode == TransferResponse.BadResponse)
-            {
-                _logger.LogWarning("Received bad response instead of header, retrying exchange of the data response");
-                if (_connected && ExchangeDataResponse(out bool success) && success)
-                {
-                    continue;
-                }
-                throw new OperationCanceledException("USB data transfer failed");
-            }
-
-            // Read received header and verify the format code
-            _rxHeader = MemoryMarshal.Read<TransferHeader>(_rxHeaderBuffer.Span);
-            if (_rxHeader.FormatCode == 0 || _rxHeader.FormatCode == 0xFF)
-            {
-                _logger.LogWarning("Restarting full transfer because a bad header format code was received (0x{0:x2})", _rxHeader.FormatCode);
-                ExchangeResponse(TransferResponse.BadResponse);
-                return false;
-            }
-
-            // Change the protocol version if necessary
-            ushort lastProtocolVersion = _txHeader.ProtocolVersion;
-            if (_rxHeader.ProtocolVersion != lastProtocolVersion &&
-                (_rxHeader.ProtocolVersion <= Consts.ProtocolVersion || _settings.UpdateOnly))
-            {
-                _txHeader.ProtocolVersion = _rxHeader.ProtocolVersion;
-                WriteCRC();
-
-                ExchangeResponse(TransferResponse.BadResponse);
-                continue;
-            }
-
-            // Verify header checksum
-            if (_rxHeader.ProtocolVersion >= 4)
-            {
-                uint crc32 = CRC32.Calculate(_rxHeaderBuffer[..12].Span);
-                if (_rxHeader.ChecksumHeader32 != crc32)
-                {
-                    _logger.LogWarning("Bad header CRC32 (expected 0x{ExpectedChecksum:x8}, got 0x{ActualChecksum:x8})", _rxHeader.ChecksumHeader32.ToString("x8"), crc32.ToString(""));
-                    responseCode = ExchangeResponse(TransferResponse.BadHeaderChecksum);
-                    if (responseCode == TransferResponse.BadHeaderChecksum)
-                    {
-                        _logger.LogWarning("Note: RepRapFirmware didn't receive valid data either (code 0x{ResponseCode:x8})", responseCode);
-                    }
-                    else
-                    {
-                        if (responseCode == TransferResponse.BadResponse)
-                        {
-                            _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad header response");
-                        }
-                        else
-                        {
-                            _logger.LogWarning("Restarting full transfer because an unexpected response code has been received (code 0x{ResponseCode:x8})", responseCode);
-                            ExchangeResponse(TransferResponse.BadResponse);
-                        }
-                        return false;
-                    }
-                    continue;
-                }
-            }
-            else
-            {
-                ushort crc16 = CRC16.Calculate(_rxHeaderBuffer[..10].Span);
-                if (_rxHeader.ChecksumHeader16 != crc16)
-                {
-                    _logger.LogWarning("Bad header CRC16 (expected 0x{ExpectedChecksum:x4}, got 0x{ActualChecksum:x4})", _rxHeader.ChecksumHeader16, crc16);
-                    responseCode = ExchangeResponse(TransferResponse.BadHeaderChecksum);
-                    if (responseCode == TransferResponse.BadResponse)
-                    {
-                        _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad header response");
-                        return false;
-                    }
-                    if (responseCode != TransferResponse.Success)
-                    {
-                        _logger.LogWarning("Note: RepRapFirmware didn't receive valid data either (code 0x{ResponseCode:x8})", responseCode);
-                    }
-                    continue;
-                }
-            }
-
-            // Check format code
-            switch (_rxHeader.FormatCode)
-            {
-                case Consts.FormatCode:
-                    // Format code OK
-                    break;
-
-                case Consts.FormatCodeStandalone:
-                    // RRF is operating in stand-alone mode
-                    throw new Exception("RepRapFirmware is operating in stand-alone mode");
-
-                default:
-                    ExchangeResponse(TransferResponse.BadFormat);
-                    throw new Exception($"Invalid format code {_rxHeader.FormatCode:x2}");
-            }
-
-            // Check for changed protocol version
-            if (_rxHeader.ProtocolVersion > Consts.ProtocolVersion && !_settings.UpdateOnly)
-            {
-                ExchangeResponse(TransferResponse.BadProtocolVersion);
-                throw new Exception($"Invalid protocol version {_rxHeader.ProtocolVersion}");
-            }
-
-            if (lastProtocolVersion != _txHeader.ProtocolVersion)
-            {
-                _logger.LogWarning(_txHeader.ProtocolVersion < Consts.ProtocolVersion ? "Downgrading protocol version {ProtocolVersion} to {DowngradedProtocolVersion}" : "Upgrading protocol version {ProtocolVersion} to {UpgradedProtocolVersion}", lastProtocolVersion, _txHeader.ProtocolVersion);
-            }
-
-            // Check the data length
-            if (_rxHeader.DataLength > _bufferSize)
-            {
-                ExchangeResponse(TransferResponse.BadDataLength);
-                throw new Exception($"Data too long ({_rxHeader.DataLength} bytes)");
-            }
-
-            // Acknowledge receipt
-            uint response = ExchangeResponse(TransferResponse.Success);
-            switch (response)
-            {
-                case TransferResponse.Success:
-                    return true;
-                case TransferResponse.BadFormat:
-                    throw new Exception("RepRapFirmware refused message format");
-                case TransferResponse.BadProtocolVersion:
-                    throw new Exception("RepRapFirmware refused protocol version");
-                case TransferResponse.BadDataLength:
-                    throw new Exception("RepRapFirmware refused data length");
-                case TransferResponse.BadHeaderChecksum:
-                    _logger.LogWarning("RepRapFirmware got a bad header checksum");
-                    continue;
-                case TransferResponse.BadResponse:
-                    _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad header response");
-                    return false;
-                default:
-                    _logger.LogWarning("Restarting full transfer because a bad header response was received (0x{ResponseCode:x8})", response);
-                    if (_rxHeader.DataLength == 0 && _txPointer == 0)
-                    {
-                        // No data was transferred so we are still in sync. Continue with the next transfer
-                        _lastTransferNumber = (ushort)(_rxHeader.SequenceNumber - 1);
-                        return true;
-                    }
-
-                    // Transfer bad data response to restart the transfer
-                    ExchangeResponse(TransferResponse.BadResponse);
-                    return false;
-            }
-        }
-
-        _logger.LogWarning("Restarting full transfer because the number of maximum retries has been exceeded");
-        ExchangeResponse(TransferResponse.BadResponse);
-        return false;
-    }
-
-    /// <summary>
-    /// Exchange a response code
-    /// </summary>
-    /// <param name="response">Response to send</param>
-    /// <returns>Received response</returns>
-    private uint ExchangeResponse(uint response)
-    {
-        Span<byte> txResponseBuffer = stackalloc byte[sizeof(uint)], rxResponseBuffer = stackalloc byte[sizeof(uint)];
-        MemoryMarshal.Write(txResponseBuffer, response);
-
-        byte[] txResponseArray = txResponseBuffer.ToArray();
-        _serialPort.Write(txResponseArray, 0, txResponseArray.Length);
-        ReadExactly(rxResponseBuffer);
-
-        return MemoryMarshal.Read<uint>(rxResponseBuffer);
+        // Receive RX header
+        ReadExactly(_rxHeaderBuffer.Span);
+        _rxHeader = MemoryMarshal.Read<UsbTransferHeader>(_rxHeaderBuffer.Span);
     }
 
     /// <summary>
@@ -1476,9 +1636,15 @@ public class USB : IDiagnostics, ILinkAdapter
     {
         int totalRead = 0;
         byte[] tempBuffer = new byte[buffer.Length];
+        Stopwatch sw = Stopwatch.StartNew();
+        int totalTimeout = _serialPort.ReadTimeout * 2;     // overall limit: 2x the per-read timeout
 
         while (totalRead < buffer.Length)
         {
+            if (sw.ElapsedMilliseconds > totalTimeout)
+            {
+                throw new OperationCanceledException($"Total timeout reading from USB device ({totalRead}/{buffer.Length} bytes in {sw.ElapsedMilliseconds}ms)");
+            }
             int bytesRead = _serialPort.Read(tempBuffer, totalRead, buffer.Length - totalRead);
             if (bytesRead == 0)
             {
@@ -1491,123 +1657,22 @@ public class USB : IDiagnostics, ILinkAdapter
     }
 
     /// <summary>
-    /// Exchange the transfer body
+    /// Exchange the transfer body. No CRC or response exchange over USB.
     /// </summary>
-    /// <returns>True on success</returns>
-    private bool ExchangeData()
+    private void ExchangeData()
     {
-        int bytesToTransfer = Math.Max(_rxHeader.DataLength, _txPointer);
-        for (int retry = 0; retry < _settings.MaxSpiRetries; retry++)
+        // Send TX data
+        if (_txPointer > 0)
         {
-            // Send data
-            _serialPort.Write(_txBuffer.Value.ToArray(), 0, bytesToTransfer);
-
-            // Receive data
-            try
-            {
-                ReadExactly(_rxBuffer[..bytesToTransfer].Span);
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogWarning("Timeout reading data from USB device");
-                return false;
-            }
-
-            // Check for possible response code
-            uint responseCode = MemoryMarshal.Read<uint>(_rxBuffer.Span);
-            if (responseCode == TransferResponse.BadResponse)
-            {
-                _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad data response");
-                return false;
-            }
-
-            // Inspect received data
-            if (_rxHeader.ProtocolVersion >= 4)
-            {
-                uint crc32 = CRC32.Calculate(_rxBuffer[.._rxHeader.DataLength].Span);
-                if (crc32 != _rxHeader.ChecksumData32)
-                {
-                    _logger.LogWarning("Bad data CRC32 (expected 0x{ExpectedChecksum:x8}, got 0x{ActualChecksum:x8})", _rxHeader.ChecksumData32, crc32);
-                    responseCode = ExchangeResponse(TransferResponse.BadDataChecksum);
-                    if (responseCode == TransferResponse.BadDataChecksum)
-                    {
-                        _logger.LogWarning("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
-                    }
-                    else
-                    {
-                        if (responseCode == TransferResponse.BadResponse)
-                        {
-                            _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad data response");
-                        }
-                        else
-                        {
-                            _logger.LogWarning("Restarting full transfer because an unexpected response code has been received (code 0x{ResponseCode:x8})", responseCode);
-                            ExchangeResponse(TransferResponse.BadResponse);
-                        }
-                        return false;
-                    }
-                    continue;
-                }
-            }
-            else
-            {
-                ushort crc16 = CRC16.Calculate(_rxBuffer[.._rxHeader.DataLength].Span);
-                if (crc16 != _rxHeader.ChecksumData16)
-                {
-                    _logger.LogWarning("Bad data CRC16 (expected 0x{ExpectedChecksum:x4}, got 0x{ActualChecksum:x4})", _rxHeader.ChecksumData16, crc16);
-                    responseCode = ExchangeResponse(TransferResponse.BadDataChecksum);
-                    if (responseCode == TransferResponse.BadResponse)
-                    {
-                        _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad data response");
-                        return false;
-                    }
-                    if (responseCode != TransferResponse.Success)
-                    {
-                        _logger.LogWarning("Note: RepRapFirmware didn't receive valid data either (code 0x{ResponseCode:x8})", responseCode);
-                    }
-                    continue;
-                }
-            }
-
-            // Exchange data response and restart the data transfer if it failed
-            if (ExchangeDataResponse(out bool success))
-            {
-                return success;
-            }
+            _serialPort.Write(_txBuffer.Value.ToArray(), 0, _txPointer);
+            _serialPort.BaseStream.Flush();
         }
-        throw new OperationCanceledException("USB connection reset because the number of maximum retries has been exceeded");
-    }
 
-    /// <summary>
-    /// Exchange the data response
-    /// </summary>
-    /// <param name="success">Whether the transfer was successful</param>
-    /// <returns>True when done</returns>
-    private bool ExchangeDataResponse(out bool success)
-    {
-        for (int retry = 0; retry < _settings.MaxSpiRetries; retry++)
+        // Receive RX data
+        if (_rxHeader.DataLength > 0)
         {
-            uint responseCode = ExchangeResponse(TransferResponse.Success);
-            switch (responseCode)
-            {
-                case TransferResponse.Success:
-                    success = true;
-                    return true;
-                case TransferResponse.BadDataChecksum:
-                    _logger.LogWarning("RepRapFirmware got a bad data checksum");
-                    success = false;
-                    return false;
-                case TransferResponse.BadResponse:
-                    _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad data response");
-                    success = false;
-                    return true;
-                default:
-                    _logger.LogWarning("Restarting data response exchange because a bad code was received (0x{ResponseCode:x8})", responseCode);
-                    ExchangeResponse(TransferResponse.BadResponse);
-                    continue;
-            }
+            ReadExactly(_rxBuffer[.._rxHeader.DataLength].Span);
         }
-        throw new OperationCanceledException("USB connection reset because the number of maximum retries has been exceeded");
     }
     #endregion
 }

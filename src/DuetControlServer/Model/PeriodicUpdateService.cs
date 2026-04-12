@@ -134,18 +134,28 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterfac
 
             do
             {
-                // Prefetch the network and volume devices because this can take quite a while (> 1.5s)
-                System.Net.NetworkInformation.NetworkInterface[] networkInterfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
-                DriveInfo[] drives = DriveInfo.GetDrives();
+                // Gather data outside the lock on a background thread (slow I/O, not cancellable)
+                var gatherTask = Task.Run(async () =>
+                {
+                    var networkInterfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
+                    var drives = DriveInfo.GetDrives();
+                    var sbcData = await GatherSbcDataAsync(stoppingToken);
+                    var volumeData = GatherVolumeData(drives);
+                    var networkData = await GatherNetworkDataAsync(networkInterfaces, stoppingToken);
+                    return (sbcData, volumeData, networkData);
+                }, stoppingToken);
 
-                // Run another update cycle
+                // Wait for gather to complete, but abort immediately on cancellation
+                var (sbcData, volumeData, networkData) = await gatherTask.WaitAsync(stoppingToken);
+
+                // Apply to model with a short write lock
                 string currentIPAddress;
                 using (await model.AccessReadWriteAsync(stoppingToken))
                 {
-                    updateNetworkSeq = await UpdateNetworkAsync(networkInterfaces, stoppingToken);
+                    updateNetworkSeq = ApplyNetworkData(networkData);
                     currentIPAddress = model.Network.Interfaces.FirstOrDefault(iface => iface.ActualIP != null)?.ActualIP ?? "0.0.0.0";
-                    UpdateSbc();
-                    updateVolumesSeq = UpdateVolumes(drives);
+                    ApplySbcData(sbcData);
+                    updateVolumesSeq = ApplyVolumeData(volumeData);
                     CleanMessages();
                 }
 
@@ -228,165 +238,167 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterfac
     /// Update network interfaces
     /// </summary>
     /// <returns>Whether the network key has been changed</returns>
-    private async Task<bool> UpdateNetworkAsync(System.Net.NetworkInformation.NetworkInterface[] networkInterfaces, CancellationToken cancellationToken = default)
+    private async Task<List<NetworkInterface>> GatherNetworkDataAsync(System.Net.NetworkInformation.NetworkInterface[] networkInterfaces, CancellationToken cancellationToken)
+    {
+        List<NetworkInterface> result = [];
+        foreach (System.Net.NetworkInformation.NetworkInterface iface in networkInterfaces)
+        {
+            if (iface.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
+            {
+                continue;
+            }
+
+            NetworkInterface ni = new();
+
+            // IPv4 configuration
+            IPAddress? ipAddress = null;
+            try
+            {
+                ni.Mac = BitConverter.ToString(iface.GetPhysicalAddress().GetAddressBytes()).Replace('-', ':');
+                ipAddress = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
+                                where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                                select unicastAddress.Address).FirstOrDefault();
+                ni.Subnet = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
+                            where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                            select unicastAddress.IPv4Mask).FirstOrDefault()?.ToString();
+                ni.Gateway = (from gatewayAddress in iface.GetIPProperties().GatewayAddresses
+                            where gatewayAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                            select gatewayAddress.Address).FirstOrDefault()?.ToString();
+                ni.DnsServer = (from item in iface.GetIPProperties().DnsAddresses
+                                where item.AddressFamily == AddressFamily.InterNetwork
+                                select item).FirstOrDefault()?.ToString();
+            }
+            catch (Exception e)
+            {
+                logger.LogDebug(e, "Failed to get IPv4 configuration data");
+            }
+
+            // DHCP detection via "ip -4 addr"
+            ni.ActualIP = ipAddress?.ToString();
+            if (ni.ActualIP != null && File.Exists("/usr/sbin/ip"))
+            {
+                try
+                {
+                    using Process? proc = Process.Start(new ProcessStartInfo("/usr/sbin/ip", $"-4 address show dev {iface.Name}") { RedirectStandardOutput = true });
+                    if (proc != null)
+                    {
+                        await proc.WaitForExitAsync(cancellationToken);
+                        string output = await proc.StandardOutput.ReadToEndAsync(cancellationToken);
+                        ni.ConfiguredIP = output.Contains("valid_lft forever") ? ni.ActualIP : "0.0.0.0";
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception e)
+                {
+                    logger.LogDebug(e, "Failed to query DHCP info via ip utility");
+                }
+            }
+
+            ni.Speed = (int?)(iface.Speed / 1000000);
+            ni.State = iface.OperationalStatus switch
+            {
+                System.Net.NetworkInformation.OperationalStatus.Up => NetworkState.Active,
+                System.Net.NetworkInformation.OperationalStatus.Down or System.Net.NetworkInformation.OperationalStatus.LowerLayerDown => NetworkState.Disabled,
+                System.Net.NetworkInformation.OperationalStatus.Dormant => NetworkState.Idle,
+                _ => null,
+            };
+
+            // Note that iface.NetworkInterfaceType is broken on Unix and cannot be used (.NET 5-6)
+            if (iface.Name.StartsWith('w'))
+            {
+                ni.Type = NetworkInterfaceType.WiFi;
+                // WifiCountry is maintained by plugins, not gathered here - it gets preserved in ApplyNetworkData
+                try
+                {
+                    string wifiData = await File.ReadAllTextAsync("/proc/net/wireless", cancellationToken);
+                    Regex signalRegex = new(iface.Name + @".*(-\d+)\.");
+                    Match signalMatch = signalRegex.Match(wifiData);
+                    if (signalMatch.Success)
+                    {
+                        ni.RSSI = int.Parse(signalMatch.Groups[1].Value);
+                    }
+
+                    if (File.Exists("/usr/sbin/iwgetid"))
+                    {
+                        using Process? process = Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "/usr/sbin/iwgetid",
+                            Arguments = $"{iface.Name} -r",
+                            RedirectStandardOutput = true
+                        });
+                        if (process is not null)
+                        {
+                            string ssid = string.Empty;
+                            process.OutputDataReceived += (sender, e) => ssid += e.Data;
+                            process.BeginOutputReadLine();
+                            await process.WaitForExitAsync(cancellationToken);
+                            ni.SSID = ssid;
+                        }
+                        else
+                        {
+                            ni.SSID = string.Empty;
+                        }
+                    }
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    ni.RSSI = null;
+                    ni.SSID = string.Empty;
+                    logger.LogDebug(e, "Failed to get WiFi data for interface {InterfaceName}", iface.Name);
+                }
+            }
+            else
+            {
+                ni.Type = NetworkInterfaceType.LAN;
+            }
+
+            result.Add(ni);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Apply gathered network data to the object model (must be called with OM write lock held)
+    /// </summary>
+    private bool ApplyNetworkData(List<NetworkInterface> gathered)
     {
         bool networkUpdated = false;
         void InterfaceUpdated(object? sender, PropertyChangedEventArgs e) => networkUpdated = true;
 
-        // DCS does not maintain the WiFi country code, so we need to cache it if was populated before
-        string? wifiCountry = model.Network.Interfaces.FirstOrDefault(iface => iface.WifiCountry != null)?.WifiCountry;
-
         int index = 0;
-        foreach (System.Net.NetworkInformation.NetworkInterface iface in networkInterfaces)
+        foreach (NetworkInterface data in gathered)
         {
-            if (iface.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
+            NetworkInterface networkInterface;
+            if (index >= model.Network.Interfaces.Count)
             {
-                NetworkInterface networkInterface;
-                if (index >= model.Network.Interfaces.Count)
-                {
-                    networkInterface = new NetworkInterface();
-                    model.Network.Interfaces.Add(networkInterface);
+                networkInterface = new NetworkInterface();
+                model.Network.Interfaces.Add(networkInterface);
 
-                    lock (_activeProtocols)
+                lock (_activeProtocols)
+                {
+                    foreach (NetworkProtocol protocol in _activeProtocols)
                     {
-                        foreach (NetworkProtocol protocol in _activeProtocols)
-                        {
-                            networkInterface.ActiveProtocols.Add(protocol);
-                        }
+                        networkInterface.ActiveProtocols.Add(protocol);
                     }
                 }
-                else
-                {
-                    networkInterface = model.Network.Interfaces[index];
-                }
-                index++;
-                networkInterface.PropertyChanged += InterfaceUpdated;
-
-                // Update IPv4 configuration
-                string? macAddress = null;
-                IPAddress? ipAddress = null, netMask = null, gateway = null, dnsServer = null;
-                try
-                {
-                    macAddress = BitConverter.ToString(iface.GetPhysicalAddress().GetAddressBytes()).Replace('-', ':');
-                    ipAddress = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
-                                    where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
-                                    select unicastAddress.Address).FirstOrDefault();
-                    netMask = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
-                                where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
-                                select unicastAddress.IPv4Mask).FirstOrDefault();
-                    gateway = (from gatewayAddress in iface.GetIPProperties().GatewayAddresses
-                                where gatewayAddress.Address.AddressFamily == AddressFamily.InterNetwork
-                                select gatewayAddress.Address).FirstOrDefault();
-                    dnsServer = (from item in iface.GetIPProperties().DnsAddresses
-                                    where item.AddressFamily == AddressFamily.InterNetwork
-                                    select item).FirstOrDefault();
-                }
-                catch (Exception e)
-                {
-                    logger.LogDebug(e, "Failed to get IPv4 configuration data");
-                }
-
-                // .NET cannot determine if DHCP is used for a given adapter on Linux, so use "ip -4 addr" to get the IPv4 address lifetime (if any)
-                string? ipAddr = ipAddress?.ToString();
-                if (ipAddr != null)
-                {
-                    if (File.Exists("/usr/sbin/ip"))
-                    {
-                        try
-                        {
-                            using Process? proc = Process.Start(new ProcessStartInfo("/usr/sbin/ip", $"-4 address show dev {iface.Name}") { RedirectStandardOutput = true });
-                            if (proc != null)
-                            {
-                                await proc.WaitForExitAsync(cancellationToken);
-
-                                // Static IPv4 addresses do not have limited lifetimes
-                                string output = await proc.StandardOutput.ReadToEndAsync(cancellationToken);
-                                networkInterface.ConfiguredIP = output.Contains("valid_lft forever") ? ipAddr : "0.0.0.0";
-                            }
-                        }
-                        catch (Exception e)
-                        {
-                            logger.LogDebug(e, "Failed to query DHCP info via ip utility");
-                        }
-                    }
-                }
-                else
-                {
-                    networkInterface.ConfiguredIP = null;
-                }
-
-                // Assign other IPv4 properties
-                networkInterface.ActualIP = ipAddr;
-                networkInterface.Subnet = netMask?.ToString();
-                networkInterface.Gateway = gateway?.ToString();
-                networkInterface.DnsServer = dnsServer?.ToString();
-                networkInterface.Mac = macAddress;
-                networkInterface.Speed = (int?)(iface.Speed / 1000000);
-                networkInterface.State = iface.OperationalStatus switch
-                {
-                    System.Net.NetworkInformation.OperationalStatus.Up => NetworkState.Active,
-                    System.Net.NetworkInformation.OperationalStatus.Down or System.Net.NetworkInformation.OperationalStatus.LowerLayerDown => NetworkState.Disabled,
-                    System.Net.NetworkInformation.OperationalStatus.Dormant => NetworkState.Idle,
-                    _ => null,
-                };
-
-                // Note that iface.NetworkInterfaceType is broken on Unix and cannot be used (.NET 5-6)
-                if (iface.Name.StartsWith('w'))
-                {
-                    try
-                    {
-                        // Get WiFi signal
-                        string wifiData = File.ReadAllText("/proc/net/wireless");
-                        Regex signalRegex = new(iface.Name + @".*(-\d+)\.");
-                        Match signalMatch = signalRegex.Match(wifiData);
-                        if (signalMatch.Success)
-                        {
-                            networkInterface.RSSI = int.Parse(signalMatch.Groups[1].Value);
-                        }
-
-                        // Get WiFi SSID
-                        if (File.Exists("/usr/sbin/iwgetid"))
-                        {
-                            ProcessStartInfo startInfo = new()
-                            {
-                                FileName = "/usr/sbin/iwgetid",
-                                Arguments = $"{iface.Name} -r",
-                                RedirectStandardOutput = true
-                            };
-
-                            using Process? process = Process.Start(startInfo);
-                            if (process is not null)
-                            {
-                                string ssid = string.Empty;
-                                process.OutputDataReceived += (sender, e) => ssid += e.Data;
-                                process.BeginOutputReadLine();
-                                await process.WaitForExitAsync(cancellationToken);
-                                networkInterface.SSID = ssid;
-                            }
-                            else
-                            {
-                                networkInterface.SSID = string.Empty;
-                            }
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        networkInterface.RSSI = null;
-                        networkInterface.SSID = string.Empty;
-                        logger.LogDebug(e, "Failed to get WiFi data for interface {InterfaceName}", iface.Name);
-                    }
-                    networkInterface.Type = NetworkInterfaceType.WiFi;
-                    networkInterface.WifiCountry = wifiCountry;
-                }
-                else
-                {
-                    networkInterface.RSSI = null;
-                    networkInterface.SSID = null;
-                    networkInterface.Type = NetworkInterfaceType.LAN;
-                    networkInterface.WifiCountry = null;
-                }
-                networkInterface.PropertyChanged -= InterfaceUpdated;
             }
+            else
+            {
+                networkInterface = model.Network.Interfaces[index];
+            }
+            index++;
+
+            networkInterface.PropertyChanged += InterfaceUpdated;
+            string? wifiCountry = networkInterface.WifiCountry;
+            networkInterface.Assign(data);
+            if (networkInterface.Type == NetworkInterfaceType.WiFi)
+            {
+                networkInterface.WifiCountry = wifiCountry;
+            }
+            networkInterface.PropertyChanged -= InterfaceUpdated;
         }
 
         for (int i = model.Network.Interfaces.Count; i > index; i--)
@@ -407,16 +419,25 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterfac
     /// <summary>
     /// Update SBC data key
     /// </summary>
-    public void UpdateSbc()
+    private record SbcData(float? AvgLoad, float? CpuTemperature, long? AvailableMemory, double? Uptime);
+
+    /// <summary>
+    /// Gather SBC stats from /proc without holding any locks
+    /// </summary>
+    private async Task<SbcData> GatherSbcDataAsync(CancellationToken cancellationToken)
     {
         Regex cpuRegex = _cpuRegex();
         Regex availableMemoryRegex = _availableMemoryRegex();
+
+        float? avgLoad = null;
+        float? cpuTemperature = null;
+        long? availableMemory = null;
+        double? uptime = null;
+
         try
         {
             // Compute average CPU load
-            double? avgLoad = null;
-            IEnumerable<string> statsInfo = File.ReadLines("/proc/stat");
-            foreach (string line in statsInfo)
+            await foreach (string line in File.ReadLinesAsync("/proc/stat", cancellationToken))
             {
                 Match match = cpuRegex.Match(line);
                 if (match.Success)
@@ -426,24 +447,21 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterfac
                     {
                         total += double.Parse(match.Groups[i].Value);
                     }
-                    avgLoad = Math.Round(100 - 100 * double.Parse(match.Groups[4].Value) / total, 2);
+                    avgLoad = (float)Math.Round(100 - 100 * double.Parse(match.Groups[4].Value) / total, 2);
                     break;
                 }
             }
-            model.SBC!.CPU.AvgLoad = (float?)avgLoad;
 
             // Try to get the CPU temperature
             if (File.Exists(settings.Value.CpuTemperaturePath))
             {
-                model.SBC!.CPU.Temperature = float.Parse(File.ReadAllText(settings.Value.CpuTemperaturePath)) / settings.Value.CpuTemperatureDivider;
+                cpuTemperature = float.Parse(await File.ReadAllTextAsync(settings.Value.CpuTemperaturePath, cancellationToken)) / settings.Value.CpuTemperatureDivider;
             }
 
             // Try to update memory stats
-            long? availableMemory = null;
             if (File.Exists("/proc/meminfo"))
             {
-                IEnumerable<string> memoryInfo = File.ReadAllLines("/proc/meminfo");
-                foreach (string line in memoryInfo)
+                foreach (string line in await File.ReadAllLinesAsync("/proc/meminfo", cancellationToken))
                 {
                     Match availableMemoryMatch = availableMemoryRegex.Match(line);
                     if (availableMemoryMatch.Success)
@@ -454,14 +472,33 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterfac
                     }
                 }
             }
-            model.SBC.Memory.Available = availableMemory;
 
-            // Update current SBC uptime
-            model.SBC.Uptime = double.Parse(File.ReadAllText("/proc/uptime").Split(' ')[0]);
+            // Read uptime
+            uptime = double.Parse((await File.ReadAllTextAsync("/proc/uptime", cancellationToken)).Split(' ')[0]);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception e)
         {
-            logger.LogDebug(e, "Failed to update SBC stats");
+            logger.LogDebug(e, "Failed to gather SBC stats");
+        }
+
+        return new SbcData(avgLoad, cpuTemperature, availableMemory, uptime);
+    }
+
+    /// <summary>
+    /// Apply gathered SBC data to the object model (must be called with OM write lock held)
+    /// </summary>
+    private void ApplySbcData(SbcData data)
+    {
+        model.SBC!.CPU.AvgLoad = data.AvgLoad;
+        model.SBC!.CPU.Temperature = data.CpuTemperature;
+        model.SBC!.Memory.Available = data.AvailableMemory;
+        if (data.Uptime.HasValue)
+        {
+            model.SBC!.Uptime = data.Uptime.Value;
         }
     }
 
@@ -473,11 +510,8 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterfac
     /// might need further adjustments to ensure this on every Linux distribution
     /// </remarks>
     /// <returns>Asynchronous task</returns>
-    private bool UpdateVolumes(DriveInfo[] drives)
+    private static List<Volume> GatherVolumeData(DriveInfo[] drives)
     {
-        bool volumesUpdated = false;
-        void VolumeUpdated(object? sender, PropertyChangedEventArgs e) => volumesUpdated = true;
-
         // Read file labels from /dev/disk/by-label (if applicable)
         Dictionary<string, string> labelSymlinks = [];
         if (Directory.Exists("/dev/disk/by-label"))
@@ -493,45 +527,76 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterfac
             }
         }
 
-        // Update volume info
-        int index = 0;
+        List<Volume> result = [];
         foreach (DriveInfo drive in drives)
         {
             long totalSize;
             try
             {
-                // On some systems this query causes an IOException...
                 totalSize = drive.TotalSize;
             }
-            catch (IOException)
+            catch
             {
                 totalSize = 0;
             }
 
             if (drive.DriveType != DriveType.Ram && totalSize > 0)
             {
-                Volume volume;
-                if (index >= model.Volumes.Count)
+                long freeSpace = 0;
+                try
                 {
-                    volume = new Volume();
-                    model.Volumes.Add(volume);
+                    freeSpace = drive.AvailableFreeSpace;
                 }
-                else
+                catch
                 {
-                    volume = model.Volumes[index];
+                    // Best effort
                 }
-                index++;
 
-                volume.PropertyChanged += VolumeUpdated;
-                volume.Capacity = (drive.DriveType == DriveType.Network) ? null : totalSize;
-                volume.FreeSpace = (drive.DriveType == DriveType.Network) ? null : drive.AvailableFreeSpace;
-                volume.Mounted = drive.IsReady;
-                // It's a shame DriveInfo does not provide a correct VolumeLabel property and no device node, so we need to *guess* it more or less
-                volume.Name = labelSymlinks.TryGetValue(Path.GetFileName(drive.RootDirectory.FullName), out string? label) ? label : (drive.VolumeLabel == "/" ? null : drive.VolumeLabel);
-                volume.PartitionSize = (drive.DriveType == DriveType.Network) ? null : totalSize;
-                volume.Path = drive.RootDirectory.FullName;
-                volume.PropertyChanged -= VolumeUpdated;
+                bool isNetwork = drive.DriveType == DriveType.Network;
+                string? name = labelSymlinks.TryGetValue(Path.GetFileName(drive.RootDirectory.FullName), out string? label)
+                    ? label
+                    : (drive.VolumeLabel == "/" ? null : drive.VolumeLabel);
+
+                result.Add(new Volume
+                {
+                    Capacity = isNetwork ? null : totalSize,
+                    FreeSpace = isNetwork ? null : freeSpace,
+                    Mounted = drive.IsReady,
+                    Name = name,
+                    PartitionSize = isNetwork ? null : totalSize,
+                    Path = drive.RootDirectory.FullName
+                });
             }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Apply gathered volume data to the object model (must be called with OM write lock held)
+    /// </summary>
+    private bool ApplyVolumeData(List<Volume> gathered)
+    {
+        bool volumesUpdated = false;
+        void VolumeUpdated(object? sender, PropertyChangedEventArgs e) => volumesUpdated = true;
+
+        int index = 0;
+        foreach (Volume data in gathered)
+        {
+            Volume volume;
+            if (index >= model.Volumes.Count)
+            {
+                volume = new Volume();
+                model.Volumes.Add(volume);
+            }
+            else
+            {
+                volume = model.Volumes[index];
+            }
+            index++;
+
+            volume.PropertyChanged += VolumeUpdated;
+            volume.Assign(data);
+            volume.PropertyChanged -= VolumeUpdated;
         }
 
         for (int i = model.Volumes.Count; i > index; i--)

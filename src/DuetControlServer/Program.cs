@@ -60,8 +60,7 @@ Option<DirectoryInfo> socketDirectoryOption = new("--socket-directory", "-S")
 };
 Option<string> socketFileOption = new("--socket-file", "-s")
 {
-    Description = "Full path to the IPC socket file",
-    DefaultValueFactory = _ => Defaults.FullSocketPath
+    Description = "Full path to the IPC socket file"
 };
 Option<DirectoryInfo> baseDirectoryOption = new("--base-directory", "-b")
 {
