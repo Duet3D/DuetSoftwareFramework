@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
@@ -96,19 +95,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
             }
         }
 
-        // If the remote process is running as dsf, reject it unless the process is in the same directory as DCS (like DWS or DPS)
-        if (!IsRoot && (uid == ProcessHelpers.GetEffectiveUserID() || gid == ProcessHelpers.GetEffectiveGroupID()))
-        {
-            string dcsDirectory = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)!;
-            string remoteDirectory = Path.GetDirectoryName(Process.GetProcessById(pid)?.MainModule?.FileName)!;
-            if (dcsDirectory != remoteDirectory)
-            {
-                logger.LogError("IPC#{Id}: Failed to find plugin permissions for pid #{Pid}", Id, pid);
-                return false;
-            }
-        }
-
-        // Grant full permissions to other programs
+        // Grant full permissions to other programs (socket ownership/mode gates who can connect)
         logger.LogDebug("IPC#{Id}: Granting full DSF permissions to external plugin", Id);
         foreach (Enum permission in Enum.GetValues<SbcPermissions>())
         {

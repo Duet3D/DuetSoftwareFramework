@@ -33,6 +33,7 @@ Option<CodeChannel[]?> channelsOption = new("--channel", "-c")
 Option<string[]?> filtersOption = new("--filters", "-f")
 {
     Description = "Code types that may be intercepted (main codes, keywords, or Q0 for comments)",
+    Arity = ArgumentArity.OneOrMore
 };
 
 Option<bool> priorityCodesOption = new("--priority-codes", "-p")
