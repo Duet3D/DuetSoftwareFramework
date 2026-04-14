@@ -1,4 +1,5 @@
-﻿using DuetAPI.Utility;
+﻿using System;
+using DuetAPI.Utility;
 
 namespace DuetAPI.ObjectModel;
 
@@ -138,8 +139,14 @@ public partial class Extruder : ModelObject, IStaticModelObject
     private float _position;
 
     /// <summary>
+    /// Pressure advance parameters (see M572)
+    /// </summary>
+    public ExtruderPressureAdvance PressAdv { get; private set; } = new ExtruderPressureAdvance();
+
+    /// <summary>
     /// Pressure advance
     /// </summary>
+    [Obsolete("use PressAdv instead")]
     public float PressureAdvance
     {
         get => _pressureAdvance;
