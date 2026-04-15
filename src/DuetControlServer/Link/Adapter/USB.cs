@@ -107,6 +107,11 @@ public class USB : IDiagnostics, ILinkAdapter
         // Open the serial port or discard any pending data
         if (!_serialPort.IsOpen)
         {
+            // Check explicitly so we get a clear FileNotFoundException instead of a misleading UnauthorizedAccessException from SerialPort.Open
+            if (!File.Exists(_serialPort.PortName))
+            {
+                throw new FileNotFoundException("Serial device not found", _serialPort.PortName);
+            }
             _serialPort.Open();
         }
         else
