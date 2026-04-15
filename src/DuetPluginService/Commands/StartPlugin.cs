@@ -60,6 +60,17 @@ public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetim
             throw new InvalidOperationException("Wrong plugin service to start this plugin");
         }
 
+        // Refuse to launch a non-SuperUser plugin if AppArmor is enabled but its profile is missing on disk - this
+        // prevents a regen failure (or any other reason the profile is absent) from letting the plugin run unconfined
+        if (!_settings.DisableAppArmor && !plugin.SbcPermissions.HasFlag(SbcPermissions.SuperUser))
+        {
+            string profilePath = Path.Combine(_settings.AppArmorProfileDirectory, $"dsf.{plugin.Id}");
+            if (!File.Exists(profilePath))
+            {
+                throw new InvalidOperationException($"AppArmor profile for plugin {plugin.Id} is missing at {profilePath}; refusing to start");
+            }
+        }
+
         // Get the actual executable
         string architecture = RuntimeInformation.OSArchitecture switch
         {
@@ -80,6 +91,14 @@ public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetim
             }
         }
 
+        // Refuse to launch if the executable is a symlink. The plugin has write access to its own directory, so a
+        // malicious plugin could swap its binary for a symlink to e.g. /bin/bash and escape its AppArmor profile on
+        // next start (the kernel resolves symlinks before profile matching)
+        if (new FileInfo(sbcExecutable).LinkTarget is not null)
+        {
+            throw new ArgumentException($"Refusing to launch plugin {plugin.Id}: executable {sbcExecutable} is a symlink");
+        }
+
         using (await pluginStore.LockAsync(cancellationToken))
         {
             // Make sure the same process isn't started twice
@@ -95,7 +114,7 @@ public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetim
                 Arguments = (plugin.SbcPythonDependencies.Count == 0) ? plugin.SbcExecutableArguments : _settings.PythonLaunchArguments
                     .Replace("{pluginDir}", Path.Combine(settings.Value.PluginDirectory, plugin.Id))
                     .Replace("{command}", sbcExecutable)
-                    .Replace("{args}", (plugin.SbcExecutableArguments ?? string.Empty).Replace("'", "\\'")),
+                    .Replace("{args}", plugin.SbcExecutableArguments ?? string.Empty),
                 EnvironmentVariables =
                 {
                     [Defaults.FullSocketPathEnvironmentVariable] = _settings.SocketPath

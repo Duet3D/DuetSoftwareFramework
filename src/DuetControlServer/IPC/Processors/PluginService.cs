@@ -4,6 +4,7 @@ using DuetAPI.Connection.InitMessages;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Commands;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
@@ -41,14 +42,29 @@ public sealed class PluginService : IProcessor
     private static bool _rootServiceConnected;
 
     /// <summary>
-    /// Queue of pending service commands vs tasks
+    /// Queue of pending service commands. The TaskCompletionSource receives the deserialized result (null for
+    /// untyped/void commands)
     /// </summary>
-    private static readonly Queue<Tuple<BaseCommand, TaskCompletionSource>> _pendingCommands = new();
+    private static readonly Queue<Tuple<BaseCommand, TaskCompletionSource<object?>>> _pendingCommands = new();
 
     /// <summary>
-    /// Queue of pending service commands vs tasks
+    /// Queue of pending service commands for the root service, same layout as <see cref="_pendingCommands"/>
     /// </summary>
-    private static readonly Queue<Tuple<BaseCommand, TaskCompletionSource>> _pendingRootCommands = new();
+    private static readonly Queue<Tuple<BaseCommand, TaskCompletionSource<object?>>> _pendingRootCommands = new();
+
+    /// <summary>
+    /// Check if the requested plugin service is currently connected
+    /// </summary>
+    /// <param name="asRoot">Whether to check the root plugin service</param>
+    /// <returns>True if the service is connected</returns>
+    public static bool IsConnected(bool asRoot) => asRoot ? _rootServiceConnected : _serviceConnected;
+
+    /// <summary>
+    /// Peer PID of the currently-connected non-root plugin service, or 0 if none is connected. Used by DCS to
+    /// authenticate DPS's internal command connections so that a plugin re-execing DuetPluginService (with LD_PRELOAD
+    /// or otherwise) cannot masquerade as the real DPS - its PID won't match
+    /// </summary>
+    public static int ServicePid { get; private set; }
 
     /// <summary>
     /// Perform a command via the plugin service
@@ -57,37 +73,49 @@ public sealed class PluginService : IProcessor
     /// <param name="asRoot">Send it to the service running as root</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public static async Task PerformCommandAsync(BaseCommand command, bool asRoot, CancellationToken cancellationToken = default)
+    public static Task PerformCommandAsync(BaseCommand command, bool asRoot, CancellationToken cancellationToken = default)
     {
-        TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        return EnqueueCommandAsync(command, asRoot, cancellationToken);
+    }
+
+    /// <summary>
+    /// Perform a command via the plugin service and return its typed result
+    /// </summary>
+    /// <typeparam name="T">Expected result type (must be registered in <see cref="CommandContext"/>)</typeparam>
+    /// <param name="command">Command to perform</param>
+    /// <param name="asRoot">Send it to the service running as root</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Deserialized command result</returns>
+    public static async Task<T?> PerformCommandAsync<T>(BaseCommand command, bool asRoot, CancellationToken cancellationToken = default)
+    {
+        return (T?)await EnqueueCommandAsync(command, asRoot, cancellationToken);
+    }
+
+    private static async Task<object?> EnqueueCommandAsync(BaseCommand command, bool asRoot, CancellationToken cancellationToken)
+    {
+        TaskCompletionSource<object?> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         using (await (asRoot ? _rootMonitor : _monitor).EnterAsync(cancellationToken))
         {
             if (asRoot)
             {
-                if (_rootServiceConnected)
-                {
-                    _pendingRootCommands.Enqueue(new Tuple<BaseCommand, TaskCompletionSource>(command, tcs));
-                    _rootMonitor.Pulse();
-                }
-                else
+                if (!_rootServiceConnected)
                 {
                     throw new InvalidOperationException("Cannot perform command because the plugin service (root) is not started");
                 }
+                _pendingRootCommands.Enqueue(new Tuple<BaseCommand, TaskCompletionSource<object?>>(command, tcs));
+                _rootMonitor.Pulse();
             }
             else
             {
-                if (_serviceConnected)
-                {
-                    _pendingCommands.Enqueue(new Tuple<BaseCommand, TaskCompletionSource>(command, tcs));
-                    _monitor.Pulse();
-                }
-                else
+                if (!_serviceConnected)
                 {
                     throw new InvalidOperationException("Cannot perform command because the plugin service is not started");
                 }
+                _pendingCommands.Enqueue(new Tuple<BaseCommand, TaskCompletionSource<object?>>(command, tcs));
+                _monitor.Pulse();
             }
         }
-        await tcs.Task;
+        return await tcs.Task;
     }
 
     /// <summary>
@@ -155,6 +183,8 @@ public sealed class PluginService : IProcessor
                     throw new InvalidOperationException("Plugin service is already connected");
                 }
                 _serviceConnected = true;
+                Connection.UnixSocket.GetPeerCredentials(out int servicePid, out _, out _);
+                ServicePid = servicePid;
             }
         }
 
@@ -169,13 +199,13 @@ public sealed class PluginService : IProcessor
         }
 
         // Process incoming requests
-        Queue<Tuple<BaseCommand, TaskCompletionSource>> pendingCommands = Connection.IsRoot ? _pendingRootCommands : _pendingCommands;
+        Queue<Tuple<BaseCommand, TaskCompletionSource<object?>>> pendingCommands = Connection.IsRoot ? _pendingRootCommands : _pendingCommands;
         try
         {
             do
             {
                 // Wait for the next request and read it
-                Tuple<BaseCommand, TaskCompletionSource>? request;
+                Tuple<BaseCommand, TaskCompletionSource<object?>>? request;
                 try
                 {
                     using (await monitor.EnterAsync(cancellationToken))
@@ -198,18 +228,23 @@ public sealed class PluginService : IProcessor
                 // Send it over to the plugin service. Exception logging should take place in the command processor
                 try
                 {
-                    await Connection.SendCommandAsync(request.Item1);
-                    BaseResponse response = await Connection.ReceiveResponseAsync(cancellationToken);
-                    if (response is ErrorResponse errorResponse)
+                    if (request.Item1 is ResolvePluginProcess)
                     {
-                        // Failed to process request, propagate the error
-                        string command = request.Item1.Command;
-                        request.Item2.SetException(new InternalServerException(command, errorResponse.ErrorType, errorResponse.ErrorMessage));
+                        string? result = await Connection.PerformCommandAsync<string>(request.Item1, cancellationToken);
+                        request.Item2.SetResult(result);
                     }
                     else
                     {
-                        // Command successfully executed
-                        request.Item2.SetResult();
+                        await Connection.SendCommandAsync(request.Item1);
+                        BaseResponse response = await Connection.ReceiveResponseAsync(cancellationToken);
+                        if (response is ErrorResponse errorResponse)
+                        {
+                            request.Item2.SetException(new InternalServerException(request.Item1.Command, errorResponse.ErrorType, errorResponse.ErrorMessage));
+                        }
+                        else
+                        {
+                            request.Item2.SetResult(null);
+                        }
                     }
                 }
                 catch (SocketException se)
@@ -217,7 +252,7 @@ public sealed class PluginService : IProcessor
                     if (request.Item1 is Commands.StopPlugins)
                     {
                         // Service may terminate before our own request is fully processed
-                        request.Item2.SetResult();
+                        request.Item2.SetResult(null);
                     }
                     else
                     {
@@ -259,10 +294,11 @@ public sealed class PluginService : IProcessor
                 else
                 {
                     _serviceConnected = false;
+                    ServicePid = 0;
                 }
 
                 // Invalidate pending requests
-                while (pendingCommands.TryDequeue(out Tuple<BaseCommand, TaskCompletionSource>? request))
+                while (pendingCommands.TryDequeue(out Tuple<BaseCommand, TaskCompletionSource<object?>>? request))
                 {
                     request.Item2.SetCanceled(cancellationToken);
                 }

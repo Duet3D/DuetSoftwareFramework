@@ -3,6 +3,11 @@
 chown dsf:dsf /opt/dsf/conf/http.json
 chmod 664 /opt/dsf/conf/http.json
 
+# Grant CAP_NET_BIND_SERVICE as a file capability (not an ambient/systemd cap) so the kernel sets AT_SECURE=1 on exec,
+# causing glibc to ignore LD_PRELOAD / LD_LIBRARY_PATH / LD_AUDIT from untrusted paths - DCS verifies AT_SECURE when
+# DWS connects over IPC to defend against code-injection masquerade
+setcap cap_net_bind_service+ep /opt/dsf/bin/DuetWebServer || true
+
 # Update systemd services
 systemctl -q --no-ask-password daemon-reload
 

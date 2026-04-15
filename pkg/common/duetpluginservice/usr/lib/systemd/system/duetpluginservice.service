@@ -13,6 +13,8 @@ Type=notify
 User=dsf
 Group=dsf
 UMask=0002
+KillMode=control-group
+SendSIGKILL=yes
 
 [Install]
 WantedBy=multi-user.target

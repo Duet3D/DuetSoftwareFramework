@@ -133,22 +133,26 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
                 }
 
                 string fileName;
+                string allowedBase;
                 if (entry.FullName.StartsWith("dsf/"))
                 {
                     // Put DSF plugin files into <PluginDirectory>/<PluginName>/dsf
                     fileName = Path.Combine(pluginBase, entry.FullName);
+                    allowedBase = pluginBase;
                     plugin.DsfFiles.Add(entry.FullName[4..]);
                 }
                 else if (entry.FullName.StartsWith("dwc/"))
                 {
                     // Put DWC plugin files into <PluginDirectory>/<PluginName>/dwc
                     fileName = Path.Combine(pluginBase, entry.FullName);
+                    allowedBase = pluginBase;
                     plugin.DwcFiles.Add(entry.FullName[4..]);
                 }
                 else if (entry.FullName.StartsWith("sd/"))
                 {
                     // Put SD files into 0:/
                     fileName = Path.Combine(sdPath, entry.FullName[3..]);
+                    allowedBase = sdPath;
                     plugin.SdFiles.Add(entry.FullName[3..]);
                 }
                 else
@@ -156,6 +160,15 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
                     // Skip other files
                     logger.LogWarning("Skipping installation of file {File}", entry.FullName);
                     continue;
+                }
+
+                // Guard against zip-slip: a malicious archive could use '..' segments or absolute paths in entry names
+                // to escape the plugin directory and overwrite files elsewhere
+                string resolvedFileName = Path.GetFullPath(fileName);
+                string resolvedBase = Path.GetFullPath(allowedBase);
+                if (!resolvedFileName.StartsWith(resolvedBase + Path.DirectorySeparatorChar, StringComparison.Ordinal) && resolvedFileName != resolvedBase)
+                {
+                    throw new ArgumentException($"Refusing to install entry {entry.FullName}: path escapes plugin directory");
                 }
 
                 // Make sure the parent directory exists
@@ -287,6 +300,14 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
         if (plugin.SbcPermissions.HasFlag(SbcPermissions.ServicePlugins))
         {
             throw new ArgumentException("ServicePlugins permission is reserved for internal purposes");
+        }
+
+        // Plugins with Python dependencies are launched via bash -c with the arguments interpolated into the
+        // double-quoted command string. Reject any char that could break out of that quoting and execute arbitrary code
+        if (!string.IsNullOrEmpty(plugin.SbcExecutableArguments) &&
+            plugin.SbcExecutableArguments.AsSpan().IndexOfAny(['"', '$', '`', '\\', '\n', '\r']) >= 0)
+        {
+            throw new ArgumentException("SbcExecutableArguments must not contain shell metacharacters (\", $, `, \\, newline)");
         }
 
         // All OK

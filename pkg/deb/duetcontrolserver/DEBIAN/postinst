@@ -14,6 +14,10 @@ chown -R dsf:dsf /opt/dsf/conf /opt/dsf/plugins
 chmod -R g+wX /opt/dsf/conf
 chmod 755 /opt/dsf/plugins
 
+# File capabilities trigger AT_SECURE=1 on exec, which DPS verifies when DCS connects back
+# to itself (e.g. `DuetControlServer -u`) to defend against LD_PRELOAD masquerade attacks
+setcap cap_sys_ptrace,cap_dac_read_search,cap_sys_time+ep /opt/dsf/bin/DuetControlServer || true
+
 # Update systemd services
 systemctl -q --no-ask-password daemon-reload
 

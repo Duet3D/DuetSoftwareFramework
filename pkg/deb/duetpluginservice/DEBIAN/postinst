@@ -6,6 +6,9 @@ chown dsf:dsf /opt/dsf/bin/pipInstall2.py
 chmod 755 /opt/dsf/plugins
 chmod 744 /opt/dsf/bin/pipInstall2.py
 
+# Drop existing per-plugin AppArmor profiles so DPS regenerates them from the current template on its next start
+rm -f /etc/apparmor.d/dsf.*
+
 # Update systemd services
 systemctl -q --no-ask-password daemon-reload
 
