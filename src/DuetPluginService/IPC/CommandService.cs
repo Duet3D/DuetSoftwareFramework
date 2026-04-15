@@ -71,7 +71,7 @@ public class CommandService(PluginServiceConnection connection, ILogger<CommandS
                     {
                         if (e is UnauthorizedAccessException)
                         {
-                            logger.LogError("Insufficient permissions to execute {Command}", command!.Command);
+                            logger.LogError("Cannot execute {Command}: {Message}", command!.Command, e.Message);
                         }
                         else
                         {

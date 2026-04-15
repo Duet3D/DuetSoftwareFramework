@@ -126,7 +126,7 @@ public sealed class Command : IProcessor
                     {
                         if (e is UnauthorizedAccessException)
                         {
-                            _logger.LogError("IPC#{Id}: Insufficient permissions to execute {Command}", Connection.Id, command.Command);
+                            _logger.LogError("IPC#{Id}: Cannot execute {Command}: {Message}", Connection.Id, command.Command, e.Message);
                         }
                         else
                         {

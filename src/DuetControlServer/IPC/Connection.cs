@@ -98,7 +98,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
         // If a plugin is currently being started its PID may not yet have propagated to the object model - ask DPS first
         if (Commands.StartPlugin.IsAnyStarting)
         {
-            string? resolvedPluginId = await ResolvePluginViaServiceAsync(pid);
+            string? resolvedPluginId = await ResolvePluginViaServiceAsync(pid, false);
             if (resolvedPluginId is not null)
             {
                 using (await model.AccessReadOnlyAsync())
@@ -222,23 +222,46 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     }
 
     /// <summary>
-    /// Ask the non-root plugin service to resolve the given PID against its tracked plugin processes. Closes the window
+    /// Ask the plugin service to resolve the given PID against its tracked plugin processes. Closes the window
     /// where a plugin has started but <c>SetPluginProcessAsync</c> has not yet updated the object model
     /// </summary>
     /// <param name="pid">PID to resolve</param>
+    /// <param name="asRoot">Whether to query the root plugin service</param>
     /// <returns>Plugin id if matched, null otherwise</returns>
-    private async Task<string?> ResolvePluginViaServiceAsync(int pid)
+    private async Task<string?> ResolvePluginViaServiceAsync(int pid, bool asRoot)
     {
         try
         {
             ResolvePluginProcess command = new() { Pid = pid };
-            return await Processors.PluginService.PerformCommandAsync<string>(command, false);
+            return await Processors.PluginService.PerformCommandAsync<string>(command, asRoot);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
             logger.LogWarning(e, "IPC#{Id}: Failed to query plugin service", Id);
             return null;
         }
+    }
+
+    /// <summary>
+    /// Resolve the peer PID to a plugin ID via the matching plugin service (root or non-root). Used by commands
+    /// that need to identify the caller's plugin when <see cref="PluginId"/> was not assigned at connect time
+    /// (notably root-owned plugins, which skip the PID lookup in <see cref="AssignPermissionsAsync"/>). Caches
+    /// the result on <see cref="PluginId"/> so later permission checks can treat the connection as owner
+    /// </summary>
+    /// <returns>Plugin id if matched, null otherwise</returns>
+    public async Task<string?> ResolvePeerPluginIdAsync()
+    {
+        if (PluginId is not null)
+        {
+            return PluginId;
+        }
+        UnixSocket.GetPeerCredentials(out int pid, out _, out _);
+        string? resolved = await ResolvePluginViaServiceAsync(pid, IsRoot);
+        if (resolved is not null)
+        {
+            PluginId = resolved;
+        }
+        return resolved;
     }
 
     /// <summary>

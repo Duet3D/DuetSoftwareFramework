@@ -6,14 +6,14 @@ namespace DuetAPI.ObjectModel;
 public partial class ExtruderPressureAdvance : ModelObject, IStaticModelObject
 {
     /// <summary>
-    /// Delay coefficient (in ms)
+    /// Delay coefficient (in ms), or null if pressure advance is in simple mode (k0 = 0) - RRF reports infinity here as null
     /// </summary>
-    public float D
+    public float? D
     {
         get => _d;
         set => SetPropertyValue(ref _d, value);
     }
-    private float _d;
+    private float? _d;
 
     /// <summary>
     /// K0 coefficient
