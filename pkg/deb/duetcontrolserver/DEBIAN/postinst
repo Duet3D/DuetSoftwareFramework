@@ -3,6 +3,12 @@
 # Create gpio group and add dsf to it
 systemd-sysusers duetcontrolserver.conf
 
+# Ensure dsf group memberships on upgrade. systemd-sysusers "m" lines are unreliable for
+# pre-existing users on older systemd versions, so re-apply explicitly
+for grp in gpio video dialout; do
+    getent group "$grp" >/dev/null 2>&1 && usermod -a -G "$grp" dsf || true
+done
+
 # Create /var/run/dsf now
 systemd-tmpfiles --create duetcontrolserver.conf
 
