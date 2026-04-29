@@ -4,7 +4,6 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Codes.Meta;
 using DuetControlServer.Files;
 using DuetControlServer.Link;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
@@ -19,26 +18,12 @@ namespace DuetControlServer.Codes.Handlers;
 /// Meta G-code keyword handler
 /// </summary>
 /// <param name="codeProcessor">Code processor</param>
-/// <param name="codeFactory">Code factory</param>
 /// <param name="expressions">Meta G-code expression parser</param>
-/// <param name="gCodeHandler">G-code handler</param>
-/// <param name="mCodeHandler">M-code handler</param>
-/// <param name="tCodeHandler">T-code handler</param>
 /// <param name="filePathResolver">File path resolver</param>
 /// <param name="linkInterface">Link interface</param>
 /// <param name="logger">Logger</param>
 /// <param name="settings">Settings</param>
-public sealed class KeywordHandler(
-    CodeProcessor codeProcessor,
-    CodeFactory codeFactory,
-    Expressions expressions,
-    [FromKeyedServices(Keys.GCodes)] ICodeHandler gCodeHandler,
-    [FromKeyedServices(Keys.MCodes)] ICodeHandler mCodeHandler,
-    [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodeHandler,
-    FilePathResolver filePathResolver,
-    LinkInterface linkInterface,
-    ILogger<KeywordHandler> logger,
-    IOptions<Settings> settings) : ICodeHandler
+public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expressions, FilePathResolver filePathResolver, LinkInterface linkInterface, ILogger<KeywordHandler> logger, IOptions<Settings> settings) : ICodeHandler
 {
     // Private fields
     private readonly ILogger<KeywordHandler> _logger = logger;
@@ -180,72 +165,6 @@ public sealed class KeywordHandler(
                     await linkInterface.AbortAllAsync(code.Channel, cancellationToken);
                 }
                 return new Message(MessageType.Success, result ?? string.Empty);
-
-            case KeywordType.Exec:
-                if (!await codeProcessor.FlushAsync(code, false, cancellationToken: cancellationToken))
-                {
-                    if (!cancellationToken.IsCancellationRequested)
-                    {
-                        // exec may be executed only if the channel is active
-                        return new Message();
-                    }
-                    throw new OperationCanceledException();
-                }
-
-                string generatedCode = (await expressions.EvaluateAsync(code, true, cancellationToken) ?? string.Empty).Trim();
-                if (string.IsNullOrEmpty(generatedCode))
-                {
-                    throw new CodeParserException("expected a code to execute", code);
-                }
-
-                Commands.Code parsedCode;
-                try
-                {
-                    parsedCode = codeFactory.Create(generatedCode);
-                }
-                catch (CodeParserException cpe)
-                {
-                    throw new CodeParserException($"failed to parse generated code '{generatedCode}': {cpe.Message}", code);
-                }
-
-                // Keep the original execution context of the code being processed
-                parsedCode.Channel = code.Channel;
-                parsedCode.Connection = code.Connection;
-                parsedCode.SourceConnection = code.SourceConnection;
-                parsedCode.File = code.File;
-                parsedCode.CancellationToken = code.CancellationToken;
-
-                Message? generatedResult = parsedCode.Type switch
-                {
-                    CodeType.GCode => await gCodeHandler.ProcessAsync(parsedCode, cancellationToken),
-                    CodeType.MCode => await mCodeHandler.ProcessAsync(parsedCode, cancellationToken),
-                    CodeType.TCode => await tCodeHandler.ProcessAsync(parsedCode, cancellationToken),
-                    CodeType.Keyword => await ProcessAsync(parsedCode, cancellationToken),
-                    _ => null,
-                };
-
-                if (generatedResult is not null)
-                {
-                    return generatedResult;
-                }
-
-                if (parsedCode.Type is not (CodeType.GCode or CodeType.MCode or CodeType.TCode))
-                {
-                    throw new CodeParserException($"generated code '{generatedCode}' is not a G/M/T-code", code);
-                }
-
-                // Forward unresolved generated code to firmware by rewriting this code in-place.
-                // Preserve non-parser flags and file position bookkeeping from the current code.
-                code.Type = parsedCode.Type;
-                code.Keyword = KeywordType.None;
-                code.KeywordArgument = null;
-                code.MajorNumber = parsedCode.MajorNumber;
-                code.MinorNumber = parsedCode.MinorNumber;
-                code.Comment = parsedCode.Comment;
-                code.Parameters = parsedCode.Parameters;
-                code.Flags &= ~(CodeFlags.EnforceAbsolutePosition | CodeFlags.HasExplicitLineNumber);
-                code.Flags |= parsedCode.Flags & (CodeFlags.EnforceAbsolutePosition | CodeFlags.HasExplicitLineNumber);
-                return null;
 
             case KeywordType.Global:
             case KeywordType.Var:

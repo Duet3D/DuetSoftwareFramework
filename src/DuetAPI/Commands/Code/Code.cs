@@ -1112,7 +1112,6 @@ public partial class Code : Command<Message?>
             KeywordType.Var => "var",
             KeywordType.Set => "set",
             KeywordType.Echo => "echo",
-            KeywordType.Exec => "exec",
             KeywordType.Global => "global",
             _ => throw new NotImplementedException(),
         };

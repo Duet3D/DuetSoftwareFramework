@@ -846,18 +846,6 @@ public class Code
     }
 
     [Test]
-    public void ParseExec()
-    {
-        foreach (DuetAPI.Commands.Code code in Parse("exec {\"G28 \" ^ move.axes[0].letter}"))
-        {
-            Assert.That(code.Indent, Is.EqualTo(0));
-            Assert.That(code.Type, Is.EqualTo(CodeType.Keyword));
-            Assert.That(code.Keyword, Is.EqualTo(KeywordType.Exec));
-            Assert.That(code.KeywordArgument, Is.EqualTo("{\"G28 \" ^ move.axes[0].letter}"));
-        }
-    }
-
-    [Test]
     public void ParseDynamicT()
     {
         foreach (DuetAPI.Commands.Code code in Parse("T{my.expression} P0"))

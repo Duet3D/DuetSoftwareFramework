@@ -238,7 +238,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     {
         if (Keyword != KeywordType.None &&
             Keyword != KeywordType.Echo &&
-            Keyword != KeywordType.Exec &&
             Keyword != KeywordType.Abort &&
             Keyword != KeywordType.Global &&
             Keyword != KeywordType.Var &&

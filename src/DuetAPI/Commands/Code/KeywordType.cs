@@ -60,11 +60,6 @@ public enum KeywordType : byte
     Echo,
 
     /// <summary>
-    /// Execute operation
-    /// </summary>
-    Exec,
-
-    /// <summary>
     /// Continue instruction
     /// </summary>
     /// <seealso cref="While"/>
