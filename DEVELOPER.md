@@ -1,29 +1,29 @@
 # Duet Software Framework Developer Setup Guide
 
-This guide explains how to set up a development environment for Duet Software Framework (DSF) from scratch using Visual Studio Code and Docker.
+This guide explains how to set up a development environment for [Duet Software Framework (DSF)](https://github.com/Duet3D/DuetSoftwareFramework) from scratch using [Visual Studio Code](https://code.visualstudio.com/) and [Docker](https://www.docker.com/).
 
 No prior knowledge of VS Code, Docker, or DSF is assumed.
 
 ## Table of Contents
 
-1. Overview
-2. Prerequisites
-3. Install Required Software
-4. Clone the Repository
-5. Open the Project in VS Code
-6. Open in Dev Container
-7. First Build
-8. Build Using VS Code Tasks
-9. Deploy to a Remote DuetPi/SBC
-10. Optional: Build with Make
-11. Working with Git in the Dev Container
-12. Troubleshooting
+1. [Overview](#overview)
+2. [Prerequisites](#prerequisites)
+3. [Install Required Software](#install-required-software)
+4. [Clone the Repository](#clone-the-repository)
+5. [Open the Project in VS Code](#open-the-project-in-vs-code)
+6. [Open in Dev Container](#open-in-dev-container)
+7. [First Build](#first-build)
+8. [Build Using VS Code Tasks](#build-using-vs-code-tasks)
+9. [Deploy to a Remote DuetPi/SBC](#deploy-to-a-remote-duetpisbc)
+10. [Optional: Build with Make](#optional-build-with-make)
+11. [Working with Git in the Dev Container](#working-with-git-in-the-dev-container)
+12. [Troubleshooting](#troubleshooting)
 
 ## Overview
 
-Duet Software Framework is a collection of .NET services and tools that run on a Linux single-board computer (SBC) and communicate with a Duet board.
+Duet Software Framework is a collection of .NET services and tools that run on a Linux single-board computer (SBC) and communicate with a Duet board. For a higher-level project overview, see [README.md](README.md).
 
-This repository includes a Dev Container configuration in .devcontainer/. A Dev Container is a Docker-based development environment defined in code. When you open this project in VS Code, it can automatically build and start a container with all required build tools preinstalled.
+This repository includes a Dev Container configuration in [.devcontainer/devcontainer.json](.devcontainer/devcontainer.json) and [.devcontainer/Dockerfile](.devcontainer/Dockerfile). A Dev Container is a Docker-based development environment defined in code. When you open this project in VS Code, it can automatically build and start a container with all required build tools preinstalled.
 
 Inside the Dev Container, you get:
 
@@ -37,10 +37,10 @@ Inside the Dev Container, you get:
 
 Install these tools on your host machine first:
 
-- Git
-- Docker Desktop (or Docker Engine on Linux)
-- Visual Studio Code
-- VS Code extension: Dev Containers (by Microsoft)
+- [Git](https://git-scm.com/)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or [Docker Engine](https://docs.docker.com/engine/install/) on Linux)
+- [Visual Studio Code](https://code.visualstudio.com/)
+- VS Code extension: [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) (by Microsoft)
 
 ### What is Docker?
 
@@ -62,7 +62,7 @@ When this is done, terminals in VS Code run inside the container.
 
 ### 1. Git
 
-Download from https://git-scm.com/downloads or install from your package manager.
+Download from [git-scm.com/downloads](https://git-scm.com/downloads) or install from your package manager.
 
 Verify:
 
@@ -73,10 +73,10 @@ git --version
 ### 2. Docker
 
 Install Docker Desktop:
-https://www.docker.com/products/docker-desktop/
+[docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/)
 
 Linux users can install Docker Engine instead:
-https://docs.docker.com/engine/install/
+[docs.docker.com/engine/install](https://docs.docker.com/engine/install/)
 
 Verify:
 
@@ -87,7 +87,7 @@ docker --version
 ### 3. Visual Studio Code
 
 Install VS Code:
-https://code.visualstudio.com/
+[code.visualstudio.com](https://code.visualstudio.com/)
 
 Then install the Dev Containers extension:
 
@@ -123,7 +123,7 @@ Or use File -> Open Folder and select the DuetSoftwareFramework folder.
 
 ## Open in Dev Container
 
-When VS Code opens this repository, it should detect .devcontainer/devcontainer.json and prompt:
+When VS Code opens this repository, it should detect [.devcontainer/devcontainer.json](.devcontainer/devcontainer.json) and prompt:
 
 "Folder contains a Dev Container configuration file. Reopen in Container?"
 
@@ -136,7 +136,7 @@ If you do not see the prompt:
 
 On first run, VS Code will:
 
-1. Build the Docker image from .devcontainer/Dockerfile.
+1. Build the Docker image from [.devcontainer/Dockerfile](.devcontainer/Dockerfile).
 2. Start the container.
 3. Run post-create setup, including restore of the solution.
 
@@ -153,11 +153,13 @@ cd src
 dotnet build DuetSoftwareFramework.sln
 ```
 
+The solution file is [src/DuetSoftwareFramework.sln](src/DuetSoftwareFramework.sln).
+
 If build succeeds, your environment is ready.
 
 ## Build Using VS Code Tasks
 
-This repository includes predefined tasks in .vscode/tasks.json.
+This repository includes predefined tasks in [.vscode/tasks.json](.vscode/tasks.json).
 
 To run a task:
 
@@ -201,6 +203,8 @@ Optional helper task:
 - Install vsdbg on Remote
 
 This installs Microsoft vsdbg on the remote machine for debugging scenarios.
+
+The task definitions are in [.vscode/tasks.json](.vscode/tasks.json) if you want to inspect or extend them.
 
 ## Working with Git in the Dev Container
 
