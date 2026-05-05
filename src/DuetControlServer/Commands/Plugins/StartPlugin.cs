@@ -27,6 +27,18 @@ public sealed class StartPlugin(CommandFactory commandFactory, Model.ObjectModel
     private static readonly AsyncLock _startLock = new();
 
     /// <summary>
+    /// Number of StartPlugin commands currently executing. Used by the IPC layer to decide whether to query DPS during
+    /// permission assignment - a plugin in its starting window has not yet had its PID propagated to the object model,
+    /// so the PPID walk alone can miss it. Incremented on entry and decremented in <c>finally</c> to survive exceptions
+    /// </summary>
+    private static int _activeStarts;
+
+    /// <summary>
+    /// True while at least one StartPlugin command is currently executing
+    /// </summary>
+    public static bool IsAnyStarting => Volatile.Read(ref _activeStarts) > 0;
+
+    /// <summary>
     /// Start a plugin
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
@@ -39,27 +51,35 @@ public sealed class StartPlugin(CommandFactory commandFactory, Model.ObjectModel
             throw new NotSupportedException("Plugin support has been disabled");
         }
 
-        // Start the plugin and its dependencies
-        using (await _startLock.LockAsync(cancellationToken))
+        Interlocked.Increment(ref _activeStarts);
+        try
         {
-            await StartAsync(Plugin, cancellationToken: cancellationToken);
-        }
-
-        // Save the execution state if requested
-        if (SaveState)
-        {
-            await using FileStream fileStream = new(settings.Value.PluginsFilename, FileMode.Create, FileAccess.Write, FileShare.None, settings.Value.FileBufferSize);
-            await using StreamWriter writer = new(fileStream, Encoding.UTF8, settings.Value.FileBufferSize);
-            using (await model.AccessReadOnlyAsync(cancellationToken))
+            // Start the plugin and its dependencies
+            using (await _startLock.LockAsync(cancellationToken))
             {
-                foreach (Plugin item in model.Plugins.Values)
+                await StartAsync(Plugin, cancellationToken: cancellationToken);
+            }
+
+            // Save the execution state if requested
+            if (SaveState)
+            {
+                await using FileStream fileStream = new(settings.Value.PluginsFilename, FileMode.Create, FileAccess.Write, FileShare.None, settings.Value.FileBufferSize);
+                await using StreamWriter writer = new(fileStream, Encoding.UTF8, settings.Value.FileBufferSize);
+                using (await model.AccessReadOnlyAsync(cancellationToken))
                 {
-                    if (item.Pid >= 0)
+                    foreach (Plugin item in model.Plugins.Values)
                     {
-                        await writer.WriteLineAsync(item.Id);
+                        if (item.Pid >= 0)
+                        {
+                            await writer.WriteLineAsync(item.Id);
+                        }
                     }
                 }
             }
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _activeStarts);
         }
     }
 

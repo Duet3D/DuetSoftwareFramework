@@ -31,10 +31,11 @@ public sealed class NotifyPluginStarted(Model.ObjectModel model) : DuetAPI.Comma
     /// <returns>Asynchronous task</returns>
     public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        // Fill in plugin name if required
+        // Fill in plugin name if required. Root-owned plugins skip the PID lookup in AssignPermissionsAsync, so ask
+        // the matching plugin service to resolve our peer PID here
         if (string.IsNullOrEmpty(Plugin))
         {
-            Plugin = Connection!.PluginId ?? throw new UnauthorizedAccessException("Failed to determine plugin ID");
+            Plugin = await Connection!.ResolvePeerPluginIdAsync() ?? throw new UnauthorizedAccessException("Failed to determine plugin ID");
         }
 
         // Check permissions. Only the owner or plugins with the ManagePlugins permission may modify other plugins

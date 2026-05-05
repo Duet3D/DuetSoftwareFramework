@@ -39,6 +39,8 @@ fi
 
 %post
 systemctl daemon-reload >/dev/null 2>&1 || :
+# Drop existing per-plugin AppArmor profiles so DPS regenerates them from the current template on its next start
+rm -f /etc/apparmor.d/dsf.* >/dev/null 2>&1 || :
 
 %preun
 if [ $1 -eq 0 ] ; then
@@ -54,6 +56,14 @@ if [ $1 -eq 1 ] && systemctl -q is-enabled %{name}.service ; then
 fi
 if [ $1 -eq 1 ] && systemctl -q is-enabled %{name}-root.service ; then
 	systemctl start %{name}-root.service
+fi
+# On full removal, unload per-plugin AppArmor profiles from the kernel and delete the profile files
+if [ $1 -eq 0 ] ; then
+	for profile in /etc/apparmor.d/dsf.* ; do
+		[ -e "$profile" ] || continue
+		apparmor_parser -R "$profile" >/dev/null 2>&1 || :
+		rm -f "$profile"
+	done
 fi
 
 %files

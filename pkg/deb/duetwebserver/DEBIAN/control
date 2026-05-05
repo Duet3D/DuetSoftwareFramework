@@ -3,7 +3,7 @@ Version: DSFVER
 Section: electronics
 Priority: optional
 Architecture: TARGET_ARCH
-Depends: duetcontrolserver (>= DSFVER), duetruntime (>= DSFVER)
+Depends: duetcontrolserver (>= DSFVER), duetruntime (>= DSFVER), libcap2-bin
 Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
 Homepage: https://pkg.duet3d.com
 Vcs-Git: https://github.com/Duet3D/DuetSoftwareFramework.git

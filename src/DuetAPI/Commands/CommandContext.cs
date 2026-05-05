@@ -40,6 +40,7 @@ namespace DuetAPI.Commands;
 [JsonSerializable(typeof(InstallPlugin))]
 [JsonSerializable(typeof(NotifyPluginStarted))]
 [JsonSerializable(typeof(ReloadPlugin))]
+[JsonSerializable(typeof(ResolvePluginProcess))]
 [JsonSerializable(typeof(SetPluginData))]
 [JsonSerializable(typeof(SetPluginProcess))]
 [JsonSerializable(typeof(StartPlugin))]

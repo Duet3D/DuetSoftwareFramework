@@ -11,6 +11,7 @@ KillMode=process
 TimeoutStopSec=15
 Restart=always
 Type=notify
+# Allow child processes to stay alive, required when performing system updates affecting DSF
 
 [Install]
 WantedBy=multi-user.target

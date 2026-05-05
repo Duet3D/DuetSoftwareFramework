@@ -1,11 +1,11 @@
-﻿using DuetAPI;
+using DuetAPI;
 using System;
 
 namespace DuetControlServer.Link.Protocol.Shared;
 
 /// <summary>
-/// Message type flags describing a code reply. This is equal to MessageType in RepRapFirmware.
-/// Make sure to keep the destinations in sync with the <see cref="CodeChannel"/> entries
+/// Supported message destinations. This is now a bitmap. Note that this type is used by RepRapFirmware as well.
+/// Make sure to keep the destinations in sync with the <see cref="CodeChannel"/> entries.
 /// </summary>
 [Flags]
 public enum MessageTypeFlags : uint
@@ -32,19 +32,19 @@ public enum MessageTypeFlags : uint
     UsbMessage = 0x08,
 
     /// <summary>
-    /// A message that is to be sent to the panel
+    /// A message that is to be sent to an auxiliary device (PanelDue)
     /// </summary>
     AuxMessage = 0x10,
 
     /// <summary>
-    /// A message that is to be sent to the code queue channel
+    /// A message that is to be sent to a trigger processor
     /// </summary>
     TriggerMessage = 0x20,
 
     /// <summary>
     /// A message that is to be sent to the code queue channel
     /// </summary>
-    QueueMessage = 0x40,
+    CodeQueueMessage = 0x40,
 
     /// <summary>
     /// A message that is to be sent to the panel
@@ -52,17 +52,17 @@ public enum MessageTypeFlags : uint
     LcdMessage = 0x80,
 
     /// <summary>
-    /// A message that is to be sent to the SPI master
+    /// A message that is to be sent to the SBC
     /// </summary>
     SbcMessage = 0x100,
 
     /// <summary>
-    /// A message that is to be sent to a daemon processor
+    /// A message that is sent to the daemon processor
     /// </summary>
     DaemonMessage = 0x200,
 
     /// <summary>
-    /// A message that is to be sent to the second UART port
+    /// A message that is to be sent to the second aux device
     /// </summary>
     Aux2Message = 0x400,
 
@@ -72,14 +72,24 @@ public enum MessageTypeFlags : uint
     AutoPauseMessage = 0x800,
 
     /// <summary>
-    /// A message that is to be published by the MQTT client
+    /// A message that is to be sent to the second file processor
     /// </summary>
-    MqttMessage = 0x1000,
+    File2Message = 0x1000,
+
+    /// <summary>
+    /// A message that is to be sent to the second code queue channel
+    /// </summary>
+    Queue2Message = 0x2000,
 
     /// <summary>
     /// A message that is to be sent to the second USB channel
     /// </summary>
-    Usb2Message = 0x2000,
+    Usb2Message = 0x4000,
+
+    /// <summary>
+    /// A message that is to be published by the MQTT client
+    /// </summary>
+    MqttMessage = 0x8000,
     #endregion
 
     #region Special destinations (byte 3)
@@ -91,7 +101,7 @@ public enum MessageTypeFlags : uint
     /// <summary>
     /// A message that is to be sent to LCD in immediate mode
     /// </summary>
-    ImmediateLcdMessage = 0x20000,
+    ImmediateAuxMessage = 0x20000,
     #endregion
 
     #region Special indicators (byte 4)
@@ -105,35 +115,33 @@ public enum MessageTypeFlags : uint
     /// </summary>
     WarningMessageFlag = 0x2000000,
 
-    // 0x4000000 is now unused
-
     /// <summary>
     /// Do not encapsulate this message
     /// </summary>
-    RawMessageFlag = 0x8000000, // Do not encapsulate this message
+    RawMessageFlag = 0x8000000,
 
     /// <summary>
     /// This message comes from a binary G-Code buffer
     /// </summary>
-    BinaryCodeReplyFlag = 0x10000000,   // This message comes from a binary G-Code buffer
+    BinaryCodeReplyFlag = 0x10000000,
 
     /// <summary>
     /// There is more to come; the message has been truncated
     /// </summary>
-    PushFlag = 0x20000000,  // There is more to come; the message has been truncated
+    PushFlag = 0x20000000,
 
     /// <summary>
-    /// Log level consists of two bits. This is the low bit
+    /// Log level consists of two bits, this is the low bit
     /// </summary>
     LogMessageLowBit = 0x40000000,
 
     /// <summary>
-    /// Log level consists of two bits. This is the high bit
+    /// Log level consists of two bits, this is the high bit
     /// </summary>
     LogMessageHighBit = 0x80000000,
     #endregion
 
-    #region Common combination
+    #region Common combinations
     /// <summary>
     /// A message that is going nowhere
     /// </summary>
@@ -145,7 +153,7 @@ public enum MessageTypeFlags : uint
     GenericMessage = UsbMessage | AuxMessage | HttpMessage | TelnetMessage,
 
     /// <summary>
-    /// Log level "off (3): do not log this message
+    /// Log level "off" (3): do not log this message
     /// </summary>
     LogOff = LogMessageLowBit | LogMessageHighBit,
 

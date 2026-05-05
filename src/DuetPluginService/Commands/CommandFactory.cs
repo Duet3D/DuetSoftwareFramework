@@ -19,6 +19,7 @@ public class CommandFactory(IServiceProvider serviceProvider)
     [
         typeof(IPC.InstallPlugin),
         typeof(IPC.ReloadPlugin),
+        typeof(IPC.ResolvePluginProcess),
         typeof(IPC.StartPlugin),
         typeof(IPC.StopPlugin),
         typeof(IPC.UninstallPlugin),

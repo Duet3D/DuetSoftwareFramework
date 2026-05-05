@@ -18,6 +18,7 @@ License: GPLv3
 URL:     https://github.com/Duet3D/DuetSoftwareFramework
 BuildRequires: rpm >= 4.7.2-2
 Requires: duetcontrolserver >= %{_tversion}
+Requires: libcap
 %systemd_requires
 
 AutoReq:  0
@@ -33,6 +34,7 @@ fi
 
 %post
 systemctl daemon-reload >/dev/null 2>&1 || :
+setcap cap_net_bind_service+ep %{dsfoptdir}/bin/DuetWebServer >/dev/null 2>&1 || :
 
 %preun
 if [ $1 -eq 0 ] ; then

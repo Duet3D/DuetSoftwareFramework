@@ -97,9 +97,16 @@ public static class Commands
         }
 
         // Unregister this session again (recommended if there is a registered session)
-        if (connection.IsConnected)
+        try
         {
-            await connection.RemoveUserSessionAsync(sessionId, cancellationToken);
+            if (connection.IsConnected)
+            {
+                await connection.RemoveUserSessionAsync(sessionId, cancellationToken);
+            }
+        }
+        catch
+        {
+            // DCS may have shut down (e.g. after a firmware update)
         }
         return 0;
     }

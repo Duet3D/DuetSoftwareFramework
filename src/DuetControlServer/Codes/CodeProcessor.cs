@@ -136,9 +136,11 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
             }
             return false;
         }
-        else if (ifExecuting)
+        else if (ifExecuting && model.MultipleMotionSystemsConfigured)
         {
-            // Make sure the current code channel is executing G/M/T-codes
+            // Make sure the current code channel is executing G/M/T-codes.
+            // This check is only needed with multiple motion systems where a channel
+            // may be inactive because it belongs to a different motion system
             using (await model.AccessReadOnlyAsync(cancellationToken))
             {
                 if (model.Inputs[code.Channel]?.Active != true)

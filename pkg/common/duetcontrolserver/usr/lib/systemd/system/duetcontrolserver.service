@@ -17,8 +17,6 @@ CPUSchedulingPriority=20
 IOSchedulingClass=realtime
 IOSchedulingPriority=2
 MemorySwapMax=0
-CapabilityBoundingSet=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_SYS_TIME
-AmbientCapabilities=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_SYS_TIME
 
 [Install]
 WantedBy=sysinit.target

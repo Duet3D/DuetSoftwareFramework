@@ -271,6 +271,12 @@ public class UpdateService : BackgroundService
                                 if (_keyUpdated)
                                 {
                                     _logger.LogDebug("Updated key {Key}{Annotation}", key, (offset + next != 0) ? $" starting from {offset}, next {next}" : string.Empty);
+
+                                    // Track whether multiple motion systems are in use
+                                    if (key == "move")
+                                    {
+                                        _model.MultipleMotionSystemsConfigured = _model.Move.MotionSystems.Count > 1;
+                                    }
                                 }
                                 else
                                 {

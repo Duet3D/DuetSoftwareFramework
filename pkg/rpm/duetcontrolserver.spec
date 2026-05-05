@@ -19,6 +19,7 @@ License: GPLv3
 URL:     https://github.com/Duet3D/DuetSoftwareFramework
 BuildRequires: rpm >= 4.7.2-2
 Requires: duetruntime = %{_tversion}
+Requires: libcap
 %systemd_requires
 
 AutoReq:  0
@@ -34,6 +35,14 @@ fi
 
 %post
 systemctl daemon-reload >/dev/null 2>&1 || :
+# File capabilities trigger AT_SECURE=1 on exec, which DPS verifies to defend against LD_PRELOAD masquerade
+setcap cap_sys_ptrace,cap_dac_read_search,cap_sys_time+ep %{dsfoptdir}/bin/DuetControlServer >/dev/null 2>&1 || :
+
+# Ensure dsf group memberships on upgrade. systemd-sysusers "m" lines are unreliable for
+# pre-existing users on older systemd versions, so re-apply explicitly
+for grp in gpio video dialout; do
+    getent group "$grp" >/dev/null 2>&1 && usermod -a -G "$grp" dsf || :
+done
 
 %preun
 if [ $1 -eq 0 ] ; then

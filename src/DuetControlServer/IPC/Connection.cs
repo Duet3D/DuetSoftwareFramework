@@ -4,10 +4,12 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
@@ -75,14 +77,44 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     {
         UnixSocket.GetPeerCredentials(out int pid, out int uid, out int gid);
 
-        // Check if the remote program is running as root
+        // Root processes get everything; no plugin lookup needed
         if (uid == 0 || gid == 0)
         {
             IsRoot = true;
             Permissions |= SbcPermissions.SuperUser;
+            logger.LogDebug("IPC#{Id}: Granting full permissions to root process (pid {Pid})", Id, pid);
+            return true;
         }
 
-        // Assign permissions based on previously launched plugins
+        // If the plugin service is not running we cannot verify plugin identity, so fall through to the external-program
+        // policy. This is the dev-mode path where DCS runs standalone without plugin management. In prod DPS kills its
+        // children when it terminates, so this check is safe
+        if (!Processors.PluginService.IsConnected(false))
+        {
+            GrantExternalPermissions();
+            return true;
+        }
+
+        // If a plugin is currently being started its PID may not yet have propagated to the object model - ask DPS first
+        if (Commands.StartPlugin.IsAnyStarting)
+        {
+            string? resolvedPluginId = await ResolvePluginViaServiceAsync(pid, false);
+            if (resolvedPluginId is not null)
+            {
+                using (await model.AccessReadOnlyAsync())
+                {
+                    if (model.Plugins.TryGetValue(resolvedPluginId, out Plugin plugin))
+                    {
+                        PluginId = plugin.Id;
+                        Permissions |= plugin.SbcPermissions;
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // Fast path: check if the peer PID itself is a known plugin before touching /proc. Only if the peer is not
+        // directly a plugin do we walk the process tree so that child processes inherit the parent plugin's permissions
         using (await model.AccessReadOnlyAsync())
         {
             foreach (Plugin plugin in model.Plugins.Values)
@@ -94,22 +126,92 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
                     return true;
                 }
             }
-        }
 
-        // If the remote process is running as dsf, reject it unless the process is in the same directory as DCS (like DWS or DPS)
-        if (!IsRoot && (uid == ProcessHelpers.GetEffectiveUserID() || gid == ProcessHelpers.GetEffectiveGroupID()))
-        {
-            string dcsDirectory = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)!;
-            string remoteDirectory = Path.GetDirectoryName(Process.GetProcessById(pid)?.MainModule?.FileName)!;
-            if (dcsDirectory != remoteDirectory)
+            for (int currentPid = ProcessHelpers.GetParentPid(pid); currentPid > 1; currentPid = ProcessHelpers.GetParentPid(currentPid))
             {
-                logger.LogError("IPC#{Id}: Failed to find plugin permissions for pid #{Pid}", Id, pid);
-                return false;
+                foreach (Plugin plugin in model.Plugins.Values)
+                {
+                    if (plugin.Pid == currentPid)
+                    {
+                        PluginId = plugin.Id;
+                        Permissions |= plugin.SbcPermissions;
+                        return true;
+                    }
+                }
             }
         }
 
-        // Grant full permissions to other programs
-        logger.LogDebug("IPC#{Id}: Granting full DSF permissions to external plugin", Id);
+        // Not a tracked plugin. If the peer shares our uid/gid the only legitimate origins are DSF services (DPS and
+        // DWS) living in DCS's directory. Anything else in our user namespace is untracked or tampered-with and must
+        // be rejected. A peer with a different uid/gid is a genuinely external program (admin tool running under its
+        // own account) and gets the external-program policy
+        int ownUid = ProcessHelpers.GetEffectiveUserID(), ownGid = ProcessHelpers.GetEffectiveGroupID();
+        if (uid == ownUid || gid == ownGid)
+        {
+            if (!IsDsfService(pid))
+            {
+                logger.LogWarning("IPC#{Id}: Rejecting untracked peer sharing our user identity (pid {Pid}, uid {Uid}, gid {Gid})", Id, pid, uid, gid);
+                return false;
+            }
+            logger.LogDebug("IPC#{Id}: Granting permissions to sibling DSF service (pid {Pid})", Id, pid);
+        }
+
+        GrantExternalPermissions();
+        return true;
+    }
+
+    /// <summary>
+    /// Check whether the peer process is a permitted DSF service (DCS, DPS or DWS). Returns false on any error
+    /// (process gone, executable unreadable, etc.) so anything we cannot positively identify is rejected
+    /// </summary>
+    /// <param name="pid">Peer process ID</param>
+    /// <returns>True if the peer is a recognized service</returns>
+    private static bool IsDsfService(int pid)
+    {
+        try
+        {
+            // Get PID's process path
+            using Process proc = Process.GetProcessById(pid);
+            string? procPath = proc.MainModule?.FileName;
+            if (string.IsNullOrEmpty(procPath))
+            {
+                return false;
+            }
+
+            // Make sure it is in the same directory as DCS
+            string? peerDir = Path.GetDirectoryName(procPath);
+            string? dcsDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            if (peerDir != dcsDir)
+            {
+                return false;
+            }
+
+            // DPS is matched against its known service PID (captured from its PluginService connection). A plugin
+            // re-execing DuetPluginService under LD_PRELOAD would get a different PID than the systemd-launched one.
+            // DCS and DWS are matched via AT_SECURE=1: the kernel sets this when a binary with file capabilities is
+            // exec'd, which causes glibc to ignore LD_PRELOAD / LD_LIBRARY_PATH / LD_AUDIT. The bit is immutable
+            // post-exec. DCS appears here for re-invocations like `DuetControlServer -u` that connect back over IPC
+            string peerFilename = Path.GetFileNameWithoutExtension(procPath);
+            return peerFilename switch
+            {
+                "DuetPluginService" => pid == Processors.PluginService.ServicePid,
+                "DuetControlServer" or "DuetWebServer" => proc.IsExecSecure(),
+                _ => false,
+            };
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Grant all non-SuperUser permissions. Used for external admin-owned programs (and in dev mode where DPS is not
+    /// available to vet plugin ownership)
+    /// </summary>
+    private void GrantExternalPermissions()
+    {
+        logger.LogDebug("IPC#{Id}: Granting full DSF permissions to external program", Id);
         foreach (Enum permission in Enum.GetValues<SbcPermissions>())
         {
             if (!permission.Equals(SbcPermissions.SuperUser))
@@ -117,7 +219,49 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
                 Permissions |= (SbcPermissions)permission;
             }
         }
-        return true;
+    }
+
+    /// <summary>
+    /// Ask the plugin service to resolve the given PID against its tracked plugin processes. Closes the window
+    /// where a plugin has started but <c>SetPluginProcessAsync</c> has not yet updated the object model
+    /// </summary>
+    /// <param name="pid">PID to resolve</param>
+    /// <param name="asRoot">Whether to query the root plugin service</param>
+    /// <returns>Plugin id if matched, null otherwise</returns>
+    private async Task<string?> ResolvePluginViaServiceAsync(int pid, bool asRoot)
+    {
+        try
+        {
+            ResolvePluginProcess command = new() { Pid = pid };
+            return await Processors.PluginService.PerformCommandAsync<string>(command, asRoot);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            logger.LogWarning(e, "IPC#{Id}: Failed to query plugin service", Id);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Resolve the peer PID to a plugin ID via the matching plugin service (root or non-root). Used by commands
+    /// that need to identify the caller's plugin when <see cref="PluginId"/> was not assigned at connect time
+    /// (notably root-owned plugins, which skip the PID lookup in <see cref="AssignPermissionsAsync"/>). Caches
+    /// the result on <see cref="PluginId"/> so later permission checks can treat the connection as owner
+    /// </summary>
+    /// <returns>Plugin id if matched, null otherwise</returns>
+    public async Task<string?> ResolvePeerPluginIdAsync()
+    {
+        if (PluginId is not null)
+        {
+            return PluginId;
+        }
+        UnixSocket.GetPeerCredentials(out int pid, out _, out _);
+        string? resolved = await ResolvePluginViaServiceAsync(pid, IsRoot);
+        if (resolved is not null)
+        {
+            PluginId = resolved;
+        }
+        return resolved;
     }
 
     /// <summary>
@@ -245,6 +389,83 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
             }
         }
         while (true);
+    }
+
+    /// <summary>
+    /// Send a command and await its typed result.
+    /// Mirrors <c>BaseConnection.PerformCommandAsync&lt;T&gt;</c> on the client side
+    /// </summary>
+    /// <typeparam name="T">Expected result type (must be registered in <see cref="CommandContext"/>)</typeparam>
+    /// <param name="command">Command to send</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Deserialized result</returns>
+    /// <exception cref="InternalServerException">Server reported an error response</exception>
+    /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+    /// <exception cref="SocketException">Connection has been closed</exception>
+    public async Task<T?> PerformCommandAsync<T>(BaseCommand command, CancellationToken cancellationToken)
+    {
+        await SendCommandAsync(command);
+
+        using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(UnixSocket, cancellationToken);
+        logger.LogTrace("IPC#{Id}: Received {Json}", Id, Encoding.UTF8.GetString(jsonStream.ToArray()));
+
+        Span<byte> jsonSpan = jsonStream.ToArray();
+        Utf8JsonReader reader = new(jsonSpan), resultReader = reader;
+        bool isSuccess = false, resultSeen = false;
+
+        if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+        {
+            throw new ArgumentException("expected start of object");
+        }
+        while (reader.TokenType != JsonTokenType.EndObject && reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.PropertyName)
+            {
+                if (reader.ValueTextEquals("success"u8) && reader.Read())
+                {
+                    if (reader.TokenType == JsonTokenType.True)
+                    {
+                        if (resultSeen)
+                        {
+                            return (T?)JsonSerializer.Deserialize(ref resultReader, typeof(T), CommandContext.Default);
+                        }
+                        isSuccess = true;
+                    }
+                    else if (reader.TokenType == JsonTokenType.False)
+                    {
+                        ErrorResponse errorResponse = JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.ErrorResponse)!;
+                        throw new InternalServerException(command.Command, errorResponse.ErrorType, errorResponse.ErrorMessage);
+                    }
+                    else
+                    {
+                        throw new ArgumentException("success must be a boolean");
+                    }
+                }
+                else if (reader.ValueTextEquals("result"u8) && reader.Read())
+                {
+                    if (isSuccess)
+                    {
+                        return (T?)JsonSerializer.Deserialize(ref reader, typeof(T), CommandContext.Default);
+                    }
+                    resultSeen = true;
+                    resultReader = reader;
+                }
+                else
+                {
+                    reader.Skip();
+                }
+            }
+            else
+            {
+                reader.Skip();
+            }
+        }
+        if (isSuccess)
+        {
+            // Success without result field
+            return default;
+        }
+        throw new ArgumentException("missing success key");
     }
 
     /// <summary>

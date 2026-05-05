@@ -10,8 +10,6 @@ TimeoutStopSec=15
 Type=notify
 User=dsf
 Group=dsf
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE
-AmbientCapabilities=CAP_NET_BIND_SERVICE
 
 [Install]
 WantedBy=multi-user.target

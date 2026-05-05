@@ -24,6 +24,13 @@ namespace DuetControlServer.Model;
 public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
 {
     /// <summary>
+    /// Indicates whether multiple motion systems are configured.
+    /// When false, the channel Active check in FlushAsync is skipped for performance.
+    /// Updated by the model update service when the "move" key is refreshed.
+    /// </summary>
+    public volatile bool MultipleMotionSystemsConfigured;
+
+    /// <summary>
     /// Lock for read/write access
     /// </summary>
     private readonly AsyncReaderWriterLock _readWriteLock = new();

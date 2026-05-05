@@ -68,11 +68,12 @@ public sealed class LinkService(
         // Get the CRC16 checksum of the firmware binary
         ushort crc16 = CRC16.Calculate(linkInterface.FirmwareStream!);
 
-        // Send the IAP binary to the firmware
+        // Send the IAP binary to the firmware. Cancellation is safe at this stage
         logger.LogInformation("Sending IAP binary");
         bool dataSent;
         do
         {
+            cancellationToken.ThrowIfCancellationRequested();
             dataSent = linkAdapter.WriteIapSegment(linkInterface.IapStream!, cancellationToken);
             if (logger.IsEnabled(LogLevel.Debug))
             {
@@ -85,15 +86,30 @@ public sealed class LinkService(
             Console.WriteLine();
         }
 
-        // Start the IAP binary
-        linkAdapter.StartIap(cancellationToken);
+        // Start the IAP binary. This is the point of no return -- after this,
+        // the board is running IAP and we must complete the firmware transfer
+        // or the board will need manual recovery
+        // The firmware length is sent as part of the USB handshake so IAP knows
+        // exactly how many bytes to expect (SPI ignores this)
+        uint firmwareLength = (uint)linkInterface.FirmwareStream!.Length;
+        linkAdapter.StartIap(firmwareLength, cancellationToken);
 
-        // Send the firmware binary to the IAP program
+        // From here on, do not honor the cancellation token for data transfer
+        // Interrupting a flash-in-progress would brick the board
+        // Only check cancellation between CRC retries as a last resort
         int numRetries = 0;
         do
         {
             if (numRetries != 0)
             {
+                // Check cancellation between retries -- if DSF is being shut down
+                // and the board is unresponsive, there's no point in retrying
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    eventLogger.LogOutput(MessageType.Error, "Firmware update cancelled during retry. The board may need manual recovery.");
+                    logger.LogError("Firmware update cancelled during CRC retry");
+                    throw new OperationCanceledException("Firmware update cancelled during retry");
+                }
                 logger.LogError("Firmware checksum verification failed");
             }
 
@@ -123,7 +139,7 @@ public sealed class LinkService(
 
             logger.LogInformation("Verifying checksum");
         }
-        while (!linkAdapter.VerifyFirmwareChecksum(linkInterface.FirmwareStream.Length, crc16, cancellationToken) && ++numRetries < 3);
+        while (!linkAdapter.VerifyFirmwareChecksum(linkInterface.FirmwareStream.Length, crc16) && ++numRetries < 3);
 
         if (numRetries == 3)
         {
@@ -133,7 +149,7 @@ public sealed class LinkService(
         }
 
         // Wait for the IAP binary to restart the controller
-        linkAdapter.WaitForIapReset(cancellationToken);
+        linkAdapter.WaitForIapReset();
         logger.LogInformation("Firmware update successful");
     }
 
@@ -310,7 +326,7 @@ public sealed class LinkService(
             if (linkAdapter.HadReset())
             {
                 Invalidate();
-                eventLogger.LogOutput(MessageType.Warning, "SPI connection has been reset");
+                eventLogger.LogOutput(MessageType.Warning, "Connection to controller has been reset");
             }
 
             // Check for changes of the print status

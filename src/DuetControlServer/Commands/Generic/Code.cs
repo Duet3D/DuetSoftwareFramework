@@ -155,12 +155,12 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     public override async Task<Message?> ExecuteAsync(CancellationToken cancellationToken = default)
     {
         // Assign a cancellation token when the execution starts.
-        // Prioritized firmware codes use the application stopping token so they survive channel resets (e.g. emergency stop)
+        // Prioritized codes use the application stopping token so they survive channel resets (e.g. emergency stop)
         if (cancellationToken != default)
         {
             CancellationToken = cancellationToken;
         }
-        else if (Flags.HasFlag(CodeFlags.IsFromFirmware | CodeFlags.IsPrioritized))
+        else if (Flags.HasFlag(CodeFlags.IsPrioritized))
         {
             CancellationToken = _lifetime.ApplicationStopping;
         }

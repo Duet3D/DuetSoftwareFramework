@@ -44,6 +44,7 @@ public sealed class InterceptInitMessage : ClientInitMessage
     /// <remarks>
     /// This option makes extra Flush calls in the interceptor implementation obsolete.
     /// It is highly recommended to enable this in order to avoid potential deadlocks when dealing with macros!
+    /// This option is only used if at least one filter is used
     /// </remarks>
     public bool AutoFlush { get; set; } = true;
 
