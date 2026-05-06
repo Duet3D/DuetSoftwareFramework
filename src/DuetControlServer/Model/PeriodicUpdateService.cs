@@ -352,7 +352,7 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterfac
             }
             else
             {
-                ni.Type = NetworkInterfaceType.LAN;
+                ni.Type = NetworkInterfaceType.Ethernet;
             }
 
             result.Add(ni);
