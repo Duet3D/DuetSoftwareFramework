@@ -13,7 +13,7 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Wired network interface
         /// </summary>
-        LAN,
+        Ethernet,
 
         /// <summary>
         /// Wireless network interface
@@ -46,7 +46,7 @@ namespace DuetAPI.ObjectModel
 
             return reader.GetString() switch
             {
-                "lan" => NetworkInterfaceType.LAN,
+                "ethernet" => NetworkInterfaceType.Ethernet,
                 "wifi" => NetworkInterfaceType.WiFi,
                 _ => throw new JsonException("Unknown network interface type")
             };
@@ -62,7 +62,7 @@ namespace DuetAPI.ObjectModel
         {
             writer.WriteStringValue(value switch
             {
-                NetworkInterfaceType.LAN => "lan",
+                NetworkInterfaceType.Ethernet => "ethernet",
                 NetworkInterfaceType.WiFi => "wifi",
                 _ => throw new JsonException("Unknown network interface type")
             });

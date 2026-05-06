@@ -361,7 +361,7 @@ namespace DuetControlServer.Model
                     {
                         networkInterface.RSSI = null;
                         networkInterface.SSID = null;
-                        networkInterface.Type = NetworkInterfaceType.LAN;
+                        networkInterface.Type = NetworkInterfaceType.Ethernet;
                         networkInterface.WifiCountry = null;
                     }
                     networkInterface.PropertyChanged -= InterfaceUpdated;
