@@ -51,7 +51,7 @@ Every plugin must provide a `plugin.json` in the root of its ZIP bundle. It may 
   "sbcRequired": true,
   "sbcDsfVersion": "3.3",
   "sbcData": {},
-  "sbcExecutable": "Plugin Executable"
+  "sbcExecutable": "Plugin Executable",
   "sbcExecutableArguments": null,
   "sbcOutputRedirected":  true,
   "sbcPermissions": [],
