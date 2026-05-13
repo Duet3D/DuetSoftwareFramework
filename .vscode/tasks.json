@@ -38,9 +38,21 @@
             }
         },
         {
+            "label": "Restore DSF Solution",
+            "type": "shell",
+            "command": "dotnet restore ./src/DuetSoftwareFramework.sln -r linux-arm64",
+            "args": [],
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        },
+        {
             "label": "Build CodeConsole",
             "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained ./src/CodeConsole -o ./build",
+            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/CodeConsole -o ./build",
             "args": [],
             "problemMatcher": [
                 "$msCompile"
@@ -53,7 +65,7 @@
         {
             "label": "Build CodeLogger",
             "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained ./src/CodeLogger -o ./build",
+            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/CodeLogger -o ./build",
             "args": [],
             "problemMatcher": [
                 "$msCompile"
@@ -66,7 +78,7 @@
         {
             "label": "Build CodeStream",
             "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained ./src/CodeStream -o ./build",
+            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/CodeStream -o ./build",
             "args": [],
             "problemMatcher": [
                 "$msCompile"
@@ -79,7 +91,7 @@
         {
             "label": "Build CustomHttpEndpoint",
             "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained ./src/CustomHttpEndpoint -o ./build",
+            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/CustomHttpEndpoint -o ./build",
             "args": [],
             "problemMatcher": [
                 "$msCompile"
@@ -92,7 +104,7 @@
         {
             "label": "Build DuetControlServer",
             "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained ./src/DuetControlServer -o ./build",
+            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/DuetControlServer -o ./build",
             "args": [],
             "problemMatcher": [
                 "$msCompile"
@@ -105,7 +117,7 @@
         {
             "label": "Build DuetPiManagementPlugin",
             "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained ./src/DuetPiManagementPlugin -o ./build",
+            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/DuetPiManagementPlugin -o ./build",
             "args": [],
             "problemMatcher": [
                 "$msCompile"
@@ -118,7 +130,7 @@
         {
             "label": "Build DuetPluginService",
             "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained ./src/DuetPluginService -o ./build",
+            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/DuetPluginService -o ./build",
             "args": [],
             "problemMatcher": [
                 "$msCompile"
@@ -131,7 +143,7 @@
         {
             "label": "Build DuetWebServer",
             "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained ./src/DuetWebServer -o ./build",
+            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/DuetWebServer -o ./build",
             "args": [],
             "problemMatcher": [
                 "$msCompile"
@@ -144,7 +156,7 @@
         {
             "label": "Build ModelObserver",
             "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained ./src/ModelObserver -o ./build",
+            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/ModelObserver -o ./build",
             "args": [],
             "problemMatcher": [
                 "$msCompile"
@@ -157,7 +169,7 @@
         {
             "label": "Build PluginManager",
             "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained ./src/PluginManager -o ./build",
+            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/PluginManager -o ./build",
             "args": [],
             "problemMatcher": [
                 "$msCompile"
@@ -174,6 +186,7 @@
             "args": [],
             "problemMatcher": [],
             "dependsOn": [
+                "Restore DSF Solution",
                 "Build CodeConsole",
                 "Build CodeLogger",
                 "Build CodeStream",
@@ -199,7 +212,7 @@
         {
             "label": "Deploy To",
             "type": "shell",
-            "command": "rsync -rav --delete ./build/ root@${input:ip_address}:/opt/dsf/bin/ && ssh root@${input:ip_address} 'systemctl start duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
+            "command": "rsync -rav --delete ./build/ root@${input:ip_address}:/opt/dsf/bin/ && ssh root@${input:ip_address} 'setcap cap_sys_ptrace,cap_dac_read_search,cap_sys_time+ep /opt/dsf/bin/DuetControlServer || true; setcap cap_net_bind_service+ep /opt/dsf/bin/DuetWebServer || true; systemctl start duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
@@ -211,7 +224,7 @@
         {
             "label": "Deploy Local",
             "type": "shell",
-            "command": "sudo systemctl stop duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root && sudo rsync -rav --delete ./build/ /opt/dsf/bin/ && sudo systemctl start duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root",
+            "command": "sudo systemctl stop duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root && sudo rsync -rav --delete ./build/ /opt/dsf/bin/ && (sudo setcap cap_sys_ptrace,cap_dac_read_search,cap_sys_time+ep /opt/dsf/bin/DuetControlServer || true) && (sudo setcap cap_net_bind_service+ep /opt/dsf/bin/DuetWebServer || true) && sudo systemctl start duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root",
             "problemMatcher": [],
             "runOptions": {
             "instanceLimit": 1
