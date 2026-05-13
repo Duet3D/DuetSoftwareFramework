@@ -93,7 +93,7 @@ public sealed class ModelObserver(IConfiguration configuration, ILogger<ModelObs
                     using SubscribeConnection subscribeConnection = new();
                     using CommandConnection commandConnection = new();
                     await subscribeConnection.ConnectAsync(DuetAPI.Connection.SubscriptionMode.Patch, [
-                        "directories/www",
+                        "directories/web",
                         "messages/**",
                         "network/corsSite",
                         "sbc/dsf/httpEndpoints/**"
@@ -209,6 +209,8 @@ public sealed class ModelObserver(IConfiguration configuration, ILogger<ModelObs
         {
             Directories directories = (Directories)sender!;
             modelProvider.WebDirectory = await _commandConnection!.ResolvePathAsync(directories.Web);
+
+            logger.LogInformation("Web directory changed to {webDirectory}", modelProvider.WebDirectory);
         }
     }
 }
