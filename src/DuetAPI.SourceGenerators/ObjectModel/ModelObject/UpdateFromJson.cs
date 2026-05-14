@@ -317,7 +317,7 @@ internal static class UpdateFromJson
                             "string" => "GetString()!",
                             "char" => "GetString()![0]",
                             "int" => "GetInt32()",
-                            "bool" => "GetBoolean()",
+                            "bool" => "ValueKind == JsonValueKind.Number ? jsonProperty.Value.GetInt32() != 0 : jsonProperty.Value.GetBoolean()",
                             "double" => "GetDouble()",
                             "float" => "GetSingle()",
                             "long" => "GetInt64()",

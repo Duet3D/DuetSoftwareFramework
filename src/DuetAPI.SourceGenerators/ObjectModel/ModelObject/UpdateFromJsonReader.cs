@@ -284,7 +284,7 @@ internal static class UpdateFromJsonReader
                             "string" => "GetString()!",
                             "char" => "GetString()![0]",
                             "int" => "GetInt32()",
-                            "bool" => "GetBoolean()",
+                            "bool" => "TokenType == JsonTokenType.Number ? reader.GetInt32() != 0 : reader.GetBoolean()",
                             "double" => "GetDouble()",
                             "float" => "GetSingle()",
                             "long" => "GetInt64()",

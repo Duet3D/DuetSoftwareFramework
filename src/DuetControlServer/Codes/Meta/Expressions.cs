@@ -420,7 +420,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
     /// <returns>Evaluation result or null</returns>
     public async Task<string?> EvaluateAsync(Code code, bool evaluateAll, CancellationToken cancellationToken = default)
     {
-        if (code.KeywordArgument is not null)
+        if (!string.IsNullOrEmpty(code.KeywordArgument))
         {
             if (code.Keyword == KeywordType.Echo)
             {

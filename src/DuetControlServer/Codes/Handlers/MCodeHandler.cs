@@ -842,13 +842,22 @@ public class MCodeHandler(
                     {
                         await using (await linkInterface.LockAllMovementSystemsAndWaitForStandstill(code.Channel))
                         {
-                            string physicalDirectory = await filePathResolver.ToPhysicalAsync(directory, "sys", cancellationToken);
+                            string physicalDirectory = (code.MinorNumber != 1)
+                                ? await filePathResolver.ToPhysicalAsync(directory, "sys", cancellationToken)
+                                : await filePathResolver.ToPhysicalAsync(directory, "www", cancellationToken);
                             if (Directory.Exists(physicalDirectory))
                             {
                                 string virtualDirectory = await filePathResolver.ToVirtualAsync(physicalDirectory, cancellationToken);
                                 using (await model.AccessReadWriteAsync(cancellationToken))
                                 {
-                                    model.Directories.System = virtualDirectory;
+                                    if (code.MinorNumber != 1)
+                                    {
+                                        model.Directories.System = virtualDirectory;
+                                    }
+                                    else
+                                    {
+                                        model.Directories.Web = virtualDirectory;
+                                    }
                                 }
                                 return new Message();
                             }
@@ -858,7 +867,7 @@ public class MCodeHandler(
 
                     using (await model.AccessReadOnlyAsync(cancellationToken))
                     {
-                        return new Message(MessageType.Success, $"Sys file path is {model.Directories.System}");
+                        return new Message(MessageType.Success, $"{((code.MinorNumber != 1) ? "Sys" : "HTTP")} file path is {((code.MinorNumber != 1) ? model.Directories.System : model.Directories.Web)}");
                     }
                 }
                 throw new OperationCanceledException();
