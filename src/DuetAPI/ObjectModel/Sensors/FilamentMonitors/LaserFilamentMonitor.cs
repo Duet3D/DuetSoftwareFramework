@@ -129,14 +129,4 @@ public partial class LaserFilamentMonitor : Duet3DFilamentMonitor
 	/// Configured properties of this filament monitor
 	/// </summary>
 	public LaserFilamentMonitorConfigured Configured { get; } = new LaserFilamentMonitorConfigured();
-
-	/// <summary>
-	/// Indicates if a filament is present
-	/// </summary>
-	public bool? FilamentPresent
-	{
-		get => _filamentPresent;
-		set => SetPropertyValue(ref _filamentPresent, value);
-	}
-	private bool? _filamentPresent;
 }

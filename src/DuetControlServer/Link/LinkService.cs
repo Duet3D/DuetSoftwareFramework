@@ -579,6 +579,9 @@ public sealed class LinkService(
             case Request.DeleteFileOrDirectoryRecursively:
                 HandleDeleteFileOrDirectory((Request)packet.Request == Request.DeleteFileOrDirectoryRecursively);
                 break;
+            case Request.SecureDeleteFile:
+                HandleSecureDeleteFile();
+                break;
             case Request.OpenFile:
                 HandleOpenFile();
                 break;
@@ -1071,6 +1074,58 @@ public sealed class LinkService(
             if (!settings.Value.UpdateOnly)
             {
                 logger.LogError(e, "Failed to delete file or directory {File}", filename);
+            }
+            linkAdapter.WriteFileDeleteResult(false);
+        }
+    }
+
+    /// <summary>
+    /// Securely delete a file: overwrite its contents with zeros and fsync before unlinking.
+    /// One zero-overwrite pass is appropriate for SD/eMMC; multi-pass wipes don't help on flash
+    /// because of wear-leveling indirection. Mirrors MassStorage::SecureDelete on the RRF side.
+    /// Directories and non-existent files are rejected (the firmware uses this only for files).
+    /// </summary>
+    private void HandleSecureDeleteFile()
+    {
+        linkAdapter.ReadDeleteFileOrDirectory(out string filename);
+        logger.LogDebug("Attempting to securely delete {File}", filename);
+
+        try
+        {
+            string physicalFile = filePathResolver.ToPhysical(filename);
+            if (Directory.Exists(physicalFile))
+            {
+                throw new IOException("SecureDelete is not supported for directories");
+            }
+
+            if (File.Exists(physicalFile))
+            {
+                using FileStream fs = new(physicalFile, FileMode.Open, FileAccess.Write, FileShare.None, settings.Value.FileBufferSize);
+                long length = fs.Length;
+                if (length > 0)
+                {
+                    byte[] zeros = new byte[Math.Min(settings.Value.FileBufferSize, length)];
+                    fs.Seek(0, SeekOrigin.Begin);
+                    long remaining = length;
+                    while (remaining > 0)
+                    {
+                        int toWrite = (int)Math.Min(zeros.Length, remaining);
+                        fs.Write(zeros, 0, toWrite);
+                        remaining -= toWrite;
+                    }
+                    fs.Flush(true);     // fsync to media
+                }
+            }
+            // File.Delete is a no-op if the file is missing, so it is safe outside the exists-check;
+            // placed after the if-block so the using declaration has disposed fs before the unlink
+            File.Delete(physicalFile);
+            linkAdapter.WriteFileDeleteResult(true);
+        }
+        catch (Exception e)
+        {
+            if (!settings.Value.UpdateOnly)
+            {
+                logger.LogError(e, "Failed to securely delete {File}", filename);
             }
             linkAdapter.WriteFileDeleteResult(false);
         }
