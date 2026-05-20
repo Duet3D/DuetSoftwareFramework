@@ -4,7 +4,9 @@ This document describes how DSF is laid out at the project level, what gets buil
 
 ## 1. Solution and projects
 
-The whole framework is a single Visual Studio solution: [`DuetSoftwareFramework.sln`](../../src/DuetSoftwareFramework.sln). Every project is .NET 8/9.
+The whole framework is a single Visual Studio solution: [`DuetSoftwareFramework.sln`](../../src/DuetSoftwareFramework.sln). Most executable projects target .NET 10, the reusable libraries multi-target where required, and the source-generator project targets `netstandard2.0`.
+
+Each project directory under [`src/`](../../src) also carries a local `README.md` with project-specific architecture notes, interfaces, runtime expectations, and verification guidance.
 
 ```mermaid
 flowchart LR

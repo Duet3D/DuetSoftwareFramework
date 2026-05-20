@@ -169,7 +169,6 @@ Binary data transfers are not supported in any mode. If you need to transfer bin
 - `-n`, `--namespace`: Set namespace to use (defaults to custom-http-endpoint)
 - `-p`, `--path`: Set HTTP query path (defaults to demo)
 - `-e`, `--exec`: Set binary file to execute when an HTTP query is received. Stdout and stderr are returned as the response body once the program terminates
-- `-u`, `--uri <uri>`: Tell the web server to relay the incoming request to another server specified by the URI
 - `-a`, `--args`: Set arguments for the executable file. Query values in `%` characters are replaced with query options (e.g. `%myvalue%`). Not applicable for WebSockets
 - `-q`, `--quiet`: Do not display info text
 - `-h`, `--help`: Display all available command-line parameters
@@ -203,7 +202,7 @@ Note that `dsf-config.g` does not run if not both services have been started unl
 ### Command-Line Options
 
 - `-l`, `--log-level`: Set the minimum log level. Valid options are: `trace`, `debug` , `info` , `warn`, `error`, `fatal`, `off` Default is `info`
-- `-c`, `--config`: Override the path to the JSON configuration file. Defaults to `/opt/dsf/conf/config.json`
+- `-c`, `--config`: Override the path to the JSON configuration file. Defaults to `/opt/dsf/conf/plugins.json`
 - `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/var/run/dsf/dcs.sock`
 - `-h`, `--help`: Display all available command-line parameters
 
@@ -215,7 +214,7 @@ Since it relies on a [model subscription](#model-subscriptions), it gives an ide
 #### Command-Line Options
 
 - `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/var/run/dsf/dcs.sock`
-- `-f`, `--filter <filter>`: UNIX socket to connect to
+- `-f`, `--filter <filter>`: Optional filter expression(s) to apply to the model
 - `-c`, `--confirm`: Confirm every JSON receipt manually
 - `-q`, `--quiet`: Do not display when a connection has been established
 - `-h`, `--help`: Display all available command-line parameters
@@ -227,13 +226,15 @@ This tool is intended to manage third-party plugins directly on the SBC without 
 #### Command-Line Options
 
 - `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/var/run/dsf/dcs.sock`
-- `list`: List installed plugins
 - `list-data`: List plugin data of all installed plugins
-- `install <pluginZIP>`: Install a plugin ZIP file
+- `install <file>`: Install a plugin ZIP file
+- `reload <plugin>`: Reload a plugin manifest
 - `start <plugin>`: Start a plugin
-- `set-data <plugin>:<key>=<value>`: Set plugin data 
+- `set-data <plugin> <key> <value>`: Set plugin data
 - `stop <plugin>`: Stop a plugin
 - `uninstall <plugin>`: Uninstall a plugin
+- `is-installed <plugin>`: Check if a plugin is installed
+- `is-started <plugin>`: Check if a plugin is started
 - `-h`, `--help`: Display all available command-line parameters
 
 ## Unit Tests
