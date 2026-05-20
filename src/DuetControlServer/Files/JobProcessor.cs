@@ -436,8 +436,12 @@ namespace DuetControlServer.Files
                             // Logging of regular messages is done by the code itself, no need to take care of it here
                             await code.Task;
 
-                            // Keep track of the file position
-                            currentFilePosition = (code.FilePosition ?? 0L) + (code.Length ?? 0L);
+                            // Keep track of the file position. Comments are resolved internally and finish even when the
+                            // print is paused, so they must not advance the position past the point RRF actually stopped at
+                            if (!code.IsNonFirmwareComment)
+                            {
+                                currentFilePosition = (code.FilePosition ?? 0L) + (code.Length ?? 0L);
+                            }
                         }
                         catch (OperationCanceledException)
                         {

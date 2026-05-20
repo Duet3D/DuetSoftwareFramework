@@ -216,6 +216,15 @@ namespace DuetControlServer.Commands
         }
 
         /// <summary>
+        /// Indicates if this is a comment or empty code that is not interpreted by RepRapFirmware
+        /// </summary>
+        /// <remarks>
+        /// Such codes are resolved internally and never sent to the firmware, so a print cannot be paused at them
+        /// </remarks>
+        internal bool IsNonFirmwareComment => (Type == CodeType.None) ||
+            (Type == CodeType.Comment && (string.IsNullOrWhiteSpace(Comment) || !Settings.FirmwareComments.Any(chunk => Comment.Contains(chunk))));
+
+        /// <summary>
         /// Attempt to process this code internally
         /// </summary>
         /// <returns>Whether the code could be processed internally</returns>
@@ -299,8 +308,7 @@ namespace DuetControlServer.Commands
             }
 
             // Do not send comments that may not be interpreted by RRF
-            if ((Type == CodeType.None) ||
-                (Type == CodeType.Comment && (string.IsNullOrWhiteSpace(Comment) || !Settings.FirmwareComments.Any(chunk => Comment.Contains(chunk)))))
+            if (IsNonFirmwareComment)
             {
                 Result = new Message();
                 return true;
