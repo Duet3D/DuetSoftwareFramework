@@ -16,7 +16,9 @@ If you are working *inside* one repository, the per-repo `docs/devel/` is usuall
 | [GCODE_FLOW.md](GCODE_FLOW.md) | A worked end-to-end trace of a single G-code from a browser click to a stepper pulse on a tool board. Each hop annotated with the relevant per-repo source files. |
 | [COMMUNICATION_PROTOCOLS.md](COMMUNICATION_PROTOCOLS.md) | Side-by-side reference for the four protocols that knit the system together: HTTP/WebSocket, IPC (Unix socket), SPI (DSF↔RRF), CAN-FD (RRF↔expansion). |
 | [DEPLOYMENT_MODES.md](DEPLOYMENT_MODES.md) | What changes between **standalone**, **SBC**, and **CAN-expansion** deployments — and which combinations are supported. |
+| [EXECUTION_CALL_DIAGRAMS.md](EXECUTION_CALL_DIAGRAMS.md) | Class/module maps and function-level call diagrams for the major standalone and SBC execution paths, including printing, macros, OM requests, meta G-code, and expansion-board flows. |
 | [OBJECT_MODEL_END_TO_END.md](OBJECT_MODEL_END_TO_END.md) | The flow of state from a device on a tool board, up the bus, through RRF, across the SPI link, into DSF, and out to a browser. The single contract that ties the whole system together. |
+| [COMPONENT_INTERACTION_MATRIX.md](COMPONENT_INTERACTION_MATRIX.md) | DSF-project keyed map of which RepRapFirmware and Duet3Expansion components each DSF project actually interacts with. |
 | [COMPATIBILITY.md](COMPATIBILITY.md) | Cross-repo version contracts: which versions of each repo work together, where the contracts live in source, and what breaks first when they go out of sync. |
 
 ## Conventions used

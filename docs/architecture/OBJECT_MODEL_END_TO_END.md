@@ -4,7 +4,7 @@ The Object Model is the single biggest contract in the Duet3D system. It is the 
 
 The per-repo documents:
 
-- [RRF OBJECT_MODEL.md](../../../RepRapFirmware/docs/devel/OBJECT_MODEL.md) — descriptor tables, sequence numbers, JSON serialiser.
+- [RRF OBJECT_MODEL.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/OBJECT_MODEL.md) — descriptor tables, sequence numbers, JSON serialiser.
 - [DSF OBJECT_MODEL.md](../devel/OBJECT_MODEL.md) — typed C# mirror, differ, subscriber delivery.
 
 ## 1. Worked example: the temperature on a tool board
@@ -40,19 +40,19 @@ Each arrow is documented in detail; you can navigate from this diagram into any 
 ## 2. Layer-by-layer
 
 ### Layer 1 — Hardware
-The thermistor is a resistor whose value changes with temperature. The MCU's ADC, oversampled and decimated by an [`AveragingFilter`](../../../Duet3Expansion/src/Platform/AveragingFilter.h), produces a stable raw reading every millisecond.
+The thermistor is a resistor whose value changes with temperature. The MCU's ADC, oversampled and decimated by an [`AveragingFilter`](https://github.com/Duet3D/Duet3Expansion/blob/3.7-docker/src/Platform/AveragingFilter.h), produces a stable raw reading every millisecond.
 
 ### Layer 2 — Sensor abstraction (Duet3Expansion)
-The `Heat::Sensor` instance for that channel ([Duet3Expansion Sensors](../../../Duet3Expansion/src/Heating/Sensors)) converts raw → °C using its calibration. It exposes the result via `TryGetTemperature`.
+The `Heat::Sensor` instance for that channel ([Duet3Expansion Sensors](https://github.com/Duet3D/Duet3Expansion/tree/3.7-docker/src/Heating/Sensors)) converts raw → °C using its calibration. It exposes the result via `TryGetTemperature`.
 
 ### Layer 3 — CAN push
-The board's heat task batches readings and sends `CanMessageSensorTemperatures` to the master at ~5 Hz (or on change). See [Duet3Expansion CAN_PROTOCOL.md](../../../Duet3Expansion/docs/devel/CAN_PROTOCOL.md#message-families).
+The board's heat task batches readings and sends `CanMessageSensorTemperatures` to the master at ~5 Hz (or on change). See [Duet3Expansion CAN_PROTOCOL.md](https://github.com/Duet3D/Duet3Expansion/blob/3.7-docker/docs/devel/CAN_PROTOCOL.md#message-families).
 
 ### Layer 4 — Master receives (RRF)
-[`CommandProcessor`](../../../RepRapFirmware/src/CAN/CommandProcessor.cpp) decodes the frame and calls into `Heat::SetSensorReading(boardAddr, sensorIdx, value, error)`. The local `RemoteSensor` instance caches the value. RRF's `Heat::Spin` notices the change and bumps `seqs.sensors`.
+[`CommandProcessor`](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/CAN/CommandProcessor.cpp) decodes the frame and calls into `Heat::SetSensorReading(boardAddr, sensorIdx, value, error)`. The local `RemoteSensor` instance caches the value. RRF's `Heat::Spin` notices the change and bumps `seqs.sensors`.
 
 ### Layer 5 — Object Model descriptor walk
-On the next demand for `sensors.analog[3]` (or `seqs`), the descriptor walker in [`ObjectModel`](../../../RepRapFirmware/src/ObjectModel/ObjectModel.cpp) emits JSON keys and values by calling each `OBJECT_MODEL_FUNC(...)` lambda. The relevant entry returns `lastReading` for sensor 3.
+On the next demand for `sensors.analog[3]` (or `seqs`), the descriptor walker in [`ObjectModel`](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/ObjectModel/ObjectModel.cpp) emits JSON keys and values by calling each `OBJECT_MODEL_FUNC(...)` lambda. The relevant entry returns `lastReading` for sensor 3.
 
 ### Layer 6 — SPI subscription
 DCS's [`Model.UpdateService`](../../src/DuetControlServer/Model/UpdateService.cs) holds a long-running subscription to `seqs`. Every full SPI transfer carries the latest `seqs`. When `seqs.sensors` changed, DCS issues a `GetObjectModel("sensors", "f")` SBC request. RRF returns the JSON. DCS deserialises into the typed mirror under the OM write lock.
@@ -130,4 +130,4 @@ In SBC mode, the *user-visible* `M409` is answered by DSF, not RRF, so there is 
 - [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md) — the model is shown as the central datum.
 - [GCODE_FLOW.md](GCODE_FLOW.md) — same layers, but for *commands* rather than *state*.
 - [COMMUNICATION_PROTOCOLS.md](COMMUNICATION_PROTOCOLS.md) — protocol-by-protocol reference.
-- Per-repo deeper dives — [RRF OBJECT_MODEL.md](../../../RepRapFirmware/docs/devel/OBJECT_MODEL.md), [DSF OBJECT_MODEL.md](../devel/OBJECT_MODEL.md).
+- Per-repo deeper dives — [RRF OBJECT_MODEL.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/OBJECT_MODEL.md), [DSF OBJECT_MODEL.md](../devel/OBJECT_MODEL.md).

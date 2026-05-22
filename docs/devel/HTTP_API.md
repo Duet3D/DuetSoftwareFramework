@@ -167,4 +167,4 @@ This is also why DWS's tail latency is low: most `/machine/model` calls are answ
 
 - IPC commands DWS uses live in [IPC_PROTOCOL.md](IPC_PROTOCOL.md).
 - The OpenAPI schema is the canonical reference for HTTP endpoints — [`OpenAPI.yaml`](../../OpenAPI.yaml).
-- For the standalone-mode equivalent of this server (when there is no SBC, RRF runs HTTP itself), see [RepRapFirmware/docs/devel/NETWORKING.md](../../../RepRapFirmware/docs/devel/NETWORKING.md).
+- For the standalone-mode equivalent of this server (when there is no SBC, RRF runs HTTP itself), see [RepRapFirmware/docs/devel/NETWORKING.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/NETWORKING.md).

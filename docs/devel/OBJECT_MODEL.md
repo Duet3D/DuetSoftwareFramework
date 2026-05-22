@@ -2,7 +2,7 @@
 
 This document describes the DSF representation of the Object Model — how it is mirrored from RRF, how observers and subscribers consume it, and where the schema is defined.
 
-The matching firmware-side document is [RepRapFirmware/docs/devel/OBJECT_MODEL.md](../../../RepRapFirmware/docs/devel/OBJECT_MODEL.md). It is the source of truth — DSF replicates it; it does not invent any fields.
+The matching firmware-side document is [RepRapFirmware/docs/devel/OBJECT_MODEL.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/OBJECT_MODEL.md). It is the source of truth — DSF replicates it; it does not invent any fields.
 
 ## 1. Where the schema lives
 
@@ -88,7 +88,7 @@ sequenceDiagram
     participant DSF
     participant RRF
     Note over RRF: state changes — bump seqs.move
-    RRF->>DSF: full transfer; ObjectModel(seqs={move:17232,...})
+    RRF->>DSF: full transfer ObjectModel(seqs={move:17232,...})
     DSF->>DSF: diff seqs<br/>(move changed: 17231 → 17232)
     DSF->>RRF: SbcRequest.GetObjectModel("move", flags="f")
     RRF-->>DSF: SbcRequest contains JSON for move subtree
@@ -175,7 +175,7 @@ This is what makes `M409 K"…"` cheap inside DSF — it's a memory walk, not a 
 
 To add a new field to the model end-to-end:
 
-1. Add the C++ side in RRF — descriptor entry in the appropriate object's `objectModelTable` (see [RepRapFirmware/docs/devel/OBJECT_MODEL.md#10-adding-a-field](../../../RepRapFirmware/docs/devel/OBJECT_MODEL.md)).
+1. Add the C++ side in RRF — descriptor entry in the appropriate object's `objectModelTable` (see [RepRapFirmware/docs/devel/OBJECT_MODEL.md#10-adding-a-field](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/OBJECT_MODEL.md#10-adding-a-field)).
 2. Add the matching property to the C# class in [`DuetAPI.ObjectModel`](../../src/DuetAPI/ObjectModel). Use `[ObsoleteAttribute]` if it replaces an old one.
 3. The source generator in `DuetAPI.SourceGenerators` will produce the JSON serialisation boilerplate — rebuild.
 4. If your field is in a new subtree, ensure `Seqs` knows about it on both sides.
@@ -185,5 +185,5 @@ To add a new field to the model end-to-end:
 
 - The wire protocol carrying patches — [SPI_LINK.md](SPI_LINK.md).
 - The IPC subscribe mode — [IPC_PROTOCOL.md](IPC_PROTOCOL.md).
-- The RRF-side schema — [RepRapFirmware/docs/devel/OBJECT_MODEL.md](../../../RepRapFirmware/docs/devel/OBJECT_MODEL.md).
+- The RRF-side schema — [RepRapFirmware/docs/devel/OBJECT_MODEL.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/OBJECT_MODEL.md).
 - DWS reads the model via `ModelObserver`, see [HTTP_API.md](HTTP_API.md).

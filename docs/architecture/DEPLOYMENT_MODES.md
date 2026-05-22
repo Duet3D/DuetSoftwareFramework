@@ -52,11 +52,11 @@ flowchart TB
 
 | Subsystem | Standalone owner | SBC mode owner |
 |---|---|---|
-| HTTP server | RRF [`HttpResponder`](../../../RepRapFirmware/src/Networking/HttpResponder.cpp) | DSF [`DuetWebServer`](../../src/DuetWebServer) |
+| HTTP server | RRF [`HttpResponder`](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/Networking/HttpResponder.cpp) | DSF [`DuetWebServer`](../../src/DuetWebServer) |
 | File system | FAT on Duet SD card | ext4 on SBC, mapped via [DSF FilePathResolver](../../src/DuetControlServer/Files/FilePathResolver.cs) |
 | Network stack | LwIP / W5500 / WiFi-coproc on RRF | Linux kernel network stack on SBC |
-| FTP / Telnet | RRF [`FtpResponder`](../../../RepRapFirmware/src/Networking/FtpResponder.cpp), [`TelnetResponder`](../../../RepRapFirmware/src/Networking/TelnetResponder.cpp) | (replace with system-level services on SBC) |
-| MQTT | RRF [`MQTT`](../../../RepRapFirmware/src/Networking/MQTT) | DSF [`Utility.MQTT`](../../src/DuetControlServer/Utility/MQTT.cs) |
+| FTP / Telnet | RRF [`FtpResponder`](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/Networking/FtpResponder.cpp), [`TelnetResponder`](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/Networking/TelnetResponder.cpp) | (replace with system-level services on SBC) |
+| MQTT | RRF [`MQTT`](https://github.com/Duet3D/RepRapFirmware/tree/3.7-docker/src/Networking/MQTT) | DSF [`Utility.MQTT`](../../src/DuetControlServer/Utility/MQTT.cs) |
 | Plugin runtime | not available | DSF `DuetPluginService` |
 | OM consumer for DWC | DWC in browser polls `M409` via `rr_*` URLs | DWC in browser opens WebSocket to DWS, receives JSON Merge Patches |
 
@@ -130,6 +130,6 @@ The mode change does not require firmware changes — these are runtime decision
 
 ## 8. Where this connects to the rest of the documentation
 
-- Detailed list of feature flags that select compile-time variants — [RRF BUILD_VARIANTS](../../../RepRapFirmware/docs/devel/BUILD_VARIANTS.md), [Duet3Expansion BUILD_VARIANTS](../../../Duet3Expansion/docs/devel/BUILD_VARIANTS.md), [DSF BUILD_VARIANTS](../devel/BUILD_VARIANTS.md).
-- The SPI link's "format code" handshake — [DSF SPI_LINK.md](../devel/SPI_LINK.md), [RRF SBC_INTERFACE.md](../../../RepRapFirmware/docs/devel/SBC_INTERFACE.md).
-- The CAN handshake / address assignment — [Duet3Expansion CAN_PROTOCOL.md](../../../Duet3Expansion/docs/devel/CAN_PROTOCOL.md).
+- Detailed list of feature flags that select compile-time variants — [RRF BUILD_VARIANTS](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/BUILD_VARIANTS.md), [Duet3Expansion BUILD_VARIANTS](https://github.com/Duet3D/Duet3Expansion/blob/3.7-docker/docs/devel/BUILD_VARIANTS.md), [DSF BUILD_VARIANTS](../devel/BUILD_VARIANTS.md).
+- The SPI link's "format code" handshake — [DSF SPI_LINK.md](../devel/SPI_LINK.md), [RRF SBC_INTERFACE.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/SBC_INTERFACE.md).
+- The CAN handshake / address assignment — [Duet3Expansion CAN_PROTOCOL.md](https://github.com/Duet3D/Duet3Expansion/blob/3.7-docker/docs/devel/CAN_PROTOCOL.md).

@@ -121,5 +121,5 @@ Bump a contract on one side without the other → first contact fails (DCS exits
 
 ## 7. Where this connects to the rest of the system
 
-- For RRF's matching matrix see [RepRapFirmware/docs/devel/BUILD_VARIANTS.md](../../../RepRapFirmware/docs/devel/BUILD_VARIANTS.md).
+- For RRF's matching matrix see [RepRapFirmware/docs/devel/BUILD_VARIANTS.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/BUILD_VARIANTS.md).
 - For the integration-level cross-version compatibility table see [../architecture/COMPATIBILITY.md](../architecture/COMPATIBILITY.md).

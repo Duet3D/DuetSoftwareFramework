@@ -67,7 +67,7 @@ Library: [`DuetAPIClient`](../../src/DuetAPIClient) provides typed connection cl
 | Direction | Both sides exchange data on **every** transfer. |
 | Auth | None — physical interface, single point-to-point. |
 | Versioning | `SbcProtocolVersion` (currently **7**) on RRF must equal `Defaults.ProtocolVersion` in DSF. CRC mismatches trigger resend. |
-| Reference | [DSF SPI_LINK.md](../devel/SPI_LINK.md), [RRF SBC_INTERFACE.md](../../../RepRapFirmware/docs/devel/SBC_INTERFACE.md). |
+| Reference | [DSF SPI_LINK.md](../devel/SPI_LINK.md), [RRF SBC_INTERFACE.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/SBC_INTERFACE.md). |
 
 ```mermaid
 sequenceDiagram
@@ -77,7 +77,7 @@ sequenceDiagram
     Note over DCS,RRF: dispatch packets per side
 ```
 
-Packet types (all defined in [`SbcMessageFormats.h`](../../../RepRapFirmware/src/SBC/SbcMessageFormats.h) and mirrored in [`Link/Protocol/`](../../src/DuetControlServer/Link/Protocol)):
+Packet types (all defined in [`SbcMessageFormats.h`](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/SBC/SbcMessageFormats.h) and mirrored in [`Link/Protocol/`](../../src/DuetControlServer/Link/Protocol)):
 
 - **DCS → RRF (`SbcRequest`)** — codes, OM queries, file results, IAP, locks, variables.
 - **RRF → DCS (`FirmwareRequest`)** — OM patches, replies, file requests, macro execution, evaluation results.
@@ -92,7 +92,7 @@ Packet types (all defined in [`SbcMessageFormats.h`](../../../RepRapFirmware/src
 | Direction | Master-initiated for commands; slaves push streaming data and replies. |
 | Auth | None — physical bus. |
 | Versioning | CANlib commit identity. Both firmwares **must** be built from a compatible CANlib version. |
-| Reference | [RRF CAN_BUS.md](../../../RepRapFirmware/docs/devel/CAN_BUS.md), [Duet3Expansion CAN_PROTOCOL.md](../../../Duet3Expansion/docs/devel/CAN_PROTOCOL.md). |
+| Reference | [RRF CAN_BUS.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/CAN_BUS.md), [Duet3Expansion CAN_PROTOCOL.md](https://github.com/Duet3D/Duet3Expansion/blob/3.7-docker/docs/devel/CAN_PROTOCOL.md). |
 
 ```mermaid
 sequenceDiagram
@@ -113,9 +113,9 @@ Message families summarised: setup / discovery, time-sync, configuration, motion
 |---|---|---|
 | HTTP `/machine/code` → IPC `Code` | [DWS MachineController](../../src/DuetWebServer/Controllers/MachineController.cs) | Translates an HTTP code request into an IPC Code command. |
 | IPC `Code` → SPI `SbcRequest.Code` | [DCS pipeline Firmware stage](../../src/DuetControlServer/Codes/Pipelines/Firmware.cs) | Final pipeline stage packs binary code into an SPI packet. |
-| SPI `Code` → CAN forward | [RRF GCodes2.cpp](../../../RepRapFirmware/src/GCodes/GCodes2.cpp) + [RRF CanInterface](../../../RepRapFirmware/src/CAN/CanInterface.cpp) | Codes addressed to a remote board are forwarded as `CanMessageGeneric`. |
+| SPI `Code` → CAN forward | [RRF GCodes2.cpp](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/GCodes/GCodes2.cpp) + [RRF CanInterface](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/CAN/CanInterface.cpp) | Codes addressed to a remote board are forwarded as `CanMessageGeneric`. |
 | `seqs` push → IPC subscribe → WS patch | [DCS Model.UpdateService](../../src/DuetControlServer/Model/UpdateService.cs) | RRF's sequence numbers drive what DCS requests, what subscribers receive, and what DWC re-renders. |
-| File proxy | [RRF SBC file ops](../../../RepRapFirmware/src/SBC/SbcInterface.cpp) ↔ [DCS FilePathResolver](../../src/DuetControlServer/Files/FilePathResolver.cs) | Maps RRF-side `0:/sys/config.g` to host `/opt/dsf/sd/sys/config.g` and back. |
+| File proxy | [RRF SBC file ops](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/SBC/SbcInterface.cpp) ↔ [DCS FilePathResolver](../../src/DuetControlServer/Files/FilePathResolver.cs) | Maps RRF-side `0:/sys/config.g` to host `/opt/dsf/sd/sys/config.g` and back. |
 
 ## 6. Backpressure and reliability
 

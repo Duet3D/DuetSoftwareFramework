@@ -77,8 +77,8 @@ flowchart LR
 |---|---|---|---|
 | 1 | HTTP + WebSocket | Browser ↔ DWS | [`OpenAPI.yaml`](../../OpenAPI.yaml), [HTTP_API.md](../devel/HTTP_API.md) |
 | 2 | JSON over UNIX socket | Plugins / DWS / tools ↔ DCS | [IPC_PROTOCOL.md](../devel/IPC_PROTOCOL.md) |
-| 3 | SPI binary, 8 KiB transfers, packet-based | DCS ↔ RRF | [SPI_LINK.md](../devel/SPI_LINK.md) and [RRF SBC_INTERFACE.md](../../../RepRapFirmware/docs/devel/SBC_INTERFACE.md) |
-| 4 | CAN-FD with shared CANlib message structs | RRF ↔ expansion firmware | [RRF CAN_BUS.md](../../../RepRapFirmware/docs/devel/CAN_BUS.md) and [Duet3Expansion CAN_PROTOCOL.md](../../../Duet3Expansion/docs/devel/CAN_PROTOCOL.md) |
+| 3 | SPI binary, 8 KiB transfers, packet-based | DCS ↔ RRF | [SPI_LINK.md](../devel/SPI_LINK.md) and [RRF SBC_INTERFACE.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/SBC_INTERFACE.md) |
+| 4 | CAN-FD with shared CANlib message structs | RRF ↔ expansion firmware | [RRF CAN_BUS.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/CAN_BUS.md) and [Duet3Expansion CAN_PROTOCOL.md](https://github.com/Duet3D/Duet3Expansion/blob/3.7-docker/docs/devel/CAN_PROTOCOL.md) |
 
 A single G-code may traverse all four; see [GCODE_FLOW.md](GCODE_FLOW.md).
 
@@ -156,6 +156,7 @@ sequenceDiagram
 ## 7. Where to go next
 
 - [GCODE_FLOW.md](GCODE_FLOW.md) walks one G-code through every component.
+- [EXECUTION_CALL_DIAGRAMS.md](EXECUTION_CALL_DIAGRAMS.md) expands that into the major standalone and SBC call paths with class/module and function-level diagrams.
 - [COMMUNICATION_PROTOCOLS.md](COMMUNICATION_PROTOCOLS.md) cross-references all four protocol stacks.
 - [DEPLOYMENT_MODES.md](DEPLOYMENT_MODES.md) lists the supported combinations of these components.
 - [OBJECT_MODEL_END_TO_END.md](OBJECT_MODEL_END_TO_END.md) traces a single field from sensor to browser.
