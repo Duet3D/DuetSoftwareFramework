@@ -12,7 +12,7 @@
 
 	<ItemGroup>
 		<AssemblyAttribute Include="DuetControlServer.Utility.BuildDateTime">
-			<_Parameter1>$([System.DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))</_Parameter1>
+			<_Parameter1>$([System.DateTime]::Now.ToString("yyyy-MM-dd HH:mm"))</_Parameter1>
 		</AssemblyAttribute>
 	</ItemGroup>
 
