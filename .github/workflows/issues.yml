@@ -4,20 +4,26 @@ on:
     types: [opened]
 jobs:
   add-comment:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       issues: write
     steps:
       - name: Check user permission
         id: check
-        uses: scherermichael-oss/action-has-permission@master
+        uses: actions/github-script@v9
         with:
-          required-permission: write
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: steps.check.outputs.has-permission == false && contains(github.event.issue.labels.*.name, 'bug') == false && contains(github.event.issue.labels.*.name, 'enhancement') == false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: string
+          script: |
+            const { data: { permission } } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              username: context.payload.issue.user.login
+            });
+            return ['admin', 'write'].includes(permission) ? 'true' : 'false';
+      - if: steps.check.outputs.result == 'false' && contains(github.event.issue.labels.*.name, 'bug') == false && contains(github.event.issue.labels.*.name, 'enhancement') == false
         name: Close Issue
-        uses: peter-evans/close-issue@v1
+        uses: peter-evans/close-issue@v3
         with:
           comment: |
             This issue has been automatically closed because it does not originate from a Duet3D administrator.

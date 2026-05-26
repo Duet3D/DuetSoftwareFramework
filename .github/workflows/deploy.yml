@@ -65,7 +65,7 @@ jobs:
 
       # Update package lists on dev feed
       - name: Update package lists on dev feed
-        uses: appleboy/ssh-action@v0.1.7
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: pkg.duet3d.com
           username: pkg
