@@ -480,11 +480,13 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                 {
                     if (IsPaused)
                     {
-                        // Adjust the file position
-#warning This needs more work
-                        long newFilePosition = _pausePosition ?? currentFilePosition;
+                        // Adjust the file position for this motion system. Each MS may have advanced its file
+                        // independently between sync points, so rewind to the firmware-reported pause offset
+                        // for this channel (falling back to the last code we executed if RRF didn't supply one)
+                        long? msPausePosition = (file.Channel == CodeChannel.File) ? _pausePosition : _pausePosition2;
+                        long newFilePosition = msPausePosition ?? currentFilePosition;
                         await SetFilePositionAsync(file.Channel == CodeChannel.File ? 0 : 1, newFilePosition);
-                        _logger.LogInformation("Job on {Channel} has been paused at byte {Offset}, reason {PauseReason}", file.Channel, (_pausePosition == null) ? $"{newFilePosition} (no fpos from firmware)" : newFilePosition.ToString(), _pauseReason);
+                        _logger.LogInformation("Job on {Channel} has been paused at byte {Offset}, reason {PauseReason}", file.Channel, (msPausePosition == null) ? $"{newFilePosition} (no fpos from firmware)" : newFilePosition.ToString(), _pauseReason);
 
                         // Wait for the print to be resumed
                         IsProcessing = false;
@@ -674,7 +676,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
 
             IsPaused = true;
             _pausePosition = filePosition;
-            _pausePosition = filePosition2;
+            _pausePosition2 = filePosition2;
             _pauseReason = pauseReason;
         }
     }
