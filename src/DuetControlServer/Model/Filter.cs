@@ -269,7 +269,7 @@ public partial class Filter(ObjectModel model)
     /// <param name="filter">Array consisting of case-insensitive property names or item indices</param>
     /// <returns>Dictionary holding the results or null if nothing could be found</returns>
     /// <remarks>Make sure the model provider is locked in read-only mode before using this class</remarks>
-    /// <seealso cref="DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filter"/>
+    /// <seealso cref="DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filters"/>
     public Dictionary<string, object?> GetFiltered(object[] filter) => (Dictionary<string, object?>?)InternalGetFiltered(model, filter, null) ?? [];
 
     /// <summary>
@@ -278,7 +278,7 @@ public partial class Filter(ObjectModel model)
     /// <param name="filter">Filter string</param>
     /// <returns>Dictionary holding the results or null if nothing could be found</returns>
     /// <remarks>Make sure the model provider is locked in read-only mode before using this class</remarks>
-    /// <seealso cref="DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filter"/>
+    /// <seealso cref="DuetAPI.Connection.InitMessages.SubscribeInitMessage.Filters"/>
     public Dictionary<string, object?> GetFiltered(string filter) => (Dictionary<string, object?>?)InternalGetFiltered(model, ConvertFilter(filter, false), null) ?? [];
 
     /// <summary>

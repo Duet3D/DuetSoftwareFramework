@@ -98,9 +98,9 @@ public partial class Code : Command<Message?>
     public int? MajorNumber { get; set; }
 
     /// <summary>
-    /// Minor code number (e.g. 3 in G54.3)
+    /// Minor code number (e.g. 3 in G54.3) or -1 if not present
     /// </summary>
-    public int? MinorNumber { get; set; }
+    public int MinorNumber { get; set; } = -1;
 
     /// <summary>
     /// Flags of this code
@@ -165,7 +165,8 @@ public partial class Code : Command<Message?>
         Indent = 0;
         Keyword = KeywordType.None;
         KeywordArgument = null;
-        MajorNumber = MinorNumber = null;
+        MajorNumber = null;
+        MinorNumber = -1;
         Flags = CodeFlags.None;
         Comment = null;
         FilePosition = Length = null;
@@ -1085,7 +1086,7 @@ public partial class Code : Command<Message?>
         string prefix = Flags.HasFlag(CodeFlags.EnforceAbsolutePosition) ? "G53 " : string.Empty;
         if (MajorNumber is not null)
         {
-            if (MinorNumber is not null)
+            if (MinorNumber >= 0)
             {
                 return prefix + $"{(char)Type}{MajorNumber}.{MinorNumber}";
             }
@@ -1113,6 +1114,7 @@ public partial class Code : Command<Message?>
             KeywordType.Set => "set",
             KeywordType.Echo => "echo",
             KeywordType.Global => "global",
+            KeywordType.Skip => "skip",
             _ => throw new NotImplementedException(),
         };
     }

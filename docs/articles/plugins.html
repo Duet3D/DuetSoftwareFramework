@@ -1,0 +1,373 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Plugins </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Plugins ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/Duet3D/DuetSoftwareFramework/blob/v3.7-dev/src/Documentation/articles/plugins.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="plugins">Plugins</h1>
+
+<p>DSF can be extended with plugins. A plugin may ship a DuetWebControl (DWC) component (web UI),
+an SBC component (a background executable on the Linux side), or both. SBC plugins connect to DCS
+through the <a href="ipc.html">IPC socket</a> like any other client, but their installation, lifecycle, and
+sandboxing are handled by a dedicated service.</p>
+<p>The end-user-facing packaging guide is the repository <a href="https://github.com/Duet3D/DuetSoftwareFramework/blob/v3.5-dev/PLUGINS.md"><code>PLUGINS.md</code></a>.
+This article covers the runtime architecture.</p>
+<ul>
+<li>Plugin service: <code>src/DuetPluginService/</code></li>
+<li>Manifest and runtime types: <code>src/DuetAPI/ObjectModel/Plugins/</code></li>
+<li>Permissions: <code>src/DuetAPI/Utility/SbcPermissions.cs</code>, <code>Utility/RequiredPermissionsAttribute.cs</code></li>
+<li>DCS-side commands: <code>src/DuetControlServer/Commands/Plugins/</code></li>
+</ul>
+<h2 id="duetpluginservice">DuetPluginService</h2>
+<p><a href="components.html#duetpluginservice">DuetPluginService</a> (DPS) is a separate process - in fact two
+processes:</p>
+<ul>
+<li>a <strong>non-root</strong> instance that runs ordinary plugins, and</li>
+<li>a <strong>root</strong> instance (disabled by default; requires <code>RootPluginSupport</code> in the DCS config) that runs
+plugins declaring the <code>SuperUser</code> permission.</li>
+</ul>
+<p>Splitting privileged from unprivileged plugins keeps ordinary plugins out of root, and lets systemd
+tear down a plugin's child processes cleanly when the service stops.</p>
+<pre><code class="lang-mermaid">flowchart LR
+    DWC[&quot;DWC / PluginManager&quot;] --&gt;|&quot;InstallPlugin etc.&lt;br/&gt;(Command mode)&quot;| DCS[&quot;DuetControlServer&quot;]
+    DCS &lt;--&gt;|&quot;PluginService mode&quot;| DPS[&quot;DuetPluginService&lt;br/&gt;(root + non-root)&quot;]
+    DPS --&gt;|spawn| PROC[&quot;Plugin process&quot;]
+    DPS --&gt;|generate| AA[&quot;AppArmor profile&quot;]
+    PROC --&gt;|&quot;Command / Subscribe / Intercept&quot;| DCS
+</code></pre>
+<p>DCS and DPS communicate over the dedicated <a href="ipc.html#connection-modes"><code>PluginService</code> connection mode</a>:
+DCS queues lifecycle commands for DPS to carry out, and DPS (and the plugins it spawns) use ordinary
+<code>Command</code>-mode connections back to DCS.</p>
+<h2 id="lifecycle">Lifecycle</h2>
+<p><code>DuetPluginService/PluginService.cs</code> and the commands under <code>DuetPluginService/Commands/</code> implement:</p>
+<ol>
+<li><strong>Discovery</strong> - on startup DPS scans the plugin directory (<code>/opt/dsf/plugins/</code>) for manifest JSON
+files and loads them into an in-memory <code>PluginStore</code>.</li>
+<li><strong>Install</strong> (<code>InstallPlugin</code>) - extract the package, register the manifest, and generate the
+plugin's AppArmor profile.</li>
+<li><strong>Start</strong> (<code>StartPlugin</code>) - validate that the plugin matches the service type (<code>SuperUser</code> plugins
+only on the root instance), that its AppArmor profile exists, and that the executable is not a
+symlink (which would defeat the profile); then spawn the process for the SBC's CPU architecture
+(<code>arm</code>, <code>arm64</code>, <code>x86</code>, <code>x86_64</code>). If the manifest sets <code>sbcNotifyStarted</code>, DPS waits for the
+plugin to call <code>NotifyPluginStarted</code> before reporting it as started. The PID is written back into
+the <a href="object-model.html#top-level-keys"><code>Plugins</code> object-model key</a> via <code>SetPluginProcess</code> so DCS can
+resolve the plugin's <a href="#permissions">permissions</a> on future IPC connections.</li>
+<li><strong>Stop / Reload / Uninstall</strong> - terminate the process (SIGTERM then SIGKILL on timeout) and, for
+uninstall, remove files and the AppArmor profile.</li>
+</ol>
+<h2 id="package-layout">Package layout</h2>
+<p>A plugin is distributed as a single ZIP file with <code>plugin.json</code> in its root and up to three component
+directories:</p>
+<table>
+<thead>
+<tr>
+<th>Path in ZIP</th>
+<th>Installed to</th>
+<th>Holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>plugin.json</code></td>
+<td>manifest store</td>
+<td>The required <a href="#manifest">manifest</a></td>
+</tr>
+<tr>
+<td><code>dwc/</code></td>
+<td>symlinked to <code>0:/www/&lt;PluginName&gt;</code></td>
+<td>DuetWebControl web assets</td>
+</tr>
+<tr>
+<td><code>dsf/</code></td>
+<td>the plugin directory under <code>/opt/dsf/plugins/</code></td>
+<td>SBC executable and config files</td>
+</tr>
+<tr>
+<td><code>sd/</code></td>
+<td><code>0:/</code> (the <a href="file-management.html#path-mapping">virtual SD card</a>)</td>
+<td>Files seeded onto the SD tree</td>
+</tr>
+</tbody>
+</table>
+<p>For security the installer rejects packages containing path traversal (<code>..</code>) or files that would
+overwrite firmware or core configuration: <code>sd/firmware/*</code>, <code>sd/sys/config.g</code>, and
+<code>sd/sys/config-override.g</code>.</p>
+<h2 id="manifest">Manifest</h2>
+<p>A plugin is described by a <code>plugin.json</code> manifest (<code>src/DuetAPI/ObjectModel/Plugins/PluginManifest.cs</code>).
+<code>id</code>, <code>name</code>, and <code>author</code> are always required; <code>id</code> is alphanumeric (max 32 chars) and <code>name</code> allows
+spaces, dashes, and underscores (max 64 chars). A minimal example:</p>
+<pre><code class="lang-json">{
+  &quot;id&quot;: &quot;DemoPluginId&quot;,
+  &quot;name&quot;: &quot;Demo Plugin&quot;,
+  &quot;author&quot;: &quot;Demo Author&quot;,
+  &quot;version&quot;: &quot;1.0.0&quot;,
+  &quot;license&quot;: &quot;LGPL-3.0-or-later&quot;,
+  &quot;dwcVersion&quot;: &quot;3.3.0&quot;,
+  &quot;dwcDependencies&quot;: [],
+  &quot;sbcRequired&quot;: false,
+  &quot;sbcDsfVersion&quot;: null,
+  &quot;sbcExecutable&quot;: null,
+  &quot;sbcPermissions&quot;: [],
+  &quot;sbcPackageDependencies&quot;: [],
+  &quot;sbcPythonDependencies&quot;: [],
+  &quot;sbcPluginDependencies&quot;: [],
+  &quot;rrfVersion&quot;: null,
+  &quot;data&quot;: {}
+}
+</code></pre>
+<p>Key field groups:</p>
+<ul>
+<li><strong>Metadata</strong> - <code>id</code>, <code>name</code>, <code>author</code>, <code>version</code>, <code>license</code>, <code>homepage</code>, <code>tags</code>.</li>
+<li><strong>DWC part</strong> - <code>dwcVersion</code> and <code>dwcDependencies</code> (IDs of plugins that must load first; circular
+dependencies are not supported), plus the web resources installed under <code>0:/www/</code>.</li>
+<li><strong>SBC part</strong> - <code>sbcRequired</code>, <code>sbcDsfVersion</code>, <code>sbcExecutable</code> (+ arguments), <code>sbcAutoRestart</code>,
+<code>sbcNotifyStarted</code>, <code>sbcOutputRedirected</code>, <code>sbcPermissions</code>, and <code>sbcConfigFiles</code> (preserved across
+upgrades).</li>
+<li><strong>Version dependencies</strong> - specify a <code>major.minor</code> version per component so DSF/DWC can refuse an
+incompatible plugin (use the full version string for beta releases).</li>
+</ul>
+<h3 id="dependencies">Dependencies</h3>
+<ul>
+<li><strong><code>sbcPluginDependencies</code></strong> - other plugins that must start first.</li>
+<li><strong><code>sbcPackageDependencies</code></strong> - apt packages the plugin needs.</li>
+<li><strong><code>sbcPythonDependencies</code></strong> - (DSF 3.4+) Python packages installed into a per-plugin virtual
+environment, using pip version syntax (for example <code>&quot;dsf-python==3.4.5&quot;</code>); DSF 3.6+ also accepts
+Git requirements.</li>
+</ul>
+<p>The runtime <code>Plugin</code> type extends the manifest with state: the installed file lists, the process <code>Pid</code>
+(-1 not started, 0 shutting down, &gt;0 running), and a <code>Started</code> flag.</p>
+<h2 id="permissions">Permissions</h2>
+<p>A plugin requests capabilities through <code>SbcPermissions</code> (<code>src/DuetAPI/Utility/SbcPermissions.cs</code>),
+a flags enum. Permissions are additive, and a command runs if the caller holds at least one of the
+permissions its <code>RequiredPermissionsAttribute</code> lists. They fall into two enforcement classes:</p>
+<p><strong>DSF-enforced</strong> - checked in DCS code when an <a href="ipc.html#command">IPC command</a> is invoked:</p>
+<table>
+<thead>
+<tr>
+<th>Permission</th>
+<th>Grants</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>commandExecution</code></td>
+<td>Execute generic commands and codes</td>
+</tr>
+<tr>
+<td><code>codeInterceptionRead</code></td>
+<td>Read codes from the <a href="ipc.html#intercept">interception</a> streams without modifying them</td>
+</tr>
+<tr>
+<td><code>codeInterceptionReadWrite</code></td>
+<td>Read and modify intercepted codes</td>
+</tr>
+<tr>
+<td><code>managePlugins</code></td>
+<td>Install/load/unload/uninstall plugins (also grants filesystem access)</td>
+</tr>
+<tr>
+<td><code>manageUserSessions</code></td>
+<td>Add or remove user sessions</td>
+</tr>
+<tr>
+<td><code>objectModelRead</code></td>
+<td>Read the <a href="object-model.html">object model</a></td>
+</tr>
+<tr>
+<td><code>objectModelReadWrite</code></td>
+<td>Read and write the object model</td>
+</tr>
+<tr>
+<td><code>registerHttpEndpoints</code></td>
+<td>Register <a href="ipc.html#custom-http-endpoints">HTTP endpoints</a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>AppArmor-enforced</strong> - mapped to filesystem/device rules in the generated profile:</p>
+<table>
+<thead>
+<tr>
+<th>Permission</th>
+<th>Grants</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>readFilaments</code> / <code>writeFilaments</code></td>
+<td>Access to <code>0:/filaments</code></td>
+</tr>
+<tr>
+<td><code>readFirmware</code> / <code>writeFirmware</code></td>
+<td>Access to <code>0:/firmware</code></td>
+</tr>
+<tr>
+<td><code>readGCodes</code> / <code>writeGCodes</code></td>
+<td>Access to <code>0:/gcodes</code></td>
+</tr>
+<tr>
+<td><code>readMacros</code> / <code>writeMacros</code></td>
+<td>Access to <code>0:/macros</code></td>
+</tr>
+<tr>
+<td><code>readSystem</code> / <code>writeSystem</code></td>
+<td>Access to <code>0:/sys</code></td>
+</tr>
+<tr>
+<td><code>readWeb</code> / <code>writeWeb</code></td>
+<td>Access to <code>0:/www</code></td>
+</tr>
+<tr>
+<td><code>fileSystemAccess</code></td>
+<td>Read and write all files</td>
+</tr>
+<tr>
+<td><code>launchProcesses</code></td>
+<td>Launch new processes</td>
+</tr>
+<tr>
+<td><code>networkAccess</code></td>
+<td>Stand-alone network access</td>
+</tr>
+<tr>
+<td><code>webcamAccess</code></td>
+<td>Access webcam devices</td>
+</tr>
+<tr>
+<td><code>gpioAccess</code></td>
+<td>Access GPIO (<code>/dev/gpiochip*</code>), SPI, and I2C devices</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>superUser</code></strong> runs the plugin as root via the root DPS instance, with no AppArmor confinement.
+Dangerous; off by default. A user installing a plugin from the web interface is shown the permissions
+it requests and must approve them. Plugins installed outside <code>/opt/dsf/plugins</code> receive full
+permissions for backward compatibility.</p>
+<h3 id="apparmor-profiles">AppArmor profiles</h3>
+<p><code>DuetPluginService/PermissionManagers/AppArmorPermissionManager.cs</code> builds a per-plugin profile from a
+template: it substitutes the plugin's directory, then for each AppArmor-enforced permission in the
+manifest emits the corresponding rule (for example <code>ReadGCodes</code> -&gt; read access to <code>0:/gcodes/**</code>,
+<code>NetworkAccess</code> -&gt; network and name-service rules), and loads it with <code>apparmor_parser</code>. DSF-enforced
+permissions add no AppArmor rules - DCS gates those itself.</p>
+<h2 id="dwc-vs-sbc-plugins">DWC vs SBC plugins</h2>
+<ul>
+<li>A <strong>DWC plugin</strong> is web UI only: its resources are installed under <code>0:/www/</code> and loaded by the
+browser. It needs no SBC component.</li>
+<li>An <strong>SBC plugin</strong> is a background executable that talks to DCS over the <a href="ipc.html">IPC socket</a>. It can
+register <a href="ipc.html#custom-http-endpoints">HTTP endpoints</a>, <a href="ipc.html#intercept">intercept codes</a>, or
+<a href="ipc.html#subscribe">subscribe</a> to the model.</li>
+<li>A plugin may provide both for a full feature.</li>
+</ul>
+<h2 id="shared-data">Shared data</h2>
+<p>Every plugin appears in the <a href="object-model.html">object model</a> under the <code>plugins</code> key, including its
+<code>data</code> dictionary - arbitrary values a plugin can publish for other plugins, for the web interface, or
+for <a href="gcode-flow.html#expression-evaluation">G-code expressions</a> to read. A plugin with an SBC executable
+sets its data with the <code>SetPluginData</code> command (which needs <code>objectModelReadWrite</code>, plus <code>managePlugins</code>
+to write <em>another</em> plugin's data); a DWC-only plugin uses <code>PATCH /machine/plugin</code>
+(<a href="rest-api.html#plugins">REST API</a>).</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="ipc.html">IPC</a> - how plugins connect and which commands need which permissions</li>
+<li><a href="components.html#command-line-tools-and-example-plugins">Components</a> - <code>CodeLogger</code>, <code>CustomHttpEndpoint</code>,
+and <code>PluginManager</code> as references</li>
+<li><a href="gcode-flow.html#the-six-stage-code-pipeline">G-code flow</a> - where interception plugins hook in</li>
+</ul>
+
+</article>
+
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

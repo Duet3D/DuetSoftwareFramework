@@ -1,0 +1,1514 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class ObjectModel </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class ObjectModel ">
+      
+      <meta name="description" content="Main object model with extensions for synchronization">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DuetControlServer.Model.ObjectModel">
+
+
+
+  <h1 id="DuetControlServer_Model_ObjectModel" data-uid="DuetControlServer.Model.ObjectModel" class="text-break">
+Class ObjectModel  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="DuetControlServer.html">DuetControlServer</a>.<a class="xref" href="DuetControlServer.Model.html">Model</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>DuetControlServer.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Main object model with extensions for synchronization</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[DiagnosticsPriority(-3)]
+public class ObjectModel : ObjectModel, INotifyPropertyChanging, IStaticModelObject, IModelObject, ICloneable, INotifyPropertyChanged</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><a class="xref" href="DuetAPI.ObjectModel.ModelObject.html">ModelObject</a></div>
+      <div><a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html">ObjectModel</a></div>
+      <div><span class="xref">ObjectModel</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.componentmodel.inotifypropertychanging">INotifyPropertyChanging</a></div>
+      <div><a class="xref" href="DuetAPI.ObjectModel.IStaticModelObject.html">IStaticModelObject</a></div>
+      <div><a class="xref" href="DuetAPI.ObjectModel.IModelObject.html">IModelObject</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.icloneable">ICloneable</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.componentmodel.inotifypropertychanged">INotifyPropertyChanged</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_UpdateFromFirmwareJson_System_String_System_Text_Json_JsonElement_System_Int32_System_Boolean_">ObjectModel.UpdateFromFirmwareJson(string, JsonElement, int, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_UpdateFromFirmwareJsonReader_System_String_System_Text_Json_Utf8JsonReader__System_Int32_System_Boolean_">ObjectModel.UpdateFromFirmwareJsonReader(string, ref Utf8JsonReader, int, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_UpdateFromJson_System_Text_Json_JsonElement_">ObjectModel.UpdateFromJson(JsonElement)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_UpdateFromJson_System_String_System_Text_Json_JsonElement_">ObjectModel.UpdateFromJson(string, JsonElement)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_UpdateFromJsonReader_System_String_System_Text_Json_Utf8JsonReader__">ObjectModel.UpdateFromJsonReader(string, ref Utf8JsonReader)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_ToString">ObjectModel.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_ToUtf8Json">ObjectModel.ToUtf8Json()</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Assign_DuetAPI_ObjectModel_IStaticModelObject_">ObjectModel.Assign(IStaticModelObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Clone">ObjectModel.Clone()</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_UpdateFromJson_System_Text_Json_JsonElement_System_Boolean_">ObjectModel.UpdateFromJson(JsonElement, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_UpdateFromJsonReader_System_Text_Json_Utf8JsonReader__System_Boolean_">ObjectModel.UpdateFromJsonReader(ref Utf8JsonReader, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Boards">ObjectModel.Boards</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Directories">ObjectModel.Directories</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Fans">ObjectModel.Fans</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Global">ObjectModel.Global</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Heat">ObjectModel.Heat</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Inputs">ObjectModel.Inputs</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Job">ObjectModel.Job</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_LedStrips">ObjectModel.LedStrips</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Limits">ObjectModel.Limits</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Messages">ObjectModel.Messages</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Move">ObjectModel.Move</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Network">ObjectModel.Network</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Plugins">ObjectModel.Plugins</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_SBC">ObjectModel.SBC</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Sensors">ObjectModel.Sensors</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Spindles">ObjectModel.Spindles</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_State">ObjectModel.State</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Tools">ObjectModel.Tools</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_Volumes">ObjectModel.Volumes</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ObjectModel.html#DuetAPI_ObjectModel_ObjectModel_OnDeserializationFailed">ObjectModel.OnDeserializationFailed</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ModelObject.html#DuetAPI_ObjectModel_ModelObject_SetPropertyValue__1___0____0_System_String_">ModelObject.SetPropertyValue&lt;T&gt;(ref T, T, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ModelObject.html#DuetAPI_ObjectModel_ModelObject_PropertyChanging">ModelObject.PropertyChanging</a>
+    </div>
+    <div>
+      <a class="xref" href="DuetAPI.ObjectModel.ModelObject.html#DuetAPI_ObjectModel_ModelObject_PropertyChanged">ModelObject.PropertyChanged</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="DuetControlServer_Model_ObjectModel__ctor_" data-uid="DuetControlServer.Model.ObjectModel.#ctor*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel__ctor_Microsoft_Extensions_Hosting_IHostApplicationLifetime_Microsoft_Extensions_Logging_ILogger_DuetControlServer_Model_ObjectModel__Microsoft_Extensions_Options_IOptions_DuetControlServer_Settings__" data-uid="DuetControlServer.Model.ObjectModel.#ctor(Microsoft.Extensions.Hosting.IHostApplicationLifetime,Microsoft.Extensions.Logging.ILogger{DuetControlServer.Model.ObjectModel},Microsoft.Extensions.Options.IOptions{DuetControlServer.Settings})">
+  ObjectModel(IHostApplicationLifetime, ILogger&lt;ObjectModel&gt;, IOptions&lt;Settings&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Main constructor</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ObjectModel(IHostApplicationLifetime lifetime, ILogger&lt;ObjectModel&gt; logger, IOptions&lt;Settings&gt; settings)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>lifetime</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.hosting.ihostapplicationlifetime">IHostApplicationLifetime</a></dt>
+    <dd><p>Host application lifetime</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger-1">ILogger</a>&lt;<a class="xref" href="DuetControlServer.Model.ObjectModel.html">ObjectModel</a>&gt;</dt>
+    <dd><p>Logger instance</p>
+</dd>
+    <dt><code>settings</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.options.ioptions-1">IOptions</a>&lt;<a class="xref" href="DuetControlServer.Settings.html">Settings</a>&gt;</dt>
+    <dd><p>Settings</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="DuetControlServer_Model_ObjectModel_MultipleMotionSystemsConfigured" data-uid="DuetControlServer.Model.ObjectModel.MultipleMotionSystemsConfigured">
+  MultipleMotionSystemsConfigured
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Indicates whether multiple motion systems are configured.
+When false, the channel Active check in FlushAsync is skipped for performance.
+Updated by the model update service when the &quot;move&quot; key is refreshed.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public volatile bool MultipleMotionSystemsConfigured</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="DuetControlServer_Model_ObjectModel_AccessReadOnly_" data-uid="DuetControlServer.Model.ObjectModel.AccessReadOnly*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_AccessReadOnly" data-uid="DuetControlServer.Model.ObjectModel.AccessReadOnly">
+  AccessReadOnly()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Access the machine model for read operations only</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IDisposable AccessReadOnly()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></dt>
+    <dd><p>Disposable lock object to be used with a using directive</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_AccessReadOnly_" data-uid="DuetControlServer.Model.ObjectModel.AccessReadOnly*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_AccessReadOnly_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.ObjectModel.AccessReadOnly(System.Threading.CancellationToken)">
+  AccessReadOnly(CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Access the machine model for read operations only</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IDisposable AccessReadOnly(CancellationToken cancellationToken)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></dt>
+    <dd><p>Disposable lock object to be used with a using directive</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_AccessReadOnlyAsync_" data-uid="DuetControlServer.Model.ObjectModel.AccessReadOnlyAsync*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_AccessReadOnlyAsync" data-uid="DuetControlServer.Model.ObjectModel.AccessReadOnlyAsync">
+  AccessReadOnlyAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Access the machine model asynchronously for read operations only</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IDisposable&gt; AccessReadOnlyAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>&gt;</dt>
+    <dd><p>Disposable lock object to be used with a using directive</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_AccessReadOnlyAsync_" data-uid="DuetControlServer.Model.ObjectModel.AccessReadOnlyAsync*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_AccessReadOnlyAsync_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.ObjectModel.AccessReadOnlyAsync(System.Threading.CancellationToken)">
+  AccessReadOnlyAsync(CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Access the machine model asynchronously for read operations only</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IDisposable&gt; AccessReadOnlyAsync(CancellationToken cancellationToken)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>&gt;</dt>
+    <dd><p>Disposable lock object to be used with a using directive</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_AccessReadWrite_" data-uid="DuetControlServer.Model.ObjectModel.AccessReadWrite*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_AccessReadWrite" data-uid="DuetControlServer.Model.ObjectModel.AccessReadWrite">
+  AccessReadWrite()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Access the machine model for read/write operations</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IDisposable AccessReadWrite()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></dt>
+    <dd><p>Disposable lock object to be used with a using directive</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_AccessReadWrite_" data-uid="DuetControlServer.Model.ObjectModel.AccessReadWrite*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_AccessReadWrite_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.ObjectModel.AccessReadWrite(System.Threading.CancellationToken)">
+  AccessReadWrite(CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Access the machine model for read/write operations</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IDisposable AccessReadWrite(CancellationToken cancellationToken)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></dt>
+    <dd><p>Disposable lock object to be used with a using directive</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_AccessReadWriteAsync_" data-uid="DuetControlServer.Model.ObjectModel.AccessReadWriteAsync*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_AccessReadWriteAsync" data-uid="DuetControlServer.Model.ObjectModel.AccessReadWriteAsync">
+  AccessReadWriteAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Access the machine model asynchronously for read/write operations</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IDisposable&gt; AccessReadWriteAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>&gt;</dt>
+    <dd><p>Disposable lock object to be used with a using directive</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_AccessReadWriteAsync_" data-uid="DuetControlServer.Model.ObjectModel.AccessReadWriteAsync*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_AccessReadWriteAsync_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.ObjectModel.AccessReadWriteAsync(System.Threading.CancellationToken)">
+  AccessReadWriteAsync(CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Access the machine model asynchronously for read/write operations</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IDisposable&gt; AccessReadWriteAsync(CancellationToken cancellationToken)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>&gt;</dt>
+    <dd><p>Disposable lock object to be used with a using directive</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_GetCpuHardware_" data-uid="DuetControlServer.Model.ObjectModel.GetCpuHardware*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_GetCpuHardware" data-uid="DuetControlServer.Model.ObjectModel.GetCpuHardware">
+  GetCpuHardware()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get the CPU hardware</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string? GetCpuHardware()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>CPU hardware or null if unknown</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_GetCpuNumCores_" data-uid="DuetControlServer.Model.ObjectModel.GetCpuNumCores*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_GetCpuNumCores" data-uid="DuetControlServer.Model.ObjectModel.GetCpuNumCores">
+  GetCpuNumCores()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get the number of processor cores/threads</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int GetCpuNumCores()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of cores/threads or 1 if unknown</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_GetDistribution_" data-uid="DuetControlServer.Model.ObjectModel.GetDistribution*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_GetDistribution" data-uid="DuetControlServer.Model.ObjectModel.GetDistribution">
+  GetDistribution()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get the current Linux distribution</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string? GetDistribution()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Distribution name or null if unknown</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_GetDistributionBuildTime_" data-uid="DuetControlServer.Model.ObjectModel.GetDistributionBuildTime*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_GetDistributionBuildTime" data-uid="DuetControlServer.Model.ObjectModel.GetDistributionBuildTime">
+  GetDistributionBuildTime()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Determine when the current Linux distribution was built</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public DateTime? GetDistributionBuildTime()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetime">DateTime</a>?</dt>
+    <dd><p>Build datetime or null if unknown</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_GetSbcModel_" data-uid="DuetControlServer.Model.ObjectModel.GetSbcModel*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_GetSbcModel" data-uid="DuetControlServer.Model.ObjectModel.GetSbcModel">
+  GetSbcModel()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get the SBC model name</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string? GetSbcModel()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>SBC model or null if unknown</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_GetSbcSerial_" data-uid="DuetControlServer.Model.ObjectModel.GetSbcSerial*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_GetSbcSerial" data-uid="DuetControlServer.Model.ObjectModel.GetSbcSerial">
+  GetSbcSerial()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get the SBC serial</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string? GetSbcSerial()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>SBC model or null if unknown</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_GetTotalMemory_" data-uid="DuetControlServer.Model.ObjectModel.GetTotalMemory*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_GetTotalMemory" data-uid="DuetControlServer.Model.ObjectModel.GetTotalMemory">
+  GetTotalMemory()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get the total memory of this SBC</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long? GetTotalMemory()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_HandleMacroErrorAsync_" data-uid="DuetControlServer.Model.ObjectModel.HandleMacroErrorAsync*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_HandleMacroErrorAsync_System_String_System_Int64_System_String_" data-uid="DuetControlServer.Model.ObjectModel.HandleMacroErrorAsync(System.String,System.Int64,System.String)">
+  HandleMacroErrorAsync(string, long, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Handle a macro file error asynchronously. Must be called WITHOUT locking this instance first!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task HandleMacroErrorAsync(string fileName, long lineNumber, string message)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>fileName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>lineNumber</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>message</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.notimplementedexception">NotImplementedException</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_IsEmulatingMarlinAsync_" data-uid="DuetControlServer.Model.ObjectModel.IsEmulatingMarlinAsync*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_IsEmulatingMarlinAsync_DuetAPI_CodeChannel_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.ObjectModel.IsEmulatingMarlinAsync(DuetAPI.CodeChannel,System.Threading.CancellationToken)">
+  IsEmulatingMarlinAsync(CodeChannel, CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check asynchronously if Marlin is being emulated on the given channel</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;bool&gt; IsEmulatingMarlinAsync(CodeChannel channel, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Code channel</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>True if Marlin is being emulated</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_Output_" data-uid="DuetControlServer.Model.ObjectModel.Output*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_Output_DuetAPI_ObjectModel_EventLogLevel_DuetAPI_ObjectModel_Message_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.ObjectModel.Output(DuetAPI.ObjectModel.EventLogLevel,DuetAPI.ObjectModel.Message,System.Threading.CancellationToken)">
+  Output(EventLogLevel, Message, CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Output a generic message</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool Output(EventLogLevel level, Message message, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>level</code> <a class="xref" href="DuetAPI.ObjectModel.EventLogLevel.html">EventLogLevel</a></dt>
+    <dd><p>Log level</p>
+</dd>
+    <dt><code>message</code> <a class="xref" href="DuetAPI.ObjectModel.Message.html">Message</a></dt>
+    <dd><p>Message to output</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the message has been written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_Output_" data-uid="DuetControlServer.Model.ObjectModel.Output*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_Output_DuetAPI_ObjectModel_Message_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.ObjectModel.Output(DuetAPI.ObjectModel.Message,System.Threading.CancellationToken)">
+  Output(Message, CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Output a generic message</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Output(Message message, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>message</code> <a class="xref" href="DuetAPI.ObjectModel.Message.html">Message</a></dt>
+    <dd><p>Message to output</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_Output_" data-uid="DuetControlServer.Model.ObjectModel.Output*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_Output_DuetAPI_ObjectModel_MessageType_System_String_" data-uid="DuetControlServer.Model.ObjectModel.Output(DuetAPI.ObjectModel.MessageType,System.String)">
+  Output(MessageType, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Output a generic message</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Output(MessageType type, string content)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="DuetAPI.ObjectModel.MessageType.html">MessageType</a></dt>
+    <dd><p>Type of the message</p>
+</dd>
+    <dt><code>content</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Content of the message</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_OutputAsync_" data-uid="DuetControlServer.Model.ObjectModel.OutputAsync*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_OutputAsync_DuetAPI_ObjectModel_EventLogLevel_DuetAPI_ObjectModel_Message_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.ObjectModel.OutputAsync(DuetAPI.ObjectModel.EventLogLevel,DuetAPI.ObjectModel.Message,System.Threading.CancellationToken)">
+  OutputAsync(EventLogLevel, Message, CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Output a generic message asynchronously</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;bool&gt; OutputAsync(EventLogLevel level, Message message, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>level</code> <a class="xref" href="DuetAPI.ObjectModel.EventLogLevel.html">EventLogLevel</a></dt>
+    <dd><p>Log level</p>
+</dd>
+    <dt><code>message</code> <a class="xref" href="DuetAPI.ObjectModel.Message.html">Message</a></dt>
+    <dd><p>Message to output</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>Whether the message has been written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_OutputAsync_" data-uid="DuetControlServer.Model.ObjectModel.OutputAsync*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_OutputAsync_DuetAPI_ObjectModel_Message_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.ObjectModel.OutputAsync(DuetAPI.ObjectModel.Message,System.Threading.CancellationToken)">
+  OutputAsync(Message, CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Output a generic message asynchronously</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task OutputAsync(Message message, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>message</code> <a class="xref" href="DuetAPI.ObjectModel.Message.html">Message</a></dt>
+    <dd><p>Message to output</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_OutputAsync_" data-uid="DuetControlServer.Model.ObjectModel.OutputAsync*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_OutputAsync_DuetAPI_ObjectModel_MessageType_System_String_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.ObjectModel.OutputAsync(DuetAPI.ObjectModel.MessageType,System.String,System.Threading.CancellationToken)">
+  OutputAsync(MessageType, string, CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Output a generic message asynchronously</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task OutputAsync(MessageType type, string content, CancellationToken cancellationToken)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="DuetAPI.ObjectModel.MessageType.html">MessageType</a></dt>
+    <dd><p>Type of the message</p>
+</dd>
+    <dt><code>content</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Content of the message</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_PrintDiagnostics_" data-uid="DuetControlServer.Model.ObjectModel.PrintDiagnostics*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_PrintDiagnostics_System_Text_StringBuilder_" data-uid="DuetControlServer.Model.ObjectModel.PrintDiagnostics(System.Text.StringBuilder)">
+  PrintDiagnostics(StringBuilder)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Report the diagnostics of this class</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void PrintDiagnostics(StringBuilder builder)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>builder</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.stringbuilder">StringBuilder</a></dt>
+    <dd><p>Target to write to</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_SetExecutingConfig_" data-uid="DuetControlServer.Model.ObjectModel.SetExecutingConfig*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_SetExecutingConfig_System_Boolean_" data-uid="DuetControlServer.Model.ObjectModel.SetExecutingConfig(System.Boolean)">
+  SetExecutingConfig(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Flag asynchronously that a start-up file is being executed. Must be called WITHOUT locking this instance first!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void SetExecutingConfig(bool executing)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>executing</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether a start-up file is being executed or not</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_WaitForFullUpdate_" data-uid="DuetControlServer.Model.ObjectModel.WaitForFullUpdate*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_WaitForFullUpdate" data-uid="DuetControlServer.Model.ObjectModel.WaitForFullUpdate">
+  WaitForFullUpdate()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Wait for the model to be fully updated from RepRapFirmware</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void WaitForFullUpdate()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_WaitForFullUpdateAsync_" data-uid="DuetControlServer.Model.ObjectModel.WaitForFullUpdateAsync*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_WaitForFullUpdateAsync_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.ObjectModel.WaitForFullUpdateAsync(System.Threading.CancellationToken)">
+  WaitForFullUpdateAsync(CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Wait asynchronously for the model to be fully updated from RepRapFirmware</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task WaitForFullUpdateAsync(CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_WaitForUpdate_" data-uid="DuetControlServer.Model.ObjectModel.WaitForUpdate*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_WaitForUpdate" data-uid="DuetControlServer.Model.ObjectModel.WaitForUpdate">
+  WaitForUpdate()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Wait for an update to occur</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void WaitForUpdate()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_WaitForUpdate_" data-uid="DuetControlServer.Model.ObjectModel.WaitForUpdate*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_WaitForUpdate_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.ObjectModel.WaitForUpdate(System.Threading.CancellationToken)">
+  WaitForUpdate(CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Wait for an update to occur</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void WaitForUpdate(CancellationToken cancellationToken)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_WaitForUpdateAsync_" data-uid="DuetControlServer.Model.ObjectModel.WaitForUpdateAsync*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_WaitForUpdateAsync" data-uid="DuetControlServer.Model.ObjectModel.WaitForUpdateAsync">
+  WaitForUpdateAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Wait for an update to occur asynchronously</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task WaitForUpdateAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Model_ObjectModel_WaitForUpdateAsync_" data-uid="DuetControlServer.Model.ObjectModel.WaitForUpdateAsync*"></a>
+
+  <h3 id="DuetControlServer_Model_ObjectModel_WaitForUpdateAsync_System_Threading_CancellationToken_" data-uid="DuetControlServer.Model.ObjectModel.WaitForUpdateAsync(System.Threading.CancellationToken)">
+  WaitForUpdateAsync(CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Wait for an update to occur asynchronously</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task WaitForUpdateAsync(CancellationToken cancellationToken)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="events">Events
+</h2>
+
+
+
+  <h3 id="DuetControlServer_Model_ObjectModel_OnConnectionLost" data-uid="DuetControlServer.Model.ObjectModel.OnConnectionLost">
+  OnConnectionLost
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Model/ObjectModel.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Event that is raised when the connection to the firmware has been lost</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event EventHandler? OnConnectionLost</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.eventhandler">EventHandler</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+</article>
+
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

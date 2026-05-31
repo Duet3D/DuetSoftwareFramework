@@ -1,0 +1,279 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Components </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Components ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/Duet3D/DuetSoftwareFramework/blob/v3.7-dev/src/Documentation/articles/components.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="components">Components</h1>
+
+<p>DSF is a collection of processes and libraries under <code>src/</code>. This article is a reference for each one.
+For how they fit together, see the <a href="intro.html#high-level-architecture">architecture overview</a>.</p>
+<h2 id="core-processes">Core processes</h2>
+<h3 id="duetcontrolserver">DuetControlServer</h3>
+<p><code>src/DuetControlServer/</code> - the heart of DSF. A long-running service that:</p>
+<ul>
+<li>owns the global <a href="object-model.html">object model</a> and its read/write locking,</li>
+<li>runs the <a href="gcode-flow.html">G-code pipeline</a> (intake, interception, internal processing, firmware),</li>
+<li>drives the <a href="firmware-link.html">Firmware link</a> to RepRapFirmware,</li>
+<li>maps virtual SD paths to the Linux filesystem and parses G-code <a href="file-management.html">file info</a>,</li>
+<li>hosts the <a href="ipc.html">IPC server</a> that every other process connects to.</li>
+</ul>
+<p>Command-line options, return codes, and the link/IPC details are documented in the repository
+<code>README.md</code>. The bulk of this documentation set describes DCS internals.</p>
+<h3 id="duetwebserver">DuetWebServer</h3>
+<p><code>src/DuetWebServer/</code> - an ASP.NET Core application that serves DuetWebControl (DWC) and the HTTP API.
+It holds no machine state of its own; every request is proxied to DCS over the
+<a href="ipc.html">IPC socket</a> via <a href="#duetapiclient">DuetAPIClient</a>.</p>
+<ul>
+<li><strong>Controllers</strong> (<code>Controllers/</code>):
+<ul>
+<li><code>MachineController</code> - the <code>/machine/*</code> REST API (connect, disconnect, code execution, object-model
+queries, file upload/download/move/delete).</li>
+<li><code>RepRapFirmwareController</code> - the legacy RRF-compatible <code>rr_*</code> endpoints (<code>rr_connect</code>,
+<code>rr_disconnect</code>, ...), reporting <code>isEmulated=true</code> so clients know this is the SBC.</li>
+<li><code>WebSocketController</code> - upgrades <code>WS /machine</code> to a WebSocket and streams
+<a href="object-model.html#observing-changes-and-patches">object-model patches</a> from a DCS subscribe
+connection.</li>
+</ul>
+</li>
+<li><strong>Authentication</strong> (<code>Authorization/</code>): <code>SessionKeyAuthenticationHandler</code> reads the <code>X-Session-Key</code>
+header (falling back to the client IP), and <code>Policies</code> defines the <code>ReadOnly</code> / <code>ReadWrite</code> access
+levels. Sessions live in the <code>SessionStorage</code> singleton; <code>SessionExpiry</code> reaps stale ones.</li>
+<li><strong>Middleware</strong> (<code>Middleware/</code>): <code>CustomEndpointMiddleware</code> forwards requests that match a
+plugin-registered <a href="plugins.html">HTTP endpoint</a> to the owning plugin; <code>FallbackMiddleware</code> serves
+<code>index.html</code> for client-side routes; <code>FixContentTypeMiddleware</code> normalises MIME types.</li>
+<li><strong>ModelObserver</strong> (<code>Services/ModelObserver.cs</code>): a background subscribe connection to DCS that keeps
+the web directory path, CORS origins, and the registered HTTP-endpoint table in sync.</li>
+</ul>
+<p>See <a href="#http-request-flow">Components: HTTP request flow</a> below and the
+<a href="ipc.html">IPC article</a> for the connection mechanics.</p>
+<h3 id="duetpluginservice">DuetPluginService</h3>
+<p><code>src/DuetPluginService/</code> - manages the lifecycle and sandboxing of <a href="plugins.html">plugins</a>. It runs as
+two systemd instances: a non-root one for ordinary plugins and a root one (disabled by default) for
+plugins that declare the <code>SuperUser</code> permission. It reads plugin manifests, spawns plugin processes
+for the right CPU architecture, and generates per-plugin AppArmor profiles. DCS talks to it over a
+dedicated <a href="ipc.html#connection-modes"><code>PluginService</code> IPC connection</a>. Full detail in
+<a href="plugins.html">Plugins</a>.</p>
+<h2 id="client-libraries">Client libraries</h2>
+<h3 id="duetapi">DuetAPI</h3>
+<p><code>src/DuetAPI/</code> - the shared contract used by every process. It contains:</p>
+<ul>
+<li>the <a href="gcode-flow.html#the-code-object"><code>Code</code></a>, <code>CodeParameter</code>, and <code>CodeChannel</code> types and the code
+parser,</li>
+<li>the <a href="object-model.html">object model</a> definition (<code>ObjectModel/</code>),</li>
+<li>the command set (<code>Commands/</code>) and connection types (<code>Connection/</code>),</li>
+<li>the <a href="plugins.html#permissions"><code>SbcPermissions</code></a> flags and <code>RequiredPermissionsAttribute</code>.</li>
+</ul>
+<p>A companion source generator, <code>src/DuetAPI.SourceGenerators/</code>, emits the fast JSON update / assign
+code for the object model (see <a href="object-model.html#json-serialization">Object model: serialization</a>).</p>
+<h3 id="duetapiclient">DuetAPIClient</h3>
+<p><code>src/DuetAPIClient/</code> - the .NET client for the DCS <a href="ipc.html">IPC socket</a>. <code>BaseConnection</code> handles the
+socket, the init handshake, and the JSON command/response protocol; the concrete connection classes
+map one-to-one to the <a href="ipc.html#connection-modes">connection modes</a>:</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Mode</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CommandConnection</code></td>
+<td>Command</td>
+<td>Run commands and codes, query/patch the model</td>
+</tr>
+<tr>
+<td><code>InterceptConnection</code></td>
+<td>Intercept</td>
+<td>Plugin code hooks (resolve/cancel/ignore/rewrite)</td>
+</tr>
+<tr>
+<td><code>SubscribeConnection</code></td>
+<td>Subscribe</td>
+<td>Receive the model and its patches</td>
+</tr>
+<tr>
+<td><code>CodeStreamConnection</code></td>
+<td>CodeStream</td>
+<td>Stream newline-delimited codes on a channel</td>
+</tr>
+<tr>
+<td><code>HttpEndpointConnection</code></td>
+<td>(helper)</td>
+<td>Serve a plugin HTTP endpoint</td>
+</tr>
+</tbody>
+</table>
+<h3 id="duethttpclient">DuetHttpClient</h3>
+<p><code>src/DuetHttpClient/</code> - a client for talking to a Duet over <strong>HTTP</strong> rather than the IPC socket, so it
+works against both standalone firmware and an SBC. <code>DuetHttpSession.ConnectAsync</code> tries a
+<code>PollConnector</code> (legacy <code>rr_*</code> polling, used for standalone firmware) and falls back to a
+<code>RestConnector</code> (the <code>/machine/*</code> REST API plus an optional model WebSocket, used for SBC mode). It
+keeps a local <a href="object-model.html"><code>ObjectModel</code></a> in sync and exposes code execution and file operations.
+<code>DuetHttpOptions</code> tunes passwords, timeouts, polling intervals, and keep-alive.</p>
+<h2 id="command-line-tools-and-example-plugins">Command-line tools and example plugins</h2>
+<p>These small executables under <code>src/</code> are utilities and references. Most connect to DCS through
+<a href="#duetapiclient">DuetAPIClient</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Audience</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CodeConsole</code></td>
+<td>End user / debugging</td>
+<td>Interactive code console; <code>-c</code> runs a single code and exits</td>
+</tr>
+<tr>
+<td><code>CodeLogger</code></td>
+<td>Developer</td>
+<td>Logs intercepted codes at the Pre/Post/Executed stages, with channel and type filters</td>
+</tr>
+<tr>
+<td><code>CodeStream</code></td>
+<td>Integrator</td>
+<td>Reads codes from stdin, streams them to a channel, prints replies</td>
+</tr>
+<tr>
+<td><code>ModelObserver</code></td>
+<td>Developer</td>
+<td>Streams live <a href="object-model.html">object-model</a> changes as JSON, with an optional filter</td>
+</tr>
+<tr>
+<td><code>PluginManager</code></td>
+<td>Administrator</td>
+<td>CLI for the <a href="plugins.html">plugin</a> lifecycle (list/install/start/stop/uninstall/set-data)</td>
+</tr>
+<tr>
+<td><code>CustomHttpEndpoint</code></td>
+<td>Developer</td>
+<td>Example plugin that registers a custom HTTP / WebSocket endpoint</td>
+</tr>
+<tr>
+<td><code>DuetPiManagementPlugin</code></td>
+<td>Built-in plugin</td>
+<td>Implements DuetPi system M-codes (networking, RTC, firmware update) by intercepting RRF codes</td>
+</tr>
+</tbody>
+</table>
+<p><code>CodeLogger</code> and <code>CustomHttpEndpoint</code> are the canonical references for writing an interception plugin
+and an HTTP-endpoint plugin respectively.</p>
+<h2 id="http-request-flow">HTTP request flow</h2>
+<p>How a request from the browser reaches the machine, end to end:</p>
+<pre><code class="lang-mermaid">flowchart LR
+    BROWSER[&quot;DWC (browser)&quot;] --&gt;|&quot;HTTP /machine/code&quot;| DWS[&quot;DuetWebServer&lt;br/&gt;MachineController&quot;]
+    DWS --&gt;|&quot;auth: X-Session-Key&quot;| AUTH[&quot;SessionKeyAuthenticationHandler&quot;]
+    AUTH --&gt; DWS
+    DWS --&gt;|&quot;CommandConnection&lt;br/&gt;(IPC socket)&quot;| DCS[&quot;DuetControlServer&quot;]
+    DCS --&gt;|&quot;G-code pipeline&quot;| PIPE[&quot;see gcode-flow.md&quot;]
+    PIPE --&gt;|&quot;firmware link&quot;| RRF[&quot;RepRapFirmware&quot;]
+    RRF --&gt;|&quot;reply&quot;| DCS --&gt; DWS --&gt; BROWSER
+</code></pre>
+<p>For the WebSocket model-subscription path and the plugin HTTP-endpoint path, see
+<a href="object-model.html#observing-changes-and-patches">Object model</a> and <a href="plugins.html">Plugins</a>.</p>
+
+</article>
+
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

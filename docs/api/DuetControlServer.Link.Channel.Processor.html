@@ -1,0 +1,1402 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class Processor </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class Processor ">
+      
+      <meta name="description" content="Class used to process data on a single code channel">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DuetControlServer.Link.Channel.Processor">
+
+
+
+  <h1 id="DuetControlServer_Link_Channel_Processor" data-uid="DuetControlServer.Link.Channel.Processor" class="text-break">
+Class Processor  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="DuetControlServer.html">DuetControlServer</a>.<a class="xref" href="DuetControlServer.Link.html">Link</a>.<a class="xref" href="DuetControlServer.Link.Channel.html">Channel</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>DuetControlServer.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Class used to process data on a single code channel</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class Processor</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">Processor</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+  <h2 id="DuetControlServer_Link_Channel_Processor_remarks">Remarks</h2>
+  <div class="markdown level0 remarks"><p>This class should be merged with Codes.Pipelines.Firmware at some point</p>
+</div>
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="DuetControlServer_Link_Channel_Processor__ctor_" data-uid="DuetControlServer.Link.Channel.Processor.#ctor*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor__ctor_DuetAPI_CodeChannel_DuetControlServer_Commands_CommandFactory_DuetControlServer_Codes_CodeProcessor_DuetControlServer_Files_FilePathResolver_DuetControlServer_Link_Adapter_ILinkAdapter_DuetControlServer_Link_LinkInterface_DuetControlServer_Files_JobProcessor_DuetControlServer_Files_FileFactory_DuetControlServer_Model_ObjectModel_Microsoft_Extensions_Hosting_IHostApplicationLifetime_Microsoft_Extensions_Logging_ILoggerFactory_Microsoft_Extensions_Options_IOptions_DuetControlServer_Settings__" data-uid="DuetControlServer.Link.Channel.Processor.#ctor(DuetAPI.CodeChannel,DuetControlServer.Commands.CommandFactory,DuetControlServer.Codes.CodeProcessor,DuetControlServer.Files.FilePathResolver,DuetControlServer.Link.Adapter.ILinkAdapter,DuetControlServer.Link.LinkInterface,DuetControlServer.Files.JobProcessor,DuetControlServer.Files.FileFactory,DuetControlServer.Model.ObjectModel,Microsoft.Extensions.Hosting.IHostApplicationLifetime,Microsoft.Extensions.Logging.ILoggerFactory,Microsoft.Extensions.Options.IOptions{DuetControlServer.Settings})">
+  Processor(CodeChannel, CommandFactory, CodeProcessor, FilePathResolver, ILinkAdapter, LinkInterface, JobProcessor, FileFactory, ObjectModel, IHostApplicationLifetime, ILoggerFactory, IOptions&lt;Settings&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Constructor of a code channel processor</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Processor(CodeChannel channel, CommandFactory commandFactory, CodeProcessor codeProcessor, FilePathResolver filePathResolver, ILinkAdapter linkAdapter, LinkInterface linkInterface, JobProcessor jobProcessor, FileFactory macroFileFactory, ObjectModel model, IHostApplicationLifetime lifetime, ILoggerFactory loggerFactory, IOptions&lt;Settings&gt; settings)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Code channel of this instance</p>
+</dd>
+    <dt><code>commandFactory</code> <a class="xref" href="DuetControlServer.Commands.CommandFactory.html">CommandFactory</a></dt>
+    <dd></dd>
+    <dt><code>codeProcessor</code> <a class="xref" href="DuetControlServer.Codes.CodeProcessor.html">CodeProcessor</a></dt>
+    <dd><p>Code processor</p>
+</dd>
+    <dt><code>filePathResolver</code> <a class="xref" href="DuetControlServer.Files.FilePathResolver.html">FilePathResolver</a></dt>
+    <dd><p>File path resolver</p>
+</dd>
+    <dt><code>linkAdapter</code> <a class="xref" href="DuetControlServer.Link.Adapter.ILinkAdapter.html">ILinkAdapter</a></dt>
+    <dd><p>Link adapter</p>
+</dd>
+    <dt><code>linkInterface</code> <a class="xref" href="DuetControlServer.Link.LinkInterface.html">LinkInterface</a></dt>
+    <dd><p>Link interface</p>
+</dd>
+    <dt><code>jobProcessor</code> <a class="xref" href="DuetControlServer.Files.JobProcessor.html">JobProcessor</a></dt>
+    <dd><p>Job processor</p>
+</dd>
+    <dt><code>macroFileFactory</code> <a class="xref" href="DuetControlServer.Files.FileFactory.html">FileFactory</a></dt>
+    <dd><p>Macro file factory</p>
+</dd>
+    <dt><code>model</code> <a class="xref" href="DuetControlServer.Model.ObjectModel.html">ObjectModel</a></dt>
+    <dd><p>Object model</p>
+</dd>
+    <dt><code>lifetime</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.hosting.ihostapplicationlifetime">IHostApplicationLifetime</a></dt>
+    <dd></dd>
+    <dt><code>loggerFactory</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.iloggerfactory">ILoggerFactory</a></dt>
+    <dd><p>Logger factory</p>
+</dd>
+    <dt><code>settings</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.options.ioptions-1">IOptions</a>&lt;<a class="xref" href="DuetControlServer.Settings.html">Settings</a>&gt;</dt>
+    <dd><p>Settings</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_BaseState_" data-uid="DuetControlServer.Link.Channel.Processor.BaseState*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_BaseState" data-uid="DuetControlServer.Link.Channel.Processor.BaseState">
+  BaseState
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>First item on the stack</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public StackState BaseState { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DuetControlServer.Link.Channel.StackState.html">StackState</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_BufferedCodes_" data-uid="DuetControlServer.Link.Channel.Processor.BufferedCodes*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_BufferedCodes" data-uid="DuetControlServer.Link.Channel.Processor.BufferedCodes">
+  BufferedCodes
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>List of buffered G/M/T-codes that are being processed by the firmware</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public List&lt;Code&gt; BufferedCodes { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="DuetControlServer.Commands.Code.html">Code</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_BytesBuffered_" data-uid="DuetControlServer.Link.Channel.Processor.BytesBuffered*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_BytesBuffered" data-uid="DuetControlServer.Link.Channel.Processor.BytesBuffered">
+  BytesBuffered
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Occupied space for buffered codes in bytes</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int BytesBuffered { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_Channel_" data-uid="DuetControlServer.Link.Channel.Processor.Channel*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_Channel" data-uid="DuetControlServer.Link.Channel.Processor.Channel">
+  Channel
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>What code channel this class is about</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public CodeChannel Channel { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_CurrentState_" data-uid="DuetControlServer.Link.Channel.Processor.CurrentState*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_CurrentState" data-uid="DuetControlServer.Link.Channel.Processor.CurrentState">
+  CurrentState
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get the current state from the stack</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public StackState CurrentState { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DuetControlServer.Link.Channel.StackState.html">StackState</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_IsWaitingForAcknowledgment_" data-uid="DuetControlServer.Link.Channel.Processor.IsWaitingForAcknowledgment*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_IsWaitingForAcknowledgment" data-uid="DuetControlServer.Link.Channel.Processor.IsWaitingForAcknowledgment">
+  IsWaitingForAcknowledgment
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Checks if this channel is waiting for acknowledgement</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsWaitingForAcknowledgment { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+  <h4 class="section" id="DuetControlServer_Link_Channel_Processor_IsWaitingForAcknowledgment_remarks">Remarks</h4>
+  <div class="markdown level1 remarks"><p>This is volatile to allow fast access without locking this instance first</p>
+</div>
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_PendingReplies_" data-uid="DuetControlServer.Link.Channel.Processor.PendingReplies*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_PendingReplies" data-uid="DuetControlServer.Link.Channel.Processor.PendingReplies">
+  PendingReplies
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Stack of code replies for codes that pushed the stack (e.g. macro files or blocking messages)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Stack&lt;Tuple&lt;MessageTypeFlags, string&gt;&gt; PendingReplies { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.stack-1">Stack</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.tuple-2">Tuple</a>&lt;<a class="xref" href="DuetControlServer.Link.Protocol.Shared.MessageTypeFlags.html">MessageTypeFlags</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_Stack_" data-uid="DuetControlServer.Link.Channel.Processor.Stack*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_Stack" data-uid="DuetControlServer.Link.Channel.Processor.Stack">
+  Stack
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Stack of the different channel states</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Stack&lt;StackState&gt; Stack { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.stack-1">Stack</a>&lt;<a class="xref" href="DuetControlServer.Link.Channel.StackState.html">StackState</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_AbortAllFilesAsync_" data-uid="DuetControlServer.Link.Channel.Processor.AbortAllFilesAsync*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_AbortAllFilesAsync" data-uid="DuetControlServer.Link.Channel.Processor.AbortAllFilesAsync">
+  AbortAllFilesAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Abort all files asynchronously</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task AbortAllFilesAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_CopyState_" data-uid="DuetControlServer.Link.Channel.Processor.CopyState*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_CopyState_DuetControlServer_Link_Channel_Processor_" data-uid="DuetControlServer.Link.Channel.Processor.CopyState(DuetControlServer.Link.Channel.Processor)">
+  CopyState(Processor)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Copy the state from another channel processor</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void CopyState(Processor from)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="DuetControlServer.Link.Channel.Processor.html">Processor</a></dt>
+    <dd><p>Source</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_DoFirmwareCode_" data-uid="DuetControlServer.Link.Channel.Processor.DoFirmwareCode*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_DoFirmwareCode_System_String_" data-uid="DuetControlServer.Link.Channel.Processor.DoFirmwareCode(System.String)">
+  DoFirmwareCode(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Perform a regular code that was requested from the firmware</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void DoFirmwareCode(string code)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>code</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Code to perform</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_DoMacroFile_" data-uid="DuetControlServer.Link.Channel.Processor.DoMacroFile*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_DoMacroFile_System_String_System_Boolean_" data-uid="DuetControlServer.Link.Channel.Processor.DoMacroFile(System.String,System.Boolean)">
+  DoMacroFile(string, bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Attempt to start a file macro</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void DoMacroFile(string virtualFile, bool fromCode)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>virtualFile</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Requested name of the macro file</p>
+</dd>
+    <dt><code>fromCode</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Request comes from a real G/M/T-code</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_FilesAborted_" data-uid="DuetControlServer.Link.Channel.Processor.FilesAborted*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_FilesAborted_System_Boolean_" data-uid="DuetControlServer.Link.Channel.Processor.FilesAborted(System.Boolean)">
+  FilesAborted(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Called when the last or all files have been aborted by the firmware</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void FilesAborted(bool abortAll)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>abortAll</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether to abort all files</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_FlushAllAsync_" data-uid="DuetControlServer.Link.Channel.Processor.FlushAllAsync*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_FlushAllAsync_System_Threading_CancellationToken_" data-uid="DuetControlServer.Link.Channel.Processor.FlushAllAsync(System.Threading.CancellationToken)">
+  FlushAllAsync(CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Flush all pending codes and return true on success or false on failure.
+This method may be deprecated; in theory it should suffice to flush the pipeline only (with stricter Busy conditions)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;bool&gt; FlushAllAsync(CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Optional cancellation token</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>Whether the codes could be flushed</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_FlushAsync_" data-uid="DuetControlServer.Link.Channel.Processor.FlushAsync*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_FlushAsync_DuetControlServer_Files_CodeFile_System_Threading_CancellationToken_" data-uid="DuetControlServer.Link.Channel.Processor.FlushAsync(DuetControlServer.Files.CodeFile,System.Threading.CancellationToken)">
+  FlushAsync(CodeFile, CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Flush pending codes and return true on success or false on failure.
+This method may be deprecated; in theory it should suffice to flush the pipeline only (with stricter Busy conditions)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;bool&gt; FlushAsync(CodeFile file, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>file</code> <a class="xref" href="DuetControlServer.Files.CodeFile.html">CodeFile</a></dt>
+    <dd><p>Optional code file for the flush target</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Optional cancellation token</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>Whether the codes could be flushed</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_FlushAsync_" data-uid="DuetControlServer.Link.Channel.Processor.FlushAsync*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_FlushAsync_System_Threading_CancellationToken_" data-uid="DuetControlServer.Link.Channel.Processor.FlushAsync(System.Threading.CancellationToken)">
+  FlushAsync(CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Flush pending codes and return true on success or false on failure.
+This method may be deprecated; in theory it should suffice to flush the pipeline only (with stricter Busy conditions)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;bool&gt; FlushAsync(CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Optional cancellation token</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>Whether the codes could be flushed</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_HandleReply_" data-uid="DuetControlServer.Link.Channel.Processor.HandleReply*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_HandleReply_DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_System_String_" data-uid="DuetControlServer.Link.Channel.Processor.HandleReply(DuetControlServer.Link.Protocol.Shared.MessageTypeFlags,System.String)">
+  HandleReply(MessageTypeFlags, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Handle a G-code reply</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool HandleReply(MessageTypeFlags flags, string reply)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>flags</code> <a class="xref" href="DuetControlServer.Link.Protocol.Shared.MessageTypeFlags.html">MessageTypeFlags</a></dt>
+    <dd><p>Message flags</p>
+</dd>
+    <dt><code>reply</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Code reply</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the reply could be processed</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_Invalidate_" data-uid="DuetControlServer.Link.Channel.Processor.Invalidate*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_Invalidate" data-uid="DuetControlServer.Link.Channel.Processor.Invalidate">
+  Invalidate()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Invalidate every request and buffered code on this channel</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Invalidate()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_InvalidateRegular_" data-uid="DuetControlServer.Link.Channel.Processor.InvalidateRegular*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_InvalidateRegular" data-uid="DuetControlServer.Link.Channel.Processor.InvalidateRegular">
+  InvalidateRegular()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Invalidate buffered and regular codes + requests</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void InvalidateRegular()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_Lock_" data-uid="DuetControlServer.Link.Channel.Processor.Lock*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_Lock_System_Threading_CancellationToken_" data-uid="DuetControlServer.Link.Channel.Processor.Lock(System.Threading.CancellationToken)">
+  Lock(CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Lock access to this code channel</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IDisposable Lock(CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></dt>
+    <dd><p>Disposable lock</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_LockAllMovementSystemsAndWaitForStandstill_" data-uid="DuetControlServer.Link.Channel.Processor.LockAllMovementSystemsAndWaitForStandstill*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_LockAllMovementSystemsAndWaitForStandstill" data-uid="DuetControlServer.Link.Channel.Processor.LockAllMovementSystemsAndWaitForStandstill">
+  LockAllMovementSystemsAndWaitForStandstill()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Lock all movement systems and wait for standstill</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;bool&gt; LockAllMovementSystemsAndWaitForStandstill()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>Whether the movement systems could be locked</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_LockAsync_" data-uid="DuetControlServer.Link.Channel.Processor.LockAsync*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_LockAsync_System_Threading_CancellationToken_" data-uid="DuetControlServer.Link.Channel.Processor.LockAsync(System.Threading.CancellationToken)">
+  LockAsync(CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Lock access to this code channel asynchronously</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public AwaitableDisposable&lt;IDisposable&gt; LockAsync(CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><span class="xref">AwaitableDisposable</span>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>&gt;</dt>
+    <dd><p>Disposable lock</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_MacroFileClosed_" data-uid="DuetControlServer.Link.Channel.Processor.MacroFileClosed*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_MacroFileClosed" data-uid="DuetControlServer.Link.Channel.Processor.MacroFileClosed">
+  MacroFileClosed()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Called when RepRapFirmware has closed the last macro file internally</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void MacroFileClosed()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_MessageAcknowledged_" data-uid="DuetControlServer.Link.Channel.Processor.MessageAcknowledged*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_MessageAcknowledged" data-uid="DuetControlServer.Link.Channel.Processor.MessageAcknowledged">
+  MessageAcknowledged()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Called when a message has been acknowledged</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void MessageAcknowledged()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_Pop_" data-uid="DuetControlServer.Link.Channel.Processor.Pop*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_Pop" data-uid="DuetControlServer.Link.Channel.Processor.Pop">
+  Pop()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Pop the last state from the stack</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Pop()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_PopAsync_" data-uid="DuetControlServer.Link.Channel.Processor.PopAsync*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_PopAsync" data-uid="DuetControlServer.Link.Channel.Processor.PopAsync">
+  PopAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Pop the last state from the stack</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task PopAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_PrintDiagnosticsAsync_" data-uid="DuetControlServer.Link.Channel.Processor.PrintDiagnosticsAsync*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_PrintDiagnosticsAsync_System_Text_StringBuilder_System_Threading_CancellationToken_" data-uid="DuetControlServer.Link.Channel.Processor.PrintDiagnosticsAsync(System.Text.StringBuilder,System.Threading.CancellationToken)">
+  PrintDiagnosticsAsync(StringBuilder, CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Print diagnostics of this class</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask PrintDiagnosticsAsync(StringBuilder builder, CancellationToken cancellationToken)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>builder</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.stringbuilder">StringBuilder</a></dt>
+    <dd><p>String builder to print to</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_PrintPaused_" data-uid="DuetControlServer.Link.Channel.Processor.PrintPaused*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_PrintPaused" data-uid="DuetControlServer.Link.Channel.Processor.PrintPaused">
+  PrintPaused()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Called when the print has been paused on the file channel</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void PrintPaused()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_Push_" data-uid="DuetControlServer.Link.Channel.Processor.Push*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_Push_DuetControlServer_Files_CodeFile_" data-uid="DuetControlServer.Link.Channel.Processor.Push(DuetControlServer.Files.CodeFile)">
+  Push(CodeFile?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Push a new state on the stack</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public StackState Push(CodeFile? file = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>file</code> <a class="xref" href="DuetControlServer.Files.CodeFile.html">CodeFile</a></dt>
+    <dd><p>Optional file being executed</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DuetControlServer.Link.Channel.StackState.html">StackState</a></dt>
+    <dd><p>New state</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_ResourceLocked_" data-uid="DuetControlServer.Link.Channel.Processor.ResourceLocked*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_ResourceLocked" data-uid="DuetControlServer.Link.Channel.Processor.ResourceLocked">
+  ResourceLocked()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Called when a resource has been locked</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ResourceLocked()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_SetMacroPausable_" data-uid="DuetControlServer.Link.Channel.Processor.SetMacroPausable*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_SetMacroPausable_System_Boolean_" data-uid="DuetControlServer.Link.Channel.Processor.SetMacroPausable(System.Boolean)">
+  SetMacroPausable(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Flag the currently executing macro file as (not) pausable</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task SetMacroPausable(bool isPausable)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>isPausable</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the macro is pausable or not</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_Spin_" data-uid="DuetControlServer.Link.Channel.Processor.Spin*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_Spin" data-uid="DuetControlServer.Link.Channel.Processor.Spin">
+  Spin()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Process pending requests on this channel</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Spin()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_StartCopiedMacros_" data-uid="DuetControlServer.Link.Channel.Processor.StartCopiedMacros*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_StartCopiedMacros" data-uid="DuetControlServer.Link.Channel.Processor.StartCopiedMacros">
+  StartCopiedMacros()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Start copied macros. This must happen later to avoid race conditions</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static void StartCopiedMacros()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_UnlockAll_" data-uid="DuetControlServer.Link.Channel.Processor.UnlockAll*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_UnlockAll" data-uid="DuetControlServer.Link.Channel.Processor.UnlockAll">
+  UnlockAll()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Unlock all resources occupied by the given channel</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task UnlockAll()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Processor_WaitForAcknowledgement_" data-uid="DuetControlServer.Link.Channel.Processor.WaitForAcknowledgement*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Processor_WaitForAcknowledgement" data-uid="DuetControlServer.Link.Channel.Processor.WaitForAcknowledgement">
+  WaitForAcknowledgement()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Processor.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Wait for a message to be acknowledged</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void WaitForAcknowledgement()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

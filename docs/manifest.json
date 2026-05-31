@@ -154,6 +154,16 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.Commands.CodeTypeConverter.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.Commands.CodeTypeConverter.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetAPI.Commands.Command-1.yml",
       "output": {
         ".html": {
@@ -174,6 +184,16 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.Commands.CommandContext.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.Commands.CommandContext.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetAPI.Commands.ErrorResponse.yml",
       "output": {
         ".html": {
@@ -188,6 +208,16 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.EvaluateExpression.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.Commands.FileDirectory.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.Commands.FileDirectory.html"
         }
       },
       "version": ""
@@ -294,10 +324,30 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.Commands.NotifyPluginStarted.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.Commands.NotifyPluginStarted.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetAPI.Commands.PatchObjectModel.yml",
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.PatchObjectModel.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.Commands.QueryObjectModel.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.Commands.QueryObjectModel.html"
         }
       },
       "version": ""
@@ -364,10 +414,30 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.Commands.ResolvePluginProcess.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.Commands.ResolvePluginProcess.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetAPI.Commands.Response-1.yml",
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Commands.Response-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.Commands.Rewrite.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.Commands.Rewrite.html"
         }
       },
       "version": ""
@@ -544,6 +614,16 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.Connection.ConnectionContext.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.Connection.ConnectionContext.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetAPI.Connection.ConnectionMode.yml",
       "output": {
         ".html": {
@@ -588,6 +668,16 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Connection.InitMessages.CommandInitMessage.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.Connection.InitMessages.InitMessage.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.Connection.InitMessages.InitMessage.html"
         }
       },
       "version": ""
@@ -864,6 +954,16 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.CommunicationMethod.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.CommunicationMethod.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetAPI.ObjectModel.Compatibility.yml",
       "output": {
         ".html": {
@@ -1044,10 +1144,40 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.DriverConfig.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.DriverConfig.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.DriverMode.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.DriverMode.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetAPI.ObjectModel.Duet3DFilamentMonitor.yml",
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.ObjectModel.Duet3DFilamentMonitor.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.DynamicModelCollection-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.DynamicModelCollection-1.html"
         }
       },
       "version": ""
@@ -1074,6 +1204,16 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.EventLogLevel.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.EventLogLevel.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetAPI.ObjectModel.Extruder.yml",
       "output": {
         ".html": {
@@ -1088,6 +1228,16 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.ObjectModel.ExtruderNonlinear.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.ExtruderPressureAdvance.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.ExtruderPressureAdvance.html"
         }
       },
       "version": ""
@@ -1158,16 +1308,6 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.ObjectModel.GCodeFileInfo.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetAPI.ObjectModel.GCodeFileInfoConverter.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetAPI.ObjectModel.GCodeFileInfoConverter.html"
         }
       },
       "version": ""
@@ -1304,10 +1444,10 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetAPI.ObjectModel.IGrowingModelCollection.yml",
+      "source_relative_path": "api/DuetAPI.ObjectModel.IDynamicModelObject.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetAPI.ObjectModel.IGrowingModelCollection.html"
+          "relative_path": "api/DuetAPI.ObjectModel.IDynamicModelObject.html"
         }
       },
       "version": ""
@@ -1338,6 +1478,16 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.ObjectModel.IModelObject.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.IStaticModelObject.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.IStaticModelObject.html"
         }
       },
       "version": ""
@@ -1414,6 +1564,26 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.JsonModelDictionary.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.JsonModelDictionary.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.JsonModelDictionaryConverter.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.JsonModelDictionaryConverter.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetAPI.ObjectModel.KeepoutZone.yml",
       "output": {
         ".html": {
@@ -1448,16 +1618,6 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.ObjectModel.KinematicsName.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetAPI.ObjectModel.KinematicsNameConverter.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetAPI.ObjectModel.KinematicsNameConverter.html"
         }
       },
       "version": ""
@@ -1514,6 +1674,16 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.LedStripColorOrder.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.LedStripColorOrder.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetAPI.ObjectModel.LedStripType.yml",
       "output": {
         ".html": {
@@ -1544,10 +1714,10 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetAPI.ObjectModel.LogLevel.yml",
+      "source_relative_path": "api/DuetAPI.ObjectModel.LiveAttribute.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetAPI.ObjectModel.LogLevel.html"
+          "relative_path": "api/DuetAPI.ObjectModel.LiveAttribute.html"
         }
       },
       "version": ""
@@ -1614,6 +1784,16 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.MessageCollection.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.MessageCollection.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetAPI.ObjectModel.MessageType.yml",
       "output": {
         ".html": {
@@ -1634,50 +1814,10 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetAPI.ObjectModel.MinMaxCurrent-1.yml",
+      "source_relative_path": "api/DuetAPI.ObjectModel.MinMaxCurrent.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetAPI.ObjectModel.MinMaxCurrent-1.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetAPI.ObjectModel.ModelCollection-1.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetAPI.ObjectModel.ModelCollection-1.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetAPI.ObjectModel.ModelDictionary-1.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetAPI.ObjectModel.ModelDictionary-1.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetAPI.ObjectModel.ModelDictionaryConverter.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetAPI.ObjectModel.ModelDictionaryConverter.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetAPI.ObjectModel.ModelGrowingCollection-1.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetAPI.ObjectModel.ModelGrowingCollection-1.html"
+          "relative_path": "api/DuetAPI.ObjectModel.MinMaxCurrent.html"
         }
       },
       "version": ""
@@ -1688,6 +1828,16 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.ObjectModel.ModelObject.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.MotionSystem.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.MotionSystem.html"
         }
       },
       "version": ""
@@ -1844,10 +1994,10 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetAPI.ObjectModel.ObjectModelConverter.yml",
+      "source_relative_path": "api/DuetAPI.ObjectModel.ObjectModelContext.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetAPI.ObjectModel.ObjectModelConverter.html"
+          "relative_path": "api/DuetAPI.ObjectModel.ObjectModelContext.html"
         }
       },
       "version": ""
@@ -1898,6 +2048,16 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.ObjectModel.ProbeGrid.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.ProbeTouchMode.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.ProbeTouchMode.html"
         }
       },
       "version": ""
@@ -2064,6 +2224,16 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.SpindleType.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.SpindleType.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetAPI.ObjectModel.StartupError.yml",
       "output": {
         ".html": {
@@ -2078,6 +2248,26 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.ObjectModel.State.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.StaticModelCollection-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.StaticModelCollection-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.StaticModelDictionary-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.StaticModelDictionary-1.html"
         }
       },
       "version": ""
@@ -2174,6 +2364,16 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPI.ObjectModel.VerboseAttribute.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPI.ObjectModel.VerboseAttribute.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetAPI.ObjectModel.Volume.yml",
       "output": {
         ".html": {
@@ -2244,20 +2444,10 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetAPI.Utility.JsonCamelCaseStringEnumConverter.yml",
+      "source_relative_path": "api/DuetAPI.Utility.JsonCamelCaseStringEnumConverter-1.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetAPI.Utility.JsonCamelCaseStringEnumConverter.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetAPI.Utility.JsonCharEnumConverter.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetAPI.Utility.JsonCharEnumConverter.html"
+          "relative_path": "api/DuetAPI.Utility.JsonCamelCaseStringEnumConverter-1.html"
         }
       },
       "version": ""
@@ -2274,30 +2464,10 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetAPI.Utility.JsonLowerCaseStringEnumConverter.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
       "source_relative_path": "api/DuetAPI.Utility.JsonOptionalShortDateTimeConverter.yml",
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.Utility.JsonOptionalShortDateTimeConverter.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter-1.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetAPI.Utility.JsonPolymorphicWriteOnlyConverter-1.html"
         }
       },
       "version": ""
@@ -2368,6 +2538,16 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetAPI.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetAPIClient.BaseCommandConnection.ObjectModelLock.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetAPIClient.BaseCommandConnection.ObjectModelLock.html"
         }
       },
       "version": ""
@@ -2484,50 +2664,90 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Codes.Handlers.Functions.yml",
+      "source_relative_path": "api/DuetControlServer.Codes.CodeFactory.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Codes.Handlers.Functions.html"
+          "relative_path": "api/DuetControlServer.Codes.CodeFactory.html"
         }
       },
       "version": ""
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Codes.Handlers.GCodes.yml",
+      "source_relative_path": "api/DuetControlServer.Codes.CodeProcessor.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Codes.Handlers.GCodes.html"
+          "relative_path": "api/DuetControlServer.Codes.CodeProcessor.html"
         }
       },
       "version": ""
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Codes.Handlers.Keywords.yml",
+      "source_relative_path": "api/DuetControlServer.Codes.CodeProcessorService.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Codes.Handlers.Keywords.html"
+          "relative_path": "api/DuetControlServer.Codes.CodeProcessorService.html"
         }
       },
       "version": ""
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Codes.Handlers.MCodes.yml",
+      "source_relative_path": "api/DuetControlServer.Codes.Handlers.GCodeHandler.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Codes.Handlers.MCodes.html"
+          "relative_path": "api/DuetControlServer.Codes.Handlers.GCodeHandler.html"
         }
       },
       "version": ""
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Codes.Handlers.TCodes.yml",
+      "source_relative_path": "api/DuetControlServer.Codes.Handlers.ICodeHandler.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Codes.Handlers.TCodes.html"
+          "relative_path": "api/DuetControlServer.Codes.Handlers.ICodeHandler.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Codes.Handlers.Keys.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Codes.Handlers.Keys.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Codes.Handlers.KeywordHandler.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Codes.Handlers.KeywordHandler.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Codes.Handlers.MCodeHandler.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Codes.Handlers.MCodeHandler.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Codes.Handlers.TCodeHandler.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Codes.Handlers.TCodeHandler.html"
         }
       },
       "version": ""
@@ -2538,6 +2758,86 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Codes.Handlers.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Codes.Meta.Expressions.CustomAsyncFunctionResolver.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Codes.Meta.Expressions.CustomAsyncFunctionResolver.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Codes.Meta.Expressions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Codes.Meta.Expressions.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Codes.Meta.Functions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Codes.Meta.Functions.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Codes.Meta.Parsing.ForwardingExpressionContext.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Codes.Meta.Parsing.ForwardingExpressionContext.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Codes.Meta.Parsing.IExpressionEvaluationContext.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Codes.Meta.Parsing.IExpressionEvaluationContext.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Codes.Meta.Parsing.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Codes.Meta.Parsing.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Codes.Meta.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Codes.Meta.html"
         }
       },
       "version": ""
@@ -2644,10 +2944,10 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Codes.Processor.yml",
+      "source_relative_path": "api/DuetControlServer.Codes.ServiceCollectionExtensions.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Codes.Processor.html"
+          "relative_path": "api/DuetControlServer.Codes.ServiceCollectionExtensions.html"
         }
       },
       "version": ""
@@ -2698,6 +2998,16 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.Code.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Commands.CommandFactory.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Commands.CommandFactory.html"
         }
       },
       "version": ""
@@ -2794,10 +3104,30 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Commands.NotifyPluginStarted.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Commands.NotifyPluginStarted.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetControlServer.Commands.PatchObjectModel.yml",
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.PatchObjectModel.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Commands.QueryObjectModel.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Commands.QueryObjectModel.html"
         }
       },
       "version": ""
@@ -2838,6 +3168,16 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Commands.ResolvePath.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Commands.ServiceCollectionExtensions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Commands.ServiceCollectionExtensions.html"
         }
       },
       "version": ""
@@ -3024,30 +3364,30 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Files.FileDirectory.yml",
+      "source_relative_path": "api/DuetControlServer.Files.CodeFilePath.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Files.FileDirectory.html"
+          "relative_path": "api/DuetControlServer.Files.CodeFilePath.html"
         }
       },
       "version": ""
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Files.FilePath.yml",
+      "source_relative_path": "api/DuetControlServer.Files.FileFactory.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Files.FilePath.html"
+          "relative_path": "api/DuetControlServer.Files.FileFactory.html"
         }
       },
       "version": ""
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Files.ImageProcessing.IconImageParser.yml",
+      "source_relative_path": "api/DuetControlServer.Files.FilePathResolver.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Files.ImageProcessing.IconImageParser.html"
+          "relative_path": "api/DuetControlServer.Files.FilePathResolver.html"
         }
       },
       "version": ""
@@ -3084,16 +3424,6 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Files.InfoParser.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.Files.InfoParser.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
       "source_relative_path": "api/DuetControlServer.Files.JobProcessor.yml",
       "output": {
         ".html": {
@@ -3108,6 +3438,56 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.Files.MacroFile.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Files.Parser.FileInfoParser.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Files.Parser.FileInfoParser.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Files.Parser.ImageProcessing.IconImageParser.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Files.Parser.ImageProcessing.IconImageParser.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Files.Parser.ImageProcessing.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Files.Parser.ImageProcessing.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Files.Parser.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Files.Parser.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Files.ServiceCollectionExtensions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Files.ServiceCollectionExtensions.html"
         }
       },
       "version": ""
@@ -3144,16 +3524,6 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.IPC.Processors.Base.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.IPC.Processors.Base.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
       "source_relative_path": "api/DuetControlServer.IPC.Processors.CodeInterception.yml",
       "output": {
         ".html": {
@@ -3184,6 +3554,16 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.IPC.Processors.IProcessor.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.IPC.Processors.IProcessor.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetControlServer.IPC.Processors.ModelSubscription.yml",
       "output": {
         ".html": {
@@ -3198,6 +3578,16 @@
       "output": {
         ".html": {
           "relative_path": "api/DuetControlServer.IPC.Processors.PluginService.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.IPC.Processors.ProcessorFactory.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.IPC.Processors.ProcessorFactory.html"
         }
       },
       "version": ""
@@ -3224,6 +3614,16 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.IPC.ServiceCollectionExtensions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.IPC.ServiceCollectionExtensions.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetControlServer.IPC.yml",
       "output": {
         ".html": {
@@ -3234,20 +3634,680 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Model.Expressions.CustomAsyncFunctionResolver.yml",
+      "source_relative_path": "api/DuetControlServer.Link.Adapter.ILinkAdapter.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Model.Expressions.CustomAsyncFunctionResolver.html"
+          "relative_path": "api/DuetControlServer.Link.Adapter.ILinkAdapter.html"
         }
       },
       "version": ""
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Model.Expressions.yml",
+      "source_relative_path": "api/DuetControlServer.Link.Adapter.SPI.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Model.Expressions.html"
+          "relative_path": "api/DuetControlServer.Link.Adapter.SPI.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Adapter.USB.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Adapter.USB.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Adapter.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Adapter.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Channel.Manager.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Channel.Manager.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Channel.Processor.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Channel.Processor.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Channel.StackState.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Channel.StackState.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Channel.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Channel.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.EvaluateExpressionRequest.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.EvaluateExpressionRequest.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.LinkInterface.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.LinkInterface.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.LinkService.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.LinkService.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.ModelQueryRequest.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.ModelQueryRequest.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.AbortFileHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.AbortFileHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.CodeBufferUpdateHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.CodeBufferUpdateHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.DoCodeHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.DoCodeHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.EvaluationResultHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.EvaluationResultHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.ExecuteMacroHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.ExecuteMacroHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.FileChunkHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.FileChunkHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.FileHandleHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.FileHandleHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.LegacyPrintPausedHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.LegacyPrintPausedHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.OpenFileHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.OpenFileHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.PrintPausedHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.PrintPausedHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.PrintPausedReason.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.PrintPausedReason.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.ReadFileHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.ReadFileHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.Request.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.Request.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.SeekFileHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.SeekFileHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.FirmwareRequests.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.Reader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.Reader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.AssignFilamentHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.AssignFilamentHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.BooleanHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.BooleanHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.CodeFlags.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.CodeFlags.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.CodeHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.CodeHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.CodeParameter.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.CodeParameter.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.DeleteLocalVariableHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.DeleteLocalVariableHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.FileChunkHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.FileChunkHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.FileDataHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.FileDataHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.GetObjectModelHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.GetObjectModelHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.MacroCompleteHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.MacroCompleteHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.OpenFileResult.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.OpenFileResult.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.PrintStartedHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.PrintStartedHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.PrintStoppedHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.PrintStoppedHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.Request.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.Request.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.SetLastCodeResultHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.SetLastCodeResultHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.SetObjectModelHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.SetObjectModelHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.SetVariableHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.SetVariableHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.SbcRequests.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.Shared.CodeChannelHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.Shared.CodeChannelHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.Shared.CodeResult.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.Shared.CodeResult.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.Shared.Consts.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.Shared.Consts.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.Shared.DataType.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.Shared.DataType.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.Shared.HeightMapHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.Shared.HeightMapHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.Shared.MessageHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.Shared.MessageHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.Shared.MessageTypeFlags.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.Shared.MessageTypeFlags.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.Shared.PacketHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.Shared.PacketHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.Shared.PrintStoppedReason.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.Shared.PrintStoppedReason.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.Shared.StringHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.Shared.StringHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.Shared.TransferHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.Shared.TransferHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.Shared.TransferResponse.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.Shared.TransferResponse.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.Shared.UsbTransferHeader.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.Shared.UsbTransferHeader.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.Shared.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.Shared.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.Writer.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.Writer.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Protocol.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Protocol.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Requests.LockMovementRequest.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Requests.LockMovementRequest.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.Requests.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.Requests.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.ServiceCollectionExtensions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.ServiceCollectionExtensions.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.SetLastCodeResultRequest.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.SetLastCodeResultRequest.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.VariableRequest.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.VariableRequest.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Link.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Link.html"
         }
       },
       "version": ""
@@ -3274,6 +4334,36 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Model.LockWrapper.OnUpdatedHandler.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Model.LockWrapper.OnUpdatedHandler.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Model.LockWrapper.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Model.LockWrapper.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Model.ObjectModel.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Model.ObjectModel.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetControlServer.Model.Observer.PropertyPathChanged.yml",
       "output": {
         ".html": {
@@ -3294,10 +4384,10 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Model.PeriodicUpdater.yml",
+      "source_relative_path": "api/DuetControlServer.Model.PeriodicUpdateService.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Model.PeriodicUpdater.html"
+          "relative_path": "api/DuetControlServer.Model.PeriodicUpdateService.html"
         }
       },
       "version": ""
@@ -3314,20 +4404,40 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Model.Provider.yml",
+      "source_relative_path": "api/DuetControlServer.Model.QueryFlags.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Model.Provider.html"
+          "relative_path": "api/DuetControlServer.Model.QueryFlags.html"
         }
       },
       "version": ""
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Model.Updater.yml",
+      "source_relative_path": "api/DuetControlServer.Model.SbcTriggerService.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Model.Updater.html"
+          "relative_path": "api/DuetControlServer.Model.SbcTriggerService.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Model.ServiceCollectionExtensions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Model.ServiceCollectionExtensions.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Model.UpdateService.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Model.UpdateService.html"
         }
       },
       "version": ""
@@ -3344,590 +4454,10 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Program.yml",
+      "source_relative_path": "api/DuetControlServer.ServiceCollectionExtensions.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Program.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Channel.LockRequest.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Channel.LockRequest.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Channel.Manager.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Channel.Manager.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Channel.Processor.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Channel.Processor.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Channel.State.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Channel.State.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Channel.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Channel.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.Consts.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.Consts.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.AbortFileHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.AbortFileHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.CodeBufferUpdateHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.CodeBufferUpdateHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.DoCodeHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.DoCodeHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.EvaluationResultHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.EvaluationResultHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.ExecuteMacroHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.FileChunkHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.FileChunkHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.FileHandleHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.FileHandleHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.OpenFileHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.OpenFileHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.PrintPausedHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.PrintPausedHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.PrintPausedReason.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.PrintPausedReason.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.ReadFileHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.ReadFileHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.Request.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.Request.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.SeekFileHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.SeekFileHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.FirmwareRequests.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.AssignFilamentHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.AssignFilamentHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.BooleanHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.BooleanHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.CodeFlags.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.CodeFlags.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.CodeHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.CodeHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.CodeParameter.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.CodeParameter.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.DeleteLocalVariableHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.DeleteLocalVariableHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.FileChunkHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.FileChunkHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.FileDataHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.FileDataHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.GetObjectModelHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.GetObjectModelHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.MacroCompleteHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.MacroCompleteHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.OpenFileResult.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.OpenFileResult.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.PrintStartedHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.PrintStartedHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.PrintStoppedHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.PrintStoppedHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.Request.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.Request.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.SetObjectModelHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.SetObjectModelHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.SetVariableHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.SetVariableHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.SbcRequests.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.Shared.CodeChannelHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.Shared.DataType.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.Shared.DataType.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.Shared.HeightMapHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.Shared.HeightMapHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.Shared.MessageHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.Shared.MessageHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.Shared.MessageTypeFlags.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.Shared.MessageTypeFlags.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.Shared.PacketHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.Shared.PacketHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.Shared.PrintStoppedReason.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.Shared.PrintStoppedReason.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.Shared.StringHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.Shared.StringHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.Shared.TransferHeader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.Shared.TransferHeader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.Shared.TransferResponse.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.Shared.TransferResponse.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.Shared.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.Shared.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Communication.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Communication.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.DataTransfer.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.DataTransfer.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.EvaluateExpressionRequest.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.EvaluateExpressionRequest.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Interface.MovementLock.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Interface.MovementLock.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Interface.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Interface.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Serialization.Reader.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Serialization.Reader.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Serialization.Writer.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Serialization.Writer.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.Serialization.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.Serialization.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.VariableRequest.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.VariableRequest.html"
-        }
-      },
-      "version": ""
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.SPI.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/DuetControlServer.SPI.html"
+          "relative_path": "api/DuetControlServer.ServiceCollectionExtensions.html"
         }
       },
       "version": ""
@@ -3974,6 +4504,36 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Utility.DiagnosticsPriorityAttribute.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Utility.DiagnosticsPriorityAttribute.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Utility.DiagnosticsProvider.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Utility.DiagnosticsProvider.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Utility.EventLogger.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Utility.EventLogger.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/DuetControlServer.Utility.Firmware.yml",
       "output": {
         ".html": {
@@ -3984,20 +4544,70 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Utility.Logger.yml",
+      "source_relative_path": "api/DuetControlServer.Utility.FirmwareUpdater.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Utility.Logger.html"
+          "relative_path": "api/DuetControlServer.Utility.FirmwareUpdater.html"
         }
       },
       "version": ""
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/DuetControlServer.Utility.PriorityThreadRunner.yml",
+      "source_relative_path": "api/DuetControlServer.Utility.IAsyncDiagnostics.yml",
       "output": {
         ".html": {
-          "relative_path": "api/DuetControlServer.Utility.PriorityThreadRunner.html"
+          "relative_path": "api/DuetControlServer.Utility.IAsyncDiagnostics.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Utility.IDiagnostics.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Utility.IDiagnostics.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Utility.MQTT.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Utility.MQTT.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Utility.MessageLogger.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Utility.MessageLogger.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Utility.MessageLoggerProvider.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Utility.MessageLoggerProvider.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/DuetControlServer.Utility.ServiceCollectionExtensions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/DuetControlServer.Utility.ServiceCollectionExtensions.html"
         }
       },
       "version": ""
@@ -4328,6 +4938,59 @@
       "output": {
         ".json": {
           "relative_path": "api/toc.json"
+        },
+        ".html": {
+          "relative_path": "api/toc.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "articles/building.md",
+      "output": {
+        ".html": {
+          "relative_path": "articles/building.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "articles/components.md",
+      "output": {
+        ".html": {
+          "relative_path": "articles/components.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "articles/file-management.md",
+      "output": {
+        ".html": {
+          "relative_path": "articles/file-management.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "articles/firmware-link.md",
+      "output": {
+        ".html": {
+          "relative_path": "articles/firmware-link.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "articles/gcode-flow.md",
+      "output": {
+        ".html": {
+          "relative_path": "articles/gcode-flow.html"
         }
       },
       "version": ""
@@ -4343,11 +5006,54 @@
       "version": ""
     },
     {
+      "type": "Conceptual",
+      "source_relative_path": "articles/ipc.md",
+      "output": {
+        ".html": {
+          "relative_path": "articles/ipc.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "articles/object-model.md",
+      "output": {
+        ".html": {
+          "relative_path": "articles/object-model.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "articles/plugins.md",
+      "output": {
+        ".html": {
+          "relative_path": "articles/plugins.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "articles/rest-api.md",
+      "output": {
+        ".html": {
+          "relative_path": "articles/rest-api.html"
+        }
+      },
+      "version": ""
+    },
+    {
       "type": "Toc",
       "source_relative_path": "articles/toc.yml",
       "output": {
         ".json": {
           "relative_path": "articles/toc.json"
+        },
+        ".html": {
+          "relative_path": "articles/toc.html"
         }
       },
       "version": ""
@@ -4368,6 +5074,9 @@
       "output": {
         ".json": {
           "relative_path": "toc.json"
+        },
+        ".html": {
+          "relative_path": "toc.html"
         }
       },
       "version": ""

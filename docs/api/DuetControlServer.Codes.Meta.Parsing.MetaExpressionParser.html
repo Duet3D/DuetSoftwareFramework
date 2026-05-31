@@ -1,0 +1,372 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class MetaExpressionParser </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class MetaExpressionParser ">
+      
+      <meta name="description" content="Recursive-descent evaluator for meta G-code expressions. This is a C# port of the firmware ExpressionParser so that DSF can evaluate expressions itself instead of forwarding them to the firmware. Operator precedence, type coercion, numeric promotion rules and error messages are kept identical to the firmware to avoid behavioural drift. Values are represented as boxed CLR objects matching the firmware type codes: null (none/null), , ,  (int32),  (uint32),  (uint64), , , ,  and object?[] (array) When the expression references something that cannot be resolved on the SBC, evaluation is abandoned (without throwing) and  returns false so the caller forwards the original expression to the firmware. Only genuine syntax errors throw a .">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser">
+
+
+
+  <h1 id="DuetControlServer_Codes_Meta_Parsing_MetaExpressionParser" data-uid="DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser" class="text-break">
+Class MetaExpressionParser  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Codes/Meta/Parsing/MetaExpressionParser.cs"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="DuetControlServer.html">DuetControlServer</a>.<a class="xref" href="DuetControlServer.Codes.html">Codes</a>.<a class="xref" href="DuetControlServer.Codes.Meta.html">Meta</a>.<a class="xref" href="DuetControlServer.Codes.Meta.Parsing.html">Parsing</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>DuetControlServer.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Recursive-descent evaluator for meta G-code expressions. This is a C# port of the firmware ExpressionParser so
+that DSF can evaluate expressions itself instead of forwarding them to the firmware. Operator precedence, type
+coercion, numeric promotion rules and error messages are kept identical to the firmware to avoid behavioural drift.</p>
+<p>Values are represented as boxed CLR objects matching the firmware type codes:
+null (none/null), <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.char">char</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a> (int32), <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a> (uint32),
+<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> (uint64), <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.single">float</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetime">DateTime</a>,
+<a class="xref" href="DuetAPI.Utility.DriverId.html">DriverId</a> and <code>object?[]</code> (array)</p>
+<p>When the expression references something that cannot be resolved on the SBC, evaluation is abandoned (without
+throwing) and <a class="xref" href="DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser.html#DuetControlServer_Codes_Meta_Parsing_MetaExpressionParser_TryEvaluate_System_String_DuetControlServer_Codes_Meta_Parsing_IExpressionEvaluationContext_System_Object__">TryEvaluate(string, IExpressionEvaluationContext?, out object?)</a> returns false so the caller forwards the original expression to the
+firmware. Only genuine syntax errors throw a <a class="xref" href="DuetAPI.CodeParserException.html">CodeParserException</a>.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class MetaExpressionParser</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">MetaExpressionParser</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="DuetControlServer_Codes_Meta_Parsing_MetaExpressionParser__ctor_" data-uid="DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser.#ctor*"></a>
+
+  <h3 id="DuetControlServer_Codes_Meta_Parsing_MetaExpressionParser__ctor_System_String_DuetControlServer_Codes_Meta_Parsing_IExpressionEvaluationContext_" data-uid="DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser.#ctor(System.String,DuetControlServer.Codes.Meta.Parsing.IExpressionEvaluationContext)">
+  MetaExpressionParser(string, IExpressionEvaluationContext?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Codes/Meta/Parsing/MetaExpressionParser.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Creates a new parser for the given expression text</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public MetaExpressionParser(string text, IExpressionEvaluationContext? context = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>text</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Expression to evaluate</p>
+</dd>
+    <dt><code>context</code> <a class="xref" href="DuetControlServer.Codes.Meta.Parsing.IExpressionEvaluationContext.html">IExpressionEvaluationContext</a></dt>
+    <dd><p>Context for resolving identifiers, functions and context-sensitive constants</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="DuetControlServer_Codes_Meta_Parsing_MetaExpressionParser_MustForward_" data-uid="DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser.MustForward*"></a>
+
+  <h3 id="DuetControlServer_Codes_Meta_Parsing_MetaExpressionParser_MustForward" data-uid="DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser.MustForward">
+  MustForward
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Codes/Meta/Parsing/MetaExpressionParser.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Whether the last <a class="xref" href="DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser.html#DuetControlServer_Codes_Meta_Parsing_MetaExpressionParser_Parse_System_Boolean_">Parse(bool)</a> hit something that cannot be resolved on the SBC</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool MustForward { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="DuetControlServer_Codes_Meta_Parsing_MetaExpressionParser_CheckForExtraCharacters_" data-uid="DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser.CheckForExtraCharacters*"></a>
+
+  <h3 id="DuetControlServer_Codes_Meta_Parsing_MetaExpressionParser_CheckForExtraCharacters" data-uid="DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser.CheckForExtraCharacters">
+  CheckForExtraCharacters()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Codes/Meta/Parsing/MetaExpressionParser.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Throw if there are non-whitespace characters left after the expression</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void CheckForExtraCharacters()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Codes_Meta_Parsing_MetaExpressionParser_Parse_" data-uid="DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser.Parse*"></a>
+
+  <h3 id="DuetControlServer_Codes_Meta_Parsing_MetaExpressionParser_Parse_System_Boolean_" data-uid="DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser.Parse(System.Boolean)">
+  Parse(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Codes/Meta/Parsing/MetaExpressionParser.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Parse and evaluate an expression. Check <a class="xref" href="DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser.html#DuetControlServer_Codes_Meta_Parsing_MetaExpressionParser_MustForward">MustForward</a> afterwards to find out whether the result is valid</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public object? Parse(bool evaluate = true)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>evaluate</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the value is actually needed (false while parsing a non-taken branch)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd><p>Resolved value, or null if the expression must be forwarded</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Codes_Meta_Parsing_MetaExpressionParser_TryEvaluate_" data-uid="DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser.TryEvaluate*"></a>
+
+  <h3 id="DuetControlServer_Codes_Meta_Parsing_MetaExpressionParser_TryEvaluate_System_String_DuetControlServer_Codes_Meta_Parsing_IExpressionEvaluationContext_System_Object__" data-uid="DuetControlServer.Codes.Meta.Parsing.MetaExpressionParser.TryEvaluate(System.String,DuetControlServer.Codes.Meta.Parsing.IExpressionEvaluationContext,System.Object@)">
+  TryEvaluate(string, IExpressionEvaluationContext?, out object?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Codes/Meta/Parsing/MetaExpressionParser.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Try to evaluate an expression entirely on the SBC</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool TryEvaluate(string expression, IExpressionEvaluationContext? context, out object? value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>expression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Expression to evaluate</p>
+</dd>
+    <dt><code>context</code> <a class="xref" href="DuetControlServer.Codes.Meta.Parsing.IExpressionEvaluationContext.html">IExpressionEvaluationContext</a></dt>
+    <dd><p>Evaluation context</p>
+</dd>
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd><p>Resolved value if the expression could be evaluated locally</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>True if the expression was fully evaluated on the SBC, false if it must be forwarded to the firmware</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DuetAPI.CodeParserException.html">CodeParserException</a></dt>
+    <dd><p>Syntax error</p>
+</dd>
+  </dl>
+
+
+
+
+</article>
+
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

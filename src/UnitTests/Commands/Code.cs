@@ -21,7 +21,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.GCode));
             Assert.That(code.MajorNumber, Is.EqualTo(28));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters, Has.Count.EqualTo(2));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('X'));
             Assert.That(code.Parameters[0].IsNull, Is.True);
@@ -37,7 +37,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.GCode));
             Assert.That(code.MajorNumber, Is.EqualTo(29));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(1));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('S'));
             Assert.That(code.GetInt('S', 0), Is.EqualTo(1));
@@ -51,7 +51,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.GCode));
             Assert.That(code.MajorNumber, Is.EqualTo(53));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
         }
     }
 
@@ -73,7 +73,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.GCode));
             Assert.That(code.MajorNumber, Is.EqualTo(92));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
 
             Assert.That(code.Parameters.Count, Is.EqualTo(3));
 
@@ -119,7 +119,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(98));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(1));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('P'));
             Assert.That((string)code.Parameters[0], Is.EqualTo("config.g"));
@@ -133,7 +133,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(106));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(4));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('P'));
             Assert.That((int)code.Parameters[0], Is.EqualTo(1));
@@ -155,7 +155,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(117));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(1));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('@'));
             Assert.That((string)code.Parameters[0], Is.EqualTo(string.Empty));
@@ -169,7 +169,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(122));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(1));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('@'));
             Assert.That((string)code.Parameters[0], Is.EqualTo("DSF"));
@@ -239,7 +239,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(563));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(3));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('P'));
             Assert.That((int)code.Parameters[0], Is.EqualTo(0));
@@ -258,7 +258,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(569));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Flags, Is.EqualTo(CodeFlags.IsLastCode));
             Assert.That(code.Parameters.Count, Is.EqualTo(3));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('P'));
@@ -277,7 +277,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(569));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Flags, Is.EqualTo(CodeFlags.IsLastCode));
             Assert.That(code.Parameters.Count, Is.EqualTo(3));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('P'));
@@ -296,7 +296,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(574));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Flags, Is.EqualTo(CodeFlags.IsLastCode));
             Assert.That(code.Parameters.Count, Is.EqualTo(3));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('Y'));
@@ -316,7 +316,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(587));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Flags, Is.EqualTo(CodeFlags.IsLastCode));
             Assert.That(code.Parameters.Count, Is.EqualTo(5));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('S'));
@@ -339,7 +339,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(915));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Flags, Is.EqualTo(CodeFlags.IsLastCode));
             Assert.That(code.Parameters.Count, Is.EqualTo(2));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('P'));
@@ -357,7 +357,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.TCode));
             Assert.That(code.MajorNumber, Is.EqualTo(3));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Flags, Is.EqualTo(CodeFlags.IsLastCode));
             Assert.That(code.Parameters.Count, Is.EqualTo(2));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('P'));
@@ -387,7 +387,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(1234));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Flags, Is.EqualTo(CodeFlags.IsLastCode));
             Assert.That(code.Parameters.Count, Is.EqualTo(2));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('P'));
@@ -427,7 +427,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(584));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(3));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('E'));
             Assert.That(code.Parameters[0].IsExpression, Is.True);
@@ -442,7 +442,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(584));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(1));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('E'));
             Assert.That(code.Parameters[0].IsExpression, Is.True);
@@ -453,7 +453,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(584));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(1));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('E'));
             Assert.That(code.Parameters[0].IsExpression, Is.True);
@@ -464,7 +464,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(92));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(1));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('E'));
             Assert.That(code.Parameters[0].IsExpression, Is.True);
@@ -481,7 +481,7 @@ public class Code
             Assert.That(code.Indent, Is.EqualTo(5));
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(586));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(2));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('P'));
             Assert.That((int)code.Parameters[0], Is.EqualTo(2));
@@ -498,7 +498,7 @@ public class Code
         {
             Assert.That(code.Flags, Is.EqualTo(CodeFlags.EnforceAbsolutePosition | CodeFlags.IsLastCode));
             Assert.That(code.MajorNumber, Is.EqualTo(1));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(5));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('X'));
             Assert.That((int)code.Parameters[0], Is.EqualTo(3));
@@ -520,7 +520,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.GCode));
             Assert.That(code.MajorNumber, Is.EqualTo(1));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(2));
             Assert.That(code.Parameters[0].IsExpression, Is.True);
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('X'));
@@ -538,7 +538,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(32));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(1));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('@'));
             Assert.That(code.Parameters[0].IsExpression, Is.EqualTo(true));
@@ -553,7 +553,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(117));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(1));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('@'));
             Assert.That(code.Parameters[0].IsExpression, Is.False);
@@ -569,7 +569,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(118));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(1));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('P'));
             Assert.That(code.Parameters[0].IsExpression, Is.False);
@@ -584,7 +584,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(117));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(1));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('@'));
             Assert.That(code.Parameters[0].IsExpression, Is.True);
@@ -617,7 +617,7 @@ public class Code
             Assert.That(code.LineNumber, Is.EqualTo(123));
             Assert.That(code.Type, Is.EqualTo(CodeType.GCode));
             Assert.That(code.MajorNumber, Is.EqualTo(1));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(2));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('X'));
             Assert.That((int)code.Parameters[0], Is.EqualTo(5));
@@ -853,7 +853,7 @@ public class Code
             Assert.That(code.Flags, Is.EqualTo(CodeFlags.IsLastCode));
             Assert.That(code.Type, Is.EqualTo(CodeType.TCode));
             Assert.That(code.MajorNumber, Is.Null);
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(2));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('T'));
             Assert.That((string)code.Parameters[0], Is.EqualTo("{my.expression}"));
@@ -870,7 +870,7 @@ public class Code
             Assert.That(code.Flags, Is.EqualTo(CodeFlags.IsLastCode));
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(84));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(3));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('X'));
             Assert.That(code.Parameters[0].IsNull, Is.True);
@@ -889,7 +889,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(106));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(2));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('P'));
             Assert.That(code.Parameters[1].Letter, Is.EqualTo('S'));
@@ -902,7 +902,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(106));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(2));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('P'));
             Assert.That(code.Parameters[1].Letter, Is.EqualTo('S'));
@@ -915,7 +915,7 @@ public class Code
         {
             Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
             Assert.That(code.MajorNumber, Is.EqualTo(106));
-            Assert.That(code.MinorNumber, Is.Null);
+            Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(2));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('P'));
             Assert.That(code.Parameters[1].Letter, Is.EqualTo('S'));
@@ -1097,6 +1097,57 @@ public class Code
             Assert.That(code.GetInt('S'), Is.EqualTo(1));
             Assert.That(code.GetInt('T'), Is.EqualTo(0));
         }
+    }
+
+    [Test]
+    public void ParseSkip()
+    {
+        foreach (DuetAPI.Commands.Code code in Parse("skip M104 S205"))
+        {
+            Assert.That(code.Type, Is.EqualTo(CodeType.Keyword));
+            Assert.That(code.Keyword, Is.EqualTo(KeywordType.Skip));
+            Assert.That(code.KeywordArgument, Is.Null);
+            Assert.That(code.ToString(), Is.EqualTo("skip"));
+        }
+    }
+
+    [Test]
+    public void ParseMinorVersion()
+    {
+        // The minor version is a single fraction digit (0-9)
+        foreach (DuetAPI.Commands.Code code in Parse("G28.1"))
+        {
+            Assert.That(code.Type, Is.EqualTo(CodeType.GCode));
+            Assert.That(code.MajorNumber, Is.EqualTo(28));
+            Assert.That(code.MinorNumber, Is.EqualTo(1));
+        }
+
+        foreach (DuetAPI.Commands.Code code in Parse("G28.10"))
+        {
+            Assert.That(code.Type, Is.EqualTo(CodeType.GCode));
+            Assert.That(code.MajorNumber, Is.EqualTo(28));
+            Assert.That(code.MinorNumber, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void ParseUnicodeComment()
+    {
+        // Comments with non-ASCII characters must decode identically via the sync and async parsers
+        foreach (DuetAPI.Commands.Code code in Parse("G1 X10 ; move to 10 mm - done 💡"))
+        {
+            Assert.That(code.Type, Is.EqualTo(CodeType.GCode));
+            Assert.That(code.MajorNumber, Is.EqualTo(1));
+            Assert.That(code.Comment, Is.EqualTo(" move to 10 mm - done 💡"));
+        }
+    }
+
+    [Test]
+    public void ParseLength()
+    {
+        // The byte length must match between the sync and async parsers
+        DuetAPI.Commands.Code[] codes = [.. Parse("G1 X10 Y20 ; some comment with Ümläute")];
+        Assert.That(codes[1].Length, Is.EqualTo(codes[0].Length));
     }
 
     public static IEnumerable<DuetAPI.Commands.Code> Parse(string code)

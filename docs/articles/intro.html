@@ -1,136 +1,219 @@
 ﻿<!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-      <title>Add your introductions here! </title>
-      <meta name="viewport" content="width=device-width">
-      <meta name="title" content="Add your introductions here! ">
-    
-    
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.json">
-      <meta property="docfx:tocrel" content="toc.json">
-    
-    
-    
+      <title>Duet Software Framework </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Duet Software Framework ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/Duet3D/DuetSoftwareFramework/blob/v3.7-dev/src/Documentation/articles/intro.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
-                <span class="sr-only">Toggle navigation</span>
-                <span class="icon-bar"></span>
-                <span class="icon-bar"></span>
-                <span class="icon-bar"></span>
-              </button>
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="collapse navbar-collapse" id="navbar">
-              <form class="navbar-form navbar-right" role="search" id="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
-              </form>
-
-                <ul class="nav level1 navbar-nav">
-                      <li>
-                          <a href="../api/DuetAPI.html" title="DuetAPI">DuetAPI</a>
-                      </li>
-                      <li>
-                          <a href="../api/DuetAPIClient.html" title="DuetAPIClient">DuetAPIClient</a>
-                      </li>
-                      <li>
-                          <a href="../api/DuetControlServer.html" title="DuetControlServer">DuetControlServer</a>
-                      </li>
-                      <li>
-                          <a href="../api/DuetWebServer.html" title="DuetWebServer">DuetWebServer</a>
-                      </li>
-                </ul>
-            </div>
-          </div>
-        </nav>
-
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
-          </div>
-        </div>
-      </header>
-      <div role="main" class="container body-content hide-when-search">
-        <div class="sidenav hide-when-search">
-          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-          <div class="sidetoggle collapse" id="sidetoggle">
-            <div>
-              <div class="sidefilter">
-                <form class="toc-filter">
-                  <span class="glyphicon glyphicon-filter filter-icon"></span>
-                  <input type="text" id="toc_filter_input" placeholder="Enter here to filter..." onkeypress="if(event.keyCode==13) {return false;}">
-                </form>
-              </div>
-              <div class="sidetoc">
-                <div class="toc" id="toc">
-
-                  <ul class="nav level1">
-                    <li class="active">
-                      <a href="intro.html" title="Introduction" class="active">Introduction</a>
-                    </li>
-                  </ul>
-                </div>
-              </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
             </div>
           </div>
         </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="">
-<h1 id="add-your-introductions-here">Add your introductions here!</h1>
+      </nav>
+    </header>
 
-
-</article>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
           </div>
-
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      
-      <span>Generated by <strong>DocFX</strong></span>
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="duet-software-framework">Duet Software Framework</h1>
+
+<p>Duet Software Framework (DSF) is the software stack that runs on a Linux single-board computer (SBC,
+typically a Raspberry Pi) attached to a Duet 3 mainboard. It replaces the firmware's own web server
+and SD-card handling with a richer .NET-based environment, while RepRapFirmware (RRF) keeps doing the
+real-time motion control on the Duet. The SBC and the Duet talk over a binary link, either SPI or USB.</p>
+<p>This documentation describes how DSF is put together and how data flows through it. It complements the
+auto-generated API reference (see the <a href="../api/DuetControlServer.html">DuetControlServer</a>,
+<a href="../api/DuetAPI.html">DuetAPI</a>, <a href="../api/DuetAPIClient.html">DuetAPIClient</a> and
+<a href="../api/DuetWebServer.html">DuetWebServer</a> namespaces).</p>
+<h2 id="articles">Articles</h2>
+<ul>
+<li><a href="components.html">Components</a> - the processes and libraries that make up DSF</li>
+<li><a href="object-model.html">Object model</a> - the central machine-state data structure and how it is kept in sync</li>
+<li><a href="ipc.html">Inter-process communication</a> - the DCS Unix socket, connection modes, and command set</li>
+<li><a href="gcode-flow.html">G-code flow</a> - how a G/M/T-code is parsed, processed, and executed</li>
+<li><a href="firmware-link.html">Firmware link</a> - the binary protocol (SPI or USB) and firmware-initiated requests</li>
+<li><a href="file-management.html">File management</a> - the virtual SD card, path mapping, jobs, macros, file info</li>
+<li><a href="rest-api.html">REST API</a> - the HTTP endpoints exposed by DuetWebServer</li>
+<li><a href="plugins.html">Plugins</a> - the plugin model, the plugin service, and the permission system</li>
+<li><a href="building.html">Building from source</a> - prerequisites and deploying a build to an SBC</li>
+</ul>
+<h2 id="high-level-architecture">High-level architecture</h2>
+<pre><code class="lang-mermaid">flowchart TB
+    subgraph clients[&quot;Clients&quot;]
+        DWC[&quot;DuetWebControl (browser)&quot;]
+        PANELDUE[&quot;PanelDue / serial&quot;]
+        CLITOOLS[&quot;CLI tools&lt;br/&gt;CodeConsole, CodeStream, ...&quot;]
+        EXTPLUGIN[&quot;Plugins (DuetAPIClient)&quot;]
+    end
+
+    subgraph sbc[&quot;Linux SBC&quot;]
+        DWS[&quot;DuetWebServer&lt;br/&gt;(ASP.NET Core, HTTP/WS)&quot;]
+        DCS[&quot;DuetControlServer (DCS)&lt;br/&gt;heart of DSF&quot;]
+        DPS[&quot;DuetPluginService&lt;br/&gt;(root + non-root)&quot;]
+        PLUGINPROC[&quot;Plugin processes&quot;]
+    end
+
+    DUET[&quot;Duet 3 mainboard&lt;br/&gt;RepRapFirmware&quot;]
+
+    DWC --&gt;|HTTP / WebSocket| DWS
+    CLITOOLS --&gt;|IPC socket| DCS
+    EXTPLUGIN --&gt;|IPC socket| DCS
+    DWS --&gt;|IPC socket&lt;br/&gt;DuetAPIClient| DCS
+    PANELDUE --&gt;|UART| DCS
+    DCS &lt;--&gt;|IPC socket| DPS
+    DPS --&gt; PLUGINPROC
+    PLUGINPROC --&gt;|IPC socket| DCS
+    DCS &lt;--&gt;|SPI or USB| DUET
+</code></pre>
+<h3 id="what-each-piece-does">What each piece does</h3>
+<ul>
+<li><strong>DuetControlServer (DCS)</strong> is the heart of DSF. It owns the <a href="object-model.html">object model</a>,
+runs the <a href="gcode-flow.html">G-code pipeline</a>, maps virtual SD paths to the Linux filesystem
+(<a href="file-management.html">file management</a>), exposes the <a href="ipc.html">IPC socket</a> for every other process,
+and drives the <a href="firmware-link.html">Firmware link</a> to RRF.</li>
+<li><strong>DuetWebServer (DWS)</strong> is an ASP.NET Core app that serves the DuetWebControl single-page app and
+the HTTP REST API. It does not talk to the Duet directly - it proxies everything to DCS over the
+IPC socket using <a href="components.html#duetapiclient">DuetAPIClient</a>. See <a href="ipc.html">IPC</a> and
+<a href="components.html#duetwebserver">Components</a>.</li>
+<li><strong>DuetPluginService (DPS)</strong> installs, starts, stops, and sandboxes <a href="plugins.html">plugins</a>. It runs
+as two instances (root and non-root) so that ordinary plugins never run with elevated privileges.</li>
+<li><strong>RepRapFirmware (RRF)</strong> runs on the Duet and performs motion planning and real-time control. DCS
+forwards to RRF every code it does not handle itself, and RRF asks DCS for macros, file I/O, and
+SBC-side code execution over the same link.</li>
+</ul>
+<h3 id="how-the-components-connect">How the components connect</h3>
+<table>
+<thead>
+<tr>
+<th>From</th>
+<th>To</th>
+<th>Transport</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Browser (DWC)</td>
+<td>DuetWebServer</td>
+<td>HTTP + WebSocket</td>
+</tr>
+<tr>
+<td>DuetWebServer</td>
+<td>DCS</td>
+<td>IPC Unix socket (<code>DuetAPIClient</code>)</td>
+</tr>
+<tr>
+<td>CLI tools, plugins</td>
+<td>DCS</td>
+<td>IPC Unix socket (<code>DuetAPIClient</code>)</td>
+</tr>
+<tr>
+<td>PanelDue / serial</td>
+<td>DCS</td>
+<td>UART</td>
+</tr>
+<tr>
+<td>DCS</td>
+<td>DuetPluginService</td>
+<td>IPC Unix socket</td>
+</tr>
+<tr>
+<td>DCS</td>
+<td>RepRapFirmware</td>
+<td>SPI (master + GPIO <code>TfrRdy</code>) or USB serial</td>
+</tr>
+</tbody>
+</table>
+<h2 id="where-to-start">Where to start</h2>
+<p>If you want to understand how a command typed in the web interface reaches the motors, read
+<a href="gcode-flow.html">G-code flow</a> first, then <a href="firmware-link.html">Firmware link</a>. If you are writing a plugin or an
+external integration, start with <a href="ipc.html">IPC</a> and <a href="components.html#client-libraries">Components</a>. If
+you care about machine state, read <a href="object-model.html">Object model</a>.</p>
+
+</article>
+
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
   </body>
 </html>
