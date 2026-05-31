@@ -63,11 +63,13 @@ jobs:
       - name: Install docfx
         run: dotnet tool install -g docfx
 
-      # Regenerate the documentation into docs/ (docfx reads the API metadata from the restored projects)
+      # Regenerate the documentation into docs/. docfx reads API metadata from the built Release
+      # assemblies and their XML doc files, so the projects must be built in Release first (the source
+      # generators do not run under docfx's own Roslyn, which is why it cannot compile the projects itself)
       - name: Regenerate documentation
         run: |
           export PATH="$PATH:$HOME/.dotnet/tools"
-          dotnet restore src/DuetSoftwareFramework.sln
+          dotnet build -c Release src/DuetSoftwareFramework.sln
           docfx src/Documentation/docfx.json
 
       # Commit and push the regenerated documentation if anything changed
