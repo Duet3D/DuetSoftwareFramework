@@ -231,7 +231,7 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <param name="builder">Target to write to</param>
     public void PrintDiagnostics(StringBuilder builder)
     {
-        if (!_settings.CommunicationMethod.Equals("usb", StringComparison.OrdinalIgnoreCase))
+        if (_settings.CommunicationMethod != CommunicationMethod.USB)
         {
             return;
         }

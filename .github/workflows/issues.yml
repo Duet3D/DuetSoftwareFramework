@@ -10,12 +10,18 @@ jobs:
     steps:
       - name: Check user permission
         id: check
-        uses: scherermichael-oss/action-has-permission@master
+        uses: actions/github-script@v9
         with:
-          required-permission: write
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: steps.check.outputs.has-permission == false && contains(github.event.issue.labels.*.name, 'bug') == false && contains(github.event.issue.labels.*.name, 'enhancement') == false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: string
+          script: |
+            const { data: { permission } } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              username: context.payload.issue.user.login
+            });
+            return ['admin', 'write'].includes(permission) ? 'true' : 'false';
+      - if: steps.check.outputs.result == 'false' && contains(github.event.issue.labels.*.name, 'bug') == false && contains(github.event.issue.labels.*.name, 'enhancement') == false
         name: Close Issue
         uses: peter-evans/close-issue@v3
         with:

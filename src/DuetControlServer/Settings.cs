@@ -1,4 +1,5 @@
 ﻿using DuetAPI.Connection;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Utility;
 using DuetSharedLibrary;
 using Microsoft.Extensions.Configuration;
@@ -150,9 +151,9 @@ public sealed class Settings
     public string SpiDevice { get; set; } = "/dev/spidev0.0";
 
     /// <summary>
-    /// Communication method to use for connection to RepRapFirmware ("spi" or "usb")
+    /// Communication method to use for connection to RepRapFirmware
     /// </summary>
-    public string CommunicationMethod { get; set; } = "spi";
+    public CommunicationMethod CommunicationMethod { get; set; } = CommunicationMethod.SPI;
 
     /// <summary>
     /// Tx and Rx buffer size for SBC protocol transfers.

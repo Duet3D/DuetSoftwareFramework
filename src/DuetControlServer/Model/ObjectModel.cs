@@ -82,6 +82,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
         SBC.CPU.Hardware = GetCpuHardware();
         SBC.CPU.NumCores = GetCpuNumCores();
         SBC.DSF.BuildDateTime = buildAttribute.Date ?? "unknown build time";
+        SBC.DSF.CommunicationMethod = settings.Value.CommunicationMethod;
         SBC.DSF.Is64Bit = Environment.Is64BitProcess;
         SBC.DSF.Version = VersionHelper.GetVersion();
         SBC.DSF.PluginSupport = settings.Value.PluginSupport;

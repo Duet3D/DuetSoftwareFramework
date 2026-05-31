@@ -224,7 +224,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <param name="builder">Target to write to</param>
     public void PrintDiagnostics(StringBuilder builder)
     {
-        if (!_settings.CommunicationMethod.Equals("spi", StringComparison.OrdinalIgnoreCase))
+        if (_settings.CommunicationMethod != CommunicationMethod.SPI)
         {
             return;
         }
