@@ -40,6 +40,16 @@ public partial class InputChannel : ModelObject, IStaticModelObject
     private Compatibility _compatibility = Compatibility.RepRapFirmware;
 
     /// <summary>
+    /// Name of the file being executed or null if none
+    /// </summary>
+    public string? CurrentFile
+    {
+        get => _currentFile;
+        set => SetPropertyValue(ref _currentFile, value);
+    }
+    private string? _currentFile;
+
+    /// <summary>
     /// Whether inches are being used instead of mm
     /// </summary>
     public DistanceUnit DistanceUnit

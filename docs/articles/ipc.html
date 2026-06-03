@@ -1,0 +1,298 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Inter-process communication </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Inter-process communication ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/Duet3D/DuetSoftwareFramework/blob/v3.7-dev/src/Documentation/articles/ipc.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="inter-process-communication">Inter-process communication</h1>
+
+<p>Every process that is not RepRapFirmware reaches DCS through a single Unix domain socket, by default
+<code>/var/run/dsf/dcs.sock</code>. DuetWebServer, the CLI tools, and plugins all use it through the
+<a href="components.html#duetapiclient">DuetAPIClient</a> library; the protocol itself is line-framed JSON.</p>
+<ul>
+<li>Server: <code>src/DuetControlServer/IPC/Server.cs</code>, <code>IPC/Connection.cs</code></li>
+<li>Processors: <code>src/DuetControlServer/IPC/Processors/</code></li>
+<li>Client: <code>src/DuetAPIClient/</code></li>
+</ul>
+<p>You do not have to use the .NET client. The <code>DuetAPI</code> and <code>DuetAPIClient</code> libraries are published on
+NuGet (LGPL-3.0-or-later), and there is a separately maintained Python client - but any language that
+can open a Unix socket and exchange JSON can speak the protocol directly, as shown below.</p>
+<h2 id="connecting">Connecting</h2>
+<pre><code class="lang-mermaid">sequenceDiagram
+    participant C as Client (DuetAPIClient)
+    participant S as DCS IPC server
+    C-&gt;&gt;S: connect to /var/run/dsf/dcs.sock
+    S-&gt;&gt;S: assign permissions from PID/UID/GID
+    S-&gt;&gt;C: ServerInitMessage (connection id)
+    C-&gt;&gt;S: ClientInitMessage (mode + protocol version)
+    S-&gt;&gt;S: validate version, create processor for the mode
+    S--&gt;&gt;C: success
+    Note over C,S: connection now runs the chosen processor until disconnect
+</code></pre>
+<ol>
+<li>The client opens the socket. The server creates a <code>Connection</code> with a unique id and works out the
+client's <a href="plugins.html#permissions">permissions</a> from its PID/UID/GID: root processes get everything;
+a plugin process is matched against the <code>Plugins</code> model (walking the parent-process tree) to inherit
+its manifest permissions; other external programs get everything except <code>SuperUser</code>.</li>
+<li>The server sends a <code>ServerInitMessage</code>; the client replies with a <code>ClientInitMessage</code> naming the
+desired <a href="#connection-modes">connection mode</a> and protocol version.</li>
+<li>The server validates the version and instantiates the matching processor
+(<code>IPC/Processors/ProcessorFactory.cs</code>). From here the connection behaves according to its mode.</li>
+</ol>
+<p>Permissions are enforced per command: each command type carries a <code>RequiredPermissionsAttribute</code>, and
+<code>Connection.CheckPermissions</code> requires the client to hold at least one of the listed permissions
+before the command runs.</p>
+<h3 id="on-the-wire">On the wire</h3>
+<p>Each message is a single JSON object terminated by a newline. The handshake and a <code>Command</code>-mode
+exchange look like this (server messages prefixed <code>&lt;-</code>, client <code>-&gt;</code>):</p>
+<pre><code class="lang-text">&lt;- {&quot;id&quot;: 12, &quot;version&quot;: 11}          # ServerInitMessage: connection id + protocol version
+-&gt; {&quot;mode&quot;: &quot;Command&quot;, &quot;version&quot;: 11} # ClientInitMessage: chosen mode
+&lt;- {&quot;success&quot;: true}                  # server acknowledges
+-&gt; {&quot;command&quot;: &quot;SimpleCode&quot;, &quot;code&quot;: &quot;G4 S3&quot;}
+&lt;- {&quot;success&quot;: true, &quot;result&quot;: &quot;&quot;}    # sent once the code completes
+</code></pre>
+<p>The same framing carries every command and response; the <code>mode</code> chosen in the <code>ClientInitMessage</code>
+decides which <a href="#connection-modes">processor</a> handles the rest of the connection.</p>
+<h2 id="connection-modes">Connection modes</h2>
+<p>The mode is chosen at connect time (<code>DuetAPI/Connection/Modes/ConnectionMode.cs</code>) and selects the
+processor that drives the connection:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Processor</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Command</code></td>
+<td><code>Command.cs</code></td>
+<td>Run commands (including codes), query/patch the model, manage files, plugins, sessions</td>
+</tr>
+<tr>
+<td><code>CodeStream</code></td>
+<td><code>CodeStream.cs</code></td>
+<td>Stream newline-delimited codes on a channel and read replies, no per-code JSON</td>
+</tr>
+<tr>
+<td><code>Intercept</code></td>
+<td><code>CodeInterception.cs</code></td>
+<td>Plugin hook into the <a href="gcode-flow.html#the-six-stage-code-pipeline">code pipeline</a></td>
+</tr>
+<tr>
+<td><code>Subscribe</code></td>
+<td><code>ModelSubscription.cs</code></td>
+<td>Receive the <a href="object-model.html">object model</a> and its patches</td>
+</tr>
+<tr>
+<td><code>PluginService</code></td>
+<td><code>PluginService.cs</code></td>
+<td>Internal channel between DCS and <a href="plugins.html">DuetPluginService</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="command">Command</h3>
+<p>The general-purpose request/response mode. The client sends a command as JSON; the processor
+deserializes it, checks permissions, runs <code>ExecuteAsync</code>, and returns the result. This is what
+<a href="components.html#duetwebserver">DuetWebServer</a> uses for every HTTP request. The command set is grouped
+under <code>src/DuetControlServer/Commands/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Examples</th>
+<th>Permission (typical)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Generic</td>
+<td><code>Code</code>, <code>SimpleCode</code>, <code>EvaluateExpression</code>, <code>Flush</code>, <code>WriteMessage</code>, <code>CheckPassword</code></td>
+<td><code>CommandExecution</code></td>
+</tr>
+<tr>
+<td>Files</td>
+<td><code>GetFileInfo</code>, <code>ResolvePath</code></td>
+<td><code>CommandExecution</code> / filesystem</td>
+</tr>
+<tr>
+<td>ObjectModel</td>
+<td><code>GetObjectModel</code>, <code>QueryObjectModel</code>, <code>LockObjectModel</code>/<code>UnlockObjectModel</code>, <code>SetObjectModel</code>, <code>PatchObjectModel</code>, <code>SyncObjectModel</code></td>
+<td><code>ObjectModelRead</code> / <code>ObjectModelReadWrite</code></td>
+</tr>
+<tr>
+<td>Plugins</td>
+<td><code>InstallPlugin</code>, <code>StartPlugin(s)</code>, <code>StopPlugin(s)</code>, <code>ReloadPlugin</code>, <code>UninstallPlugin</code>, <code>SetPluginData</code>, <code>SetPluginProcess</code>, <code>NotifyPluginStarted</code></td>
+<td><code>ManagePlugins</code></td>
+</tr>
+<tr>
+<td>HttpEndpoints</td>
+<td><code>AddHttpEndpoint</code>, <code>RemoveHttpEndpoint</code></td>
+<td><code>RegisterHttpEndpoints</code></td>
+</tr>
+<tr>
+<td>UserSessions</td>
+<td><code>AddUserSession</code>, <code>RemoveUserSession</code></td>
+<td><code>ManageUserSessions</code></td>
+</tr>
+<tr>
+<td>Packages</td>
+<td><code>InstallSystemPackage</code>, <code>UninstallSystemPackage</code></td>
+<td><code>ManagePlugins</code></td>
+</tr>
+</tbody>
+</table>
+<p>A <code>Code</code> command runs a full <a href="gcode-flow.html#the-code-object"><code>Code</code></a> object; <code>SimpleCode</code> parses one
+or more codes from a text string. Both enter the <a href="gcode-flow.html">code pipeline</a>.</p>
+<h3 id="codestream">CodeStream</h3>
+<p>A throughput-oriented mode: the client writes raw code lines to the socket's stream and reads replies
+back, bound to one <a href="gcode-flow.html#code-channels">code channel</a>. There is no per-code JSON envelope, so
+it suits feeding many codes (for example from a generator or a file) with minimal overhead.</p>
+<h3 id="intercept">Intercept</h3>
+<p>Lets a plugin observe and alter codes as they pass through the pipeline. The client declares which
+channels, code types, and interception stage it wants:</p>
+<ul>
+<li><strong>Pre</strong> - before DCS processes the code internally,</li>
+<li><strong>Post</strong> - after internal processing, before the code is sent to RRF,</li>
+<li><strong>Executed</strong> - after the code has run.</li>
+</ul>
+<p>For each intercepted code the plugin may <code>Resolve</code> it (supply a result and stop further processing),
+<code>Cancel</code> it, <code>Ignore</code> it (let it continue untouched), or <code>Rewrite</code> it (replace it). See how these
+stages sit in the pipeline in <a href="gcode-flow.html#the-six-stage-code-pipeline">G-code flow</a>.
+<code>CodeLogger</code> and <code>DuetPiManagementPlugin</code> are working examples (<a href="components.html#command-line-tools-and-example-plugins">Components</a>).</p>
+<h3 id="subscribe">Subscribe</h3>
+<p>Streams <a href="object-model.html#observing-changes-and-patches">object-model</a> state to the client, either in
+<strong>Full</strong> mode (the whole model after every update) or <strong>Patch</strong> mode (only the JSON diff). An optional
+set of filter paths restricts what is sent. The <a href="components.html#duetwebserver">DuetWebServer WebSocket</a>
+and the <code>ModelObserver</code> tool both use this mode.</p>
+<h3 id="pluginservice">PluginService</h3>
+<p>An internal mode used only by <a href="plugins.html">DuetPluginService</a>. It is bidirectional: DCS queues
+commands (such as &quot;start this plugin&quot;) for the plugin service to execute, and the plugin service uses
+ordinary <code>Command</code>-mode connections back to DCS. The PID of the non-root plugin service is recorded so
+plugin processes cannot impersonate it.</p>
+<h2 id="custom-http-endpoints">Custom HTTP endpoints</h2>
+<p>A plugin with the <code>RegisterHttpEndpoints</code> <a href="plugins.html#permissions">permission</a> can extend the HTTP API
+served by <a href="components.html#duetwebserver">DuetWebServer</a>. It sends an <code>AddHttpEndpoint</code> command on a
+<code>Command</code> connection:</p>
+<pre><code class="lang-json">{
+    &quot;command&quot;: &quot;AddHttpEndpoint&quot;,
+    &quot;endpointType&quot;: &quot;GET&quot;,
+    &quot;namespace&quot;: &quot;third-party-app&quot;,
+    &quot;path&quot;: &quot;test&quot;,
+    &quot;uploadRequest&quot;: false
+}
+</code></pre>
+<p>DCS replies with the path of a new Unix socket. The plugin listens on that socket; whenever a matching
+request arrives at <code>/machine/{namespace}/{path}</code>, DuetWebServer's custom-endpoint middleware forwards
+it there and relays the plugin's response back to the HTTP client. Setting <code>endpointType</code> to
+<code>WebSocket</code> instead of an HTTP verb registers a bidirectional WebSocket endpoint. <code>RemoveHttpEndpoint</code>
+unregisters it. The <code>CustomHttpEndpoint</code>
+<a href="components.html#command-line-tools-and-example-plugins">example</a> is a complete reference.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="components.html#client-libraries">Components</a> - the client libraries that speak this protocol</li>
+<li><a href="object-model.html">Object model</a> - what the <code>Subscribe</code> mode streams</li>
+<li><a href="gcode-flow.html">G-code flow</a> - what the <code>Command</code>, <code>CodeStream</code>, and <code>Intercept</code> modes feed into</li>
+<li><a href="plugins.html">Plugins</a> - the permission model enforced on every command</li>
+</ul>
+
+</article>
+
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

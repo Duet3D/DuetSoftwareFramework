@@ -1,0 +1,940 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class Reader </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class Reader ">
+      
+      <meta name="description" content="Static class for reading data from SPI transmissions. It is expected that each data block occupies entire 4-byte blocks. Make sure to keep the data returned by these functions only as long as the underlying buffer is actually valid!">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DuetControlServer.Link.Protocol.Reader">
+
+
+
+  <h1 id="DuetControlServer_Link_Protocol_Reader" data-uid="DuetControlServer.Link.Protocol.Reader" class="text-break">
+Class Reader  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="DuetControlServer.html">DuetControlServer</a>.<a class="xref" href="DuetControlServer.Link.html">Link</a>.<a class="xref" href="DuetControlServer.Link.Protocol.html">Protocol</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>DuetControlServer.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Static class for reading data from SPI transmissions.
+It is expected that each data block occupies entire 4-byte blocks.
+Make sure to keep the data returned by these functions only as long as the underlying buffer is actually valid!</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static class Reader</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">Reader</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadAbortFile_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadAbortFile*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadAbortFile_System_ReadOnlySpan_System_Byte__DuetAPI_CodeChannel__System_Boolean__" data-uid="DuetControlServer.Link.Protocol.Reader.ReadAbortFile(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@,System.Boolean@)">
+  ReadAbortFile(ReadOnlySpan&lt;byte&gt;, out CodeChannel, out bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read information about an abort file request</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadAbortFile(ReadOnlySpan&lt;byte&gt; from, out CodeChannel channel, out bool abortAll)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Code channel running the file</p>
+</dd>
+    <dt><code>abortAll</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether all files are supposed to be aborted</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadCodeBufferUpdate_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadCodeBufferUpdate*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadCodeBufferUpdate_System_ReadOnlySpan_System_Byte__System_UInt16__" data-uid="DuetControlServer.Link.Protocol.Reader.ReadCodeBufferUpdate(System.ReadOnlySpan{System.Byte},System.UInt16@)">
+  ReadCodeBufferUpdate(ReadOnlySpan&lt;byte&gt;, out ushort)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a code buffer update from a memory span</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadCodeBufferUpdate(ReadOnlySpan&lt;byte&gt; from, out ushort bufferSpace)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>bufferSpace</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint16">ushort</a></dt>
+    <dd><p>Buffer space</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadCodeChannel_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadCodeChannel*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadCodeChannel_System_ReadOnlySpan_System_Byte__DuetAPI_CodeChannel__" data-uid="DuetControlServer.Link.Protocol.Reader.ReadCodeChannel(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@)">
+  ReadCodeChannel(ReadOnlySpan&lt;byte&gt;, out CodeChannel)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a G-code channel</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadCodeChannel(ReadOnlySpan&lt;byte&gt; from, out CodeChannel channel)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Channel that has acquired the lock</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadDoCode_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadDoCode*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadDoCode_System_ReadOnlySpan_System_Byte__DuetAPI_CodeChannel__System_String__" data-uid="DuetControlServer.Link.Protocol.Reader.ReadDoCode(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@,System.String@)">
+  ReadDoCode(ReadOnlySpan&lt;byte&gt;, out CodeChannel, out string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a <a class="xref" href="DuetControlServer.Link.Protocol.FirmwareRequests.Request.html#DuetControlServer_Link_Protocol_FirmwareRequests_Request_DoCode">DoCode</a> request</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadDoCode(ReadOnlySpan&lt;byte&gt; from, out CodeChannel channel, out string code)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Code channel</p>
+</dd>
+    <dt><code>code</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Code to execute</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadEvaluationResult_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadEvaluationResult*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadEvaluationResult_System_ReadOnlySpan_System_Byte__DuetAPI_CodeChannel__System_String__System_Object__" data-uid="DuetControlServer.Link.Protocol.Reader.ReadEvaluationResult(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@,System.String@,System.Object@)">
+  ReadEvaluationResult(ReadOnlySpan&lt;byte&gt;, out CodeChannel, out string, out object?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a <a class="xref" href="DuetControlServer.Link.Protocol.FirmwareRequests.Request.html#DuetControlServer_Link_Protocol_FirmwareRequests_Request_EvaluationResult">EvaluationResult</a> request</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadEvaluationResult(ReadOnlySpan&lt;byte&gt; from, out CodeChannel channel, out string expression, out object? result)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Channel where the evaluation was performed</p>
+</dd>
+    <dt><code>expression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Expression</p>
+</dd>
+    <dt><code>result</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd><p>Evaluation result</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadFileChunkRequest_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadFileChunkRequest*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadFileChunkRequest_System_ReadOnlySpan_System_Byte__System_String__System_UInt32__System_Int32__" data-uid="DuetControlServer.Link.Protocol.Reader.ReadFileChunkRequest(System.ReadOnlySpan{System.Byte},System.String@,System.UInt32@,System.Int32@)">
+  ReadFileChunkRequest(ReadOnlySpan&lt;byte&gt;, out string, out uint, out int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a file chunk request`</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadFileChunkRequest(ReadOnlySpan&lt;byte&gt; from, out string filename, out uint offset, out int maxLength)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>filename</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Filename to read from</p>
+</dd>
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>Offset in the file</p>
+</dd>
+    <dt><code>maxLength</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Maximum chunk length</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadFileHandle_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadFileHandle*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadFileHandle_System_ReadOnlySpan_System_Byte__System_UInt32__" data-uid="DuetControlServer.Link.Protocol.Reader.ReadFileHandle(System.ReadOnlySpan{System.Byte},System.UInt32@)">
+  ReadFileHandle(ReadOnlySpan&lt;byte&gt;, out uint)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read an arbitrary file handle</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadFileHandle(ReadOnlySpan&lt;byte&gt; from, out uint handle)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>handle</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>File handle</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadFileRequest_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadFileRequest*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadFileRequest_System_ReadOnlySpan_System_Byte__System_UInt32__System_Int32__" data-uid="DuetControlServer.Link.Protocol.Reader.ReadFileRequest(System.ReadOnlySpan{System.Byte},System.UInt32@,System.Int32@)">
+  ReadFileRequest(ReadOnlySpan&lt;byte&gt;, out uint, out int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a request to retrieve data from a file</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadFileRequest(ReadOnlySpan&lt;byte&gt; from, out uint handle, out int maxLength)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>handle</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>File handle</p>
+</dd>
+    <dt><code>maxLength</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Maximum buffer length</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadLegacyPrintPaused_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadLegacyPrintPaused*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadLegacyPrintPaused_System_ReadOnlySpan_System_Byte__System_UInt32__DuetControlServer_Link_Protocol_FirmwareRequests_PrintPausedReason__" data-uid="DuetControlServer.Link.Protocol.Reader.ReadLegacyPrintPaused(System.ReadOnlySpan{System.Byte},System.UInt32@,DuetControlServer.Link.Protocol.FirmwareRequests.PrintPausedReason@)">
+  ReadLegacyPrintPaused(ReadOnlySpan&lt;byte&gt;, out uint, out PrintPausedReason)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a legacy print pause event</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadLegacyPrintPaused(ReadOnlySpan&lt;byte&gt; from, out uint filePosition, out PrintPausedReason reason)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>filePosition</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>Position at which the print has been paused</p>
+</dd>
+    <dt><code>reason</code> <a class="xref" href="DuetControlServer.Link.Protocol.FirmwareRequests.PrintPausedReason.html">PrintPausedReason</a></dt>
+    <dd><p>Reason why the print has been paused</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadMacroRequest_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadMacroRequest*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadMacroRequest_System_ReadOnlySpan_System_Byte__DuetAPI_CodeChannel__System_Boolean__System_String__" data-uid="DuetControlServer.Link.Protocol.Reader.ReadMacroRequest(System.ReadOnlySpan{System.Byte},DuetAPI.CodeChannel@,System.Boolean@,System.String@)">
+  ReadMacroRequest(ReadOnlySpan&lt;byte&gt;, out CodeChannel, out bool, out string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a macro file request from a memory span</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadMacroRequest(ReadOnlySpan&lt;byte&gt; from, out CodeChannel channel, out bool fromCode, out string filename)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Code channel that requested the execution</p>
+</dd>
+    <dt><code>fromCode</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the macro request came from the G/M/T-code being executed</p>
+</dd>
+    <dt><code>filename</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Filename of the macro to execute</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadMessage_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadMessage*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadMessage_System_ReadOnlySpan_System_Byte__DuetControlServer_Link_Protocol_Shared_MessageTypeFlags__System_String__" data-uid="DuetControlServer.Link.Protocol.Reader.ReadMessage(System.ReadOnlySpan{System.Byte},DuetControlServer.Link.Protocol.Shared.MessageTypeFlags@,System.String@)">
+  ReadMessage(ReadOnlySpan&lt;byte&gt;, out MessageTypeFlags, out string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a message from a memory span</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadMessage(ReadOnlySpan&lt;byte&gt; from, out MessageTypeFlags messageType, out string reply)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>messageType</code> <a class="xref" href="DuetControlServer.Link.Protocol.Shared.MessageTypeFlags.html">MessageTypeFlags</a></dt>
+    <dd><p>Message flags</p>
+</dd>
+    <dt><code>reply</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Raw message</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadOpenFile_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadOpenFile*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadOpenFile_System_ReadOnlySpan_System_Byte__System_String__System_Boolean__System_Boolean__System_Int64__" data-uid="DuetControlServer.Link.Protocol.Reader.ReadOpenFile(System.ReadOnlySpan{System.Byte},System.String@,System.Boolean@,System.Boolean@,System.Int64@)">
+  ReadOpenFile(ReadOnlySpan&lt;byte&gt;, out string, out bool, out bool, out long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read an open file request</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadOpenFile(ReadOnlySpan&lt;byte&gt; from, out string filename, out bool forWriting, out bool append, out long preAllocSize)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>filename</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Filename to open</p>
+</dd>
+    <dt><code>forWriting</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the file is supposed to be written to</p>
+</dd>
+    <dt><code>append</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether data is supposed to be appended in write mode</p>
+</dd>
+    <dt><code>preAllocSize</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>How many bytes to allocate if the file is created or overwritten</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadPacketHeader_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadPacketHeader*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadPacketHeader_System_ReadOnlySpan_System_Byte__DuetControlServer_Link_Protocol_Shared_PacketHeader__" data-uid="DuetControlServer.Link.Protocol.Reader.ReadPacketHeader(System.ReadOnlySpan{System.Byte},DuetControlServer.Link.Protocol.Shared.PacketHeader@)">
+  ReadPacketHeader(ReadOnlySpan&lt;byte&gt;, out PacketHeader)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a packet header from a memory span</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadPacketHeader(ReadOnlySpan&lt;byte&gt; from, out PacketHeader packet)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>packet</code> <a class="xref" href="DuetControlServer.Link.Protocol.Shared.PacketHeader.html">PacketHeader</a></dt>
+    <dd><p>Read packet</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadPrintPaused_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadPrintPaused*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadPrintPaused_System_ReadOnlySpan_System_Byte__System_UInt32__System_UInt32__DuetControlServer_Link_Protocol_FirmwareRequests_PrintPausedReason__" data-uid="DuetControlServer.Link.Protocol.Reader.ReadPrintPaused(System.ReadOnlySpan{System.Byte},System.UInt32@,System.UInt32@,DuetControlServer.Link.Protocol.FirmwareRequests.PrintPausedReason@)">
+  ReadPrintPaused(ReadOnlySpan&lt;byte&gt;, out uint, out uint, out PrintPausedReason)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a print pause event</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadPrintPaused(ReadOnlySpan&lt;byte&gt; from, out uint filePosition, out uint filePosition2, out PrintPausedReason reason)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>filePosition</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>Position at which the print has been paused</p>
+</dd>
+    <dt><code>filePosition2</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>Position at which the second open file has been paused (if applicable)</p>
+</dd>
+    <dt><code>reason</code> <a class="xref" href="DuetControlServer.Link.Protocol.FirmwareRequests.PrintPausedReason.html">PrintPausedReason</a></dt>
+    <dd><p>Reason why the print has been paused</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadSeekFile_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadSeekFile*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadSeekFile_System_ReadOnlySpan_System_Byte__System_UInt32__System_Int64__" data-uid="DuetControlServer.Link.Protocol.Reader.ReadSeekFile(System.ReadOnlySpan{System.Byte},System.UInt32@,System.Int64@)">
+  ReadSeekFile(ReadOnlySpan&lt;byte&gt;, out uint, out long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a request to seek in a file</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadSeekFile(ReadOnlySpan&lt;byte&gt; from, out uint handle, out long offset)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>handle</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>File handle</p>
+</dd>
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>New file position</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadStringRequest_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadStringRequest*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadStringRequest_System_ReadOnlySpan_System_Byte__System_ReadOnlySpan_System_Byte___" data-uid="DuetControlServer.Link.Protocol.Reader.ReadStringRequest(System.ReadOnlySpan{System.Byte},System.ReadOnlySpan{System.Byte}@)">
+  ReadStringRequest(ReadOnlySpan&lt;byte&gt;, out ReadOnlySpan&lt;byte&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a UTF-8 encoded string request from a memory span</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadStringRequest(ReadOnlySpan&lt;byte&gt; from, out ReadOnlySpan&lt;byte&gt; data)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>data</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>UTF-8 string</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Reader_ReadStringRequest_" data-uid="DuetControlServer.Link.Protocol.Reader.ReadStringRequest*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Reader_ReadStringRequest_System_ReadOnlySpan_System_Byte__System_String__" data-uid="DuetControlServer.Link.Protocol.Reader.ReadStringRequest(System.ReadOnlySpan{System.Byte},System.String@)">
+  ReadStringRequest(ReadOnlySpan&lt;byte&gt;, out string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Reader.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a UTF-8 encoded string request from a memory span</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int ReadStringRequest(ReadOnlySpan&lt;byte&gt; from, out string data)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Origin</p>
+</dd>
+    <dt><code>data</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>UTF-8 string</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

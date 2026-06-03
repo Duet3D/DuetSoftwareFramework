@@ -40,3 +40,47 @@ jobs:
         env:
           GH_API_KEY: ${{ secrets.GH_API_KEY }}
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+
+  # Regenerate the docfx documentation and commit it back to the released branch on stable releases
+  docs:
+    if: github.event_name == 'release' && github.event.release.prerelease == false
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      # The release ref is a tag, so check out the branch it was cut from to push the docs back
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.target_commitish }}
+
+      # Install .NET environment
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10
+
+      # Install docfx
+      - name: Install docfx
+        run: dotnet tool install -g docfx
+
+      # Regenerate the documentation into docs/. docfx reads API metadata from the built Release
+      # assemblies and their XML doc files, so the projects must be built in Release first (the source
+      # generators do not run under docfx's own Roslyn, which is why it cannot compile the projects itself)
+      - name: Regenerate documentation
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet build -c Release src/DuetSoftwareFramework.sln
+          docfx src/Documentation/docfx.json
+
+      # Commit and push the regenerated documentation if anything changed
+      - name: Commit documentation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs
+          if git diff --staged --quiet; then
+            echo "Documentation is already up to date"
+          else
+            git commit -m "Updated documentation"
+            git push
+          fi

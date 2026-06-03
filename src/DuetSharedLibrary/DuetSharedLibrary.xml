@@ -4,6 +4,36 @@
         <name>DuetSharedLibrary</name>
     </assembly>
     <members>
+        <member name="T:DuetSharedLibrary.CommonLogFormatter">
+            <summary>
+            Custom console formatter that provides a common log output format
+            </summary>
+        </member>
+        <member name="M:DuetSharedLibrary.CommonLogFormatter.#ctor">
+            <summary>
+            Constructor
+            </summary>
+        </member>
+        <member name="M:DuetSharedLibrary.CommonLogFormatter.Write``1(Microsoft.Extensions.Logging.Abstractions.LogEntry{``0}@,Microsoft.Extensions.Logging.IExternalScopeProvider,System.IO.TextWriter)">
+            <summary>
+            Write a log entry
+            </summary>
+        </member>
+        <member name="M:DuetSharedLibrary.CommonLogFormatter.GetColorCode(Microsoft.Extensions.Logging.LogLevel)">
+            <summary>
+            Get the ANSI color code for the log level
+            </summary>
+        </member>
+        <member name="M:DuetSharedLibrary.CommonLogFormatter.GetLogLevelString(Microsoft.Extensions.Logging.LogLevel)">
+            <summary>
+            Get the string representation of the log level
+            </summary>
+        </member>
+        <member name="T:DuetSharedLibrary.CommonLogFormatterOptions">
+            <summary>
+            Options for the common log formatter
+            </summary>
+        </member>
         <member name="T:DuetSharedLibrary.ExitCode">
             <summary>
             Exit codes derived from sysexits.h
@@ -103,83 +133,6 @@
             <param name="gid">Group ID</param>
             <exception cref="T:System.IO.IOException">Operation failed</exception>
         </member>
-        <member name="T:DuetSharedLibrary.InputGpioPin">
-            <summary>
-            Class for event-based polling of pin level changes
-            </summary>
-        </member>
-        <member name="M:DuetSharedLibrary.InputGpioPin.#ctor(System.String,System.Int32,System.String)">
-            <summary>
-            Open a GPIO device and subscribe to pin level changes
-            </summary>
-            <param name="devNode">Path to the GPIO chip device node</param>
-            <param name="pin">Pin to open</param>
-            <param name="consumerLabel">Label of the consumer</param>
-            <exception cref="T:System.IO.IOException">Pin could not be initialized</exception>
-        </member>
-        <member name="M:DuetSharedLibrary.InputGpioPin.Finalize">
-            <summary>
-            Finalizer of this instance
-            </summary>
-        </member>
-        <member name="M:DuetSharedLibrary.InputGpioPin.Dispose">
-            <summary>
-            Disposes this instance
-            </summary>
-        </member>
-        <member name="F:DuetSharedLibrary.InputGpioPin.disposed">
-            <summary>
-            Indicates if this instance has been disposed
-            </summary>
-        </member>
-        <member name="M:DuetSharedLibrary.InputGpioPin.DisposeInternal">
-            <summary>
-            Dispose this instance internally
-            </summary>
-        </member>
-        <member name="F:DuetSharedLibrary.InputGpioPin._sizeOfEventData">
-            <summary>
-            Size of the event data struct
-            </summary>
-        </member>
-        <member name="M:DuetSharedLibrary.InputGpioPin.WaitForEvent(System.Int32)">
-            <summary>
-            Wait for a pin event to occur
-            </summary>
-            <param name="timeout">Timeout in ms</param>
-            <returns>New pin level</returns>
-            <exception cref="T:System.IO.IOException">Generic IO error</exception>
-            <exception cref="T:System.OperationCanceledException">Timeout occurred</exception>
-        </member>
-        <member name="M:DuetSharedLibrary.InputGpioPin.FlushEvents">
-            <summary>
-            Flush pending events
-            </summary>
-        </member>
-        <member name="P:DuetSharedLibrary.InputGpioPin.Value">
-            <summary>
-            Current value of this pin
-            </summary>
-        </member>
-        <member name="T:DuetSharedLibrary.InputGpioPin.PinChangeDelegate">
-            <summary>
-            Delegate of the event type
-            </summary>
-            <param name="sender">Object invoking the callback</param>
-            <param name="pinValue">New pin value</param>
-        </member>
-        <member name="E:DuetSharedLibrary.InputGpioPin.PinChanged">
-            <summary>
-            Event to call when a pin change has occurreed
-            </summary>
-        </member>
-        <member name="M:DuetSharedLibrary.InputGpioPin.StartMonitoring(System.Threading.CancellationToken)">
-            <summary>
-            Start polling for pin events
-            </summary>
-            <param name="cancellationToken">Optional cancellation token</param>
-            <returns>Asynchronous task</returns>
-        </member>
         <member name="T:DuetSharedLibrary.InternalCommandConnection">
             <summary>
             Connection class for sending commands to the control server
@@ -253,6 +206,61 @@
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Command could not be processed</exception>
         </member>
+        <member name="T:DuetSharedLibrary.LogLevelHelper">
+            <summary>
+            Helper methods for parsing log level strings
+            </summary>
+        </member>
+        <member name="F:DuetSharedLibrary.LogLevelHelper.ValidLogLevels">
+            <summary>
+            Valid log level names shown in help/error messages (lowercase short forms)
+            </summary>
+        </member>
+        <member name="M:DuetSharedLibrary.LogLevelHelper.TryParseLogLevel(System.String,Microsoft.Extensions.Logging.LogLevel@)">
+            <summary>
+            Try to parse a log level string, accepting both canonical .NET names and common short aliases
+            </summary>
+            <param name="value">String to parse</param>
+            <param name="logLevel">Parsed log level on success</param>
+            <returns>True if the value was recognised</returns>
+        </member>
+        <member name="M:DuetSharedLibrary.LogLevelHelper.ParseLogLevel(System.String,Microsoft.Extensions.Logging.LogLevel)">
+            <summary>
+            Parse a log level string, returning <paramref name="defaultLevel"/> if the value is not recognised
+            </summary>
+            <param name="value">String to parse</param>
+            <param name="defaultLevel">Value to return when parsing fails</param>
+            <returns>Parsed or default log level</returns>
+        </member>
+        <member name="T:DuetSharedLibrary.LogLevelJsonConverter">
+            <summary>
+            JSON converter that reads/writes <see cref="T:Microsoft.Extensions.Logging.LogLevel"/> using the short lowercase aliases
+            defined in <see cref="T:DuetSharedLibrary.LogLevelHelper"/> (e.g. "info", "warn", "debug").
+            </summary>
+        </member>
+        <member name="M:DuetSharedLibrary.LogLevelJsonConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
+            <inheritdoc />
+        </member>
+        <member name="M:DuetSharedLibrary.LogLevelJsonConverter.Write(System.Text.Json.Utf8JsonWriter,Microsoft.Extensions.Logging.LogLevel,System.Text.Json.JsonSerializerOptions)">
+            <inheritdoc />
+        </member>
+        <member name="T:DuetSharedLibrary.PathExtensions">
+            <summary>
+            Extension members for <see cref="T:System.IO.Path"/>
+            </summary>
+        </member>
+        <member name="M:DuetSharedLibrary.PathExtensions.GetRealPath(System.String)">
+            <inheritdoc cref="M:DuetSharedLibrary.PathExtensions.&lt;G&gt;$009965FC9BE91ED9D11C3C63624A1761.GetRealPath(System.String)"/>
+        </member>
+        <member name="M:DuetSharedLibrary.PathExtensions.&lt;G&gt;$009965FC9BE91ED9D11C3C63624A1761.GetRealPath(System.String)">
+            <summary>
+            Resolve a path to its canonical form, following all symlinks and resolving
+            ".." components through the actual filesystem (not lexically).
+            This is equivalent to the POSIX realpath() function.
+            </summary>
+            <param name="path">Path to resolve</param>
+            <returns>Canonical path, or null if the path does not exist</returns>
+        </member>
         <member name="T:DuetSharedLibrary.ProcessHelpers">
             <summary>
             Helper class to retrieve process information and perform operations on processes
@@ -277,6 +285,36 @@
             <param name="process">Process</param>
             <exception cref="T:System.IO.IOException">Failed to kill process</exception>
         </member>
+        <member name="M:DuetSharedLibrary.ProcessHelpers.GetParentPid(System.Int32)">
+            <summary>
+            Read the parent PID of a given process from /proc/{pid}/stat
+            </summary>
+            <param name="pid">Process ID to look up</param>
+            <returns>Parent PID, or 0 if it could not be determined</returns>
+        </member>
+        <member name="M:DuetSharedLibrary.ProcessHelpers.IsExecSecure(System.Diagnostics.Process)">
+            <summary>
+            Check whether the process was exec'd with <c>AT_SECURE=1</c>. Parses /proc/{pid}/auxv looking for the AT_SECURE
+            entry (type 23) set to non-zero. The kernel sets this when the exec crosses a privilege boundary (setuid,
+            setgid, or file capabilities), causing glibc to ignore LD_PRELOAD and related environment variables. The bit is
+            immutable for the life of the process so it cannot be stripped after the fact
+            </summary>
+            <param name="process">Process</param>
+            <returns>True if the process's exec was secure-mode</returns>
+        </member>
+        <member name="T:DuetSharedLibrary.RegexJsonConverter">
+            <summary>
+            JSON converter for <see cref="T:System.Text.RegularExpressions.Regex"/> that serializes the pattern (and options, when non-default)
+            in a human-readable form. Accepts either a bare pattern string or an object with
+            <c>Pattern</c> and optional <c>Options</c> fields on read.
+            </summary>
+        </member>
+        <member name="M:DuetSharedLibrary.RegexJsonConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
+            <inheritdoc />
+        </member>
+        <member name="M:DuetSharedLibrary.RegexJsonConverter.Write(System.Text.Json.Utf8JsonWriter,System.Text.RegularExpressions.Regex,System.Text.Json.JsonSerializerOptions)">
+            <inheritdoc />
+        </member>
         <member name="T:DuetSharedLibrary.SocketExtensions">
             <summary>
             Extension methods for UNIX sockets
@@ -290,47 +328,6 @@
             <param name="pid">Process ID</param>
             <param name="uid">User ID</param>
             <param name="gid">Group ID</param>
-        </member>
-        <member name="T:DuetSharedLibrary.SpiDevice">
-            <summary>
-            Driver class for SPI transfers. Most of this is copied from the System.Device.Gpio library
-            </summary>
-        </member>
-        <member name="M:DuetSharedLibrary.SpiDevice.#ctor(System.String,System.Int32,System.Int32)">
-            <summary>
-            Initialize an SPI device
-            </summary>
-            <param name="devNode">Path to the /dev node</param>
-            <param name="speed">Transfer speed in Hz</param>
-            <param name="transferMode">Transfer mode</param>
-        </member>
-        <member name="M:DuetSharedLibrary.SpiDevice.Finalize">
-            <summary>
-            Finalizer of this class
-            </summary>
-        </member>
-        <member name="M:DuetSharedLibrary.SpiDevice.Dispose">
-            <summary>
-            Disposes this instance
-            </summary>
-        </member>
-        <member name="F:DuetSharedLibrary.SpiDevice.disposed">
-            <summary>
-            Indicates if this instance has been disposed
-            </summary>
-        </member>
-        <member name="M:DuetSharedLibrary.SpiDevice.Dispose(System.Boolean)">
-            <summary>
-            Dispose this instance internally
-            </summary>
-            <param name="disposing">Release managed resourcess</param>
-        </member>
-        <member name="M:DuetSharedLibrary.SpiDevice.TransferFullDuplex(System.ReadOnlySpan{System.Byte},System.Span{System.Byte})">
-            <summary>
-            Writes and reads data from the SPI device.
-            </summary>
-            <param name="writeBuffer">The buffer that contains the data to be written to the SPI device.</param>
-            <param name="readBuffer">The buffer to read the data from the SPI device.</param>
         </member>
         <member name="T:DuetSharedLibrary.VersionHelper">
             <summary>

@@ -1,16 +1,785 @@
-﻿using DuetAPI.Utility;
+using DuetAPI.Utility;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace DuetAPI.Commands;
 
 public partial class Code
 {
-    // Numeric parameters may hold only characters of this string 
+    // Numeric parameters may hold only characters of this string
     private const string NumericParameterChars = "01234567890+-.";
+
+    /// <summary>
+    /// Mutable state shared by the synchronous and asynchronous parsers while decoding a single code.
+    /// The parsing logic itself lives in <see cref="ProcessCharacter"/>; the wrappers only provide
+    /// the character source and the surrounding stream/file bookkeeping.
+    /// </summary>
+    private sealed class ParserState
+    {
+        public char Letter;
+        public bool ContentRead, UnprecedentedParameter;
+        public bool InFinalComment, InEncapsulatedComment, InChunk, InSingleQuotes, InDoubleQuotes, InExpression, InKeywordArgument;
+        public bool ReadingAtStart, IsLineNumber, HadLineNumber, IsNumericParameter, EndingChunk;
+        public bool NextCharLowerCase, WasQuoted, WasExpression;
+        public int NumCurlyBraces, NumRoundBraces;
+
+        /// <summary>
+        /// Whether the last code may be repeated as per Fanuc or LaserWeb style (async only)
+        /// </summary>
+        public bool MayRepeatCode;
+
+        // Parameter values and keyword arguments accumulate here as raw UTF-8 bytes and are only
+        // decoded when a chunk completes. Comments accumulate separately because a single code may
+        // carry an encapsulated comment and a final comment at once.
+        private readonly List<byte> _value = [];
+        private readonly List<byte> _comment = [];
+
+        /// <summary>
+        /// Whether a comment (possibly empty) was seen, so the resulting comment is non-null
+        /// </summary>
+        public bool HadComment;
+
+        public int ValueLength => _value.Count;
+
+        public void AddToValue(char c) => _value.Add((byte)c);
+
+        public void ClearValue() => _value.Clear();
+
+        public string GetValue() => Encoding.UTF8.GetString(CollectionsMarshal.AsSpan(_value));
+
+        public void SetValue(string value)
+        {
+            _value.Clear();
+            _value.AddRange(Encoding.UTF8.GetBytes(value));
+        }
+
+        /// <summary>
+        /// Check if the current value contains the given ASCII character
+        /// </summary>
+        public bool ValueContains(char c)
+        {
+            byte b = (byte)c;
+            return _value.Contains(b);
+        }
+
+        /// <summary>
+        /// Check if the current value ends with a colon, ignoring trailing whitespace
+        /// </summary>
+        public bool ValueTrimEndEndsWithColon()
+        {
+            for (int i = _value.Count - 1; i >= 0; i--)
+            {
+                char c = (char)_value[i];
+                if (char.IsWhiteSpace(c))
+                {
+                    continue;
+                }
+                return c == ':';
+            }
+            return false;
+        }
+
+        public void AddToComment(char c)
+        {
+            _comment.Add((byte)c);
+            HadComment = true;
+        }
+
+        public string? GetComment() => HadComment ? Encoding.UTF8.GetString(CollectionsMarshal.AsSpan(_comment)) : null;
+    }
+
+    /// <summary>
+    /// Process a single character through the shared parser state machine
+    /// </summary>
+    /// <param name="state">Current parser state</param>
+    /// <param name="result">Code being filled</param>
+    /// <param name="c">Character to process (a single UTF-8 byte for non-ASCII content)</param>
+    /// <param name="peek">Next character that follows, or '\0' if none</param>
+    /// <returns>Whether the <paramref name="peek"/> character was consumed as well</returns>
+    /// <exception cref="CodeParserException">Thrown if the code contains errors like unterminated strings or comments</exception>
+    private static bool ProcessCharacter(ParserState state, Code result, char c, char peek)
+    {
+        bool consumedPeek = false;
+
+        if (state.InFinalComment)
+        {
+            // Reading a comment ending the current line
+            if (c != '\n')
+            {
+                // Add next character to the comment unless it is the "artificial" 0-character termination
+                state.AddToComment(c);
+            }
+            else
+            {
+                // Something started a comment, so the comment cannot be null any more
+                state.HadComment = true;
+            }
+            return consumedPeek;
+        }
+
+        if (state.InEncapsulatedComment)
+        {
+            // Reading an encapsulated comment in braces
+            if (c != ')')
+            {
+                // Add next character to the comment
+                state.AddToComment(c);
+            }
+            else
+            {
+                // End of encapsulated comment, it cannot be null any more
+                state.HadComment = true;
+                state.InEncapsulatedComment = false;
+            }
+            return consumedPeek;
+        }
+
+        if (state.InKeywordArgument)
+        {
+            if (state.InSingleQuotes)
+            {
+                // Add next character to the parameter value
+                state.AddToValue(c);
+
+                if (c == '\'')
+                {
+                    if (peek == '\'')
+                    {
+                        // Subsequent single quotes are treated as a single quote char
+                        state.AddToValue(c);
+                        consumedPeek = true;
+                    }
+                    state.InSingleQuotes = false;
+                }
+            }
+            else if (state.InDoubleQuotes)
+            {
+                // Add next character to the parameter value
+                state.AddToValue(c);
+
+                if (c == '"')
+                {
+                    if (peek == '"')
+                    {
+                        // Subsequent double quotes are treated as a single quote char
+                        state.AddToValue(c);
+                        consumedPeek = true;
+                    }
+                    else
+                    {
+                        // No longer in an escaped parameter
+                        state.InDoubleQuotes = false;
+                    }
+                }
+            }
+            else
+            {
+                switch (c)
+                {
+                    case '\n':
+                        // Ignore final NL
+                        break;
+                    case '\'':
+                        state.AddToValue('\'');
+                        state.InSingleQuotes = true;
+                        break;
+                    case '"':
+                        state.AddToValue('"');
+                        state.InDoubleQuotes = true;
+                        break;
+                    case ';':
+                        result.KeywordArgument = state.GetValue().Trim();
+                        state.ClearValue();
+                        state.InKeywordArgument = false;
+                        state.InFinalComment = true;
+                        state.HadComment = true;
+                        break;
+                    case '{':
+                        state.AddToValue('{');
+                        state.NumCurlyBraces++;
+                        break;
+                    case '}':
+                        state.AddToValue('}');
+                        state.NumCurlyBraces--;
+                        break;
+                    case '(':
+                        state.AddToValue('(');
+                        state.NumRoundBraces++;
+                        break;
+                    case ')':
+                        if (state.NumRoundBraces > 0)
+                        {
+                            state.AddToValue(')');
+                            state.NumRoundBraces--;
+                        }
+                        else
+                        {
+                            throw new CodeParserException("Unexpected closing round brace", result);
+                        }
+                        break;
+                    default:
+                        if (!char.IsWhiteSpace(c) || state.InKeywordArgument)
+                        {
+                            // In fact, it should be possible to leave out whitespaces here but we here don't check for quoted strings yet
+                            state.AddToValue(c);
+                        }
+                        break;
+                }
+            }
+
+            if (state.InKeywordArgument)
+            {
+                return consumedPeek;
+            }
+        }
+
+        if (state.InChunk)
+        {
+            if (state.InSingleQuotes)
+            {
+                if (c == '\'')
+                {
+                    if (peek == '\'')
+                    {
+                        // Treat subsequent single quotes as a single quote char
+                        state.AddToValue('\'');
+                        consumedPeek = true;
+                    }
+                    state.InSingleQuotes = false;
+                    state.WasQuoted = true;
+                    state.EndingChunk = true;
+                }
+                else
+                {
+                    // Add next character to the parameter value
+                    state.AddToValue(c);
+                }
+            }
+            else if (state.InDoubleQuotes)
+            {
+                if (c == '\'')
+                {
+                    if (state.NextCharLowerCase)
+                    {
+                        // Treat subsequent single-quotes as a single-quote char
+                        state.AddToValue('\'');
+                        state.NextCharLowerCase = false;
+                    }
+                    else
+                    {
+                        // Next letter should be lower-case
+                        state.NextCharLowerCase = true;
+                    }
+                }
+                else if (c == '"')
+                {
+                    if (peek == '"')
+                    {
+                        // Treat subsequent double quotes as a single double-quote char
+                        state.AddToValue('"');
+                        consumedPeek = true;
+                    }
+                    else
+                    {
+                        // No longer in an escaped parameter
+                        state.InDoubleQuotes = state.NextCharLowerCase = false;
+                        state.WasQuoted = true;
+                        state.EndingChunk = true;
+                    }
+                }
+                else if (state.NextCharLowerCase)
+                {
+                    // Add next lower-case character to the parameter value
+                    state.AddToValue(char.ToLower(c));
+                    state.NextCharLowerCase = false;
+                }
+                else
+                {
+                    // Add next character to the parameter value
+                    state.AddToValue(c);
+                }
+            }
+            else if (state.InExpression)
+            {
+                if (c == '{')
+                {
+                    // Starting inner expression
+                    state.NumCurlyBraces++;
+                }
+                else if (c == '}')
+                {
+                    state.NumCurlyBraces--;
+                    if (state.NumCurlyBraces == 0)
+                    {
+                        // Check if the round braces are properly terminated
+                        if (state.NumRoundBraces > 0)
+                        {
+                            throw new CodeParserException("Unterminated round brace", result);
+                        }
+                        if (state.NumRoundBraces < 0)
+                        {
+                            throw new CodeParserException("Too many closing round braces", result);
+                        }
+
+                        // No longer in an expression
+                        state.InExpression = false;
+                        state.WasExpression = true;
+                        state.EndingChunk = true;
+                    }
+                }
+                else if (c == '(')
+                {
+                    // Starting inner expression
+                    state.NumRoundBraces++;
+                }
+                else if (c == ')')
+                {
+                    // Ending inner expression
+                    state.NumRoundBraces--;
+                }
+                state.AddToValue(c);
+            }
+            else if (c == ';')
+            {
+                state.InFinalComment = true;
+                state.HadComment = true;
+                state.InChunk = state.EndingChunk = false;
+            }
+            else if (c == '(')
+            {
+                state.InEncapsulatedComment = true;
+                state.HadComment = true;
+                state.InChunk = state.EndingChunk = false;
+            }
+            else if (!state.EndingChunk && state.ValueLength == 0)
+            {
+                if (char.IsWhiteSpace(c))
+                {
+                    // Parameter is empty
+                    state.EndingChunk = true;
+                }
+                else if (c == '\'')
+                {
+                    // Parameter is a character
+                    state.InSingleQuotes = true;
+                    state.IsNumericParameter = false;
+                }
+                else if (c == '"')
+                {
+                    // Parameter is a quoted string
+                    state.InDoubleQuotes = true;
+                    state.IsNumericParameter = false;
+                }
+                else if (c == '{')
+                {
+                    // Parameter is an expression
+                    state.SetValue("{");
+                    state.InExpression = true;
+                    state.IsNumericParameter = false;
+                    state.NumCurlyBraces++;
+                }
+                else
+                {
+                    // Starting numeric or string parameter
+                    state.IsNumericParameter = (c == ':' || NumericParameterChars.Contains(c)) && !state.UnprecedentedParameter;
+                    state.AddToValue(c);
+                }
+            }
+            else if (state.EndingChunk ||
+                (state.UnprecedentedParameter && c == '\n') ||
+                (!state.UnprecedentedParameter && char.IsWhiteSpace(c)) ||
+                (state.IsNumericParameter && c != ':' && !NumericParameterChars.Contains(c)))
+            {
+                if ((c == '{' && state.ValueTrimEndEndsWithColon()) ||
+                    (c == ':' && state.WasExpression))
+                {
+                    // Array expression, keep on reading
+                    state.AddToValue(c);
+                    state.InExpression = true;
+                    state.IsNumericParameter = false;
+                    if (c == '{')
+                    {
+                        state.NumCurlyBraces++;
+                    }
+                }
+                else if ((c == 'e' || c == 'x') && !state.ValueContains(c))
+                {
+                    // Parameter contains special letter for hex or exp display
+                    state.AddToValue(c);
+                }
+                else
+                {
+                    // Parameter has ended
+                    state.InChunk = state.EndingChunk = false;
+                }
+            }
+            else
+            {
+                // Reading more of the current chunk
+                state.AddToValue(c);
+            }
+
+            if (state.EndingChunk && c == '\n')
+            {
+                // Last character - process the last parameter being read
+                state.InChunk = state.EndingChunk = false;
+            }
+        }
+
+        if (state.ReadingAtStart)
+        {
+            state.IsLineNumber = char.ToUpperInvariant(c) == 'N';
+            if (char.IsWhiteSpace(c) && c != '\n')
+            {
+                if (c == '\t')
+                {
+                    int indent = (result.Indent + 4) & ~3;
+                    if (indent >= byte.MaxValue)
+                    {
+                        throw new CodeParserException("Indentation too big", result);
+                    }
+                    result.Indent = (byte)indent;
+                }
+                else
+                {
+                    if (result.Indent == byte.MaxValue)
+                    {
+                        throw new CodeParserException("Indentation too big", result);
+                    }
+                    result.Indent++;
+                }
+            }
+            else
+            {
+                state.ReadingAtStart = false;
+            }
+        }
+
+        if (!state.InKeywordArgument && !state.InChunk && !state.ReadingAtStart)
+        {
+            if (state.Letter != '\0' || state.ValueLength > 0 || state.WasQuoted)
+            {
+                // Chunk is complete
+                string value = state.GetValue();
+                if (state.IsLineNumber)
+                {
+                    // Process line number
+                    if (long.TryParse(value, out long lineNumber))
+                    {
+                        result.LineNumber = lineNumber;
+                        result.Flags |= CodeFlags.HasExplicitLineNumber;
+                    }
+                    state.IsLineNumber = false;
+                    state.HadLineNumber = true;
+                }
+                else if (((state.Letter == 'G' && value != "lobal") || state.Letter == 'M' || state.Letter == 'T') &&
+                            (result.MajorNumber is null || (result.Type == CodeType.GCode && result.MajorNumber == 53)))
+                {
+                    // Process G/M/T identifier(s)
+                    if (result.Type == CodeType.GCode && result.MajorNumber == 53)
+                    {
+                        result.MajorNumber = null;
+                        result.Flags |= CodeFlags.EnforceAbsolutePosition;
+                    }
+
+                    result.Type = (CodeType)state.Letter;
+                    if (state.WasExpression)
+                    {
+                        if (result.Type == CodeType.TCode)
+                        {
+                            AddParameter(result, 'T', value, false, true);
+                        }
+                        else
+                        {
+                            throw new CodeParserException("Dynamic command numbers are only supported for T-codes", result);
+                        }
+                    }
+                    else if (value.Contains('.'))
+                    {
+                        int dotIndex = value.IndexOf('.');
+                        string majorValue = value[..dotIndex];
+                        if (int.TryParse(majorValue, out int majorNumber))
+                        {
+                            result.MajorNumber = majorNumber;
+                            // Codes with unprecedented parameters are not dot-separated
+                        }
+                        else
+                        {
+                            throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({majorValue})", result);
+                        }
+                        // The minor version is a single fraction digit (0-9) as supported by the firmware
+                        if (dotIndex + 1 < value.Length && char.IsDigit(value[dotIndex + 1]))
+                        {
+                            result.MinorNumber = value[dotIndex + 1] - '0';
+                        }
+                        else
+                        {
+                            throw new CodeParserException($"Failed to parse minor {char.ToUpperInvariant((char)result.Type)}-code number ({value[(dotIndex + 1)..]})", result);
+                        }
+                    }
+                    else if (int.TryParse(value, out int majorNumber))
+                    {
+                        result.MajorNumber = majorNumber;
+                        state.UnprecedentedParameter = (state.Letter == 'M') && (majorNumber == 23 || majorNumber == 28 || majorNumber == 30 || majorNumber == 32 || majorNumber == 36 || majorNumber == 117);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(value) || result.Type != CodeType.TCode)
+                    {
+                        throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({value})", result);
+                    }
+                }
+                else if (result.Type == CodeType.None && result.MajorNumber is null && !state.WasQuoted && !state.WasExpression)
+                {
+                    // Check for conditional G-code
+                    string keyword = char.ToLowerInvariant(state.Letter) + value;
+                    if (keyword == "if")
+                    {
+                        result.Type = CodeType.Keyword;
+                        result.Keyword = KeywordType.If;
+                        result.KeywordArgument = string.Empty;
+                        state.InKeywordArgument = true;
+                    }
+                    else if (keyword == "elif")
+                    {
+                        result.Type = CodeType.Keyword;
+                        result.Keyword = KeywordType.ElseIf;
+                        result.KeywordArgument = string.Empty;
+                        state.InKeywordArgument = true;
+                    }
+                    else if (keyword == "else")
+                    {
+                        result.Type = CodeType.Keyword;
+                        result.Keyword = KeywordType.Else;
+                    }
+                    else if (keyword == "while")
+                    {
+                        result.Type = CodeType.Keyword;
+                        result.Keyword = KeywordType.While;
+                        result.KeywordArgument = string.Empty;
+                        state.InKeywordArgument = true;
+                    }
+                    else if (keyword == "break")
+                    {
+                        result.Type = CodeType.Keyword;
+                        result.Keyword = KeywordType.Break;
+                    }
+                    else if (keyword == "continue")
+                    {
+                        result.Type = CodeType.Keyword;
+                        result.Keyword = KeywordType.Continue;
+                    }
+                    else if (keyword == "abort")
+                    {
+                        result.Type = CodeType.Keyword;
+                        result.Keyword = KeywordType.Abort;
+                        state.InKeywordArgument = true;
+                    }
+                    else if (keyword == "var")
+                    {
+                        result.Type = CodeType.Keyword;
+                        result.Keyword = KeywordType.Var;
+                        result.KeywordArgument = string.Empty;
+                        state.InKeywordArgument = true;
+                    }
+                    else if (keyword == "global")
+                    {
+                        result.Type = CodeType.Keyword;
+                        result.Keyword = KeywordType.Global;
+                        result.KeywordArgument = string.Empty;
+                        state.InKeywordArgument = true;
+                    }
+                    else if (keyword == "set")
+                    {
+                        result.Type = CodeType.Keyword;
+                        result.Keyword = KeywordType.Set;
+                        result.KeywordArgument = string.Empty;
+                        state.InKeywordArgument = true;
+                    }
+                    else if (keyword == "echo")
+                    {
+                        result.Type = CodeType.Keyword;
+                        result.Keyword = KeywordType.Echo;
+                        result.KeywordArgument = string.Empty;
+                        state.InKeywordArgument = true;
+                    }
+                    else if (keyword == "skip")
+                    {
+                        result.Type = CodeType.Keyword;
+                        result.Keyword = KeywordType.Skip;
+                    }
+                    else if (!result.HasParameter(state.Letter))
+                    {
+                        AddParameter(result, state.Letter, value, false, state.MayRepeatCode || state.UnprecedentedParameter || state.IsNumericParameter);
+                    }
+                    // Ignore duplicate parameters
+                }
+                else
+                {
+                    if (state.Letter == '\0')
+                    {
+                        state.Letter = '@';
+                    }
+                    else if (state.UnprecedentedParameter)
+                    {
+                        value = state.Letter + value;
+                        state.Letter = '@';
+                    }
+
+                    if (!result.HasParameter(state.Letter))
+                    {
+                        if (state.WasExpression && (!value.StartsWith('{') || !value.EndsWith('}')))
+                        {
+                            value = '{' + value.Trim() + '}';
+                        }
+                        AddParameter(result, state.Letter, value, state.WasQuoted, state.UnprecedentedParameter || state.IsNumericParameter || state.WasExpression);
+                    }
+                    // Ignore duplicate parameters
+                }
+
+                state.Letter = '\0';
+                state.ClearValue();
+                state.WasQuoted = state.WasExpression = false;
+            }
+
+            if (c == ';')
+            {
+                // Starting final comment
+                state.ContentRead = state.InFinalComment = state.HadComment = true;
+            }
+            else if (c == '(' && !state.InExpression)
+            {
+                if (state.InKeywordArgument)
+                {
+                    // No space between keyword and brace. This is not an encapsulated comment
+                    state.InEncapsulatedComment = false;
+                    state.AddToValue('(');
+                    state.NumRoundBraces++;
+                }
+                else
+                {
+                    // Starting encapsulated comment
+                    state.ContentRead = state.InEncapsulatedComment = state.HadComment = true;
+                }
+            }
+            else if (c == '\'')
+            {
+                state.ContentRead = state.NextCharLowerCase = true;
+            }
+            else if (!char.IsWhiteSpace(c))
+            {
+                // Starting a new parameter
+                state.ContentRead = state.InChunk = true;
+                if (c == '{')
+                {
+                    state.SetValue("{");
+                    state.InExpression = true;
+                    state.InSingleQuotes = state.InDoubleQuotes = false;
+                    state.NumCurlyBraces++;
+                }
+                else if (c == '\'')
+                {
+                    state.InSingleQuotes = true;
+                }
+                else if (c == '"')
+                {
+                    state.InDoubleQuotes = true;
+                }
+                else if (state.NextCharLowerCase)
+                {
+                    state.Letter = char.ToLowerInvariant(c);
+                    state.NextCharLowerCase = false;
+                }
+                else if (!state.UnprecedentedParameter)
+                {
+                    state.Letter = char.ToUpperInvariant(c);
+                }
+                else
+                {
+                    state.Letter = c;
+                }
+            }
+        }
+
+        return consumedPeek;
+    }
+
+    /// <summary>
+    /// Check if the upcoming character starts another G/M/T-code while the current one is complete
+    /// </summary>
+    private static bool StartsNextCode(ParserState state, Code result, char c)
+    {
+        if (!state.ContentRead || state.InFinalComment || state.InEncapsulatedComment || state.InKeywordArgument || state.InChunk)
+        {
+            return false;
+        }
+
+        char nextChar = state.NextCharLowerCase ? c : char.ToUpperInvariant(c);
+        return (nextChar == 'G' || nextChar == 'M' || nextChar == 'T') && result.Type != CodeType.None &&
+            (result.Type != CodeType.GCode || result.MajorNumber != 53) &&
+            (nextChar != 'T' || result.Type == CodeType.TCode || result.Parameters.Any(item => item.Letter == 'T'));
+    }
+
+    /// <summary>
+    /// Finalize a parsed code after the input line or stream ended
+    /// </summary>
+    /// <exception cref="CodeParserException">Thrown if the code is malformed</exception>
+    private static void FinishCode(ParserState state, Code result, char lastChar)
+    {
+        // Check if this was the last code on the line
+        if (lastChar is '\n' or '\0')
+        {
+            result.Flags |= CodeFlags.IsLastCode;
+        }
+
+        // Materialize the comment that was read for this code
+        result.Comment = state.GetComment();
+
+        // Check if this is a whole-line comment
+        if (result.Type == CodeType.None && result.Parameters.Count == 0 && result.Comment is not null)
+        {
+            result.Type = CodeType.Comment;
+        }
+
+        // Do not allow malformed codes
+        if (state.InEncapsulatedComment)
+        {
+            throw new CodeParserException("Unterminated encapsulated comment", result);
+        }
+        if (state.InSingleQuotes)
+        {
+            throw new CodeParserException("Unterminated character literal", result);
+        }
+        if (state.InDoubleQuotes)
+        {
+            throw new CodeParserException("Unterminated string", result);
+        }
+        if (state.NumCurlyBraces > 0)
+        {
+            throw new CodeParserException("Unterminated curly brace", result);
+        }
+        if (state.NumCurlyBraces < 0)
+        {
+            throw new CodeParserException("Too many closing curly braces", result);
+        }
+        if (state.InKeywordArgument)
+        {
+            result.KeywordArgument = state.GetValue().Trim();
+        }
+        if (result.KeywordArgument?.Length > 255)
+        {
+            throw new CodeParserException("Keyword argument too long (> 255)", result);
+        }
+        if (result.Parameters.Count > 255)
+        {
+            throw new CodeParserException("Too many parameters (> 255)", result);
+        }
+
+        // M569, M584, and M915 use driver identifiers
+        result.ConvertDriverIds();
+    }
 
     /// <summary>
     /// Parse the next available G/M/T-code from the given stream
@@ -28,25 +797,64 @@ public partial class Code
     /// </remarks>
     public static bool Parse(TextReader reader, Code result)
     {
-        char letter = '\0', c;
-        string value = string.Empty;
-
-        bool contentRead = false, unprecedentedParameter = false;
-        bool inFinalComment = false, inEncapsulatedComment = false, inChunk = false, inSingleQuotes = false, inDoubleQuotes = false, inExpression = false, inKeywordArgument = false;
-        bool readingAtStart = true, isLineNumber = false, isNumericParameter = false, endingChunk = false;
-        bool nextCharLowerCase = false, wasQuoted = false, wasExpression = false;
-        int numCurlyBraces = 0, numRoundBraces = 0;
-
-        char[] charArray = new char[1];
-        Encoding encoding = (reader is StreamReader sr) ? sr.CurrentEncoding : Encoding.UTF8;
+        ParserState state = new() { ReadingAtStart = true };
         result.Length = 0;
+
+        // The shared parser works on UTF-8 bytes. Decode characters from the reader and re-encode
+        // them so that multi-byte content round-trips correctly regardless of the source encoding.
+        byte[] pending = new byte[4];
+        char[] charBuffer = new char[2];
+        int pendingLength = 0, pendingPointer = 0;
+
+        int ReadByte()
+        {
+            if (pendingPointer >= pendingLength)
+            {
+                int next = reader.Read();
+                if (next < 0)
+                {
+                    return -1;
+                }
+
+                char ch = (char)next;
+                if (char.IsHighSurrogate(ch) && reader.Peek() >= 0)
+                {
+                    charBuffer[0] = ch;
+                    charBuffer[1] = (char)reader.Read();
+                    pendingLength = Encoding.UTF8.GetBytes(charBuffer, 0, 2, pending, 0);
+                }
+                else
+                {
+                    charBuffer[0] = ch;
+                    pendingLength = Encoding.UTF8.GetBytes(charBuffer, 0, 1, pending, 0);
+                }
+                pendingPointer = 0;
+            }
+            return pending[pendingPointer++];
+        }
+
+        char PeekChar()
+        {
+            if (pendingPointer < pendingLength)
+            {
+                return (char)pending[pendingPointer];
+            }
+
+            int next = reader.Peek();
+            if (next < 0)
+            {
+                return '\0';
+            }
+            // Lookahead is only ever compared against ASCII characters, so a non-ASCII byte is irrelevant
+            return (next < 0x80) ? (char)next : '\xFF';
+        }
+
+        char c;
         do
         {
-            // Read the next character
-            int currentChar = reader.Read();
-            c = (currentChar < 0) ? '\n' : (char)currentChar;
-            charArray[0] = c;
-            result.Length += encoding.GetByteCount(charArray);
+            int b = ReadByte();
+            c = (b < 0) ? '\n' : (char)b;
+            result.Length++;
 
             if (c == '\r')
             {
@@ -54,663 +862,25 @@ public partial class Code
                 continue;
             }
 
-            if (inFinalComment)
+            // Stop if another G/M/T code is coming up and this one is complete
+            if (StartsNextCode(state, result, c))
             {
-                // Reading a comment ending the current line
-                if (c != '\n')
-                {
-                    // Add next character to the comment unless it is the "artificial" 0-character termination
-                    result.Comment += c;
-                }
-                else
-                {
-                    // Something started a comment, so the comment cannot be null any more
-                    result.Comment ??= string.Empty;
-                }
-                continue;
+                // The character belongs to the next code, so put it back and do not count it
+                pendingPointer--;
+                result.Length--;
+                break;
             }
 
-            if (inEncapsulatedComment)
+            if (ProcessCharacter(state, result, c, PeekChar()))
             {
-                // Reading an encapsulated comment in braces
-                if (c != ')')
-                {
-                    // Add next character to the comment
-                    result.Comment += c;
-                }
-                else
-                {
-                    // End of encapsulated comment, it cannot be null any more
-                    result.Comment ??= string.Empty;
-                    inEncapsulatedComment = false;
-                }
-                continue;
-            }
-
-            if (inKeywordArgument)
-            {
-                if (inSingleQuotes)
-                {
-                    // Add next character to the parameter value
-                    result.KeywordArgument += c;
-                    result.Length++;
-
-                    if (c == '\'')
-                    {
-                        if (reader.Peek() == '\'')
-                        {
-                            // Subsequent single quotes are treated as a single quote char
-                            reader.Read();
-                            result.KeywordArgument += c;
-                            result.Length++;
-                        }
-                        inSingleQuotes = false;
-                    }
-                }
-                else if (inDoubleQuotes)
-                {
-                    // Add next character to the parameter value
-                    result.KeywordArgument += c;
-                    result.Length++;
-
-                    if (c == '"')
-                    {
-                        if (reader.Peek() == '"')
-                        {
-                            // Subsequent double quotes are treated as a single quote char
-                            reader.Read();
-                            result.KeywordArgument += c;
-                            result.Length++;
-                        }
-                        else
-                        {
-                            // No longer in an escaped parameter
-                            inDoubleQuotes = false;
-                        }
-                    }
-                }
-                else
-                {
-                    switch (c)
-                    {
-                        case '\n':
-                            // Ignore final NL
-                            break;
-                        case '\'':
-                            result.KeywordArgument += '\'';
-                            inSingleQuotes = true;
-                            break;
-                        case '"':
-                            result.KeywordArgument += '"';
-                            inDoubleQuotes = true;
-                            break;
-                        case ';':
-                            inKeywordArgument = false;
-                            inFinalComment = true;
-                            break;
-                        case '{':
-                            result.KeywordArgument += '{';
-                            numCurlyBraces++;
-                            break;
-                        case '}':
-                            result.KeywordArgument += '}';
-                            numCurlyBraces--;
-                            break;
-                        case '(':
-                            result.KeywordArgument += '(';
-                            numRoundBraces++;
-                            break;
-                        case ')':
-                            if (numRoundBraces > 0)
-                            {
-                                result.KeywordArgument += ')';
-                                numRoundBraces--;
-                            }
-                            else
-                            {
-                                throw new CodeParserException("Unexpected closing round brace", result);
-                            }
-                            break;
-                        default:
-                            if (!char.IsWhiteSpace(c) || !string.IsNullOrEmpty(result.KeywordArgument))
-                            {
-                                // In fact, it should be possible to leave out whitespaces here but we here don't check for quoted strings yet
-                                result.KeywordArgument += c;
-                            }
-                            break;
-                    }
-                }
-
-                if (inKeywordArgument)
-                {
-                    continue;
-                }
-            }
-
-            if (inChunk)
-            {
-                if (inSingleQuotes)
-                {
-                    if (c == '\'')
-                    {
-                        if (reader.Peek() == '\'')
-                        {
-                            // Treat subsequent single quotes as a single quote char
-                            value += '\'';
-                            reader.Read();
-                            result.Length++;
-                        }
-                        inSingleQuotes = false;
-                        wasQuoted = true;
-                        endingChunk = true;
-                    }
-                    else
-                    {
-                        // Add next character to the parameter value
-                        value += c;
-                    }
-                }
-                else if (inDoubleQuotes)
-                {
-                    if (c == '\'')
-                    {
-                        if (nextCharLowerCase)
-                        {
-                            // Treat subsequent single-quotes as a single-quite char
-                            value += '\'';
-                            nextCharLowerCase = false;
-                        }
-                        else
-                        {
-                            // Next letter should be lower-case
-                            nextCharLowerCase = true;
-                        }
-                    }
-                    else if (c == '"')
-                    {
-                        if (reader.Peek() == '"')
-                        {
-                            // Treat subsequent double quotes as a single quote char
-                            value += '"';
-                            reader.Read();
-                            result.Length++;
-                        }
-                        else
-                        {
-                            // No longer in an escaped parameter
-                            inDoubleQuotes = nextCharLowerCase = false;
-                            wasQuoted = true;
-                            endingChunk = true;
-                        }
-                    }
-                    else if (nextCharLowerCase)
-                    {
-                        // Add next lower-case character to the parameter value
-                        value += char.ToLower(c);
-                        nextCharLowerCase = false;
-                    }
-                    else
-                    {
-                        // Add next character to the parameter value
-                        value += c;
-                    }
-                }
-                else if (inExpression)
-                {
-                    if (c == '{')
-                    {
-                        // Starting inner expression
-                        numCurlyBraces++;
-                    }
-                    else if (c == '}')
-                    {
-                        numCurlyBraces--;
-                        if (numCurlyBraces == 0)
-                        {
-                            // Check if the round braces are properly terminated
-                            if (numRoundBraces > 0)
-                            {
-                                throw new CodeParserException("Unterminated round brace", result);
-                            }
-                            if (numRoundBraces < 0)
-                            {
-                                throw new CodeParserException("Too many closing round braces", result);
-                            }
-
-                            // No longer in an expression
-                            inExpression = false;
-                            wasExpression = true;
-                            endingChunk = true;
-                        }
-                    }
-                    else if (c == '(')
-                    {
-                        // Starting inner expression
-                        numRoundBraces++;
-                    }
-                    else if (c == ')')
-                    {
-                        // Ending inner expression
-                        numRoundBraces--;
-                    }
-                    value += c;
-                }
-                else if (c == ';')
-                {
-                    inFinalComment = true;
-                    inChunk = endingChunk = false;
-                }
-                else if (c == '(')
-                {
-                    inEncapsulatedComment = true;
-                    inChunk = endingChunk = false;
-                }
-                else if (!endingChunk && string.IsNullOrEmpty(value))
-                {
-                    if (char.IsWhiteSpace(c))
-                    {
-                        // Parameter is empty
-                        endingChunk = true;
-                    }
-                    else if (c == '\'')
-                    {
-                        // Parameter is a quoted character
-                        inSingleQuotes = true;
-                        isNumericParameter = false;
-                    }
-                    else if (c == '"')
-                    {
-                        // Parameter is a quoted string
-                        inDoubleQuotes = true;
-                        isNumericParameter = false;
-                    }
-                    else if (c == '{')
-                    {
-                        // Parameter is an expression
-                        value = "{";
-                        inExpression = true;
-                        isNumericParameter = false;
-                        numCurlyBraces++;
-                    }
-                    else
-                    {
-                        // Starting numeric or string parameter
-                        isNumericParameter = (c == ':' || NumericParameterChars.Contains(c)) && !unprecedentedParameter;
-                        value += c;
-                    }
-                }
-                else if (endingChunk ||
-                    (unprecedentedParameter && c == '\n') ||
-                    (!unprecedentedParameter && char.IsWhiteSpace(c)) ||
-                    (isNumericParameter && c != ':' && !NumericParameterChars.Contains(c)))
-                {
-                    if ((c == '{' && value.TrimEnd().EndsWith(":")) ||
-                        (c == ':' && wasExpression))
-                    {
-                        // Array expression, keep on reading
-                        value += c;
-                        inExpression = true;
-                        isNumericParameter = false;
-                        if (c == '{')
-                        {
-                            numCurlyBraces++;
-                        }
-                    }
-                    else if ((c == 'e' || c == 'x') && !value.Contains(c))
-                    {
-                        // Parameter contains special letter for hex or exp display
-                        value += c;
-                    }
-                    else
-                    {
-                        // Parameter has ended
-                        inChunk = endingChunk = false;
-                    }
-                }
-                else
-                {
-                    // Reading more of the current chunk
-                    value += c;
-                }
-
-                if (endingChunk && c == '\n')
-                {
-                    // Last character - process the last parameter being read
-                    inChunk = endingChunk = false;
-                }
-            }
-
-            if (readingAtStart)
-            {
-                isLineNumber = (char.ToUpperInvariant(c) == 'N');
-                if (char.IsWhiteSpace(c) && c != '\n')
-                {
-                    if (c == '\t')
-                    {
-                        int indent = (result.Indent + 4) & ~3;
-                        if (indent >= byte.MaxValue)
-                        {
-                            throw new CodeParserException("Indentation too big", result);
-                        }
-                        result.Indent = (byte)indent;
-                    }
-                    else
-                    {
-                        if (result.Indent == byte.MaxValue)
-                        {
-                            throw new CodeParserException("Indentation too big", result);
-                        }
-                        result.Indent++;
-                    }
-                }
-                else
-                {
-                    readingAtStart = false;
-                }
-            }
-
-            if (!inKeywordArgument && !inChunk && !readingAtStart)
-            {
-                if (letter != '\0' || !string.IsNullOrEmpty(value) || wasQuoted)
-                {
-                    // Chunk is complete
-                    if (isLineNumber)
-                    {
-                        // Process line number
-                        if (long.TryParse(value, out long lineNumber))
-                        {
-                            result.LineNumber = lineNumber;
-                            result.Flags |= CodeFlags.HasExplicitLineNumber;
-                        }
-                        isLineNumber = false;
-                    }
-                    else if (((letter == 'G' && value != "lobal") || letter == 'M' || letter == 'T') &&
-                                (result.MajorNumber is null || (result.Type == CodeType.GCode && result.MajorNumber == 53)))
-                    {
-                        // Process G/M/T identifier(s)
-                        if (result.Type == CodeType.GCode && result.MajorNumber == 53)
-                        {
-                            result.MajorNumber = null;
-                            result.Flags |= CodeFlags.EnforceAbsolutePosition;
-                        }
-
-                        result.Type = (CodeType)letter;
-                        if (wasExpression)
-                        {
-                            if (result.Type == CodeType.TCode)
-                            {
-                                AddParameter(result, 'T', value, false, true);
-                            }
-                            else
-                            {
-                                throw new CodeParserException("Dynamic command numbers are only supported for T-codes");
-                            }
-                        }
-                        else if (value.Contains('.'))
-                        {
-                            string[] args = value.Split('.');
-                            if (int.TryParse(args[0], out int majorNumber))
-                            {
-                                result.MajorNumber = majorNumber;
-                                // Codes with unprecedented parameters are not dot-separated
-                            }
-                            else
-                            {
-                                throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({args[0]})", result);
-                            }
-                            if (int.TryParse(args[1], out int minorNumber) && minorNumber >= 0)
-                            {
-                                result.MinorNumber = minorNumber;
-                            }
-                            else
-                            {
-                                throw new CodeParserException($"Failed to parse minor {char.ToUpperInvariant((char)result.Type)}-code number ({args[1]})", result);
-                            }
-                        }
-                        else if (int.TryParse(value, out int majorNumber))
-                        {
-                            result.MajorNumber = majorNumber;
-                            unprecedentedParameter = (letter == 'M') && (majorNumber == 23 || majorNumber == 28 || majorNumber == 30 || majorNumber == 32 || majorNumber == 36 || majorNumber == 117);
-                        }
-                        else if (!string.IsNullOrWhiteSpace(value) || result.Type != CodeType.TCode)
-                        {
-                            throw new CodeParserException($"Failed to parse major {char.ToUpperInvariant((char)result.Type)}-code number ({value})", result);
-                        }
-                    }
-                    else if (result.Type == CodeType.None && result.MajorNumber is null && !wasQuoted && !wasExpression)
-                    {
-                        // Check for conditional G-code
-                        string keyword = char.ToLowerInvariant(letter) + value;
-                        if (keyword == "if")
-                        {
-                            result.Type = CodeType.Keyword;
-                            result.Keyword = KeywordType.If;
-                            result.KeywordArgument = string.Empty;
-                            inKeywordArgument = true;
-                        }
-                        else if (keyword == "elif")
-                        {
-                            result.Type = CodeType.Keyword;
-                            result.Keyword = KeywordType.ElseIf;
-                            result.KeywordArgument = string.Empty;
-                            inKeywordArgument = true;
-                        }
-                        else if (keyword == "else")
-                        {
-                            result.Type = CodeType.Keyword;
-                            result.Keyword = KeywordType.Else;
-                        }
-                        else if (keyword == "while")
-                        {
-                            result.Type = CodeType.Keyword;
-                            result.Keyword = KeywordType.While;
-                            result.KeywordArgument = string.Empty;
-                            inKeywordArgument = true;
-                        }
-                        else if (keyword == "break")
-                        {
-                            result.Type = CodeType.Keyword;
-                            result.Keyword = KeywordType.Break;
-                        }
-                        else if (keyword == "continue")
-                        {
-                            result.Type = CodeType.Keyword;
-                            result.Keyword = KeywordType.Continue;
-                        }
-                        else if (keyword == "abort")
-                        {
-                            result.Type = CodeType.Keyword;
-                            result.Keyword = KeywordType.Abort;
-                            inKeywordArgument = true;
-                        }
-                        else if (keyword == "var")
-                        {
-                            result.Type = CodeType.Keyword;
-                            result.Keyword = KeywordType.Var;
-                            result.KeywordArgument = string.Empty;
-                            inKeywordArgument = true;
-                        }
-                        else if (keyword == "global")
-                        {
-                            result.Type = CodeType.Keyword;
-                            result.Keyword = KeywordType.Global;
-                            result.KeywordArgument = string.Empty;
-                            inKeywordArgument = true;
-                        }
-                        else if (keyword == "set")
-                        {
-                            result.Type = CodeType.Keyword;
-                            result.Keyword = KeywordType.Set;
-                            result.KeywordArgument = string.Empty;
-                            inKeywordArgument = true;
-                        }
-                        else if (keyword == "echo")
-                        {
-                            result.Type = CodeType.Keyword;
-                            result.Keyword = KeywordType.Echo;
-                            result.KeywordArgument = string.Empty;
-                            inKeywordArgument = true;
-                        }
-                        else if (!result.HasParameter(letter))
-                        {
-                            AddParameter(result, letter, value, false, unprecedentedParameter || isNumericParameter);
-                        }
-                        // Ignore duplicate parameters
-                    }
-                    else
-                    {
-                        if (letter == '\0')
-                        {
-                            letter = '@';
-                        }
-                        else if (unprecedentedParameter)
-                        {
-                            value = letter + value;
-                            letter = '@';
-                        }
-
-                        if (!result.HasParameter(letter))
-                        {
-                            if (wasExpression && (!value.StartsWith("{") || !value.EndsWith("}")))
-                            {
-                                value = '{' + value.Trim() + '}';
-                            }
-                            AddParameter(result, letter, value, wasQuoted, unprecedentedParameter || isNumericParameter || wasExpression);
-                        }
-                        // Ignore duplicate parameters
-                    }
-
-                    letter = '\0';
-                    value = string.Empty;
-                    wasQuoted = wasExpression = false;
-                }
-
-                if (c == ';')
-                {
-                    // Starting final comment
-                    contentRead = inFinalComment = true;
-                }
-                else if (c == '(' && !inExpression)
-                {
-                    if (inKeywordArgument)
-                    {
-                        // No space between keyword and brace. This is not an encapsulated comment
-                        inEncapsulatedComment = false;
-                        result.KeywordArgument = "(";
-                        numRoundBraces++;
-                    }
-                    else
-                    {
-                        // Starting encapsulated comment
-                        contentRead = inEncapsulatedComment = true;
-                    }
-                }
-                else if (c == '\'')
-                {
-                    contentRead = nextCharLowerCase = true;
-                }
-                else if (!char.IsWhiteSpace(c))
-                {
-                    // Starting a new parameter
-                    contentRead = inChunk = true;
-                    if (c == '{')
-                    {
-                        value = "{";
-                        inExpression = true;
-                        inSingleQuotes = inDoubleQuotes = false;
-                        numCurlyBraces++;
-                    }
-                    else if (c == '\'')
-                    {
-                        inSingleQuotes = true;
-                    }
-                    else if (c == '"')
-                    {
-                        inDoubleQuotes = true;
-                    }
-                    else if (nextCharLowerCase)
-                    {
-                        letter = char.ToLowerInvariant(c);
-                        nextCharLowerCase = false;
-                    }
-                    else if (!unprecedentedParameter)
-                    {
-                        letter = char.ToUpperInvariant(c);
-                    }
-                    else
-                    {
-                        letter = c;
-                    }
-                }
-            }
-
-            if (!inFinalComment && !inEncapsulatedComment && !inKeywordArgument && !inChunk)
-            {
-                // Stop if another G/M/T code is coming up and this one is complete
-                int next = reader.Peek();
-                char nextChar = (next == -1) ? '\n' : (nextCharLowerCase ? (char)next : char.ToUpperInvariant((char)next));
-                if ((nextChar == 'G' || nextChar == 'M' || nextChar == 'T') && result.Type != CodeType.None &&
-                    (result.Type != CodeType.GCode || result.MajorNumber != 53) &&
-                    (nextChar != 'T' || result.Type == CodeType.TCode || result.Parameters.Any(item => item.Letter == 'T')))
-                {
-                    // Note that G- and M-codes may T parameters
-                    break;
-                }
-            }
-        } while (c != '\n');
-
-
-        // Check if this was the last code on the line
-        if (c is '\n' or '\0')
-        {
-            result.Flags |= CodeFlags.IsLastCode;
-        }
-
-        // Check if this is a whole-line comment
-        if (result.Type == CodeType.None && result.Parameters.Count == 0 && result.Comment is not null)
-        {
-            result.Type = CodeType.Comment;
-        }
-
-        // Do not allow malformed codes
-        if (inEncapsulatedComment)
-        {
-            throw new CodeParserException("Unterminated encapsulated comment", result);
-        }
-        if (inSingleQuotes)
-        {
-            throw new CodeParserException("Unterminated character literal", result);
-        }
-        if (inDoubleQuotes)
-        {
-            throw new CodeParserException("Unterminated string", result);
-        }
-        if (numCurlyBraces > 0)
-        {
-            throw new CodeParserException("Unterminated curly brace", result);
-        }
-        if (numCurlyBraces < 0)
-        {
-            throw new CodeParserException("Too many closing curly braces", result);
-        }
-        if (result.KeywordArgument is not null)
-        {
-            result.KeywordArgument = result.KeywordArgument.Trim();
-            if (result.KeywordArgument.Length > 255)
-            {
-                throw new CodeParserException("Keyword argument too long (> 255)", result);
+                ReadByte();
+                result.Length++;
             }
         }
-        if (result.Parameters.Count > 255)
-        {
-            throw new CodeParserException("Too many parameters (> 255)", result);
-        }
+        while (c != '\n');
 
-        // M569, M584, and M915 use driver identifiers
-        result.ConvertDriverIds();
-
-        // End
-        return contentRead;
+        FinishCode(state, result, c);
+        return state.ContentRead;
     }
 
     /// <summary>
@@ -747,7 +917,7 @@ public partial class Code
                 {
                     throw new CodeParserException($"Illegal parameter letter '{c}'");
                 }
-                code.Parameters.Add(new CodeParameter(c, string.Empty, false, false)); 
+                code.Parameters.Add(new CodeParameter(c, string.Empty, false, false));
             }
         }
     }

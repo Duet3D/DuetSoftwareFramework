@@ -1,0 +1,318 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class KeywordHandler </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class KeywordHandler ">
+      
+      <meta name="description" content="Meta G-code keyword handler">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DuetControlServer.Codes.Handlers.KeywordHandler">
+
+
+
+  <h1 id="DuetControlServer_Codes_Handlers_KeywordHandler" data-uid="DuetControlServer.Codes.Handlers.KeywordHandler" class="text-break">
+Class KeywordHandler  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Codes/Handlers/KeywordHandler.cs"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="DuetControlServer.html">DuetControlServer</a>.<a class="xref" href="DuetControlServer.Codes.html">Codes</a>.<a class="xref" href="DuetControlServer.Codes.Handlers.html">Handlers</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>DuetControlServer.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Meta G-code keyword handler</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class KeywordHandler : ICodeHandler</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">KeywordHandler</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="DuetControlServer.Codes.Handlers.ICodeHandler.html">ICodeHandler</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="DuetControlServer_Codes_Handlers_KeywordHandler__ctor_" data-uid="DuetControlServer.Codes.Handlers.KeywordHandler.#ctor*"></a>
+
+  <h3 id="DuetControlServer_Codes_Handlers_KeywordHandler__ctor_DuetControlServer_Codes_CodeProcessor_DuetControlServer_Codes_Meta_Expressions_DuetControlServer_Files_FilePathResolver_DuetControlServer_Link_LinkInterface_Microsoft_Extensions_Logging_ILogger_DuetControlServer_Codes_Handlers_KeywordHandler__Microsoft_Extensions_Options_IOptions_DuetControlServer_Settings__" data-uid="DuetControlServer.Codes.Handlers.KeywordHandler.#ctor(DuetControlServer.Codes.CodeProcessor,DuetControlServer.Codes.Meta.Expressions,DuetControlServer.Files.FilePathResolver,DuetControlServer.Link.LinkInterface,Microsoft.Extensions.Logging.ILogger{DuetControlServer.Codes.Handlers.KeywordHandler},Microsoft.Extensions.Options.IOptions{DuetControlServer.Settings})">
+  KeywordHandler(CodeProcessor, Expressions, FilePathResolver, LinkInterface, ILogger&lt;KeywordHandler&gt;, IOptions&lt;Settings&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Codes/Handlers/KeywordHandler.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Meta G-code keyword handler</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public KeywordHandler(CodeProcessor codeProcessor, Expressions expressions, FilePathResolver filePathResolver, LinkInterface linkInterface, ILogger&lt;KeywordHandler&gt; logger, IOptions&lt;Settings&gt; settings)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>codeProcessor</code> <a class="xref" href="DuetControlServer.Codes.CodeProcessor.html">CodeProcessor</a></dt>
+    <dd><p>Code processor</p>
+</dd>
+    <dt><code>expressions</code> <a class="xref" href="DuetControlServer.Codes.Meta.Expressions.html">Expressions</a></dt>
+    <dd><p>Meta G-code expression parser</p>
+</dd>
+    <dt><code>filePathResolver</code> <a class="xref" href="DuetControlServer.Files.FilePathResolver.html">FilePathResolver</a></dt>
+    <dd><p>File path resolver</p>
+</dd>
+    <dt><code>linkInterface</code> <a class="xref" href="DuetControlServer.Link.LinkInterface.html">LinkInterface</a></dt>
+    <dd><p>Link interface</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger-1">ILogger</a>&lt;<a class="xref" href="DuetControlServer.Codes.Handlers.KeywordHandler.html">KeywordHandler</a>&gt;</dt>
+    <dd><p>Logger</p>
+</dd>
+    <dt><code>settings</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.options.ioptions-1">IOptions</a>&lt;<a class="xref" href="DuetControlServer.Settings.html">Settings</a>&gt;</dt>
+    <dd><p>Settings</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="DuetControlServer_Codes_Handlers_KeywordHandler_CodeExecutedAsync_" data-uid="DuetControlServer.Codes.Handlers.KeywordHandler.CodeExecutedAsync*"></a>
+
+  <h3 id="DuetControlServer_Codes_Handlers_KeywordHandler_CodeExecutedAsync_DuetControlServer_Commands_Code_System_Threading_CancellationToken_" data-uid="DuetControlServer.Codes.Handlers.KeywordHandler.CodeExecutedAsync(DuetControlServer.Commands.Code,System.Threading.CancellationToken)">
+  CodeExecutedAsync(Code, CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Codes/Handlers/KeywordHandler.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>React to an executed T-code before its result is returned</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask CodeExecutedAsync(Code code, CancellationToken cancellationToken)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>code</code> <a class="xref" href="DuetControlServer.Commands.Code.html">Code</a></dt>
+    <dd><p>Code processed by RepRapFirmware</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>Result to output</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Codes_Handlers_KeywordHandler_ProcessAsync_" data-uid="DuetControlServer.Codes.Handlers.KeywordHandler.ProcessAsync*"></a>
+
+  <h3 id="DuetControlServer_Codes_Handlers_KeywordHandler_ProcessAsync_DuetControlServer_Commands_Code_System_Threading_CancellationToken_" data-uid="DuetControlServer.Codes.Handlers.KeywordHandler.ProcessAsync(DuetControlServer.Commands.Code,System.Threading.CancellationToken)">
+  ProcessAsync(Code, CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Codes/Handlers/KeywordHandler.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Process a non-branching meta G-code statement</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;Message?&gt; ProcessAsync(Code code, CancellationToken cancellationToken)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>code</code> <a class="xref" href="DuetControlServer.Commands.Code.html">Code</a></dt>
+    <dd><p>Code to process</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Messages/Message.cs">Message</a>&gt;</dt>
+    <dd><p>Result of the code if the code completed</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></dt>
+    <dd><p>The code was cancelled</p>
+</dd>
+  </dl>
+
+
+
+
+</article>
+
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

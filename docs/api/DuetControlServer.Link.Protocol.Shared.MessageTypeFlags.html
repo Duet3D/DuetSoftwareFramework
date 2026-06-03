@@ -1,0 +1,235 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Enum MessageTypeFlags </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Enum MessageTypeFlags ">
+      
+      <meta name="description" content="Supported message destinations. This is now a bitmap. Note that this type is used by RepRapFirmware as well. Make sure to keep the destinations in sync with the  entries.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DuetControlServer.Link.Protocol.Shared.MessageTypeFlags">
+
+
+
+
+  <h1 id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags" data-uid="DuetControlServer.Link.Protocol.Shared.MessageTypeFlags" class="text-break">
+Enum MessageTypeFlags  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Shared/MessageTypeFlags.cs"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="DuetControlServer.html">DuetControlServer</a>.<a class="xref" href="DuetControlServer.Link.html">Link</a>.<a class="xref" href="DuetControlServer.Link.Protocol.html">Protocol</a>.<a class="xref" href="DuetControlServer.Link.Protocol.Shared.html">Shared</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>DuetControlServer.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Supported message destinations. This is now a bitmap. Note that this type is used by RepRapFirmware as well.
+Make sure to keep the destinations in sync with the <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a> entries.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[Flags]
+public enum MessageTypeFlags : uint</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+  <h2 id="fields">Fields
+</h2>
+  <dl class="parameters">
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_AutoPauseMessage"><code>AutoPauseMessage = 2048</code></dt>
+    <dd><p>A message that is to be sent to an auto-pause processor</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_Aux2Message"><code>Aux2Message = 1024</code></dt>
+    <dd><p>A message that is to be sent to the second aux device</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_AuxMessage"><code>AuxMessage = 16</code></dt>
+    <dd><p>A message that is to be sent to an auxiliary device (PanelDue)</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_BinaryCodeReplyFlag"><code>BinaryCodeReplyFlag = 268435456</code></dt>
+    <dd><p>This message comes from a binary G-Code buffer</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_BlockingUsbMessage"><code>BlockingUsbMessage = 65536</code></dt>
+    <dd><p>A message that is to be sent to USB in blocking mode</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_CodeQueueMessage"><code>CodeQueueMessage = 64</code></dt>
+    <dd><p>A message that is to be sent to the code queue channel</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_DaemonMessage"><code>DaemonMessage = 512</code></dt>
+    <dd><p>A message that is sent to the daemon processor</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_ErrorMessageFlag"><code>ErrorMessageFlag = 16777216</code></dt>
+    <dd><p>This is an error message</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_File2Message"><code>File2Message = 4096</code></dt>
+    <dd><p>A message that is to be sent to the second file processor</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_FileMessage"><code>FileMessage = 4</code></dt>
+    <dd><p>A message that is to be sent to a file processor</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_GenericMessage"><code>GenericMessage = HttpMessage | TelnetMessage | UsbMessage | AuxMessage</code></dt>
+    <dd><p>A message that is to be sent to the web, Telnet, USB and panel</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_HttpMessage"><code>HttpMessage = 1</code></dt>
+    <dd><p>A message that is to be sent to the web (HTTP)</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_ImmediateAuxMessage"><code>ImmediateAuxMessage = 131072</code></dt>
+    <dd><p>A message that is to be sent to LCD in immediate mode</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_LcdMessage"><code>LcdMessage = 128</code></dt>
+    <dd><p>A message that is to be sent to the panel</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_LogInfo"><code>LogInfo = 1073741824</code></dt>
+    <dd><p>Log level &quot;info&quot; (1): all messages of level &quot;warn&quot; plus info messages</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_LogMessageHighBit"><code>LogMessageHighBit = 2147483648</code></dt>
+    <dd><p>Log level consists of two bits, this is the high bit</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_LogMessageLowBit"><code>LogMessageLowBit = 1073741824</code></dt>
+    <dd><p>Log level consists of two bits, this is the low bit</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_LogOff"><code>LogOff = LogInfo | LogMessageHighBit</code></dt>
+    <dd><p>Log level &quot;off&quot; (3): do not log this message</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_LogWarn"><code>LogWarn = 2147483648</code></dt>
+    <dd><p>Log level &quot;warn&quot; (2): all messages of type Error and Warning are logged</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_LoggedGenericMessage"><code>LoggedGenericMessage = GenericMessage | LogMessageHighBit</code></dt>
+    <dd><p>A GenericMessage that is also logged</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_MqttMessage"><code>MqttMessage = 32768</code></dt>
+    <dd><p>A message that is to be published by the MQTT client</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_NoDestinationMessage"><code>NoDestinationMessage = 0</code></dt>
+    <dd><p>A message that is going nowhere</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_PushFlag"><code>PushFlag = 536870912</code></dt>
+    <dd><p>There is more to come; the message has been truncated</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_Queue2Message"><code>Queue2Message = 8192</code></dt>
+    <dd><p>A message that is to be sent to the second code queue channel</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_RawMessageFlag"><code>RawMessageFlag = 134217728</code></dt>
+    <dd><p>Do not encapsulate this message</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_SbcMessage"><code>SbcMessage = 256</code></dt>
+    <dd><p>A message that is to be sent to the SBC</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_TelnetMessage"><code>TelnetMessage = 2</code></dt>
+    <dd><p>A message that is to be sent to a Telnet client</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_TriggerMessage"><code>TriggerMessage = 32</code></dt>
+    <dd><p>A message that is to be sent to a trigger processor</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_Usb2Message"><code>Usb2Message = 16384</code></dt>
+    <dd><p>A message that is to be sent to the second USB channel</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_UsbMessage"><code>UsbMessage = 8</code></dt>
+    <dd><p>A message that is to be sent in non-blocking mode to the host via USB</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_WarningMessageFlag"><code>WarningMessageFlag = 33554432</code></dt>
+    <dd><p>This is a warning message</p>
+</dd>
+  </dl>
+
+
+
+</article>
+
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

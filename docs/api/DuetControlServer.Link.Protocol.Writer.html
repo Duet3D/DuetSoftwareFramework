@@ -1,0 +1,1122 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class Writer </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class Writer ">
+      
+      <meta name="description" content="Static class for writing data for SPI transmissions. This class makes sure each data block is on a 4-byte boundary to guarantee efficient DMA transfers on the remote side.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DuetControlServer.Link.Protocol.Writer">
+
+
+
+  <h1 id="DuetControlServer_Link_Protocol_Writer" data-uid="DuetControlServer.Link.Protocol.Writer" class="text-break">
+Class Writer  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="DuetControlServer.html">DuetControlServer</a>.<a class="xref" href="DuetControlServer.Link.html">Link</a>.<a class="xref" href="DuetControlServer.Link.Protocol.html">Protocol</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>DuetControlServer.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Static class for writing data for SPI transmissions.
+This class makes sure each data block is on a 4-byte boundary to guarantee efficient DMA transfers on the remote side.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static class Writer</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">Writer</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_GetCodeSize_" data-uid="DuetControlServer.Link.Protocol.Writer.GetCodeSize*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_GetCodeSize_DuetAPI_Commands_Code_System_Int32_System_Int32_" data-uid="DuetControlServer.Link.Protocol.Writer.GetCodeSize(DuetAPI.Commands.Code,System.Int32,System.Int32)">
+  GetCodeSize(Code, int, int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Calculate the size of a binary G/M/T-code</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int GetCodeSize(Code code, int bufferSize, int protocolVersion)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>code</code> <a class="xref" href="DuetAPI.Commands.Code.html">Code</a></dt>
+    <dd><p>Code to write</p>
+</dd>
+    <dt><code>bufferSize</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Size of the buffer to write to</p>
+</dd>
+    <dt><code>protocolVersion</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Protocol version</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Code size in bytes</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>Thrown if the code is too long to fit into the buffer</p>
+</dd>
+  </dl>
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_InitTransferHeader_" data-uid="DuetControlServer.Link.Protocol.Writer.InitTransferHeader*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_InitTransferHeader_DuetControlServer_Link_Protocol_Shared_TransferHeader__" data-uid="DuetControlServer.Link.Protocol.Writer.InitTransferHeader(DuetControlServer.Link.Protocol.Shared.TransferHeader@)">
+  InitTransferHeader(ref TransferHeader)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Initialize a transfer header</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static void InitTransferHeader(ref TransferHeader header)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>header</code> <a class="xref" href="DuetControlServer.Link.Protocol.Shared.TransferHeader.html">TransferHeader</a></dt>
+    <dd><p>Header reference to initialize</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WriteAssignFilament_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteAssignFilament*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WriteAssignFilament_System_Span_System_Byte__System_Int32_System_String_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteAssignFilament(System.Span{System.Byte},System.Int32,System.String)">
+  WriteAssignFilament(Span&lt;byte&gt;, int, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Assign a filament name to the given extruder drive</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteAssignFilament(Span&lt;byte&gt; to, int extruder, string filamentName)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>extruder</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Extruder drive</p>
+</dd>
+    <dt><code>filamentName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Filament name</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WriteBoolean_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteBoolean*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WriteBoolean_System_Span_System_Byte__System_Boolean_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteBoolean(System.Span{System.Byte},System.Boolean)">
+  WriteBoolean(Span&lt;byte&gt;, bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write an arbitrary boolean value</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteBoolean(Span&lt;byte&gt; to, bool value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Boolean value</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WriteCode_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteCode*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WriteCode_System_Span_System_Byte__DuetAPI_Commands_Code_System_Int32_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteCode(System.Span{System.Byte},DuetAPI.Commands.Code,System.Int32)">
+  WriteCode(Span&lt;byte&gt;, Code, int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write a parsed G/M/T code in binary format to a memory span</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteCode(Span&lt;byte&gt; to, Code code, int protocolVersion)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>code</code> <a class="xref" href="DuetAPI.Commands.Code.html">Code</a></dt>
+    <dd><p>Code to write</p>
+</dd>
+    <dt><code>protocolVersion</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Protocol version</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>Unsupported data type</p>
+</dd>
+  </dl>
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WriteCodeChannel_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteCodeChannel*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WriteCodeChannel_System_Span_System_Byte__DuetAPI_CodeChannel_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteCodeChannel(System.Span{System.Byte},DuetAPI.CodeChannel)">
+  WriteCodeChannel(Span&lt;byte&gt;, CodeChannel)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write a G-code channel</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteCodeChannel(Span&lt;byte&gt; to, CodeChannel channel)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Channel for the lock request</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WriteDeleteLocalVariable_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteDeleteLocalVariable*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WriteDeleteLocalVariable_System_Span_System_Byte__DuetAPI_CodeChannel_System_String_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteDeleteLocalVariable(System.Span{System.Byte},DuetAPI.CodeChannel,System.String)">
+  WriteDeleteLocalVariable(Span&lt;byte&gt;, CodeChannel, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write a <a class="xref" href="DuetControlServer.Link.Protocol.SbcRequests.DeleteLocalVariableHeader.html">DeleteLocalVariableHeader</a> to a memory span</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteDeleteLocalVariable(Span&lt;byte&gt; to, CodeChannel channel, string varName)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Source of this request</p>
+</dd>
+    <dt><code>varName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Name of the variable excluding var prefix</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WriteEvaluateExpression_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteEvaluateExpression*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WriteEvaluateExpression_System_Span_System_Byte__DuetAPI_CodeChannel_System_String_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteEvaluateExpression(System.Span{System.Byte},DuetAPI.CodeChannel,System.String)">
+  WriteEvaluateExpression(Span&lt;byte&gt;, CodeChannel, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write a request to evaluate an expression</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteEvaluateExpression(Span&lt;byte&gt; to, CodeChannel channel, string expression)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Where to evaluate the expression</p>
+</dd>
+    <dt><code>expression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Expression to evaluate</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WriteFileChunk_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteFileChunk*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WriteFileChunk_System_Span_System_Byte__System_Span_System_Byte__System_Int64_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteFileChunk(System.Span{System.Byte},System.Span{System.Byte},System.Int64)">
+  WriteFileChunk(Span&lt;byte&gt;, Span&lt;byte&gt;, long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write a file chunk</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteFileChunk(Span&lt;byte&gt; to, Span&lt;byte&gt; data, long fileLength)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>data</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>File chunk data</p>
+</dd>
+    <dt><code>fileLength</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Total length of the file in bytes</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WriteFileReadResult_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteFileReadResult*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WriteFileReadResult_System_Span_System_Byte__System_Span_System_Byte__System_Int32_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteFileReadResult(System.Span{System.Byte},System.Span{System.Byte},System.Int32)">
+  WriteFileReadResult(Span&lt;byte&gt;, Span&lt;byte&gt;, int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write read file data</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteFileReadResult(Span&lt;byte&gt; to, Span&lt;byte&gt; data, int bytesRead)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>data</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Read file data</p>
+</dd>
+    <dt><code>bytesRead</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WriteGetObjectModel_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteGetObjectModel*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WriteGetObjectModel_System_Span_System_Byte__System_String_System_String_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteGetObjectModel(System.Span{System.Byte},System.String,System.String)">
+  WriteGetObjectModel(Span&lt;byte&gt;, string, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Request a part of the object model</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteGetObjectModel(Span&lt;byte&gt; to, string key, string flags)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Key to the object model part</p>
+</dd>
+    <dt><code>flags</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Object model flags</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WriteMacroCompleted_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteMacroCompleted*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WriteMacroCompleted_System_Span_System_Byte__DuetAPI_CodeChannel_System_Boolean_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteMacroCompleted(System.Span{System.Byte},DuetAPI.CodeChannel,System.Boolean)">
+  WriteMacroCompleted(Span&lt;byte&gt;, CodeChannel, bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write notification about a completed macro file</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteMacroCompleted(Span&lt;byte&gt; to, CodeChannel channel, bool error)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Channel where the macro file has finished</p>
+</dd>
+    <dt><code>error</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether an error occurred when trying to open/process the macro file</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WriteMessage_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteMessage*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WriteMessage_System_Span_System_Byte__DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_System_String_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteMessage(System.Span{System.Byte},DuetControlServer.Link.Protocol.Shared.MessageTypeFlags,System.String)">
+  WriteMessage(Span&lt;byte&gt;, MessageTypeFlags, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write a <a class="xref" href="DuetControlServer.Link.Protocol.Shared.MessageHeader.html">MessageHeader</a> to a memory span</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteMessage(Span&lt;byte&gt; to, MessageTypeFlags type, string message)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>type</code> <a class="xref" href="DuetControlServer.Link.Protocol.Shared.MessageTypeFlags.html">MessageTypeFlags</a></dt>
+    <dd><p>Message flags</p>
+</dd>
+    <dt><code>message</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Message content</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WriteOpenFileResult_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteOpenFileResult*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WriteOpenFileResult_System_Span_System_Byte__System_UInt32_System_Int64_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteOpenFileResult(System.Span{System.Byte},System.UInt32,System.Int64)">
+  WriteOpenFileResult(Span&lt;byte&gt;, uint, long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write the result of an attempt to open a file</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteOpenFileResult(Span&lt;byte&gt; to, uint handle, long fileSize)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>handle</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>File handle</p>
+</dd>
+    <dt><code>fileSize</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>File length</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WritePacketHeader_" data-uid="DuetControlServer.Link.Protocol.Writer.WritePacketHeader*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WritePacketHeader_System_Span_System_Byte__DuetControlServer_Link_Protocol_SbcRequests_Request_System_UInt16_System_Int32_" data-uid="DuetControlServer.Link.Protocol.Writer.WritePacketHeader(System.Span{System.Byte},DuetControlServer.Link.Protocol.SbcRequests.Request,System.UInt16,System.Int32)">
+  WritePacketHeader(Span&lt;byte&gt;, Request, ushort, int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write an arbitrary packet header to a memory span</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static void WritePacketHeader(Span&lt;byte&gt; to, Request request, ushort id, int length)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>request</code> <a class="xref" href="DuetControlServer.Link.Protocol.SbcRequests.Request.html">Request</a></dt>
+    <dd><p>Packet type</p>
+</dd>
+    <dt><code>id</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint16">ushort</a></dt>
+    <dd><p>Packet ID</p>
+</dd>
+    <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Length of the packet</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WritePrintFileInfo_" data-uid="DuetControlServer.Link.Protocol.Writer.WritePrintFileInfo*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WritePrintFileInfo_System_Span_System_Byte__DuetAPI_ObjectModel_GCodeFileInfo_" data-uid="DuetControlServer.Link.Protocol.Writer.WritePrintFileInfo(System.Span{System.Byte},DuetAPI.ObjectModel.GCodeFileInfo)">
+  WritePrintFileInfo(Span&lt;byte&gt;, GCodeFileInfo)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Notify the firmware that a print has started</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WritePrintFileInfo(Span&lt;byte&gt; to, GCodeFileInfo info)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>info</code> <a class="xref" href="DuetAPI.ObjectModel.GCodeFileInfo.html">GCodeFileInfo</a></dt>
+    <dd><p>Information about the file being printed</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>One of the supplied values is too big</p>
+</dd>
+  </dl>
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WritePrintStopped_" data-uid="DuetControlServer.Link.Protocol.Writer.WritePrintStopped*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WritePrintStopped_System_Span_System_Byte__DuetControlServer_Link_Protocol_Shared_PrintStoppedReason_" data-uid="DuetControlServer.Link.Protocol.Writer.WritePrintStopped(System.Span{System.Byte},DuetControlServer.Link.Protocol.Shared.PrintStoppedReason)">
+  WritePrintStopped(Span&lt;byte&gt;, PrintStoppedReason)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Notify the firmware that a print has been stopped</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WritePrintStopped(Span&lt;byte&gt; to, PrintStoppedReason reason)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>reason</code> <a class="xref" href="DuetControlServer.Link.Protocol.Shared.PrintStoppedReason.html">PrintStoppedReason</a></dt>
+    <dd><p>Reason why the print has been stopped</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WriteSetLastCodeResult_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteSetLastCodeResult*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WriteSetLastCodeResult_System_Span_System_Byte__DuetAPI_CodeChannel_DuetControlServer_Link_Protocol_Shared_CodeResult_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteSetLastCodeResult(System.Span{System.Byte},DuetAPI.CodeChannel,DuetControlServer.Link.Protocol.Shared.CodeResult)">
+  WriteSetLastCodeResult(Span&lt;byte&gt;, CodeChannel, CodeResult)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write the last result of a code executed by the SBC</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteSetLastCodeResult(Span&lt;byte&gt; to, CodeChannel channel, CodeResult result)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Code channel</p>
+</dd>
+    <dt><code>result</code> <a class="xref" href="DuetControlServer.Link.Protocol.Shared.CodeResult.html">CodeResult</a></dt>
+    <dd><p>Code result</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WriteSetObjectModel_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteSetObjectModel*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WriteSetObjectModel_System_Span_System_Byte__System_String_System_Object_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteSetObjectModel(System.Span{System.Byte},System.String,System.Object)">
+  WriteSetObjectModel(Span&lt;byte&gt;, string, object)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Request the update of an object model field to an arbitrary value via a <a class="xref" href="DuetControlServer.Link.Protocol.SbcRequests.Request.html#DuetControlServer_Link_Protocol_SbcRequests_Request_GetObjectModel">GetObjectModel</a> request</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteSetObjectModel(Span&lt;byte&gt; to, string field, object value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>field</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Path to the object model field</p>
+</dd>
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd><p>New value</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+  <h4 class="section" id="DuetControlServer_Link_Protocol_Writer_WriteSetObjectModel_System_Span_System_Byte__System_String_System_Object__remarks">Remarks</h4>
+  <div class="markdown level1 remarks"><p>value must be of type <a class="xref" href="DuetControlServer.Link.Protocol.Shared.DataType.html">DataType</a></p>
+</div>
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>Unsupported data type</p>
+</dd>
+  </dl>
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WriteSetVariable_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteSetVariable*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WriteSetVariable_System_Span_System_Byte__DuetAPI_CodeChannel_System_Boolean_System_String_System_String_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteSetVariable(System.Span{System.Byte},DuetAPI.CodeChannel,System.Boolean,System.String,System.String)">
+  WriteSetVariable(Span&lt;byte&gt;, CodeChannel, bool, string, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write a <a class="xref" href="DuetControlServer.Link.Protocol.SbcRequests.SetVariableHeader.html">SetVariableHeader</a> to a memory span</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteSetVariable(Span&lt;byte&gt; to, CodeChannel channel, bool createVariable, string varName, string expression)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Source of this request</p>
+</dd>
+    <dt><code>createVariable</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Create a new variable</p>
+</dd>
+    <dt><code>varName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Name of the variable including prefix</p>
+</dd>
+    <dt><code>expression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Content to assign to the variable</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Protocol_Writer_WriteStringRequest_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteStringRequest*"></a>
+
+  <h3 id="DuetControlServer_Link_Protocol_Writer_WriteStringRequest_System_Span_System_Byte__System_String_" data-uid="DuetControlServer.Link.Protocol.Writer.WriteStringRequest(System.Span{System.Byte},System.String)">
+  WriteStringRequest(Span&lt;byte&gt;, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/Writer.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write a <a class="xref" href="DuetControlServer.Link.Protocol.Shared.StringHeader.html">StringHeader</a> to a memory span</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int WriteStringRequest(Span&lt;byte&gt; to, string data)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Destination</p>
+</dd>
+    <dt><code>data</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>String data</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

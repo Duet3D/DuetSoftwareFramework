@@ -409,7 +409,7 @@ namespace DuetPiManagementPlugin
                         case 587:
                             try
                             {
-                                if (code.MinorNumber is null || code.MinorNumber == 0)
+                                if (code.MinorNumber <= 0)
                                 {
                                     code.TryGetString('S', out string? ssid);
                                     if (code.TryGetString('P', out string? psk))

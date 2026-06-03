@@ -427,7 +427,7 @@ public class MCodeHandler(
                         string virtualFilename = string.Empty;
                         try
                         {
-                            if ((code.MinorNumber ?? 0) <= 0)
+                            if (code.MinorNumber <= 0)
                             {
                                 // Get fileinfo
                                 virtualFilename = code.GetUnprecedentedString();
