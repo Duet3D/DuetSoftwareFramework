@@ -5,14 +5,22 @@ chmod 664 /opt/dsf/conf/http.json
 
 # Grant CAP_NET_BIND_SERVICE as a file capability (not an ambient/systemd cap) so the kernel sets AT_SECURE=1 on exec,
 # causing glibc to ignore LD_PRELOAD / LD_LIBRARY_PATH / LD_AUDIT from untrusted paths - DCS verifies AT_SECURE when
-# DWS connects over IPC to defend against code-injection masquerade
-setcap cap_net_bind_service+ep /opt/dsf/bin/DuetWebServer || true
+# DWS connects over IPC to defend against code-injection masquerade. Without this cap DWS cannot bind port 80 and DCS
+# rejects its IPC connection, so a failed setcap must not be silently ignored
+if ! setcap cap_net_bind_service+ep /opt/dsf/bin/DuetWebServer; then
+    echo "WARNING: failed to set file capabilities on DuetWebServer" >&2
+    echo "         DuetWebServer cannot bind privileged ports and DCS will reject its IPC connection" >&2
+    echo "         (check that /opt is on a filesystem supporting capabilities and not mounted nosuid)" >&2
+fi
 
 # Update systemd services
 systemctl -q --no-ask-password daemon-reload
 
-# Start DWS again if it is enabled via systemd
+# Start DWS again if it is enabled via systemd. Ignore the return code so a failed start does not
+# abort package configuration of the meta package
 if (systemctl -q is-enabled duetwebserver); then
-    systemctl -q --no-ask-password start duetwebserver
+    systemctl -q --no-ask-password start duetwebserver || true
 fi
+
+exit 0
 

@@ -35,8 +35,12 @@ fi
 
 %post
 systemctl daemon-reload >/dev/null 2>&1 || :
-# File capabilities trigger AT_SECURE=1 on exec, which DPS verifies to defend against LD_PRELOAD masquerade
-setcap cap_sys_ptrace,cap_dac_read_search,cap_sys_time+ep %{dsfoptdir}/bin/DuetControlServer >/dev/null 2>&1 || :
+# File capabilities trigger AT_SECURE=1 on exec, which DPS verifies to defend against LD_PRELOAD masquerade.
+# The IPC handshake rejects peers without AT_SECURE, so warn loudly if setcap fails
+if ! setcap cap_sys_ptrace,cap_dac_read_search+ep %{dsfoptdir}/bin/DuetControlServer >/dev/null 2>&1; then
+    echo "WARNING: failed to set file capabilities on DuetControlServer" >&2
+    echo "         DSF services will refuse IPC connections until file capabilities can be set" >&2
+fi
 
 # Ensure dsf group memberships on upgrade. systemd-sysusers "m" lines are unreliable for
 # pre-existing users on older systemd versions, so re-apply explicitly

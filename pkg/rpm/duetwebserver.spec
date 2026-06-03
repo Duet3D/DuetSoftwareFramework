@@ -34,7 +34,11 @@ fi
 
 %post
 systemctl daemon-reload >/dev/null 2>&1 || :
-setcap cap_net_bind_service+ep %{dsfoptdir}/bin/DuetWebServer >/dev/null 2>&1 || :
+# Without this cap DWS cannot bind port 80 and DCS rejects its IPC connection, so warn loudly if setcap fails
+if ! setcap cap_net_bind_service+ep %{dsfoptdir}/bin/DuetWebServer >/dev/null 2>&1; then
+    echo "WARNING: failed to set file capabilities on DuetWebServer" >&2
+    echo "         DuetWebServer cannot bind privileged ports and DCS will reject its IPC connection" >&2
+fi
 
 %preun
 if [ $1 -eq 0 ] ; then
@@ -45,7 +49,7 @@ fi
 %postun
 if [ $1 -eq 1 ] && systemctl -q is-enabled %{name}.service ; then
 # upgrade
-	systemctl start %{name}.service
+	systemctl start %{name}.service || :
 fi
 
 %files
