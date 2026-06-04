@@ -5,6 +5,7 @@ using DuetSharedLibrary;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Encodings.Web;
@@ -419,6 +420,20 @@ public sealed class Settings
 public static class ServiceCollectionExtensions
 {
     /// <summary>
+    /// Legacy settings keys (DSF 3.6 and earlier) mapped to their current equivalents.
+    /// The SPI buffer and timeout settings became transport-agnostic when USB support was added,
+    /// so this remapping keeps existing config files working after an upgrade
+    /// </summary>
+    private static readonly Dictionary<string, string> RenamedSettings = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["SpiBufferSize"] = nameof(Settings.SbcBufferSize),
+        ["SpiConnectTimeout"] = nameof(Settings.SbcConnectTimeout),
+        ["SpiTransferTimeout"] = nameof(Settings.SbcTransferTimeout),
+        ["SpiConnectionTimeout"] = nameof(Settings.SbcConnectionTimeout),
+        ["MaxSpiRetries"] = nameof(Settings.MaxSbcRetries)
+    };
+
+    /// <summary>
     /// Add settings to the service collection
     /// </summary>
     /// <param name="services">Service collection</param>
@@ -441,14 +456,30 @@ public static class ServiceCollectionExtensions
         string logLevelString = configuration.GetValue<string>("LogLevel") ?? "Information";
         LogLevel parsedLogLevel = LogLevelHelper.ParseLogLevel(logLevelString);
         
-        // Create a memory configuration source that excludes LogLevel
-        var configData = new Dictionary<string, string?>();
+        // Build a memory configuration source that excludes LogLevel (handled above) and
+        // remaps renamed keys so config files from earlier DSF versions keep working
+        var configData = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var legacyData = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         foreach (var kvp in configuration.AsEnumerable())
         {
-            if (kvp.Key != "LogLevel" && kvp.Value != null)
+            if (kvp.Value is null || kvp.Key == "LogLevel")
+            {
+                continue;
+            }
+            if (RenamedSettings.TryGetValue(kvp.Key, out string? currentKey))
+            {
+                legacyData[currentKey] = kvp.Value;
+            }
+            else
             {
                 configData[kvp.Key] = kvp.Value;
             }
+        }
+
+        // Apply legacy values only where the current key was not provided explicitly
+        foreach (var kvp in legacyData)
+        {
+            configData.TryAdd(kvp.Key, kvp.Value);
         }
         var filteredConfig = new ConfigurationBuilder()
             .AddInMemoryCollection(configData)
