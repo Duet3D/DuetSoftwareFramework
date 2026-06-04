@@ -93,10 +93,11 @@ public partial class ObjectModel : ModelObject, IStaticModelObject
     /// </summary>
     /// <remarks>
     /// This is only populated by DSF in SBC mode, however it may be populated manually as well in standalone mode.
+    /// Keys are compared case-insensitively, so two plugin identifiers differing only in case map to the same entry.
     /// Values in this dictionary cannot become null. If a value is changed to null, the corresponding item is deleted
     /// </remarks>
     [SbcProperty(false)]
-    public StaticModelDictionary<Plugin> Plugins { get; } = new StaticModelDictionary<Plugin>(true);
+    public StaticModelDictionary<Plugin> Plugins { get; } = new StaticModelDictionary<Plugin>(true, true);
 
     /// <summary>
     /// Information about the SBC which Duet Software Framework is running on.
