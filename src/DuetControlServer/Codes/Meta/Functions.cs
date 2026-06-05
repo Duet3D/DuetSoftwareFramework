@@ -222,7 +222,7 @@ public class Functions(Expressions expressions, FilePathResolver filePathResolve
             {
                 if (lastElement is not null)
                 {
-                    throw new ArgumentException($"in fileread() function: unexpected value after element at column ${tokenStart}");
+                    throw new ArgumentException($"in fileread() function: unexpected value after element at column {tokenStart}");
                 }
                 lastToken.Append(c);
             }

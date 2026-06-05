@@ -116,13 +116,7 @@ public enum AnalogSensorType
 /// </summary>
 public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
 {
-    /// <summary>
-    /// Read an <see cref="AnalogSensorType"/> from JSON
-    /// </summary>
-    /// <param name="reader">JSON reader</param>
-    /// <param name="typeToConvert">Type to convert</param>
-    /// <param name="options">Serializer options</param>
-    /// <returns>Read value</returns>
+    /// <inheritdoc />
     public override AnalogSensorType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType == JsonTokenType.String)
@@ -154,12 +148,7 @@ public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
         throw new JsonException($"Invalid type for {nameof(AnalogSensorType)}");
     }
 
-    /// <summary>
-    /// Write an <see cref="AnalogSensorType"/> to JSON
-    /// </summary>
-    /// <param name="writer">JSON writer</param>
-    /// <param name="value">Value to serialize</param>
-    /// <param name="options">Write options</param>
+    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, AnalogSensorType value, JsonSerializerOptions options)
     {
         switch (value)

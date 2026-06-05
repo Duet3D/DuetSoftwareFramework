@@ -43,11 +43,7 @@ public class UpdateService : BackgroundService
         _settings = settings.Value;
     }
 
-    /// <summary>
-    /// Stop the update service
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override Task StopAsync(CancellationToken cancellationToken) => base.StopAsync(cancellationToken);
 
     // Data for object model updates

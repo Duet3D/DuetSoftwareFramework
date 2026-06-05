@@ -18,11 +18,7 @@ namespace DuetControlServer.Codes.Pipelines;
 public sealed class Post(ChannelProcessor channelProcessor, CodeProcessor codeProcessor, IOptions<Settings> settings, IHostApplicationLifetime lifetime)
     : PipelineBase(PipelineStage.Post, channelProcessor, codeProcessor, lifetime, settings)
 {
-    /// <summary>
-    /// Process an incoming code
-    /// </summary>
-    /// <param name="code">Code to process</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task ProcessCodeAsync(Commands.Code code)
     {
         if (!code.Flags.HasFlag(CodeFlags.IsPostProcessed))

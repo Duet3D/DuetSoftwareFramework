@@ -29,9 +29,7 @@ public class DynamicModelCollection<T> : ObservableCollection<T>, IModelCollecti
     /// <param name="list">List to use for items</param>
     public DynamicModelCollection(List<T> list) : base(list) { }
 
-    /// <summary>
-    /// Removes all items from the collection
-    /// </summary>
+    /// <inheritdoc />
     protected override void ClearItems()
     {
         List<T?> removed = new(this);
@@ -39,10 +37,7 @@ public class DynamicModelCollection<T> : ObservableCollection<T>, IModelCollecti
         base.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed));
     }
 
-    /// <summary>
-    /// Raises the change event handler
-    /// </summary>
-    /// <param name="e">Event arguments</param>
+    /// <inheritdoc />
     protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
         if (e.Action != NotifyCollectionChangedAction.Reset)
@@ -52,11 +47,7 @@ public class DynamicModelCollection<T> : ObservableCollection<T>, IModelCollecti
         }
     }
 
-    /// <summary>
-    /// Assign the properties from another instance.
-    /// This is required to update model properties which do not have a setter
-    /// </summary>
-    /// <param name="from">Other instance</param>
+    /// <inheritdoc />
     public void Assign(IStaticModelObject from)
     {
         // Validate the types
@@ -107,10 +98,7 @@ public class DynamicModelCollection<T> : ObservableCollection<T>, IModelCollecti
         }
     }
 
-    /// <summary>
-    /// Create a clone of this list
-    /// </summary>
-    /// <returns>Cloned list</returns>
+    /// <inheritdoc />
     public object Clone()
     {
         DynamicModelCollection<T> clone = [];
@@ -140,13 +128,7 @@ public class DynamicModelCollection<T> : ObservableCollection<T>, IModelCollecti
         return this;
     }
 
-    /// <summary>
-    /// Update this collection from a given JSON array
-    /// </summary>
-    /// <param name="jsonElement">Element to update this intance from</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
-    /// <param name="offset">Index offset</param>
-    /// <param name="last">Whether this is the last update</param>
+    /// <inheritdoc />
     public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties, int offset = 0, bool last = true)
     {
         int arrayLength = jsonElement.GetArrayLength();
@@ -213,22 +195,10 @@ public class DynamicModelCollection<T> : ObservableCollection<T>, IModelCollecti
         }
     }
 
-    /// <summary>
-    /// Update this instance from a given JSON element
-    /// </summary>
-    /// <param name="jsonElement">Element to update this intance from</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
-    /// <returns>Updated instance</returns>
-    /// <exception cref="JsonException">Failed to deserialize data</exception>
+    /// <inheritdoc />
     void IStaticModelObject.UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties) => UpdateFromJson(jsonElement, ignoreSbcProperties, 0, true);
 
-    /// <summary>
-    /// Update this collection from a given JSON reader
-    /// </summary>
-    /// <param name="reader">JSON reader</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
-    /// <param name="offset">Index offset</param>
-    /// <param name="last">Whether this is the last update</param>
+    /// <inheritdoc />
     public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true)
     {
         if (reader.TokenType != JsonTokenType.StartArray)
@@ -292,11 +262,6 @@ public class DynamicModelCollection<T> : ObservableCollection<T>, IModelCollecti
         }
     }
 
-    /// <summary>
-    /// Update this instance from a given JSON reader
-    /// </summary>
-    /// <param name="reader">JSON reader</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
-    /// <exception cref="JsonException">Failed to deserialize data</exception>
+    /// <inheritdoc />
     public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties) => UpdateFromJsonReader(ref reader, ignoreSbcProperties, 0, true);
 }

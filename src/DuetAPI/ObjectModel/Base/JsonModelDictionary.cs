@@ -60,11 +60,7 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
         return _dictionary[key];
     }
 
-    /// <summary>
-    /// Index operator
-    /// </summary>
-    /// <param name="key">Key</param>
-    /// <returns>Value</returns>
+    /// <inheritdoc />
     [AllowNull]
     public JsonElement? this[string key]
     {
@@ -84,11 +80,7 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
         }
     }
 
-    /// <summary>
-    /// Basic index operator
-    /// </summary>
-    /// <param name="key">Key object</param>
-    /// <returns>Value if found</returns>
+    /// <inheritdoc />
     [AllowNull]
     [MaybeNull]
     public object this[object key]
@@ -97,62 +89,37 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
         set => this[(string)key] = (JsonElement?)value;
     }
 
-    /// <summary>
-    /// Get an enumerator for this instance
-    /// </summary>
-    /// <returns>Enumerator instance</returns>
+    /// <inheritdoc />
     public IEnumerator<KeyValuePair<string, JsonElement?>> GetEnumerator() => _dictionary.GetEnumerator();
 
-    /// <summary>
-    /// List of keys
-    /// </summary>
+    /// <inheritdoc />
     public ICollection<string> Keys => _dictionary.Keys;
 
-    /// <summary>
-    /// List of values
-    /// </summary>
+    /// <inheritdoc />
     public ICollection<JsonElement?> Values => _dictionary.Values;
 
-    /// <summary>
-    /// Whether the dictionary is read-only
-    /// </summary>
+    /// <inheritdoc />
     public bool IsReadOnly => false;
 
-    /// <summary>
-    /// Whether this dictionary has a fixed size
-    /// </summary>
+    /// <inheritdoc />
     public bool IsFixedSize => false;
 
-    /// <summary>
-    /// Collection of dictionary keys
-    /// </summary>
+    /// <inheritdoc />
     ICollection IDictionary.Keys => _dictionary.Keys;
 
-    /// <summary>
-    /// Collection of dictionary values
-    /// </summary>
+    /// <inheritdoc />
     ICollection IDictionary.Values => _dictionary.Values;
 
-    /// <summary>
-    /// If this is thread-safe
-    /// </summary>
+    /// <inheritdoc />
     public bool IsSynchronized => false;
 
-    /// <summary>
-    /// Synchronization root
-    /// </summary>
+    /// <inheritdoc />
     public object SyncRoot => _dictionary;
 
-    /// <summary>
-    /// Returns the number of items in this collection
-    /// </summary>
+    /// <inheritdoc />
     public int Count => _dictionary.Count;
 
-    /// <summary>
-    /// Add a new item
-    /// </summary>
-    /// <param name="key">Key to add</param>
-    /// <param name="value">Value to add</param>
+    /// <inheritdoc />
     public void Add(string key, JsonElement? value)
     {
         if (NullRemovesItems && value is null)
@@ -165,23 +132,13 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
         PropertyChanged?.Invoke(this, new(key));
     }
 
-    /// <summary>
-    /// Add a new item
-    /// </summary>
-    /// <param name="key">Key to add</param>
-    /// <param name="value">Value to add</param>
+    /// <inheritdoc />
     public void Add(object key, object? value) => Add((string)key, (JsonElement?)value);
 
-    /// <summary>
-    /// Add a new item
-    /// </summary>
-    /// <param name="item">Item to add</param>
+    /// <inheritdoc />
     public void Add(KeyValuePair<string, JsonElement?> item) => Add(item.Key, item.Value);
 
-    /// <summary>
-    /// Assign the properties from another instance
-    /// </summary>
-    /// <param name="from">Other instance</param>
+    /// <inheritdoc />
     public void Assign(IStaticModelObject from)
     {
         // Validate the types
@@ -228,9 +185,7 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
         }
     }
 
-    /// <summary>
-    /// Clear this dictionary
-    /// </summary>
+    /// <inheritdoc />
     public void Clear()
     {
         if (NullRemovesItems)
@@ -248,10 +203,7 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
         }
     }
 
-    /// <summary>
-    /// Create a clone of this instance
-    /// </summary>
-    /// <returns></returns>
+    /// <inheritdoc />
     public object Clone()
     {
         JsonModelDictionary clone = new(NullRemovesItems);
@@ -262,25 +214,13 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
         return clone;
     }
 
-    /// <summary>
-    /// Check if a key is present
-    /// </summary>
-    /// <param name="key">Key to check</param>
-    /// <returns>Whether the key is present</returns>
+    /// <inheritdoc />
     public bool ContainsKey(string key) => _dictionary.ContainsKey(key);
 
-    /// <summary>
-    /// Check if a key is present
-    /// </summary>
-    /// <param name="key">Key to check</param>
-    /// <returns>Whether the key is present</returns>
+    /// <inheritdoc />
     public bool Contains(object key) => ContainsKey((string)key);
 
-    /// <summary>
-    /// Copy this instance to another array
-    /// </summary>
-    /// <param name="array">Destination array</param>
-    /// <param name="index">Start index</param>
+    /// <inheritdoc />
     public void CopyTo(Array array, int index)
     {
         List<string> keys = new(_dictionary.Keys);
@@ -291,30 +231,16 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
         }
     }
 
-    /// <summary>
-    /// Copy this instance to another dictionary
-    /// </summary>
-    /// <param name="array">Destination array</param>
-    /// <param name="arrayIndex">Start iondex</param>
-    public void CopyTo(KeyValuePair<string, JsonElement?>[] array, int arrayIndex) => CopyTo(array, arrayIndex);
+    /// <inheritdoc />
+    public void CopyTo(KeyValuePair<string, JsonElement?>[] array, int arrayIndex) => CopyTo((Array)array, arrayIndex);
 
-    /// <summary>
-    /// Check if a key-value pair exists
-    /// </summary>
-    /// <param name="item">Item to check</param>
-    /// <returns>If the item exists in the dictionary</returns>
+    /// <inheritdoc />
     public bool Contains(KeyValuePair<string, JsonElement?> item) => _dictionary.TryGetValue(item.Key, out JsonElement? value) && Equals(value, item.Value);
 
-    /// <summary>
-    /// Get an enumerator
-    /// </summary>
-    /// <returns>Enumerator</returns>
+    /// <inheritdoc />
     IEnumerator IEnumerable.GetEnumerator() => _dictionary.GetEnumerator();
 
-    /// <summary>
-    /// Get an enumerator
-    /// </summary>
-    /// <returns>Enumerator</returns>
+    /// <inheritdoc />
     IDictionaryEnumerator IDictionary.GetEnumerator() => (IDictionaryEnumerator)GetEnumerator();
 
     /// <summary>
@@ -345,19 +271,10 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
     /// <returns>Whether the key could be found</returns>
     public void Remove(object key) => Remove((string)key);
 
-    /// <summary>
-    /// Remove a key-value pair if applicable
-    /// </summary>
-    /// <param name="item">Item to remove</param>
-    /// <returns>If the key-value pair was present</returns>
+    /// <inheritdoc />
     public bool Remove(KeyValuePair<string, JsonElement?> item) => Contains(item) && Remove(item.Key);
 
-    /// <summary>
-    /// Try to get a value
-    /// </summary>
-    /// <param name="key">Key to look up</param>
-    /// <param name="value">Retrieved value</param>
-    /// <returns>Whether the key could be found</returns>
+    /// <inheritdoc />
     public bool TryGetValue(string key, [NotNullWhen(true)] out JsonElement? value) => _dictionary.TryGetValue(key, out value);
 
     /// <summary>
@@ -390,12 +307,7 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
         }
     }
 
-    /// <summary>
-    /// Update this instance from a given JSON reader
-    /// </summary>
-    /// <param name="reader">JSON reader</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
-    /// <exception cref="JsonException">Failed to deserialize data</exception>
+    /// <inheritdoc />
     public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
     {
         if (reader.TokenType == JsonTokenType.Null)
@@ -433,35 +345,20 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
 /// </summary>
 public class JsonModelDictionaryConverter : JsonConverter<JsonModelDictionary>
 {
-    /// <summary>
-    /// Checks if the given type can be converted
-    /// </summary>
-    /// <param name="typeToConvert">Type to convert</param>
-    /// <returns>Whether the type can be converted</returns>
+    /// <inheritdoc />
     public override bool CanConvert(Type typeToConvert)
     {
         return typeToConvert == typeof(JsonModelDictionary);
     }
 
-    /// <summary>
-    /// Read from JSON
-    /// </summary>
-    /// <param name="reader">JSON reader</param>
-    /// <param name="typeToConvert">Type to convert</param>
-    /// <param name="options">Read options</param>
-    /// <returns>Read value</returns>
+    /// <inheritdoc />
     public override JsonModelDictionary Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         // We don't have the information about the nullRemovesItems flag here
         throw new NotSupportedException();
     }
 
-    /// <summary>
-    /// Write a CodeParameter to JSON
-    /// </summary>
-    /// <param name="writer">JSON writer</param>
-    /// <param name="value">Value to serialize</param>
-    /// <param name="options">Write options</param>
+    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, JsonModelDictionary value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();

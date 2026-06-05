@@ -79,11 +79,7 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterfac
         }
     }
 
-    /// <summary>
-    /// Start the periodic update service
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
         // Load plugin manifests

@@ -153,11 +153,7 @@ public sealed class LinkService(
         logger.LogInformation("Firmware update successful");
     }
 
-    /// <summary>
-    /// Start this service asynchronously
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override Task StartAsync(CancellationToken cancellationToken)
     {
         // Initialize the link interface
@@ -230,11 +226,7 @@ public sealed class LinkService(
         return tcs.Task;
     }
 
-    /// <summary>
-    /// Shut down this service
-    /// </summary>
-    /// <param name="stoppingToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task StopAsync(CancellationToken stoppingToken)
     {
         // Cancel the file being printed

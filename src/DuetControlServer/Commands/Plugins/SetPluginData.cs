@@ -15,9 +15,7 @@ namespace DuetControlServer.Commands;
 /// <param name="settings">Settings</param>
 public sealed class SetPluginData(Model.ObjectModel model, IOptions<Settings> settings) : DuetAPI.Commands.SetPluginData, IConnectionCommand
 {
-    /// <summary>
-    /// Source connection of this command
-    /// </summary>
+    /// <inheritdoc />
     public Connection? Connection { get; set; }
 
     /// <summary>

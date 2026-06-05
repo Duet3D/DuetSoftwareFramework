@@ -772,23 +772,13 @@ public class CodeParameter
     /// <returns>True if both objects are not equal</returns>
     public static bool operator !=(CodeParameter? a, object? b) => !(a == b);
 
-    /// <summary>
-    /// Checks if the other obj equals this instance
-    /// </summary>
-    /// <param name="obj">Other object</param>
-    /// <returns>True if both objects are not equal</returns>
+    /// <inheritdoc />
     public override bool Equals(object? obj) => this == obj;
 
-    /// <summary>
-    /// Returns the hash code of this instance
-    /// </summary>
-    /// <returns>Computed hash code</returns>
+    /// <inheritdoc />
     public override int GetHashCode() => Letter.GetHashCode() ^ (ParsedValue?.GetHashCode() ?? 0);
 
-    /// <summary>
-    /// Converts this parameter to a string
-    /// </summary>
-    /// <returns>String representation</returns>
+    /// <inheritdoc />
     public override string ToString() => Letter + StringValue;
 }
 
@@ -797,13 +787,7 @@ public class CodeParameter
 /// </summary>
 public sealed class CodeParameterConverter : JsonConverter<CodeParameter>
 {
-    /// <summary>
-    /// Read a CodeParameter object from JSON
-    /// </summary>
-    /// <param name="reader">JSON reader</param>
-    /// <param name="typeToConvert">Type to convert</param>
-    /// <param name="options">Serializer options</param>
-    /// <returns>Read value</returns>
+    /// <inheritdoc />
     public override CodeParameter Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType == JsonTokenType.StartObject)
@@ -866,12 +850,7 @@ public sealed class CodeParameterConverter : JsonConverter<CodeParameter>
         throw new JsonException("Invalid code parameter");
     }
 
-    /// <summary>
-    /// Write a CodeParameter to JSON
-    /// </summary>
-    /// <param name="writer">JSON writer</param>
-    /// <param name="value">Value to serialize</param>
-    /// <param name="options">Write options</param>
+    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, CodeParameter value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();

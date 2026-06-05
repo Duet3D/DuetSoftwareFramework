@@ -49,7 +49,11 @@ public partial class Code
 
         public void ClearValue() => _value.Clear();
 
+#if NET5_0_OR_GREATER
         public string GetValue() => Encoding.UTF8.GetString(CollectionsMarshal.AsSpan(_value));
+#else
+        public string GetValue() => Encoding.UTF8.GetString(_value.ToArray());
+#endif
 
         public void SetValue(string value)
         {
@@ -89,7 +93,11 @@ public partial class Code
             HadComment = true;
         }
 
+#if NET5_0_OR_GREATER
         public string? GetComment() => HadComment ? Encoding.UTF8.GetString(CollectionsMarshal.AsSpan(_comment)) : null;
+#else
+        public string? GetComment() => HadComment ? Encoding.UTF8.GetString(_comment.ToArray()) : null;
+#endif
     }
 
     /// <summary>
@@ -501,7 +509,7 @@ public partial class Code
                     else if (value.Contains('.'))
                     {
                         int dotIndex = value.IndexOf('.');
-                        string majorValue = value[..dotIndex];
+                        string majorValue = value.Substring(0, dotIndex);
                         if (int.TryParse(majorValue, out int majorNumber))
                         {
                             result.MajorNumber = majorNumber;
@@ -518,7 +526,7 @@ public partial class Code
                         }
                         else
                         {
-                            throw new CodeParserException($"Failed to parse minor {char.ToUpperInvariant((char)result.Type)}-code number ({value[(dotIndex + 1)..]})", result);
+                            throw new CodeParserException($"Failed to parse minor {char.ToUpperInvariant((char)result.Type)}-code number ({value.Substring(dotIndex + 1)})", result);
                         }
                     }
                     else if (int.TryParse(value, out int majorNumber))
@@ -630,7 +638,7 @@ public partial class Code
 
                     if (!result.HasParameter(state.Letter))
                     {
-                        if (state.WasExpression && (!value.StartsWith('{') || !value.EndsWith('}')))
+                        if (state.WasExpression && (!value.StartsWith("{", StringComparison.Ordinal) || !value.EndsWith("}", StringComparison.Ordinal)))
                         {
                             value = '{' + value.Trim() + '}';
                         }

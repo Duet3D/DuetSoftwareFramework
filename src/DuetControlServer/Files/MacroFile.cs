@@ -494,9 +494,7 @@ public sealed class MacroFile : CodeFile, IDisposable
     /// </summary>
     private bool _disposed;
 
-    /// <summary>
-    /// Dispose this instance
-    /// </summary>
+    /// <inheritdoc />
     public override void Dispose()
     {
         // Don't dispose this instance twice...

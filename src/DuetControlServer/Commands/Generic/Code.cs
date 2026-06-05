@@ -109,9 +109,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _settings = settings.Value;
     }
 
-    /// <summary>
-    /// Source connection of this command
-    /// </summary>
+    /// <inheritdoc />
     public Connection? Connection
     {
         get => _connection;

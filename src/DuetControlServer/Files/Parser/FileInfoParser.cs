@@ -483,7 +483,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
             {
                 string key = comment[..index].Trim(), value = comment[(index + 1)..].Trim();
                 logger.LogDebug("Evaluating user-defined key '{Key}' with value '{Value}'", key, value);
-                userDefinedKeys.Add(key, expressions.EvaluateExpressionRaw(code, value, false));
+                userDefinedKeys.Add(key, expressions.EvaluateExpressionToValueAsync(code, value, false));
                 return true;
             }
         }

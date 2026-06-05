@@ -20,13 +20,7 @@ namespace DuetAPI.Utility;
 /// </remarks>
 public class JsonRegexListConverter : JsonConverter<List<Regex>>
 {
-    /// <summary>
-    /// Read a Regex list from JSON
-    /// </summary>
-    /// <param name="reader">JSON reader</param>
-    /// <param name="typeToConvert">Type to convert</param>
-    /// <param name="options">Reader options</param>
-    /// <returns>Read value</returns>
+    /// <inheritdoc />
     public override List<Regex> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions? options)
     {
         if (reader.TokenType == JsonTokenType.StartArray)
@@ -81,12 +75,7 @@ public class JsonRegexListConverter : JsonConverter<List<Regex>>
         throw new JsonException("Invalid regular expression");
     }
 
-    /// <summary>
-    /// Write a Regex list to JSON
-    /// </summary>
-    /// <param name="writer">JSON writer</param>
-    /// <param name="value">Value to serialize</param>
-    /// <param name="options">Write options</param>
+    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, List<Regex> value, JsonSerializerOptions? options)
     {
         writer.WriteStartArray();

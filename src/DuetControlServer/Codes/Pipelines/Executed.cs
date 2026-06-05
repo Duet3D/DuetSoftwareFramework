@@ -71,11 +71,7 @@ public sealed class Executed : PipelineBase
         _stackItem = _stack.Peek();
     }
 
-    /// <summary>
-    /// Process an incoming code
-    /// </summary>
-    /// <param name="code">Code to process</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task ProcessCodeAsync(Commands.Code code)
     {
         if (code.Result is not null)
@@ -233,33 +229,15 @@ public sealed class Executed : PipelineBase
         }
     }
 
-    /// <summary>
-    /// Wait for the pipeline stage to become idle
-    /// </summary>
-    /// <param name="file">Code file</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Whether the codes have been flushed successfully</returns>
+    /// <inheritdoc />
     public override Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default) => _stackItem.FlushAsync(cancellationToken);
 
-    /// <summary>
-    /// Wait for the pipeline stage to become idle
-    /// </summary>
-    /// <param name="code">Code waiting for the flush</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Whether the codes have been flushed successfully</returns>
+    /// <inheritdoc />
     public override Task<bool> FlushAsync(Commands.Code code, CancellationToken cancellationToken = default) => _stackItem.FlushAsync(cancellationToken);
 
-    /// <summary>
-    /// Execute a given code on this pipeline stage
-    /// </summary>
-    /// <param name="code">Code to enqueue</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override void WriteCode(Commands.Code code) => _stackItem.WriteCode(code);
 
-    /// <summary>
-    /// Execute a given code on this pipeline stage
-    /// </summary>
-    /// <param name="code">Code to enqueue</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override ValueTask WriteCodeAsync(Commands.Code code) => _stackItem.WriteCodeAsync(code);
 }

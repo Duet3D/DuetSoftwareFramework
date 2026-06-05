@@ -25,41 +25,24 @@ public sealed class Firmware(
     IHostApplicationLifetime lifetime,
     IOptions<Settings> settings) : PipelineBase(PipelineStage.Firmware, channelProcessor, codeProcessor, lifetime, settings)
 {
-    /// <summary>
-    /// Wait for the pipeline stage to become idle
-    /// </summary>
-    /// <param name="flushAll">Flush everything</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Whether the codes have been flushed successfully</returns>
+    /// <inheritdoc />
     public override Task<bool> FlushAsync(bool flushAll, CancellationToken cancellationToken = default)
     {
         return linkInterface.FlushAsync(ChannelProcessor.Channel, flushAll, cancellationToken);
     }
 
-    /// <summary>
-    /// Wait for the pipeline stage to become idle
-    /// </summary>
-    /// <returns>Whether the codes have been flushed successfully</returns>
+    /// <inheritdoc />
     public override Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
     {
         return linkInterface.FlushAsync(file, cancellationToken);
     }
 
-    /// <summary>
-    /// Wait for the pipeline stage to become idle
-    /// </summary>
-    /// <param name="code">Code waiting for the flush</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Whether the codes have been flushed successfully</returns>
+    /// <inheritdoc />
     public override Task<bool> FlushAsync(Code code, CancellationToken cancellationToken = default)
     {
         return linkInterface.FlushAsync(code, cancellationToken);
     }
 
-    /// <summary>
-    /// Process an incoming code
-    /// </summary>
-    /// <param name="code">Code to process</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override Task ProcessCodeAsync(Code code) => Task.CompletedTask;
 }

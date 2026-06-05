@@ -34,7 +34,7 @@ public sealed class EvaluateExpression(CodeFactory codeFactory, Model.ObjectMode
         Code dummyCode = codeFactory.Create();
         dummyCode.Channel = Channel;
 
-        object? result = await expressions.EvaluateExpressionRaw(dummyCode, Expression, false, cancellationToken);
+        object? result = await expressions.EvaluateExpressionToValueAsync(dummyCode, Expression, false, cancellationToken);
         return JsonSerializer.SerializeToElement(result);
     }
 }

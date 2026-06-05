@@ -193,9 +193,9 @@ public sealed class CodeStream : IProcessor, IDisposable
                                                 }
                                             }
                                         }
-                                        catch (CodeParserException cpe)
+                                        catch (Exception e) when (e is CodeParserException or ArgumentException)
                                         {
-                                            await _streamWriter.WriteLineAsync("Error: " + cpe.Message);
+                                            await _streamWriter.WriteLineAsync("Error: " + e.Message);
                                             using (await _model.AccessReadOnlyAsync())
                                             {
                                                 // Repetier or other host servers expect an "ok" after error messages

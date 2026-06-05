@@ -100,9 +100,7 @@ internal partial class PollConnector : BaseConnector
     /// </summary>
     private readonly Dictionary<TaskCompletionSource<string>, int> _runningCodes = [];
 
-    /// <summary>
-    /// Reconnect to the board when the connection has been reset
-    /// </summary>
+    /// <inheritdoc />
     protected override async Task ReconnectAsync(CancellationToken cancellationToken = default)
     {
         lock (_seqs)
@@ -149,12 +147,7 @@ internal partial class PollConnector : BaseConnector
         }
     }
 
-    /// <summary>
-    /// Send a generic a HTTP request
-    /// </summary>
-    /// <param name="request">HTTP request to send</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>HTTP response</returns>
+    /// <inheritdoc />
     protected override async ValueTask<HttpResponseMessage> SendRequestAsync(HttpRequestMessage request, TimeSpan timeout, CancellationToken cancellationToken = default)
     {
         if (_sessionKey != null)
@@ -221,11 +214,7 @@ internal partial class PollConnector : BaseConnector
     /// </summary>
     private readonly List<TaskCompletionSource<object?>> _modelUpdateTcs = [];
 
-    /// <summary>
-    /// Wait for the object model to be up-to-date
-    /// </summary>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override Task WaitForModelUpdateAsync(CancellationToken cancellationToken = default)
     {
         if (disposed)
@@ -656,24 +645,13 @@ internal partial class PollConnector : BaseConnector
         HttpClient.Dispose();
     }
 
-    /// <summary>
-    /// Send a G/M/T-code and return the G-code reply
-    /// </summary>
-    /// <param name="code">Code to send</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Code reply</returns>
+    /// <inheritdoc />
     public override async Task<string> SendCodeAsync(string code, CancellationToken cancellationToken = default)
     {
         return await SendCodeAsync(code, false, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Send a G/M/T-code and return the G-code reply
-    /// </summary>
-    /// <param name="code">Code to send</param>
-    /// <param name="executeAsynchronously">Don't wait for the code to finish</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Code reply</returns>
+    /// <inheritdoc />
     public override async Task<string> SendCodeAsync(string code, bool executeAsynchronously, CancellationToken cancellationToken = default)
     {
         // Check if we can expect a code reply at all
@@ -868,14 +846,7 @@ internal partial class PollConnector : BaseConnector
         throw new HttpRequestException(errorMessage);
     }
 
-    /// <summary>
-    /// Upload arbitrary content to a file
-    /// </summary>
-    /// <param name="filename">Target filename</param>
-    /// <param name="content">File content</param>
-    /// <param name="lastModified">Last modified datetime. Ignored in SBC mode</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task UploadAsync(string filename, Stream content, DateTime? lastModified = null, CancellationToken cancellationToken = default)
     {
         // Compute the CRC32 checksum
@@ -908,12 +879,7 @@ internal partial class PollConnector : BaseConnector
         }
     }
 
-    /// <summary>
-    /// Delete a file or directory
-    /// </summary>
-    /// <param name="filename">Target filename</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task DeleteAsync(string filename, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
@@ -963,14 +929,7 @@ internal partial class PollConnector : BaseConnector
         throw new HttpRequestException(errorMessage);
     }
 
-    /// <summary>
-    /// Move a file or directory
-    /// </summary>
-    /// <param name="from">Source file</param>
-    /// <param name="to">Destination file</param>
-    /// <param name="force">Overwrite file if it already exists</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task MoveAsync(string from, string to, bool force = false, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
@@ -1020,12 +979,7 @@ internal partial class PollConnector : BaseConnector
         throw new HttpRequestException(errorMessage);
     }
 
-    /// <summary>
-    /// Make a new directory
-    /// </summary>
-    /// <param name="directory">Target directory</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task MakeDirectoryAsync(string directory, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
@@ -1090,12 +1044,7 @@ internal partial class PollConnector : BaseConnector
         return response;
     }
 
-    /// <summary>
-    /// Enumerate all files and directories in the given directory
-    /// </summary>
-    /// <param name="directory">Directory to query</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>List of all files and directories</returns>
+    /// <inheritdoc />
     public override async Task<IList<FileListItem>> GetFileListAsync(string directory, CancellationToken cancellationToken = default)
     {
         List<FileListItem> result = [];
@@ -1169,13 +1118,7 @@ internal partial class PollConnector : BaseConnector
         return result;
     }
 
-    /// <summary>
-    /// Get G-code file info
-    /// </summary>
-    /// <param name="filename">File to query</param>
-    /// <param name="readThumbnailContent">Whether thumbnail contents shall be parsed</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>G-code file info</returns>
+    /// <inheritdoc />
     public override async Task<GCodeFileInfo> GetFileInfoAsync(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
