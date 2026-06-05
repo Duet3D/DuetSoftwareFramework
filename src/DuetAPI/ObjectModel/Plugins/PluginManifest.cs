@@ -13,7 +13,9 @@ public partial class PluginManifest : ModelObject, IStaticModelObject
     /// Identifier of this plugin. May consist of letters and digits only (max length 32 chars)
     /// </summary>
     /// <remarks>
-    /// For plugins with DWC components, this is the Webpack chunk name too
+    /// Compared case-insensitively, so two ids differing only in case refer to the same plugin and
+    /// cannot be installed alongside each other. For plugins with DWC components, this is the Webpack
+    /// chunk name too
     /// </remarks>
     public string Id
     {
