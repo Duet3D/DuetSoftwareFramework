@@ -476,7 +476,7 @@ public class MCodeHandler(
             case 37:
                 if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
                 {
-                    if (code.Channel != CodeChannel.File2)
+                    if (code.Channel != CodeChannel.File2 && code.HasParameter('P'))
                     {
                         string fileName = code.GetString('P');
                         string physicalFile = await filePathResolver.ToPhysicalAsync(fileName, FileDirectory.GCodes, cancellationToken);
@@ -493,6 +493,8 @@ public class MCodeHandler(
                             }
 
                             await jobProcessor.SelectFileAsync(fileName, physicalFile, true, cancellationToken);
+                            // F0 suppresses writing the simulated time back to the file; absent or F1 updates it, as in standalone mode
+                            jobProcessor.UpdateSimulatedTime = code.GetInt('F', 1) == 1;
                             // Simulation is started when M37 has been processed by the firmware
                         }
                     }
