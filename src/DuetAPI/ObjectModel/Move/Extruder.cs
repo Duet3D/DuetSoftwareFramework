@@ -146,7 +146,7 @@ public partial class Extruder : ModelObject, IStaticModelObject
     /// <summary>
     /// Pressure advance
     /// </summary>
-    [Obsolete("use PressAdv instead")]
+    [Obsolete("use PressAdv.K0 instead")]
     public float PressureAdvance
     {
         get => _pressureAdvance;

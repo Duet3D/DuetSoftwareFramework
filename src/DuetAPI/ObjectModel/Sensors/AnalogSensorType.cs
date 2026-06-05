@@ -38,7 +38,7 @@ public enum AnalogSensorType
     /// <summary>
     /// Linear analog sensor
     /// </summary>
-    LinearAnalaog,
+    LinearAnalog,
 
     /// <summary>
     /// DHT11 sensor
@@ -128,7 +128,7 @@ public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
                 "rtdmax31865" => AnalogSensorType.MAX31865,
                 "thermocouplemax31855" => AnalogSensorType.MAX31855,
                 "thermocouplemax31856" => AnalogSensorType.MAX31856,
-                "linearanalog" => AnalogSensorType.LinearAnalaog,
+                "linearanalog" => AnalogSensorType.LinearAnalog,
                 "dht11" => AnalogSensorType.DHT11,
                 "dht21" => AnalogSensorType.DHT21,
                 "dht22" => AnalogSensorType.DHT22,
@@ -168,7 +168,7 @@ public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
             case AnalogSensorType.MAX31856:
                 writer.WriteStringValue("thermocouplemax31856");
                 break;
-            case AnalogSensorType.LinearAnalaog:
+            case AnalogSensorType.LinearAnalog:
                 writer.WriteStringValue("linearanalog");
                 break;
             case AnalogSensorType.DHT11:
