@@ -36,14 +36,14 @@ public partial class LaserFilamentMonitorCalibrated : ModelObject, IStaticModelO
 	private float _percentMin;
 
 	/// <summary>
-	/// Calibrated sensivity
+	/// Calibrated sensitivity
 	/// </summary>
-	public float Sensivity
+	public float Sensitivity
 	{
-		get => _sensivity;
-		set => SetPropertyValue(ref _sensivity, value);
+		get => _sensitivity;
+		set => SetPropertyValue(ref _sensitivity, value);
 	}
-	private float _sensivity;
+	private float _sensitivity;
 
 	/// <summary>
 	/// Total extruded distance (in mm)
