@@ -20,6 +20,11 @@ public enum NetworkState
 	Enabled,
 
 	/// <summary>
+	/// Tried to start the network but initialisation failed
+	/// </summary>
+	InitFailed,
+
+	/// <summary>
 	/// Starting up (used by WiFi networking in standalone mode)
 	/// </summary>
 	Starting1,

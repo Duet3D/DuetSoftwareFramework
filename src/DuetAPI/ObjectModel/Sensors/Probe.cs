@@ -9,26 +9,6 @@ namespace DuetAPI.ObjectModel;
 public partial class Probe : ModelObject, IStaticModelObject
 {
     /// <summary>
-    /// Linear coefficient for scanning probes
-    /// </summary>
-    public float? CalibA
-    {
-        get => _calibA;
-        set => SetPropertyValue(ref _calibA, value);
-    }
-    private float? _calibA;
-
-    /// <summary>
-    /// Quadratic coefficient for scanning probes
-    /// </summary>
-    public float? CalibB
-    {
-        get => _calibB;
-        set => SetPropertyValue(ref _calibB, value);
-    }
-    private float? _calibB;
-
-    /// <summary>
     /// Calibration temperature (in C)
     /// </summary>
     public float CalibrationTemperature

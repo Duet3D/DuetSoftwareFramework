@@ -100,6 +100,26 @@ public enum TemperatureError
     BadVssa,
 
     /// <summary>
+    /// Sensor reading too low
+    /// </summary>
+    ReadingTooLow,
+
+    /// <summary>
+    /// Sensor reading too high
+    /// </summary>
+    ReadingTooHigh,
+
+    /// <summary>
+    /// Ambient reading too low (for composite sensors that read ambient temperature to calculate object temperature)
+    /// </summary>
+    AmbientReadingTooLow,
+
+    /// <summary>
+    /// Ambient reading too high (for composite sensors that read ambient temperature to calculate object temperature)
+    /// </summary>
+    AmbientReadingTooHigh,
+
+    /// <summary>
     /// Unknown error
     /// </summary>
     UnknownError

@@ -6,16 +6,6 @@
 public partial class LaserFilamentMonitorCalibrated : ModelObject, IStaticModelObject
 {
 	/// <summary>
-	/// Calibration factor of this sensor
-	/// </summary>
-	public float CalibrationFactor
-	{
-		get => _calibrationFactor;
-		set => SetPropertyValue(ref _calibrationFactor, value);
-	}
-	private float _calibrationFactor;
-
-	/// <summary>
 	/// Maximum percentage (0..1 or greater)
 	/// </summary>
 	public float PercentMax
@@ -70,6 +60,16 @@ public partial class LaserFilamentMonitorConfigured : ModelObject, IStaticModelO
 		set => SetPropertyValue(ref _allMoves, value);
 	}
 	private bool _allMoves;
+
+	/// <summary>
+	/// Calibration factor of this sensor
+	/// </summary>
+	public float CalibrationFactor
+	{
+		get => _calibrationFactor;
+		set => SetPropertyValue(ref _calibrationFactor, value);
+	}
+	private float _calibrationFactor;
 
 	/// <summary>
 	/// Maximum percentage (0..1 or greater)
