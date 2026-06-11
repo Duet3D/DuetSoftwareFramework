@@ -6,14 +6,14 @@ namespace DuetAPI.ObjectModel;
 public partial class DriverConfig : ModelObject, IStaticModelObject
 {
     /// <summary>
-    /// Configured direction of the driver (0 = reverse, 1 = forward)
+    /// Configured direction of the driver (false = reverse, true = forward)
     /// </summary>
-    public int Direction
+    public bool Direction
     {
         get => _direction;
         set => SetPropertyValue(ref _direction, value);
     }
-    private int _direction;
+    private bool _direction = true;
 
     /// <summary>
     /// Configured driver mode (only available for smart drivers)

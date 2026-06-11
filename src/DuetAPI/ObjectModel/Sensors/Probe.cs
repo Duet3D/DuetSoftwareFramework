@@ -50,8 +50,8 @@ public partial class Probe : ModelObject, IStaticModelObject
     private float _diveHeight;
 
     /// <summary>
-    /// Dive heights of the probe.
-    /// The first element is the regular dive height, the second element may be used by scanning Z-probes
+    /// Dive heights of the probe (in mm).
+    /// The first element is the dive height for the first tap; the second element is used for subsequent taps when multi-tapping
     /// </summary>
     public ObservableCollection<float> DiveHeights { get; } = [0F, 0F];
 
