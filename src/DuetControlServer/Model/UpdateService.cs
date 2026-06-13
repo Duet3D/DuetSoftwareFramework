@@ -23,6 +23,7 @@ public class UpdateService : BackgroundService
     private readonly FirmwareUpdater _firmwareUpdater;
     private readonly LinkInterface _linkInterface;
     private readonly ObjectModel _model;
+    private readonly IHostApplicationLifetime _lifetime;
     private readonly ILogger<UpdateService> _logger;
     private readonly Settings _settings;
 
@@ -32,13 +33,15 @@ public class UpdateService : BackgroundService
     /// <param name="firmwareUpdater">Firmware updater</param>
     /// <param name="linkInterface">Link interface</param>
     /// <param name="model">Object model</param>
+    /// <param name="lifetime">Application lifetime</param>
     /// <param name="logger">Logger</param>
     /// <param name="settings">Settings</param>
-    public UpdateService(FirmwareUpdater firmwareUpdater, LinkInterface linkInterface, ObjectModel model, ILogger<UpdateService> logger, IOptions<Settings> settings)
+    public UpdateService(FirmwareUpdater firmwareUpdater, LinkInterface linkInterface, ObjectModel model, IHostApplicationLifetime lifetime, ILogger<UpdateService> logger, IOptions<Settings> settings)
     {
         _firmwareUpdater = firmwareUpdater;
         _linkInterface = linkInterface;
         _model = model;
+        _lifetime = lifetime;
         _logger = logger;
         _settings = settings.Value;
     }
@@ -297,7 +300,23 @@ public class UpdateService : BackgroundService
                 if (_settings.UpdateOnly && !_updatingFirmware)
                 {
                     _updatingFirmware = true;
-                    _ = Task.Run(async () => await _firmwareUpdater.UpdateFirmwareAsync(stoppingToken), stoppingToken);
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _firmwareUpdater.UpdateFirmwareAsync(stoppingToken);
+                        }
+                        catch (Exception e)
+                        {
+                            // In update-only mode the process must terminate even if the update fails,
+                            // else dcs -u hangs forever without a diagnostic
+                            if (e is not OperationCanceledException)
+                            {
+                                _logger.LogError(e, "Failed to update firmware");
+                            }
+                            _lifetime.StopApplication();
+                        }
+                    }, stoppingToken);
                 }
 
                 // Wait a moment
@@ -397,7 +416,7 @@ public class UpdateService : BackgroundService
             // Compute layer usage stats first
             int numChangedLayers = (_model.Job.Layer.Value > _lastLayer) ? Math.Abs(_model.Job.Layer.Value - _lastLayer) : 1;
             int printDuration = _model.Job.Duration.Value - (_model.Job.WarmUpDuration is not null ? _model.Job.WarmUpDuration.Value : 0);
-            float avgLayerDuration = (printDuration - _lastDuration) / numChangedLayers;
+            float avgLayerDuration = (float)(printDuration - _lastDuration) / numChangedLayers;
             long bytesPrinted = (_model.Job.FilePosition is not null) ? (_model.Job.FilePosition.Value - _lastFilePosition) : 0L;
             float avgFractionPrinted = (_model.Job.File.Size > 0) ? (float)bytesPrinted / (_model.Job.File.Size * numChangedLayers) : 0F;
             #region deprecated, to be removed in v3.8

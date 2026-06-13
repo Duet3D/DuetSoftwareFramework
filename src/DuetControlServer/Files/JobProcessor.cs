@@ -498,7 +498,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                         await _resume.WaitAsync(_lifetime.ApplicationStopping);
 
                         // Reassign the file being printed unless the print is aborted
-                        if (!IsAborted || !IsCancelled)
+                        if (!IsAborted && !IsCancelled)
                         {
                             IsProcessing = true;
                             _codeProcessor.SetJobFile(file.Channel, file);

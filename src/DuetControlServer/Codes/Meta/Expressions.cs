@@ -152,6 +152,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
                 }
                 parsedExpression.Append(c);
             }
+            lastC = c;
         }
 
         if (parsedExpression.Length > 0)
@@ -822,6 +823,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
                             // Not an atomic string...
                             return null;
                         }
+                        lastC = c;
                     }
 
                     if (inQuotes)

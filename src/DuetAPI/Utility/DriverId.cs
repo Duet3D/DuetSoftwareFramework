@@ -81,6 +81,10 @@ public sealed class DriverId : ICloneable
                 throw new ArgumentException($"Failed to parse driver number");
             }
         }
+        else
+        {
+            throw new ArgumentException($"Invalid driver value {value}");
+        }
     }
 
     /// <summary>

@@ -29,7 +29,7 @@ public class EvaluateExpressionRequest(CodeChannel channel, string expression)
     /// <summary>
     /// Internal TCS for the task
     /// </summary>
-    private readonly TaskCompletionSource<object?> _tcs = new();
+    private readonly TaskCompletionSource<object?> _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     /// <summary>
     /// Task that completes when the request has been fulfilled

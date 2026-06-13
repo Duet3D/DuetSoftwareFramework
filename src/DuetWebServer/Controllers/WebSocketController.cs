@@ -241,6 +241,7 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
 
         // Register this client and keep it up-to-date
         using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(applicationLifetime.ApplicationStopping);
+        Task? rxTask = null, txTask = null;
         try
         {
             // Fetch full model copy and send it over initially
@@ -249,10 +250,12 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
                 await webSocket.SendAsync(json.ToArray(), WebSocketMessageType.Text, true, default);
             }
 
-            // Deal with this connection in full-duplex mode
+            // Deal with this connection in full-duplex mode. All sends must be serialized via a shared
+            // lock because WebSocket forbids concurrent SendAsync calls (e.g. PONG vs model patch)
             AsyncAutoResetEvent dataAcknowledged = new();
-            Task rxTask = ReadFromClient(webSocket, dataAcknowledged, cts.Token);
-            Task txTask = WriteToClient(webSocket, subscribeConnection, dataAcknowledged, cts.Token);
+            AsyncLock sendLock = new();
+            rxTask = ReadFromClient(webSocket, dataAcknowledged, sendLock, cts.Token);
+            txTask = WriteToClient(webSocket, subscribeConnection, dataAcknowledged, sendLock, cts.Token);
 
             // Deal with the tasks' lifecycles
             Task terminatedTask = await Task.WhenAny(rxTask, txTask);
@@ -285,6 +288,17 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
         finally
         {
             cts.Cancel();
+
+            // Wait for both tasks to finish before the socket is disposed
+            try
+            {
+                await Task.WhenAll(rxTask ?? Task.CompletedTask, txTask ?? Task.CompletedTask);
+            }
+            catch
+            {
+                // ignored, the connection is being torn down anyway
+            }
+
             LogInformation($"WebSocket disconnected from {ipAddress}:{port}");
         }
     }
@@ -296,7 +310,7 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
     /// <param name="dataAcknowledged">Event to trigger when the client has acknowledged data</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    private async Task ReadFromClient(WebSocket webSocket, AsyncAutoResetEvent dataAcknowledged, CancellationToken cancellationToken)
+    private async Task ReadFromClient(WebSocket webSocket, AsyncAutoResetEvent dataAcknowledged, AsyncLock sendLock, CancellationToken cancellationToken)
     {
         byte[] receiveBuffer = new byte[128];
         do
@@ -331,7 +345,10 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
                 else if (line == "PING")
                 {
                     // Client hasn't received an update in a while, send back a PONG response
-                    await webSocket.SendAsync(PONG, WebSocketMessageType.Text, true, cancellationToken);
+                    using (await sendLock.LockAsync(cancellationToken))
+                    {
+                        await webSocket.SendAsync(PONG, WebSocketMessageType.Text, true, cancellationToken);
+                    }
                 }
                 else if (!string.IsNullOrWhiteSpace(line))
                 {
@@ -352,7 +369,7 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
     /// <param name="dataAcknowledged">Event that is triggered when the client has acknowledged data</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    private static async Task WriteToClient(WebSocket webSocket, SubscribeConnection subscribeConnection, AsyncAutoResetEvent dataAcknowledged, CancellationToken cancellationToken)
+    private static async Task WriteToClient(WebSocket webSocket, SubscribeConnection subscribeConnection, AsyncAutoResetEvent dataAcknowledged, AsyncLock sendLock, CancellationToken cancellationToken)
     {
         do
         {
@@ -365,7 +382,10 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
 
             // Wait for another object model update and send it to the client
             await using MemoryStream objectModelPatch = await subscribeConnection.GetSerializedObjectModelAsync(cancellationToken);
-            await webSocket.SendAsync(objectModelPatch.ToArray(), WebSocketMessageType.Text, true, cancellationToken);
+            using (await sendLock.LockAsync(cancellationToken))
+            {
+                await webSocket.SendAsync(objectModelPatch.ToArray(), WebSocketMessageType.Text, true, cancellationToken);
+            }
         }
         while (webSocket.State == WebSocketState.Open);
     }

@@ -193,6 +193,13 @@ public sealed class InstallPlugin(CommandFactory commandFactory, Model.ObjectMod
         plugin.Pid = -1;
         plugin.Started = false;
 
+        // Make sure the required fields are present. The property setters only validate the content,
+        // a missing manifest key leaves the default value behind
+        if (string.IsNullOrEmpty(plugin.Id) || string.IsNullOrEmpty(plugin.Name))
+        {
+            throw new ArgumentException("Plugin manifest must provide an id and a name");
+        }
+
         // Check for reserved permissions
         if (plugin.SbcPermissions.HasFlag(SbcPermissions.ServicePlugins))
         {

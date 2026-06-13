@@ -323,10 +323,17 @@ public sealed class CodeStream : IProcessor, IDisposable
             .AsTask()
             .ContinueWith(async task =>
             {
-                using (await task)
+                try
                 {
-                    await _streamWriter!.WriteAsync(message.ToString());
-                    await _streamWriter!.FlushAsync();
+                    using (await task)
+                    {
+                        await _streamWriter!.WriteAsync(message.ToString());
+                        await _streamWriter!.FlushAsync();
+                    }
+                }
+                catch (Exception e) when (e is SocketException or IOException or ObjectDisposedException)
+                {
+                    // Client is gone or the stream has been disposed concurrently
                 }
             }, TaskContinuationOptions.RunContinuationsAsynchronously);
     }

@@ -194,7 +194,15 @@ internal static class UpdateFromJson
                     {
                         writer.WriteLine($"{genericPropType} {varNameAndItemGetter!.Item1} = jsonProperty.Value[i].{varNameAndItemGetter.Item2};");
                     }
-                    writer.WriteLine($"if ({prop.Identifier.ValueText}[i] != {varNameAndItemGetter.Item1})");
+                    if (genericPropType is "float[]" or "int[]")
+                    {
+                        // Arrays need a content comparison because != would compare references and always differ
+                        writer.WriteLine($"if (!{varNameAndItemGetter.Item1}.SequenceEqual({prop.Identifier.ValueText}[i]))");
+                    }
+                    else
+                    {
+                        writer.WriteLine($"if ({prop.Identifier.ValueText}[i] != {varNameAndItemGetter.Item1})");
+                    }
                     writer.WriteLine("{");
                     writer.Indent++;
                     writer.WriteLine($"{prop.Identifier.ValueText}[i] = {varNameAndItemGetter.Item1};");

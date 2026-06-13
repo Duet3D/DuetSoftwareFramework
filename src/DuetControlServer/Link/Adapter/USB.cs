@@ -679,7 +679,11 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <param name="sbcRequest">Content of the packet to resend</param>
     public void ResendPacket(PacketHeader packet, out Protocol.SbcRequests.Request sbcRequest)
     {
-        Span<byte> buffer = (_txBuffer.Next ?? _txBuffers.First!).Value.Span;
+        // USB transfers are sequential: the firmware sees our data before composing its response, so a
+        // resend request always refers to the exchange that was just sent. That buffer is the previous
+        // one because the transfer routine has already rotated to the next buffer at this point (unlike
+        // SPI, where the full-duplex pipeline makes resend requests refer to the transfer before that)
+        Span<byte> buffer = (_txBuffer.Previous ?? _txBuffers.Last!).Value.Span;
 
         PacketHeader header;
         int headerSize = Marshal.SizeOf<PacketHeader>();

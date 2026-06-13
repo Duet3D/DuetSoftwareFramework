@@ -538,7 +538,7 @@ public class MCodeHandler(
                         {
                             if (index < 0 || index >= model.Volumes.Count)
                             {
-                                return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," : "{") + $"\"SDinfo\":{{\"slot\":{index},present:0}}}}");
+                                return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," : "{") + $"\"SDinfo\":{{\"slot\":{index},\"present\":0}}}}");
                             }
 
                             Volume storage = model.Volumes[index];
@@ -569,7 +569,7 @@ public class MCodeHandler(
                             }
 
                             Volume storage = model.Volumes[index];
-                            return new Message(MessageType.Success, $"SD card in slot {index}: capacity {storage.Capacity / (1000 * 1000 * 1000):F2}Gb, partition size {storage.PartitionSize / (1000 * 1000 * 1000):F2}Gb,free space {storage.FreeSpace / (1000 * 1000 * 1000):F2}Gb, speed {storage.Speed / (1000 * 1000):F2}MBytes/sec");
+                            return new Message(MessageType.Success, $"SD card in slot {index}: capacity {storage.Capacity / 1000000000.0:F2}Gb, partition size {storage.PartitionSize / 1000000000.0:F2}Gb, free space {storage.FreeSpace / 1000000000.0:F2}Gb, speed {storage.Speed / 1000000.0:F2}MBytes/sec");
                         }
                     }
                 }
@@ -630,11 +630,15 @@ public class MCodeHandler(
                                         _messageLoggerProvider = new MessageLoggerProvider(model, minimumLevel);
                                         loggerFactory.AddProvider(_messageLoggerProvider);
                                     }
+                                    else
+                                    {
+                                        _messageLoggerProvider.Enabled = true;
+                                    }
                                 }
-                                else
+                                else if (_messageLoggerProvider is not null)
                                 {
-                                    _messageLoggerProvider?.Dispose();
-                                    _messageLoggerProvider = null;
+                                    // The logger factory offers no way to remove the provider again, so just disable its output
+                                    _messageLoggerProvider.Enabled = false;
                                 }
                                 seen = true;
                             }

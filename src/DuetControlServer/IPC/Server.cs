@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Connection;
 using DuetAPI.Connection.InitMessages;
+using DuetAPI.Utility;
 using DuetControlServer.Commands;
 using DuetControlServer.IPC.Processors;
 using DuetControlServer.Utility;
@@ -226,7 +227,7 @@ public sealed class Server(CommandFactory commandFactory,
             {
                 string message = $"Incompatible protocol version (got {initMessage.Version}, need {MinimumProtocolVersion} to {Defaults.ProtocolVersion})";
                 logger.LogWarning("IPC#{Id}: {Message}", conn.Id, message);
-                await conn.SendResponseAsync(new IncompatibleVersionException(message));
+                await conn.SendExceptionAsync(new IncompatibleVersionException(message));
                 return null;
             }
             else if (initMessage.Version != Defaults.ProtocolVersion)
@@ -266,6 +267,10 @@ public sealed class Server(CommandFactory commandFactory,
                     return processorFactory.Create<CodeStream>(conn, initMessage);
 
                 case ConnectionMode.PluginService:
+                    if (!conn.Permissions.HasFlag(SbcPermissions.ServicePlugins))
+                    {
+                        throw new UnauthorizedAccessException("Insufficient permissions");
+                    }
                     return processorFactory.Create<PluginService>(conn, initMessage);
 
                 default:
@@ -275,7 +280,7 @@ public sealed class Server(CommandFactory commandFactory,
         catch (Exception e) when (e is not OperationCanceledException and not SocketException)
         {
             logger.LogError(e, "IPC#{Id}: Failed to assign connection processor", conn.Id);
-            await conn.SendResponseAsync(e);
+            await conn.SendExceptionAsync(e);
         }
 
         return null;

@@ -22,6 +22,13 @@ public class LockManager(ObjectModel model)
     public bool IsLocked => _lockConnection is not null;
 
     /// <summary>
+    /// Check if the given connection holds the current write lock
+    /// </summary>
+    /// <param name="connection">Connection to check</param>
+    /// <returns>True if the connection holds the lock</returns>
+    public bool IsLockedBy(Connection? connection) => connection is not null && _lockConnection == connection;
+
+    /// <summary>
     /// Read/write lock held by a third-party plugins
     /// </summary>
     private IDisposable? _lock;

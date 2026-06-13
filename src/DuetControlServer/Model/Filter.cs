@@ -301,6 +301,24 @@ public partial class Filter(ObjectModel model)
     /// <param name="queryFlags">Optional flags controlling which properties are included, or null for no attribute filtering</param>
     /// <param name="depth">Current recursion depth (used with <see cref="QueryFlags.MaxDepth"/>)</param>
     /// <returns>Dictionary or list holding the result or null if nothing could be found</returns>
+    /// <summary>
+    /// Resolve the item type of a generic model collection, walking up the type hierarchy so that
+    /// non-generic subclasses (e.g. Inputs) are resolved as well
+    /// </summary>
+    /// <param name="collection">Collection instance</param>
+    /// <returns>Item type or null if it could not be determined</returns>
+    private static Type? GetCollectionItemType(object collection)
+    {
+        for (Type? type = collection.GetType(); type is not null; type = type.BaseType)
+        {
+            if (type.IsGenericType)
+            {
+                return type.GetGenericArguments()[0];
+            }
+        }
+        return null;
+    }
+
     private static object? InternalGetFiltered(object? partialModel, object[] partialFilter, QueryFlags? queryFlags, int depth = 0)
     {
         // Cannot proceed if there is nothing more to do...
@@ -381,8 +399,7 @@ public partial class Filter(ObjectModel model)
             else if (partialModel is IList filterList && propertyName == "**" && queryFlags is not null)
             {
                 // Recurse into list items to apply attribute-based filtering
-                bool isModelObjectList = filterList.GetType().IsGenericType &&
-                    filterList.GetType().GetGenericArguments()[0].IsSubclassOf(typeof(ModelObject));
+                bool isModelObjectList = GetCollectionItemType(filterList)?.IsSubclassOf(typeof(ModelObject)) == true;
                 if (isModelObjectList)
                 {
                     List<object?> results = [.. new object?[filterList.Count]];
@@ -405,9 +422,9 @@ public partial class Filter(ObjectModel model)
             if (partialModel is IList list && itemIndex >= -1 && itemIndex < list.Count)
             {
                 bool isModelObjectList = false, isListList = false;
-                if (partialModel.GetType().IsGenericType && partialModel.GetType().GetGenericTypeDefinition() == typeof(StaticModelCollection<>))
+                Type? itemType = GetCollectionItemType(partialModel);
+                if (itemType is not null)
                 {
-                    Type itemType = partialModel.GetType().GetGenericArguments()[0];
                     isModelObjectList = itemType.IsSubclassOf(typeof(ModelObject));
                     isListList = typeof(IList).IsAssignableFrom(itemType);
                 }

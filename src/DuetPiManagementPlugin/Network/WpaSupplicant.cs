@@ -179,7 +179,19 @@ namespace DuetPiManagementPlugin.Network
         /// <returns>Update result</returns>
         public static async Task<Message> UpdateSSID(string? ssid, string? psk, string? countryCode = null)
         {
-            // Create template if it doesn't already exist or if the 
+            // Validate the inputs first. These values are written to wpa_supplicant.conf, so they must not
+            // be able to inject extra directives via quotes or newlines
+            static bool HasInvalidChars(string? value) => value is not null && value.Any(c => c is '"' or '\\' || char.IsControl(c));
+            if ((HasInvalidChars(ssid) && ssid != "*") || HasInvalidChars(psk))
+            {
+                return new Message(MessageType.Error, "SSID and PSK must not contain quotes, backslashes, or control characters");
+            }
+            if (!string.IsNullOrWhiteSpace(countryCode) && !countryCode.All(char.IsLetter))
+            {
+                return new Message(MessageType.Error, "Invalid country code");
+            }
+
+            // Create template if it doesn't already exist or if the
             if (!File.Exists("/etc/wpa_supplicant/wpa_supplicant.conf"))
             {
                 if (string.IsNullOrWhiteSpace(countryCode))

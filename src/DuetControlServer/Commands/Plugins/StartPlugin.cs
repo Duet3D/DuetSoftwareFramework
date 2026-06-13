@@ -96,7 +96,7 @@ public sealed class StartPlugin(CommandFactory commandFactory, Model.ObjectModel
         List<string> dependencies = [];
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            if (model.Plugins.TryGetValue(Plugin, out Plugin plugin))
+            if (model.Plugins.TryGetValue(id, out Plugin plugin))
             {
                 // Don't do anything if the plugin is already running or if it cannot be started on the SBC
                 if (plugin.Pid > 0 || string.IsNullOrEmpty(plugin.SbcExecutable))

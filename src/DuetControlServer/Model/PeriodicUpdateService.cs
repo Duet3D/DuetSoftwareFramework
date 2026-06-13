@@ -96,6 +96,15 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterfac
                         Plugin plugin = new();
                         plugin.UpdateFromJson(manifestJson.RootElement, false);
                         plugin.Pid = -1;
+
+                        // Do not add incomplete manifests to the object model, a plugin without id or
+                        // name cannot be addressed properly
+                        if (string.IsNullOrEmpty(plugin.Id) || string.IsNullOrEmpty(plugin.Name))
+                        {
+                            logger.LogError("Skipping incomplete plugin manifest {File}", Path.GetFileName(file));
+                            continue;
+                        }
+
                         using (await model.AccessReadWriteAsync(cancellationToken))
                         {
                             model.Plugins.Add(plugin.Id, plugin);
@@ -130,92 +139,100 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterfac
 
             do
             {
-                // Gather data outside the lock on a background thread (slow I/O, not cancellable)
-                var gatherTask = Task.Run(async () =>
+                try
                 {
-                    var networkInterfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
-                    var drives = DriveInfo.GetDrives();
-                    var sbcData = await GatherSbcDataAsync(stoppingToken);
-                    var volumeData = GatherVolumeData(drives);
-                    var networkData = await GatherNetworkDataAsync(networkInterfaces, stoppingToken);
-                    return (sbcData, volumeData, networkData);
-                }, stoppingToken);
-
-                // Wait for gather to complete, but abort immediately on cancellation
-                var (sbcData, volumeData, networkData) = await gatherTask.WaitAsync(stoppingToken);
-
-                // Apply to model with a short write lock
-                string currentIPAddress;
-                using (await model.AccessReadWriteAsync(stoppingToken))
-                {
-                    updateNetworkSeq = ApplyNetworkData(networkData);
-                    currentIPAddress = model.Network.Interfaces.FirstOrDefault(iface => iface.ActualIP != null)?.ActualIP ?? "0.0.0.0";
-                    ApplySbcData(sbcData);
-                    updateVolumesSeq = ApplyVolumeData(volumeData);
-                    CleanMessages();
-                }
-
-                // Check if the system time has to be updated
-                if (measuredDelay > TimeSpan.FromMilliseconds(settings.Value.HostUpdateInterval + 2000) && !Debugger.IsAttached)
-                {
-                    logger.LogInformation("System time has been changed");
-                    Code code = codeFactory.Create();
-                    code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
-                    code.Channel = CodeChannel.Trigger;
-                    code.Type = CodeType.MCode;
-                    code.MajorNumber = 905;
-                    code.Parameters =
-                    [
-                        new('P', DateTime.Now.ToString("yyyy-MM-dd")),
-                        new('S', DateTime.Now.ToString("HH:mm:ss"))
-                    ];
-                    await code.ExecuteAsync();
-                }
-
-                // Check if the hostname has to be updated
-                if (lastHostname != Environment.MachineName)
-                {
-                    logger.LogInformation("Hostname has been changed");
-                    lastHostname = Environment.MachineName;
-                    Code code = codeFactory.Create();
-                    code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
-                    code.Channel = CodeChannel.Trigger;
-                    code.Type = CodeType.MCode;
-                    code.MajorNumber = 550;
-                    code.Parameters =
-                    [
-                        new('P', lastHostname)
-                    ];
-                    await code.ExecuteAsync();
-                }
-
-                // Check if the network or volume keys have been updated
-                if (updateNetworkSeq)
-                {
-                    // Update the network seq value
-                    linkInterface.ObjectModelKeyChanged("network");
-
-                    // Update the IP address to report on 12864 displays
-                    if (currentIPAddress != lastIPAddress)
+                    // Gather data outside the lock on a background thread (slow I/O, not cancellable)
+                    var gatherTask = Task.Run(async () =>
                     {
-                        lastIPAddress = currentIPAddress;
+                        var networkInterfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
+                        var drives = DriveInfo.GetDrives();
+                        var sbcData = await GatherSbcDataAsync(stoppingToken);
+                        var volumeData = GatherVolumeData(drives);
+                        var networkData = await GatherNetworkDataAsync(networkInterfaces, stoppingToken);
+                        return (sbcData, volumeData, networkData);
+                    }, stoppingToken);
 
+                    // Wait for gather to complete, but abort immediately on cancellation
+                    var (sbcData, volumeData, networkData) = await gatherTask.WaitAsync(stoppingToken);
+
+                    // Apply to model with a short write lock
+                    string currentIPAddress;
+                    using (await model.AccessReadWriteAsync(stoppingToken))
+                    {
+                        updateNetworkSeq = ApplyNetworkData(networkData);
+                        currentIPAddress = model.Network.Interfaces.FirstOrDefault(iface => iface.ActualIP != null)?.ActualIP ?? "0.0.0.0";
+                        ApplySbcData(sbcData);
+                        updateVolumesSeq = ApplyVolumeData(volumeData);
+                        CleanMessages();
+                    }
+
+                    // Check if the system time has to be updated
+                    if (measuredDelay > TimeSpan.FromMilliseconds(settings.Value.HostUpdateInterval + 2000) && !Debugger.IsAttached)
+                    {
+                        logger.LogInformation("System time has been changed");
                         Code code = codeFactory.Create();
                         code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
                         code.Channel = CodeChannel.Trigger;
                         code.Type = CodeType.MCode;
-                        code.MajorNumber = 552;
+                        code.MajorNumber = 905;
                         code.Parameters =
                         [
-                            new('P', currentIPAddress ?? "0.0.0.0")
+                            new('P', DateTime.Now.ToString("yyyy-MM-dd")),
+                            new('S', DateTime.Now.ToString("HH:mm:ss"))
                         ];
                         await code.ExecuteAsync();
                     }
-                }
 
-                if (updateVolumesSeq)
+                    // Check if the hostname has to be updated
+                    if (lastHostname != Environment.MachineName)
+                    {
+                        logger.LogInformation("Hostname has been changed");
+                        lastHostname = Environment.MachineName;
+                        Code code = codeFactory.Create();
+                        code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
+                        code.Channel = CodeChannel.Trigger;
+                        code.Type = CodeType.MCode;
+                        code.MajorNumber = 550;
+                        code.Parameters =
+                        [
+                            new('P', lastHostname)
+                        ];
+                        await code.ExecuteAsync();
+                    }
+
+                    // Check if the network or volume keys have been updated
+                    if (updateNetworkSeq)
+                    {
+                        // Update the network seq value
+                        linkInterface.ObjectModelKeyChanged("network");
+
+                        // Update the IP address to report on 12864 displays
+                        if (currentIPAddress != lastIPAddress)
+                        {
+                            lastIPAddress = currentIPAddress;
+
+                            Code code = codeFactory.Create();
+                            code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
+                            code.Channel = CodeChannel.Trigger;
+                            code.Type = CodeType.MCode;
+                            code.MajorNumber = 552;
+                            code.Parameters =
+                            [
+                                new('P', currentIPAddress ?? "0.0.0.0")
+                            ];
+                            await code.ExecuteAsync();
+                        }
+                    }
+
+                    if (updateVolumesSeq)
+                    {
+                        linkInterface.ObjectModelKeyChanged("volumes");
+                    }
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
                 {
-                    linkInterface.ObjectModelKeyChanged("volumes");
+                    // A single failed iteration must not terminate the whole service
+                    logger.LogError(e, "Failed to perform periodic model update");
                 }
 
                 // Wait for next scheduled update check
@@ -611,7 +628,7 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterfac
     {
         for (int i = model.Messages.Count - 1; i >= 0; i--)
         {
-            if (model.Messages[i].Time - DateTime.Now > TimeSpan.FromSeconds(settings.Value.MaxMessageAge))
+            if (DateTime.Now - model.Messages[i].Time > TimeSpan.FromSeconds(settings.Value.MaxMessageAge))
             {
                 model.Messages.RemoveAt(i);
             }

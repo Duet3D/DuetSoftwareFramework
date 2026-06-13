@@ -235,6 +235,10 @@ public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems, bool ca
                     }
                 }
             }
+            else if (kv.Value is ICloneable cloneableItem)
+            {
+                Add(kv.Key, (TValue)cloneableItem.Clone());
+            }
             else
             {
                 Add(kv);
@@ -273,7 +277,7 @@ public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems, bool ca
         {
             if (kv.Value is ICloneable cloneableItem)
             {
-                clone.Add(kv.Key, (TValue)cloneableItem);
+                clone.Add(kv.Key, (TValue)cloneableItem.Clone());
             }
             else
             {
@@ -317,7 +321,7 @@ public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems, bool ca
     /// </summary>
     /// <param name="array">Destination array</param>
     /// <param name="arrayIndex">Start iondex</param>
-    public void CopyTo(KeyValuePair<string, TValue>[] array, int arrayIndex) => CopyTo(array, arrayIndex);
+    public void CopyTo(KeyValuePair<string, TValue>[] array, int arrayIndex) => CopyTo((Array)array, arrayIndex);
 
     /// <summary>
     /// Check if a key-value pair exists

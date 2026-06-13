@@ -30,10 +30,11 @@ public sealed class SetPluginData(Model.ObjectModel model, IOptions<Settings> se
             throw new NotSupportedException("Plugin support has been disabled");
         }
 
-        // Fill in plugin name if required
+        // Fill in plugin name if required. Root-owned plugins skip the PID lookup in AssignPermissionsAsync, so ask
+        // the matching plugin service to resolve our peer PID here
         if (string.IsNullOrEmpty(Plugin))
         {
-            Plugin = Connection!.PluginId ?? throw new UnauthorizedAccessException("Failed to determine plugin ID");
+            Plugin = await Connection!.ResolvePeerPluginIdAsync() ?? throw new UnauthorizedAccessException("Failed to determine plugin ID");
         }
 
         // Check permissions. Only the owner or plugins with the ManagePlugins permission may modify plugin data

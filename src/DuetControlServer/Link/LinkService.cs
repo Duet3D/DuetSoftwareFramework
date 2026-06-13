@@ -235,18 +235,19 @@ public sealed class LinkService(
             jobProcessor.Abort();
         }
 
+        // Shut down the link subsystem
+        await linkInterface.InvalidateAsync(stoppingToken);
+
+        // Shut down this service. This terminates the transfer thread, which may still be serving file
+        // requests, so the open files must not be closed before this call
+        await base.StopAsync(stoppingToken);
+
         // Close all the files
         foreach (var kv in _openFiles)
         {
             await kv.Value.DisposeAsync();
         }
         _openFiles.Clear();
-
-        // Shut down the link subsystem
-        await linkInterface.InvalidateAsync(stoppingToken);
-
-        // Shut down this service
-        await base.StopAsync(stoppingToken);
     }
 
     /// <summary>
@@ -848,6 +849,10 @@ public sealed class LinkService(
             {
                 Position = offset
             };
+
+            // The requested length comes from the wire and can never legitimately exceed the transfer
+            // buffer size, so clamp it before allocating the chunk on the stack
+            maxLength = Math.Clamp(maxLength, 0, settings.Value.SbcBufferSize);
             Span<byte> buffer = stackalloc byte[maxLength];
             int bytesRead = fs.Read(buffer);
 
@@ -1181,7 +1186,9 @@ public sealed class LinkService(
 
         try
         {
-            // Read file content as requested
+            // Read file content as requested. The requested length comes from the wire and can never
+            // legitimately exceed the transfer buffer size, so clamp it before allocating on the stack
+            maxLength = Math.Clamp(maxLength, 0, settings.Value.SbcBufferSize);
             FileStream fs = _openFiles[handle];
             Span<byte> data = stackalloc byte[maxLength];
             int bytesRead = fs.Read(data);

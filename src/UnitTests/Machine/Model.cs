@@ -233,6 +233,26 @@ namespace UnitTests.Machine
         }
 
         [Test]
+        public void AssignKinematicsTypeChange()
+        {
+            ObjectModel cartesianModel = new(), deltaModel = new();
+            using (JsonDocument json = JsonDocument.Parse("{\"move\":{\"kinematics\":{\"name\":\"cartesian\"}}}"))
+            {
+                cartesianModel.UpdateFromJson(json.RootElement, false);
+            }
+            using (JsonDocument json = JsonDocument.Parse("{\"move\":{\"kinematics\":{\"name\":\"delta\"}}}"))
+            {
+                deltaModel.UpdateFromJson(json.RootElement, false);
+            }
+            Assert.That(cartesianModel.Move.Kinematics, Is.TypeOf<CoreKinematics>());
+            Assert.That(deltaModel.Move.Kinematics, Is.TypeOf<DeltaKinematics>());
+
+            // Assigning a model whose kinematics type differs must replace the instance, not crash
+            cartesianModel.Assign(deltaModel);
+            Assert.That(cartesianModel.Move.Kinematics, Is.TypeOf<DeltaKinematics>());
+        }
+
+        [Test]
         public void Clone()
         {
             string modelPath = Path.Combine(Directory.GetCurrentDirectory(), "../../../Machine/JSON/model.json");

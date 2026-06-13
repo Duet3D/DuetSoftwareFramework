@@ -46,6 +46,16 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
     public event PropertyChangingEventHandler? PropertyChanging;
 
     /// <summary>
+    /// Compare two nullable JSON elements by content. JsonElement does not override Equals,
+    /// so the default comparison checks the backing document references and never matches
+    /// elements from different parses
+    /// </summary>
+    /// <param name="a">First element</param>
+    /// <param name="b">Second element</param>
+    /// <returns>Whether both elements carry the same JSON content</returns>
+    private static bool JsonElementEquals(JsonElement? a, JsonElement? b) => (a is null || b is null) ? a is null == b is null : JsonElement.DeepEquals(a.Value, b.Value);
+
+    /// <summary>
     /// Get an element from the dictionary
     /// </summary>
     /// <param name="key">Key</param>
@@ -173,7 +183,7 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
                         this[kv.Key] = kv.Value;
                     }
                 }
-                else if (!existingItem.Equals(kv.Value))
+                else if (!JsonElementEquals(existingItem, kv.Value))
                 {
                     this[kv.Key] = kv.Value;
                 }
@@ -235,7 +245,7 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
     public void CopyTo(KeyValuePair<string, JsonElement?>[] array, int arrayIndex) => CopyTo((Array)array, arrayIndex);
 
     /// <inheritdoc />
-    public bool Contains(KeyValuePair<string, JsonElement?> item) => _dictionary.TryGetValue(item.Key, out JsonElement? value) && Equals(value, item.Value);
+    public bool Contains(KeyValuePair<string, JsonElement?> item) => _dictionary.TryGetValue(item.Key, out JsonElement? value) && JsonElementEquals(value, item.Value);
 
     /// <inheritdoc />
     IEnumerator IEnumerable.GetEnumerator() => _dictionary.GetEnumerator();
@@ -299,7 +309,7 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
                 {
                     Remove(jsonProperty.Name);
                 }
-                else if (!TryGetValue(jsonProperty.Name, out JsonElement? value) || !value!.Equals(jsonProperty.Value))
+                else if (!TryGetValue(jsonProperty.Name, out JsonElement? value) || !JsonElementEquals(value, jsonProperty.Value))
                 {
                     this[jsonProperty.Name] = jsonProperty.Value.Clone();
                 }
@@ -326,7 +336,7 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
                     {
                         Remove(key);
                     }
-                    else if (!TryGetValue(key, out JsonElement? existingValue) || !existingValue!.Equals(value))
+                    else if (!TryGetValue(key, out JsonElement? existingValue) || !JsonElementEquals(existingValue, value))
                     {
                         this[key] = value;
                     }

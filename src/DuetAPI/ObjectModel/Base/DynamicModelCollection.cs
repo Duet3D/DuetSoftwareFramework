@@ -81,10 +81,10 @@ public class DynamicModelCollection<T> : ObservableCollection<T>, IModelCollecti
                 }
                 else
                 {
-                    myItem = (T?)myItem.Assign(otherItem);
-                    if (!ReferenceEquals(myItem, otherItem))
+                    T? updatedItem = (T?)myItem.Assign(otherItem);
+                    if (!ReferenceEquals(this[i], updatedItem))
                     {
-                        this[i] = myItem!;
+                        this[i] = updatedItem!;
                     }
                 }
             }
@@ -212,6 +212,8 @@ public class DynamicModelCollection<T> : ObservableCollection<T>, IModelCollecti
         {
             if (reader.TokenType == JsonTokenType.StartObject)
             {
+                // Save the reader state in case this item fails to deserialize
+                Utf8JsonReader itemStart = reader;
                 try
                 {
                     if (i >= Count)
@@ -238,16 +240,24 @@ public class DynamicModelCollection<T> : ObservableCollection<T>, IModelCollecti
                             }
                         }
                     }
-                    i++;
                 }
-                catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(T), JsonElement.ParseValue(ref reader), e))
+                catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(T), JsonElement.ParseValue(ref itemStart), e))
                 {
-                    // suppressed
+                    // Resume after the failed item, ParseValue has already advanced the saved reader past it
+                    reader = itemStart;
                 }
+                i++;
             }
             else if (reader.TokenType == JsonTokenType.Null)
             {
-                Add(default!);
+                if (i >= Count)
+                {
+                    Add(default!);
+                }
+                else if (this[i] is not null)
+                {
+                    this[i] = default!;
+                }
                 i++;
             }
         }

@@ -557,7 +557,10 @@ namespace DuetPiManagementPlugin
                                 {
                                     if (File.Exists($"/usr/share/zoneinfo/{timezone}"))
                                     {
-                                        await Process.Start("timedatectl", $"set-timezone {timezone}").WaitForExitAsync(CancellationToken);
+                                        using (Process timezoneProcess = Process.Start("timedatectl", $"set-timezone {timezone}"))
+                                        {
+                                            await timezoneProcess.WaitForExitAsync(CancellationToken);
+                                        }
                                         seen = true;
                                     }
                                     else

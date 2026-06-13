@@ -40,6 +40,7 @@ public sealed class Start(Manager channelManager, ChannelProcessor channelProces
             if (code.Flags.HasFlag(CodeFlags.Unbuffered))
             {
                 _unbufferedCodesCounter.AddCount(1);
+                _ = code.Task.ContinueWith(_ => _unbufferedCodesCounter.Signal(), TaskContinuationOptions.ExecuteSynchronously);
             }
 
             // Log it
