@@ -26,13 +26,7 @@ public enum DistanceUnit
 /// </summary>
 public class DistanceUnitConverter : JsonConverter<DistanceUnit>
 {
-    /// <summary>
-    /// Read a distance units from a JSON reader
-    /// </summary>
-    /// <param name="reader">JSON reader</param>
-    /// <param name="typeToConvert">Target type</param>
-    /// <param name="options">JSON options</param>
-    /// <returns>Distance unit value</returns>
+    /// <inheritdoc />
     public override DistanceUnit Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType != JsonTokenType.String)
@@ -44,12 +38,7 @@ public class DistanceUnitConverter : JsonConverter<DistanceUnit>
         return jsonValue.Equals("in", StringComparison.InvariantCultureIgnoreCase) ? DistanceUnit.Inch : DistanceUnit.MM;
     }
 
-    /// <summary>
-    /// Write a distance units to a JSON writer
-    /// </summary>
-    /// <param name="writer">JSON writer</param>
-    /// <param name="value">Distance unit value</param>
-    /// <param name="options">JSON options</param>
+    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, DistanceUnit value, JsonSerializerOptions options)
     {
         writer.WriteStringValue((value == DistanceUnit.MM) ? "mm" : "in");

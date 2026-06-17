@@ -73,7 +73,7 @@ public partial class DirectDisplayScreen : ModelObject, IDynamicModelObject
             return null;
         }
 
-        if (jsonElement.TryGetProperty("type", out JsonElement typeProperty))
+        if (jsonElement.TryGetProperty("controller", out JsonElement typeProperty))
         {
             if (typeProperty.GetString() == "ST7567")
             {
@@ -120,7 +120,7 @@ public partial class DirectDisplayScreen : ModelObject, IDynamicModelObject
         {
             if (readerCopy.TokenType == JsonTokenType.PropertyName)
             {
-                if (readerCopy.ValueTextEquals("type"u8) && readerCopy.Read())
+                if (readerCopy.ValueTextEquals("controller"u8) && readerCopy.Read())
                 {
                     if (readerCopy.GetString() == "ST7567")
                     {

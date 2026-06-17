@@ -152,6 +152,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
                 }
                 parsedExpression.Append(c);
             }
+            lastC = c;
         }
 
         if (parsedExpression.Length > 0)
@@ -420,14 +421,14 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
     /// <returns>Evaluation result or null</returns>
     public async Task<string?> EvaluateAsync(Code code, bool evaluateAll, CancellationToken cancellationToken = default)
     {
-        if (code.KeywordArgument is not null)
+        if (!string.IsNullOrEmpty(code.KeywordArgument))
         {
             if (code.Keyword == KeywordType.Echo)
             {
                 StringBuilder builder = new();
                 foreach (string expression in SplitExpression(code.KeywordArgument))
                 {
-                    string result = await EvaluateExpressionAsync(code, expression, !evaluateAll, false, cancellationToken);
+                    string result = await EvaluateExpressionToStringAsync(code, expression, !evaluateAll, false, cancellationToken);
                     if (builder.Length != 0)
                     {
                         builder.Append(' ');
@@ -440,7 +441,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
             if (code.Keyword == KeywordType.Abort)
             {
                 string keywordArgument = code.KeywordArgument.Trim();
-                return await EvaluateExpressionAsync(code, keywordArgument, !evaluateAll, false, cancellationToken);
+                return await EvaluateExpressionToStringAsync(code, keywordArgument, !evaluateAll, false, cancellationToken);
             }
 
             string keywordExpression;
@@ -468,7 +469,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
             }
 
             // Evaluate SBC properties
-            return await EvaluateExpressionAsync(code, keywordExpression.Trim(), !evaluateAll, false, cancellationToken);
+            return await EvaluateExpressionToStringAsync(code, keywordExpression.Trim(), !evaluateAll, false, cancellationToken);
         }
 
         if (code.Parameters.Any(parameter => parameter.IsExpression))
@@ -479,7 +480,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
                 if (parameter.IsExpression)
                 {
                     string trimmedExpression = ((string)parameter).Trim();
-                    string parameterValue = await EvaluateExpressionAsync(code, trimmedExpression, !evaluateAll, !evaluateAll, cancellationToken);
+                    string parameterValue = await EvaluateExpressionToStringAsync(code, trimmedExpression, !evaluateAll, !evaluateAll, cancellationToken);
                     if (!evaluateAll && !parameterValue.StartsWith('{') && !parameterValue.EndsWith('}'))
                     {
                         // Encapsulate fully expanded parameters so that plugins and RRF know it was an expression
@@ -626,16 +627,16 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
     }
 
     /// <summary>
-    /// Evaluate expression(s) and return the raw evaluation result (if applicable)
+    /// Evaluate expression(s), returning the resulting value (or the partially-substituted string when only SBC fields are replaced)
     /// </summary>
     /// <param name="code">Code holding the expression(s)</param>
     /// <param name="expression">Expression(s) to replace</param>
     /// <param name="onlySbcFields">Whether to replace only SBC fields</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Replaced expression(s)</returns>
+    /// <returns>Resulting value, or the partially-substituted expression</returns>
     /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
     /// <exception cref="OperationCanceledException">Code was cancelled</exception>
-    public async Task<object?> EvaluateExpressionRaw(Code code, string expression, bool onlySbcFields, CancellationToken cancellationToken = default)
+    public async Task<object?> EvaluateExpressionToValueAsync(Code code, string expression, bool onlySbcFields, CancellationToken cancellationToken = default)
     {
         int i = 0;
 
@@ -822,6 +823,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
                             // Not an atomic string...
                             return null;
                         }
+                        lastC = c;
                     }
 
                     if (inQuotes)
@@ -1011,6 +1013,24 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
             return result.ToString();
         }
 
+        // Fast path: evaluate the whole expression on the SBC when possible, avoiding the firmware round-trip.
+        // If anything in it cannot be resolved here, fall back to substituting SBC fields and forwarding the rest
+        if (!onlySbcFields)
+        {
+            // Whole-mirror evaluation will be selected by the connection method (it is needed when sending G-codes directly over CAN-FD); off for now
+            Parsing.IExpressionEvaluationContext context = new ExpressionContext(this, () => code.File?.GetIterations(code), (int)(code.LineNumber ?? 0), filter, false);
+            bool resolvedLocally;
+            object? localResult;
+            using (await model.AccessReadOnlyAsync(cancellationToken))
+            {
+                resolvedLocally = Parsing.MetaExpressionParser.TryEvaluate(expression, context, out localResult);
+            }
+            if (resolvedLocally)
+            {
+                return localResult;
+            }
+        }
+
         string expressionContent = await eatExpression('\0');
         if (onlySbcFields)
         {
@@ -1030,19 +1050,103 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
     }
 
     /// <summary>
-    /// Evaluate expression(s)
+    /// Evaluate expression(s) and return the result as a string
     /// </summary>
     /// <param name="code">Code holding the expression(s)</param>
     /// <param name="expression">Expression(s) to replace</param>
     /// <param name="onlySbcFields">Whether to replace only SBC fields</param>
     /// <param name="encodeResult">Whether the final result shall be encoded</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Replaced expression(s)</returns>
+    /// <returns>Result as a string</returns>
     /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
     /// <exception cref="OperationCanceledException">Code was cancelled</exception>
-    public async Task<string> EvaluateExpressionAsync(Code code, string expression, bool onlySbcFields, bool encodeResult, CancellationToken cancellationToken = default)
+    public async Task<string> EvaluateExpressionToStringAsync(Code code, string expression, bool onlySbcFields, bool encodeResult, CancellationToken cancellationToken = default)
     {
-        object? result = await EvaluateExpressionRaw(code, expression, onlySbcFields, cancellationToken);
+        object? result = await EvaluateExpressionToValueAsync(code, expression, onlySbcFields, cancellationToken);
         return (onlySbcFields && result is string resultString) ? resultString : ObjectToString(result, false, encodeResult, code);
+    }
+
+    /// <summary>
+    /// Evaluation context backing the SBC-side expression evaluator with the running code and the object model mirror
+    /// </summary>
+    /// <param name="owner">Owning expression evaluator (for SBC field detection)</param>
+    /// <param name="iterationsProvider">Provides the current loop iteration count lazily (it errors outside a loop)</param>
+    /// <param name="lineNumber">Current G-code line number</param>
+    /// <param name="filter">Object model filter</param>
+    /// <param name="evaluateAllObjectModelFields">Whether to resolve all object model fields and not just SBC-specific ones</param>
+    internal sealed class ExpressionContext(Expressions owner, Func<int?> iterationsProvider, int lineNumber, Model.Filter filter, bool evaluateAllObjectModelFields) : Parsing.IExpressionEvaluationContext
+    {
+        /// <inheritdoc/>
+        public int? Iterations => iterationsProvider();
+
+        /// <inheritdoc/>
+        public int LineNumber => lineNumber;
+
+        /// <inheritdoc/>
+        public bool TryResolveIdentifier(string path, bool wantExists, bool wantArrayLength, out object? value)
+        {
+            value = null;
+            if (wantExists)
+            {
+                if (wantArrayLength)
+                {
+                    return false;       // exists(#...) is forwarded for now
+                }
+
+                // var/param are owned by the firmware, so their existence cannot be determined here
+                if (path is "var" or "param" || path.StartsWith("var.", StringComparison.Ordinal) || path.StartsWith("param.", StringComparison.Ordinal))
+                {
+                    return false;
+                }
+
+                // Default mode can only answer for SBC-rooted paths; the flag opts into the whole (non-live) mirror
+                if (!evaluateAllObjectModelFields && !owner.IsSbcExpression(path, false))
+                {
+                    return false;
+                }
+                value = filter.GetSpecific(path, false, out _);
+                return true;
+            }
+
+            // findSbcProperty restricts resolution to SBC-only fields unless the operator opts into the whole mirror
+            if (!filter.GetSpecific(path, !evaluateAllObjectModelFields, out object? field))
+            {
+                return false;
+            }
+
+            if (wantArrayLength)
+            {
+                // The count is read while the model lock is held and returned as an int, so it is safe afterwards
+                switch (field)
+                {
+                    case string s:
+                        value = s.Length;
+                        return true;
+                    case ICollection collection:
+                        value = collection.Count;
+                        return true;
+                    default:
+                        return false;   // not an array or string -> let the firmware handle it
+                }
+            }
+
+            // The value is used after the object model read lock is released, so only hand back immutable scalars.
+            // Live collections and model objects are mutated in place by the SPI update task, so they are left to the
+            // locked fallback path to substitute and format
+            if (field is null or bool or char or int or uint or long or ulong or float or double or string or DateTime)
+            {
+                value = field;
+                return true;
+            }
+            return false;
+        }
+
+        /// <inheritdoc/>
+        public bool TryCallFunction(string name, object?[] arguments, bool wantArrayLength, out object? value)
+        {
+            // Meta G-code functions are not implemented on the SBC yet, so forward them to the firmware
+            value = null;
+            return false;
+        }
     }
 }

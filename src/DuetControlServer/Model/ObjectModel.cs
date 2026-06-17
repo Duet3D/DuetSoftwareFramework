@@ -82,6 +82,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
         SBC.CPU.Hardware = GetCpuHardware();
         SBC.CPU.NumCores = GetCpuNumCores();
         SBC.DSF.BuildDateTime = buildAttribute.Date ?? "unknown build time";
+        SBC.DSF.CommunicationMethod = settings.Value.CommunicationMethod;
         SBC.DSF.Is64Bit = Environment.Is64BitProcess;
         SBC.DSF.Version = VersionHelper.GetVersion();
         SBC.DSF.PluginSupport = settings.Value.PluginSupport;
@@ -145,14 +146,16 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// <param name="e">Event args pointing to the property that failed to be deserialized</param>
     private void DeserializationFailedHandler(object sender, DeserializationFailedEventArgs e)
     {
-        if (!_deserializationErrors.ContainsKey(e.TargetType))
+        // This may be called concurrently from any thread deserializing model data, so the check
+        // must happen inside the lock to avoid racing duplicate additions
+        lock (_deserializationErrors)
         {
-            lock (_deserializationErrors)
+            if (!_deserializationErrors.TryAdd(e.TargetType, new(sender.GetType(), e.JsonValue)))
             {
-                _deserializationErrors.Add(e.TargetType, new(sender.GetType(), e.JsonValue));
+                return;
             }
-            _logger.LogError("Failed to deserialize {TypeName} -> {TargetType} from {JSON}", sender.GetType().Name, e.TargetType.Name, e.JsonValue.GetRawText());
         }
+        _logger.LogError("Failed to deserialize {TypeName} -> {TargetType} from {JSON}", sender.GetType().Name, e.TargetType.Name, e.JsonValue.GetRawText());
     }
 
     [GeneratedRegex(@"^Hardware\s*:\s*(\w+)", RegexOptions.IgnoreCase)]
@@ -515,7 +518,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// <summary>
     /// Indicates how many config files are being processed
     /// </summary>
-    private volatile int _numRunningConfigFiles = 0;
+    private int _numRunningConfigFiles = 0;
 
     /// <summary>
     /// Flag asynchronously that a start-up file is being executed. Must be called WITHOUT locking this instance first!
@@ -525,11 +528,11 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     {
         if (executing)
         {
-            _numRunningConfigFiles++;
+            Interlocked.Increment(ref _numRunningConfigFiles);
         }
         else
         {
-            _numRunningConfigFiles--;
+            Interlocked.Decrement(ref _numRunningConfigFiles);
         }
     }
 

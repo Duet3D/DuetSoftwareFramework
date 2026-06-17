@@ -483,7 +483,8 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
             {
                 string key = comment[..index].Trim(), value = comment[(index + 1)..].Trim();
                 logger.LogDebug("Evaluating user-defined key '{Key}' with value '{Value}'", key, value);
-                userDefinedKeys.Add(key, expressions.EvaluateExpressionRaw(code, value, false));
+                // Use the indexer so a duplicate key overwrites the previous value instead of throwing
+                userDefinedKeys[key] = expressions.EvaluateExpressionToValueAsync(code, value, false);
                 return true;
             }
         }
@@ -621,30 +622,39 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
 
         // This is the start of an embedded thumbnail image
         string trimmedComment = code.Comment.TrimStart();
-        if (trimmedComment.StartsWith("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
+        try
         {
-            logger.LogDebug("Found embedded thumbnail PNG image");
-            await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.PNG, cancellationToken);
-            return true;
-        }
-        if (trimmedComment.StartsWith("thumbnail_JPG", StringComparison.InvariantCultureIgnoreCase))
-        {
-            logger.LogDebug("Found embedded thumbnail JPG Image");
-            await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.JPEG, cancellationToken);
-            return true;
-        }
-        if (trimmedComment.StartsWith("thumbnail_QOI", StringComparison.InvariantCultureIgnoreCase))
-        {
-            logger.LogDebug("Found embedded thumbnail QOI Image");
-            await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.QOI, cancellationToken);
-            return true;
-        }
+            if (trimmedComment.StartsWith("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
+            {
+                logger.LogDebug("Found embedded thumbnail PNG image");
+                await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.PNG, cancellationToken);
+                return true;
+            }
+            if (trimmedComment.StartsWith("thumbnail_JPG", StringComparison.InvariantCultureIgnoreCase))
+            {
+                logger.LogDebug("Found embedded thumbnail JPG Image");
+                await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.JPEG, cancellationToken);
+                return true;
+            }
+            if (trimmedComment.StartsWith("thumbnail_QOI", StringComparison.InvariantCultureIgnoreCase))
+            {
+                logger.LogDebug("Found embedded thumbnail QOI Image");
+                await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.QOI, cancellationToken);
+                return true;
+            }
 
-        // Icon Image (proprietary)
-        if (trimmedComment.Contains("Icon:"))
+            // Icon Image (proprietary)
+            if (trimmedComment.Contains("Icon:"))
+            {
+                logger.LogDebug("Found Icon Image");
+                await IconImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, cancellationToken);
+                return true;
+            }
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
         {
-            logger.LogDebug("Found Icon Image");
-            await IconImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, cancellationToken);
+            // A malformed thumbnail must not abort the whole file info parse
+            logger.LogWarning(e, "Failed to parse thumbnail image, skipping it");
             return true;
         }
 
@@ -743,7 +753,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
                             content.StartsWith("thumbnail_JPG end") ||
                             content.StartsWith("thumbnail_QOI end"))
                         {
-                            offset = 0;
+                            offset = bytesProcessed = 0;
                             break;
                         }
 
@@ -825,6 +835,30 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
         // Update the simulated time in the file
         await using (FileStream fileStream = new(filename, FileMode.Open, FileAccess.ReadWrite, FileShare.Read, settings.Value.FileBufferSize))
         {
+            // Search the marker in the raw bytes to obtain a byte offset. The marker is plain ASCII, but the
+            // surrounding file content may not be, so a char index from the decoded string would be wrong
+            static int FindSimulationMarker(ReadOnlySpan<byte> buffer)
+            {
+                ReadOnlySpan<char> marker = SimulatedTimeString;
+                for (int i = 0; i + marker.Length <= buffer.Length; i++)
+                {
+                    bool found = true;
+                    for (int k = 0; k < marker.Length; k++)
+                    {
+                        if (char.ToLowerInvariant((char)buffer[i + k]) != char.ToLowerInvariant(marker[k]))
+                        {
+                            found = false;
+                            break;
+                        }
+                    }
+                    if (found)
+                    {
+                        return i;
+                    }
+                }
+                return -1;
+            }
+
             // Check if we need to truncate the file before the last simulated time
             bool truncate = false;
             Memory<byte> buffer = new byte[64];
@@ -834,8 +868,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
                 int bytesRead = await fileStream.ReadAsync(buffer, cancellationToken), offset = 0;
                 if (bytesRead > 0)
                 {
-                    string bufferString = Encoding.UTF8.GetString(buffer[..bytesRead].Span);
-                    int simulationMarkerPosition = bufferString.IndexOf(SimulatedTimeString, StringComparison.InvariantCultureIgnoreCase);
+                    int simulationMarkerPosition = FindSimulationMarker(buffer[..bytesRead].Span);
                     if (simulationMarkerPosition >= 0)
                     {
                         offset = bytesRead - simulationMarkerPosition;

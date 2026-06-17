@@ -1,0 +1,287 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Object model </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Object model ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/Duet3D/DuetSoftwareFramework/blob/v3.7-dev/src/Documentation/articles/object-model.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="object-model">Object model</h1>
+
+<p>The object model is the single structured representation of the machine's state - temperatures, axis
+positions, the current job, network configuration, loaded plugins, and so on. Clients read it,
+subscribe to changes to it, and reference it inside <a href="gcode-flow.html#expression-evaluation">expressions</a>.
+It is defined once in <a href="components.html#duetapi">DuetAPI</a> and maintained at runtime by DCS.</p>
+<ul>
+<li>Definition: <code>src/DuetAPI/ObjectModel/ObjectModel.cs</code> and the <code>ObjectModel/</code> subtree</li>
+<li>DCS provider and locking: <code>src/DuetControlServer/Model/ObjectModel.cs</code>, <code>Model/LockWrapper.cs</code></li>
+</ul>
+<h2 id="top-level-keys">Top-level keys</h2>
+<p><code>ObjectModel</code> exposes these top-level keys, each a subtree of the model:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Boards</code></td>
+<td>Connected mainboard and expansion boards</td>
+</tr>
+<tr>
+<td><code>Directories</code></td>
+<td>Virtual directory paths (see <a href="file-management.html#directory-layout">File management</a>)</td>
+</tr>
+<tr>
+<td><code>Fans</code></td>
+<td>Fan configurations</td>
+</tr>
+<tr>
+<td><code>Global</code></td>
+<td>User-defined global variables (arbitrary JSON values)</td>
+</tr>
+<tr>
+<td><code>Heat</code></td>
+<td>Heaters, sensors, and temperature control</td>
+</tr>
+<tr>
+<td><code>Inputs</code></td>
+<td>The state of each <a href="gcode-flow.html#code-channels">code channel</a></td>
+</tr>
+<tr>
+<td><code>Job</code></td>
+<td>The active print job (file, progress, layers, timing)</td>
+</tr>
+<tr>
+<td><code>LedStrips</code></td>
+<td>Addressable LED strip configurations</td>
+</tr>
+<tr>
+<td><code>Limits</code></td>
+<td>Machine configuration limits</td>
+</tr>
+<tr>
+<td><code>Messages</code></td>
+<td>Generic message log (status, errors, <code>M118</code> output) - SBC-maintained</td>
+</tr>
+<tr>
+<td><code>Move</code></td>
+<td>Axes, extruders, kinematics, compensation</td>
+</tr>
+<tr>
+<td><code>Network</code></td>
+<td>Interfaces and protocols - partly SBC-maintained</td>
+</tr>
+<tr>
+<td><code>Plugins</code></td>
+<td>Installed <a href="plugins.html">plugins</a> - SBC-maintained</td>
+</tr>
+<tr>
+<td><code>Sensors</code></td>
+<td>Endstops, probes, and other sensors</td>
+</tr>
+<tr>
+<td><code>Spindles</code></td>
+<td>Spindle configurations</td>
+</tr>
+<tr>
+<td><code>State</code></td>
+<td>Machine status, message box, log level</td>
+</tr>
+<tr>
+<td><code>Tools</code></td>
+<td>Tool definitions</td>
+</tr>
+<tr>
+<td><code>Volumes</code></td>
+<td>Mass-storage volumes - SBC-maintained</td>
+</tr>
+</tbody>
+</table>
+<h2 id="base-types">Base types</h2>
+<p>Every node in the model derives from one of a small set of base types in
+<code>src/DuetAPI/ObjectModel/Base/</code>. They all raise change notifications so the model can be observed:</p>
+<ul>
+<li><strong><code>ModelObject</code></strong> - base class for a structured node. Implements <code>INotifyPropertyChanging</code> /
+<code>INotifyPropertyChanged</code> and updates properties through <code>SetPropertyValue</code>. Two flavours exist:
+static model objects (properties are updated in place) and dynamic ones (a property may be replaced
+with a new instance).</li>
+<li><strong><code>StaticModelCollection&lt;T&gt;</code></strong> - an observable, typed list for fixed-schema arrays (<code>Tools</code>,
+<code>Boards</code>, <code>Fans</code>, ...). Raises granular add/remove/replace notifications.</li>
+<li><strong><code>StaticModelDictionary&lt;T&gt;</code></strong> - a typed key/value store (<code>Plugins</code>). Keys keep their original case
+(they are not camel-cased). Supports a &quot;null removes the item&quot; mode.</li>
+<li><strong><code>JsonModelDictionary</code></strong> - an untyped key/value store of raw JSON values, used for <code>Global</code>.</li>
+</ul>
+<p>Two attributes annotate properties and drive query/merge behaviour:</p>
+<ul>
+<li><strong><code>[SbcProperty]</code></strong> marks a property maintained by DSF rather than by the firmware. A constructor
+argument records whether it is also available in standalone mode. When firmware updates are merged
+these properties are skipped, and <a href="gcode-flow.html#expression-evaluation">expressions</a> that reference
+them are evaluated on the SBC instead of being forwarded to RRF.</li>
+<li><strong><code>[Live]</code></strong> marks frequently-changing properties (temperatures, positions) that are only included
+when the live query flag is set.</li>
+</ul>
+<h2 id="json-serialization">JSON serialization</h2>
+<p>The model is serialized to JSON with a camelCase naming policy
+(<code>src/DuetAPI/ObjectModel/ObjectModelContext.cs</code>): <code>State.Status</code> becomes <code>state.status</code>. Dictionary
+keys (<code>Plugins</code>, <code>Global</code>) keep their original case. The companion source generator
+(<code>src/DuetAPI.SourceGenerators/</code>) emits, for every model type, fast <code>UpdateFromJson</code> /
+<code>UpdateFromJsonReader</code> and <code>Assign</code> methods used when merging firmware updates and cloning - this
+avoids reflection on the hot path. The generated update code honours <code>[SbcProperty]</code> so a firmware
+merge never clobbers SBC-owned state.</p>
+<h2 id="maintaining-the-model-in-dcs">Maintaining the model in DCS</h2>
+<h3 id="locking">Locking</h3>
+<p>DCS holds one global <code>ObjectModel</code> instance, guarded by an async reader/writer lock
+(<code>Model/LockWrapper.cs</code>, <code>Model/ObjectModel.cs</code>):</p>
+<ul>
+<li><code>AccessReadOnly()</code> / <code>AccessReadOnlyAsync()</code> - many concurrent readers.</li>
+<li><code>AccessReadWrite()</code> / <code>AccessReadWriteAsync()</code> - one exclusive writer.</li>
+</ul>
+<p>The lock wrapper is disposable; releasing a write lock signals observers that the model changed.
+Condition variables let callers wait for the next update (<code>WaitForUpdate</code>) or for a full firmware
+update. A watchdog (<code>MaxMachineModelLockTime</code>) logs and shuts the app down if a lock is held too long,
+to surface deadlocks rather than hang silently.</p>
+<blockquote>
+<p>Lock contention on this single model is a real failure mode: any long-running work must gather data
+outside the lock and apply it inside a short write-lock window. The periodic update service below is
+written this way.</p>
+</blockquote>
+<h3 id="updates-from-the-firmware">Updates from the firmware</h3>
+<p><code>Model/UpdateService.cs</code> requests object-model JSON from RRF over the <a href="firmware-link.html">Firmware link</a> and
+merges each section with the generated <code>UpdateFromFirmwareJson</code> methods, skipping <code>[SbcProperty]</code>
+fields. Per-section sequence numbers (<code>Seqs</code>) tell DCS which sections actually changed since the last
+poll, so it only re-requests what moved.</p>
+<p><code>Model/PeriodicUpdateService.cs</code> fills in the host-side facts the firmware cannot know - network
+interfaces, storage volumes, SBC CPU/memory/distribution info. It gathers these asynchronously
+outside the lock, then applies them under a brief write lock.</p>
+<h3 id="observing-changes-and-patches">Observing changes and patches</h3>
+<pre><code class="lang-mermaid">flowchart LR
+    FW[&quot;Firmware update&lt;br/&gt;(SPI)&quot;] --&gt; MODEL
+    PERIODIC[&quot;PeriodicUpdateService&quot;] --&gt; MODEL
+    CODE[&quot;Code execution&quot;] --&gt; MODEL
+
+    MODEL[&quot;Global ObjectModel&lt;br/&gt;(reader/writer lock)&quot;] --&gt;|&quot;property/collection&lt;br/&gt;change events&quot;| OBS[&quot;Model/Observer&quot;]
+    OBS --&gt;|&quot;(path, changeType, value)&quot;| SUB[&quot;ModelSubscription processor&quot;]
+    SUB --&gt;|&quot;JSON patch or full model&quot;| CLIENTS[&quot;Subscribers:&lt;br/&gt;DWC, ModelObserver, ...&quot;]
+    OBS --&gt; TRIG[&quot;SbcTriggerService&lt;br/&gt;(M581.1)&quot;]
+</code></pre>
+<p><code>Model/Observer/Observer.cs</code> recursively subscribes to the change events of every node. When
+something changes it raises <code>OnPropertyPathChanged</code> with the dotted path (e.g. <code>[&quot;state&quot;,&quot;status&quot;]</code>),
+a <code>PropertyChangeType</code> (<code>Property</code>, <code>Collection</code>, or the special <code>MessageCollection</code>), and the new
+value. The <a href="ipc.html#connection-modes"><code>ModelSubscription</code> IPC processor</a> turns these into JSON patches
+(or sends the whole model, depending on the subscriber's mode) and pushes them to clients - this is
+what drives the live DWC interface through the <a href="components.html#duetwebserver">DuetWebServer WebSocket</a>.</p>
+<p><code>Model/SbcTriggerService.cs</code> is a second observer: it re-evaluates <code>M581.1</code> external-trigger
+expressions that reference SBC fields (which RRF cannot evaluate) whenever a relevant path changes,
+and queues codes when a trigger fires.</p>
+<h2 id="querying-by-path">Querying by path</h2>
+<p><code>Model/Filter.cs</code> resolves dotted paths such as <code>state.status</code> or <code>heat.heaters[0].current</code> into a
+node traversal, and parses the query flags used by <code>M409</code> and the API: live-only, verbose, include
+obsolete, include nulls, maximum depth, and an array start index for pagination. The same path
+resolution backs SBC-side <a href="gcode-flow.html#expression-evaluation">expression evaluation</a>.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="ipc.html">IPC</a> - the <code>Subscribe</code> connection mode and the object-model commands</li>
+<li><a href="gcode-flow.html#meta-codes-expressions-and-flow-control">G-code flow</a> - how expressions read the model</li>
+<li><a href="firmware-link.html">Firmware link</a> - where firmware updates come from</li>
+</ul>
+
+</article>
+
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

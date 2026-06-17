@@ -71,11 +71,7 @@ public sealed class Executed : PipelineBase
         _stackItem = _stack.Peek();
     }
 
-    /// <summary>
-    /// Process an incoming code
-    /// </summary>
-    /// <param name="code">Code to process</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task ProcessCodeAsync(Commands.Code code)
     {
         if (code.Result is not null)
@@ -186,19 +182,29 @@ public sealed class Executed : PipelineBase
                         }
 
                         // Split the message into multiple chunks so RRF can output it
-                        Memory<byte> encodedMessage = Encoding.UTF8.GetBytes(code.Result.ToString());
-                        for (int i = 0; i < encodedMessage.Length; i += _settings.Value.MaxMessageLength)
+                        byte[] encodedMessage = Encoding.UTF8.GetBytes(code.Result.ToString());
+                        int i = 0;
+                        while (i < encodedMessage.Length)
                         {
-                            if (i + _settings.Value.MaxMessageLength >= encodedMessage.Length)
+                            int chunkLength = Math.Min(_settings.Value.MaxMessageLength, encodedMessage.Length - i);
+                            if (i + chunkLength < encodedMessage.Length)
                             {
-                                Memory<byte> partialMessage = encodedMessage[i..];
-                                _linkInterface.SendMessage(flags, Encoding.UTF8.GetString(partialMessage.ToArray()));
+                                // Move the split back to a character boundary, else both chunks decode to
+                                // replacement characters where a multi-byte UTF-8 sequence is divided
+                                while (chunkLength > 0 && (encodedMessage[i + chunkLength] & 0xC0) == 0x80)
+                                {
+                                    chunkLength--;
+                                }
+                                if (chunkLength == 0)
+                                {
+                                    // Invalid UTF-8 content, fall back to a hard split to guarantee progress
+                                    chunkLength = Math.Min(_settings.Value.MaxMessageLength, encodedMessage.Length - i);
+                                }
                             }
-                            else
-                            {
-                                Memory<byte> partialMessage = encodedMessage.Slice(i, Math.Min(encodedMessage.Length - i, _settings.Value.MaxMessageLength));
-                                _linkInterface.SendMessage(flags | MessageTypeFlags.PushFlag, Encoding.UTF8.GetString(partialMessage.ToArray()));
-                            }
+
+                            MessageTypeFlags chunkFlags = (i + chunkLength < encodedMessage.Length) ? flags | MessageTypeFlags.PushFlag : flags;
+                            _linkInterface.SendMessage(chunkFlags, Encoding.UTF8.GetString(encodedMessage, i, chunkLength));
+                            i += chunkLength;
                         }
                     }
                     else if (code.IsFromFileChannel)
@@ -233,33 +239,15 @@ public sealed class Executed : PipelineBase
         }
     }
 
-    /// <summary>
-    /// Wait for the pipeline stage to become idle
-    /// </summary>
-    /// <param name="file">Code file</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Whether the codes have been flushed successfully</returns>
+    /// <inheritdoc />
     public override Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default) => _stackItem.FlushAsync(cancellationToken);
 
-    /// <summary>
-    /// Wait for the pipeline stage to become idle
-    /// </summary>
-    /// <param name="code">Code waiting for the flush</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Whether the codes have been flushed successfully</returns>
+    /// <inheritdoc />
     public override Task<bool> FlushAsync(Commands.Code code, CancellationToken cancellationToken = default) => _stackItem.FlushAsync(cancellationToken);
 
-    /// <summary>
-    /// Execute a given code on this pipeline stage
-    /// </summary>
-    /// <param name="code">Code to enqueue</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override void WriteCode(Commands.Code code) => _stackItem.WriteCode(code);
 
-    /// <summary>
-    /// Execute a given code on this pipeline stage
-    /// </summary>
-    /// <param name="code">Code to enqueue</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override ValueTask WriteCodeAsync(Commands.Code code) => _stackItem.WriteCodeAsync(code);
 }

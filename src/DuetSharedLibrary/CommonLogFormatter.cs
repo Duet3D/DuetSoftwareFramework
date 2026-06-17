@@ -21,9 +21,7 @@ public sealed class CommonLogFormatter : ConsoleFormatter
         Console.SetOut(new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true });
     }
 
-    /// <summary>
-    /// Write a log entry
-    /// </summary>
+    /// <inheritdoc />
     public override void Write<TState>(in LogEntry<TState> logEntry, IExternalScopeProvider? scopeProvider, TextWriter textWriter)
     {
         string? message = logEntry.Formatter(logEntry.State, logEntry.Exception);

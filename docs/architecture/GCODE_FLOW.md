@@ -85,15 +85,15 @@ The **Firmware** stage ([Pipelines/Firmware.cs](../../src/DuetControlServer/Code
 
 ### Hop 5: SPI → RRF
 
-The next full transfer carries the `Code` packet (`SbcRequest::Code`). On RRF's side ([src/SBC/SbcInterface.cpp](../../../RepRapFirmware/src/SBC/SbcInterface.cpp)) it is dropped into `GCodeBuffer[SBC]` as a binary code. `GCodes::Spin` notices it on the next pass.
+The next full transfer carries the `Code` packet (`SbcRequest::Code`). On RRF's side ([src/SBC/SbcInterface.cpp](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/SBC/SbcInterface.cpp)) it is dropped into `GCodeBuffer[SBC]` as a binary code. `GCodes::Spin` notices it on the next pass.
 
 ### Hop 6: RRF parses and dispatches
 
-`ActOnCode` → `HandleGcode` ([src/GCodes/GCodes2.cpp](../../../RepRapFirmware/src/GCodes/GCodes2.cpp)) for `G1`. Parameters are decoded from the binary form. `GCodes::DoStraightMove` builds a [`RawMove`](../../../RepRapFirmware/src/Movement/RawMove.cpp), and calls `Move::AddMoveFromGCode`.
+`ActOnCode` → `HandleGcode` ([src/GCodes/GCodes2.cpp](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/GCodes/GCodes2.cpp)) for `G1`. Parameters are decoded from the binary form. `GCodes::DoStraightMove` builds a [`RawMove`](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/Movement/RawMove.cpp), and calls `Move::AddMoveFromGCode`.
 
 ### Hop 7: RRF Move builds the DDA
 
-[`Move`](../../../RepRapFirmware/src/Movement/Move.cpp) allocates a fresh [`DDA`](../../../RepRapFirmware/src/Movement/DDA.cpp), runs the active kinematics ([Kinematics](../../../RepRapFirmware/src/Movement/Kinematics)) to convert (X, Y, E) → motor steps for each driver, applies look-ahead linkage, jerk / acceleration limits, and (depending on `M593`) input shaping ([AxisShaper](../../../RepRapFirmware/src/Movement/AxisShaper.cpp)) and pressure advance ([ExtruderShaper](../../../RepRapFirmware/src/Movement/ExtruderShaper.cpp)).
+[`Move`](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/Movement/Move.cpp) allocates a fresh [`DDA`](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/Movement/DDA.cpp), runs the active kinematics ([Kinematics](https://github.com/Duet3D/RepRapFirmware/tree/3.7-docker/src/Movement/Kinematics)) to convert (X, Y, E) → motor steps for each driver, applies look-ahead linkage, jerk / acceleration limits, and (depending on `M593`) input shaping ([AxisShaper](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/Movement/AxisShaper.cpp)) and pressure advance ([ExtruderShaper](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/Movement/ExtruderShaper.cpp)).
 
 The DDA produces per-drive `MoveSegment` chains.
 
@@ -101,15 +101,15 @@ The DDA produces per-drive `MoveSegment` chains.
 
 `X` is local — its `MoveSegment` chain goes to a `DriveMovement` consumed by the local step ISR.
 
-`Y` and `E` are remote (board addresses 1 and 2). [`CanMotion`](../../../RepRapFirmware/src/CAN/CanMotion.cpp) packs each remote board's slice of the move into one `CanMessageMovementLinearShaped` and tags it with the master step-clock time at which the move starts.
+`Y` and `E` are remote (board addresses 1 and 2). [`CanMotion`](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/CAN/CanMotion.cpp) packs each remote board's slice of the move into one `CanMessageMovementLinearShaped` and tags it with the master step-clock time at which the move starts.
 
 ### Hop 9: CAN → expansion / tool boards
 
-The CAN-FD frames arrive at addresses 1 and 2. On each, [`CommandProcessor::Spin`](../../../Duet3Expansion/src/CommandProcessing/CommandProcessor.cpp) dispatches the message into `Move::AddRemoteMove`, which converts the master-clock start time to a local-clock start time using the time-sync offset ([CAN_PROTOCOL.md#time-synchronisation](../../../Duet3Expansion/docs/devel/CAN_PROTOCOL.md)).
+The CAN-FD frames arrive at addresses 1 and 2. On each, [`CommandProcessor::Spin`](https://github.com/Duet3D/Duet3Expansion/blob/3.7-docker/src/CommandProcessing/CommandProcessor.cpp) dispatches the message into `Move::AddRemoteMove`, which converts the master-clock start time to a local-clock start time using the time-sync offset ([CAN_PROTOCOL.md#time-synchronisation](https://github.com/Duet3D/Duet3Expansion/blob/3.7-docker/docs/devel/CAN_PROTOCOL.md#time-synchronisation)).
 
 ### Hop 10: Step ISRs run in lockstep
 
-At the calculated start instant on each board, the [step ISR](../../../Duet3Expansion/src/Movement/StepTimer.cpp) starts pulsing local STEP/DIR pins. The X stepper on the main board, Y on board 1, and E on board 2 all step in time.
+At the calculated start instant on each board, the [step ISR](https://github.com/Duet3D/Duet3Expansion/blob/3.7-docker/src/Movement/StepTimer.cpp) starts pulsing local STEP/DIR pins. The X stepper on the main board, Y on board 1, and E on board 2 all step in time.
 
 For E specifically, pressure advance has been folded into the `MoveSegment` chain so the extruder commands include the appropriate pre-acceleration extrusion.
 
@@ -151,8 +151,8 @@ End-to-end "ok" turnaround for a single code is typically 30–50 ms idle, ~5 ms
   - HTTP — [DSF HTTP_API.md](../devel/HTTP_API.md).
   - IPC — [DSF IPC_PROTOCOL.md](../devel/IPC_PROTOCOL.md).
   - DCS pipeline — [DSF CODE_PIPELINE.md](../devel/CODE_PIPELINE.md).
-  - SPI — [DSF SPI_LINK.md](../devel/SPI_LINK.md), [RRF SBC_INTERFACE.md](../../../RepRapFirmware/docs/devel/SBC_INTERFACE.md).
-  - RRF G-code — [RRF GCODE_PROCESSING.md](../../../RepRapFirmware/docs/devel/GCODE_PROCESSING.md).
-  - RRF motion — [RRF MOTION_PIPELINE.md](../../../RepRapFirmware/docs/devel/MOTION_PIPELINE.md).
-  - CAN — [RRF CAN_BUS.md](../../../RepRapFirmware/docs/devel/CAN_BUS.md), [Duet3Expansion CAN_PROTOCOL.md](../../../Duet3Expansion/docs/devel/CAN_PROTOCOL.md).
-  - Expansion motion — [Duet3Expansion MOTION.md](../../../Duet3Expansion/docs/devel/MOTION.md).
+  - SPI — [DSF SPI_LINK.md](../devel/SPI_LINK.md), [RRF SBC_INTERFACE.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/SBC_INTERFACE.md).
+  - RRF G-code — [RRF GCODE_PROCESSING.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/GCODE_PROCESSING.md).
+  - RRF motion — [RRF MOTION_PIPELINE.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/MOTION_PIPELINE.md).
+  - CAN — [RRF CAN_BUS.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/CAN_BUS.md), [Duet3Expansion CAN_PROTOCOL.md](https://github.com/Duet3D/Duet3Expansion/blob/3.7-docker/docs/devel/CAN_PROTOCOL.md).
+  - Expansion motion — [Duet3Expansion MOTION.md](https://github.com/Duet3D/Duet3Expansion/blob/3.7-docker/docs/devel/MOTION.md).

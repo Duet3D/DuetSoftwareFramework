@@ -42,7 +42,7 @@ internal partial class PollConnector : BaseConnector
         uint? sessionKey = null;
         using (HttpClient client = new() { Timeout = options.Timeout })
         {
-            using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"rr_connect?password={HttpUtility.UrlPathEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken).ConfigureAwait(false);
+            using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"rr_connect?password={HttpUtility.UrlEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
 #if NET6_0_OR_GREATER
@@ -58,14 +58,28 @@ internal partial class PollConnector : BaseConnector
                 2 => throw new NoFreeSessionException(),
                 _ => throw new LoginException($"rr_connect returned unknown err {connectResponse.Err}"),
             };
-            if (connectResponse.IsEmulated)
+            if (connectResponse.IsEmulated || connectResponse.ApiLevel < MinApiLevel)
             {
-                // Don't attempt to use emulated endpoints since the remote server provides support for RESTful calls too
-                throw new HttpRequestException("HTTP backend is emulated");
-            }
+                // Free the just-created session again, boards only support a limited number of them
+                try
+                {
+                    using HttpRequestMessage disconnectRequest = new(HttpMethod.Get, new Uri(baseUri, "rr_disconnect"));
+                    if (sessionKey is not null)
+                    {
+                        disconnectRequest.Headers.Add("X-Session-Key", sessionKey.ToString());
+                    }
+                    using HttpResponseMessage disconnectResponse = await client.SendAsync(disconnectRequest, cancellationToken).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // ignored
+                }
 
-            if (connectResponse.ApiLevel < MinApiLevel)
-            {
+                if (connectResponse.IsEmulated)
+                {
+                    // Don't attempt to use emulated endpoints since the remote server provides support for RESTful calls too
+                    throw new HttpRequestException("HTTP backend is emulated");
+                }
                 throw new InvalidVersionException("Incompatible API level");
             }
         }
@@ -100,9 +114,7 @@ internal partial class PollConnector : BaseConnector
     /// </summary>
     private readonly Dictionary<TaskCompletionSource<string>, int> _runningCodes = [];
 
-    /// <summary>
-    /// Reconnect to the board when the connection has been reset
-    /// </summary>
+    /// <inheritdoc />
     protected override async Task ReconnectAsync(CancellationToken cancellationToken = default)
     {
         lock (_seqs)
@@ -119,8 +131,11 @@ internal partial class PollConnector : BaseConnector
             _runningCodes.Clear();
         }
 
-        using HttpRequestMessage request = new(HttpMethod.Get, $"rr_connect?password={HttpUtility.UrlPathEncode(Options.Password)}&time={DateTime.Now:s}");
-        using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken);
+        // Send rr_connect directly. Going through SendRequestAsync could recurse without bounds if
+        // the remote end answered the connect request itself with a 401 code
+        using CancellationTokenSource connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _terminateSession.Token);
+        connectCts.CancelAfter(Options.Timeout);
+        using HttpResponseMessage response = await HttpClient.GetAsync($"rr_connect?password={HttpUtility.UrlEncode(Options.Password)}&time={DateTime.Now:s}", connectCts.Token);
         response.EnsureSuccessStatusCode();
 
 #if NET6_0_OR_GREATER
@@ -149,19 +164,14 @@ internal partial class PollConnector : BaseConnector
         }
     }
 
-    /// <summary>
-    /// Send a generic a HTTP request
-    /// </summary>
-    /// <param name="request">HTTP request to send</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>HTTP response</returns>
-    protected override async ValueTask<HttpResponseMessage> SendRequestAsync(HttpRequestMessage request, TimeSpan timeout, CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    protected override async ValueTask<HttpResponseMessage> SendRequestAsync(HttpRequestMessage request, TimeSpan timeout, CancellationToken cancellationToken = default, HttpCompletionOption completionOption = HttpCompletionOption.ResponseContentRead)
     {
         if (_sessionKey != null)
         {
             request.Headers.Add("X-Session-Key", _sessionKey.ToString());
         }
-        HttpResponseMessage response = await base.SendRequestAsync(request, timeout, cancellationToken);
+        HttpResponseMessage response = await base.SendRequestAsync(request, timeout, cancellationToken, completionOption);
         if (response.StatusCode == HttpStatusCode.ServiceUnavailable &&
             (request.Method != HttpMethod.Get || request.RequestUri?.AbsolutePath != "/rr_reply"))
         {
@@ -221,12 +231,8 @@ internal partial class PollConnector : BaseConnector
     /// </summary>
     private readonly List<TaskCompletionSource<object?>> _modelUpdateTcs = [];
 
-    /// <summary>
-    /// Wait for the object model to be up-to-date
-    /// </summary>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public override Task WaitForModelUpdateAsync(CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    public override async Task WaitForModelUpdateAsync(CancellationToken cancellationToken = default)
     {
         if (disposed)
         {
@@ -238,24 +244,24 @@ internal partial class PollConnector : BaseConnector
         }
 
         TaskCompletionSource<object?> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_terminateSession.Token, cancellationToken);
+        using CancellationTokenRegistration ctsRegistration = cts.Token.Register(() => tcs.TrySetCanceled());
         lock (_modelUpdateTcs)
         {
             _modelUpdateTcs.Add(tcs);
         }
 
-        CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_terminateSession.Token, cancellationToken);
-        CancellationTokenRegistration ctsRegistration = cts.Token.Register(() => tcs.TrySetCanceled());
-        return tcs.Task.ContinueWith(async task =>
+        try
         {
-            try
+            await tcs.Task.ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (_modelUpdateTcs)
             {
-                await task;
+                _modelUpdateTcs.Remove(tcs);
             }
-            finally
-            {
-                ctsRegistration.Dispose();
-            }
-        }, TaskContinuationOptions.RunContinuationsAsynchronously);
+        }
     }
 
     /// <summary>
@@ -273,6 +279,7 @@ internal partial class PollConnector : BaseConnector
         {
             do
             {
+                bool hadError = false;
                 try
                 {
                     if (Options.ObserveObjectModel)
@@ -412,28 +419,20 @@ internal partial class PollConnector : BaseConnector
                         }
                         else
                         {
-                            // Request only seqs.reply to know when to query rr_reply
-                            using JsonDocument replySeqDocument = await GetObjectModelAsync("seqs.reply", string.Empty);
-                            if (replySeqDocument.RootElement.TryGetProperty("result", out JsonElement replySeqElement) &&
-                                replySeqElement.ValueKind == JsonValueKind.Number)
-                            {
-                                int seq, newSeq = replySeqElement.GetInt32();
-                                lock (_seqs)
-                                {
-                                    _seqs.TryGetValue("reply", out seq);
-                                }
-
-                                if (newSeq > seq)
-                                {
-                                    await GetGCodeReplyAsync(newSeq);
-                                }
-                            }
+                            await PollReplySeqAsync();
                         }
                     }
+                    else
+                    {
+                        // Even without model observation the reply seq must be polled so that
+                        // SendCodeAsync gets its replies and the HTTP session stays alive
+                        await PollReplySeqAsync();
+                    }
                 }
-                catch (Exception e) when (e is OperationCanceledException || e is HttpRequestException)
+                catch (Exception e) when (e is not OperationCanceledException || !_terminateSession.IsCancellationRequested)
                 {
-                    // This happens when the remote end is offline or unavailable
+                    // This happens when the remote end is offline, unavailable, or returns garbage
+                    hadError = true;
                     lock (Model)
                     {
                         Model.State.Status = MachineStatus.Disconnected;
@@ -445,10 +444,10 @@ internal partial class PollConnector : BaseConnector
                     }
                 }
 
-                // Wait a moment before attempting to reconnect
+                // Wait a moment before polling again
                 try
                 {
-                    await Task.Delay(Options.RetryDelay, _terminateSession.Token);
+                    await Task.Delay(hadError ? Options.RetryDelay : Options.UpdateInterval, _terminateSession.Token);
                 }
                 catch (OperationCanceledException)
                 {
@@ -460,6 +459,29 @@ internal partial class PollConnector : BaseConnector
         finally
         {
             _sessionTaskTerminated.SetResult(null);
+        }
+    }
+
+    /// <summary>
+    /// Request only seqs.reply to know when to query rr_reply. This also serves as a session keepalive
+    /// </summary>
+    /// <returns>Asynchronous task</returns>
+    private async Task PollReplySeqAsync()
+    {
+        using JsonDocument replySeqDocument = await GetObjectModelAsync("seqs.reply", string.Empty);
+        if (replySeqDocument.RootElement.TryGetProperty("result", out JsonElement replySeqElement) &&
+            replySeqElement.ValueKind == JsonValueKind.Number)
+        {
+            int seq, newSeq = replySeqElement.GetInt32();
+            lock (_seqs)
+            {
+                _seqs.TryGetValue("reply", out seq);
+            }
+
+            if (newSeq > seq)
+            {
+                await GetGCodeReplyAsync(newSeq);
+            }
         }
     }
 
@@ -636,7 +658,7 @@ internal partial class PollConnector : BaseConnector
         {
             foreach (TaskCompletionSource<string> tcs in _runningCodes.Keys)
             {
-                tcs.SetCanceled();
+                tcs.TrySetCanceled();
             }
             _runningCodes.Clear();
         }
@@ -645,7 +667,12 @@ internal partial class PollConnector : BaseConnector
         try
         {
             using CancellationTokenSource cts = new(Options.Timeout);
-            await HttpClient.GetAsync("rr_disconnect", cts.Token).ConfigureAwait(false);
+            using HttpRequestMessage request = new(HttpMethod.Get, "rr_disconnect");
+            if (_sessionKey is not null)
+            {
+                request.Headers.Add("X-Session-Key", _sessionKey.ToString());
+            }
+            await HttpClient.SendAsync(request, cts.Token).ConfigureAwait(false);
         }
         catch
         {
@@ -656,24 +683,13 @@ internal partial class PollConnector : BaseConnector
         HttpClient.Dispose();
     }
 
-    /// <summary>
-    /// Send a G/M/T-code and return the G-code reply
-    /// </summary>
-    /// <param name="code">Code to send</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Code reply</returns>
+    /// <inheritdoc />
     public override async Task<string> SendCodeAsync(string code, CancellationToken cancellationToken = default)
     {
         return await SendCodeAsync(code, false, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Send a G/M/T-code and return the G-code reply
-    /// </summary>
-    /// <param name="code">Code to send</param>
-    /// <param name="executeAsynchronously">Don't wait for the code to finish</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Code reply</returns>
+    /// <inheritdoc />
     public override async Task<string> SendCodeAsync(string code, bool executeAsynchronously, CancellationToken cancellationToken = default)
     {
         // Check if we can expect a code reply at all
@@ -715,73 +731,90 @@ internal partial class PollConnector : BaseConnector
             }
         }
 
-        // Send it to RRF
-        Task<string>? codeTask = null;
-        string errorMessage = "Invalid number of maximum retries configured";
-        for (int i = 0; i <= Options.MaxRetries; i++)
+        // Register the pending code first. If this happened only after the transmission, the session
+        // task could consume the corresponding reply in between and the code would never resolve
+        TaskCompletionSource<string>? codeRequest = null;
+        if (canAwaitCode)
         {
-            try
+            codeRequest = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            lock (_runningCodes)
             {
-                using HttpRequestMessage request = new(HttpMethod.Get, $"rr_gcode?gcode={HttpUtility.UrlPathEncode(code)}");
-                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
-                if (response.IsSuccessStatusCode)
+                _runningCodes.Add(codeRequest, replySeq);
+            }
+        }
+
+        try
+        {
+            // Send it to RRF
+            string errorMessage = "Invalid number of maximum retries configured";
+            for (int i = 0; i <= Options.MaxRetries; i++)
+            {
+                try
                 {
-                    // Make sure the full G-code could be stored
-#if NET6_0_OR_GREATER
-                    using (Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
-#else
-                    using (Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
-#endif
+                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_gcode?gcode={HttpUtility.UrlPathEncode(code)}");
+                    using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
+                    if (response.IsSuccessStatusCode)
                     {
-                        Responses.GcodeReply responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.GcodeReply, cancellationToken).ConfigureAwait(false))!;
-                        if (responseObj.Buff == 0)
+                        // Make sure the full G-code could be stored
+#if NET6_0_OR_GREATER
+                        using (Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
+#else
+                        using (Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
+#endif
                         {
-                            throw new ArgumentException("G-code buffer is full");
+                            Responses.GcodeReply responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.GcodeReply, cancellationToken).ConfigureAwait(false))!;
+                            if (responseObj.Buff == 0)
+                            {
+                                throw new ArgumentException("G-code buffer is full");
+                            }
+                        }
+
+                        // Stop here if no reply can be expected
+                        if (!canAwaitCode)
+                        {
+                            return string.Empty;
+                        }
+
+                        // Wait for the code to complete
+                        using (cancellationToken.Register(() => codeRequest!.TrySetCanceled(cancellationToken)))
+                        {
+                            return await codeRequest!.Task.ConfigureAwait(false);
                         }
                     }
 
-                    // Stop here if no reply can be expected
-                    if (!canAwaitCode)
+                    errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
+                    if (response.StatusCode == HttpStatusCode.ServiceUnavailable)
                     {
-                        return string.Empty;
+                        await Task.Delay(Options.RetryDelay, cancellationToken).ConfigureAwait(false);
                     }
-
-                    // Enqueue this code request
-                    TaskCompletionSource<string> codeRequest = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                    lock (_runningCodes)
+                    else if (response.StatusCode >= HttpStatusCode.InternalServerError)
                     {
-                        _runningCodes.Add(codeRequest, replySeq);
+                        break;
                     }
-                    codeTask = codeRequest.Task;
-                    break;
                 }
-
-                errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
-                if (response.StatusCode == HttpStatusCode.ServiceUnavailable)
+                catch (OperationCanceledException oce)
                 {
-                    await Task.Delay(Options.RetryDelay, cancellationToken).ConfigureAwait(false);
-                }
-                else if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                {
-                    break;
+                    if (cancellationToken.IsCancellationRequested || _terminateSession.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    errorMessage = oce.Message;
                 }
             }
-            catch (OperationCanceledException oce)
-            {
-                if (cancellationToken.IsCancellationRequested || _terminateSession.IsCancellationRequested)
-                {
-                    throw;
-                }
-                errorMessage = oce.Message;
-            }
+            throw new HttpRequestException(errorMessage);
         }
-
-        // Code has been started or it could not be transmitted
-        if (codeTask is not null)
+        catch
         {
-            return await codeTask;
+            // The code did not complete, remove its pending registration again
+            if (codeRequest is not null)
+            {
+                lock (_runningCodes)
+                {
+                    _runningCodes.Remove(codeRequest);
+                }
+            }
+            throw;
         }
-        throw new HttpRequestException(errorMessage);
     }
 
     /// <summary>
@@ -814,8 +847,7 @@ internal partial class PollConnector : BaseConnector
                         {
                             if (seq > kv.Value)
                             {
-                                kv.Key.SetResult(gcodeReply);
-                                codeHandled = true;
+                                codeHandled |= kv.Key.TrySetResult(gcodeReply);
                             }
                         }
 
@@ -868,14 +900,7 @@ internal partial class PollConnector : BaseConnector
         throw new HttpRequestException(errorMessage);
     }
 
-    /// <summary>
-    /// Upload arbitrary content to a file
-    /// </summary>
-    /// <param name="filename">Target filename</param>
-    /// <param name="content">File content</param>
-    /// <param name="lastModified">Last modified datetime. Ignored in SBC mode</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task UploadAsync(string filename, Stream content, DateTime? lastModified = null, CancellationToken cancellationToken = default)
     {
         // Compute the CRC32 checksum
@@ -908,12 +933,7 @@ internal partial class PollConnector : BaseConnector
         }
     }
 
-    /// <summary>
-    /// Delete a file or directory
-    /// </summary>
-    /// <param name="filename">Target filename</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task DeleteAsync(string filename, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
@@ -963,14 +983,7 @@ internal partial class PollConnector : BaseConnector
         throw new HttpRequestException(errorMessage);
     }
 
-    /// <summary>
-    /// Move a file or directory
-    /// </summary>
-    /// <param name="from">Source file</param>
-    /// <param name="to">Destination file</param>
-    /// <param name="force">Overwrite file if it already exists</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task MoveAsync(string from, string to, bool force = false, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
@@ -1020,12 +1033,7 @@ internal partial class PollConnector : BaseConnector
         throw new HttpRequestException(errorMessage);
     }
 
-    /// <summary>
-    /// Make a new directory
-    /// </summary>
-    /// <param name="directory">Target directory</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task MakeDirectoryAsync(string directory, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
@@ -1080,7 +1088,7 @@ internal partial class PollConnector : BaseConnector
     public override async Task<HttpResponseMessage> DownloadAsync(string filename, CancellationToken cancellationToken = default)
     {
         using HttpRequestMessage request = new(HttpMethod.Get, $"rr_download?name={HttpUtility.UrlPathEncode(filename)}");
-        HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+        HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             throw new FileNotFoundException();
@@ -1090,12 +1098,7 @@ internal partial class PollConnector : BaseConnector
         return response;
     }
 
-    /// <summary>
-    /// Enumerate all files and directories in the given directory
-    /// </summary>
-    /// <param name="directory">Directory to query</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>List of all files and directories</returns>
+    /// <inheritdoc />
     public override async Task<IList<FileListItem>> GetFileListAsync(string directory, CancellationToken cancellationToken = default)
     {
         List<FileListItem> result = [];
@@ -1169,13 +1172,7 @@ internal partial class PollConnector : BaseConnector
         return result;
     }
 
-    /// <summary>
-    /// Get G-code file info
-    /// </summary>
-    /// <param name="filename">File to query</param>
-    /// <param name="readThumbnailContent">Whether thumbnail contents shall be parsed</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>G-code file info</returns>
+    /// <inheritdoc />
     public override async Task<GCodeFileInfo> GetFileInfoAsync(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
@@ -1257,28 +1254,33 @@ internal partial class PollConnector : BaseConnector
 
                         do
                         {
-                            using HttpRequestMessage request = new(HttpMethod.Get, $"rr_thumbnail?name={fileinfo.FileName}&offset={offset}");
+                            using HttpRequestMessage request = new(HttpMethod.Get, $"rr_thumbnail?name={HttpUtility.UrlPathEncode(fileinfo.FileName)}&offset={offset}");
                             using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
-                            if (response.IsSuccessStatusCode)
+                            if (!response.IsSuccessStatusCode)
                             {
-#if NET6_0_OR_GREATER
-                                using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-#else
-                                using Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-#endif
-                                using JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken).ConfigureAwait(false);
-                                if (responseJson.RootElement.TryGetProperty("err", out JsonElement errValue) && errValue.ValueKind == JsonValueKind.Number)
-                                {
-                                    int err = errValue.GetInt32();
-                                    if (err != 0)
-                                    {
-                                        throw new ArgumentException($"err {err}");
-                                    }
-
-                                    offset = responseJson.RootElement.GetProperty("next").GetInt32();
-                                    thumbnailData.Append(responseJson.RootElement.GetProperty("data").GetString());
-                                }
+                                // Do not retry the same offset forever if the remote end keeps failing
+                                throw new HttpRequestException($"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}");
                             }
+
+#if NET6_0_OR_GREATER
+                            using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+#else
+                            using Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+#endif
+                            using JsonDocument responseJson = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken).ConfigureAwait(false);
+                            if (!responseJson.RootElement.TryGetProperty("err", out JsonElement errValue) || errValue.ValueKind != JsonValueKind.Number)
+                            {
+                                throw new ArgumentException("missing err value");
+                            }
+
+                            int err = errValue.GetInt32();
+                            if (err != 0)
+                            {
+                                throw new ArgumentException($"err {err}");
+                            }
+
+                            offset = responseJson.RootElement.GetProperty("next").GetInt32();
+                            thumbnailData.Append(responseJson.RootElement.GetProperty("data").GetString());
                         } while (offset != 0);
                         thumbnail.Data = thumbnailData.ToString();
                     }

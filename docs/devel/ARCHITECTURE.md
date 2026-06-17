@@ -8,7 +8,7 @@ This document maps out the DSF code base at component level. Every other documen
 flowchart TB
     subgraph SBC[Linux SBC - typically Raspberry Pi]
       direction TB
-      DWC[Duet Web Control<br/>browser SPA]
+      DWC[Duet Web Control]
       DWS[DuetWebServer<br/>ASP.NET Kestrel]
       DCS[DuetControlServer<br/>main daemon]
       DPS[DuetPluginService x2<br/>root + dsf user]
@@ -93,8 +93,8 @@ The four protocol layers are documented separately:
 
 - Browser ↔ DWS — [HTTP_API.md](HTTP_API.md).
 - DWS / plugins / tools ↔ DCS — [IPC_PROTOCOL.md](IPC_PROTOCOL.md).
-- DCS ↔ RRF — [SPI_LINK.md](SPI_LINK.md). (Mirrored from RRF's [SBC_INTERFACE.md](../../../RepRapFirmware/docs/devel/SBC_INTERFACE.md).)
-- RRF ↔ expansion — see [Duet3Expansion's CAN docs](../../../Duet3Expansion/docs/devel/CAN_PROTOCOL.md).
+- DCS ↔ RRF — [SPI_LINK.md](SPI_LINK.md). (Mirrored from RRF's [SBC_INTERFACE.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/SBC_INTERFACE.md).)
+- RRF ↔ expansion — see [Duet3Expansion's CAN docs](https://github.com/Duet3D/Duet3Expansion/blob/3.7-docker/docs/devel/CAN_PROTOCOL.md).
 
 ## 4. The DCS process
 
@@ -209,5 +209,5 @@ The careful staging is so that plugins and DWS are running before `dsf-config.g`
 
 ## 9. Where this connects to the rest of the system
 
-- The matching firmware-side document is [RepRapFirmware/docs/devel/ARCHITECTURE.md](../../../RepRapFirmware/docs/devel/ARCHITECTURE.md).
+- The matching firmware-side document is [RepRapFirmware/docs/devel/ARCHITECTURE.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/ARCHITECTURE.md).
 - The cross-protocol path "browser request → motor pulse" is in [../architecture/GCODE_FLOW.md](../architecture/GCODE_FLOW.md).

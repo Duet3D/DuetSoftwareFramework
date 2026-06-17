@@ -193,7 +193,7 @@ public sealed class Processor
 
         // Restore message box and motion system states
         _isWaitingForAcknowledgment = CurrentState.WaitingForAcknowledgement;
-        using (_model.AccessReadOnly())
+        using (_model.AccessReadWrite())
         {
             InputChannel? input = _model.Inputs[Channel];
             if (input is not null)
@@ -280,7 +280,17 @@ public sealed class Processor
         _codeProcessor.Pop(Channel);
         StackState oldState = Stack.Pop();
         CurrentState = Stack.Peek();
+
+        // Restore message box and motion system states
         _isWaitingForAcknowledgment = CurrentState.WaitingForAcknowledgement;
+        using (await _model.AccessReadWriteAsync())
+        {
+            InputChannel? input = _model.Inputs[Channel];
+            if (input is not null)
+            {
+                input.Active = oldState.MotionSystemWasActive;
+            }
+        }
 
         // Invalidate obsolete lock requests and supended codes
         while (oldState.LockRequests.TryDequeue(out LockMovementRequest? lockRequest))
@@ -412,9 +422,10 @@ public sealed class Processor
     public int BytesBuffered { get; private set; }
 
     /// <summary>
-    /// Stack of code replies for codes that pushed the stack (e.g. macro files or blocking messages)
+    /// Queue of code replies for codes that pushed the stack (e.g. macro files or blocking messages).
+    /// Replies must be consumed in arrival order, else multi-chunk replies are reassembled wrongly
     /// </summary>
-    public Stack<Tuple<MessageTypeFlags, string>> PendingReplies { get; } = new();
+    public Queue<Tuple<MessageTypeFlags, string>> PendingReplies { get; } = new();
 
     /// <summary>
     /// Print diagnostics of this class
@@ -636,7 +647,10 @@ public sealed class Processor
                 {
                     if (startCode is not null && abortAll)
                     {
-                        // Wait for the macro to be fully cancelled and then cancel the code that started it
+                        // Wait for the macro to be fully cancelled and then cancel the code that started it.
+                        // Copy the code to a local first because startCode is shared across loop iterations
+                        // and must be reset here so lower stack levels cannot complete it a second time
+                        Code codeToComplete = startCode;
                         _ = macro.WaitForFinishAsync().ContinueWith(async task =>
                         {
                             try
@@ -645,9 +659,10 @@ public sealed class Processor
                             }
                             finally
                             {
-                                _codeProcessor.CodeCompleted(startCode);
+                                _codeProcessor.CodeCompleted(codeToComplete);
                             }
                         }, TaskContinuationOptions.RunContinuationsAsynchronously);
+                        startCode = null;
                     }
 
                     // Abort the macro file
@@ -730,9 +745,12 @@ public sealed class Processor
             {
                 using (await macro.LockAsync(_lifetime.ApplicationStopping))
                 {
-                    // Resolve potential start codes when the macro file finishes
+                    // Resolve potential start codes when the macro file finishes. Copy the code to a local
+                    // first because startCode is shared across loop iterations and must be reset here so
+                    // lower stack levels cannot complete it a second time
                     if (startCode is not null)
                     {
+                        Code codeToComplete = startCode;
                         _ = macro.WaitForFinishAsync().ContinueWith(async task =>
                         {
                             try
@@ -741,9 +759,10 @@ public sealed class Processor
                             }
                             finally
                             {
-                                _codeProcessor.CodeCompleted(startCode);
+                                _codeProcessor.CodeCompleted(codeToComplete);
                             }
                         }, TaskContinuationOptions.RunContinuationsAsynchronously);
+                        startCode = null;
                     }
 
                     // Abort the macro file
@@ -816,7 +835,7 @@ public sealed class Processor
     /// </summary>
     private void ResolvePendingReplies()
     {
-        while (BufferedCodes.Count > 0 && PendingReplies.TryPop(out Tuple<MessageTypeFlags, string>? reply))
+        while (BufferedCodes.Count > 0 && PendingReplies.TryDequeue(out Tuple<MessageTypeFlags, string>? reply))
         {
             HandleReply(reply.Item1, reply.Item2);
         }
@@ -953,7 +972,7 @@ public sealed class Processor
         }
 
         // Log untracked code replies
-        while (PendingReplies.TryPop(out Tuple<MessageTypeFlags, string>? reply))
+        while (PendingReplies.TryDequeue(out Tuple<MessageTypeFlags, string>? reply))
         {
             _logger.LogWarning("Pending out-of-order reply: '{Reply}'", reply.Item2);
         }
@@ -1056,7 +1075,7 @@ public sealed class Processor
             }
             else if (_linkAdapter.ProtocolVersion >= 3)
             {
-                PendingReplies.Push(new Tuple<MessageTypeFlags, string>(flags, reply));
+                PendingReplies.Enqueue(new Tuple<MessageTypeFlags, string>(flags, reply));
                 return true;
             }
         }
@@ -1071,7 +1090,7 @@ public sealed class Processor
             }
             else if (_linkAdapter.ProtocolVersion >= 3)
             {
-                PendingReplies.Push(new Tuple<MessageTypeFlags, string>(flags, reply));
+                PendingReplies.Enqueue(new Tuple<MessageTypeFlags, string>(flags, reply));
                 return true;
             }
         }

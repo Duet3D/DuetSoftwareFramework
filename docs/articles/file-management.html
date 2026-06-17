@@ -1,0 +1,239 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>File management </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="File management ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/Duet3D/DuetSoftwareFramework/blob/v3.7-dev/src/Documentation/articles/file-management.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="file-management">File management</h1>
+
+<p>RepRapFirmware addresses files with FatFs-style virtual paths (<code>0:/sys/config.g</code>). DSF has no real SD
+card - it maps those paths onto a directory on the Linux filesystem, parses G-code metadata for the
+web interface, and runs print jobs and macros out of that tree.</p>
+<ul>
+<li>Path mapping: <code>src/DuetControlServer/Files/FilePathResolver.cs</code></li>
+<li>Jobs and macros: <code>src/DuetControlServer/Files/JobProcessor.cs</code>, <code>Files/CodeFile.cs</code>, <code>Files/MacroFile.cs</code></li>
+<li>File info: <code>src/DuetControlServer/Files/Parser/</code></li>
+<li>Directory keys: <code>src/DuetAPI/ObjectModel/Directories/</code></li>
+</ul>
+<h2 id="path-mapping">Path mapping</h2>
+<p><code>FilePathResolver</code> translates between virtual and physical paths
+(<code>ToPhysical</code> / <code>ToVirtualAsync</code>):</p>
+<ul>
+<li>Drive <code>0:/</code> maps to the base directory, default <code>/opt/dsf/sd</code> (the <code>-b</code> / <code>--base-directory</code>
+option).</li>
+<li>Drives <code>1:/</code>, <code>2:/</code>, ... map to additional mounted <a href="object-model.html#top-level-keys">volumes</a> via
+<code>Volumes[n].Path</code>.</li>
+<li>A leading-driveless relative path is resolved against a <code>FileDirectory</code> context (for example a macro
+name is resolved against the macros directory).</li>
+</ul>
+<h3 id="directory-layout">Directory layout</h3>
+<p>The standard directories live under drive 0 and are exposed in the
+<a href="object-model.html#top-level-keys"><code>Directories</code></a> model key:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>Holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>System</code></td>
+<td><code>0:/sys/</code></td>
+<td><code>config.g</code>, <code>config-override.g</code>, homing and other system macros</td>
+</tr>
+<tr>
+<td><code>GCodes</code></td>
+<td><code>0:/gcodes/</code></td>
+<td>Print job files</td>
+</tr>
+<tr>
+<td><code>Macros</code></td>
+<td><code>0:/macros/</code></td>
+<td>User macro files</td>
+</tr>
+<tr>
+<td><code>Filaments</code></td>
+<td><code>0:/filaments/</code></td>
+<td>Per-filament configuration</td>
+</tr>
+<tr>
+<td><code>Firmware</code></td>
+<td><code>0:/firmware/</code></td>
+<td>Firmware and IAP binaries</td>
+</tr>
+<tr>
+<td><code>Web</code></td>
+<td><code>0:/www/</code></td>
+<td>DuetWebControl and plugin web assets</td>
+</tr>
+<tr>
+<td><code>Menu</code></td>
+<td><code>0:/menu/</code></td>
+<td>12864-display menu files (unused on the SBC)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="reading-codes-from-files">Reading codes from files</h2>
+<p>A file on disk becomes codes through <code>CodeFile</code> (<code>Files/CodeFile.cs</code>), which parses lazily through a
+<code>CodeParserBuffer</code> - one <a href="gcode-flow.html#the-code-object"><code>Code</code></a> at a time, tracking byte position and
+line number. <code>CodeFile</code> is also where <a href="gcode-flow.html#flow-control">flow control</a> (<code>if</code>/<code>while</code>/...)
+lives: it keeps a stack of <code>CodeBlock</code>s and decides which lines to execute or skip based on evaluated
+conditions and indentation.</p>
+<h3 id="print-jobs">Print jobs</h3>
+<pre><code class="lang-mermaid">flowchart TD
+    SEL[&quot;M23/M32 -&gt; JobProcessor.SelectFileAsync()&quot;] --&gt; OPEN[&quot;FileFactory.Create() -&gt; CodeFile&quot;]
+    OPEN --&gt; LOOP[&quot;JobProcessor.DoFilePrint()&lt;br/&gt;read a pool of codes&quot;]
+    LOOP --&gt; READ[&quot;CodeFile.ReadCodeAsync()&lt;br/&gt;lazy parse + flow control&quot;]
+    READ --&gt; PIPE[&quot;Code.ExecuteAsync()&lt;br/&gt;-&gt; code pipeline&quot;]
+    PIPE --&gt; LOOP
+
+    LOOP -- &quot;pause&quot; --&gt; PAUSE[&quot;save FilePosition&lt;br/&gt;await resume&quot;]
+    PAUSE -- &quot;resume&quot; --&gt; SEEK[&quot;seek to saved position&quot;]
+    SEEK --&gt; LOOP
+
+    READ -- &quot;M98 / firmware macro request&quot; --&gt; MAC[&quot;MacroFile + ChannelProcessor.Push()&quot;]
+    MAC --&gt; MACLOOP[&quot;MacroFile.RunAsync()&lt;br/&gt;buffered async execution&quot;]
+    MACLOOP -- &quot;macro ends&quot; --&gt; POP[&quot;ChannelProcessor.Pop()&lt;br/&gt;restore parent codes&quot;]
+    POP --&gt; LOOP
+</code></pre>
+<p><code>JobProcessor</code> (<code>Files/JobProcessor.cs</code>) owns the print lifecycle. <code>SelectFileAsync</code> opens the file on
+the <a href="gcode-flow.html#code-channels"><code>File</code> channel</a>; <code>DoFilePrint()</code> then reads codes and pushes them
+into the <a href="gcode-flow.html#the-six-stage-code-pipeline">pipeline</a>. File position advances by
+<code>FilePosition + Length</code> per code.</p>
+<p>On <strong>pause</strong>, the current position is saved and the loop waits on a resume signal; on <strong>resume</strong> it
+seeks back and continues. Note that block state is not persisted across a pause - on resume the file
+seeks to the saved byte offset and re-parses any open blocks from there, so a <code>while</code> counter resets.</p>
+<p><code>M606 S1</code> <strong>forks</strong> the job (<code>ForkAsync</code>): the <code>CodeFile</code> state, including the block stack and parser
+buffer, is copied onto the <a href="gcode-flow.html#code-channels"><code>File2</code> channel</a> so two motion systems can
+print in parallel.</p>
+<h2 id="macros">Macros</h2>
+<p>A macro is a <code>MacroFile</code> (<code>Files/MacroFile.cs</code>), a <code>CodeFile</code> that runs its codes asynchronously on
+the channel that owns it. Each channel keeps a stack of macro levels; starting a macro pushes a level
+and exhausting it pops one, restoring any suspended parent codes (the stack lives in the
+<a href="firmware-link.html#sending-codes-to-the-firmware">firmware channel processor</a>).</p>
+<ul>
+<li>A <strong>nested macro</strong> is started by a code - <code>M98</code>, or implicitly <code>config.g</code>, <code>M501</code>, a homing file,
+... - and carries its start code and source connection. Its codes are flagged <code>IsFromMacro</code> (plus
+<code>IsNestedMacro</code>, <code>IsFromConfig</code>, etc. as applicable).</li>
+<li>A <strong>system macro</strong> is requested by the firmware over the <a href="firmware-link.html#requests-initiated-by-the-firmware">Firmware link</a>
+with no start code.</li>
+</ul>
+<p>For <code>config.g</code>, DCS injects synthetic codes (machine name, date/time) so the configuration reflects
+the host environment.</p>
+<h2 id="file-info-parsing">File info parsing</h2>
+<p><code>Files/Parser/FileInfoParser.cs</code> extracts metadata from G-code files for the web interface and the
+<code>M36</code> command. It scans a bounded header and footer for slicer-specific comment patterns and reports:
+print time and simulated time, layer height and layer count, per-extruder filament usage, object
+height, the generating slicer, user-defined custom info, and embedded thumbnails.</p>
+<p>Thumbnails are decoded under <code>Files/Parser/ImageProcessing/</code>: <code>ImageParser.cs</code> handles PNG/JPG/QOI
+thumbnails embedded as base64 between <code>thumbnail begin</code>/<code>thumbnail end</code> markers, and
+<code>IconImageParser.cs</code> decodes the proprietary RGB565 icon format to PNG. <code>M36.1</code> / <code>M36.2</code> stream
+thumbnail data and file fragments on demand.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="gcode-flow.html">G-code flow</a> - the pipeline these files feed, and the flow-control details</li>
+<li><a href="firmware-link.html#requests-initiated-by-the-firmware">Firmware link</a> - firmware macro and file-I/O requests</li>
+<li><a href="object-model.html">Object model</a> - the <code>Job</code>, <code>Directories</code>, and <code>Volumes</code> keys</li>
+</ul>
+
+</article>
+
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

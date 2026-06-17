@@ -1,6 +1,6 @@
 # SPI Link to RepRapFirmware
 
-This is the DSF-side description of the SPI link to the Duet main board. It is the mirror of [RepRapFirmware/docs/devel/SBC_INTERFACE.md](../../../RepRapFirmware/docs/devel/SBC_INTERFACE.md), describing the same protocol from the master side.
+This is the DSF-side description of the SPI link to the Duet main board. It is the mirror of [RepRapFirmware/docs/devel/SBC_INTERFACE.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/SBC_INTERFACE.md), describing the same protocol from the master side.
 
 ## 1. Component layout
 
@@ -212,7 +212,7 @@ Useful for tuning `SbcTransferDelay`, diagnosing SBC-side scheduling jitter, or 
 
 ## 13. Where this connects to the rest of the system
 
-- Firmware-side mirror — [RepRapFirmware/docs/devel/SBC_INTERFACE.md](../../../RepRapFirmware/docs/devel/SBC_INTERFACE.md).
+- Firmware-side mirror — [RepRapFirmware/docs/devel/SBC_INTERFACE.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/SBC_INTERFACE.md).
 - Code routing through this link — [CODE_PIPELINE.md](CODE_PIPELINE.md).
 - Path resolution feeding the file proxy — [FILES.md](FILES.md).
 - Object Model merging — [OBJECT_MODEL.md](OBJECT_MODEL.md).

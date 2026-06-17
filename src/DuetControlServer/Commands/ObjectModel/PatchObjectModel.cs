@@ -18,25 +18,26 @@ public sealed class PatchObjectModel(Model.ObjectModel model, IOptions<Settings>
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public override Task ExecuteAsync(CancellationToken cancellationToken = default)
+    public override async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
         if (!settings.Value.AllowCustomModelPatches)
         {
             throw new InvalidOperationException("Command is only supported in non-SPI mode");
         }
 
-        if (model.UpdateFromJson(Key, Patch))
+        using (await model.AccessReadWriteAsync(cancellationToken))
         {
-            if (model.IsUpdating && model.State.Status != MachineStatus.Updating)
+            if (model.UpdateFromJson(Key, Patch))
             {
-                model.State.Status = MachineStatus.Updating;
+                if (model.IsUpdating && model.State.Status != MachineStatus.Updating)
+                {
+                    model.State.Status = MachineStatus.Updating;
+                }
+            }
+            else
+            {
+                throw new ArgumentException($"Property '{Key}' not found");
             }
         }
-        else
-        {
-            throw new ArgumentException($"Property '{Key}' not found");
-        }
-
-        return Task.CompletedTask;
     }
 }

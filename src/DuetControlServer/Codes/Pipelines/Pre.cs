@@ -20,11 +20,7 @@ namespace DuetControlServer.Codes.Pipelines;
 public sealed class Pre(ChannelProcessor channelProcessor, CodeProcessor codeProcessor, LinkInterface linkInterface, IHostApplicationLifetime lifetime, IOptions<Settings> settings)
     : PipelineBase(PipelineStage.Pre, channelProcessor, codeProcessor, lifetime, settings)
 {
-    /// <summary>
-    /// Process an incoming code
-    /// </summary>
-    /// <param name="code">Code to process</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task ProcessCodeAsync(Commands.Code code)
     {
         if (!code.Flags.HasFlag(CodeFlags.IsPreProcessed))

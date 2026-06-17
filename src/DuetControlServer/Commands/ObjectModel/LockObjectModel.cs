@@ -10,9 +10,7 @@ namespace DuetControlServer.Commands;
 /// <param name="lockManager">Lock manager</param>
 public sealed class LockObjectModel(LockManager lockManager) : DuetAPI.Commands.LockObjectModel, IConnectionCommand
 {
-    /// <summary>
-    /// Source connection of this command
-    /// </summary>
+    /// <inheritdoc />
     public Connection? Connection { get; set; }
 
     /// <summary>

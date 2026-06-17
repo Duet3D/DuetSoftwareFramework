@@ -4,7 +4,9 @@ This document describes how DSF is laid out at the project level, what gets buil
 
 ## 1. Solution and projects
 
-The whole framework is a single Visual Studio solution: [`DuetSoftwareFramework.sln`](../../src/DuetSoftwareFramework.sln). Every project is .NET 8/9.
+The whole framework is a single Visual Studio solution: [`DuetSoftwareFramework.sln`](../../src/DuetSoftwareFramework.sln). Most executable projects target .NET 10, the reusable libraries multi-target where required, and the source-generator project targets `netstandard2.0`.
+
+Each project directory under [`src/`](../../src) also carries a local `README.md` with project-specific architecture notes, interfaces, runtime expectations, and verification guidance.
 
 ```mermaid
 flowchart LR
@@ -119,5 +121,5 @@ Bump a contract on one side without the other → first contact fails (DCS exits
 
 ## 7. Where this connects to the rest of the system
 
-- For RRF's matching matrix see [RepRapFirmware/docs/devel/BUILD_VARIANTS.md](../../../RepRapFirmware/docs/devel/BUILD_VARIANTS.md).
+- For RRF's matching matrix see [RepRapFirmware/docs/devel/BUILD_VARIANTS.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/BUILD_VARIANTS.md).
 - For the integration-level cross-version compatibility table see [../architecture/COMPATIBILITY.md](../architecture/COMPATIBILITY.md).

@@ -25,7 +25,7 @@ public class SetLastCodeResultRequest(CodeChannel channel, CodeResult result)
     /// <summary>
     /// Internal TCS for the task
     /// </summary>
-    private readonly TaskCompletionSource _tcs = new();
+    private readonly TaskCompletionSource _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     /// <summary>
     /// Task that completes when the request has been fulfilled

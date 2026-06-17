@@ -18,16 +18,6 @@ public partial class Board : ModelObject, IStaticModelObject
     private Accelerometer? _accelerometer;
 
     /// <summary>
-    /// Filename of the bootloader binary or null if unknown
-    /// </summary>
-    public string? BootloaderFileName
-    {
-        get => _bootloaderFileName;
-        set => SetPropertyValue(ref _bootloaderFileName, value);
-    }
-    private string? _bootloaderFileName;
-
-    /// <summary>
     /// CAN address of this board or null if not applicable
     /// </summary>
     public int? CanAddress
@@ -78,14 +68,14 @@ public partial class Board : ModelObject, IStaticModelObject
     private string _firmwareDate = string.Empty;
 
     /// <summary>
-    /// Filename of the firmware binary or null if unknown
+    /// Filename of the firmware binary
     /// </summary>
-    public string? FirmwareFileName
+    public string FirmwareFileName
     {
         get => _firmwareFileName;
         set => SetPropertyValue(ref _firmwareFileName, value);
     }
-    private string? _firmwareFileName;
+    private string _firmwareFileName = string.Empty;
 
     /// <summary>
     /// Name of the firmware build

@@ -1,0 +1,524 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>G-code flow </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="G-code flow ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/Duet3D/DuetSoftwareFramework/blob/v3.7-dev/src/Documentation/articles/gcode-flow.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="g-code-flow">G-code flow</h1>
+
+<p>This article follows a single G/M/T-code through DuetControlServer (DCS): how its source text becomes
+a <a href="#the-code-object"><code>Code</code></a>, how the six-stage pipeline processes it, what DCS handles itself versus
+forwards to RepRapFirmware (RRF), and how its reply gets back to the client. The final hop to the
+firmware is covered separately in <a href="firmware-link.html">Firmware link</a>; files and macros in
+<a href="file-management.html">File management</a>.</p>
+<p>Paths are relative to the repository root; line numbers are indicative - the file and method names are
+the stable references.</p>
+<h2 id="the-code-object">The Code object</h2>
+<p>Every G/M/T-code, comment, or meta keyword is one <code>Code</code> object.</p>
+<ul>
+<li>API type: <code>src/DuetAPI/Commands/Code/Code.cs</code></li>
+<li>DCS subclass with execution logic: <code>src/DuetControlServer/Commands/Generic/Code.cs</code></li>
+</ul>
+<p>Key fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Type</code> (<code>CodeType</code>)</td>
+<td><code>G</code>, <code>M</code>, <code>T</code>, <code>Comment</code>, or <code>Keyword</code></td>
+</tr>
+<tr>
+<td><code>Channel</code> (<code>CodeChannel</code>)</td>
+<td>Input channel the code belongs to (see below)</td>
+</tr>
+<tr>
+<td><code>MajorNumber</code> / <code>MinorNumber</code></td>
+<td>e.g. <code>28</code> / <code>null</code> for <code>G28</code>, <code>54</code> / <code>3</code> for <code>G54.3</code></td>
+</tr>
+<tr>
+<td><code>Parameters</code> (<code>List&lt;CodeParameter&gt;</code>)</td>
+<td>Parsed parameters, each with a typed value and an <code>IsExpression</code> flag</td>
+</tr>
+<tr>
+<td><code>Keyword</code> / <code>KeywordArgument</code></td>
+<td>For meta codes: <code>if</code>, <code>elif</code>, <code>else</code>, <code>while</code>, <code>break</code>, <code>continue</code>, <code>abort</code>, <code>echo</code>, <code>var</code>, <code>set</code>, <code>global</code></td>
+</tr>
+<tr>
+<td><code>Flags</code> (<code>CodeFlags</code>)</td>
+<td><code>Asynchronous</code>, <code>IsFromFirmware</code>, <code>IsFromMacro</code>, <code>IsPrioritized</code>, <code>Unbuffered</code>, and the progress flags <code>IsPreProcessed</code> / <code>IsInternallyProcessed</code> / <code>IsPostProcessed</code></td>
+</tr>
+<tr>
+<td><code>FilePosition</code> / <code>Length</code></td>
+<td>Byte offset and length in the source file</td>
+</tr>
+<tr>
+<td><code>LineNumber</code> / <code>Indent</code></td>
+<td>Source line and indentation level (indentation drives block nesting)</td>
+</tr>
+<tr>
+<td><code>SourceConnection</code></td>
+<td>IPC connection id that submitted the code (0 if internal)</td>
+</tr>
+<tr>
+<td><code>Result</code> (<code>Message?</code>)</td>
+<td>Reply text and type, filled in once the code completes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="code-channels">Code channels</h3>
+<p><code>src/DuetAPI/CodeChannel.cs</code> defines every channel a code can belong to. Each channel is processed
+independently and in parallel:</p>
+<table>
+<thead>
+<tr>
+<th>Channel</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HTTP</code></td>
+<td>Codes from HTTP clients (DWC, REST API)</td>
+</tr>
+<tr>
+<td><code>Telnet</code></td>
+<td>Telnet session</td>
+</tr>
+<tr>
+<td><code>File</code></td>
+<td>Primary file print job</td>
+</tr>
+<tr>
+<td><code>USB</code></td>
+<td>USB serial</td>
+</tr>
+<tr>
+<td><code>Aux</code></td>
+<td>Serial device, e.g. PanelDue</td>
+</tr>
+<tr>
+<td><code>Trigger</code></td>
+<td>Trigger macros and <code>config.g</code></td>
+</tr>
+<tr>
+<td><code>Queue</code></td>
+<td>Code queue synced with primary motion</td>
+</tr>
+<tr>
+<td><code>LCD</code></td>
+<td>Auxiliary LCD device</td>
+</tr>
+<tr>
+<td><code>SBC</code></td>
+<td>Default channel for SPI requests from the firmware</td>
+</tr>
+<tr>
+<td><code>Daemon</code></td>
+<td><code>daemon.g</code> background process</td>
+</tr>
+<tr>
+<td><code>Aux2</code></td>
+<td>Second UART</td>
+</tr>
+<tr>
+<td><code>Autopause</code></td>
+<td>Power-fail / heater-fault / filament-out macros</td>
+</tr>
+<tr>
+<td><code>File2</code></td>
+<td>Secondary (forked) file print job</td>
+</tr>
+<tr>
+<td><code>Queue2</code></td>
+<td>Code queue synced with secondary motion</td>
+</tr>
+<tr>
+<td><code>USB2</code></td>
+<td>Secondary USB channel</td>
+</tr>
+</tbody>
+</table>
+<h2 id="where-codes-enter-the-system">Where codes enter the system</h2>
+<p>A code becomes a <code>Code</code> object through one of several intake points. Text is turned into structured
+codes by the parser in <code>src/DuetAPI/Commands/Code/Parser.cs</code> / <code>ParserAsync.cs</code>, which uses a
+<code>CodeParserBuffer</code> to retain state across reads (line number, last G-code for Fanuc-style repetition,
+indentation, <code>G53</code> absolute mode).</p>
+<pre><code class="lang-mermaid">flowchart TD
+    IPC[&quot;IPC socket clients&lt;br/&gt;(see ipc.md)&quot;] --&gt; CSTREAM[&quot;CodeStream&lt;br/&gt;(streamed lines)&quot;]
+    IPC --&gt; CMD[&quot;Command&lt;br/&gt;(Code / SimpleCode)&quot;]
+    IPC --&gt; INTERCEPT[&quot;CodeInterception&lt;br/&gt;(plugin rewrites)&quot;]
+
+    FILEJOB[&quot;Print job&lt;br/&gt;JobProcessor&quot;] --&gt; CODEFILE[&quot;CodeFile.ReadCodeAsync()&quot;]
+    MACRO[&quot;Macro file&lt;br/&gt;MacroFile&quot;] --&gt; CODEFILE
+
+    FWREQ[&quot;RRF over firmware link&lt;br/&gt;(see firmware-link.md)&quot;] --&gt; SIMPLE[&quot;DoFirmwareCode&lt;br/&gt;SimpleCode, IsFromFirmware&quot;]
+
+    CSTREAM --&gt; START
+    CMD --&gt; START
+    INTERCEPT --&gt; START
+    CODEFILE --&gt; START
+    SIMPLE --&gt; START
+
+    START[&quot;CodeProcessor.StartCodeAsync()&quot;]
+</code></pre>
+<ul>
+<li><strong>IPC connections</strong> (<a href="ipc.html">ipc.md</a>): the <code>Command</code> mode runs a <code>Code</code>/<code>SimpleCode</code>; <code>CodeStream</code>
+feeds streamed lines on a channel; <code>Intercept</code> lets plugins rewrite codes in flight.</li>
+<li><strong>Print jobs and macros</strong> (<a href="file-management.html">file-management.md</a>): the job loop and macros read
+codes lazily from files on the <code>File</code>/<code>File2</code> and macro-owning channels.</li>
+<li><strong>Firmware <code>DoCode</code></strong> (<a href="firmware-link.html#requests-initiated-by-the-firmware">firmware-link.md</a>): RRF can ask
+the SBC to run a code; a <code>SimpleCode</code> flagged <code>IsFromFirmware</code> is built and executed.</li>
+</ul>
+<p><code>SimpleCode</code> (<code>src/DuetControlServer/Commands/Generic/SimpleCode.cs</code>) parses an arbitrary text string
+(possibly several codes) and runs each resulting <code>Code</code>.</p>
+<h2 id="the-six-stage-code-pipeline">The six-stage code pipeline</h2>
+<p>Once a <code>Code</code> is handed to <code>CodeProcessor.StartCodeAsync()</code>
+(<code>src/DuetControlServer/Codes/CodeProcessor.cs</code>), it flows through six ordered stages defined by the
+<code>PipelineStage</code> enum (<code>src/DuetControlServer/Codes/Pipelines/PipelineStage.cs</code>):</p>
+<pre><code>Start -&gt; Pre -&gt; ProcessInternally -&gt; Post -&gt; Firmware -&gt; Executed
+</code></pre>
+<p>Each stage is a <code>PipelineBase</code> subclass under <code>src/DuetControlServer/Codes/Pipelines/</code>. The hand-off
+between stages is a bounded <code>System.Threading.Channel&lt;Code&gt;</code> (the <code>Executed</code> stage uses an unbounded
+channel so finalisation can never deadlock). A stage finishes by calling
+<code>ChannelProcessor.WriteCodeAsync(code, nextStage)</code>, which enqueues the code on the next stage's
+channel. A dedicated processor task per stage reads its channel and runs <code>ProcessCodeAsync</code> one code
+at a time, so ordering within a single file/macro context is preserved.</p>
+<pre><code class="lang-mermaid">flowchart TD
+    A[Code arrives] --&gt; START
+
+    START[&quot;Start&lt;br/&gt;account for unbuffered/priority codes&quot;]
+    START --&gt; PRE
+
+    PRE{&quot;Pre&lt;br/&gt;InterceptionMode.Pre&quot;}
+    PRE -- &quot;interceptor resolved&quot; --&gt; EXEC
+    PRE -- &quot;not resolved&quot; --&gt; PROC
+
+    PROC{&quot;ProcessInternally&lt;br/&gt;code.ProcessInternally()&quot;}
+    PROC -- &quot;handled on SBC&quot; --&gt; EXEC
+    PROC -- &quot;needs firmware&quot; --&gt; POST
+
+    POST{&quot;Post&lt;br/&gt;InterceptionMode.Post&quot;}
+    POST -- &quot;interceptor resolved&quot; --&gt; EXEC
+    POST -- &quot;not resolved&quot; --&gt; FW
+
+    FW[&quot;Firmware&lt;br/&gt;buffer for firmware link&quot;]
+    FW --&gt; EXEC
+
+    EXEC[&quot;Executed&lt;br/&gt;InterceptionMode.Executed&lt;br/&gt;SetFinished() / SetCancelled()&quot;]
+    EXEC --&gt; DONE[Reply returned to client]
+</code></pre>
+<p>Stage by stage:</p>
+<ol>
+<li><strong>Start</strong> (<code>Pipelines/Start.cs</code>): accounts for unbuffered and prioritised codes (an <code>Unbuffered</code>
+code blocks the channel until it completes; a prioritised code may overtake), then forwards to
+<strong>Pre</strong>.</li>
+<li><strong>Pre</strong> (<code>Pipelines/Pre.cs</code>): offers the code to plugins via the
+<a href="ipc.html#intercept"><code>Intercept</code> connection</a> in <code>Pre</code> mode. If a plugin <em>resolves</em> it, the code jumps
+straight to <strong>Executed</strong>; otherwise it proceeds to <strong>ProcessInternally</strong>. The <code>IsPreProcessed</code> flag
+prevents re-interception on re-entry.</li>
+<li><strong>ProcessInternally</strong> (<code>Pipelines/ProcessInternally.cs</code>): calls <code>code.ProcessInternally()</code>. If DCS
+fully handles the code (non-null result) it goes to <strong>Executed</strong>; otherwise it continues to
+<strong>Post</strong>. Sets <code>IsInternallyProcessed</code>. This is where the per-type handlers run (see
+<a href="#internal-processing-vs-forwarding-to-firmware">Internal processing</a>).</li>
+<li><strong>Post</strong> (<code>Pipelines/Post.cs</code>): a second interception hook, <code>Post</code> mode. Resolve -&gt; <strong>Executed</strong>;
+otherwise -&gt; <strong>Firmware</strong>. Sets <code>IsPostProcessed</code>.</li>
+<li><strong>Firmware</strong> (<code>Pipelines/Firmware.cs</code>): not a processing stage - it has no processor task. Codes
+parked here are picked up by the <a href="firmware-link.html">firmware link layer</a>, serialised, and transmitted to RRF.
+Its <code>FlushAsync</code> delegates to the link interface so callers can wait for the firmware to drain.</li>
+<li><strong>Executed</strong> (<code>Pipelines/Executed.cs</code>): the terminal stage. Runs <code>Executed</code>-mode interception
+(notification only - it cannot resolve), then finalises the code with <code>SetFinished()</code> or, on
+failure/cancellation, <code>SetCancelled()</code>. The result travels back to the originating client.</li>
+</ol>
+<h3 id="channelprocessor-and-the-per-channel-stack">ChannelProcessor and the per-channel stack</h3>
+<p><code>CodeProcessor</code> holds one <code>ChannelProcessor</code> per <a href="#code-channels">code channel</a>
+(<code>src/DuetControlServer/Codes/ChannelProcessor.cs</code>). Each <code>ChannelProcessor</code> owns the full six-stage
+pipeline for that channel. To support nested files and macros, every stage keeps a
+<code>Stack&lt;PipelineStackItem&gt;</code>: starting a macro pushes a new stack item onto all non-Executed stages at
+once; ending it pops them. Each stack item has its own processor task, so a macro nested on top of a
+print runs concurrently with - but logically above - the codes beneath it.</p>
+<h2 id="internal-processing-vs-forwarding-to-firmware">Internal processing vs. forwarding to firmware</h2>
+<p><code>code.ProcessInternally()</code> (<code>src/DuetControlServer/Commands/Generic/Code.cs</code>) dispatches by code type
+to one of four handlers registered through keyed DI (<code>Codes/Handlers/</code>):</p>
+<ul>
+<li><code>GCodeHandler</code>, <code>MCodeHandler</code>, <code>TCodeHandler</code>, <code>KeywordHandler</code>, all implementing <code>ICodeHandler</code>.</li>
+</ul>
+<p>The contract: a handler's <code>ProcessAsync</code> returns a <code>Message?</code>. <strong>Non-null means the code was fully
+handled on the SBC and is never sent to the firmware</strong>; <strong>null means &quot;forward to the firmware&quot;</strong> (the
+code continues to Post -&gt; Firmware).</p>
+<pre><code class="lang-mermaid">flowchart TD
+    PI[&quot;code.ProcessInternally()&quot;] --&gt; TYPE{Code type}
+    TYPE -- &quot;G&quot; --&gt; GH[&quot;GCodeHandler&lt;br/&gt;always returns null&quot;]
+    TYPE -- &quot;T&quot; --&gt; TH[&quot;TCodeHandler&lt;br/&gt;always returns null&quot;]
+    TYPE -- &quot;M&quot; --&gt; MH[&quot;MCodeHandler&lt;br/&gt;selected M-codes handled,&lt;br/&gt;rest return null&quot;]
+    TYPE -- &quot;Keyword&lt;br/&gt;(echo/abort/var/set/global)&quot; --&gt; KH[&quot;KeywordHandler&quot;]
+
+    GH --&gt; FWD[&quot;null -&gt; forward to firmware&quot;]
+    TH --&gt; FWD
+    MH --&gt; DECIDE{handled?}
+    DECIDE -- &quot;yes&quot; --&gt; RESOLVED[&quot;non-null -&gt; resolved on SBC&quot;]
+    DECIDE -- &quot;no&quot; --&gt; FWD
+    KH --&gt; RESOLVED
+</code></pre>
+<ul>
+<li><p><strong>G-codes and T-codes</strong> are always forwarded - DCS does not interpret motion or tool-change
+semantics; RRF does.</p>
+</li>
+<li><p><strong>M-codes</strong>: <code>MCodeHandler</code> handles the M-codes that need SBC-side resources - filesystem,
+networking, the <a href="object-model.html">object model</a>, plugins, firmware update - and forwards the rest.
+Notable SBC-handled M-codes:</p>
+<table>
+<thead>
+<tr>
+<th>M-code</th>
+<th>SBC-side action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>M0/M1/M2</td>
+<td>Cancel the active job (if any), then forward</td>
+</tr>
+<tr>
+<td>M20</td>
+<td>List an SD directory from the Linux filesystem</td>
+</tr>
+<tr>
+<td>M21/M22</td>
+<td>Mount/release (the virtual SD is always mounted)</td>
+</tr>
+<tr>
+<td>M23/M32/M37</td>
+<td>Select / start / simulate a print file</td>
+</tr>
+<tr>
+<td>M24/M26/M27</td>
+<td>Resume / set / report file position</td>
+</tr>
+<tr>
+<td>M28/M29/M30</td>
+<td>Begin / end SD write, delete file</td>
+</tr>
+<tr>
+<td>M36/M38/M39</td>
+<td>File info (incl. thumbnails), CRC32, SD volume info</td>
+</tr>
+<tr>
+<td>M98</td>
+<td>Mark a macro as pausable</td>
+</tr>
+<tr>
+<td>M111 P-1</td>
+<td>Set the DCS log level</td>
+</tr>
+<tr>
+<td>M112</td>
+<td>Emergency stop via the link interface</td>
+</tr>
+<tr>
+<td>M118 P6</td>
+<td>Publish over MQTT</td>
+</tr>
+<tr>
+<td>M122 &quot;DSF&quot;</td>
+<td>DSF diagnostics</td>
+</tr>
+<tr>
+<td>M409 (network/plugins/sbc/volumes)</td>
+<td>Object-model query handled on the SBC</td>
+</tr>
+<tr>
+<td>M470/M471/M472</td>
+<td>Create / rename / delete directory or file</td>
+</tr>
+<tr>
+<td>M503/M505/M550/M551</td>
+<td>Config dump, config folder, machine name, password</td>
+</tr>
+<tr>
+<td>M581.1/M586(.4)</td>
+<td>SBC trigger config, protocol/MQTT/CORS config</td>
+</tr>
+<tr>
+<td>M606 S1</td>
+<td>Fork the input reader (start a second job on File2)</td>
+</tr>
+<tr>
+<td>M929</td>
+<td>Start/stop event logging</td>
+</tr>
+<tr>
+<td>M997/M999</td>
+<td>Firmware update / controller reset (stops the app)</td>
+</tr>
+</tbody>
+</table>
+</li>
+<li><p><strong>Keywords</strong>: <code>KeywordHandler</code> handles only <code>echo</code>, <code>abort</code>, <code>var</code>, <code>set</code>, and <code>global</code>.
+Flow-control keywords (<code>if</code>, <code>elif</code>, <code>else</code>, <code>while</code>, <code>break</code>, <code>continue</code>) never reach a handler -
+they are resolved earlier, at the file-parsing layer (<a href="#flow-control">Flow control</a>).</p>
+</li>
+</ul>
+<h2 id="meta-codes-expressions-and-flow-control">Meta codes, expressions, and flow control</h2>
+<p>Meta G-code (conditionals, loops, variables, and <code>{ ... }</code> expressions) is the one area where DCS must
+understand code structure rather than pass it through.</p>
+<h3 id="expression-evaluation">Expression evaluation</h3>
+<p><code>src/DuetControlServer/Codes/Meta/Expressions.cs</code> evaluates <code>{ ... }</code> expressions and expression
+parameters, distinguishing two kinds of operand:</p>
+<ul>
+<li><strong>SBC fields</strong>: <a href="object-model.html">object-model</a> properties marked <code>[SbcProperty]</code> (parts of
+<code>network</code>, <code>sbc</code>, <code>volumes</code>, <code>plugins</code>), the special variables <code>iterations</code> and <code>line</code>, and the
+custom functions <code>exists</code>, <code>fileexists</code>, <code>fileread</code>. These are resolved locally.</li>
+<li><strong>Firmware fields</strong>: everything else. DCS substitutes any SBC sub-expressions in place, then sends
+the remaining expression to RRF (<code>linkInterface.EvaluateExpressionAsync()</code>) for the actual
+arithmetic/boolean evaluation.</li>
+</ul>
+<p>So <code>M104 S{heat.heaters[0].target + 5}</code> has <code>heat.heaters[0].target</code> resolved by RRF (a firmware
+field), whereas <code>{sbc.ethernet.ipAddress}</code> is resolved entirely on the SBC. Expression parameters are
+rewritten to their evaluated value before the code proceeds (<code>IsExpression</code> is cleared). The custom
+functions are registered at startup by <code>Functions</code> / <code>FunctionsInitializer</code> (<code>Codes/Meta/</code>).</p>
+<h3 id="flow-control">Flow control</h3>
+<p><code>if</code>/<code>elif</code>/<code>else</code>/<code>while</code>/<code>break</code>/<code>continue</code> are handled in <code>CodeFile.ReadCodeAsync()</code>
+(<code>src/DuetControlServer/Files/CodeFile.cs</code>), not in the pipeline. The file keeps a <code>Stack&lt;CodeBlock&gt;</code>
+(<code>Files/CodeBlock.cs</code>) describing the open blocks:</p>
+<ul>
+<li>On <code>if</code>/<code>elif</code>/<code>while</code>, the condition is evaluated to <code>&quot;true&quot;</code>/<code>&quot;false&quot;</code> and stored in
+<code>CodeBlock.ProcessBlock</code>; if false, the block's codes are skipped.</li>
+<li><code>elif</code>/<code>else</code> consult the previous block's <code>ExpectingElse</code> flag.</li>
+<li>A <code>while</code> block records its <code>FilePosition</code>; when the block ends and the loop should continue, the
+file seeks back and increments <code>CodeBlock.Iterations</code> (exposed as the <code>iterations</code> variable).</li>
+<li><code>break</code>/<code>continue</code> flush the channel and set <code>ProcessBlock</code>/<code>ContinueLoop</code> on the enclosing while.</li>
+<li><code>var</code>/<code>global</code>/<code>set</code> blocks track <code>HasLocalVariables</code>; locals declared inside a block are deleted
+when it ends.</li>
+</ul>
+<p>Block nesting is keyed off <code>Indent</code>. Block state is not persisted across a pause - see
+<a href="file-management.html#print-jobs">File management</a>.</p>
+<h2 id="end-to-end-example">End-to-end example</h2>
+<p>A <code>M104 S200</code> typed in DWC during a print:</p>
+<ol>
+<li>DWC posts the code; it arrives over the <a href="ipc.html">IPC socket</a> and is parsed into a <code>Code</code> on the
+<code>HTTP</code> channel, then handed to <code>CodeProcessor.StartCodeAsync()</code>.</li>
+<li><strong>Start</strong> accounts for it and forwards to <strong>Pre</strong>.</li>
+<li><strong>Pre</strong>: no interceptor resolves it -&gt; <strong>ProcessInternally</strong>.</li>
+<li><strong>ProcessInternally</strong>: <code>MCodeHandler</code> does not special-case M104, returns null -&gt; <strong>Post</strong>.</li>
+<li><strong>Post</strong>: no interceptor resolves it -&gt; <strong>Firmware</strong>.</li>
+<li><strong>Firmware</strong>: the <a href="firmware-link.html">Firmware link</a> buffers it for the <code>HTTP</code> channel and, on the next
+transfer, serialises and sends it to RRF.</li>
+<li>RRF sets the tool temperature and returns a reply; DCS matches it to the buffered code and sets its
+<code>Result</code>.</li>
+<li><strong>Executed</strong>: the <code>Executed</code> interception fires, the code is finalised with <code>SetFinished()</code>, and
+the reply is returned to DWC.</li>
+</ol>
+<p>Meanwhile the print continues on the <code>File</code> channel completely independently, with its own pipeline,
+macro stack, and SPI buffer - the two channels never block each other.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="firmware-link.html">Firmware link</a> - the Firmware stage and what happens once a code leaves DCS</li>
+<li><a href="file-management.html">File management</a> - jobs, macros, and the flow-control details</li>
+<li><a href="ipc.html">IPC</a> - the connections codes arrive on</li>
+<li><a href="object-model.html">Object model</a> - the state expressions read</li>
+</ul>
+
+</article>
+
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

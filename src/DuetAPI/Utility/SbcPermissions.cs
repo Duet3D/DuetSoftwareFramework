@@ -169,20 +169,10 @@ public enum SbcPermissions
 /// </summary>
 public class SbcPermissionsConverter : JsonConverter<SbcPermissions>
 {
-    /// <summary>
-    /// Checks if the given type can be converted
-    /// </summary>
-    /// <param name="typeToConvert">Type to convert</param>
-    /// <returns>Whether the type can be converted</returns>
+    /// <inheritdoc />
     public override bool CanConvert(Type typeToConvert) => typeToConvert == typeof(SbcPermissions);
 
-    /// <summary>
-    /// Read SBC permissions from JSON
-    /// </summary>
-    /// <param name="reader">JSON reader</param>
-    /// <param name="typeToConvert">Target type</param>
-    /// <param name="options">Serializer options</param>
-    /// <returns>Deserialized permissions</returns>
+    /// <inheritdoc />
     public override SbcPermissions Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         SbcPermissions result = SbcPermissions.None;
@@ -201,12 +191,7 @@ public class SbcPermissionsConverter : JsonConverter<SbcPermissions>
         return result;
     }
 
-    /// <summary>
-    /// Write SBC permissions to JSON
-    /// </summary>
-    /// <param name="writer">JSON writer</param>
-    /// <param name="value">Value</param>
-    /// <param name="options">Serializer options</param>
+    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, SbcPermissions value, JsonSerializerOptions options)
     {
         writer.WriteStartArray();

@@ -1,0 +1,275 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Firmware link </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Firmware link ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/Duet3D/DuetSoftwareFramework/blob/v3.7-dev/src/Documentation/articles/firmware-link.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="firmware-link">Firmware link</h1>
+
+<p>DCS and RepRapFirmware (RRF) exchange data over a binary link. Every code DCS does not handle itself
+crosses this link, and RRF uses the same link to ask DCS for macros, file I/O, and SBC-side code
+execution. The link supports <strong>two transports</strong> behind a common interface:</p>
+<ul>
+<li><strong>SPI</strong> - the SBC is the SPI master and a GPIO line (<code>TfrRdy</code>) signals readiness. The default.</li>
+<li><strong>USB</strong> - a serial connection over <code>/dev/ttyACM*</code>.</li>
+</ul>
+<p>The choice is made by the <code>CommunicationMethod</code> setting (<code>&quot;spi&quot;</code> or <code>&quot;usb&quot;</code>) and wired up in
+<code>Link/Extensions.cs</code>. Everything above the transport - the transfer loop, per-channel buffering, the
+packet protocol, and the firmware-request handlers - is shared.</p>
+<ul>
+<li>Transport interface: <code>src/DuetControlServer/Link/Adapter/ILinkAdapter.cs</code></li>
+<li>Transports: <code>Link/Adapter/SPI.cs</code>, <code>Link/Adapter/USB.cs</code></li>
+<li>Transfer loop and request handlers: <code>Link/LinkService.cs</code></li>
+<li>Higher-level link API: <code>Link/LinkInterface.cs</code></li>
+<li>Per-channel buffering: <code>Link/Channel/Processor.cs</code>, <code>Channel/Manager.cs</code></li>
+<li>Wire format: <code>Link/Protocol/</code></li>
+</ul>
+<p>This article continues from the <a href="gcode-flow.html#the-six-stage-code-pipeline">Firmware stage of the code pipeline</a>:
+once a code reaches that stage, the link layer described here transmits it.</p>
+<h2 id="layering">Layering</h2>
+<pre><code class="lang-mermaid">flowchart TD
+    FW[&quot;Firmware stage&lt;br/&gt;(gcode-flow.md)&quot;] --&gt; CHAN[&quot;Channel processors&lt;br/&gt;per-channel code buffering&quot;]
+    CHAN --&gt; LI[&quot;LinkInterface&lt;br/&gt;buffer-space accounting, high-level API&quot;]
+    LS[&quot;LinkService&lt;br/&gt;transfer loop + request routing&quot;] --&gt; LI
+    LI --&gt; ADAPTER{&quot;ILinkAdapter&quot;}
+    ADAPTER -- &quot;CommunicationMethod = spi&quot; --&gt; SPI[&quot;SPI adapter&lt;br/&gt;/dev/spidev0.0 + GPIO TfrRdy&quot;]
+    ADAPTER -- &quot;CommunicationMethod = usb&quot; --&gt; USB[&quot;USB adapter&lt;br/&gt;/dev/ttyACM*&quot;]
+    SPI &lt;--&gt; RRF[&quot;RepRapFirmware&quot;]
+    USB &lt;--&gt; RRF
+</code></pre>
+<p><code>ILinkAdapter</code> is the transport abstraction. It exposes <code>Connect</code>, <code>PerformFullTransfer</code>,
+<code>ReadNextPacket</code>, and a set of typed readers for firmware requests (<code>ReadMacroRequest</code>,
+<code>ReadMessage</code>, <code>ReadObjectModel</code>, <code>ReadCodeBufferUpdate</code>, ...). <code>LinkService</code>, <code>LinkInterface</code>, and the
+channel processors are written entirely against this interface, so they do not care which transport is
+in use.</p>
+<h2 id="the-transfer-loop">The transfer loop</h2>
+<p>One high-priority thread runs <code>LinkService.Execute()</code>:</p>
+<pre><code class="lang-mermaid">flowchart TD
+    subgraph loop[&quot;LinkService.Execute() - highest priority&quot;]
+        RECV[&quot;Read received packets&lt;br/&gt;ProcessPacket() routes each&quot;] --&gt; SPIN[&quot;channels.Spin()&lt;br/&gt;round-robin over channels&quot;]
+        SPIN --&gt; BUF[&quot;Processor.Spin() per channel:&lt;br/&gt;replies, locks, aborts,&lt;br/&gt;macros, BufferCode()&quot;]
+        BUF --&gt; XFER[&quot;adapter.PerformFullTransfer()&quot;]
+        XFER --&gt; RECV
+    end
+
+    FW[&quot;Firmware stage&lt;br/&gt;(gcode-flow.md)&quot;] --&gt; BUF
+    XFER &lt;--&gt;|&quot;chosen transport&quot;| RRF[&quot;RepRapFirmware&quot;]
+</code></pre>
+<p>Each iteration: read and route the packets RRF sent, let every <a href="gcode-flow.html#code-channels">code channel</a>
+buffer outgoing codes, then perform one full transfer over the active transport.</p>
+<h2 id="sending-codes-to-the-firmware">Sending codes to the firmware</h2>
+<p><code>Link/Channel/Manager.cs</code> visits each channel round-robin and calls <code>Processor.Spin()</code>
+(<code>Link/Channel/Processor.cs</code>), which handles, in priority order: pending replies, lock/unlock
+requests, abort requests, macro management, resumption of suspended codes, then buffering of new codes
+via <code>BufferCode()</code>.</p>
+<p>Each channel tracks a <code>BufferedCodes</code> list and a <code>BytesBuffered</code> counter. A code is only buffered when
+it fits within <code>MaxBufferSpacePerChannel</code> <strong>and</strong> RRF has reported enough free space (RRF sends
+<code>CodeBufferUpdate</code> packets; <code>LinkInterface</code> keeps a running <code>BufferSpace</code> figure). The code is
+serialized by <code>Link/Protocol/Writer.cs</code> into a <code>CodeHeader</code> plus its parameters, wrapped in an 8-byte
+<code>PacketHeader</code> of type <code>Code</code>, and copied into the transmit buffer.</p>
+<h2 id="the-wire-format">The wire format</h2>
+<p>A single transfer carries one <strong>transfer header</strong> followed by a sequence of packets. Each packet
+begins with an 8-byte <code>PacketHeader</code> (request type, id, length, resend id) followed by a
+4-byte-aligned payload. The packet layer is identical on both transports; only the transfer header and
+the integrity guarantees differ:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>SPI (<code>TransferHeader</code>)</th>
+<th>USB (<code>UsbTransferHeader</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Header size</td>
+<td>16 bytes</td>
+<td>8 bytes</td>
+</tr>
+<tr>
+<td>Format code</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>Sequence number</td>
+<td>yes (detects resets)</td>
+<td>no</td>
+</tr>
+<tr>
+<td>CRC</td>
+<td>CRC32 (v4+) / CRC16</td>
+<td>none - USB guarantees integrity and ordering</td>
+</tr>
+<tr>
+<td>Readiness signalling</td>
+<td>GPIO <code>TfrRdy</code> line</td>
+<td>serial flow, no GPIO</td>
+</tr>
+<tr>
+<td>Direction</td>
+<td>full-duplex (TX and RX swapped together)</td>
+<td>serial read/write</td>
+</tr>
+</tbody>
+</table>
+<p>Both transports keep three transmit buffers so a firmware resend request can be honoured.</p>
+<h3 id="spi-transport">SPI transport</h3>
+<p><code>Link/Adapter/SPI.cs</code> drives <code>/dev/spidev0.0</code>. <code>PerformFullTransfer()</code>:</p>
+<ol>
+<li>finalises the transmit header (packet count, incremented sequence number, data length, CRC),</li>
+<li><code>ExchangeHeader()</code> - waits for <code>TfrRdy</code>, swaps the 16-byte headers full-duplex, validates the CRC
+and protocol version, and acknowledges,</li>
+<li><code>ExchangeData()</code> - if either side has data, swaps the payloads full-duplex and validates the CRC,</li>
+<li>rotates to the next transmit buffer and resets the pointers.</li>
+</ol>
+<h3 id="usb-transport">USB transport</h3>
+<p><code>Link/Adapter/USB.cs</code> drives a <code>SerialPort</code> on <code>/dev/ttyACM*</code> (default <code>/dev/ttyACM1</code>). Because USB
+already provides reliable, ordered delivery, the <code>UsbTransferHeader</code> drops the CRC, format code, and
+sequence number, and there is no GPIO handshake - the adapter simply writes the header and data and
+reads the firmware's response from the serial stream. The packet protocol above it is unchanged, so
+the same <code>LinkService</code> request handlers and channel buffering apply.</p>
+<h2 id="replies">Replies</h2>
+<p>When RRF returns a <code>Message</code> carrying the binary-code-reply flag, DCS routes it to the originating
+channel (<code>Manager.HandleReply</code> -&gt; <code>Processor.HandleReply</code>), pops the matching code off that channel's
+<code>BufferedCodes</code> (FIFO), and attaches the text as the code's
+<a href="gcode-flow.html#the-code-object"><code>Result</code></a>. The code then finalises in the
+<a href="gcode-flow.html#the-six-stage-code-pipeline">Executed stage</a> and the reply travels back to whichever
+client submitted it.</p>
+<h2 id="requests-initiated-by-the-firmware">Requests initiated by the firmware</h2>
+<p>RRF is not only a sink for codes - it drives work back into DCS. These arrive as packets and are
+routed by <code>LinkService.ProcessPacket()</code>, independent of transport:</p>
+<pre><code class="lang-mermaid">flowchart LR
+    RRF[&quot;RepRapFirmware&quot;] --&gt;|ExecuteMacro| MAC[&quot;DoMacroFile()&lt;br/&gt;push macro on channel stack&quot;]
+    RRF --&gt;|DoCode| DC[&quot;DoFirmwareCode()&lt;br/&gt;SimpleCode, IsFromFirmware&quot;]
+    RRF --&gt;|Message / code reply| RPL[&quot;HandleReply()&lt;br/&gt;complete buffered code&quot;]
+    RRF --&gt;|AbortFile| AB[&quot;FilesAborted()&lt;br/&gt;unwind macro stack&quot;]
+    RRF --&gt;|PrintPaused| PP[&quot;pause the job&lt;br/&gt;invalidate file codes&quot;]
+    RRF --&gt;|Locked| LK[&quot;resolve movement-lock request&quot;]
+    RRF --&gt;|MacroFileClosed| MFC[&quot;pop SBC macro stack&quot;]
+    RRF --&gt;|OpenFile/Read/Write/Seek/Close| FIO[&quot;filesystem I/O on the SBC&quot;]
+
+    MAC --&gt; PIPE[&quot;into the code pipeline&quot;]
+    DC --&gt; PIPE
+</code></pre>
+<ul>
+<li><strong>ExecuteMacro</strong> - RRF asks DCS to run a macro (homing files, <code>config.g</code>, tool-change macros, ...).
+DCS resolves the <a href="file-management.html#path-mapping">virtual path</a>, pushes a
+<a href="file-management.html#macros"><code>MacroFile</code></a> onto the channel stack, and its codes flow through the
+normal pipeline.</li>
+<li><strong>DoCode</strong> - RRF asks DCS to execute a code string; a <code>SimpleCode</code> flagged <code>IsFromFirmware</code> is run.</li>
+<li><strong>AbortFile / PrintPaused / MacroFileClosed</strong> - keep DCS's per-channel macro stack and
+<a href="file-management.html#print-jobs">job state</a> consistent with the firmware's.</li>
+<li><strong>Locked</strong> - completes a pending movement-lock request so a code waiting on motion synchronisation
+can proceed.</li>
+<li><strong>File I/O</strong> - RRF delegates file open/read/write/seek/close to the SBC, which performs the actual
+Linux filesystem access and streams data back.</li>
+</ul>
+<p>The <a href="object-model.html#updates-from-the-firmware">object model</a> is also kept current over this link via
+<code>GetObjectModel</code> requests and <code>CodeBufferUpdate</code> packets.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="gcode-flow.html">G-code flow</a> - how a code reaches the Firmware stage in the first place</li>
+<li><a href="file-management.html">File management</a> - macros, jobs, and the virtual paths RRF requests</li>
+<li><a href="object-model.html#updates-from-the-firmware">Object model</a> - the model updates carried over this link</li>
+</ul>
+
+</article>
+
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

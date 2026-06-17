@@ -9,25 +9,14 @@ namespace DuetAPI.Utility;
 /// </summary>
 public class JsonOptionalShortDateTimeConverter : JsonConverter<DateTime?>
 {
-    /// <summary>
-    /// Read a short DateTime from JSON
-    /// </summary>
-    /// <param name="reader">JSON reader</param>
-    /// <param name="typeToConvert">Target type</param>
-    /// <param name="options">Serializer options</param>
-    /// <returns>Deserialized DateTime or null</returns>
+    /// <inheritdoc />
     public override DateTime? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         string? value = reader.GetString();
         return string.IsNullOrEmpty(value) ? null : DateTime.Parse(value);
     }
 
-    /// <summary>
-    /// Write a short DateTime to JSON
-    /// </summary>
-    /// <param name="writer">JSON writer</param>
-    /// <param name="value">Value to write</param>
-    /// <param name="options">Serializer options</param>
+    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, DateTime? value, JsonSerializerOptions options)
     {
         if (value is null)

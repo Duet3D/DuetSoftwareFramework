@@ -1,0 +1,863 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class EventLogger </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class EventLogger ">
+      
+      <meta name="description" content="Class for message logging">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DuetControlServer.Utility.EventLogger">
+
+
+
+  <h1 id="DuetControlServer_Utility_EventLogger" data-uid="DuetControlServer.Utility.EventLogger" class="text-break">
+Class EventLogger  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="DuetControlServer.html">DuetControlServer</a>.<a class="xref" href="DuetControlServer.Utility.html">Utility</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>DuetControlServer.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Class for message logging</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class EventLogger</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">EventLogger</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="DuetControlServer_Utility_EventLogger__ctor_" data-uid="DuetControlServer.Utility.EventLogger.#ctor*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger__ctor_DuetControlServer_Files_FilePathResolver_DuetControlServer_Model_ObjectModel_Microsoft_Extensions_Hosting_IHostApplicationLifetime_Microsoft_Extensions_Logging_ILogger_DuetControlServer_Utility_EventLogger__Microsoft_Extensions_Options_IOptions_DuetControlServer_Settings__" data-uid="DuetControlServer.Utility.EventLogger.#ctor(DuetControlServer.Files.FilePathResolver,DuetControlServer.Model.ObjectModel,Microsoft.Extensions.Hosting.IHostApplicationLifetime,Microsoft.Extensions.Logging.ILogger{DuetControlServer.Utility.EventLogger},Microsoft.Extensions.Options.IOptions{DuetControlServer.Settings})">
+  EventLogger(FilePathResolver, ObjectModel, IHostApplicationLifetime, ILogger&lt;EventLogger&gt;, IOptions&lt;Settings&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Class for message logging</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public EventLogger(FilePathResolver filePath, ObjectModel model, IHostApplicationLifetime lifetime, ILogger&lt;EventLogger&gt; logger, IOptions&lt;Settings&gt; settings)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>filePath</code> <a class="xref" href="DuetControlServer.Files.FilePathResolver.html">FilePathResolver</a></dt>
+    <dd><p>File path resolver</p>
+</dd>
+    <dt><code>model</code> <a class="xref" href="DuetControlServer.Model.ObjectModel.html">ObjectModel</a></dt>
+    <dd><p>Object model</p>
+</dd>
+    <dt><code>lifetime</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.hosting.ihostapplicationlifetime">IHostApplicationLifetime</a></dt>
+    <dd><p>Host application lifetime</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger-1">ILogger</a>&lt;<a class="xref" href="DuetControlServer.Utility.EventLogger.html">EventLogger</a>&gt;</dt>
+    <dd><p>Logger instance</p>
+</dd>
+    <dt><code>settings</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.options.ioptions-1">IOptions</a>&lt;<a class="xref" href="DuetControlServer.Settings.html">Settings</a>&gt;</dt>
+    <dd><p>Settings</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="DuetControlServer_Utility_EventLogger_DefaultLogFile" data-uid="DuetControlServer.Utility.EventLogger.DefaultLogFile">
+  DefaultLogFile
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Default log file for M929 in case no P parameter is specified</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const string DefaultLogFile = &quot;eventlog.txt&quot;</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="DuetControlServer_Utility_EventLogger_Log_" data-uid="DuetControlServer.Utility.EventLogger.Log*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger_Log_DuetAPI_ObjectModel_EventLogLevel_DuetAPI_ObjectModel_Message_" data-uid="DuetControlServer.Utility.EventLogger.Log(DuetAPI.ObjectModel.EventLogLevel,DuetAPI.ObjectModel.Message)">
+  Log(EventLogLevel, Message)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write a message including timestamp to the log file</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Log(EventLogLevel level, Message message)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>level</code> <a class="xref" href="DuetAPI.ObjectModel.EventLogLevel.html">EventLogLevel</a></dt>
+    <dd><p>Log level of the message</p>
+</dd>
+    <dt><code>message</code> <a class="xref" href="DuetAPI.ObjectModel.Message.html">Message</a></dt>
+    <dd><p>Message to log</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Utility_EventLogger_Log_" data-uid="DuetControlServer.Utility.EventLogger.Log*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger_Log_DuetAPI_ObjectModel_EventLogLevel_DuetAPI_ObjectModel_MessageType_System_String_" data-uid="DuetControlServer.Utility.EventLogger.Log(DuetAPI.ObjectModel.EventLogLevel,DuetAPI.ObjectModel.MessageType,System.String)">
+  Log(EventLogLevel, MessageType, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write a message including timestamp to the log file</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Log(EventLogLevel level, MessageType type, string content)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>level</code> <a class="xref" href="DuetAPI.ObjectModel.EventLogLevel.html">EventLogLevel</a></dt>
+    <dd><p>Log level</p>
+</dd>
+    <dt><code>type</code> <a class="xref" href="DuetAPI.ObjectModel.MessageType.html">MessageType</a></dt>
+    <dd><p>Message type</p>
+</dd>
+    <dt><code>content</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Message content</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Utility_EventLogger_Log_" data-uid="DuetControlServer.Utility.EventLogger.Log*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger_Log_DuetAPI_ObjectModel_Message_" data-uid="DuetControlServer.Utility.EventLogger.Log(DuetAPI.ObjectModel.Message)">
+  Log(Message)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write messages including timestamp to the log file</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Log(Message message)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>message</code> <a class="xref" href="DuetAPI.ObjectModel.Message.html">Message</a></dt>
+    <dd><p>Message to log</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Utility_EventLogger_Log_" data-uid="DuetControlServer.Utility.EventLogger.Log*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger_Log_DuetAPI_ObjectModel_MessageType_System_String_" data-uid="DuetControlServer.Utility.EventLogger.Log(DuetAPI.ObjectModel.MessageType,System.String)">
+  Log(MessageType, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write a message including timestamp to the log file</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Log(MessageType type, string content)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="DuetAPI.ObjectModel.MessageType.html">MessageType</a></dt>
+    <dd><p>Message type</p>
+</dd>
+    <dt><code>content</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Message content</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Utility_EventLogger_LogAsync_" data-uid="DuetControlServer.Utility.EventLogger.LogAsync*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger_LogAsync_DuetAPI_ObjectModel_EventLogLevel_DuetAPI_ObjectModel_Message_" data-uid="DuetControlServer.Utility.EventLogger.LogAsync(DuetAPI.ObjectModel.EventLogLevel,DuetAPI.ObjectModel.Message)">
+  LogAsync(EventLogLevel, Message)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write a message including timestamp to the log file asynchronously</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task LogAsync(EventLogLevel level, Message message)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>level</code> <a class="xref" href="DuetAPI.ObjectModel.EventLogLevel.html">EventLogLevel</a></dt>
+    <dd><p>Log level of the message</p>
+</dd>
+    <dt><code>message</code> <a class="xref" href="DuetAPI.ObjectModel.Message.html">Message</a></dt>
+    <dd><p>Message to log</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Utility_EventLogger_LogAsync_" data-uid="DuetControlServer.Utility.EventLogger.LogAsync*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger_LogAsync_DuetAPI_ObjectModel_EventLogLevel_DuetAPI_ObjectModel_MessageType_System_String_" data-uid="DuetControlServer.Utility.EventLogger.LogAsync(DuetAPI.ObjectModel.EventLogLevel,DuetAPI.ObjectModel.MessageType,System.String)">
+  LogAsync(EventLogLevel, MessageType, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write a message including timestamp to the log file asynchronously</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task LogAsync(EventLogLevel level, MessageType type, string content)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>level</code> <a class="xref" href="DuetAPI.ObjectModel.EventLogLevel.html">EventLogLevel</a></dt>
+    <dd><p>Log level</p>
+</dd>
+    <dt><code>type</code> <a class="xref" href="DuetAPI.ObjectModel.MessageType.html">MessageType</a></dt>
+    <dd><p>Message type</p>
+</dd>
+    <dt><code>content</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Message content</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Utility_EventLogger_LogAsync_" data-uid="DuetControlServer.Utility.EventLogger.LogAsync*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger_LogAsync_DuetAPI_ObjectModel_Message_" data-uid="DuetControlServer.Utility.EventLogger.LogAsync(DuetAPI.ObjectModel.Message)">
+  LogAsync(Message)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write messages including timestamp to the log file asynchronously</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task LogAsync(Message message)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>message</code> <a class="xref" href="DuetAPI.ObjectModel.Message.html">Message</a></dt>
+    <dd><p>Message to log</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Utility_EventLogger_LogAsync_" data-uid="DuetControlServer.Utility.EventLogger.LogAsync*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger_LogAsync_DuetAPI_ObjectModel_MessageType_System_String_" data-uid="DuetControlServer.Utility.EventLogger.LogAsync(DuetAPI.ObjectModel.MessageType,System.String)">
+  LogAsync(MessageType, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write a message including timestamp to the log file asynchronously</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task LogAsync(MessageType type, string content)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="DuetAPI.ObjectModel.MessageType.html">MessageType</a></dt>
+    <dd><p>Message type</p>
+</dd>
+    <dt><code>content</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Message content</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Utility_EventLogger_LogOutput_" data-uid="DuetControlServer.Utility.EventLogger.LogOutput*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger_LogOutput_DuetAPI_ObjectModel_Message_" data-uid="DuetControlServer.Utility.EventLogger.LogOutput(DuetAPI.ObjectModel.Message)">
+  LogOutput(Message)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Log and output a message</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void LogOutput(Message message)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>message</code> <a class="xref" href="DuetAPI.ObjectModel.Message.html">Message</a></dt>
+    <dd><p>Message to log and output</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Utility_EventLogger_LogOutput_" data-uid="DuetControlServer.Utility.EventLogger.LogOutput*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger_LogOutput_DuetAPI_ObjectModel_MessageType_System_String_" data-uid="DuetControlServer.Utility.EventLogger.LogOutput(DuetAPI.ObjectModel.MessageType,System.String)">
+  LogOutput(MessageType, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Log and output a message</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void LogOutput(MessageType type, string content)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="DuetAPI.ObjectModel.MessageType.html">MessageType</a></dt>
+    <dd><p>Message type</p>
+</dd>
+    <dt><code>content</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Message content</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Utility_EventLogger_LogOutputAsync_" data-uid="DuetControlServer.Utility.EventLogger.LogOutputAsync*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger_LogOutputAsync_DuetAPI_ObjectModel_Message_System_Threading_CancellationToken_" data-uid="DuetControlServer.Utility.EventLogger.LogOutputAsync(DuetAPI.ObjectModel.Message,System.Threading.CancellationToken)">
+  LogOutputAsync(Message, CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Log and output a message asynchronously</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task LogOutputAsync(Message message, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>message</code> <a class="xref" href="DuetAPI.ObjectModel.Message.html">Message</a></dt>
+    <dd><p>Message to log and output</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Utility_EventLogger_LogOutputAsync_" data-uid="DuetControlServer.Utility.EventLogger.LogOutputAsync*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger_LogOutputAsync_DuetAPI_ObjectModel_MessageType_System_String_System_Threading_CancellationToken_" data-uid="DuetControlServer.Utility.EventLogger.LogOutputAsync(DuetAPI.ObjectModel.MessageType,System.String,System.Threading.CancellationToken)">
+  LogOutputAsync(MessageType, string, CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Log and output a message</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task LogOutputAsync(MessageType type, string content, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="DuetAPI.ObjectModel.MessageType.html">MessageType</a></dt>
+    <dd><p>Message type</p>
+</dd>
+    <dt><code>content</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Message content</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Utility_EventLogger_Start_" data-uid="DuetControlServer.Utility.EventLogger.Start*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger_Start_System_String_DuetAPI_ObjectModel_EventLogLevel_" data-uid="DuetControlServer.Utility.EventLogger.Start(System.String,DuetAPI.ObjectModel.EventLogLevel)">
+  Start(string, EventLogLevel)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Start logging to a file</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Start(string filename, EventLogLevel level)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>filename</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Filename to write to</p>
+</dd>
+    <dt><code>level</code> <a class="xref" href="DuetAPI.ObjectModel.EventLogLevel.html">EventLogLevel</a></dt>
+    <dd><p>Requested log level</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Utility_EventLogger_StartAsync_" data-uid="DuetControlServer.Utility.EventLogger.StartAsync*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger_StartAsync_System_String_DuetAPI_ObjectModel_EventLogLevel_" data-uid="DuetControlServer.Utility.EventLogger.StartAsync(System.String,DuetAPI.ObjectModel.EventLogLevel)">
+  StartAsync(string, EventLogLevel)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Start logging to a file</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task StartAsync(string filename, EventLogLevel level)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>filename</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Filename to write to</p>
+</dd>
+    <dt><code>level</code> <a class="xref" href="DuetAPI.ObjectModel.EventLogLevel.html">EventLogLevel</a></dt>
+    <dd><p>Requested log level</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Utility_EventLogger_Stop_" data-uid="DuetControlServer.Utility.EventLogger.Stop*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger_Stop" data-uid="DuetControlServer.Utility.EventLogger.Stop">
+  Stop()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Stop logging</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Stop()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Utility_EventLogger_StopAsync_" data-uid="DuetControlServer.Utility.EventLogger.StopAsync*"></a>
+
+  <h3 id="DuetControlServer_Utility_EventLogger_StopAsync" data-uid="DuetControlServer.Utility.EventLogger.StopAsync">
+  StopAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Utility/Logger.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Stop logging asynchronously</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task StopAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>Asynchronous task</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

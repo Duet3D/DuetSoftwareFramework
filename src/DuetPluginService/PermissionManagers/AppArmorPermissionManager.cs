@@ -152,10 +152,15 @@ public class AppArmorPermissionManager(IOptions<Settings> settings) : IPermissio
         string profilePath = Path.Combine(_settings.AppArmorProfileDirectory, $"dsf.{plugin.Id}");
         await File.WriteAllTextAsync(profilePath, profile, CancellationToken.None);
 
-        // Load new profile
-        await System.Diagnostics.Process
-            .Start(_settings.AppArmorParser, $"-r \"{profilePath}\"")
-            .WaitForExitAsync(cancellationToken);
+        // Load new profile. The plugin launch gate only checks if the profile file exists, so the file
+        // must be deleted again if the kernel did not actually load it - else the plugin runs unconfined
+        using System.Diagnostics.Process parserProcess = System.Diagnostics.Process.Start(_settings.AppArmorParser, $"-r \"{profilePath}\"");
+        await parserProcess.WaitForExitAsync(cancellationToken);
+        if (parserProcess.ExitCode != 0)
+        {
+            File.Delete(profilePath);
+            throw new ArgumentException($"Failed to load AppArmor profile for plugin {plugin.Id} (apparmor_parser exited with code {parserProcess.ExitCode})");
+        }
     }
 
     /// <summary>
@@ -171,9 +176,8 @@ public class AppArmorPermissionManager(IOptions<Settings> settings) : IPermissio
         if (File.Exists(profilePath))
         {
             // Disable the profile via AppArmor
-            await System.Diagnostics.Process
-                .Start(_settings.AppArmorParser, $"-R \"{profilePath}\"")
-                .WaitForExitAsync(cancellationToken);
+            using System.Diagnostics.Process parserProcess = System.Diagnostics.Process.Start(_settings.AppArmorParser, $"-R \"{profilePath}\"");
+            await parserProcess.WaitForExitAsync(cancellationToken);
 
             // Delete it
             File.Delete(profilePath);

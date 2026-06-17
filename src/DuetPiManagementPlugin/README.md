@@ -1,50 +1,92 @@
-# DuetPi Management Plugin 
+# DuetPiManagementPlugin
 
-This plugin provides system management functions using regular RepRapFirmware M-codes for the DuetPi distribution.
+`DuetPiManagementPlugin` is the bundled privileged plugin that gives a DuetPi system a firmware-style way to manage the SBC itself. It intercepts selected M-codes and turns them into persistent Linux-side operations such as network reconfiguration, hostname changes, storage mounting, reboot, and shutdown.
 
-## Supported codes
+## At A Glance
 
-- `M21`: Initialize SD card (mount device)
-- `M22`: Release SD card (unmount device)
-- `M540` Set MAC address
-- `M550` Set Name
-- `M552` Set IP address, enable/disable network interface
-- `M553` Set Netmask
-- `M554` Set Gateway
-- `M586` Configure network protocols
-- `M587` Add WiFi host network to remembered list, or list remembered networks
-- `M588` Forget WiFi host network
-- `M589` Configure access point parameters
-- `M905` Set current RTC date and time
-- `M999 B-1` Reboot SBC
-- `M999 B-1 P"OFF"` Shut down SBC
+| Aspect | Details |
+|---|---|
+| Entry point | [Program.cs](Program.cs) |
+| Runtime type | DSF plugin executable |
+| Key areas | [Command.cs](Command.cs), [Mount.cs](Mount.cs), [Network/](Network) |
+| Primary dependencies | [../DuetAPI/README.md](../DuetAPI/README.md), [../DuetAPIClient/README.md](../DuetAPIClient/README.md), [../DuetSharedLibrary/README.md](../DuetSharedLibrary/README.md) |
+
+## What This Plugin Does
+
+It provides SBC-management functions through familiar M-codes so the user experience on DuetPi stays close to standalone firmware behavior. The plugin is intended for DSF systems that need to configure the Linux host from the printer control plane.
+
+Supported codes include:
+
+- `M21`: mount storage
+- `M22`: unmount storage
+- `M540`: set MAC address
+- `M550`: set machine name / hostname integration
+- `M552`: configure IP address and enable or disable interfaces
+- `M553`: set netmask
+- `M554`: set gateway
+- `M586`: configure network protocols
+- `M587`: manage remembered WiFi networks
+- `M588`: forget a remembered WiFi network
+- `M589`: configure access-point parameters
+- `M905`: set the RTC date and time
+- `M999 B-1`: reboot the SBC
+- `M999 B-1 P"OFF"`: power down the SBC
+
+## How It Works
+
+The plugin runs as a DSF plugin process and communicates with DCS over the normal IPC socket. It resolves supported M-codes before they need to reach firmware, then applies the corresponding Linux-side configuration changes.
+
+The implementation is split broadly into:
+
+- [Command.cs](Command.cs) for code interception and command handling;
+- [Mount.cs](Mount.cs) for mount and unmount operations;
+- [Network/](Network) for interface management, DHCP/static address handling, WiFi scanning, access-point setup, and protocol configuration;
+- [JsonContext.cs](JsonContext.cs) for the plugin's JSON serialization helpers.
+
+Several operations write persistent configuration rather than temporary runtime state. For example, HTTP and HTTPS protocol management updates DSF-side web configuration files such as `/opt/dsf/conf/http.json` and may create `/opt/dsf/conf/https.pfx`.
+
+## Interfaces With Other DSF Projects
+
+| Peer | Interface |
+|---|---|
+| [../DuetControlServer/README.md](../DuetControlServer/README.md) | DCS hosts the code pipeline where this plugin intercepts and resolves its supported M-codes. |
+| [../DuetPluginService/README.md](../DuetPluginService/README.md) | The root plugin-service instance installs and launches this plugin because it needs elevated permissions. |
+| [../DuetWebServer/README.md](../DuetWebServer/README.md) | Some settings modified here affect DWS behavior, especially network protocol and certificate configuration. |
+
+## Relationship To RepRapFirmware
+
+This plugin exists specifically to bridge the gap between firmware-era control commands and SBC-hosted functionality. It does not talk to RepRapFirmware directly; instead it intercepts selected codes on the SBC side and resolves them inside DSF so the Linux host can perform the requested system-management action.
+
+That means the semantics are intentionally similar to standalone mode, but the effect is often more persistent because the underlying state lives in Linux configuration files and services.
 
 ## Requirements
 
-To use all the features of this plugin, the following packages should be installed:
-- openssl
-- proftpd
-- ssh
-- telnetd
-- dnsmasq
-- hostapd
-- wpa_supplicant
+To use the full feature set, the surrounding Linux system is expected to provide packages such as:
 
-## Build instructions
+- `openssl`
+- `proftpd`
+- `ssh`
+- `telnetd`
+- `dnsmasq`
+- `hostapd`
+- `wpa_supplicant`
 
-This plugin requires the .NET SDK to be installed first.
+## Build And Package
 
-1. Open a command prompt in this directory
-2. Run `dotnet publish -r linux-arm -o .\zip\dsf\ /p:PublishTrimmed=true`
-3. Go to the `zip` directory and compress all the files and directories in it to a single ZIP file
+```sh
+dotnet publish -r linux-arm -o ./zip/dsf /p:PublishTrimmed=true
+```
 
-To install this plugin, you may have to enable super-user (root) plugins in `/opt/dsf/conf/config.json` first (set `` to `true).
-After that you can upload the generated ZIP file using the "Upload & Start" button on DWC and install it.
+Package the contents of `zip/` into a plugin ZIP for installation. Because this is a privileged plugin, third-party root-plugin support must be enabled first in DCS configuration by setting `RootPluginSupport` in `/opt/dsf/conf/config.json`.
 
-## Notes and limitations
+## Notes And Limitations
 
-Unlike in RRF the changes performed by this plugin are permanently saved. This means they should be used **only once** to reconfigure the SBC.
-In addition it comes with the following limitations:
+- Changes made by this plugin are persistent on the SBC and should be treated as system configuration, not temporary print-session state.
+- `M586 P2 R` cannot change the Telnet port. That still requires editing `/etc/inetd.conf` manually.
+- Unless NetworkManager is in use, `M587` does not preserve per-SSID IP configuration; the configured address behavior applies more broadly.
 
-- `M586 P2 R` cannot be used to set the Telnet port. If this is required, the file `/etc/inetd.conf` must be manually edited (change `telnet` to a port of your choice).
-- Unless NetworkManager is used (Debian Bookworm or newer), `M587` does not save the IP address configuration per SSID. Once set, the configuration is used for every available SSID
+## Related Docs
+
+- [../../docs/devel/PLUGINS.md](../../docs/devel/PLUGINS.md)
+- [../DuetPluginService/README.md](../DuetPluginService/README.md)
+- [../DuetControlServer/README.md](../DuetControlServer/README.md)

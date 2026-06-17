@@ -129,7 +129,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                         }
 
                         // Evaluate the filename and result to write
-                        string filename = await expressions.EvaluateExpressionAsync(code, filenameExpression, false, false, cancellationToken);
+                        string filename = await expressions.EvaluateExpressionToStringAsync(code, filenameExpression, false, false, cancellationToken);
                         string physicalFilename = await filePathResolver.ToPhysicalAsync(filename, FileDirectory.System, cancellationToken), parentDirectory = Path.GetDirectoryName(physicalFilename)!;
                         result = await expressions.EvaluateAsync(code, true, cancellationToken);
 
@@ -257,7 +257,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                 string fullVarName = varName;
                 if (code.Keyword == KeywordType.Set)
                 {
-                    fullVarName = await expressions.EvaluateExpressionAsync(code, fullVarName, true, false, cancellationToken);
+                    fullVarName = await expressions.EvaluateExpressionToStringAsync(code, fullVarName, true, false, cancellationToken);
                 }
                 else
                 {

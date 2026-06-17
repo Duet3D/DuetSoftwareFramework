@@ -13,9 +13,7 @@ namespace DuetControlServer.Commands;
 /// <param name="model">Object model</param>
 public sealed class InvalidateChannel(LinkInterface linkInterface, Model.ObjectModel model) : DuetAPI.Commands.InvalidateChannel, IConnectionCommand
 {
-    /// <summary>
-    /// Source connection of this command
-    /// </summary>
+    /// <inheritdoc />
     public Connection? Connection { get; set; }
 
     /// <summary>

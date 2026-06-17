@@ -196,8 +196,10 @@ public class CodeParameter
         {
             StringValue = longValue.ToString("G", CultureInfo.InvariantCulture);
         }
-        else if (value is int[] intArray)
+        else if (value is int[] intArray && intArray.GetType() == typeof(int[]))
         {
+            // Note the extra type checks: the CLR treats int[] and uint[] as interchangeable array types,
+            // so the patterns alone cannot tell them apart
             StringValue = string.Join(":", intArray.Select(intVal => intVal.ToString("G", CultureInfo.InvariantCulture)));
         }
         else if (value is uint[] uintArray)
@@ -570,7 +572,7 @@ public class CodeParameter
         {
             return [Convert.ToSingle(uintValue)];
         }
-        if (codeParameter.ParsedValue is int[] intArray)
+        if (codeParameter.ParsedValue is int[] intArray && intArray.GetType() == typeof(int[]))
         {
             return intArray.Select(Convert.ToSingle).ToArray();
         }
@@ -595,7 +597,7 @@ public class CodeParameter
         {
             return null;
         }
-        if (codeParameter.ParsedValue is int[] intArray)
+        if (codeParameter.ParsedValue is int[] intArray && intArray.GetType() == typeof(int[]))
         {
             return intArray;
         }
@@ -628,7 +630,7 @@ public class CodeParameter
         {
             return null;
         }
-        if (codeParameter.ParsedValue is uint[] uintArray)
+        if (codeParameter.ParsedValue is uint[] uintArray && uintArray.GetType() == typeof(uint[]))
         {
             return uintArray;
         }
@@ -697,11 +699,11 @@ public class CodeParameter
         {
             return [Convert.ToInt64(floatValue)];
         }
-        if (codeParameter.ParsedValue is int[] intArray)
+        if (codeParameter.ParsedValue is int[] intArray && intArray.GetType() == typeof(int[]))
         {
             return intArray.Select(Convert.ToInt64).ToArray();
         }
-        if (codeParameter.ParsedValue is int[] uintArray)
+        if (codeParameter.ParsedValue is uint[] uintArray)
         {
             return uintArray.Select(Convert.ToInt64).ToArray();
         }
@@ -733,7 +735,7 @@ public class CodeParameter
         {
             return [driverId];
         }
-        if (codeParameter.ParsedValue is uint[] uintArray)
+        if (codeParameter.ParsedValue is uint[] uintArray && uintArray.GetType() == typeof(uint[]))
         {
             return uintArray.Select(value => new DriverId(value)).ToArray();
         }
@@ -753,15 +755,15 @@ public class CodeParameter
     /// <returns>True if both objects are equal</returns>
     public static bool operator ==(CodeParameter? a, object? b)
     {
-        if (a is null || a.ParsedValue is null)
+        if (a is null)
         {
             return b is null;
         }
         if (b is CodeParameter other)
         {
-            return a.Letter.Equals(other.Letter) && a.ParsedValue.Equals(other.ParsedValue);
+            return a.Letter.Equals(other.Letter) && Equals(a.ParsedValue, other.ParsedValue);
         }
-        return a.ParsedValue.Equals(b);
+        return a.ParsedValue is null ? b is null : a.ParsedValue.Equals(b);
     }
 
     /// <summary>
@@ -772,23 +774,13 @@ public class CodeParameter
     /// <returns>True if both objects are not equal</returns>
     public static bool operator !=(CodeParameter? a, object? b) => !(a == b);
 
-    /// <summary>
-    /// Checks if the other obj equals this instance
-    /// </summary>
-    /// <param name="obj">Other object</param>
-    /// <returns>True if both objects are not equal</returns>
+    /// <inheritdoc />
     public override bool Equals(object? obj) => this == obj;
 
-    /// <summary>
-    /// Returns the hash code of this instance
-    /// </summary>
-    /// <returns>Computed hash code</returns>
+    /// <inheritdoc />
     public override int GetHashCode() => Letter.GetHashCode() ^ (ParsedValue?.GetHashCode() ?? 0);
 
-    /// <summary>
-    /// Converts this parameter to a string
-    /// </summary>
-    /// <returns>String representation</returns>
+    /// <inheritdoc />
     public override string ToString() => Letter + StringValue;
 }
 
@@ -797,13 +789,7 @@ public class CodeParameter
 /// </summary>
 public sealed class CodeParameterConverter : JsonConverter<CodeParameter>
 {
-    /// <summary>
-    /// Read a CodeParameter object from JSON
-    /// </summary>
-    /// <param name="reader">JSON reader</param>
-    /// <param name="typeToConvert">Type to convert</param>
-    /// <param name="options">Serializer options</param>
-    /// <returns>Read value</returns>
+    /// <inheritdoc />
     public override CodeParameter Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType == JsonTokenType.StartObject)
@@ -866,12 +852,7 @@ public sealed class CodeParameterConverter : JsonConverter<CodeParameter>
         throw new JsonException("Invalid code parameter");
     }
 
-    /// <summary>
-    /// Write a CodeParameter to JSON
-    /// </summary>
-    /// <param name="writer">JSON writer</param>
-    /// <param name="value">Value to serialize</param>
-    /// <param name="options">Write options</param>
+    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, CodeParameter value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();

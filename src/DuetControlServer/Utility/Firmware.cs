@@ -144,7 +144,7 @@ public static class Firmware
 
                 int numCharsRead = 0;
                 StringBuilder builder = new();
-                while (firmwareFile.CanRead)
+                while (firmwareFile.Position < firmwareFile.Length)
                 {
                     char c = reader.ReadChar();
                     if (c == '\0')

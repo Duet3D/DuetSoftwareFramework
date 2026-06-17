@@ -153,11 +153,7 @@ public sealed class LinkService(
         logger.LogInformation("Firmware update successful");
     }
 
-    /// <summary>
-    /// Start this service asynchronously
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override Task StartAsync(CancellationToken cancellationToken)
     {
         // Initialize the link interface
@@ -230,11 +226,7 @@ public sealed class LinkService(
         return tcs.Task;
     }
 
-    /// <summary>
-    /// Shut down this service
-    /// </summary>
-    /// <param name="stoppingToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task StopAsync(CancellationToken stoppingToken)
     {
         // Cancel the file being printed
@@ -243,18 +235,19 @@ public sealed class LinkService(
             jobProcessor.Abort();
         }
 
+        // Shut down the link subsystem
+        await linkInterface.InvalidateAsync(stoppingToken);
+
+        // Shut down this service. This terminates the transfer thread, which may still be serving file
+        // requests, so the open files must not be closed before this call
+        await base.StopAsync(stoppingToken);
+
         // Close all the files
         foreach (var kv in _openFiles)
         {
             await kv.Value.DisposeAsync();
         }
         _openFiles.Clear();
-
-        // Shut down the link subsystem
-        await linkInterface.InvalidateAsync(stoppingToken);
-
-        // Shut down this service
-        await base.StopAsync(stoppingToken);
     }
 
     /// <summary>
@@ -579,6 +572,9 @@ public sealed class LinkService(
             case Request.DeleteFileOrDirectoryRecursively:
                 HandleDeleteFileOrDirectory((Request)packet.Request == Request.DeleteFileOrDirectoryRecursively);
                 break;
+            case Request.SecureDeleteFile:
+                HandleSecureDeleteFile();
+                break;
             case Request.OpenFile:
                 HandleOpenFile();
                 break;
@@ -853,6 +849,10 @@ public sealed class LinkService(
             {
                 Position = offset
             };
+
+            // The requested length comes from the wire and can never legitimately exceed the transfer
+            // buffer size, so clamp it before allocating the chunk on the stack
+            maxLength = Math.Clamp(maxLength, 0, settings.Value.SbcBufferSize);
             Span<byte> buffer = stackalloc byte[maxLength];
             int bytesRead = fs.Read(buffer);
 
@@ -1077,6 +1077,58 @@ public sealed class LinkService(
     }
 
     /// <summary>
+    /// Securely delete a file: overwrite its contents with zeros and fsync before unlinking.
+    /// One zero-overwrite pass is appropriate for SD/eMMC; multi-pass wipes don't help on flash
+    /// because of wear-leveling indirection. Mirrors MassStorage::SecureDelete on the RRF side.
+    /// Directories and non-existent files are rejected (the firmware uses this only for files).
+    /// </summary>
+    private void HandleSecureDeleteFile()
+    {
+        linkAdapter.ReadDeleteFileOrDirectory(out string filename);
+        logger.LogDebug("Attempting to securely delete {File}", filename);
+
+        try
+        {
+            string physicalFile = filePathResolver.ToPhysical(filename);
+            if (Directory.Exists(physicalFile))
+            {
+                throw new IOException("SecureDelete is not supported for directories");
+            }
+
+            if (File.Exists(physicalFile))
+            {
+                using FileStream fs = new(physicalFile, FileMode.Open, FileAccess.Write, FileShare.None, settings.Value.FileBufferSize);
+                long length = fs.Length;
+                if (length > 0)
+                {
+                    byte[] zeros = new byte[Math.Min(settings.Value.FileBufferSize, length)];
+                    fs.Seek(0, SeekOrigin.Begin);
+                    long remaining = length;
+                    while (remaining > 0)
+                    {
+                        int toWrite = (int)Math.Min(zeros.Length, remaining);
+                        fs.Write(zeros, 0, toWrite);
+                        remaining -= toWrite;
+                    }
+                    fs.Flush(true);     // fsync to media
+                }
+            }
+            // File.Delete is a no-op if the file is missing, so it is safe outside the exists-check;
+            // placed after the if-block so the using declaration has disposed fs before the unlink
+            File.Delete(physicalFile);
+            linkAdapter.WriteFileDeleteResult(true);
+        }
+        catch (Exception e)
+        {
+            if (!settings.Value.UpdateOnly)
+            {
+                logger.LogError(e, "Failed to securely delete {File}", filename);
+            }
+            linkAdapter.WriteFileDeleteResult(false);
+        }
+    }
+
+    /// <summary>
     /// Try to open a file
     /// </summary>
     private void HandleOpenFile()
@@ -1134,7 +1186,9 @@ public sealed class LinkService(
 
         try
         {
-            // Read file content as requested
+            // Read file content as requested. The requested length comes from the wire and can never
+            // legitimately exceed the transfer buffer size, so clamp it before allocating on the stack
+            maxLength = Math.Clamp(maxLength, 0, settings.Value.SbcBufferSize);
             FileStream fs = _openFiles[handle];
             Span<byte> data = stackalloc byte[maxLength];
             int bytesRead = fs.Read(data);

@@ -6,16 +6,6 @@
 public partial class LaserFilamentMonitorCalibrated : ModelObject, IStaticModelObject
 {
 	/// <summary>
-	/// Calibration factor of this sensor
-	/// </summary>
-	public float CalibrationFactor
-	{
-		get => _calibrationFactor;
-		set => SetPropertyValue(ref _calibrationFactor, value);
-	}
-	private float _calibrationFactor;
-
-	/// <summary>
 	/// Maximum percentage (0..1 or greater)
 	/// </summary>
 	public float PercentMax
@@ -36,14 +26,14 @@ public partial class LaserFilamentMonitorCalibrated : ModelObject, IStaticModelO
 	private float _percentMin;
 
 	/// <summary>
-	/// Calibrated sensivity
+	/// Calibrated sensitivity
 	/// </summary>
-	public float Sensivity
+	public float Sensitivity
 	{
-		get => _sensivity;
-		set => SetPropertyValue(ref _sensivity, value);
+		get => _sensitivity;
+		set => SetPropertyValue(ref _sensitivity, value);
 	}
-	private float _sensivity;
+	private float _sensitivity;
 
 	/// <summary>
 	/// Total extruded distance (in mm)
@@ -70,6 +60,16 @@ public partial class LaserFilamentMonitorConfigured : ModelObject, IStaticModelO
 		set => SetPropertyValue(ref _allMoves, value);
 	}
 	private bool _allMoves;
+
+	/// <summary>
+	/// Calibration factor of this sensor
+	/// </summary>
+	public float CalibrationFactor
+	{
+		get => _calibrationFactor;
+		set => SetPropertyValue(ref _calibrationFactor, value);
+	}
+	private float _calibrationFactor;
 
 	/// <summary>
 	/// Maximum percentage (0..1 or greater)
@@ -129,14 +129,4 @@ public partial class LaserFilamentMonitor : Duet3DFilamentMonitor
 	/// Configured properties of this filament monitor
 	/// </summary>
 	public LaserFilamentMonitorConfigured Configured { get; } = new LaserFilamentMonitorConfigured();
-
-	/// <summary>
-	/// Indicates if a filament is present
-	/// </summary>
-	public bool? FilamentPresent
-	{
-		get => _filamentPresent;
-		set => SetPropertyValue(ref _filamentPresent, value);
-	}
-	private bool? _filamentPresent;
 }

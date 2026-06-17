@@ -14,11 +14,7 @@ namespace DuetPluginService.IPC;
 /// <param name="logger">Logger</param>
 public class CommandService(PluginServiceConnection connection, ILogger<CommandService> logger) : BackgroundService
 {
-    /// <summary>
-    /// Start the main service
-    /// </summary>
-    /// <param name="cancellationToken"></param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
         // Connect to DCS

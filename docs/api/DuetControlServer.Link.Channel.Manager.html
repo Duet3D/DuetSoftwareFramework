@@ -1,0 +1,414 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class Manager </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class Manager ">
+      
+      <meta name="description" content="Class used to manage access to channel processors">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DuetControlServer.Link.Channel.Manager">
+
+
+
+  <h1 id="DuetControlServer_Link_Channel_Manager" data-uid="DuetControlServer.Link.Channel.Manager" class="text-break">
+Class Manager  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Manager.cs"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="DuetControlServer.html">DuetControlServer</a>.<a class="xref" href="DuetControlServer.Link.html">Link</a>.<a class="xref" href="DuetControlServer.Link.Channel.html">Channel</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>DuetControlServer.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Class used to manage access to channel processors</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[DiagnosticsPriority(-6)]
+public class Manager : IAsyncDiagnostics, IEnumerable&lt;Processor&gt;, IEnumerable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">Manager</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="DuetControlServer.Utility.IAsyncDiagnostics.html">IAsyncDiagnostics</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="DuetControlServer.Link.Channel.Processor.html">Processor</a>&gt;</div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.ienumerable">IEnumerable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="DuetControlServer_Link_Channel_Manager__ctor_" data-uid="DuetControlServer.Link.Channel.Manager.#ctor*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Manager__ctor_System_IServiceProvider_" data-uid="DuetControlServer.Link.Channel.Manager.#ctor(System.IServiceProvider)">
+  Manager(IServiceProvider)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Manager.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Class used to manage access to channel processors</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Manager(IServiceProvider provider)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>provider</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iserviceprovider">IServiceProvider</a></dt>
+    <dd><p>Service provider to use for creating channel processors</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="DuetControlServer_Link_Channel_Manager_Item_" data-uid="DuetControlServer.Link.Channel.Manager.Item*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Manager_Item_DuetAPI_CodeChannel_" data-uid="DuetControlServer.Link.Channel.Manager.Item(DuetAPI.CodeChannel)">
+  this[CodeChannel]
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Manager.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Index operator for easy access via a <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a> value</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Processor this[CodeChannel channel] { get; set; }</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Channel to retrieve information about</p>
+</dd>
+  </dl>
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DuetControlServer.Link.Channel.Processor.html">Processor</a></dt>
+    <dd><p>Information about the code channel</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="DuetControlServer_Link_Channel_Manager_HandleReply_" data-uid="DuetControlServer.Link.Channel.Manager.HandleReply*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Manager_HandleReply_DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_System_String_" data-uid="DuetControlServer.Link.Channel.Manager.HandleReply(DuetControlServer.Link.Protocol.Shared.MessageTypeFlags,System.String)">
+  HandleReply(MessageTypeFlags, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Manager.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Try to process a code reply</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool HandleReply(MessageTypeFlags flags, string reply)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>flags</code> <a class="xref" href="DuetControlServer.Link.Protocol.Shared.MessageTypeFlags.html">MessageTypeFlags</a></dt>
+    <dd><p>Message type flags</p>
+</dd>
+    <dt><code>reply</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Message content</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the reply could be handled</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Manager_IsWaitingForAcknowledgment_" data-uid="DuetControlServer.Link.Channel.Manager.IsWaitingForAcknowledgment*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Manager_IsWaitingForAcknowledgment_DuetAPI_CodeChannel_" data-uid="DuetControlServer.Link.Channel.Manager.IsWaitingForAcknowledgment(DuetAPI.CodeChannel)">
+  IsWaitingForAcknowledgment(CodeChannel)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Manager.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if a code channel is waiting for acknowledgement</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsWaitingForAcknowledgment(CodeChannel channel)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Channel to query</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the channel is awaiting acknowledgement</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Channel_Manager_PrintDiagnosticsAsync_" data-uid="DuetControlServer.Link.Channel.Manager.PrintDiagnosticsAsync*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Manager_PrintDiagnosticsAsync_System_Text_StringBuilder_System_Threading_CancellationToken_" data-uid="DuetControlServer.Link.Channel.Manager.PrintDiagnosticsAsync(System.Text.StringBuilder,System.Threading.CancellationToken)">
+  PrintDiagnosticsAsync(StringBuilder, CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Manager.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Print diagnostics of this class</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask PrintDiagnosticsAsync(StringBuilder builder, CancellationToken cancellationToken)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>builder</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.stringbuilder">StringBuilder</a></dt>
+    <dd></dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.notimplementedexception">NotImplementedException</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+  <a id="DuetControlServer_Link_Channel_Manager_Spin_" data-uid="DuetControlServer.Link.Channel.Manager.Spin*"></a>
+
+  <h3 id="DuetControlServer_Link_Channel_Manager_Spin" data-uid="DuetControlServer.Link.Channel.Manager.Spin">
+  Spin()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Channel/Manager.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Process requests in the G-code channel processors</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Spin()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

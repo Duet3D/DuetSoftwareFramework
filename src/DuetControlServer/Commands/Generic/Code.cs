@@ -109,9 +109,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _settings = settings.Value;
     }
 
-    /// <summary>
-    /// Source connection of this command
-    /// </summary>
+    /// <inheritdoc />
     public Connection? Connection
     {
         get => _connection;
@@ -230,6 +228,15 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     }
 
     /// <summary>
+    /// Indicates if this is a comment or empty code that is not interpreted by RepRapFirmware
+    /// </summary>
+    /// <remarks>
+    /// Such codes are resolved internally and never sent to the firmware, so a print cannot be paused at them
+    /// </remarks>
+    internal bool IsNonFirmwareComment => (Type == CodeType.None) ||
+        (Type == CodeType.Comment && (string.IsNullOrWhiteSpace(Comment) || !_settings.FirmwareComments.Any(chunk => Comment.Contains(chunk))));
+
+    /// <summary>
     /// Attempt to process this code internally
     /// </summary>
     /// <returns>Whether the code could be processed internally</returns>
@@ -320,8 +327,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         }
 
         // Do not send comments that may not be interpreted by RRF
-        if ((Type == CodeType.None) ||
-            (Type == CodeType.Comment && (string.IsNullOrWhiteSpace(Comment) || !_settings.FirmwareComments.Any(chunk => Comment.Contains(chunk)))))
+        if (IsNonFirmwareComment)
         {
             Result = new Message();
             return true;

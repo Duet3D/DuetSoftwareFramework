@@ -26,7 +26,7 @@ flowchart LR
 
 ## 2. Per-channel pipelines
 
-Each `CodeChannel` (see [GCodeChannel.h](../../../RepRapFirmware/src/GCodes/GCodeChannel.h)) has its own pipeline so that codes on different channels can execute concurrently. Implementation: [`ChannelProcessor`](../../src/DuetControlServer/Codes/ChannelProcessor.cs) — one per channel, holding 6 `PipelineStage` workers.
+Each `CodeChannel` (see [GCodeChannel.h](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/GCodes/GCodeChannel.h)) has its own pipeline so that codes on different channels can execute concurrently. Implementation: [`ChannelProcessor`](../../src/DuetControlServer/Codes/ChannelProcessor.cs) — one per channel, holding 6 `PipelineStage` workers.
 
 ```mermaid
 flowchart LR
@@ -63,13 +63,6 @@ flowchart LR
     Letter -- M --> MCh[MCodeHandler]
     Letter -- T --> TCh[TCodeHandler]
     Letter -- keyword --> KCh[KeywordHandler<br/>echo, abort, set, var, global,<br/>if/elif/else/endif, while, break,<br/>continue, return, call]
-    MCh --> M0[M0/M1 cancel print]
-    MCh --> M28[M28/M29 streamed write]
-    MCh --> M37[M37 simulation handover]
-    MCh --> M122[M122 diagnostics]
-    MCh --> M409[M409 query OM]
-    MCh --> M598[M598 sync points]
-    MCh --> Other[delegate to firmware]
 ```
 
 Codes that DSF resolves entirely include:
@@ -154,7 +147,7 @@ Cancellation propagates via .NET `CancellationToken`s; any awaiting stage cleans
 
 ## 9. Where this connects to the rest of the system
 
-- The matching firmware-side document — [RepRapFirmware/docs/devel/GCODE_PROCESSING.md](../../../RepRapFirmware/docs/devel/GCODE_PROCESSING.md).
+- The matching firmware-side document — [RepRapFirmware/docs/devel/GCODE_PROCESSING.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/GCODE_PROCESSING.md).
 - The wire protocol that carries codes from DSF to RRF — [SPI_LINK.md](SPI_LINK.md).
 - The plugin interception API — [IPC_PROTOCOL.md](IPC_PROTOCOL.md) and [PLUGINS.md](PLUGINS.md).
 - The full cross-process trace of a single G-code is in [../architecture/GCODE_FLOW.md](../architecture/GCODE_FLOW.md).

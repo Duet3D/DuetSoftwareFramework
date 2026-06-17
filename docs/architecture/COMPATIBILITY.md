@@ -25,7 +25,7 @@ flowchart LR
 
 | Side | File | Symbol |
 |---|---|---|
-| RRF | [src/SBC/SbcMessageFormats.h](../../../RepRapFirmware/src/SBC/SbcMessageFormats.h) | `SbcProtocolVersion`, `SbcTransferBufferSize`, `SbcFormatCode` |
+| RRF | [src/SBC/SbcMessageFormats.h](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/SBC/SbcMessageFormats.h) | `SbcProtocolVersion`, `SbcTransferBufferSize`, `SbcFormatCode` |
 | DSF | [src/DuetControlServer/Link/Protocol/Shared/Consts.cs](../../src/DuetControlServer/Link/Protocol/Shared/Consts.cs), [src/DuetAPI/Connection/Defaults.cs](../../src/DuetAPI/Connection/Defaults.cs) | `Consts.ProtocolVersion`, `Consts.BufferSize` |
 
 A bump on either side without the other = first-contact failure.
@@ -45,7 +45,7 @@ Any struct change must be made in CANlib and both firmwares must be rebuilt agai
 
 | Side | Where | Mechanism |
 |---|---|---|
-| RRF | descriptor tables in `*.cpp` files (e.g. [Move.cpp](../../../RepRapFirmware/src/Movement/Move.cpp), [Heat.cpp](../../../RepRapFirmware/src/Heating/Heat.cpp)) | macro-defined `objectModelTable[]` |
+| RRF | descriptor tables in `*.cpp` files (e.g. [Move.cpp](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/Movement/Move.cpp), [Heat.cpp](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/src/Heating/Heat.cpp)) | macro-defined `objectModelTable[]` |
 | DSF | C# classes in [DuetAPI.ObjectModel](../../src/DuetAPI/ObjectModel) | typed properties; source generator builds JSON serialisation |
 
 A new field needs both sides updated; the source generator regenerates the JSON glue automatically. A deletion needs both sides; transitional `[ObsoleteAttribute]` on the C# side helps third parties migrate.
@@ -135,5 +135,5 @@ If you are working across repos:
 ## 7. Where this connects to the rest of the documentation
 
 - [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md) — the system overview.
-- Per-repo build matrix — [RRF BUILD_VARIANTS](../../../RepRapFirmware/docs/devel/BUILD_VARIANTS.md), [Duet3Expansion BUILD_VARIANTS](../../../Duet3Expansion/docs/devel/BUILD_VARIANTS.md), [DSF BUILD_VARIANTS](../devel/BUILD_VARIANTS.md).
-- The protocol versions in the wild — [DSF SPI_LINK.md](../devel/SPI_LINK.md), [RRF SBC_INTERFACE.md](../../../RepRapFirmware/docs/devel/SBC_INTERFACE.md).
+- Per-repo build matrix — [RRF BUILD_VARIANTS](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/BUILD_VARIANTS.md), [Duet3Expansion BUILD_VARIANTS](https://github.com/Duet3D/Duet3Expansion/blob/3.7-docker/docs/devel/BUILD_VARIANTS.md), [DSF BUILD_VARIANTS](../devel/BUILD_VARIANTS.md).
+- The protocol versions in the wild — [DSF SPI_LINK.md](../devel/SPI_LINK.md), [RRF SBC_INTERFACE.md](https://github.com/Duet3D/RepRapFirmware/blob/3.7-docker/docs/devel/SBC_INTERFACE.md).

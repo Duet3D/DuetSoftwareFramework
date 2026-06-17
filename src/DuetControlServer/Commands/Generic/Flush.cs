@@ -13,9 +13,7 @@ namespace DuetControlServer.Commands;
 /// <param name="model">Object model</param>
 public sealed class Flush(CodeProcessor codeProcessor, Model.ObjectModel model) : DuetAPI.Commands.Flush, IConnectionCommand
 {
-    /// <summary>
-    /// Source connection of this command
-    /// </summary>
+    /// <inheritdoc />
     public Connection? Connection { get; set; }
 
     /// <summary>

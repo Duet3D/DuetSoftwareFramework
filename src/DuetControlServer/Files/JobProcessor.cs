@@ -167,6 +167,11 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     private volatile bool _isSimulating;
 
     /// <summary>
+    /// Whether the simulated time is written back to the file when a simulation completes (cleared by M37 F0)
+    /// </summary>
+    public bool UpdateSimulatedTime { get; set; } = true;
+
+    /// <summary>
     /// Indicates if the file print has been paused
     /// </summary>
     public bool IsPaused { get; private set; }
@@ -432,8 +437,12 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                         // Logging of regular messages is done by the code itself, no need to take care of it here
                         await code.Task;
 
-                        // Keep track of the file position
-                        currentFilePosition = (code.FilePosition ?? 0L) + (code.Length ?? 0L);
+                        // Keep track of the file position. Comments are resolved internally and finish even when the
+                        // print is paused, so they must not advance the position past the point RRF actually stopped at
+                        if (!code.IsNonFirmwareComment)
+                        {
+                            currentFilePosition = (code.FilePosition ?? 0L) + (code.Length ?? 0L);
+                        }
                     }
                     catch (OperationCanceledException)
                     {
@@ -476,18 +485,20 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                 {
                     if (IsPaused)
                     {
-                        // Adjust the file position
-#warning This needs more work
-                        long newFilePosition = _pausePosition ?? currentFilePosition;
+                        // Adjust the file position for this motion system. Each MS may have advanced its file
+                        // independently between sync points, so rewind to the firmware-reported pause offset
+                        // for this channel (falling back to the last code we executed if RRF didn't supply one)
+                        long? msPausePosition = (file.Channel == CodeChannel.File) ? _pausePosition : _pausePosition2;
+                        long newFilePosition = msPausePosition ?? currentFilePosition;
                         await SetFilePositionAsync(file.Channel == CodeChannel.File ? 0 : 1, newFilePosition);
-                        _logger.LogInformation("Job on {Channel} has been paused at byte {Offset}, reason {PauseReason}", file.Channel, (_pausePosition == null) ? $"{newFilePosition} (no fpos from firmware)" : newFilePosition.ToString(), _pauseReason);
+                        _logger.LogInformation("Job on {Channel} has been paused at byte {Offset}, reason {PauseReason}", file.Channel, (msPausePosition == null) ? $"{newFilePosition} (no fpos from firmware)" : newFilePosition.ToString(), _pauseReason);
 
                         // Wait for the print to be resumed
                         IsProcessing = false;
                         await _resume.WaitAsync(_lifetime.ApplicationStopping);
 
                         // Reassign the file being printed unless the print is aborted
-                        if (!IsAborted || !IsCancelled)
+                        if (!IsAborted && !IsCancelled)
                         {
                             IsProcessing = true;
                             _codeProcessor.SetJobFile(file.Channel, file);
@@ -558,13 +569,14 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                     }
 
                     // Get the last print result
-                    bool isCancelled, isAborted, isSimulating;
+                    bool isCancelled, isAborted, isSimulating, updateSimulatedTime;
                     string physicalFileName;
                     using (await LockAsync(stoppingToken))
                     {
                         isCancelled = IsCancelled;
                         isAborted = IsAborted;
                         isSimulating = IsSimulating;
+                        updateSimulatedTime = UpdateSimulatedTime;
                         physicalFileName = _file.FilePath.Physical;
                     }
 
@@ -603,7 +615,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                     }
 
                     // Update the last simulated time
-                    if (isSimulating && !isAborted && !isCancelled)
+                    if (isSimulating && updateSimulatedTime && !isAborted && !isCancelled)
                     {
                         // Wait for the simulation time to be available
                         int? lastDuration = null;
@@ -670,7 +682,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
 
             IsPaused = true;
             _pausePosition = filePosition;
-            _pausePosition = filePosition2;
+            _pausePosition2 = filePosition2;
             _pauseReason = pauseReason;
         }
     }

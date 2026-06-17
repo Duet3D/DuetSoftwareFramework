@@ -49,13 +49,7 @@ public enum CodeType
 /// </summary>
 public class CodeTypeConverter : JsonConverter<CodeType>
 {
-    /// <summary>
-    /// Read a JSON value and convert it to a HttpResponseType
-    /// </summary>
-    /// <param name="reader">JSON reader</param>
-    /// <param name="typeToConvert">Target type</param>
-    /// <param name="options">JSON options</param>
-    /// <returns>Deserialized value</returns>
+    /// <inheritdoc />
     public override CodeType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType != JsonTokenType.String)
@@ -75,12 +69,7 @@ public class CodeTypeConverter : JsonConverter<CodeType>
         };
     }
 
-    /// <summary>
-    /// Write a HttpResponseType value to JSON
-    /// </summary>
-    /// <param name="writer">JSON writer</param>
-    /// <param name="value">Value to write</param>
-    /// <param name="options">JSON options</param>
+    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, CodeType value, JsonSerializerOptions options)
     {
         writer.WriteStringValue(value switch

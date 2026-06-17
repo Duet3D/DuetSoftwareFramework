@@ -87,7 +87,8 @@ public partial class Observer
 
         if (GetItemType(modelDictionary.GetType())!.IsSubclassOf(typeof(ModelObject)))
         {
-            foreach (object key in modelDictionary)
+            // Enumerate the keys explicitly, plain enumeration would yield key-value pairs
+            foreach (object key in modelDictionary.Keys)
             {
                 if (modelDictionary[key] is ModelObject modelItem)
                 {
@@ -118,7 +119,8 @@ public partial class Observer
 
         if (GetItemType(modelDictionary.GetType())!.IsSubclassOf(typeof(ModelObject)))
         {
-            foreach (object key in modelDictionary)
+            // Enumerate the keys explicitly, plain enumeration would yield key-value pairs
+            foreach (object key in modelDictionary.Keys)
             {
                 if (modelDictionary[key] is ModelObject modelItem)
                 {

@@ -39,9 +39,7 @@ public sealed class SimpleCode(Codes.CodeFactory codeFactory, Model.ObjectModel 
         }
     }
 
-    /// <summary>
-    /// Source connection of this command
-    /// </summary>
+    /// <inheritdoc />
     public Connection? Connection { get; set; }
 
     /// <summary>
@@ -189,9 +187,9 @@ public sealed class SimpleCode(Codes.CodeFactory codeFactory, Model.ObjectModel 
                 }
             }
         }
-        catch (CodeParserException cpe)
+        catch (Exception e) when (e is CodeParserException or ArgumentException)
         {
-            result.Append(MessageType.Error, cpe.Message);
+            result.Append(MessageType.Error, e.Message);
             using (await model.AccessReadOnlyAsync(lifetime.ApplicationStopping))
             {
                 // Repetier or other host servers expect an "ok" after error messages

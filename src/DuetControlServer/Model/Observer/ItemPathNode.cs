@@ -29,20 +29,13 @@ public class ItemPathNode(string name, int index, IList list)
     /// </summary>
     public readonly IList List = list;
 
-    /// <summary>
-    /// Check if this instance equals another
-    /// </summary>
-    /// <param name="obj">Other instance</param>
-    /// <returns>If this instance equals obj</returns>
+    /// <inheritdoc />
     public override bool Equals(object? obj)
     {
         return obj is ItemPathNode other && other.Name == Name && other.Index == Index && other.List.Count == List.Count;
     }
 
-    /// <summary>
-    /// Compute a hash code for this instance
-    /// </summary>
-    /// <returns>Hash code</returns>
+    /// <inheritdoc />
     public override int GetHashCode() => HashCode.Combine(Name.GetHashCode(), Index.GetHashCode(), List.Count.GetHashCode());
 
     /// <summary>

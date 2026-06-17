@@ -16,7 +16,8 @@ namespace DuetAPI.ObjectModel;
 /// Key names are NOT converted to camel-case (unlike regular class properties)
 /// </remarks>
 /// <param name="nullRemovesItems">Defines if setting items to null effectively removes them</param>
-public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems) : IDictionary<string, TValue>, IModelDictionary where TValue : IStaticModelObject, new()
+/// <param name="caseInsensitiveKeys">Defines if keys are compared case-insensitively</param>
+public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems, bool caseInsensitiveKeys = false) : IDictionary<string, TValue>, IModelDictionary where TValue : IStaticModelObject, new()
 {
     /// <summary>
     /// Flags if keys can be removed again by setting their value to null
@@ -25,9 +26,15 @@ public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems) : IDict
     public bool NullRemovesItems { get; } = nullRemovesItems;
 
     /// <summary>
+    /// Flags if keys are compared case-insensitively
+    /// </summary>
+    [JsonIgnore]
+    public bool CaseInsensitiveKeys { get; } = caseInsensitiveKeys;
+
+    /// <summary>
     /// Internal storage for key/value pairs
     /// </summary>
-    private readonly Dictionary<string, TValue> _dictionary = [];
+    private readonly Dictionary<string, TValue> _dictionary = caseInsensitiveKeys ? new(StringComparer.OrdinalIgnoreCase) : [];
 
     /// <summary>
     /// Event that is called when the entire directory is cleared. Only used if <see cref="NullRemovesItems"/> is false
@@ -228,6 +235,10 @@ public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems) : IDict
                     }
                 }
             }
+            else if (kv.Value is ICloneable cloneableItem)
+            {
+                Add(kv.Key, (TValue)cloneableItem.Clone());
+            }
             else
             {
                 Add(kv);
@@ -261,12 +272,12 @@ public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems) : IDict
     /// <returns></returns>
     public object Clone()
     {
-        StaticModelDictionary<TValue> clone = new(NullRemovesItems);
+        StaticModelDictionary<TValue> clone = new(NullRemovesItems, CaseInsensitiveKeys);
         foreach (KeyValuePair<string, TValue> kv in _dictionary)
         {
             if (kv.Value is ICloneable cloneableItem)
             {
-                clone.Add(kv.Key, (TValue)cloneableItem);
+                clone.Add(kv.Key, (TValue)cloneableItem.Clone());
             }
             else
             {
@@ -310,7 +321,7 @@ public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems) : IDict
     /// </summary>
     /// <param name="array">Destination array</param>
     /// <param name="arrayIndex">Start iondex</param>
-    public void CopyTo(KeyValuePair<string, TValue>[] array, int arrayIndex) => CopyTo(array, arrayIndex);
+    public void CopyTo(KeyValuePair<string, TValue>[] array, int arrayIndex) => CopyTo((Array)array, arrayIndex);
 
     /// <summary>
     /// Check if a key-value pair exists

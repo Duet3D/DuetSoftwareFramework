@@ -145,8 +145,8 @@ public sealed class UninstallPlugin(IPermissionManager permissionManager, Plugin
                         if (Path.GetFileName(sdFile).Equals("daemon.g"))
                         {
                             // daemon.g may be still open at this time
-                            logger.LogDebug("Renaming file {SourceFile} to {File}", sdFile, sdFile + ".bak");
-                            File.Move(sdFile, sdFile + ".bak", true);
+                            logger.LogDebug("Renaming file {SourceFile} to {File}", fileName, fileName + ".bak");
+                            File.Move(fileName, fileName + ".bak", true);
                         }
                         else
                         {

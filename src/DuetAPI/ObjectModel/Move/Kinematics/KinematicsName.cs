@@ -1,12 +1,13 @@
-﻿using System.Text.Json.Serialization;
-using DuetAPI.Utility;
+﻿using System;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.ObjectModel;
 
 /// <summary>
 /// Enumeration of supported kinematics
 /// </summary>
-[JsonConverter(typeof(JsonCamelCaseStringEnumConverter<KinematicsName>))]
+[JsonConverter(typeof(KinematicsNameConverter))]
 public enum KinematicsName
 {
     /// <summary>
@@ -73,4 +74,53 @@ public enum KinematicsName
     /// Unknown
     /// </summary>
     Unknown
+}
+
+/// <summary>
+/// Class to (de-)serialize kinematics names using the spellings reported by RepRapFirmware
+/// (e.g. "delta" for linear delta and capitalized names like "Hangprinter" or "Rotary delta")
+/// </summary>
+public class KinematicsNameConverter : JsonConverter<KinematicsName>
+{
+    /// <inheritdoc />
+    public override KinematicsName Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        return reader.GetString()?.ToLowerInvariant() switch
+        {
+            "cartesian" => KinematicsName.Cartesian,
+            "corexy" => KinematicsName.CoreXY,
+            "corexyu" => KinematicsName.CoreXYU,
+            "corexyuv" => KinematicsName.CoreXYUV,
+            "corexz" => KinematicsName.CoreXZ,
+            "markforged" => KinematicsName.MarkForged,
+            "fivebarscara" => KinematicsName.FiveBarScara,
+            "hangprinter" => KinematicsName.Hangprinter,
+            "delta" or "lineardelta" => KinematicsName.LinearDelta,
+            "polar" => KinematicsName.Polar,
+            "rotary delta" or "rotarydelta" => KinematicsName.RotaryDelta,
+            "scara" => KinematicsName.Scara,
+            _ => KinematicsName.Unknown,
+        };
+    }
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, KinematicsName value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value switch
+        {
+            KinematicsName.Cartesian => "cartesian",
+            KinematicsName.CoreXY => "coreXY",
+            KinematicsName.CoreXYU => "coreXYU",
+            KinematicsName.CoreXYUV => "coreXYUV",
+            KinematicsName.CoreXZ => "coreXZ",
+            KinematicsName.MarkForged => "markForged",
+            KinematicsName.FiveBarScara => "FiveBarScara",
+            KinematicsName.Hangprinter => "Hangprinter",
+            KinematicsName.LinearDelta => "delta",
+            KinematicsName.Polar => "Polar",
+            KinematicsName.RotaryDelta => "Rotary delta",
+            KinematicsName.Scara => "Scara",
+            _ => "unknown",
+        });
+    }
 }

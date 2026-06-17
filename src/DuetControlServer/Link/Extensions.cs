@@ -1,4 +1,4 @@
-using System;
+using DuetAPI.ObjectModel;
 using Microsoft.Extensions.DependencyInjection;
 using DuetControlServer.Utility;
 
@@ -31,7 +31,7 @@ public static partial class ServiceCollectionExtensions
         var serviceProvider = services.BuildServiceProvider();
         var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Settings>>().Value;
 
-        if (settings.CommunicationMethod.Equals("usb", StringComparison.OrdinalIgnoreCase))
+        if (settings.CommunicationMethod == CommunicationMethod.USB)
         {
             return services
                 .AddSingleton<Adapter.USB>()

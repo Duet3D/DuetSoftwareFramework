@@ -38,12 +38,7 @@ public enum AnalogSensorType
     /// <summary>
     /// Linear analog sensor
     /// </summary>
-    LinearAnalaog,
-
-    /// <summary>
-    /// DHT11 sensor
-    /// </summary>
-    DHT11,
+    LinearAnalog,
 
     /// <summary>
     /// DHT21 sensor
@@ -76,14 +71,39 @@ public enum AnalogSensorType
     BME280Humidity,
 
     /// <summary>
+    /// BME68x temperature sensor
+    /// </summary>
+    BME68x,
+
+    /// <summary>
+    /// BME68x pressure sensor
+    /// </summary>
+    BME68xPressure,
+
+    /// <summary>
+    /// BME68x humidity sensor
+    /// </summary>
+    BME68xHumidity,
+
+    /// <summary>
+    /// BME68x gas resistance sensor
+    /// </summary>
+    BME68xGas,
+
+    /// <summary>
     /// Current loop sensor
     /// </summary>
     CurrentLoop,
 
     /// <summary>
-    /// ADS131 channel 0
+    /// ADS131 channel 0 (unipolar)
     /// </summary>
-    ADS131Chan0,
+    ADS131Chan0Unipolar,
+
+    /// <summary>
+    /// ADS131 channel 0 (bipolar)
+    /// </summary>
+    ADS131Chan0Bipolar,
 
     /// <summary>
     /// ADS131 channel 1
@@ -116,13 +136,7 @@ public enum AnalogSensorType
 /// </summary>
 public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
 {
-    /// <summary>
-    /// Read an <see cref="AnalogSensorType"/> from JSON
-    /// </summary>
-    /// <param name="reader">JSON reader</param>
-    /// <param name="typeToConvert">Type to convert</param>
-    /// <param name="options">Serializer options</param>
-    /// <returns>Read value</returns>
+    /// <inheritdoc />
     public override AnalogSensorType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType == JsonTokenType.String)
@@ -134,16 +148,20 @@ public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
                 "rtdmax31865" => AnalogSensorType.MAX31865,
                 "thermocouplemax31855" => AnalogSensorType.MAX31855,
                 "thermocouplemax31856" => AnalogSensorType.MAX31856,
-                "linearanalog" => AnalogSensorType.LinearAnalaog,
-                "dht11" => AnalogSensorType.DHT11,
+                "linearanalog" => AnalogSensorType.LinearAnalog,
                 "dht21" => AnalogSensorType.DHT21,
                 "dht22" => AnalogSensorType.DHT22,
                 "bme280" => AnalogSensorType.BME280,
                 "bmepressure" => AnalogSensorType.BME280Pressure,
                 "bmehumidity" => AnalogSensorType.BME280Humidity,
+                "bme68x" => AnalogSensorType.BME68x,
+                "bme68xpressure" => AnalogSensorType.BME68xPressure,
+                "bme68xhumidity" => AnalogSensorType.BME68xHumidity,
+                "bme68xgas" => AnalogSensorType.BME68xGas,
                 "dhthumidity" => AnalogSensorType.DHTHumidity,
-                "currentlooppyro" => AnalogSensorType.CurrentLoop,
-                "ads131.chan0" => AnalogSensorType.ADS131Chan0,
+                "currentloop" => AnalogSensorType.CurrentLoop,
+                "ads131.chan0.u" => AnalogSensorType.ADS131Chan0Unipolar,
+                "ads131.chan0.b" => AnalogSensorType.ADS131Chan0Bipolar,
                 "ads131.chan1" => AnalogSensorType.ADS131Chan1,
                 "mcutemp" => AnalogSensorType.McuTemp,
                 "drivers" => AnalogSensorType.Drivers,
@@ -154,12 +172,7 @@ public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
         throw new JsonException($"Invalid type for {nameof(AnalogSensorType)}");
     }
 
-    /// <summary>
-    /// Write an <see cref="AnalogSensorType"/> to JSON
-    /// </summary>
-    /// <param name="writer">JSON writer</param>
-    /// <param name="value">Value to serialize</param>
-    /// <param name="options">Write options</param>
+    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, AnalogSensorType value, JsonSerializerOptions options)
     {
         switch (value)
@@ -179,11 +192,8 @@ public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
             case AnalogSensorType.MAX31856:
                 writer.WriteStringValue("thermocouplemax31856");
                 break;
-            case AnalogSensorType.LinearAnalaog:
+            case AnalogSensorType.LinearAnalog:
                 writer.WriteStringValue("linearanalog");
-                break;
-            case AnalogSensorType.DHT11:
-                writer.WriteStringValue("dht11");
                 break;
             case AnalogSensorType.DHT21:
                 writer.WriteStringValue("dht21");
@@ -203,11 +213,26 @@ public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
             case AnalogSensorType.BME280Humidity:
                 writer.WriteStringValue("bmehumidity");
                 break;
-            case AnalogSensorType.CurrentLoop:
-                writer.WriteStringValue("currentlooppyro");
+            case AnalogSensorType.BME68x:
+                writer.WriteStringValue("bme68x");
                 break;
-            case AnalogSensorType.ADS131Chan0:
-                writer.WriteStringValue("ads131.chan0");
+            case AnalogSensorType.BME68xPressure:
+                writer.WriteStringValue("bme68xpressure");
+                break;
+            case AnalogSensorType.BME68xHumidity:
+                writer.WriteStringValue("bme68xhumidity");
+                break;
+            case AnalogSensorType.BME68xGas:
+                writer.WriteStringValue("bme68xgas");
+                break;
+            case AnalogSensorType.CurrentLoop:
+                writer.WriteStringValue("currentloop");
+                break;
+            case AnalogSensorType.ADS131Chan0Unipolar:
+                writer.WriteStringValue("ads131.chan0.u");
+                break;
+            case AnalogSensorType.ADS131Chan0Bipolar:
+                writer.WriteStringValue("ads131.chan0.b");
                 break;
             case AnalogSensorType.ADS131Chan1:
                 writer.WriteStringValue("ads131.chan1");

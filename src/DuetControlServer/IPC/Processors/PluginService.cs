@@ -270,10 +270,12 @@ public sealed class PluginService : IProcessor
         }
         finally
         {
-            using (await monitor.EnterAsync(cancellationToken))
+            // Do not use the cancellation token here, it is already cancelled on application shutdown and
+            // the cleanup must still run to completion
+            using (await monitor.EnterAsync())
             {
                 // Plugins from this service are no longer running
-                using (await _model.AccessReadWriteAsync(cancellationToken))
+                using (await _model.AccessReadWriteAsync(CancellationToken.None))
                 {
                     foreach (Plugin item in _model.Plugins.Values)
                     {
@@ -300,7 +302,7 @@ public sealed class PluginService : IProcessor
                 // Invalidate pending requests
                 while (pendingCommands.TryDequeue(out Tuple<BaseCommand, TaskCompletionSource<object?>>? request))
                 {
-                    request.Item2.SetCanceled(cancellationToken);
+                    request.Item2.TrySetCanceled();
                 }
 
                 // Stop the remaining plugins again unless they are already stopped
@@ -311,7 +313,7 @@ public sealed class PluginService : IProcessor
                 }
 
                 // Plugins from this service are no longer running
-                using (await _model.AccessReadWriteAsync(cancellationToken))
+                using (await _model.AccessReadWriteAsync(CancellationToken.None))
                 {
                     foreach (Plugin item in _model.Plugins.Values)
                     {

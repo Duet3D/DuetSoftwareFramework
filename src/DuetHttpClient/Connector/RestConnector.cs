@@ -35,7 +35,7 @@ internal class RestConnector : BaseConnector
     public static async Task<RestConnector> ConnectAsync(Uri baseUri, DuetHttpOptions options, CancellationToken cancellationToken)
     {
         using HttpClient client = new() { Timeout = options.Timeout };
-        using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"machine/connect?password={HttpUtility.UrlPathEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken).ConfigureAwait(false);
+        using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"machine/connect?password={HttpUtility.UrlEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken).ConfigureAwait(false);
         if (response.IsSuccessStatusCode)
         {
 #if NET6_0_OR_GREATER
@@ -65,7 +65,6 @@ internal class RestConnector : BaseConnector
     /// <param name="sessionKey">Session key</param>
     private RestConnector(Uri baseUri, DuetHttpOptions options, string sessionKey) : base(baseUri, options)
     {
-        HttpClient.DefaultRequestHeaders.Add("X-Session-Key", sessionKey);
         _sessionKey = sessionKey;
 
         if (options.ObserveMessages || options.ObserveObjectModel)
@@ -83,20 +82,30 @@ internal class RestConnector : BaseConnector
     /// <summary>
     /// Session key of the underlying HTTP session
     /// </summary>
-    private string? _sessionKey;
+    private volatile string? _sessionKey;
 
-    /// <summary>
-    /// Reconnect to the board when the connection has been reset
-    /// </summary>
+    /// <inheritdoc />
+    protected override ValueTask<HttpResponseMessage> SendRequestAsync(HttpRequestMessage request, TimeSpan timeout, CancellationToken cancellationToken = default, HttpCompletionOption completionOption = HttpCompletionOption.ResponseContentRead)
+    {
+        // Set the session key per request. HttpClient.DefaultRequestHeaders is not thread-safe and
+        // must not be modified by ReconnectAsync while other requests are in flight
+        string? sessionKey = _sessionKey;
+        if (sessionKey is not null)
+        {
+            request.Headers.Add("X-Session-Key", sessionKey);
+        }
+        return base.SendRequestAsync(request, timeout, cancellationToken, completionOption);
+    }
+
+    /// <inheritdoc />
     protected override async Task ReconnectAsync(CancellationToken cancellationToken = default)
     {
         _sessionKey = null;
-        HttpClient.DefaultRequestHeaders.Remove("X-Session-Key");
 
         using CancellationTokenSource connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _terminateSession.Token);
         connectCts.CancelAfter(Options.Timeout);
 
-        using HttpResponseMessage response = await HttpClient.GetAsync($"machine/connect?password={Options.Password}", connectCts.Token);
+        using HttpResponseMessage response = await HttpClient.GetAsync($"machine/connect?password={HttpUtility.UrlEncode(Options.Password)}", connectCts.Token);
         if (response.IsSuccessStatusCode)
         {
 #if NET6_0_OR_GREATER
@@ -107,7 +116,6 @@ internal class RestConnector : BaseConnector
             Responses.RestConnectResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.RestConnectResponse, cancellationToken))!;
 
             _sessionKey = responseObj.SessionKey;
-            HttpClient.DefaultRequestHeaders.Add("X-Session-Key", responseObj.SessionKey);
         }
         else if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
         {
@@ -141,12 +149,8 @@ internal class RestConnector : BaseConnector
     /// </summary>
     private readonly List<TaskCompletionSource<object?>> _modelUpdateTCS = [];
 
-    /// <summary>
-    /// Wait for the object model to be up-to-date
-    /// </summary>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public override Task WaitForModelUpdateAsync(CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    public override async Task WaitForModelUpdateAsync(CancellationToken cancellationToken = default)
     {
         if (disposed)
         {
@@ -158,24 +162,24 @@ internal class RestConnector : BaseConnector
         }
 
         TaskCompletionSource<object?> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_terminateSession.Token, cancellationToken);
-        CancellationTokenRegistration ctsRegistration = cts.Token.Register(() => tcs.TrySetCanceled());
+        using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_terminateSession.Token, cancellationToken);
+        using CancellationTokenRegistration ctsRegistration = cts.Token.Register(() => tcs.TrySetCanceled());
         lock (_modelUpdateTCS)
         {
             _modelUpdateTCS.Add(tcs);
         }
 
-        return tcs.Task.ContinueWith(async task =>
+        try
         {
-            try
+            await tcs.Task.ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (_modelUpdateTCS)
             {
-                await task;
+                _modelUpdateTCS.Remove(tcs);
             }
-            finally
-            {
-                ctsRegistration.Dispose();
-            }
-        }, TaskContinuationOptions.RunContinuationsAsynchronously);
+        }
     }
 
     /// <summary>
@@ -252,14 +256,14 @@ internal class RestConnector : BaseConnector
 
                                 do
                                 {
-                                    WebSocketReceiveResult result = await webSocket.ReceiveAsync(new ArraySegment<byte>(patchChunk), _terminateSession.Token).ConfigureAwait(false);
+                                    WebSocketReceiveResult result = await webSocket.ReceiveAsync(new ArraySegment<byte>(patchChunk), cts.Token).ConfigureAwait(false);
                                     if (result.MessageType == WebSocketMessageType.Close)
                                     {
                                         // Server has closed the connection
                                         break;
                                     }
 
-                                    if (result.Count == pongResponse.Length && patchChunk.SequenceEqual(pongResponse))
+                                    if (result.Count == pongResponse.Length && patchChunk.AsSpan(0, result.Count).SequenceEqual(pongResponse))
                                     {
                                         // Got a PONG response back
                                         continue;
@@ -323,9 +327,14 @@ internal class RestConnector : BaseConnector
                     await Task.Delay(Options.RetryDelay, _terminateSession.Token).ConfigureAwait(false);
                     await ReconnectAsync().ConfigureAwait(false);
                 }
-                catch (Exception e) when (e is OperationCanceledException || e is HttpRequestException)
+                catch (Exception e) when (e is not OperationCanceledException || !_terminateSession.IsCancellationRequested)
                 {
-                    // expected when the remote end is still offline or unavailable
+                    // Expected when the remote end is still offline or unavailable. Other errors
+                    // (e.g. a changed password) are recorded so the session task keeps retrying
+                    lock (this)
+                    {
+                        LastConnectionError = e;
+                    }
                 }
             }
             while (!_terminateSession.IsCancellationRequested);
@@ -358,9 +367,9 @@ internal class RestConnector : BaseConnector
                     // Wait a moment
                     await Task.Delay(Options.SessionKeepAliveInterval, _terminateSession.Token);
                 }
-                catch (Exception e) when (e is not OperationCanceledException)
+                catch (Exception e) when (e is not OperationCanceledException || !_terminateSession.IsCancellationRequested)
                 {
-                    // Something went wrong
+                    // Something went wrong (including request timeouts), try again after the retry delay
                 }
 
                 if (!_terminateSession.IsCancellationRequested)
@@ -407,7 +416,9 @@ internal class RestConnector : BaseConnector
             try
             {
                 using CancellationTokenSource cts = new(Options.Timeout);
-                await HttpClient.GetAsync("machine/disconnect", cts.Token).ConfigureAwait(false);
+                using HttpRequestMessage request = new(HttpMethod.Get, "machine/disconnect");
+                request.Headers.Add("X-Session-Key", _sessionKey);
+                await HttpClient.SendAsync(request, cts.Token).ConfigureAwait(false);
             }
             catch
             {
@@ -419,24 +430,13 @@ internal class RestConnector : BaseConnector
         HttpClient.Dispose();
     }
 
-    /// <summary>
-    /// Send a G/M/T-code and return the G-code reply
-    /// </summary>
-    /// <param name="code">Code to send</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Code reply</returns>
+    /// <inheritdoc />
     public override async Task<string> SendCodeAsync(string code, CancellationToken cancellationToken = default)
     {
         return await SendCodeAsync(code, false, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Send a G/M/T-code and return the G-code reply
-    /// </summary>
-    /// <param name="code">Code to send</param>
-    /// <param name="executeAsynchronously">Don't wait for the code to finish</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Code reply</returns>
+    /// <inheritdoc />
     public override async Task<string> SendCodeAsync(string code, bool executeAsynchronously, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
@@ -465,14 +465,7 @@ internal class RestConnector : BaseConnector
         throw new HttpRequestException(errorMessage);
     }
 
-    /// <summary>
-    /// Upload arbitrary content to a file
-    /// </summary>
-    /// <param name="filename">Target filename</param>
-    /// <param name="content">File content</param>
-    /// <param name="lastModified">Last modified datetime. Ignored in SBC mode</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task UploadAsync(string filename, Stream content, DateTime? lastModified = null, CancellationToken cancellationToken = default)
     {
         using HttpRequestMessage request = new(HttpMethod.Put, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
@@ -482,12 +475,7 @@ internal class RestConnector : BaseConnector
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>
-    /// Delete a file or directory
-    /// </summary>
-    /// <param name="filename">Target filename</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task DeleteAsync(string filename, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
@@ -525,14 +513,7 @@ internal class RestConnector : BaseConnector
         throw new HttpRequestException(errorMessage);
     }
 
-    /// <summary>
-    /// Move a file or directory
-    /// </summary>
-    /// <param name="from">Source file</param>
-    /// <param name="to">Destination file</param>
-    /// <param name="force">Overwrite file if it already exists</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task MoveAsync(string from, string to, bool force = false, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
@@ -578,12 +559,7 @@ internal class RestConnector : BaseConnector
         throw new HttpRequestException(errorMessage);
     }
 
-    /// <summary>
-    /// Make a new directory
-    /// </summary>
-    /// <param name="directory">Target directory</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     public override async Task MakeDirectoryAsync(string directory, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
@@ -625,7 +601,7 @@ internal class RestConnector : BaseConnector
     public override async Task<HttpResponseMessage> DownloadAsync(string filename, CancellationToken cancellationToken = default)
     {
         using HttpRequestMessage request = new(HttpMethod.Get, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
-        HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+        HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             throw new FileNotFoundException();
@@ -635,12 +611,7 @@ internal class RestConnector : BaseConnector
         return response;
     }
 
-    /// <summary>
-    /// Enumerate all files and directories in the given directory
-    /// </summary>
-    /// <param name="directory">Directory to query</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>List of all files and directories</returns>
+    /// <inheritdoc />
     public override async Task<IList<FileListItem>> GetFileListAsync(string directory, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
@@ -691,13 +662,7 @@ internal class RestConnector : BaseConnector
         throw new HttpRequestException(errorMessage);
     }
 
-    /// <summary>
-    /// Get G-code file info
-    /// </summary>
-    /// <param name="filename">File to query</param>
-    /// <param name="readThumbnailContent">Whether thumbnail contents shall be parsed</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>G-code file info</returns>
+    /// <inheritdoc />
     public override async Task<GCodeFileInfo> GetFileInfoAsync(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";

@@ -1,0 +1,2435 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class SPI </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class SPI ">
+      
+      <meta name="description" content="Class to handle the SPI link to the firmware">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DuetControlServer.Link.Adapter.SPI">
+
+
+
+  <h1 id="DuetControlServer_Link_Adapter_SPI" data-uid="DuetControlServer.Link.Adapter.SPI" class="text-break">
+Class SPI  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="DuetControlServer.html">DuetControlServer</a>.<a class="xref" href="DuetControlServer.Link.html">Link</a>.<a class="xref" href="DuetControlServer.Link.Adapter.html">Adapter</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>DuetControlServer.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Class to handle the SPI link to the firmware</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[DiagnosticsPriority(-4)]
+public class SPI : IDiagnostics, ILinkAdapter</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">SPI</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="DuetControlServer.Utility.IDiagnostics.html">IDiagnostics</a></div>
+      <div><a class="xref" href="DuetControlServer.Link.Adapter.ILinkAdapter.html">ILinkAdapter</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI__ctor_" data-uid="DuetControlServer.Link.Adapter.SPI.#ctor*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI__ctor_DuetControlServer_Utility_EventLogger_DuetControlServer_Model_ObjectModel_Microsoft_Extensions_Logging_ILogger_DuetControlServer_Link_Adapter_SPI__Microsoft_Extensions_Options_IOptions_DuetControlServer_Settings__" data-uid="DuetControlServer.Link.Adapter.SPI.#ctor(DuetControlServer.Utility.EventLogger,DuetControlServer.Model.ObjectModel,Microsoft.Extensions.Logging.ILogger{DuetControlServer.Link.Adapter.SPI},Microsoft.Extensions.Options.IOptions{DuetControlServer.Settings})">
+  SPI(EventLogger, ObjectModel, ILogger&lt;SPI&gt;, IOptions&lt;Settings&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Constructor of this class</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public SPI(EventLogger eventLogger, ObjectModel model, ILogger&lt;SPI&gt; logger, IOptions&lt;Settings&gt; settings)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>eventLogger</code> <a class="xref" href="DuetControlServer.Utility.EventLogger.html">EventLogger</a></dt>
+    <dd><p>EVent logger</p>
+</dd>
+    <dt><code>model</code> <a class="xref" href="DuetControlServer.Model.ObjectModel.html">ObjectModel</a></dt>
+    <dd><p>Object model</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger-1">ILogger</a>&lt;<a class="xref" href="DuetControlServer.Link.Adapter.SPI.html">SPI</a>&gt;</dt>
+    <dd><p>Logger instance</p>
+</dd>
+    <dt><code>settings</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.options.ioptions-1">IOptions</a>&lt;<a class="xref" href="DuetControlServer.Settings.html">Settings</a>&gt;</dt>
+    <dd><p>Settings</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></dt>
+    <dd><p>Failed to connect to board</p>
+</dd>
+  </dl>
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_PacketsToRead_" data-uid="DuetControlServer.Link.Adapter.SPI.PacketsToRead*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_PacketsToRead" data-uid="DuetControlServer.Link.Adapter.SPI.PacketsToRead">
+  PacketsToRead
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Returns the number of packets to read</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int PacketsToRead { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ProtocolVersion_" data-uid="DuetControlServer.Link.Adapter.SPI.ProtocolVersion*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ProtocolVersion" data-uid="DuetControlServer.Link.Adapter.SPI.ProtocolVersion">
+  ProtocolVersion
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Currently-used protocol version</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int ProtocolVersion { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_Connect_" data-uid="DuetControlServer.Link.Adapter.SPI.Connect*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_Connect_System_Threading_CancellationToken_" data-uid="DuetControlServer.Link.Adapter.SPI.Connect(System.Threading.CancellationToken)">
+  Connect(CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Attempt to connect to the firmware</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Connect(CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Optional cancellation token</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_DumpMalformedPacket_" data-uid="DuetControlServer.Link.Adapter.SPI.DumpMalformedPacket*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_DumpMalformedPacket" data-uid="DuetControlServer.Link.Adapter.SPI.DumpMalformedPacket">
+  DumpMalformedPacket()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write the last packet + content for diagnostic purposes</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void DumpMalformedPacket()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_FlashFirmwareSegment_" data-uid="DuetControlServer.Link.Adapter.SPI.FlashFirmwareSegment*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_FlashFirmwareSegment_System_IO_Stream_" data-uid="DuetControlServer.Link.Adapter.SPI.FlashFirmwareSegment(System.IO.Stream)">
+  FlashFirmwareSegment(Stream)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Flash another segment of the firmware via the IAP binary</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool FlashFirmwareSegment(Stream stream)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>stream</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a></dt>
+    <dd><p>Stream of the firmware binary</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether another segment could be sent</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_GetMaxFullTransferDelay_" data-uid="DuetControlServer.Link.Adapter.SPI.GetMaxFullTransferDelay*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_GetMaxFullTransferDelay" data-uid="DuetControlServer.Link.Adapter.SPI.GetMaxFullTransferDelay">
+  GetMaxFullTransferDelay()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get the maximum time between two full transfers</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public double GetMaxFullTransferDelay()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd><p>Time in ms</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_GetMaxPinWaitDuration_" data-uid="DuetControlServer.Link.Adapter.SPI.GetMaxPinWaitDuration*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_GetMaxPinWaitDuration_System_Boolean_" data-uid="DuetControlServer.Link.Adapter.SPI.GetMaxPinWaitDuration(System.Boolean)">
+  GetMaxPinWaitDuration(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get the maximum time to wait for the transfer ready pin to be toggled and reset the counter</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public double GetMaxPinWaitDuration(bool fullTransferCounter)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>fullTransferCounter</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Query and reset the full transfer duration</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd><p>Time in ms</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_HadReset_" data-uid="DuetControlServer.Link.Adapter.SPI.HadReset*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_HadReset" data-uid="DuetControlServer.Link.Adapter.SPI.HadReset">
+  HadReset()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if the controller has been reset</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool HadReset()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the controller has been reset</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_PerformFullTransfer_" data-uid="DuetControlServer.Link.Adapter.SPI.PerformFullTransfer*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_PerformFullTransfer_System_Boolean_System_Threading_CancellationToken_" data-uid="DuetControlServer.Link.Adapter.SPI.PerformFullTransfer(System.Boolean,System.Threading.CancellationToken)">
+  PerformFullTransfer(bool, CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Perform a full data transfer synchronously</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>connecting</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether this an initial connection is being established</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Cancellation token to cancel the transfer</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_PrintDiagnostics_" data-uid="DuetControlServer.Link.Adapter.SPI.PrintDiagnostics*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_PrintDiagnostics_System_Text_StringBuilder_" data-uid="DuetControlServer.Link.Adapter.SPI.PrintDiagnostics(System.Text.StringBuilder)">
+  PrintDiagnostics(StringBuilder)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Print diagnostics to the given string builder</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void PrintDiagnostics(StringBuilder builder)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>builder</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.stringbuilder">StringBuilder</a></dt>
+    <dd><p>Target to write to</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadAbortFile_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadAbortFile*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadAbortFile_DuetAPI_CodeChannel__System_Boolean__" data-uid="DuetControlServer.Link.Adapter.SPI.ReadAbortFile(DuetAPI.CodeChannel@,System.Boolean@)">
+  ReadAbortFile(out CodeChannel, out bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read the content of an <a class="xref" href="DuetControlServer.Link.Protocol.FirmwareRequests.AbortFileHeader.html">AbortFileHeader</a> packet</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadAbortFile(out CodeChannel channel, out bool abortAll)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Code channel where all files are supposed to be aborted</p>
+</dd>
+    <dt><code>abortAll</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether all files are supposed to be aborted</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadCheckFileExists_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadCheckFileExists*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadCheckFileExists_System_String__" data-uid="DuetControlServer.Link.Adapter.SPI.ReadCheckFileExists(System.String@)">
+  ReadCheckFileExists(out string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a request to check if a file exists</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadCheckFileExists(out string filename)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>filename</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Name of the file</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadCloseFile_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadCloseFile*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadCloseFile_System_UInt32__" data-uid="DuetControlServer.Link.Adapter.SPI.ReadCloseFile(System.UInt32@)">
+  ReadCloseFile(out uint)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a request to close a file</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadCloseFile(out uint handle)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>handle</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>File handle</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadCodeBufferUpdate_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadCodeBufferUpdate*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadCodeBufferUpdate_System_UInt16__" data-uid="DuetControlServer.Link.Adapter.SPI.ReadCodeBufferUpdate(System.UInt16@)">
+  ReadCodeBufferUpdate(out ushort)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a code buffer update</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadCodeBufferUpdate(out ushort bufferSpace)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>bufferSpace</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint16">ushort</a></dt>
+    <dd><p>Buffer space</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadCodeChannel_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadCodeChannel*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadCodeChannel_DuetAPI_CodeChannel__" data-uid="DuetControlServer.Link.Adapter.SPI.ReadCodeChannel(DuetAPI.CodeChannel@)">
+  ReadCodeChannel(out CodeChannel)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a code channel</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadCodeChannel(out CodeChannel channel)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Code channel that has acquired the lock</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadDeleteFileOrDirectory_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadDeleteFileOrDirectory*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadDeleteFileOrDirectory_System_String__" data-uid="DuetControlServer.Link.Adapter.SPI.ReadDeleteFileOrDirectory(System.String@)">
+  ReadDeleteFileOrDirectory(out string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a request to delete a file or directory</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadDeleteFileOrDirectory(out string filename)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>filename</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Name of the file</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadDoCode_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadDoCode*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadDoCode_DuetAPI_CodeChannel__System_String__" data-uid="DuetControlServer.Link.Adapter.SPI.ReadDoCode(DuetAPI.CodeChannel@,System.String@)">
+  ReadDoCode(out CodeChannel, out string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a code request</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadDoCode(out CodeChannel channel, out string code)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Channel to execute this code on</p>
+</dd>
+    <dt><code>code</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Code to execute</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadEvaluationResult_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadEvaluationResult*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadEvaluationResult_System_Nullable_DuetAPI_CodeChannel___System_String__System_Object__" data-uid="DuetControlServer.Link.Adapter.SPI.ReadEvaluationResult(System.Nullable{DuetAPI.CodeChannel}@,System.String@,System.Object@)">
+  ReadEvaluationResult(out CodeChannel?, out string, out object?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read the result of an expression evaluation request</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadEvaluationResult(out CodeChannel? channel, out string expression, out object? result)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/CodeChannel.cs">CodeChannel</a>?</dt>
+    <dd><p>Channel where the evaluation was performed</p>
+</dd>
+    <dt><code>expression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Evaluated expression</p>
+</dd>
+    <dt><code>result</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd><p>Result</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadFileChunkRequest_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadFileChunkRequest*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadFileChunkRequest_System_String__System_UInt32__System_Int32__" data-uid="DuetControlServer.Link.Adapter.SPI.ReadFileChunkRequest(System.String@,System.UInt32@,System.Int32@)">
+  ReadFileChunkRequest(out string, out uint, out int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a chunk of a <a class="xref" href="DuetControlServer.Link.Protocol.FirmwareRequests.Request.html#DuetControlServer_Link_Protocol_FirmwareRequests_Request_FileChunk">FileChunk</a> packet</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadFileChunkRequest(out string filename, out uint offset, out int maxLength)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>filename</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Filename</p>
+</dd>
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>File offset</p>
+</dd>
+    <dt><code>maxLength</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Maximum chunk size</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadFileRequest_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadFileRequest*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadFileRequest_System_UInt32__System_Int32__" data-uid="DuetControlServer.Link.Adapter.SPI.ReadFileRequest(System.UInt32@,System.Int32@)">
+  ReadFileRequest(out uint, out int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a request to read data from a file</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadFileRequest(out uint handle, out int maxLength)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>handle</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>File handle</p>
+</dd>
+    <dt><code>maxLength</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Maximum data length</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadMacroRequest_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadMacroRequest*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadMacroRequest_DuetAPI_CodeChannel__System_Boolean__System_String__" data-uid="DuetControlServer.Link.Adapter.SPI.ReadMacroRequest(DuetAPI.CodeChannel@,System.Boolean@,System.String@)">
+  ReadMacroRequest(out CodeChannel, out bool, out string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read the content of a <a class="xref" href="DuetControlServer.Link.Protocol.FirmwareRequests.ExecuteMacroHeader.html">ExecuteMacroHeader</a> packet</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadMacroRequest(out CodeChannel channel, out bool isSystemMacro, out string filename)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Channel requesting a macro file</p>
+</dd>
+    <dt><code>isSystemMacro</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Indicates if this code is not bound to a code being executed (e.g. when a trigger macro is requested)</p>
+</dd>
+    <dt><code>filename</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Filename of the requested macro</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadMessage_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadMessage*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadMessage_DuetControlServer_Link_Protocol_Shared_MessageTypeFlags__System_String__" data-uid="DuetControlServer.Link.Adapter.SPI.ReadMessage(DuetControlServer.Link.Protocol.Shared.MessageTypeFlags@,System.String@)">
+  ReadMessage(out MessageTypeFlags, out string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read an incoming message</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadMessage(out MessageTypeFlags messageType, out string reply)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>messageType</code> <a class="xref" href="DuetControlServer.Link.Protocol.Shared.MessageTypeFlags.html">MessageTypeFlags</a></dt>
+    <dd><p>Message type flags of the reply</p>
+</dd>
+    <dt><code>reply</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Code reply</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadNextPacket_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadNextPacket*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadNextPacket" data-uid="DuetControlServer.Link.Adapter.SPI.ReadNextPacket">
+  ReadNextPacket()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read the next packet</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public PacketHeader? ReadNextPacket()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="DuetControlServer.Link.Protocol.Shared.PacketHeader.html">PacketHeader</a>?</dt>
+    <dd><p>The next packet or null if none is available</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadObjectModel_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadObjectModel*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadObjectModel_System_ReadOnlySpan_System_Byte___" data-uid="DuetControlServer.Link.Adapter.SPI.ReadObjectModel(System.ReadOnlySpan{System.Byte}@)">
+  ReadObjectModel(out ReadOnlySpan&lt;byte&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read the result of a <a class="xref" href="DuetControlServer.Link.Protocol.SbcRequests.Request.html#DuetControlServer_Link_Protocol_SbcRequests_Request_GetObjectModel">GetObjectModel</a> request</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadObjectModel(out ReadOnlySpan&lt;byte&gt; json)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>json</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>JSON data</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadOpenFile_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadOpenFile*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadOpenFile_System_String__System_Boolean__System_Boolean__System_Int64__" data-uid="DuetControlServer.Link.Adapter.SPI.ReadOpenFile(System.String@,System.Boolean@,System.Boolean@,System.Int64@)">
+  ReadOpenFile(out string, out bool, out bool, out long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read an open file request</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadOpenFile(out string filename, out bool forWriting, out bool append, out long preAllocSize)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>filename</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Filename to open</p>
+</dd>
+    <dt><code>forWriting</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the file is supposed to be written to</p>
+</dd>
+    <dt><code>append</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether data is supposed to be appended in write mode</p>
+</dd>
+    <dt><code>preAllocSize</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>How many bytes to allocate if the file is created or overwritten</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadPrintPaused_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadPrintPaused*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadPrintPaused_System_UInt32__System_UInt32__DuetControlServer_Link_Protocol_FirmwareRequests_PrintPausedReason__" data-uid="DuetControlServer.Link.Adapter.SPI.ReadPrintPaused(System.UInt32@,System.UInt32@,DuetControlServer.Link.Protocol.FirmwareRequests.PrintPausedReason@)">
+  ReadPrintPaused(out uint, out uint, out PrintPausedReason)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read the content of a <a class="xref" href="DuetControlServer.Link.Protocol.FirmwareRequests.PrintPausedHeader.html">PrintPausedHeader</a> packet</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadPrintPaused(out uint filePosition, out uint filePosition2, out PrintPausedReason reason)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>filePosition</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>Position where the print has been paused</p>
+</dd>
+    <dt><code>filePosition2</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>Position where the second open file has been paused (if applicable)</p>
+</dd>
+    <dt><code>reason</code> <a class="xref" href="DuetControlServer.Link.Protocol.FirmwareRequests.PrintPausedReason.html">PrintPausedReason</a></dt>
+    <dd><p>Reason why the print has been paused</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadSeekFile_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadSeekFile*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadSeekFile_System_UInt32__System_Int64__" data-uid="DuetControlServer.Link.Adapter.SPI.ReadSeekFile(System.UInt32@,System.Int64@)">
+  ReadSeekFile(out uint, out long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a request to seek in a file</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadSeekFile(out uint handle, out long offset)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>handle</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>File handle</p>
+</dd>
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>New file position</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadTruncateFile_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadTruncateFile*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadTruncateFile_System_UInt32__" data-uid="DuetControlServer.Link.Adapter.SPI.ReadTruncateFile(System.UInt32@)">
+  ReadTruncateFile(out uint)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a request to truncate a file</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadTruncateFile(out uint handle)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>handle</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>File handle</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ReadWriteRequest_" data-uid="DuetControlServer.Link.Adapter.SPI.ReadWriteRequest*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ReadWriteRequest_System_UInt32__System_ReadOnlySpan_System_Byte___" data-uid="DuetControlServer.Link.Adapter.SPI.ReadWriteRequest(System.UInt32@,System.ReadOnlySpan{System.Byte}@)">
+  ReadWriteRequest(out uint, out ReadOnlySpan&lt;byte&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read a request to write data to a file</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ReadWriteRequest(out uint handle, out ReadOnlySpan&lt;byte&gt; data)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>handle</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>File handle</p>
+</dd>
+    <dt><code>data</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Data to write</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_ResendPacket_" data-uid="DuetControlServer.Link.Adapter.SPI.ResendPacket*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_ResendPacket_DuetControlServer_Link_Protocol_Shared_PacketHeader_DuetControlServer_Link_Protocol_SbcRequests_Request__" data-uid="DuetControlServer.Link.Adapter.SPI.ResendPacket(DuetControlServer.Link.Protocol.Shared.PacketHeader,DuetControlServer.Link.Protocol.SbcRequests.Request@)">
+  ResendPacket(PacketHeader, out Request)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Resend a packet back to the firmware</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ResendPacket(PacketHeader packet, out Request sbcRequest)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>packet</code> <a class="xref" href="DuetControlServer.Link.Protocol.Shared.PacketHeader.html">PacketHeader</a></dt>
+    <dd><p>Packet holding the resend request</p>
+</dd>
+    <dt><code>sbcRequest</code> <a class="xref" href="DuetControlServer.Link.Protocol.SbcRequests.Request.html">Request</a></dt>
+    <dd><p>Content of the packet to resend</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_StartIap_" data-uid="DuetControlServer.Link.Adapter.SPI.StartIap*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_StartIap_System_UInt32_System_Threading_CancellationToken_" data-uid="DuetControlServer.Link.Adapter.SPI.StartIap(System.UInt32,System.Threading.CancellationToken)">
+  StartIap(uint, CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Instruct the firmware to start the IAP binary</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void StartIap(uint firmwareLength, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>firmwareLength</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>Firmware length (unused by SPI IAP but present for interface parity with USB)</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Optional cancellation token</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_VerifyFirmwareChecksum_" data-uid="DuetControlServer.Link.Adapter.SPI.VerifyFirmwareChecksum*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_VerifyFirmwareChecksum_System_Int64_System_UInt16_" data-uid="DuetControlServer.Link.Adapter.SPI.VerifyFirmwareChecksum(System.Int64,System.UInt16)">
+  VerifyFirmwareChecksum(long, ushort)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Send the CRC16 checksum of the firmware binary to the IAP program and verify the written data</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>firmwareLength</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Length of the written firmware in bytes</p>
+</dd>
+    <dt><code>crc16</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint16">ushort</a></dt>
+    <dd><p>CRC16 checksum of the firmware</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the firmware has been written successfully</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WaitForIapReset_" data-uid="DuetControlServer.Link.Adapter.SPI.WaitForIapReset*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WaitForIapReset" data-uid="DuetControlServer.Link.Adapter.SPI.WaitForIapReset">
+  WaitForIapReset()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Wait for the IAP program to reset the controller</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void WaitForIapReset()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteCheckFileExistsResult_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteCheckFileExistsResult*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteCheckFileExistsResult_System_Boolean_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteCheckFileExistsResult(System.Boolean)">
+  WriteCheckFileExistsResult(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Send back whether a file exists or not</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteCheckFileExistsResult(bool exists)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>exists</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the file exists</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteCode_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteCode*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteCode_DuetControlServer_Commands_Code_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteCode(DuetControlServer.Commands.Code)">
+  WriteCode(Code)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Request a code to be executed</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteCode(Code code)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>code</code> <a class="xref" href="DuetControlServer.Commands.Code.html">Code</a></dt>
+    <dd><p>Code to send</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>True if the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteDeleteLocalVariable_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteDeleteLocalVariable*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteDeleteLocalVariable_DuetAPI_CodeChannel_System_String_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteDeleteLocalVariable(DuetAPI.CodeChannel,System.String)">
+  WriteDeleteLocalVariable(CodeChannel, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Delete a local variable at the end of the current code block</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteDeleteLocalVariable(CodeChannel channel, string varName)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>G-code channel</p>
+</dd>
+    <dt><code>varName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Name of the variable excluding var prefix</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>True if the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteEmergencyStop_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteEmergencyStop*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteEmergencyStop" data-uid="DuetControlServer.Link.Adapter.SPI.WriteEmergencyStop">
+  WriteEmergencyStop()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Request an emergency stop</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteEmergencyStop()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>True if the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteEvaluateExpression_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteEvaluateExpression*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteEvaluateExpression_DuetAPI_CodeChannel_System_String_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteEvaluateExpression(DuetAPI.CodeChannel,System.String)">
+  WriteEvaluateExpression(CodeChannel, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write a request for an expression evaluation</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteEvaluateExpression(CodeChannel channel, string expression)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Where to evaluate the expression</p>
+</dd>
+    <dt><code>expression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Expression to evaluate</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the evaluation request has been written successfully</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteFileChunk_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteFileChunk*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteFileChunk_System_Span_System_Byte__System_Int64_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteFileChunk(System.Span{System.Byte},System.Int64)">
+  WriteFileChunk(Span&lt;byte&gt;, long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write another chunk of the file being requested</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteFileChunk(Span&lt;byte&gt; data, long fileLength)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>data</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>File chunk data</p>
+</dd>
+    <dt><code>fileLength</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Total length of the file in bytes</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the firmware has been written successfully</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteFileDeleteResult_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteFileDeleteResult*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteFileDeleteResult_System_Boolean_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteFileDeleteResult(System.Boolean)">
+  WriteFileDeleteResult(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Send back whether a file or directory could be deleted</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteFileDeleteResult(bool success)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>success</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the file operation was successful</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteFileReadResult_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteFileReadResult*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteFileReadResult_System_Span_System_Byte__System_Int32_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteFileReadResult(System.Span{System.Byte},System.Int32)">
+  WriteFileReadResult(Span&lt;byte&gt;, int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write requested read data from a file</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteFileReadResult(Span&lt;byte&gt; data, int bytesRead)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>data</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>File data</p>
+</dd>
+    <dt><code>bytesRead</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Number of bytes read or negative on error</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteFileSeekResult_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteFileSeekResult*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteFileSeekResult_System_Boolean_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteFileSeekResult(System.Boolean)">
+  WriteFileSeekResult(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Tell RRF if the seek operation was successful</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteFileSeekResult(bool success)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>success</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If the seek operation succeeded</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteFileTruncateResult_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteFileTruncateResult*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteFileTruncateResult_System_Boolean_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteFileTruncateResult(System.Boolean)">
+  WriteFileTruncateResult(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Tell RRF if the seek operation was successful</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteFileTruncateResult(bool success)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>success</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If the seek operation succeeded</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteFileWriteResult_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteFileWriteResult*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteFileWriteResult_System_Boolean_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteFileWriteResult(System.Boolean)">
+  WriteFileWriteResult(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Tell RRF if the last file block could be written</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteFileWriteResult(bool success)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>success</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If the file data could be written</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteGetObjectModel_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteGetObjectModel*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteGetObjectModel_System_String_System_String_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteGetObjectModel(System.String,System.String)">
+  WriteGetObjectModel(string, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Request the key of a object module of a specific module</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteGetObjectModel(string key, string flags)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Object model key to query</p>
+</dd>
+    <dt><code>flags</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Object model flags to query</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>True if the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteIapSegment_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteIapSegment*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteIapSegment_System_IO_Stream_System_Threading_CancellationToken_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteIapSegment(System.IO.Stream,System.Threading.CancellationToken)">
+  WriteIapSegment(Stream, CancellationToken)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write another segment of the IAP binary</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteIapSegment(Stream stream, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>stream</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a></dt>
+    <dd><p>IAP binary</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>Optional cancellation token</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether another segment could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteInvalidateChannel_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteInvalidateChannel*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteInvalidateChannel_DuetAPI_CodeChannel_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteInvalidateChannel(DuetAPI.CodeChannel)">
+  WriteInvalidateChannel(CodeChannel)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Called when a code channel is supposed to be invalidated (e.g. via abort keyword)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteInvalidateChannel(CodeChannel channel)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Code channel that requires the lock</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>True if the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteLockAllMovementSystemsAndWaitForStandstill_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteLockAllMovementSystemsAndWaitForStandstill*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteLockAllMovementSystemsAndWaitForStandstill_DuetAPI_CodeChannel_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteLockAllMovementSystemsAndWaitForStandstill(DuetAPI.CodeChannel)">
+  WriteLockAllMovementSystemsAndWaitForStandstill(CodeChannel)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Request the movement systems to be locked and wait for standstill</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteLockAllMovementSystemsAndWaitForStandstill(CodeChannel channel)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Code channel that requires the lock</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>True if the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteMacroCompleted_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteMacroCompleted*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteMacroCompleted_DuetAPI_CodeChannel_System_Boolean_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteMacroCompleted(DuetAPI.CodeChannel,System.Boolean)">
+  WriteMacroCompleted(CodeChannel, bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Notify the firmware about a completed macro file.
+This function is only used for macro files that the firmware requested</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteMacroCompleted(CodeChannel channel, bool error)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Code channel of the finished macro</p>
+</dd>
+    <dt><code>error</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether an error occurred</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>True if the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteMacroStarted_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteMacroStarted*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteMacroStarted_DuetAPI_CodeChannel_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteMacroStarted(DuetAPI.CodeChannel)">
+  WriteMacroStarted(CodeChannel)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Notify RepRapFirmware that a macro file could be started</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteMacroStarted(CodeChannel channel)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Code channel that requires the lock</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>True if the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteMessage_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteMessage*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteMessage_DuetControlServer_Link_Protocol_Shared_MessageTypeFlags_System_String_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteMessage(DuetControlServer.Link.Protocol.Shared.MessageTypeFlags,System.String)">
+  WriteMessage(MessageTypeFlags, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write a message</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteMessage(MessageTypeFlags flags, string message)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>flags</code> <a class="xref" href="DuetControlServer.Link.Protocol.Shared.MessageTypeFlags.html">MessageTypeFlags</a></dt>
+    <dd><p>Message flags</p>
+</dd>
+    <dt><code>message</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Message content</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the firmware has been written successfully</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteObjectModelKeyChanged_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteObjectModelKeyChanged*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteObjectModelKeyChanged_System_String_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteObjectModelKeyChanged(System.String)">
+  WriteObjectModelKeyChanged(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Notify RRF that an object model key has changed</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteObjectModelKeyChanged(string key)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Key that has changed</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteOpenFileResult_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteOpenFileResult*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteOpenFileResult_System_UInt32_System_Int64_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteOpenFileResult(System.UInt32,System.Int64)">
+  WriteOpenFileResult(uint, long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write the new file handle and file length of the file that has just been opened</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteOpenFileResult(uint fileHandle, long length)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>fileHandle</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>New file handle or noFileHandle if the file could not be opened</p>
+</dd>
+    <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Length of the file</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WritePrintFileInfo_" data-uid="DuetControlServer.Link.Adapter.SPI.WritePrintFileInfo*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WritePrintFileInfo_DuetAPI_ObjectModel_GCodeFileInfo_" data-uid="DuetControlServer.Link.Adapter.SPI.WritePrintFileInfo(DuetAPI.ObjectModel.GCodeFileInfo)">
+  WritePrintFileInfo(GCodeFileInfo)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Notify the firmware that a file print has started</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WritePrintFileInfo(GCodeFileInfo info)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>info</code> <a class="xref" href="DuetAPI.ObjectModel.GCodeFileInfo.html">GCodeFileInfo</a></dt>
+    <dd><p>Information about the file being printed</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>True if the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WritePrintStopped_" data-uid="DuetControlServer.Link.Adapter.SPI.WritePrintStopped*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WritePrintStopped_DuetControlServer_Link_Protocol_Shared_PrintStoppedReason_" data-uid="DuetControlServer.Link.Adapter.SPI.WritePrintStopped(DuetControlServer.Link.Protocol.Shared.PrintStoppedReason)">
+  WritePrintStopped(PrintStoppedReason)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Notify that a file print has been stopped</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WritePrintStopped(PrintStoppedReason reason)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>reason</code> <a class="xref" href="DuetControlServer.Link.Protocol.Shared.PrintStoppedReason.html">PrintStoppedReason</a></dt>
+    <dd><p>Reason why the print has been stopped</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>True if the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteReset_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteReset*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteReset" data-uid="DuetControlServer.Link.Adapter.SPI.WriteReset">
+  WriteReset()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Request a firmware reset</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteReset()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>True if the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteSetLastCodeResult_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteSetLastCodeResult*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteSetLastCodeResult_DuetAPI_CodeChannel_DuetControlServer_Link_Protocol_Shared_CodeResult_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteSetLastCodeResult(DuetAPI.CodeChannel,DuetControlServer.Link.Protocol.Shared.CodeResult)">
+  WriteSetLastCodeResult(CodeChannel, CodeResult)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Write the last code result for a specific code channel</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteSetLastCodeResult(CodeChannel channel, CodeResult result)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Code channel</p>
+</dd>
+    <dt><code>result</code> <a class="xref" href="DuetControlServer.Link.Protocol.Shared.CodeResult.html">CodeResult</a></dt>
+    <dd><p>Last code result</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteSetVariable_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteSetVariable*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteSetVariable_DuetAPI_CodeChannel_System_Boolean_System_String_System_String_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteSetVariable(DuetAPI.CodeChannel,System.Boolean,System.String,System.String)">
+  WriteSetVariable(CodeChannel, bool, string, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Set a global or local variable</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteSetVariable(CodeChannel channel, bool createVariable, string varName, string expression)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>G-code channel</p>
+</dd>
+    <dt><code>createVariable</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the variable should be created or updated</p>
+</dd>
+    <dt><code>varName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Name of the variable including global or var prefix</p>
+</dd>
+    <dt><code>expression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>New value of the variable</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>True if the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetControlServer_Link_Adapter_SPI_WriteUnlock_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteUnlock*"></a>
+
+  <h3 id="DuetControlServer_Link_Adapter_SPI_WriteUnlock_DuetAPI_CodeChannel_" data-uid="DuetControlServer.Link.Adapter.SPI.WriteUnlock(DuetAPI.CodeChannel)">
+  WriteUnlock(CodeChannel)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Adapter/SPI.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Release all acquired locks again</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool WriteUnlock(CodeChannel channel)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>channel</code> <a class="xref" href="DuetAPI.CodeChannel.html">CodeChannel</a></dt>
+    <dd><p>Code channel that releases the locks</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>True if the packet could be written</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -130,7 +130,10 @@ public static class CRC32
 			{
 				crcLocal = _table[(byte)(crcLocal ^ buffer[offset++])] ^ crcLocal >> 8;
 			}
-		} while (!cancellationToken.IsCancellationRequested);
+
+			// Do not return a partial checksum when the operation is cancelled
+			cancellationToken.ThrowIfCancellationRequested();
+		} while (true);
 
 		return crcLocal ^ uint.MaxValue;
 	}

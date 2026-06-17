@@ -4,6 +4,9 @@
     "dockerfile": "Dockerfile",
     "context": ".."
   },
+  "features": {
+    "ghcr.io/devcontainers-extra/features/ripgrep": "latest"
+  },
   "customizations": {
     "vscode": {
       "extensions": [

@@ -127,7 +127,7 @@ public sealed partial class LinkInterface(
                 if (item.Channel == channel && item.Expression == expression)
                 {
                     // There is no reason to evaluate the same expression twice...
-                    return item.Task;
+                    return item.Task.WaitAsync(cancellationToken);
                 }
             }
 

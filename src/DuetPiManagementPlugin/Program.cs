@@ -409,7 +409,7 @@ namespace DuetPiManagementPlugin
                         case 587:
                             try
                             {
-                                if (code.MinorNumber is null || code.MinorNumber == 0)
+                                if (code.MinorNumber <= 0)
                                 {
                                     code.TryGetString('S', out string? ssid);
                                     if (code.TryGetString('P', out string? psk))
@@ -557,7 +557,10 @@ namespace DuetPiManagementPlugin
                                 {
                                     if (File.Exists($"/usr/share/zoneinfo/{timezone}"))
                                     {
-                                        await Process.Start("timedatectl", $"set-timezone {timezone}").WaitForExitAsync(CancellationToken);
+                                        using (Process timezoneProcess = Process.Start("timedatectl", $"set-timezone {timezone}"))
+                                        {
+                                            await timezoneProcess.WaitForExitAsync(CancellationToken);
+                                        }
                                         seen = true;
                                     }
                                     else

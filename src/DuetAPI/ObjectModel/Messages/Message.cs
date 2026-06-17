@@ -112,10 +112,7 @@ public sealed class Message : ICloneable
         };
     }
 
-    /// <summary>
-    /// Create a clone of this message
-    /// </summary>
-    /// <returns>Clone</returns>
+    /// <inheritdoc />
     public object Clone()
     {
         return new Message(Type, Content)
