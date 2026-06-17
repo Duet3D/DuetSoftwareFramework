@@ -70,17 +70,18 @@ public sealed class LockWrapper : IDisposable
             _releaseCts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
 
             StackTrace stackTrace = new(true);
+            CancellationToken releaseToken = _releaseCts.Token;        // capture it here, the CTS may already be disposed when the task starts
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    await Task.Delay(_settings.MaxMachineModelLockTime, _releaseCts.Token);
+                    await Task.Delay(_settings.MaxMachineModelLockTime, releaseToken);
                     _logger.LogCritical("{LockType} deadlock detected, stack trace of the deadlock:\n{StackTrace}", isWriteLock ? "Writer" : "Reader", stackTrace);
                     _lifetime.StopApplication();
                 }
-                finally
+                catch (OperationCanceledException)
                 {
-                    _releaseCts.Dispose();
+                    // Lock was released in time
                 }
             });
         }
@@ -110,10 +111,12 @@ public sealed class LockWrapper : IDisposable
             // Dispose the lock again
             _lock.Dispose();
 
-            // Stop the deadlock detection task if applicable
-            if (!_lifetime.ApplicationStopping.IsCancellationRequested)
+            // Stop the deadlock detection task if applicable. The CTS is disposed here and not in the
+            // watchdog task so that Cancel cannot race a concurrent disposal
+            if (_releaseCts is not null)
             {
-                _releaseCts?.Cancel();
+                _releaseCts.Cancel();
+                _releaseCts.Dispose();
             }
         }
     }

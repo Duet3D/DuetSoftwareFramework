@@ -40,10 +40,7 @@ public class SessionKeyAuthenticationHandler(IOptionsMonitor<SessionKeyAuthentic
     /// </summary>
     private readonly Settings _settings = configuration.Get<Settings>() ?? new();
 
-    /// <summary>
-    /// Try to authenticate a request
-    /// </summary>
-    /// <returns>Authentication result</returns>
+    /// <inheritdoc />
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         if (Request.Headers.TryGetValue("X-Session-Key", out StringValues sessionKeys))

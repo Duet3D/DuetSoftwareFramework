@@ -13,14 +13,18 @@ public partial class PluginManifest : ModelObject, IStaticModelObject
     /// Identifier of this plugin. May consist of letters and digits only (max length 32 chars)
     /// </summary>
     /// <remarks>
-    /// For plugins with DWC components, this is the Webpack chunk name too
+    /// Compared case-insensitively, so two ids differing only in case refer to the same plugin and
+    /// cannot be installed alongside each other. For plugins with DWC components, this is the Webpack
+    /// chunk name too
     /// </remarks>
     public string Id
     {
         get => _id;
         set
         {
-            if (string.IsNullOrWhiteSpace(value) || value.Length > 32)
+            // An empty value is permitted here so that default instances can be cloned and assigned.
+            // Manifest ingestion checks that an identifier is actually present
+            if (value is null || value.Length > 32)
             {
                 throw new ArgumentException("Invalid plugin identifier");
             }
@@ -46,7 +50,9 @@ public partial class PluginManifest : ModelObject, IStaticModelObject
         get => _name;
         set
         {
-            if (string.IsNullOrWhiteSpace(value) || value.Length > 64)
+            // An empty value is permitted here so that default instances can be cloned and assigned.
+            // Manifest ingestion checks that a name is actually present
+            if (value is null || value.Length > 64 || (value.Length > 0 && string.IsNullOrWhiteSpace(value)))
             {
                 throw new ArgumentException("Invalid plugin name");
             }

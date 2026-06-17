@@ -26,16 +26,6 @@ public partial class HeaterModelPID : ModelObject, IStaticModelObject
     private float _i;
 
     /// <summary>
-    /// Indicates if custom PID values are used
-    /// </summary>
-    public bool Overridden
-    {
-        get => _overridden;
-        set => SetPropertyValue(ref _overridden, value);
-    }
-    private bool _overridden;
-
-    /// <summary>
     /// Proportional value of the PID regulator
     /// </summary>
     public float P

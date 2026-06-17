@@ -16,6 +16,26 @@ public partial class LedStrip : ModelObject, IStaticModelObject
     private int _board;
 
     /// <summary>
+    /// Order in which colour components are sent to the strip
+    /// </summary>
+    public LedStripColorOrder ColorOrder
+    {
+        get => _colorOrder;
+        set => SetPropertyValue(ref _colorOrder, value);
+    }
+    private LedStripColorOrder _colorOrder = LedStripColorOrder.BGR;
+
+    /// <summary>
+    /// Maximum number of LEDs that can be addressed on this strip
+    /// </summary>
+    public uint MaxLeds
+    {
+        get => _maxLeds;
+        set => SetPropertyValue(ref _maxLeds, value);
+    }
+    private uint _maxLeds;
+
+    /// <summary>
     /// Name of the pin this LED strip is connected to
     /// </summary>
     public string Pin

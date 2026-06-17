@@ -43,9 +43,11 @@ internal abstract class BaseConnector : IAsyncDisposable
     /// Send a generic a HTTP request
     /// </summary>
     /// <param name="request">HTTP request to send</param>
+    /// <param name="timeout">Request timeout</param>
     /// <param name="cancellationToken">Cancellation token</param>
+    /// <param name="completionOption">When the returned task completes (set to ResponseHeadersRead to stream large downloads)</param>
     /// <returns>HTTP response</returns>
-    protected virtual async ValueTask<HttpResponseMessage> SendRequestAsync(HttpRequestMessage request, TimeSpan timeout, CancellationToken cancellationToken = default)
+    protected virtual async ValueTask<HttpResponseMessage> SendRequestAsync(HttpRequestMessage request, TimeSpan timeout, CancellationToken cancellationToken = default, HttpCompletionOption completionOption = HttpCompletionOption.ResponseContentRead)
     {
         using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _terminateSession.Token);
         if (timeout != Timeout.InfiniteTimeSpan)
@@ -53,7 +55,7 @@ internal abstract class BaseConnector : IAsyncDisposable
             cts.CancelAfter(timeout);
         }
 
-        HttpResponseMessage response = await HttpClient.SendAsync(request, cts.Token);
+        HttpResponseMessage response = await HttpClient.SendAsync(request, completionOption, cts.Token);
         if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
         {
             // Session is no longer valid, attempt to connect again

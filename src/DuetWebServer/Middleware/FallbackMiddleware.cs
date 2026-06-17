@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace DuetWebServer.Middleware;
 
 /// <summary>
-/// Middleware class to redirect GET requests without dot in the path to the main index file
+/// Middleware class to redirect GET requests for client-side routes to the main index file
 /// </summary>
 /// <param name="next">Next request delegate</param>
 /// <param name="logger">Logger instance</param>
@@ -19,10 +19,13 @@ public class FallbackMiddleware(RequestDelegate next, ILogger<FallbackMiddleware
     /// <returns>Asynchronous task</returns>
     public async Task InvokeAsync(HttpContext context)
     {
+        string path = context.Request.Path.Value!;
         if (context.Request.Method == HttpMethods.Get &&
-            !context.Request.Path.Value!.Equals("/") &&
-            !context.Request.Path.Value.StartsWith("/rr_") && !context.Request.Path.Value.StartsWith("/machine/") &&
-            !context.Request.Path.Value.Contains('.'))
+            !path.Equals("/") &&
+            !path.StartsWith("/rr_") && !path.StartsWith("/machine/") &&
+            // A path without a dot is a client-side route; the Explorer editor (e.g.
+            // /Explorer/edit/sys/config.g) is one too but carries the target filename, so admit it explicitly
+            (!path.Contains('.') || path.StartsWith("/Explorer/")))
         {
             logger.LogWarning("Could not find resource {Path}, serving index file", context.Request.Path);
             context.Request.Path = PathString.FromUriComponent("/");

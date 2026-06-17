@@ -18,10 +18,10 @@ public partial class MoveSegmentation : ModelObject, IStaticModelObject
     /// <summary>
     /// Minimum length of a segment (in mm)
     /// </summary>
-    public float MinSegmentLength
+    public float MinSegLength
     {
-        get => _minSegmentLength;
-        set => SetPropertyValue(ref _minSegmentLength, value);
+        get => _minSegLength;
+        set => SetPropertyValue(ref _minSegLength, value);
     }
-    private float _minSegmentLength;
+    private float _minSegLength;
 }

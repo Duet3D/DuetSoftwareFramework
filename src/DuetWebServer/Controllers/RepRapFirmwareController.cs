@@ -263,9 +263,10 @@ public class RepRapFirmwareController(IConfiguration configuration, ILogger<RepR
     }
 
     /// <summary>
-    /// Indicates if the last upload was successful
+    /// Indicates if the last upload was successful. Static because controllers are instantiated per
+    /// request and GET /rr_upload queries the result of a previous POST request
     /// </summary>
-    private bool _lastUploadSuccessful = true;
+    private static volatile bool _lastUploadSuccessful = true;
 
     /// <summary>
     /// GET /rr_upload
@@ -682,7 +683,12 @@ public class RepRapFirmwareController(IConfiguration configuration, ILogger<RepR
     /// <summary>
     /// Last queried file info
     /// </summary>
-    private GCodeFileInfo? _lastFileInfo;
+    private static GCodeFileInfo? _lastFileInfo;
+
+    /// <summary>
+    /// Lock for the cached file info
+    /// </summary>
+    private static readonly object _lastFileInfoLock = new();
 
     /// <summary>
     /// GET /rr_fileinfo?name={filename}
@@ -722,7 +728,7 @@ public class RepRapFirmwareController(IConfiguration configuration, ILogger<RepR
                 return Content("{\"err\":1}", "application/json");
             }
             GCodeFileInfo info = await connection.GetFileInfoAsync(resolvedPath, true);
-            lock (this)
+            lock (_lastFileInfoLock)
             {
                 _lastFileInfo = info;
                 _lastFileInfo.FileName = resolvedPath;
@@ -823,7 +829,7 @@ public class RepRapFirmwareController(IConfiguration configuration, ILogger<RepR
 
             // Get fileinfo and cache it
             GCodeFileInfo? info = null;
-            lock (this)
+            lock (_lastFileInfoLock)
             {
                 if (_lastFileInfo is not null && _lastFileInfo.FileName == resolvedPath)
                 {
@@ -833,7 +839,7 @@ public class RepRapFirmwareController(IConfiguration configuration, ILogger<RepR
             if (info is null)
             {
                 info = await connection.GetFileInfoAsync(resolvedPath, true);
-                lock (this)
+                lock (_lastFileInfoLock)
                 {
                     _lastFileInfo = info;
                     _lastFileInfo.FileName = resolvedPath;

@@ -19,9 +19,7 @@ public sealed class NotifyPluginStarted(Model.ObjectModel model) : DuetAPI.Comma
     /// </summary>
     public static readonly AsyncAutoResetEvent PluginStartedEvent = new(false);
 
-    /// <summary>
-    /// Source connection of this command
-    /// </summary>
+    /// <inheritdoc />
     public Connection? Connection { get; set; }
 
     /// <summary>

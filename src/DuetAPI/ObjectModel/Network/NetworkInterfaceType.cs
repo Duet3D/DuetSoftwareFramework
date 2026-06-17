@@ -11,8 +11,8 @@ public enum NetworkInterfaceType
     /// <summary>
     /// Wired network interface
     /// </summary>
-    [JsonStringEnumMemberName("lan")]
-    LAN,
+    [JsonStringEnumMemberName("ethernet")]
+    Ethernet,
 
     /// <summary>
     /// Wireless network interface

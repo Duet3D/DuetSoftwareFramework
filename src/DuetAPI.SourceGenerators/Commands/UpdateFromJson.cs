@@ -371,7 +371,8 @@ internal static class UpdateFromJson
                         }
                         else if (propType == "JsonElement")
                         {
-                            writer.WriteLine($"{prop.Identifier.ValueText} = jsonProperty.Value;");
+                            // Clone the element so the stored value does not depend on the lifetime of the caller's JsonDocument
+                            writer.WriteLine($"{prop.Identifier.ValueText} = jsonProperty.Value.Clone();");
                         }
                         else
                         {

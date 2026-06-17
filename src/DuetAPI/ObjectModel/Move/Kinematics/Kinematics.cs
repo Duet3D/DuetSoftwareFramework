@@ -49,8 +49,9 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
 
         if (jsonElement.TryGetProperty("name", out JsonElement nameProperty))
         {
-            string? name = nameProperty.GetString();
-            if (name is "cartesian" or "coreXY" or "coreXYU" or "coreXYUV" or "coreXZ" or "markForged")
+            // Compare case-insensitively, the firmware reports some kinematics with capitalized names
+            string? name = nameProperty.GetString()?.ToLowerInvariant();
+            if (name is "cartesian" or "corexy" or "corexyu" or "corexyuv" or "corexz" or "markforged")
             {
                 if (this is not CoreKinematics)
                 {
@@ -58,7 +59,7 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                     return newKinematics.UpdateFromJson(jsonElement, ignoreSbcProperties);
                 }
             }
-            else if (name is "delta")
+            else if (name is "delta" or "lineardelta")
             {
                 if (this is not DeltaKinematics)
                 {
@@ -74,7 +75,7 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                     return newKinematics.UpdateFromJson(jsonElement, ignoreSbcProperties);
                 }
             }
-            else if (name is "fiveBarScara" or "scara")
+            else if (name is "fivebarscara" or "scara")
             {
                 if (this is not ScaraKinematics)
                 {
@@ -128,8 +129,9 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
             {
                 if (readerCopy.ValueTextEquals("name"u8) && readerCopy.Read())
                 {
-                    string? name = readerCopy.GetString();
-                    if (name is "cartesian" or "coreXY" or "coreXYU" or "coreXYUV" or "coreXZ" or "markForged")
+                    // Compare case-insensitively, the firmware reports some kinematics with capitalized names
+                    string? name = readerCopy.GetString()?.ToLowerInvariant();
+                    if (name is "cartesian" or "corexy" or "corexyu" or "corexyuv" or "corexz" or "markforged")
                     {
                         if (this is not CoreKinematics)
                         {
@@ -137,7 +139,7 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                             return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
                         }
                     }
-                    else if (name is "delta")
+                    else if (name is "delta" or "lineardelta")
                     {
                         if (this is not DeltaKinematics)
                         {
@@ -153,7 +155,7 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                             return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
                         }
                     }
-                    else if (name is "fiveBarScara" or "scara")
+                    else if (name is "fivebarscara" or "scara")
                     {
                         if (this is not ScaraKinematics)
                         {

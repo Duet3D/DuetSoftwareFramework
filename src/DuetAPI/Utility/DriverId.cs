@@ -81,6 +81,10 @@ public sealed class DriverId : ICloneable
                 throw new ArgumentException($"Failed to parse driver number");
             }
         }
+        else
+        {
+            throw new ArgumentException($"Invalid driver value {value}");
+        }
     }
 
     /// <summary>
@@ -105,30 +109,16 @@ public sealed class DriverId : ICloneable
     /// <param name="id">Driver ID to convert</param>
     public static implicit operator string(DriverId id) => id.ToString();
 
-    /// <summary>
-    /// Compute a hash code for this instance
-    /// </summary>
-    /// <returns>Hash code</returns>
+    /// <inheritdoc />
     public override int GetHashCode() => Board.GetHashCode() ^ Port.GetHashCode();
 
-    /// <summary>
-    /// Convert this instance to a string
-    /// </summary>
-    /// <returns>String representation</returns>
+    /// <inheritdoc />
     public override string ToString() => $"{Board}.{Port}";
 
-    /// <summary>
-    /// Checks whether this instance is equal to another
-    /// </summary>
-    /// <param name="obj">Other instance</param>
-    /// <returns>Whether this and the other instance are equal</returns>
+    /// <inheritdoc />
     public override bool Equals(object? obj) => obj is DriverId other && Board == other.Board && Port == other.Port;
 
-    /// <summary>
-    /// Create a clome of this instance
-    /// </summary>
-    /// <returns></returns>
-    /// <exception cref="NotImplementedException"></exception>
+    /// <inheritdoc />
     public object Clone()
     {
         return new DriverId()
@@ -144,13 +134,7 @@ public sealed class DriverId : ICloneable
 /// </summary>
 public sealed class DriverIdJsonConverter : JsonConverter<DriverId>
 {
-    /// <summary>
-    /// Read an instance from JSON
-    /// </summary>
-    /// <param name="reader">JSON reader</param>
-    /// <param name="typeToConvert">Target type</param>
-    /// <param name="options">JSON options</param>
-    /// <returns></returns>
+    /// <inheritdoc />
     public override DriverId? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         return reader.TokenType switch
@@ -161,12 +145,7 @@ public sealed class DriverIdJsonConverter : JsonConverter<DriverId>
         };
     }
 
-    /// <summary>
-    /// Write an instance to JSON
-    /// </summary>
-    /// <param name="writer">JSON writer</param>
-    /// <param name="value">Value to write</param>
-    /// <param name="options">JSON options</param>
+    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, DriverId? value, JsonSerializerOptions options)
     {
         if (value is null)

@@ -1,0 +1,179 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Building from source </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Building from source ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/Duet3D/DuetSoftwareFramework/blob/v3.7-dev/src/Documentation/articles/building.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="building-from-source">Building from source</h1>
+
+<p>DSF is a .NET solution. The application projects target the current .NET runtime (<code>net10.0</code>); the
+shared libraries multi-target older frameworks as well so they can be consumed by external tools. This
+article covers building DSF and deploying a modified build to an SBC for testing.</p>
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li>The <a href="https://dotnet.microsoft.com/download">.NET SDK</a> for the framework the projects target
+(currently .NET 10).</li>
+<li>A checkout of this repository.</li>
+<li>For cross-building and deploying to an SBC: SSH access to the target.</li>
+</ul>
+<h2 id="building">Building</h2>
+<p>From the repository root, build a project for the SBC's architecture with a self-contained runtime:</p>
+<pre><code class="lang-sh">dotnet build src/DuetControlServer/DuetControlServer.csproj -r linux-arm64 --self-contained
+</code></pre>
+<p>Use <code>-r linux-arm</code> for 32-bit targets. To build directly on the SBC into the standard install
+location:</p>
+<pre><code class="lang-sh">dotnet build -o /opt/dsf/bin
+</code></pre>
+<h3 id="the-verify_object_model-constant">The VERIFY_OBJECT_MODEL constant</h3>
+<p>Development builds may define the <code>VERIFY_OBJECT_MODEL</code> constant
+(<code>-p:DefineConstants=VERIFY_OBJECT_MODEL</code>). It enables extra consistency checks in the generated
+<a href="object-model.html#json-serialization">object-model</a> update code and is deliberately left out of release
+packages, where it would only add overhead.</p>
+<h2 id="deploying-to-an-sbc-for-testing">Deploying to an SBC for testing</h2>
+<p>The typical loop is: build for the target architecture, stop the DSF services, copy the binaries over,
+and restart the services.</p>
+<pre><code class="lang-sh"># stop the services
+ssh root@&lt;sbc&gt; &quot;systemctl stop duetcontrolserver duetwebserver&quot;
+
+# sync the build output (example for DuetControlServer)
+rsync -a --delete src/DuetControlServer/bin/Debug/net10.0/linux-arm64/ root@&lt;sbc&gt;:/opt/dsf/bin/
+
+# restart
+ssh root@&lt;sbc&gt; &quot;systemctl start duetcontrolserver duetwebserver&quot;
+</code></pre>
+<p>Deploying over SSH as root requires root SSH login to be enabled on the SBC (set a root password and
+permit root login in the SSH daemon configuration). On Windows, <code>rsync</code> and <code>libxxhash</code> from MSYS2 can
+be dropped into the Git-for-Windows <code>usr</code> tree to make the same workflow available there.</p>
+<blockquote>
+<p>The exact service names, paths, and any packaging steps are environment-specific. The repository
+<code>Makefile</code> and <code>pkg/</code> directory hold the canonical packaging recipes used to build the <code>.deb</code> /
+<code>.rpm</code> / Arch packages.</p>
+</blockquote>
+<h2 id="building-the-documentation">Building the documentation</h2>
+<p>The documentation lives under <code>src/Documentation/</code> and is built with
+<a href="https://dotnet.github.io/docfx/">DocFX</a>. The hand-written articles plus an API reference generated
+from the source XML comments are combined into a static site.</p>
+<p>DocFX cannot run this project's Roslyn source generators (the custom object-model <code>UpdateFromJson</code>
+generator targets a newer Roslyn than DocFX hosts, and <code>[GeneratedRegex]</code> partial methods are emitted
+the same way), so it does not compile the projects from source. Instead it extracts the API metadata
+from the <strong>built Release assemblies</strong>, which already contain the generated code and ship their XML
+documentation files (the <code>Release</code> configuration sets <code>DocumentationFile</code>; <code>Debug</code> does not). Build
+the projects in Release first, then run DocFX:</p>
+<pre><code class="lang-sh">dotnet build src/DuetControlServer/DuetControlServer.csproj -c Release
+dotnet build src/DuetWebServer/DuetWebServer.csproj -c Release
+docfx src/Documentation/docfx.json --serve
+</code></pre>
+<p>Building the two applications also builds <code>DuetAPI</code> and <code>DuetAPIClient</code>, producing all four
+<code>bin/Release/net10.0/*.dll</code> plus <code>*.xml</code> files that <code>docfx.json</code> points its <code>metadata</code> step at. The
+<code>modern</code> template renders the Mermaid diagrams in the articles; because that template fetches the
+table of contents and search index, view the result through <code>docfx serve</code> (or <code>--serve</code>) over HTTP
+rather than opening the files directly.</p>
+<blockquote>
+<p>The assembly paths in <code>docfx.json</code> are pinned to <code>bin/Release/net10.0</code>. If the target framework is
+bumped, update those four paths to match.</p>
+</blockquote>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="components.html">Components</a> - what each project builds into</li>
+<li>The repository <code>README.md</code> - runtime command-line options and configuration</li>
+</ul>
+
+</article>
+
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -2,11 +2,11 @@
 
 ![Version](https://img.shields.io/github/v/release/Duet3D/DuetSoftwareFramework) ![License](https://img.shields.io/github/license/Duet3D/DuetSoftwareFramework?color=blue) ![Issues](https://img.shields.io/github/issues/Duet3D/DuetSoftwareFramework?color=blue)
 
-Duet Software Framework resembles a collection of programs to control an attached Duet3D board from a Linux-based mini computer (SBC). Since it is using .NET, it requires an ARM processor that supports ARMv7 instructions processor is required (Raspberry Pi 2 or newer). In addition, Linux >= 4.8 is required because the relatively new gpiochip character device interface is used.
+Duet Software Framework resembles a collection of programs to control an attached Duet3D board from a Linux-based mini computer (SBC). Since it uses .NET, it requires an ARM processor that supports the ARMv7 instruction set (Raspberry Pi 2 or newer). In addition, Linux >= 4.8 is required because the gpiochip character device interface is used.
 
 ## DuetControlServer
 
-This application is the heart component of Duet Software Framework. It takes takes care of  G/M/T-code processing, inter-process communication, file path mapping, and communication with RepRapFirmware as well as firmware updates.
+This application is the heart component of Duet Software Framework. It takes care of G/M/T-code processing, inter-process communication, file path mapping, and communication with RepRapFirmware as well as firmware updates.
 If you want to write your own plugins, this is the component that you need to connect to.
 
 ### Command-Line Options
@@ -16,11 +16,9 @@ The following command-line arguments are available:
 - `-u`, `--update`: Update RepRapFirmware and exit. This works even if another instance is already started
 - `-l`, `--log-level`: Set the minimum log level. Valid options are: `trace`, `debug` , `info` , `warn`, `error`, `fatal`, `off` Default is `info`
 - `-c`, `--config`: Override the path to the JSON configuration file. Defaults to `/opt/dsf/conf/config.json`
-- `-r`, `--no-reset-stop`: Do not terminate this application when M999 has been processed
-- `-S`, `--socket-directory`: Override the path where DCS creates UNIX sockets. Defaults to `/var/run/dsf`
+- `-S`, `--socket-directory`: Override the path where DCS creates UNIX sockets. Defaults to `/run/dsf`
 - `-s`, `--socket-file`: Override the filename of DCS's UNIX socket. Defaults to `dcs.sock`
-- `-b`, `--base-directory`: Set the base directory of the virtual SD card directoy. This is used for RepRapFirmware compatibility. Defaults to `/opt/dsf/sd`
-- `-D`, `--no-spi`: Do NOT connect over SPI. Not recommended, use at your own risk!
+- `-b`, `--base-directory`: Set the base directory of the virtual SD card directory. This is used for RepRapFirmware compatibility. Defaults to `/opt/dsf/sd`
 - `-h`, `--help`: Display all available command-line parameters
 
 Note that all the command-line options are case-sensitive.
@@ -43,14 +41,14 @@ This application may return the following codes (derived from `sysexits.h`):
 In order to connect to the firmware, a binary data protocol is used. DuetControlServer attaches to the Duet using an SPI connection (typically `/dev/spidev0.0`) in master mode.
 In addition, a GPIO pin (typically pin 22 on the Raspberry Pi header via `/dev/gpiochip0`) is required which is toggled by RepRapFirmware whenever the firmware is ready to exchange data.
 
-More technical documentation about this can be found [here](https://duet3d.github.io/DuetSoftwareFramework/api/DuetControlServer.SPI.Communication.html).
+More technical documentation about this can be found [here](https://duet3d.github.io/DuetSoftwareFramework/index.html).
 
 ### Inter-Process Communication
 
-DuetControlServer provides a UNIX socket for inter-process commmunication. This socket usually resides in `/var/run/dsf/dcs.sock` .
+DuetControlServer provides a UNIX socket for inter-process communication. This socket usually resides in `/run/dsf/dcs.sock` .
 For .NET, DSF provides the `DuetAPIClient` class library which is also used internally by the DSF core applications.
 
-Technical information about the way the communication over the UNIX socket works can be found in the [API description](#api).
+Technical information about the way the communication over the UNIX socket works can be found in the [API documentation](https://duet3d.github.io/DuetSoftwareFramework/index.html).
 
 ### Object Model
 
@@ -74,7 +72,7 @@ Check out the [code documentation](https://duet3d.github.io/DuetSoftwareFramewor
 ## DuetWebServer
 
 This application provides Duet Web Control along with a RESTful API and possibly custom HTTP endpoints.
-It is implemented using ASP.NET and uses Kestrel internally. The coniguration file defaults to `/opt/dsf/conf/http.json`.
+It is implemented using ASP.NET and uses Kestrel internally. The configuration file defaults to `/opt/dsf/conf/http.json`.
 
 ### Configuration
 
@@ -82,7 +80,7 @@ The configuration file of DuetWebServer can be found in `/opt/dsf/conf/http.json
 
 In the `Logging` section, the default minimum `LogLevel` can be changed to one of `Trace`, `Debug`, `Information`, `Warning`, `Error`, or`Critical`. It defaults to `Information`.
 
-The `Kestrel` section specifies the default configuration of the underlying webserver. Further details about the available options can be found at [Microsoft Docs](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/kestrel?view=aspnetcore-3.1#kestrel-options).
+The `Kestrel` section specifies the default configuration of the underlying webserver. Further details about the available options can be found at [Microsoft Docs](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/servers/kestrel).
 
 Apart from these two sections, you can also customize the following settings:
 
@@ -102,7 +100,7 @@ It is possible to override these settings using command-line arguments, too.
 ### Operation as a reverse proxy
 
 If you wish to use another HTTP server than DuetWebServer, it is possible to set up DuetWebServer as a reverse proxy.
-Check out [this](https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/linux-apache?view=aspnetcore-3.1) page for Apache and [this](https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/linux-nginx?view=aspnetcore-3.1) one for nginx.
+Check out [this](https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/linux-apache) page for Apache and [this](https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/linux-nginx) one for nginx.
 
 ## Tools
 
@@ -117,7 +115,7 @@ This tool can be used to run G/M/T-codes and to wait for a result.
 
 The following command-line arguments are available:
 
-- `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/var/run/dsf/dcs.sock`
+- `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/run/dsf/dcs.sock`
 - `-c`, `--code`: Execute the given code(s), wait for the result and exit
 - `-q`, `--quiet`: Do not display when a connection has been established (only applicable if `-c` is not set)
 - `-h`, `--help`: Display all available command-line parameters
@@ -135,8 +133,12 @@ Once launched, these types of code interception can be observed:
 
 The following command-line arguments are available:
 
-- `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/var/run/dsf/dcs.sock`
-- `-q`, `--quiet`: Do not display when a connection has been established (only applicable if `-c` is not set)
+- `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/run/dsf/dcs.sock`
+- `-t`, `--type`: Interception type(s) to log: `Pre` (before processed by DSF), `Post` (after processed by DSF), or `Executed`
+- `-c`, `--channel`: Input channel(s) where codes may be intercepted. Defaults to all
+- `-f`, `--filters`: Code types that may be intercepted (main codes, keywords, or `Q0` for comments)
+- `-p`, `--priority-codes`: Intercept priority codes instead of regular codes (not recommended)
+- `-q`, `--quiet`: Do not display when a connection has been established
 - `-h`, `--help`: Display all available command-line parameters
 
 ### CodeStream
@@ -148,9 +150,9 @@ When a code has finished, the corresponding result is written to the console.
 
 The following command-line arguments are available:
 
-- `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/var/run/dsf/dcs.sock`
+- `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/run/dsf/dcs.sock`
 - `-b`, `--buffer-size <size>`: Maximum number of codes to execute simultaneously
-- `-q`, `--quiet`: Do not display when a connection has been established (only applicable if `-c` is not set)
+- `-q`, `--quiet`: Do not display when a connection has been established
 - `-h`, `--help`: Display all available command-line parameters
 
 ### CustomHttpEndpoint
@@ -158,13 +160,13 @@ The following command-line arguments are available:
 This tool lets you create a custom RESTful HTTP or WebSocket endpoint via `/machine/{namespace}/{path}`. If started without any command-line arguments, it will try to register a new HTTP GET endpoint at `/machine/custom-http-endpoint/demo` that is accessible from a web browser. It is possible to register different HTTP methods at the same endpoint path.
 
 By default, this tool echoes the session ID, HTTP method, received HTTP headers, queries, and body (if set).
-If WebSocket mode is selected, the tool will wait for the a single connection, print text data received from the WebSocket to stdout and send input lines from stdin back to the WebSocket.
+If WebSocket mode is selected, the tool will wait for a single connection, print text data received from the WebSocket to stdout and send input lines from stdin back to the WebSocket.
 
 Binary data transfers are not supported in any mode. If you need to transfer binary data, upload to a file instead and call your custom endpoint when the transfer has finished.
 
 #### Command-Line Options
 
-- `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/var/run/dsf/dcs.sock`
+- `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/run/dsf/dcs.sock`
 - `-m`, `--method`: Set designated method for the HTTP endpoint. May be one of `GET`, `POST`, `PUT`, `PATCH`, `TRACE`, `DELETE`, `OPTIONS`, `WebSocket`
 - `-n`, `--namespace`: Set namespace to use (defaults to custom-http-endpoint)
 - `-p`, `--path`: Set HTTP query path (defaults to demo)
@@ -182,7 +184,7 @@ See its dedicated [README.md](src/DuetPiManagementPlugin/README.md) for further 
 
 #### Command-Line Options
 
-- `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/var/run/dsf/dcs.sock`
+- `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/run/dsf/dcs.sock`
 
 ### DuetPluginService
 
@@ -202,19 +204,18 @@ Note that `dsf-config.g` does not run if not both services have been started unl
 ### Command-Line Options
 
 - `-l`, `--log-level`: Set the minimum log level. Valid options are: `trace`, `debug` , `info` , `warn`, `error`, `fatal`, `off` Default is `info`
-- `-c`, `--config`: Override the path to the JSON configuration file. Defaults to `/opt/dsf/conf/plugins.json`
-- `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/var/run/dsf/dcs.sock`
+- `-c`, `--config`: Override the path to the JSON configuration file. Defaults to `/opt/dsf/conf/config.json`
 - `-h`, `--help`: Display all available command-line parameters
 
 ### ModelObserver
 
 This tool lets you keep track of object model changes.
-Since it relies on a [model subscription](#model-subscriptions), it gives an idea how model updates are pushed from DuetWebServer to Duet Web Control.
+Since it relies on a model subscription, it gives an idea how model updates are pushed from DuetWebServer to Duet Web Control.
 
 #### Command-Line Options
 
-- `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/var/run/dsf/dcs.sock`
-- `-f`, `--filter <filter>`: Optional filter expression(s) to apply to the model
+- `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/run/dsf/dcs.sock`
+- `-f`, `--filter <filter>`: Optional filter expression(s) to apply to the object model
 - `-c`, `--confirm`: Confirm every JSON receipt manually
 - `-q`, `--quiet`: Do not display when a connection has been established
 - `-h`, `--help`: Display all available command-line parameters
@@ -225,12 +226,14 @@ This tool is intended to manage third-party plugins directly on the SBC without 
 
 #### Command-Line Options
 
-- `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/var/run/dsf/dcs.sock`
+- `-s`, `--socket`:  Specify the UNIX socket to connect to. Defaults to `/run/dsf/dcs.sock`
+- `-q`, `--quiet`: Do not display when a connection has been established
+- `list`: List installed plugins
 - `list-data`: List plugin data of all installed plugins
 - `install <file>`: Install a plugin ZIP file
 - `reload <plugin>`: Reload a plugin manifest
 - `start <plugin>`: Start a plugin
-- `set-data <plugin> <key> <value>`: Set plugin data
+- `set-data <plugin>:<key>=<value>`: Set plugin data
 - `stop <plugin>`: Stop a plugin
 - `uninstall <plugin>`: Uninstall a plugin
 - `is-installed <plugin>`: Check if a plugin is installed
@@ -257,5 +260,5 @@ To launch DuetControlServer with this log level on DuetPi, you may run the follo
 
 ```
 sudo systemctl stop duetcontrolserver
-sudo /opt/dsf/bin/DuetControlServer -l debug -r
+sudo /opt/dsf/bin/DuetControlServer -l debug
 ```

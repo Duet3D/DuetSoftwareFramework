@@ -14,8 +14,11 @@ namespace DuetControlServer.Commands;
 /// </summary>
 /// <param name="model">Object model</param>
 /// <param name="lockManager">Lock manager</param>
-public sealed class SetObjectModel(Model.ObjectModel model, LockManager lockManager) : DuetAPI.Commands.SetObjectModel
+public sealed class SetObjectModel(Model.ObjectModel model, LockManager lockManager) : DuetAPI.Commands.SetObjectModel, IConnectionCommand
 {
+    /// <inheritdoc />
+    public Connection? Connection { get; set; }
+
     /// <summary>
     /// Set an atomic property in the object model
     /// </summary>
@@ -23,9 +26,9 @@ public sealed class SetObjectModel(Model.ObjectModel model, LockManager lockMana
     /// <returns>Asynchronous task</returns>
     public override Task<bool> ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        if (!lockManager.IsLocked)
+        if (!lockManager.IsLockedBy(Connection))
         {
-            throw new InvalidOperationException("Machine model has not been locked");
+            throw new InvalidOperationException("Machine model has not been locked by the requesting connection");
         }
 
         // Split the path

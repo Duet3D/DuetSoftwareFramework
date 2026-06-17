@@ -21,8 +21,14 @@ chmod -R g+wX /opt/dsf/conf
 chmod 755 /opt/dsf/plugins
 
 # File capabilities trigger AT_SECURE=1 on exec, which DPS verifies when DCS connects back
-# to itself (e.g. `DuetControlServer -u`) to defend against LD_PRELOAD masquerade attacks
-setcap cap_sys_ptrace,cap_dac_read_search,cap_sys_time+ep /opt/dsf/bin/DuetControlServer || true
+# to itself (e.g. `DuetControlServer -u`) to defend against LD_PRELOAD masquerade attacks.
+# The IPC handshake rejects peers without AT_SECURE, so a failed setcap must not be silently
+# ignored - warn loudly because DSF services will refuse to talk to each other otherwise
+if ! setcap cap_sys_ptrace,cap_dac_read_search+ep /opt/dsf/bin/DuetControlServer; then
+    echo "WARNING: failed to set file capabilities on DuetControlServer" >&2
+    echo "         DSF services will refuse IPC connections until file capabilities can be set" >&2
+    echo "         (check that /opt is on a filesystem supporting capabilities and not mounted nosuid)" >&2
+fi
 
 # Update systemd services
 systemctl -q --no-ask-password daemon-reload

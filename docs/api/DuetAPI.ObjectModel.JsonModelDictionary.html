@@ -1,0 +1,1326 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class JsonModelDictionary </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class JsonModelDictionary ">
+      
+      <meta name="description" content="Class for holding string keys and custom values">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DuetAPI.ObjectModel.JsonModelDictionary">
+
+
+
+  <h1 id="DuetAPI_ObjectModel_JsonModelDictionary" data-uid="DuetAPI.ObjectModel.JsonModelDictionary" class="text-break">
+Class JsonModelDictionary  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="DuetAPI.html">DuetAPI</a>.<a class="xref" href="DuetAPI.ObjectModel.html">ObjectModel</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>DuetAPI.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Class for holding string keys and custom values</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[JsonConverter(typeof(JsonModelDictionaryConverter))]
+public sealed class JsonModelDictionary : IDictionary&lt;string, JsonElement?&gt;, ICollection&lt;KeyValuePair&lt;string, JsonElement?&gt;&gt;, IEnumerable&lt;KeyValuePair&lt;string, JsonElement?&gt;&gt;, IModelDictionary, IStaticModelObject, IModelObject, ICloneable, INotifyPropertyChanged, IDictionary, ICollection, IEnumerable, INotifyPropertyChanging</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">JsonModelDictionary</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2">IDictionary</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonelement">JsonElement</a>?&gt;</div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1">ICollection</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.keyvaluepair-2">KeyValuePair</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonelement">JsonElement</a>?&gt;&gt;</div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.keyvaluepair-2">KeyValuePair</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonelement">JsonElement</a>?&gt;&gt;</div>
+      <div><a class="xref" href="DuetAPI.ObjectModel.IModelDictionary.html">IModelDictionary</a></div>
+      <div><a class="xref" href="DuetAPI.ObjectModel.IStaticModelObject.html">IStaticModelObject</a></div>
+      <div><a class="xref" href="DuetAPI.ObjectModel.IModelObject.html">IModelObject</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.icloneable">ICloneable</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.componentmodel.inotifypropertychanged">INotifyPropertyChanged</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.idictionary">IDictionary</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.icollection">ICollection</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.ienumerable">IEnumerable</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.componentmodel.inotifypropertychanging">INotifyPropertyChanging</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+  <h2 id="DuetAPI_ObjectModel_JsonModelDictionary_remarks">Remarks</h2>
+  <div class="markdown level0 remarks"><p>Key names are NOT converted to camel-case (unlike regular class properties)</p>
+</div>
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary__ctor_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.#ctor*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary__ctor_System_Boolean_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.#ctor(System.Boolean)">
+  JsonModelDictionary(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Class for holding string keys and custom values</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public JsonModelDictionary(bool nullRemovesItems)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>nullRemovesItems</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Defines if setting items to null effectively removes them</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section" id="DuetAPI_ObjectModel_JsonModelDictionary__ctor_System_Boolean__remarks">Remarks</h4>
+  <div class="markdown level1 remarks"><p>Key names are NOT converted to camel-case (unlike regular class properties)</p>
+</div>
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_Count_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Count*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_Count" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Count">
+  Count
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Returns the number of items in this collection</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int Count { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_IsFixedSize_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.IsFixedSize*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_IsFixedSize" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.IsFixedSize">
+  IsFixedSize
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Whether this dictionary has a fixed size</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsFixedSize { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_IsReadOnly_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.IsReadOnly*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_IsReadOnly" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.IsReadOnly">
+  IsReadOnly
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Whether the dictionary is read-only</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsReadOnly { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_IsSynchronized_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.IsSynchronized*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_IsSynchronized" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.IsSynchronized">
+  IsSynchronized
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>If this is thread-safe</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsSynchronized { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_Item_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Item*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_Item_System_Object_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Item(System.Object)">
+  this[object]
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Basic index operator</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public object this[object key] { get; set; }</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd><p>Key object</p>
+</dd>
+  </dl>
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd><p>Value if found</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_Item_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Item*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_Item_System_String_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Item(System.String)">
+  this[string]
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Index operator</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public JsonElement? this[string key] { get; set; }</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Key</p>
+</dd>
+  </dl>
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonelement">JsonElement</a>?</dt>
+    <dd><p>Value</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_Keys_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Keys*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_Keys" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Keys">
+  Keys
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>List of keys</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ICollection&lt;string&gt; Keys { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1">ICollection</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_NullRemovesItems_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.NullRemovesItems*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_NullRemovesItems" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.NullRemovesItems">
+  NullRemovesItems
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Flags if keys can be removed again by setting their value to null</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[JsonIgnore]
+public bool NullRemovesItems { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_SyncRoot_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.SyncRoot*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_SyncRoot" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.SyncRoot">
+  SyncRoot
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Synchronization root</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public object SyncRoot { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_Values_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Values*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_Values" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Values">
+  Values
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>List of values</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ICollection&lt;JsonElement?&gt; Values { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1">ICollection</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonelement">JsonElement</a>?&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_Add_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Add*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_Add_System_Collections_Generic_KeyValuePair_System_String_System_Nullable_System_Text_Json_JsonElement___" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Add(System.Collections.Generic.KeyValuePair{System.String,System.Nullable{System.Text.Json.JsonElement}})">
+  Add(KeyValuePair&lt;string, JsonElement?&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Add a new item</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Add(KeyValuePair&lt;string, JsonElement?&gt; item)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>item</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.keyvaluepair-2">KeyValuePair</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonelement">JsonElement</a>?&gt;</dt>
+    <dd><p>Item to add</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_Add_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Add*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_Add_System_Object_System_Object_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Add(System.Object,System.Object)">
+  Add(object, object?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Add a new item</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Add(object key, object? value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd><p>Key to add</p>
+</dd>
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd><p>Value to add</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_Add_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Add*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_Add_System_String_System_Nullable_System_Text_Json_JsonElement__" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Add(System.String,System.Nullable{System.Text.Json.JsonElement})">
+  Add(string, JsonElement?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Add a new item</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Add(string key, JsonElement? value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Key to add</p>
+</dd>
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonelement">JsonElement</a>?</dt>
+    <dd><p>Value to add</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_Assign_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Assign*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_Assign_DuetAPI_ObjectModel_IStaticModelObject_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Assign(DuetAPI.ObjectModel.IStaticModelObject)">
+  Assign(IStaticModelObject)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Assign the properties from another instance</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Assign(IStaticModelObject from)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="DuetAPI.ObjectModel.IStaticModelObject.html">IStaticModelObject</a></dt>
+    <dd><p>Other instance</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_Clear_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Clear*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_Clear" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Clear">
+  Clear()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Clear this dictionary</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Clear()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_Clone_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Clone*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_Clone" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Clone">
+  Clone()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Create a clone of this instance</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public object Clone()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_Contains_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Contains*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_Contains_System_Collections_Generic_KeyValuePair_System_String_System_Nullable_System_Text_Json_JsonElement___" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Contains(System.Collections.Generic.KeyValuePair{System.String,System.Nullable{System.Text.Json.JsonElement}})">
+  Contains(KeyValuePair&lt;string, JsonElement?&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if a key-value pair exists</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool Contains(KeyValuePair&lt;string, JsonElement?&gt; item)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>item</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.keyvaluepair-2">KeyValuePair</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonelement">JsonElement</a>?&gt;</dt>
+    <dd><p>Item to check</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If the item exists in the dictionary</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_Contains_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Contains*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_Contains_System_Object_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Contains(System.Object)">
+  Contains(object)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if a key is present</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool Contains(object key)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd><p>Key to check</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the key is present</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_ContainsKey_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.ContainsKey*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_ContainsKey_System_String_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.ContainsKey(System.String)">
+  ContainsKey(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if a key is present</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool ContainsKey(string key)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Key to check</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the key is present</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_CopyTo_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.CopyTo*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_CopyTo_System_Array_System_Int32_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.CopyTo(System.Array,System.Int32)">
+  CopyTo(Array, int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Copy this instance to another array</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void CopyTo(Array array, int index)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>array</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.array">Array</a></dt>
+    <dd><p>Destination array</p>
+</dd>
+    <dt><code>index</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Start index</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_CopyTo_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.CopyTo*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_CopyTo_System_Collections_Generic_KeyValuePair_System_String_System_Nullable_System_Text_Json_JsonElement_____System_Int32_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.CopyTo(System.Collections.Generic.KeyValuePair{System.String,System.Nullable{System.Text.Json.JsonElement}}[],System.Int32)">
+  CopyTo(KeyValuePair&lt;string, JsonElement?&gt;[], int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Copy this instance to another dictionary</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void CopyTo(KeyValuePair&lt;string, JsonElement?&gt;[] array, int arrayIndex)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>array</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.keyvaluepair-2">KeyValuePair</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonelement">JsonElement</a>?&gt;[]</dt>
+    <dd><p>Destination array</p>
+</dd>
+    <dt><code>arrayIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Start iondex</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_GetEnumerator_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.GetEnumerator*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_GetEnumerator" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.GetEnumerator">
+  GetEnumerator()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get an enumerator for this instance</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IEnumerator&lt;KeyValuePair&lt;string, JsonElement?&gt;&gt; GetEnumerator()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerator-1">IEnumerator</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.keyvaluepair-2">KeyValuePair</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonelement">JsonElement</a>?&gt;&gt;</dt>
+    <dd><p>Enumerator instance</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_Remove_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Remove*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_Remove_System_Collections_Generic_KeyValuePair_System_String_System_Nullable_System_Text_Json_JsonElement___" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Remove(System.Collections.Generic.KeyValuePair{System.String,System.Nullable{System.Text.Json.JsonElement}})">
+  Remove(KeyValuePair&lt;string, JsonElement?&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Remove a key-value pair if applicable</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool Remove(KeyValuePair&lt;string, JsonElement?&gt; item)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>item</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.keyvaluepair-2">KeyValuePair</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonelement">JsonElement</a>?&gt;</dt>
+    <dd><p>Item to remove</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If the key-value pair was present</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_Remove_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Remove*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_Remove_System_Object_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Remove(System.Object)">
+  Remove(object)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Remove a key (only supported if <a class="xref" href="DuetAPI.ObjectModel.JsonModelDictionary.html#DuetAPI_ObjectModel_JsonModelDictionary_NullRemovesItems">NullRemovesItems</a> is true)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Remove(object key)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd><p>Key to remove</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_Remove_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Remove*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_Remove_System_String_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.Remove(System.String)">
+  Remove(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Remove a key (only supported if <a class="xref" href="DuetAPI.ObjectModel.JsonModelDictionary.html#DuetAPI_ObjectModel_JsonModelDictionary_NullRemovesItems">NullRemovesItems</a> is true)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool Remove(string key)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Key to remove</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the key could be found</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_TryGetValue_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.TryGetValue*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_TryGetValue_System_String_System_Nullable_System_Text_Json_JsonElement___" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.TryGetValue(System.String,System.Nullable{System.Text.Json.JsonElement}@)">
+  TryGetValue(string, out JsonElement?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Try to get a value</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool TryGetValue(string key, out JsonElement? value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Key to look up</p>
+</dd>
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonelement">JsonElement</a>?</dt>
+    <dd><p>Retrieved value</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether the key could be found</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_UpdateFromJson_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.UpdateFromJson*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_UpdateFromJson_System_Text_Json_JsonElement_System_Boolean_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.UpdateFromJson(System.Text.Json.JsonElement,System.Boolean)">
+  UpdateFromJson(JsonElement, bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Update this instance from a given JSON element</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>jsonElement</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonelement">JsonElement</a></dt>
+    <dd><p>Element to update this intance from</p>
+</dd>
+    <dt><code>ignoreSbcProperties</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether SBC properties are ignored</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section" id="DuetAPI_ObjectModel_JsonModelDictionary_UpdateFromJson_System_Text_Json_JsonElement_System_Boolean__remarks">Remarks</h4>
+  <div class="markdown level1 remarks"><p>Accepts null as the JSON value to clear existing items</p>
+</div>
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonexception">JsonException</a></dt>
+    <dd><p>Failed to deserialize data</p>
+</dd>
+  </dl>
+
+
+
+  <a id="DuetAPI_ObjectModel_JsonModelDictionary_UpdateFromJsonReader_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.UpdateFromJsonReader*"></a>
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_UpdateFromJsonReader_System_Text_Json_Utf8JsonReader__System_Boolean_" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+  UpdateFromJsonReader(ref Utf8JsonReader, bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Update this instance from a given JSON reader</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>reader</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.utf8jsonreader">Utf8JsonReader</a></dt>
+    <dd><p>JSON reader</p>
+</dd>
+    <dt><code>ignoreSbcProperties</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Whether SBC properties are ignored</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsonexception">JsonException</a></dt>
+    <dd><p>Failed to deserialize data</p>
+</dd>
+  </dl>
+
+
+
+  <h2 class="section" id="events">Events
+</h2>
+
+
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_DictionaryCleared" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.DictionaryCleared">
+  DictionaryCleared
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Event that is called when the entire directory is cleared. Only used if <a class="xref" href="DuetAPI.ObjectModel.JsonModelDictionary.html#DuetAPI_ObjectModel_JsonModelDictionary_NullRemovesItems">NullRemovesItems</a> is false</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event EventHandler? DictionaryCleared</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.eventhandler">EventHandler</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_PropertyChanged" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.PropertyChanged">
+  PropertyChanged
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Event that is called when a key has been changed</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event PropertyChangedEventHandler? PropertyChanged</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.componentmodel.propertychangedeventhandler">PropertyChangedEventHandler</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h3 id="DuetAPI_ObjectModel_JsonModelDictionary_PropertyChanging" data-uid="DuetAPI.ObjectModel.JsonModelDictionary.PropertyChanging">
+  PropertyChanging
+  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetAPI/ObjectModel/Base/JsonModelDictionary.cs"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Event that is called when a key is being changed</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event PropertyChangingEventHandler? PropertyChanging</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.componentmodel.propertychangingeventhandler">PropertyChangingEventHandler</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+</article>
+
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

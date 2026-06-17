@@ -74,6 +74,10 @@ internal static class Generator
                             {
                                 writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonElement, ignoreSbcProperties, offset, last);");
                             }
+                            else if (prop.Identifier.ValueText == "Move")
+                            {
+                                writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonElement, ignoreSbcProperties, last);");
+                            }
                             else
                             {
                                 writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonElement, ignoreSbcProperties);");
@@ -86,10 +90,9 @@ internal static class Generator
                             writer.WriteLine("{");
                             writer.Indent++;
                             WriteSetOrUpdate();
-                            writer.WriteLine("return true;");
                             writer.Indent--;
                             writer.WriteLine("}");
-                            writer.WriteLine("return false;");
+                            writer.WriteLine("return true;");
                         }
                         else
                         {

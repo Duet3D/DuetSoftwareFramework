@@ -81,7 +81,8 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
         if (uid == 0 || gid == 0)
         {
             IsRoot = true;
-            Permissions |= SbcPermissions.SuperUser;
+            Permissions |= SbcPermissions.SuperUser | SbcPermissions.ServicePlugins;
+            GrantExternalPermissions();
             logger.LogDebug("IPC#{Id}: Granting full permissions to root process (pid {Pid})", Id, pid);
             return true;
         }
@@ -89,8 +90,15 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
         // If the plugin service is not running we cannot verify plugin identity, so fall through to the external-program
         // policy. This is the dev-mode path where DCS runs standalone without plugin management. In prod DPS kills its
         // children when it terminates, so this check is safe
+        int ownUid = ProcessHelpers.GetEffectiveUserID(), ownGid = ProcessHelpers.GetEffectiveGroupID();
         if (!Processors.PluginService.IsConnected(false))
         {
+            // This is also the bootstrap path for DPS itself, which needs the internal ServicePlugins
+            // permission to register as plugin service
+            if ((uid == ownUid || gid == ownGid) && IsDsfService(pid))
+            {
+                Permissions |= SbcPermissions.ServicePlugins;
+            }
             GrantExternalPermissions();
             return true;
         }
@@ -145,7 +153,6 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
         // DWS) living in DCS's directory. Anything else in our user namespace is untracked or tampered-with and must
         // be rejected. A peer with a different uid/gid is a genuinely external program (admin tool running under its
         // own account) and gets the external-program policy
-        int ownUid = ProcessHelpers.GetEffectiveUserID(), ownGid = ProcessHelpers.GetEffectiveGroupID();
         if (uid == ownUid || gid == ownGid)
         {
             if (!IsDsfService(pid))
@@ -154,6 +161,9 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
                 return false;
             }
             logger.LogDebug("IPC#{Id}: Granting permissions to sibling DSF service (pid {Pid})", Id, pid);
+
+            // Sibling DSF services additionally need the internal ServicePlugins permission (e.g. DPS calls SetPluginProcess)
+            Permissions |= SbcPermissions.ServicePlugins;
         }
 
         GrantExternalPermissions();
@@ -188,13 +198,15 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
 
             // DPS is matched against its known service PID (captured from its PluginService connection). A plugin
             // re-execing DuetPluginService under LD_PRELOAD would get a different PID than the systemd-launched one.
+            // While the service slot is still empty (bootstrap or DPS restart), the path check above must suffice
+            // because the PID is only known after DPS has registered - the binary lives in a root-owned directory.
             // DCS and DWS are matched via AT_SECURE=1: the kernel sets this when a binary with file capabilities is
             // exec'd, which causes glibc to ignore LD_PRELOAD / LD_LIBRARY_PATH / LD_AUDIT. The bit is immutable
             // post-exec. DCS appears here for re-invocations like `DuetControlServer -u` that connect back over IPC
             string peerFilename = Path.GetFileNameWithoutExtension(procPath);
             return peerFilename switch
             {
-                "DuetPluginService" => pid == Processors.PluginService.ServicePid,
+                "DuetPluginService" => Processors.PluginService.ServicePid == 0 || pid == Processors.PluginService.ServicePid,
                 "DuetControlServer" or "DuetWebServer" => proc.IsExecSecure(),
                 _ => false,
             };
@@ -206,15 +218,15 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     }
 
     /// <summary>
-    /// Grant all non-SuperUser permissions. Used for external admin-owned programs (and in dev mode where DPS is not
-    /// available to vet plugin ownership)
+    /// Grant all permissions except SuperUser and the internal ServicePlugins flag. Used for external admin-owned
+    /// programs (and in dev mode where DPS is not available to vet plugin ownership)
     /// </summary>
     private void GrantExternalPermissions()
     {
         logger.LogDebug("IPC#{Id}: Granting full DSF permissions to external program", Id);
         foreach (Enum permission in Enum.GetValues<SbcPermissions>())
         {
-            if (!permission.Equals(SbcPermissions.SuperUser))
+            if (!permission.Equals(SbcPermissions.SuperUser) && !permission.Equals(SbcPermissions.ServicePlugins))
             {
                 Permissions |= (SbcPermissions)permission;
             }

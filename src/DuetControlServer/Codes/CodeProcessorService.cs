@@ -12,9 +12,6 @@ namespace DuetControlServer.Codes;
 /// <param name="codeProcessor">Code processor</param>
 public class CodeProcessorService(CodeProcessor codeProcessor) : BackgroundService
 {
-    /// <summary>
-    /// Task representing the lifecycle of this class
-    /// </summary>
-    /// <returns>Asynchronous task</returns>
+    /// <inheritdoc />
     protected override Task ExecuteAsync(CancellationToken stoppingToken) => Task.WhenAll(codeProcessor.Processors.Value.Select(processor => processor.ExecuteAsync()));
 }

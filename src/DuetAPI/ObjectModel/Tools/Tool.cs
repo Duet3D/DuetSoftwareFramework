@@ -126,7 +126,7 @@ public partial class Tool : ModelObject, IStaticModelObject
     public ObservableCollection<float> Offsets { get; } = [];
 
     /// <summary>
-    /// Bitmap of the probed axis offsets
+    /// Bitmap of the probed axis offsets, one bit per axis in the same order as <see cref="Move.Axes"/>
     /// </summary>
     public int OffsetsProbed
     {

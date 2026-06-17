@@ -129,16 +129,23 @@ public sealed class InstallPlugin(CommandFactory commandFactory, Model.ObjectMod
             }
         }
 
-        // Uninstall the old plugin (if applicable)
+        // Uninstall the old plugin (if applicable). Plugin ids are matched case-insensitively, so an
+        // existing plugin installed under a different-cased id is treated as the same plugin. Uninstall
+        // it by its stored id so the on-disk files (named after that id) are removed rather than orphaned
+        string? installedId = null;
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            Upgrade = model.Plugins.ContainsKey(plugin.Id);
+            if (model.Plugins.TryGetValue(plugin.Id, out Plugin? installedPlugin))
+            {
+                installedId = installedPlugin.Id;
+            }
         }
 
-        if (Upgrade)
+        Upgrade = installedId is not null;
+        if (installedId is not null)
         {
             UninstallPlugin uninstallCommand = commandFactory.Create<UninstallPlugin>();
-            uninstallCommand.Plugin = plugin.Id;
+            uninstallCommand.Plugin = installedId;
             uninstallCommand.ForUpgrade = true;
             await uninstallCommand.ExecuteAsync(cancellationToken);
         }
@@ -185,6 +192,13 @@ public sealed class InstallPlugin(CommandFactory commandFactory, Model.ObjectMod
         }
         plugin.Pid = -1;
         plugin.Started = false;
+
+        // Make sure the required fields are present. The property setters only validate the content,
+        // a missing manifest key leaves the default value behind
+        if (string.IsNullOrEmpty(plugin.Id) || string.IsNullOrEmpty(plugin.Name))
+        {
+            throw new ArgumentException("Plugin manifest must provide an id and a name");
+        }
 
         // Check for reserved permissions
         if (plugin.SbcPermissions.HasFlag(SbcPermissions.ServicePlugins))

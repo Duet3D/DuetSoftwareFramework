@@ -1,0 +1,223 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Enum Request </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Enum Request ">
+      
+      <meta name="description" content="Request indices for SPI transfers from the RepRapFirmware controller to the SBC">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="DuetControlServer.Link.Protocol.FirmwareRequests.Request">
+
+
+
+
+  <h1 id="DuetControlServer_Link_Protocol_FirmwareRequests_Request" data-uid="DuetControlServer.Link.Protocol.FirmwareRequests.Request" class="text-break">
+Enum Request  <a class="header-action link-secondary" title="View source" href="https://github.com/Duet3D/DuetSoftwareFramework/blob/37beae70fb9d6f963b37083ca42edc038fd974fc/src/DuetControlServer/Link/Protocol/FirmwareRequests/Request.cs"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="DuetControlServer.html">DuetControlServer</a>.<a class="xref" href="DuetControlServer.Link.html">Link</a>.<a class="xref" href="DuetControlServer.Link.Protocol.html">Protocol</a>.<a class="xref" href="DuetControlServer.Link.Protocol.FirmwareRequests.html">FirmwareRequests</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>DuetControlServer.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Request indices for SPI transfers from the RepRapFirmware controller to the SBC</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public enum Request : ushort</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+  <h2 id="fields">Fields
+</h2>
+  <dl class="parameters">
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_AbortFile"><code>AbortFile = 5</code></dt>
+    <dd><p>Request all files of the code channel to be closed</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_CheckFileExists"><code>CheckFileExists = 17</code></dt>
+    <dd><p>Check if a file exists</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_CloseFile"><code>CloseFile = 24</code></dt>
+    <dd><p>Close a file again</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_CodeBufferUpdate"><code>CodeBufferUpdate = 2</code></dt>
+    <dd><p>Update about the available code buffer size</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_DeleteFileOrDirectory"><code>DeleteFileOrDirectory = 18</code></dt>
+    <dd><p>Delete a file or directory</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_DeleteFileOrDirectoryRecursively"><code>DeleteFileOrDirectoryRecursively = 25</code></dt>
+    <dd><p>Delete a file or directory recursively</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_DoCode"><code>DoCode = 12</code></dt>
+    <dd><p>Perform a G/M/T-code from a RepRapFirmware code input</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_EvaluationResult"><code>EvaluationResult = 11</code></dt>
+    <dd><p>Response to an expression evaluation request</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_ExecuteMacro"><code>ExecuteMacro = 4</code></dt>
+    <dd><p>Request execution of a macro file</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_FileChunk"><code>FileChunk = 10</code></dt>
+    <dd><p>Request another chunk of a file</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_HeightMap_Obsolete"><code>HeightMap_Obsolete = 8</code></dt>
+    <dd><p>Response to a heightmap request. This is no longer used</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_Locked"><code>Locked = 9</code></dt>
+    <dd><p>Resource locked</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_MacroFileClosed"><code>MacroFileClosed = 14</code></dt>
+    <dd><p>Last file closed successfully</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_Message"><code>Message = 3</code></dt>
+    <dd><p>Message from the firmware</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_MessageAcknowledged"><code>MessageAcknowledged = 15</code></dt>
+    <dd><p>Last message successfully acknowledged</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_ObjectModel"><code>ObjectModel = 1</code></dt>
+    <dd><p>Response to an object model request</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_OpenFile"><code>OpenFile = 19</code></dt>
+    <dd><p>Open a file on the SBC</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_PrintPaused"><code>PrintPaused = 7</code></dt>
+    <dd><p>Print has been paused</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_ReadFile"><code>ReadFile = 20</code></dt>
+    <dd><p>Read from a file</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_ResendPacket"><code>ResendPacket = 0</code></dt>
+    <dd><p>Request retransmission of the given packet.
+This is always guaranteed to work in case RRF does not have not enough resources are available to process the packet</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_SecureDeleteFile"><code>SecureDeleteFile = 26</code></dt>
+    <dd><p>Securely delete a file (overwrite contents with zeros + fsync, then unlink).
+Files only - directories are rejected. Payload is identical to <a class="xref" href="DuetControlServer.Link.Protocol.FirmwareRequests.Request.html#DuetControlServer_Link_Protocol_FirmwareRequests_Request_DeleteFileOrDirectory">DeleteFileOrDirectory</a>.</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_SeekFile"><code>SeekFile = 22</code></dt>
+    <dd><p>Seek in a file</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_StackEvent_Obsolete"><code>StackEvent_Obsolete = 6</code></dt>
+    <dd><p>Stack has been changed. This is no longer used</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_TruncateFile"><code>TruncateFile = 23</code></dt>
+    <dd><p>Truncate a file</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_VariableResult"><code>VariableResult = 16</code></dt>
+    <dd><p>Response to a variable set request</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_WaitForAcknowledgement"><code>WaitForAcknowledgement = 13</code></dt>
+    <dd><p>Firmware is waiting for a blocking message to be acknowledged</p>
+</dd>
+    <dt id="DuetControlServer_Link_Protocol_FirmwareRequests_Request_WriteFile"><code>WriteFile = 21</code></dt>
+    <dd><p>Write to a file</p>
+</dd>
+  </dl>
+
+
+
+</article>
+
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

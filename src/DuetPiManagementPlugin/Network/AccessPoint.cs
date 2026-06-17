@@ -1,5 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
@@ -89,6 +90,14 @@ namespace DuetPiManagementPlugin.Network
         /// <returns></returns>
         public static async Task<Message> Configure(string ssid, string psk, IPAddress ipAddress, int channel)
         {
+            // Validate the inputs first. These values are substituted into hostapd config templates, so
+            // they must not be able to inject extra directives via newlines
+            static bool HasInvalidChars(string? value) => value is not null && value.Any(char.IsControl);
+            if ((HasInvalidChars(ssid) && ssid != "*") || HasInvalidChars(psk))
+            {
+                return new Message(MessageType.Error, "SSID and PSK must not contain control characters");
+            }
+
             if (await NetworkManager.IsActive())
             {
                 NetworkManager.ConfigureHotspot(ssid, psk, ipAddress, channel);

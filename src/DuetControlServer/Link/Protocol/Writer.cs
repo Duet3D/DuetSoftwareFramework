@@ -72,7 +72,7 @@ public static class Writer
             FilePosition = (uint)(code.FilePosition ?? 0xFFFFFFFF),
             Letter = (byte)code.Type,
             MajorCode = (code.Type == CodeType.Comment) ? 0 : (code.MajorNumber ?? 0),
-            MinorCode = code.MinorNumber ?? 0,
+            MinorCode = (code.MinorNumber >= 0) ? code.MinorNumber : 0,
             NumParameters = (byte)((code.Type == CodeType.Comment) ? 1 : code.Parameters.Count)
         };
 
@@ -80,7 +80,7 @@ public static class Writer
         {
             header.Flags |= CodeFlags.HasMajorCommandNumber;
         }
-        if (code.MinorNumber is not null)
+        if (code.MinorNumber >= 0)
         {
             header.Flags |= CodeFlags.HasMinorCommandNumber;
         }
@@ -111,9 +111,20 @@ public static class Writer
         // Write parameters
         if (code.Type == CodeType.Comment)
         {
-            // Write comment as an unprecedented parameter
+            // Write comment as an unprecedented parameter. The declared length is in bytes, not in chars,
+            // so encode the comment first and truncate it on a UTF-8 character boundary
             string comment = (code.Comment ?? string.Empty).Trim();
-            int commentLength = Math.Min(comment.Length, Consts.MaxCommentLength);
+            byte[] asUnicode = Encoding.UTF8.GetBytes(comment);
+            int commentLength = asUnicode.Length;
+            if (commentLength > Consts.MaxCommentLength)
+            {
+                commentLength = Consts.MaxCommentLength;
+                while (commentLength > 0 && (asUnicode[commentLength] & 0xC0) == 0x80)
+                {
+                    commentLength--;
+                }
+            }
+
             CodeParameter binaryParam = new()
             {
                 Letter = (byte)'@',
@@ -123,9 +134,8 @@ public static class Writer
             MemoryMarshal.Write(to[bytesWritten..], in binaryParam);
             bytesWritten += Marshal.SizeOf<CodeParameter>();
 
-            Span<byte> asUnicode = Encoding.UTF8.GetBytes(comment[..commentLength]);
-            asUnicode.CopyTo(to[bytesWritten..]);
-            bytesWritten += asUnicode.Length;
+            asUnicode.AsSpan(0, commentLength).CopyTo(to[bytesWritten..]);
+            bytesWritten += commentLength;
             bytesWritten = AddPadding(to, bytesWritten);
         }
         else
@@ -715,8 +725,9 @@ else {              // Character parameters are not supported yet, they are wrap
             throw new ArgumentException("Value is too long", nameof(varName));
         }
 
+        // The header field is a single byte, so an expression of exactly 256 bytes would wrap to length 0
         Span<byte> unicodeExpression = Encoding.UTF8.GetBytes(expression);
-        if (unicodeExpression.Length > Consts.MaxExpressionLength)
+        if (unicodeExpression.Length >= Consts.MaxExpressionLength)
         {
             throw new ArgumentException("Value is too long", nameof(expression));
         }

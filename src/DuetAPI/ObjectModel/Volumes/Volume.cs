@@ -47,14 +47,14 @@ public partial class Volume : ModelObject, IStaticModelObject
     private string? _name;
 
     /// <summary>
-    /// Number of currently open files or null if unknown
+    /// Whether any file is open on this volume or null if unknown
     /// </summary>
-    public int? OpenFiles
+    public bool? OpenFiles
     {
         get => _openFiles;
         set => SetPropertyValue(ref _openFiles, value);
     }
-    private int? _openFiles;
+    private bool? _openFiles;
 
     /// <summary>
     /// Total size of this volume (in bytes or null)

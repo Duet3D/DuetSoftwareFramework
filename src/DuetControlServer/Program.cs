@@ -225,8 +225,16 @@ rootCommand.SetAction(async (parserResult) =>
         }
     });
 
-    // Run the host application
-    host.Run();
+    // Run the host application. Startup failures of hosted services (e.g. IPC socket binding or
+    // SPI/USB device initialization) surface here and must produce the start error file too
+    try
+    {
+        host.Run();
+    }
+    catch (Exception e)
+    {
+        Terminate(e, $"Failed to start: {e.Message}", ExitCode.OsError, loggerFactory);
+    }
 });
 
 return rootCommand.Parse(args).Invoke();

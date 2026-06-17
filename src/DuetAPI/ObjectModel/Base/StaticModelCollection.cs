@@ -29,9 +29,7 @@ public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollectio
     /// <param name="list">List to use for items</param>
     public StaticModelCollection(List<T> list) : base(list) { }
 
-    /// <summary>
-    /// Removes all items from the collection
-    /// </summary>
+    /// <inheritdoc />
     protected override void ClearItems()
     {
         List<T?> removed = new(this);
@@ -39,10 +37,7 @@ public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollectio
         base.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed));
     }
 
-    /// <summary>
-    /// Raises the change event handler
-    /// </summary>
-    /// <param name="e">Event arguments</param>
+    /// <inheritdoc />
     protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
         if (e.Action != NotifyCollectionChangedAction.Reset)
@@ -52,11 +47,7 @@ public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollectio
         }
     }
 
-    /// <summary>
-    /// Assign the properties from another instance.
-    /// This is required to update model properties which do not have a setter
-    /// </summary>
-    /// <param name="from">Other instance</param>
+    /// <inheritdoc />
     public void Assign(IStaticModelObject from)
     {
         // Validate the types
@@ -103,10 +94,7 @@ public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollectio
         }
     }
 
-    /// <summary>
-    /// Create a clone of this list
-    /// </summary>
-    /// <returns>Cloned list</returns>
+    /// <inheritdoc />
     public object Clone()
     {
         StaticModelCollection<T> clone = [];
@@ -136,13 +124,7 @@ public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollectio
         return this;
     }
 
-    /// <summary>
-    /// Update this collection from a given JSON array
-    /// </summary>
-    /// <param name="jsonElement">Element to update this intance from</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
-    /// <param name="offset">Index offset</param>
-    /// <param name="last">Whether this is the last update</param>
+    /// <inheritdoc />
     public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties, int offset = 0, bool last = true)
     {
         int arrayLength = jsonElement.GetArrayLength();
@@ -214,23 +196,10 @@ public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollectio
         }
     }
 
-    /// <summary>
-    /// Update this instance from a given JSON element
-    /// </summary>
-    /// <param name="jsonElement">Element to update this intance from</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
-    /// <returns>Updated instance</returns>
-    /// <exception cref="JsonException">Failed to deserialize data</exception>
-
+    /// <inheritdoc />
     void IStaticModelObject.UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties) => UpdateFromJson(jsonElement, ignoreSbcProperties, 0, true);
 
-    /// <summary>
-    /// Update this collection from a given JSON reader
-    /// </summary>
-    /// <param name="reader">JSON reader</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
-    /// <param name="offset">Index offset</param>
-    /// <param name="last">Whether this is the last update</param>
+    /// <inheritdoc />
     public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true)
     {
         if (reader.TokenType != JsonTokenType.StartArray)
@@ -244,6 +213,8 @@ public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollectio
         {
             if (reader.TokenType == JsonTokenType.StartObject)
             {
+                // Save the reader state in case this item fails to deserialize
+                Utf8JsonReader itemStart = reader;
                 try
                 {
                     if (i >= Count)
@@ -266,16 +237,24 @@ public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollectio
                             item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
                         }
                     }
-                    i++;
                 }
-                catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(T), JsonElement.ParseValue(ref reader), e))
+                catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(T), JsonElement.ParseValue(ref itemStart), e))
                 {
-                    // suppressed
+                    // Resume after the failed item, ParseValue has already advanced the saved reader past it
+                    reader = itemStart;
                 }
+                i++;
             }
             else if (reader.TokenType == JsonTokenType.Null)
             {
-                Add(default!);
+                if (i >= Count)
+                {
+                    Add(default!);
+                }
+                else if (this[i] is not null)
+                {
+                    this[i] = default!;
+                }
                 i++;
             }
         }
@@ -290,10 +269,6 @@ public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollectio
         }
     }
 
-    /// <summary>
-    /// Update this collection from a given JSON reader
-    /// </summary>
-    /// <param name="reader">JSON reader</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+    /// <inheritdoc />
     public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties) => UpdateFromJsonReader(ref reader, ignoreSbcProperties, 0, true);
 }

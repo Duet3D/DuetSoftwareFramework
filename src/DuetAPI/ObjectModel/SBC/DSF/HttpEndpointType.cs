@@ -44,7 +44,7 @@ public enum HttpEndpointType
     OPTIONS,
 
     /// <summary>
-    /// WebSocket request. This has not been implemented yet but it is reserved for future usage
+    /// WebSocket request for bidirectional communication with a custom endpoint
     /// </summary>
     WebSocket
 }

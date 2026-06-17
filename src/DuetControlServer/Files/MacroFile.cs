@@ -348,144 +348,158 @@ public sealed class MacroFile : CodeFile, IDisposable
     /// <returns>Asynchronous task</returns>
     private async Task RunAsync()
     {
-        // Reset start-up error
-        if (IsConfig)
-        {
-            using (await _model.AccessReadWriteAsync())
-            {
-                _model.State.StartupError = null;
-            }
-        }
-
-        // Check if we're executing a config file
+        // The cleanup in the finally block must run even if an unexpected exception occurs, else the macro
+        // remains marked as executing forever and codes waiting for it never resume
         bool executingConfigFile = false;
-        if (IsConfig || IsConfigOverride || IsDsfConfig)
+        try
         {
-            executingConfigFile = true;
-            _model.SetExecutingConfig(true);
-        }
-
-        // Flush this code channel to make sure it's our turn now
-        if (!await _codeProcessor.FlushAsync(this))
-        {
-            using (await LockAsync(_cts.Token))
+            // Reset start-up error
+            if (IsConfig)
             {
-                Abort();
-            }
-        }
-
-        // Start processing codes
-        Queue<Code> codes = new();
-        do
-        {
-            // Fill up the macro code buffer
-            while (codes.Count < _settings.BufferedMacroCodes)
-            {
-                try
+                using (await _model.AccessReadWriteAsync())
                 {
-                    Code? readCode = await ReadCodeAsync();
-                    if (readCode is null)
-                    {
-                        // No more codes available
-                        break;
-                    }
-
-                    codes.Enqueue(readCode);
-                    await readCode.ExecuteAsync();       // actual execution happens in the background
+                    _model.State.StartupError = null;
                 }
-                catch (Exception e)
+            }
+
+            // Check if we're executing a config file
+            if (IsConfig || IsConfigOverride || IsDsfConfig)
+            {
+                executingConfigFile = true;
+                _model.SetExecutingConfig(true);
+            }
+
+            // Flush this code channel to make sure it's our turn now
+            if (!await _codeProcessor.FlushAsync(this))
+            {
+                using (await LockAsync(_lifetime.ApplicationStopping))
                 {
-                    if (e is not OperationCanceledException)
+                    Abort();
+                }
+            }
+
+            // Start processing codes
+            Queue<Code> codes = new();
+            do
+            {
+                // Fill up the macro code buffer
+                while (codes.Count < _settings.BufferedMacroCodes)
+                {
+                    try
                     {
-                        if (e is AggregateException ae)
+                        Code? readCode = await ReadCodeAsync();
+                        if (readCode is null)
                         {
-                            e = ae.InnerException!;
+                            // No more codes available
+                            break;
                         }
 
-                        await _model.HandleMacroErrorAsync(FilePath.Virtual, LineNumber, e.Message);
-                        await _eventLogger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FilePath.Virtual)} line {LineNumber}: {e.Message}");
-                        _logger.LogError(e, "Error while reading code from macro file {File}", FilePath.Virtual);
+                        codes.Enqueue(readCode);
+                        await readCode.ExecuteAsync();       // actual execution happens in the background
                     }
-
-                    using (await LockAsync(_lifetime.ApplicationStopping))
+                    catch (Exception e)
                     {
-                        Abort();
-                    }
-                }
-            }
-
-            // Wait for the next code to finish
-            if (codes.TryDequeue(out Code? code))
-            {
-                try
-                {
-                    // Logging of regular messages is done by the code itself, no need to take care of it here
-                    Message? codeResult = await code.Task;
-                    if (codeResult?.Type is MessageType.Error)
-                    {
-                        await _model.HandleMacroErrorAsync(FilePath.Virtual, code.LineNumber ?? 0, codeResult.Content);
-                    }
-                }
-                catch (Exception e)
-                {
-                    if (e is not OperationCanceledException)
-                    {
-                        if (e is AggregateException ae)
+                        if (e is not OperationCanceledException)
                         {
-                            e = ae.InnerException!;
+                            if (e is AggregateException ae)
+                            {
+                                e = ae.InnerException!;
+                            }
+
+                            await _model.HandleMacroErrorAsync(FilePath.Virtual, LineNumber, e.Message);
+                            await _eventLogger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FilePath.Virtual)} line {LineNumber}: {e.Message}");
+                            _logger.LogError(e, "Error while reading code from macro file {File}", FilePath.Virtual);
                         }
 
-                        await _model.HandleMacroErrorAsync(FilePath.Virtual, code.LineNumber ?? 0, e.Message);
-                        await _eventLogger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FilePath.Virtual)} line {code.LineNumber ?? 0}: {e.Message}");
-                        _logger.LogError(e, "Error while executing code {Code} from macro file {File}", code, FilePath.Virtual);
-                    }
-
-                    using (await LockAsync(_lifetime.ApplicationStopping))
-                    {
-                        Abort();
+                        using (await LockAsync(_lifetime.ApplicationStopping))
+                        {
+                            Abort();
+                        }
                     }
                 }
-            }
-            else
-            {
-                // No more codes to process, macro file has finished
-                _logger.LogDebug("{Channel}: Finished codes from macro file {File}", Channel, FilePath.Virtual);
-                break;
-            }
-        }
-        while (!_lifetime.ApplicationStopping.IsCancellationRequested);
 
-        using (await LockAsync(_lifetime.ApplicationStopping))
-        {
-            // No longer executing
-            IsExecuting = false;
-            if (!IsAborted)
-            {
-                if (Channel != CodeChannel.Daemon)
+                // Wait for the next code to finish
+                if (codes.TryDequeue(out Code? code))
                 {
-                    _logger.LogInformation("{Channel}: Finished macro file {File}", Channel, FilePath.Virtual);
+                    try
+                    {
+                        // Logging of regular messages is done by the code itself, no need to take care of it here
+                        Message? codeResult = await code.Task;
+                        if (codeResult?.Type is MessageType.Error)
+                        {
+                            await _model.HandleMacroErrorAsync(FilePath.Virtual, code.LineNumber ?? 0, codeResult.Content);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        if (e is not OperationCanceledException)
+                        {
+                            if (e is AggregateException ae)
+                            {
+                                e = ae.InnerException!;
+                            }
+
+                            await _model.HandleMacroErrorAsync(FilePath.Virtual, code.LineNumber ?? 0, e.Message);
+                            await _eventLogger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FilePath.Virtual)} line {code.LineNumber ?? 0}: {e.Message}");
+                            _logger.LogError(e, "Error while executing code {Code} from macro file {File}", code, FilePath.Virtual);
+                        }
+
+                        using (await LockAsync(_lifetime.ApplicationStopping))
+                        {
+                            Abort();
+                        }
+                    }
                 }
                 else
                 {
-                    _logger.LogDebug("{Channel}: Finished macro file {File}", Channel, FilePath.Virtual);
+                    // No more codes to process, macro file has finished
+                    _logger.LogDebug("{Channel}: Finished codes from macro file {File}", Channel, FilePath.Virtual);
+                    break;
                 }
             }
-
-            // Resolve potential tasks waiting for the macro result
-            if (_finishTcs is not null)
+            while (!_lifetime.ApplicationStopping.IsCancellationRequested);
+        }
+        catch (Exception e)
+        {
+            if (e is not OperationCanceledException)
             {
-                _finishTcs.SetResult();
-                _finishTcs = null;
+                _logger.LogError(e, "Failed to execute macro file {File}", FilePath.Virtual);
             }
-
-            // Check if we've finished executing a config file
-            if (executingConfigFile)
+        }
+        finally
+        {
+            using (await LockAsync(CancellationToken.None))
             {
-                _model.SetExecutingConfig(false);
-            }
+                // No longer executing
+                IsExecuting = false;
+                if (!IsAborted)
+                {
+                    if (Channel != CodeChannel.Daemon)
+                    {
+                        _logger.LogInformation("{Channel}: Finished macro file {File}", Channel, FilePath.Virtual);
+                    }
+                    else
+                    {
+                        _logger.LogDebug("{Channel}: Finished macro file {File}", Channel, FilePath.Virtual);
+                    }
+                }
 
-            // Release this instance when done
-            Dispose();
+                // Resolve potential tasks waiting for the macro result
+                if (_finishTcs is not null)
+                {
+                    _finishTcs.SetResult();
+                    _finishTcs = null;
+                }
+
+                // Check if we've finished executing a config file
+                if (executingConfigFile)
+                {
+                    _model.SetExecutingConfig(false);
+                }
+
+                // Release this instance when done
+                Dispose();
+            }
         }
     }
 
@@ -494,9 +508,7 @@ public sealed class MacroFile : CodeFile, IDisposable
     /// </summary>
     private bool _disposed;
 
-    /// <summary>
-    /// Dispose this instance
-    /// </summary>
+    /// <inheritdoc />
     public override void Dispose()
     {
         // Don't dispose this instance twice...

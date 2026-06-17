@@ -128,8 +128,15 @@ internal static class Assign
                         writer.Indent++;
                     }
 
-                    // Item assignment
-                    writer.WriteLine($"if ({prop.Identifier.ValueText}[i] != other.{prop.Identifier.ValueText}[i])");
+                    // Item assignment. Arrays need a content comparison because != would compare references and always differ
+                    if (genericPropType is "float[]" or "int[]")
+                    {
+                        writer.WriteLine($"if (!{prop.Identifier.ValueText}[i].SequenceEqual(other.{prop.Identifier.ValueText}[i]))");
+                    }
+                    else
+                    {
+                        writer.WriteLine($"if ({prop.Identifier.ValueText}[i] != other.{prop.Identifier.ValueText}[i])");
+                    }
                     writer.WriteLine("{");
                     writer.Indent++;
                     if (genericPropType == "DriverId")
@@ -261,7 +268,7 @@ internal static class Assign
     {{
         if (from.GetType() != GetType())
         {{
-            {(isDynamic ? $"return ({cls})from.Clone();" : "throw new ArgumentNullException(nameof(from));")}
+            {(isDynamic ? "return (IDynamicModelObject)from.Clone();" : "throw new ArgumentException(\"Types do not match\", nameof(from));")}
         }}
 
         {cls} other = ({cls})from;

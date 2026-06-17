@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -51,72 +52,127 @@ public partial class FilePathResolver(Model.ObjectModel model, IOptions<Settings
     private static readonly Regex _driveRegex = _generateDriveRegex();
 
     /// <summary>
+    /// Combine a drive root with the given path segments and normalize the result. Leading slashes of the segments
+    /// are stripped so that absolute-looking inputs are treated as drive-relative, and the normalized result must
+    /// not escape the root (e.g. via ..)
+    /// </summary>
+    /// <param name="root">Physical root directory the result must remain in</param>
+    /// <param name="segments">Path segments to combine</param>
+    /// <returns>Normalized physical path</returns>
+    /// <exception cref="ArgumentException">Resulting path escapes the root directory</exception>
+    private static string CombineContained(string root, params string[] segments)
+    {
+        string fullRoot = Path.GetFullPath(root);
+        string result = Path.GetFullPath(Path.Combine([fullRoot, .. segments.Select(segment => segment.TrimStart('/'))]));
+        if (result != fullRoot && !result.StartsWith(fullRoot.EndsWith('/') ? fullRoot : fullRoot + '/', StringComparison.Ordinal))
+        {
+            throw new ArgumentException($"Path {string.Join('/', segments)} escapes the volume root directory");
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Get the physical root directory of the given drive number
+    /// </summary>
+    /// <param name="driveNumber">Drive number</param>
+    /// <returns>Physical root directory</returns>
+    /// <exception cref="ArgumentException">Invalid drive index</exception>
+    private string GetDrivePath(int driveNumber)
+    {
+        if (driveNumber == 0)
+        {
+            return Path.GetFullPath(settings.Value.BaseDirectory);
+        }
+
+        using (model.AccessReadOnly())
+        {
+            if (driveNumber > 0 && driveNumber < model.Volumes.Count)
+            {
+                return model.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
+            }
+        }
+        throw new ArgumentException("Invalid drive index");
+    }
+
+    /// <summary>
+    /// Get the physical root directory of the given drive number asynchronously
+    /// </summary>
+    /// <param name="driveNumber">Drive number</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Physical root directory</returns>
+    /// <exception cref="ArgumentException">Invalid drive index</exception>
+    private async Task<string> GetDrivePathAsync(int driveNumber, CancellationToken cancellationToken = default)
+    {
+        if (driveNumber == 0)
+        {
+            return Path.GetFullPath(settings.Value.BaseDirectory);
+        }
+
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            if (driveNumber > 0 && driveNumber < model.Volumes.Count)
+            {
+                return model.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
+            }
+        }
+        throw new ArgumentException("Invalid drive index");
+    }
+
+    /// <summary>
+    /// Get the virtual directory path for the given well-known directory
+    /// </summary>
+    /// <param name="directory">Well-known directory</param>
+    /// <returns>Virtual directory path</returns>
+    private string GetDirectoryPath(FileDirectory directory)
+    {
+        using (model.AccessReadOnly())
+        {
+            return directory switch
+            {
+                FileDirectory.Filaments => model.Directories.Filaments,
+                FileDirectory.Firmware => model.Directories.Firmware,
+                FileDirectory.GCodes => model.Directories.GCodes,
+                FileDirectory.Macros => model.Directories.Macros,
+                FileDirectory.Menu => model.Directories.Menu,
+                FileDirectory.System => model.Directories.System,
+                FileDirectory.Web => model.Directories.Web,
+                _ => model.Directories.System,
+            };
+        }
+    }
+
+    /// <summary>
+    /// Get the virtual directory path for the given well-known directory asynchronously
+    /// </summary>
+    /// <param name="directory">Well-known directory</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Virtual directory path</returns>
+    private async Task<string> GetDirectoryPathAsync(FileDirectory directory, CancellationToken cancellationToken = default)
+    {
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            return directory switch
+            {
+                FileDirectory.Filaments => model.Directories.Filaments,
+                FileDirectory.Firmware => model.Directories.Firmware,
+                FileDirectory.GCodes => model.Directories.GCodes,
+                FileDirectory.Macros => model.Directories.Macros,
+                FileDirectory.Menu => model.Directories.Menu,
+                FileDirectory.System => model.Directories.System,
+                FileDirectory.Web => model.Directories.Web,
+                _ => model.Directories.System,
+            };
+        }
+    }
+
+    /// <summary>
     /// Resolve a RepRapFirmware/FatFs-style file path to a physical file path.
     /// The first drive (0:/) is reserved for usage with the base directory as specified in the settings
     /// </summary>
     /// <param name="filePath">File path to resolve</param>
     /// <param name="directory">Directory containing filePath if it is not absolute is specified</param>
     /// <returns>Resolved file path</returns>
-    public string ToPhysical(string filePath, FileDirectory directory)
-    {
-        filePath = filePath.Replace('\\', '/');
-
-        Match match = _driveRegex.Match(filePath);
-        if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
-        {
-            if (driveNumber == 0)
-            {
-                return Path.Combine(Path.GetFullPath(settings.Value.BaseDirectory), match.Groups[2].Value);
-            }
-
-            using (model.AccessReadOnly())
-            {
-                if (driveNumber > 0 && driveNumber < model.Volumes.Count)
-                {
-                    string? path = model.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
-                    return Path.Combine(path, match.Groups[2].Value);
-                }
-            }
-
-            throw new ArgumentException("Invalid drive index");
-        }
-
-        if (!filePath.StartsWith('/'))
-        {
-            string directoryPath;
-            using (model.AccessReadOnly())
-            {
-                directoryPath = directory switch
-                {
-                    FileDirectory.Filaments => model.Directories.Filaments,
-                    FileDirectory.Firmware => model.Directories.Firmware,
-                    FileDirectory.GCodes => model.Directories.GCodes,
-                    FileDirectory.Macros => model.Directories.Macros,
-                    FileDirectory.Menu => model.Directories.Menu,
-                    FileDirectory.System => model.Directories.System,
-                    FileDirectory.Web => model.Directories.Web,
-                    _ => model.Directories.System,
-                };
-
-                match = _driveRegex.Match(directoryPath);
-                if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
-                {
-                    if (driveNumber == 0)
-                    {
-                        directoryPath = Path.Combine(Path.GetFullPath(settings.Value.BaseDirectory), match.Groups[2].Value);
-                    }
-
-                    if (driveNumber > 0 && driveNumber < model.Volumes.Count)
-                    {
-                        string? path = model.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
-                        directoryPath = Path.Combine(path, match.Groups[2].Value);
-                    }
-                }
-            }
-            return Path.Combine(Path.GetFullPath(settings.Value.BaseDirectory), directoryPath, filePath);
-        }
-        return Path.Combine(Path.GetFullPath(settings.Value.BaseDirectory), filePath.StartsWith('/') ? filePath[1..] : filePath);
-    }
+    public string ToPhysical(string filePath, FileDirectory directory) => ToPhysical(filePath, GetDirectoryPath(directory));
 
     /// <summary>
     /// Resolve a RepRapFirmware/FatFs-style file path to a physical file path asynchronously.
@@ -128,63 +184,7 @@ public partial class FilePathResolver(Model.ObjectModel model, IOptions<Settings
     /// <returns>Resolved file path</returns>
     public async Task<string> ToPhysicalAsync(string filePath, FileDirectory directory, CancellationToken cancellationToken = default)
     {
-        filePath = filePath.Replace('\\', '/');
-
-        Match match = _driveRegex.Match(filePath);
-        if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
-        {
-            if (driveNumber == 0)
-            {
-                return Path.Combine(Path.GetFullPath(settings.Value.BaseDirectory), match.Groups[2].Value);
-            }
-
-            using (await model.AccessReadOnlyAsync(cancellationToken))
-            {
-                if (driveNumber > 0 && driveNumber < model.Volumes.Count)
-                {
-                    string? path = model.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
-                    return Path.Combine(path, match.Groups[2].Value);
-                }
-            }
-
-            throw new ArgumentException("Invalid drive index");
-        }
-
-        if (!filePath.StartsWith('/'))
-        {
-            string directoryPath;
-            using (await model.AccessReadOnlyAsync(cancellationToken))
-            {
-                directoryPath = directory switch
-                {
-                    FileDirectory.Filaments => model.Directories.Filaments,
-                    FileDirectory.Firmware => model.Directories.Firmware,
-                    FileDirectory.GCodes => model.Directories.GCodes,
-                    FileDirectory.Macros => model.Directories.Macros,
-                    FileDirectory.Menu => model.Directories.Menu,
-                    FileDirectory.System => model.Directories.System,
-                    FileDirectory.Web => model.Directories.Web,
-                    _ => model.Directories.System,
-                };
-
-                match = _driveRegex.Match(directoryPath);
-                if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
-                {
-                    if (driveNumber == 0)
-                    {
-                        directoryPath = Path.Combine(Path.GetFullPath(settings.Value.BaseDirectory), match.Groups[2].Value);
-                    }
-
-                    if (driveNumber > 0 && driveNumber < model.Volumes.Count)
-                    {
-                        string? path = model.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
-                        directoryPath = Path.Combine(path, match.Groups[2].Value);
-                    }
-                }
-            }
-            return Path.Combine(Path.GetFullPath(settings.Value.BaseDirectory), directoryPath, filePath);
-        }
-        return Path.Combine(Path.GetFullPath(settings.Value.BaseDirectory), filePath.StartsWith('/') ? filePath[1..] : filePath);
+        return await ToPhysicalAsync(filePath, await GetDirectoryPathAsync(directory, cancellationToken), cancellationToken);
     }
 
     /// <summary>
@@ -201,21 +201,7 @@ public partial class FilePathResolver(Model.ObjectModel model, IOptions<Settings
         Match match = _driveRegex.Match(filePath);
         if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
         {
-            if (driveNumber == 0)
-            {
-                return Path.Combine(Path.GetFullPath(settings.Value.BaseDirectory), match.Groups[2].Value);
-            }
-
-            using (model.AccessReadOnly())
-            {
-                if (driveNumber > 0 && driveNumber < model.Volumes.Count)
-                {
-                    string? path = model.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
-                    return Path.Combine(path, match.Groups[2].Value);
-                }
-            }
-
-            throw new ArgumentException("Invalid drive index");
+            return CombineContained(GetDrivePath(driveNumber), match.Groups[2].Value);
         }
 
         if (directory is not null && !filePath.StartsWith('/'))
@@ -223,24 +209,11 @@ public partial class FilePathResolver(Model.ObjectModel model, IOptions<Settings
             match = _driveRegex.Match(directory);
             if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
             {
-                if (driveNumber == 0)
-                {
-                    directory = Path.Combine(Path.GetFullPath(settings.Value.BaseDirectory), match.Groups[2].Value);
-                }
-
-                using (model.AccessReadOnly())
-                {
-                    if (driveNumber > 0 && driveNumber < model.Volumes.Count)
-                    {
-                        string? path = model.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
-                        directory = Path.Combine(path, match.Groups[2].Value);
-                    }
-                }
+                return CombineContained(GetDrivePath(driveNumber), match.Groups[2].Value, filePath);
             }
-
-            return Path.Combine(Path.GetFullPath(settings.Value.BaseDirectory), directory, filePath);
+            return CombineContained(settings.Value.BaseDirectory, directory, filePath);
         }
-        return Path.Combine(Path.GetFullPath(settings.Value.BaseDirectory), filePath.StartsWith('/') ? filePath[1..] : filePath);
+        return CombineContained(settings.Value.BaseDirectory, filePath);
     }
 
     /// <summary>
@@ -258,21 +231,7 @@ public partial class FilePathResolver(Model.ObjectModel model, IOptions<Settings
         Match match = _driveRegex.Match(filePath);
         if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
         {
-            if (driveNumber == 0)
-            {
-                return Path.Combine(Path.GetFullPath(settings.Value.BaseDirectory), match.Groups[2].Value);
-            }
-
-            using (await model.AccessReadOnlyAsync(cancellationToken))
-            {
-                if (driveNumber > 0 && driveNumber < model.Volumes.Count)
-                {
-                    string? path = model.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
-                    return Path.Combine(path, match.Groups[2].Value);
-                }
-            }
-
-            throw new ArgumentException("Invalid drive index");
+            return CombineContained(await GetDrivePathAsync(driveNumber, cancellationToken), match.Groups[2].Value);
         }
 
         if (directory is not null && !filePath.StartsWith('/'))
@@ -280,38 +239,51 @@ public partial class FilePathResolver(Model.ObjectModel model, IOptions<Settings
             match = _driveRegex.Match(directory);
             if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
             {
-                if (driveNumber == 0)
-                {
-                    directory = Path.Combine(Path.GetFullPath(settings.Value.BaseDirectory), match.Groups[2].Value);
-                }
-
-                using (await model.AccessReadOnlyAsync(cancellationToken))
-                {
-                    if (driveNumber > 0 && driveNumber < model.Volumes.Count)
-                    {
-                        string? path = model.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
-                        directory = Path.Combine(path, match.Groups[2].Value);
-                    }
-                }
+                return CombineContained(await GetDrivePathAsync(driveNumber, cancellationToken), match.Groups[2].Value, filePath);
             }
-
-            return Path.Combine(Path.GetFullPath(settings.Value.BaseDirectory), directory, filePath);
+            return CombineContained(settings.Value.BaseDirectory, directory, filePath);
         }
-        return Path.Combine(Path.GetFullPath(settings.Value.BaseDirectory), filePath.StartsWith('/') ? filePath[1..] : filePath);
+        return CombineContained(settings.Value.BaseDirectory, filePath);
     }
 
     /// <summary>
-    /// Convert a physical ile path to a RRF-style file path.
+    /// Check if the given physical path is located inside the given volume directory and compute the relative path if so
+    /// </summary>
+    /// <param name="filePath">Physical path to check</param>
+    /// <param name="volumePath">Physical volume root directory</param>
+    /// <param name="relativePath">Path relative to the volume root</param>
+    /// <returns>True if the path is located inside the volume</returns>
+    private static bool TryGetRelativeToVolume(string filePath, string volumePath, out string relativePath)
+    {
+        string fullVolume = Path.GetFullPath(volumePath);
+        if (filePath == fullVolume)
+        {
+            relativePath = string.Empty;
+            return true;
+        }
+
+        string prefix = fullVolume.EndsWith('/') ? fullVolume : fullVolume + '/';
+        if (filePath.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            relativePath = filePath[prefix.Length..];
+            return true;
+        }
+
+        relativePath = string.Empty;
+        return false;
+    }
+
+    /// <summary>
+    /// Convert a physical file path to a RRF-style file path.
     /// The first drive (0:/) is reserved for usage with the base directory as specified in the settings.
     /// </summary>
     /// <param name="filePath">File path to convert</param>
     /// <returns>Resolved file path</returns>
     public string ToVirtual(string filePath)
     {
-        if (filePath.StartsWith(settings.Value.BaseDirectory))
+        if (TryGetRelativeToVolume(filePath, settings.Value.BaseDirectory, out string relativePath))
         {
-            filePath = filePath[(settings.Value.BaseDirectory.EndsWith('/') ? settings.Value.BaseDirectory.Length : (settings.Value.BaseDirectory.Length + 1))..];
-            return Path.Combine("0:/", filePath);
+            return "0:/" + relativePath;
         }
 
         using (model.AccessReadOnly())
@@ -319,9 +291,9 @@ public partial class FilePathResolver(Model.ObjectModel model, IOptions<Settings
             for (int i = 1; i < model.Volumes.Count; i++)
             {
                 string? path = model.Volumes[i].Path;
-                if (path is not null && filePath.StartsWith(path))
+                if (path is not null && TryGetRelativeToVolume(filePath, path, out relativePath))
                 {
-                    return Path.Combine($"{i}:/", filePath[path.Length..]);
+                    return $"{i}:/" + relativePath;
                 }
             }
         }
@@ -331,7 +303,7 @@ public partial class FilePathResolver(Model.ObjectModel model, IOptions<Settings
     }
 
     /// <summary>
-    /// Convert a physical ile path to a RRF-style file path asynchronously.
+    /// Convert a physical file path to a RRF-style file path asynchronously.
     /// The first drive (0:/) is reserved for usage with the base directory as specified in the settings.
     /// </summary>
     /// <param name="filePath">File path to convert</param>
@@ -339,10 +311,9 @@ public partial class FilePathResolver(Model.ObjectModel model, IOptions<Settings
     /// <returns>Resolved file path</returns>
     public async Task<string> ToVirtualAsync(string filePath, CancellationToken cancellationToken = default)
     {
-        if (filePath.StartsWith(settings.Value.BaseDirectory))
+        if (TryGetRelativeToVolume(filePath, settings.Value.BaseDirectory, out string relativePath))
         {
-            filePath = filePath[(settings.Value.BaseDirectory.EndsWith('/') ? settings.Value.BaseDirectory.Length : (settings.Value.BaseDirectory.Length + 1))..];
-            return Path.Combine("0:/", filePath);
+            return "0:/" + relativePath;
         }
 
         using (await model.AccessReadOnlyAsync(cancellationToken))
@@ -350,9 +321,9 @@ public partial class FilePathResolver(Model.ObjectModel model, IOptions<Settings
             for (int i = 1; i < model.Volumes.Count; i++)
             {
                 string? path = model.Volumes[i].Path;
-                if (path is not null && filePath.StartsWith(path))
+                if (path is not null && TryGetRelativeToVolume(filePath, path, out relativePath))
                 {
-                    return Path.Combine($"{i}:/", filePath[path.Length..]);
+                    return $"{i}:/" + relativePath;
                 }
             }
         }

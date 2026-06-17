@@ -427,7 +427,7 @@ public class MCodeHandler(
                         string virtualFilename = string.Empty;
                         try
                         {
-                            if ((code.MinorNumber ?? 0) <= 0)
+                            if (code.MinorNumber <= 0)
                             {
                                 // Get fileinfo
                                 virtualFilename = code.GetUnprecedentedString();
@@ -476,7 +476,7 @@ public class MCodeHandler(
             case 37:
                 if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
                 {
-                    if (code.Channel != CodeChannel.File2)
+                    if (code.Channel != CodeChannel.File2 && code.HasParameter('P'))
                     {
                         string fileName = code.GetString('P');
                         string physicalFile = await filePathResolver.ToPhysicalAsync(fileName, FileDirectory.GCodes, cancellationToken);
@@ -493,6 +493,8 @@ public class MCodeHandler(
                             }
 
                             await jobProcessor.SelectFileAsync(fileName, physicalFile, true, cancellationToken);
+                            // F0 suppresses writing the simulated time back to the file; absent or F1 updates it, as in standalone mode
+                            jobProcessor.UpdateSimulatedTime = code.GetInt('F', 1) == 1;
                             // Simulation is started when M37 has been processed by the firmware
                         }
                     }
@@ -536,7 +538,7 @@ public class MCodeHandler(
                         {
                             if (index < 0 || index >= model.Volumes.Count)
                             {
-                                return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," : "{") + $"\"SDinfo\":{{\"slot\":{index},present:0}}}}");
+                                return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," : "{") + $"\"SDinfo\":{{\"slot\":{index},\"present\":0}}}}");
                             }
 
                             Volume storage = model.Volumes[index];
@@ -567,7 +569,7 @@ public class MCodeHandler(
                             }
 
                             Volume storage = model.Volumes[index];
-                            return new Message(MessageType.Success, $"SD card in slot {index}: capacity {storage.Capacity / (1000 * 1000 * 1000):F2}Gb, partition size {storage.PartitionSize / (1000 * 1000 * 1000):F2}Gb,free space {storage.FreeSpace / (1000 * 1000 * 1000):F2}Gb, speed {storage.Speed / (1000 * 1000):F2}MBytes/sec");
+                            return new Message(MessageType.Success, $"SD card in slot {index}: capacity {storage.Capacity / 1000000000.0:F2}Gb, partition size {storage.PartitionSize / 1000000000.0:F2}Gb, free space {storage.FreeSpace / 1000000000.0:F2}Gb, speed {storage.Speed / 1000000.0:F2}MBytes/sec");
                         }
                     }
                 }
@@ -628,11 +630,15 @@ public class MCodeHandler(
                                         _messageLoggerProvider = new MessageLoggerProvider(model, minimumLevel);
                                         loggerFactory.AddProvider(_messageLoggerProvider);
                                     }
+                                    else
+                                    {
+                                        _messageLoggerProvider.Enabled = true;
+                                    }
                                 }
-                                else
+                                else if (_messageLoggerProvider is not null)
                                 {
-                                    _messageLoggerProvider?.Dispose();
-                                    _messageLoggerProvider = null;
+                                    // The logger factory offers no way to remove the provider again, so just disable its output
+                                    _messageLoggerProvider.Enabled = false;
                                 }
                                 seen = true;
                             }
@@ -843,8 +849,8 @@ public class MCodeHandler(
                         await using (await linkInterface.LockAllMovementSystemsAndWaitForStandstill(code.Channel))
                         {
                             string physicalDirectory = (code.MinorNumber != 1)
-                                    ? await filePathResolver.ToPhysicalAsync(directory, "sys", cancellationToken)
-                                    : await filePathResolver.ToPhysicalAsync(directory, "www", cancellationToken);
+                                ? await filePathResolver.ToPhysicalAsync(directory, "sys", cancellationToken)
+                                : await filePathResolver.ToPhysicalAsync(directory, "www", cancellationToken);
                             if (Directory.Exists(physicalDirectory))
                             {
                                 string virtualDirectory = await filePathResolver.ToVirtualAsync(physicalDirectory, cancellationToken);

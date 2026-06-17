@@ -4,10 +4,10 @@
       "src": [
         {
           "files": [
-            "DuetAPI/DuetAPI.csproj",
-            "DuetAPIClient/DuetAPIClient.csproj",
-            "DuetControlServer/DuetControlServer.csproj",
-            "DuetWebServer/DuetWebServer.csproj"
+            "DuetAPI/bin/Release/net10.0/DuetAPI.dll",
+            "DuetAPIClient/bin/Release/net10.0/DuetAPIClient.dll",
+            "DuetControlServer/bin/Release/net10.0/DuetControlServer.dll",
+            "DuetWebServer/bin/Release/net10.0/DuetWebServer.dll"
           ],
           "src": "../"
         }
@@ -58,7 +58,8 @@
     "globalMetadataFiles": [],
     "fileMetadataFiles": [],
     "template": [
-      "statictoc"
+      "default",
+      "modern"
     ],
     "postProcessors": [],
     "markdownEngineName": "markdig",

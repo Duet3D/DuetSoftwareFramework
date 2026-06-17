@@ -185,6 +185,12 @@ internal static class UpdateFromJsonReader
                     }
 
                     // Update or add items
+                    writer.WriteLine("if (reader.TokenType != JsonTokenType.StartArray)");
+                    writer.WriteLine("{");
+                    writer.Indent++;
+                    writer.WriteLine("throw new JsonException(\"expected start of array\");");
+                    writer.Indent--;
+                    writer.WriteLine("}");
                     writer.WriteLine("int i = 0;");
                     writer.WriteLine("while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)");
                     writer.WriteLine("{");
@@ -284,7 +290,7 @@ internal static class UpdateFromJsonReader
                             "string" => "GetString()!",
                             "char" => "GetString()![0]",
                             "int" => "GetInt32()",
-                            "bool" => "GetBoolean()",
+                            "bool" => "TokenType == JsonTokenType.Number ? reader.GetInt32() != 0 : reader.GetBoolean()",
                             "double" => "GetDouble()",
                             "float" => "GetSingle()",
                             "long" => "GetInt64()",

@@ -78,17 +78,6 @@ public partial class NetworkInterface : ModelObject, IStaticModelObject
     private string? _mac;
 
     /// <summary>
-    /// Number of reconnect attempts or null if unknown.
-    /// This is only reported by ESP-based boards in standalone mode
-    /// </summary>
-    public int? NumReconnects
-    {
-        get => _numReconnects;
-        set => SetPropertyValue(ref _numReconnects, value);
-    }
-    private int? _numReconnects;
-
-    /// <summary>
     /// Received signal strength indicator of the WiFi adapter (only WiFi, in dBm, or null if unknown)
     /// </summary>
     [SbcProperty(true)]

@@ -318,7 +318,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
             throw new ArgumentException("Code has no file position and cannot be used for sync requests", nameof(code));
         }
 
-        if (!Processors.Value[(int)CodeChannel.File].HasValidJobFile && !Processors.Value[(int)CodeChannel.File2].HasValidJobFile)
+        if (!Processors.Value[(int)CodeChannel.File].HasValidJobFile || !Processors.Value[(int)CodeChannel.File2].HasValidJobFile)
         {
             // There is nothing to sync if the files have finished or if there is only one file stream...
             return true;

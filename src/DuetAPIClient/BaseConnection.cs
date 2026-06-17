@@ -134,7 +134,7 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
 
         // Create a new connection
         UnixDomainSocketEndPoint endPoint = new(socketPath);
-        _unixSocket.Connect(endPoint);
+        await _unixSocket.ConnectAsync(endPoint, cancellationToken);
 
         // Read the server init message
         ServerInitMessage ownMessage = new();
@@ -189,7 +189,7 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
         if (response is not null && !response.Success)
         {
             ErrorResponse errorResponse = (ErrorResponse)response;
-            if (errorResponse.ErrorType == nameof(TaskCanceledException))
+            if (errorResponse.ErrorType is nameof(TaskCanceledException) or nameof(OperationCanceledException))
             {
                 throw new TaskCanceledException(errorResponse.ErrorMessage);
             }
@@ -214,7 +214,7 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
         if (response is not null && !response.Success)
         {
             ErrorResponse errorResponse = (ErrorResponse)response;
-            if (errorResponse.ErrorType == nameof(TaskCanceledException))
+            if (errorResponse.ErrorType is nameof(TaskCanceledException) or nameof(OperationCanceledException))
             {
                 throw new TaskCanceledException(errorResponse.ErrorMessage);
             }
@@ -286,6 +286,10 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
                         else if (reader.TokenType == JsonTokenType.False)
                         {
                             ErrorResponse errorResponse = JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.ErrorResponse)!;
+                            if (errorResponse.ErrorType is nameof(TaskCanceledException) or nameof(OperationCanceledException))
+                            {
+                                throw new TaskCanceledException(errorResponse.ErrorMessage);
+                            }
                             throw new InternalServerException(command.Command, errorResponse.ErrorType, errorResponse.ErrorMessage);
                         }
                         else
@@ -301,8 +305,10 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
                         }
                         else
                         {
+                            // Save the reader state and skip the value so the loop does not descend into it
                             resultSeen = true;
                             resultReader = reader;
+                            reader.Skip();
                         }
                     }
                     else
@@ -314,6 +320,11 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
                 {
                     reader.Skip();
                 }
+            }
+            if (isSuccess)
+            {
+                // Success response without a result (e.g. from an asynchronously executed code)
+                return default!;
             }
             throw new ArgumentException("missing success key");
         }
@@ -386,6 +397,10 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
                         else if (reader.TokenType == JsonTokenType.False)
                         {
                             ErrorResponse errorResponse = JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.ErrorResponse)!;
+                            if (errorResponse.ErrorType is nameof(TaskCanceledException) or nameof(OperationCanceledException))
+                            {
+                                throw new TaskCanceledException(errorResponse.ErrorMessage);
+                            }
                             throw new InternalServerException(command.Command, errorResponse.ErrorType, errorResponse.ErrorMessage);
                         }
                         else
@@ -401,8 +416,10 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
                         }
                         else
                         {
+                            // Save the reader state and skip the value so the loop does not descend into it
                             resultSeen = true;
                             resultReader = reader;
+                            reader.Skip();
                         }
                     }
                     else
@@ -414,6 +431,11 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
                 {
                     reader.Skip();
                 }
+            }
+            if (isSuccess)
+            {
+                // Success response without a result (e.g. from an asynchronously executed code)
+                return default!;
             }
             throw new ArgumentException("missing success key");
         }

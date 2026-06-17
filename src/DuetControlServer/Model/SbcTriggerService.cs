@@ -159,7 +159,7 @@ public sealed class SbcTriggerService(
         {
             Commands.Code evalCode = codeFactory.Create();
             evalCode.Channel = CodeChannel.Trigger;
-            object? evalResult = await expressions.EvaluateExpressionRaw(evalCode, triggerExpression, false, cancellationToken);
+            object? evalResult = await expressions.EvaluateExpressionToValueAsync(evalCode, triggerExpression, false, cancellationToken);
             initialResult = evalResult is bool b && b;
         }
         catch (Exception e) when (e is not OperationCanceledException)
@@ -246,7 +246,7 @@ public sealed class SbcTriggerService(
                 {
                     Commands.Code evalCode = codeFactory.Create();
                     evalCode.Channel = CodeChannel.Trigger;
-                    object? result = await expressions.EvaluateExpressionRaw(evalCode, state.Expression, false, stoppingToken);
+                    object? result = await expressions.EvaluateExpressionToValueAsync(evalCode, state.Expression, false, stoppingToken);
                     bool newResult = result is bool b && b;
 
                     bool fire;

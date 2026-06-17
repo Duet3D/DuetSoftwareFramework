@@ -147,5 +147,11 @@ public enum Request : ushort
     /// <summary>
     /// Delete a file or directory recursively
     /// </summary>
-    DeleteFileOrDirectoryRecursively = 25
+    DeleteFileOrDirectoryRecursively = 25,
+
+    /// <summary>
+    /// Securely delete a file (overwrite contents with zeros + fsync, then unlink).
+    /// Files only - directories are rejected. Payload is identical to <see cref="DeleteFileOrDirectory"/>.
+    /// </summary>
+    SecureDeleteFile = 26
 }

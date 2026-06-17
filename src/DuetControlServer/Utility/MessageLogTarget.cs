@@ -12,7 +12,6 @@ public sealed class MessageLoggerProvider : ILoggerProvider
 {
     private readonly Model.ObjectModel _model;
     private readonly ConcurrentDictionary<string, MessageLogger> _loggers = new();
-    private readonly LogLevel _minimumLevel;
 
     /// <summary>
     /// Constructor of this class
@@ -22,15 +21,26 @@ public sealed class MessageLoggerProvider : ILoggerProvider
     public MessageLoggerProvider(Model.ObjectModel model, LogLevel minimumLevel)
     {
         _model = model;
-        _minimumLevel = minimumLevel;
+        MinimumLevel = minimumLevel;
     }
+
+    /// <summary>
+    /// Minimum log level
+    /// </summary>
+    public LogLevel MinimumLevel { get; set; }
+
+    /// <summary>
+    /// Whether messages are output to the object model. The logger factory offers no way to remove
+    /// a registered provider again, so M111 O0 disables the output via this flag instead
+    /// </summary>
+    public bool Enabled { get; set; } = true;
 
     /// <summary>
     /// Create a logger
     /// </summary>
     public ILogger CreateLogger(string categoryName)
     {
-        return _loggers.GetOrAdd(categoryName, name => new MessageLogger(name, _model, _minimumLevel));
+        return _loggers.GetOrAdd(categoryName, name => new MessageLogger(name, _model, this));
     }
 
     /// <summary>
@@ -49,16 +59,16 @@ public sealed class MessageLogger : ILogger
 {
     private readonly string _categoryName;
     private readonly Model.ObjectModel _model;
-    private readonly LogLevel _minimumLevel;
+    private readonly MessageLoggerProvider _provider;
 
     /// <summary>
     /// Constructor
     /// </summary>
-    public MessageLogger(string categoryName, Model.ObjectModel model, LogLevel minimumLevel)
+    public MessageLogger(string categoryName, Model.ObjectModel model, MessageLoggerProvider provider)
     {
         _categoryName = categoryName;
         _model = model;
-        _minimumLevel = minimumLevel;
+        _provider = provider;
     }
 
     /// <summary>
@@ -69,7 +79,7 @@ public sealed class MessageLogger : ILogger
     /// <summary>
     /// Check if log level is enabled
     /// </summary>
-    public bool IsEnabled(LogLevel logLevel) => logLevel >= _minimumLevel;
+    public bool IsEnabled(LogLevel logLevel) => _provider.Enabled && logLevel >= _provider.MinimumLevel;
 
     /// <summary>
     /// Log a message

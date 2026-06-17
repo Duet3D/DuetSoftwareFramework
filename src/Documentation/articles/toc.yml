@@ -1,2 +1,20 @@
 - name: Introduction
   href: intro.md
+- name: Components
+  href: components.md
+- name: Object Model
+  href: object-model.md
+- name: Inter-process Communication
+  href: ipc.md
+- name: G-Code Flow
+  href: gcode-flow.md
+- name: Firmware Link
+  href: firmware-link.md
+- name: File Management
+  href: file-management.md
+- name: REST API
+  href: rest-api.md
+- name: Plugins
+  href: plugins.md
+- name: Building from Source
+  href: building.md
