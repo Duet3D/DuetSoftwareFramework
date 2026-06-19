@@ -15,6 +15,17 @@ public sealed class ReceivedHttpRequest
     public int SessionId { get; set; }
 
     /// <summary>
+    /// IP address of the transport peer that issued the request, or null if it could not be determined.
+    /// This is set by DuetWebServer from the real connection and cannot be spoofed by the client
+    /// </summary>
+    public string? RemoteIPAddress { get; set; }
+
+    /// <summary>
+    /// Port of the transport peer that issued the request, or 0 if it could not be determined
+    /// </summary>
+    public int RemotePort { get; set; }
+
+    /// <summary>
     /// List of HTTP query pairs
     /// </summary>
     public Dictionary<string, string> Queries { get; set; } = [];

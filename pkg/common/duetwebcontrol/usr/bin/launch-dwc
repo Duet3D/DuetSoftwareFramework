@@ -1,41 +1,52 @@
 #!/bin/bash
 
-# Wait for DWS to be started
+# Wait for DWS to be fully started
 while (systemctl -q is-enabled duetwebserver.service) && !(systemctl -q is-active duetwebserver.service); do
 	sleep 1
 done
 
-# Start preinstalled browser but prefer Chromium
-if [ -x /usr/bin/chromium-browser ]; then
+# Find the Chromium binary (named chromium-browser on some images, chromium on others)
+chromium_bin=
+for c in chromium-browser chromium; do
+	if command -v "$c" >/dev/null; then
+		chromium_bin="$c"
+		break
+	fi
+done
+
+# Older releases (X11 / Wayfire) show DWC fullscreen. On trixie and later the
+# labwc on-screen keyboard cannot draw over a fullscreen window, so show a
+# maximized window there instead and hide the taskbar while DWC is up
+. /etc/os-release
+case "$VERSION_CODENAME" in
+	buster | bullseye | bookworm)
+		window_arg=--start-fullscreen
+		;;
+	*)
+		window_arg=--start-maximized
+		hide_panel=1
+		;;
+esac
+
+# Launch DWC in Chromium, or the default browser if Chromium is not installed
+if [ -n "$chromium_bin" ]; then
+	# Clear restore prompt info in case the SBC was powered off
 	if (! pgrep chromium > /dev/null); then
 		rm -f ~/.config/chromium/SingletonLock
 		sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' ~/.config/chromium/'Local State'
 		sed -i 's/"exited_cleanly":false/"exited_cleanly":true/; s/"exit_type":"[^"]\+"/"exit_type":"Normal"/' ~/.config/chromium/Default/Preferences
 	fi
-	chromium-browser --app=http://localhost --app-auto-launched --start-maximized --start-fullscreen &
-elif [ -x /usr/bin/firefox ]; then
-	firefox --kiosk --new-window http://localhost
+
+	# wf-panel-pi reserves a strip at the screen edge, so hide it (and its
+	# respawn wrapper) while DWC fills the screen, and bring it back on exit
+	if [ "$hide_panel" = 1 ] && pgrep -x wf-panel-pi >/dev/null; then
+		pkill -f 'lwrespawn.*wf-panel-pi'
+		pkill -x wf-panel-pi
+		trap '/usr/bin/lwrespawn /usr/bin/wf-panel-pi &' EXIT
+	fi
+
+	"$chromium_bin" --app=http://localhost --app-auto-launched "$window_arg"
 else
 	xdg-open http://localhost
 fi
-pid=$!
 
-# Focus other windows if wmctrl is preinstalled (not the case on Bookworm)
-if [ -x /usr/bin/wmctrl ]; then
-	# Wait for DWC to be started
-	while [ -z "$(wmctrl -l | cut -d ' ' -f 5- | grep -e "Duet Web Control" -e "$(hostname)")" ]; do
-			sleep 1
-	done
-	sleep 2
-
-	# Focus other windows
-	wmctrl -l | cut -d ' ' -f 5- | grep -v -e "Duet Web Control" -e "$(hostname)" | while read window; do
-			if [ ! -z "$window" ]; then
-					echo "Focusing $window"
-					wmctrl -R "$window"
-			fi
-	done
-fi
-
-# Wait for Chromium to be closed again
-wait $pid
