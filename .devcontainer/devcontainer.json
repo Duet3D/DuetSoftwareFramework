@@ -12,7 +12,10 @@
       "extensions": [
         "ms-dotnettools.csharp",
         "ms-dotnettools.csdevkit",
-        "editorconfig.editorconfig"
+        "editorconfig.editorconfig",
+				"ms-vscode.cpptools",
+				"ms-vscode.makefile-tools",
+				"ms-vscode.cmake-tools"
       ]
     }
   },

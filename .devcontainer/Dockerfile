@@ -1,6 +1,18 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0
+FROM mcr.microsoft.com/devcontainers/dotnet:10.0
+# FROM mcr.microsoft.com/devcontainers/cpp:2-ubuntu24.04
 
-ARG DEBIAN_FRONTEND=noninteractive
+ENV ARM_GNU_TOOLCHAIN_VERSION="15.2.rel1"
+ENV ARM_GNU_TOOLCHAIN_DIR="/opt/arm-gnu-toolchain-${ARM_GNU_TOOLCHAIN_VERSION}"
+ENV PATH="${ARM_GNU_TOOLCHAIN_DIR}/bin:${PATH}"
+
+# ARG DEBIAN_FRONTEND=noninteractive
+
+COPY .devcontainer/install-arm-gcc.sh /tmp/
+
+RUN echo "Installing ARM GNU Toolchain version ${ARM_GNU_TOOLCHAIN_VERSION}..." \
+    && chmod +x /tmp/install-arm-gcc.sh \
+    && /tmp/install-arm-gcc.sh \
+    && rm -f /tmp/install-arm-gcc.sh
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -16,5 +28,18 @@ RUN apt-get update \
         unzip \
         zip \
         openssh-client \
-
+        software-properties-common \
+        build-essential \
+        cmake \
+        cppcheck \
+        valgrind \
+        clang \
+        lldb \
+        llvm \
+        gdb \
+    && add-apt-repository -y ppa:ubuntu-toolchain-r/test \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        gcc-15 \
+        g++-15 \
     && rm -rf /var/lib/apt/lists/*
