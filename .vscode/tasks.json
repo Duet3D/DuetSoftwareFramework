@@ -11,6 +11,24 @@
             "type": "promptString",
             "description": "SSH user for remote target",
             "default": "root"
+        },
+        {
+            "id": "project_name",
+            "type": "pickString",
+            "description": "Project name to build",
+            "options": [
+                "All",
+                "DuetControlServer",
+                "DuetPiManagementPlugin",
+                "DuetPluginService",
+                "DuetWebServer",
+                "PluginManager",
+                "CodeConsole",
+                "CodeLogger",
+                "CodeStream",
+                "CustomHttpEndpoint",
+                "ModelObserver"
+            ]
         }
     ],
     "tasks": [
@@ -186,7 +204,6 @@
             "args": [],
             "problemMatcher": [],
             "dependsOn": [
-                "Restore DSF Solution",
                 "Build CodeConsole",
                 "Build CodeLogger",
                 "Build CodeStream",
@@ -204,66 +221,81 @@
             "dependsOrder": "sequence"
         },
         {
+            "label": "Restore & Build All",
+            "type": "shell",
+            "command": "echo Build Complete",
+            "args": [],
+            "problemMatcher": [],
+            "dependsOn": [
+                "Restore DSF Solution",
+                "Build All",
+            ],
+            "runOptions": {
+                "instanceLimit": 1
+            },
+            "dependsOrder": "sequence"
+        },
+        {
             "label": "Install vsdbg on Remote",
             "type": "shell",
-            "command": "ssh -o StrictHostKeyChecking=no ${input:ssh_user}@${input:ip_address} 'mkdir -p ~/vsdbg && curl -fsSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l ~/vsdbg && ~/vsdbg/vsdbg --version'",
+            "command": "ssh -o StrictHostKeyChecking=no ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} 'mkdir -p ~/vsdbg && curl -fsSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l ~/vsdbg && ~/vsdbg/vsdbg --version'",
             "problemMatcher": []
         },
         {
             "label": "Deploy To",
             "type": "shell",
-            "command": "rsync -rav --delete ./build/ root@${input:ip_address}:/opt/dsf/bin/ && ssh root@${input:ip_address} 'setcap cap_sys_ptrace,cap_dac_read_search,cap_sys_time+ep /opt/dsf/bin/DuetControlServer || true; setcap cap_net_bind_service+ep /opt/dsf/bin/DuetWebServer || true; systemctl start duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
+            "command": "./scripts/deploy.sh --skip-build --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} ${input:project_name}",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
-            },
-            "dependsOn": [
-                "Stop DSF Services"
-            ],
+            }
         },
         {
             "label": "Deploy Local",
             "type": "shell",
-            "command": "sudo systemctl stop duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root && sudo rsync -rav --delete ./build/ /opt/dsf/bin/ && (sudo setcap cap_sys_ptrace,cap_dac_read_search,cap_sys_time+ep /opt/dsf/bin/DuetControlServer || true) && (sudo setcap cap_net_bind_service+ep /opt/dsf/bin/DuetWebServer || true) && sudo systemctl start duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root",
+            "command": "./scripts/deploy.sh --skip-build --local ${input:project_name}",
             "problemMatcher": [],
             "runOptions": {
-            "instanceLimit": 1
+                "instanceLimit": 1
             }
         },
         {
             "label": "Build and Deploy To",
             "type": "shell",
-            "command": "echo Build and Deploy Complete",
-            "args": [],
-            "problemMatcher": [],
-            "dependsOn": [
-                "Build All",
-                "Deploy To"
+            "command": "./scripts/deploy.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} ${input:project_name}",
+            "problemMatcher": [
+                "$msCompile"
             ],
             "runOptions": {
                 "instanceLimit": 1
-            },
-            "dependsOrder": "sequence"
+            }
         },
         {
             "label": "Build and Deploy Local",
             "type": "shell",
-            "command": "echo Build and Deploy Complete",
-            "args": [],
-            "problemMatcher": [],
-            "dependsOn": [
-                "Build All",
-                "Deploy Local"
+            "command": "./scripts/deploy.sh --local ${input:project_name}",
+            "problemMatcher": [
+                "$msCompile"
             ],
             "runOptions": {
                 "instanceLimit": 1
-            },
-            "dependsOrder": "sequence"
+            }
+        },
+        {
+            "label": "Build and Deploy DCS to",
+            "type": "shell",
+            "command": "./scripts/deploy.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} DuetControlServer",
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "runOptions": {
+                "instanceLimit": 1
+            }
         },
         {
             "label": "Stop DSF Services",
             "type": "shell",
-            "command": "ssh root@${input:ip_address} 'systemctl stop duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
+            "command": "ssh root@${config:dsf.debug.targetIp} 'systemctl stop duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
@@ -275,10 +307,34 @@
         {
             "label": "Restart DSF Services",
             "type": "shell",
-            "command": "ssh root@${input:ip_address} 'systemctl restart duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
+            "command": "ssh root@${config:dsf.debug.targetIp} 'systemctl restart duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
+            }
+        },
+        {
+            "label": "Stop Remote DuetControlServer",
+            "type": "shell",
+            "command": "ssh ${config:config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} 'systemctl stop duetcontrolserver'",
+            "problemMatcher": [],
+            "runOptions": {
+                "instanceLimit": 1
+            },
+            "presentation": {
+                "reveal": "silent"
+            }
+        },
+        {
+            "label": "Start Remote DuetControlServer",
+            "type": "shell",
+            "command": "ssh ${config:config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} 'systemctl start duetcontrolserver'",
+            "problemMatcher": [],
+            "runOptions": {
+                "instanceLimit": 1
+            },
+            "presentation": {
+                "reveal": "silent"
             }
         }
     ]

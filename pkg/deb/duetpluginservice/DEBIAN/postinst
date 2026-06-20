@@ -2,9 +2,9 @@
 
 # Set ownership and permissions
 chown -R dsf:dsf /opt/dsf/conf/plugins*
-chown dsf:dsf /opt/dsf/bin/pipInstall2.py
+chown dsf:dsf /opt/dsf/bin/pipInstall2.py 2>/dev/null || true
 chmod 755 /opt/dsf/plugins
-chmod 744 /opt/dsf/bin/pipInstall2.py
+chmod 744 /opt/dsf/bin/pipInstall2.py 2>/dev/null || true
 
 # Drop existing per-plugin AppArmor profiles so DPS regenerates them from the current template on its next start
 rm -f /etc/apparmor.d/dsf.*
