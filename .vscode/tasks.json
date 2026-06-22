@@ -7,6 +7,11 @@
             "description": "IP address of SBC to deploy to"
         },
         {
+            "id": "debug_target_ip",
+            "type": "promptString",
+            "description": "IP address of debug target SBC (saved to .vscode/settings.json)"
+        },
+        {
             "id": "ssh_user",
             "type": "promptString",
             "description": "SSH user for remote target",
@@ -335,6 +340,19 @@
             },
             "presentation": {
                 "reveal": "silent"
+            }
+        },
+        {
+            "label": "Set Debug Target IP",
+            "type": "shell",
+            "command": "python3 scripts/create_settings.py --target-ip ${input:debug_target_ip}",
+            "problemMatcher": [],
+            "runOptions": {
+                "instanceLimit": 1
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
             }
         }
     ]

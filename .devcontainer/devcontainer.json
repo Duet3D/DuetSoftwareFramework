@@ -19,6 +19,6 @@
       ]
     }
   },
-  "postCreateCommand": "dotnet --info && cd src && dotnet restore DuetSoftwareFramework.sln",
+  "postCreateCommand": "dotnet --info && (cd src && dotnet restore DuetSoftwareFramework.sln) && python3 scripts/create_settings.py",
   "postStartCommand": "echo 'Ready: run the `Build and Deploy` task or `cd src && dotnet build DuetSoftwareFramework.sln`'"
 }

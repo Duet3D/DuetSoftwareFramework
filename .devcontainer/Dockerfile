@@ -7,7 +7,7 @@ ENV PATH="${ARM_GNU_TOOLCHAIN_DIR}/bin:${PATH}"
 
 # ARG DEBIAN_FRONTEND=noninteractive
 
-COPY .devcontainer/install-arm-gcc.sh /tmp/
+COPY scripts/install-arm-gcc.sh /tmp/
 
 RUN echo "Installing ARM GNU Toolchain version ${ARM_GNU_TOOLCHAIN_VERSION}..." \
     && chmod +x /tmp/install-arm-gcc.sh \
