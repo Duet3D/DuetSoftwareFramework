@@ -321,25 +321,25 @@
         {
             "label": "Stop Remote DuetControlServer",
             "type": "shell",
-            "command": "ssh ${config:config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} 'systemctl stop duetcontrolserver'",
+            "command": "ssh ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} 'systemctl stop duetcontrolserver'",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
             },
             "presentation": {
-                "reveal": "silent"
+                // "reveal": "silent"
             }
         },
         {
             "label": "Start Remote DuetControlServer",
             "type": "shell",
-            "command": "ssh ${config:config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} 'systemctl start duetcontrolserver'",
+            "command": "ssh ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} 'systemctl start duetcontrolserver'",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
             },
             "presentation": {
-                "reveal": "silent"
+                // "reveal": "silent"
             }
         },
         {
