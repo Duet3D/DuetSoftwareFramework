@@ -3,18 +3,18 @@
 namespace DuetControlServer.Link.Protocol.SbcRequests;
 
 /// <summary>
-/// Query the object model
+/// Configure the CAN bus interface
 /// </summary>
 [StructLayout(LayoutKind.Sequential, Size = 4)]
-public struct GetObjectModelHeader
+public struct EnableCANHeader
 {
     /// <summary>
-    /// Type of the value
+    /// channel number (0 or 1)
     /// </summary>
-    public ushort KeyLength;
+    public byte Channel;
 
     /// <summary>
-    /// Length of the payload
+    /// true if the CAN bus interface should be enabled
     /// </summary>
-    public ushort FlagsLength;
+    public byte Enable;
 }

@@ -539,23 +539,6 @@ public sealed partial class LinkInterface(
     }
 
     /// <summary>
-    /// Send a pending code to the firmware
-    /// </summary>
-    /// <param name="code">Code to send</param>
-    /// <param name="codeLength">Length of the binary code in bytes</param>
-    /// <returns>Whether the code could be sent</returns>
-    internal bool SendCode(Code code, int codeLength)
-    {
-        if (BufferSpace > codeLength && linkAdapter.WriteCode(code))
-        {
-            BytesReserved += codeLength;
-            BufferSpace -= codeLength;
-            return true;
-        }
-        return false;
-    }
-
-    /// <summary>
     /// Invalidate pending codes and code-relevant requests due to an emergency stop
     /// </summary>
     internal void InvalidateCodes()

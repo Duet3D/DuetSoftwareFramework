@@ -3,18 +3,18 @@
 namespace DuetControlServer.Link.Protocol.FirmwareRequests;
 
 /// <summary>
-/// Seek to a new file position
+/// Master clock used for motion control
 /// </summary>
 [StructLayout(LayoutKind.Sequential, Size = 8)]
-public struct SeekFileHeader
+public struct MasterClockHeader
 {
     /// <summary>
-    /// Handle of the file to write to
+    /// Last master clock in milliseconds
     /// </summary>
-    public uint Handle;
+    public uint MasterClock;
 
     /// <summary>
-    /// File position to go to
+    /// Hiccup time in milliseconds
     /// </summary>
-    public uint Offset;
+    public uint HiccupTime;
 }
