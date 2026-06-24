@@ -50,7 +50,12 @@ public class Functions(Expressions expressions, FilePathResolver filePathResolve
             {
                 return true;
             }
+            // TODO: evaluate the expression locally
+#if false
             return await linkInterface.EvaluateExpressionAsync(channel, $"exists({stringArgument})");
+#else
+            return false;
+#endif
         }
         throw new ArgumentException("exists requires an argument");
     }

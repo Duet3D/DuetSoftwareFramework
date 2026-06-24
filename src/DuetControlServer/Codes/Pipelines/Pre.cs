@@ -29,10 +29,12 @@ public sealed class Pre(ChannelProcessor channelProcessor, CodeProcessor codePro
             {
                 bool resolved = await IPC.Processors.CodeInterception.InterceptAsync(code, InterceptionMode.Pre);
                 code.Flags |= CodeFlags.IsPreProcessed;
+#if false // TODO: do we need to do anything now RRF is removed?
                 if (resolved)
                 {
                     await linkInterface.SetLastCodeResultAsync(code);
                 }
+#endif
                 await ChannelProcessor.WriteCodeAsync(code, resolved ? PipelineStage.Executed : PipelineStage.ProcessInternally);
             }
             catch (Exception e)

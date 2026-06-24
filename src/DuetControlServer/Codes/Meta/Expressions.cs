@@ -861,7 +861,12 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
+                // TODO: evaluate the expression locally
+#if false
                 return await linkInterface.EvaluateExpressionAsync(code.Channel, subExpression, cancellationToken);
+#else
+                return null;
+#endif
             }
             catch (CodeParserException) when (cancellationToken.IsCancellationRequested)
             {
@@ -1041,7 +1046,12 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
+            // TODO: evaluate the expression locally
+#if false
             return await linkInterface.EvaluateExpressionAsync(code.Channel, expressionContent, cancellationToken);
+#else
+            return null;
+#endif
         }
         catch (CodeParserException) when (cancellationToken.IsCancellationRequested)
         {

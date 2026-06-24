@@ -1,13 +1,13 @@
-﻿using DuetAPI;
+using System;
 using System.Runtime.InteropServices;
 
-namespace DuetControlServer.Link.Protocol.FirmwareRequests;
+namespace DuetControlServer.Link.Protocol.SbcRequests;
 
 /// <summary>
-/// CAN bus message received by the SBC
+/// Configure the CAN bus interface
 /// </summary>
 [StructLayout(LayoutKind.Sequential, Size = 12)]
-public struct CANResponseHeader
+public struct SendCanMessageHeader
 {
     /// <summary>
     /// SBC-chosen token to map responses to the request. Not sent in the CAN message.
@@ -20,22 +20,22 @@ public struct CANResponseHeader
     public ushort MsgType;
 
     /// <summary>
-    /// CAN payload bytes that follow the header. May be > 64 because of reply reassembly.
+    /// Reply to expect from the expansion board. If no reply is expected, set to 0xFFFF
     /// </summary>
-    public ushort DataLength;
+    public ushort ReplyType;
+
+    /// <summary>
+    /// CAN payload bytes that follow the header. Must be <= 64
+    /// </summary>
+    public byte DataLength;
 
     /// <summary>
     /// CAN destination: 0..126, or 127 for broadcast
     /// </summary>
-    public byte SrcAddress;
+    public byte DstAddress;
 
     /// <summary>
     /// Flags for the CAN message
     /// </summary>
     public byte Flags;
-
-    /// <summary>
-    /// Status of the CAN message
-    /// </summary>
-    public CANStatus status;
 }

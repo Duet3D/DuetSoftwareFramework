@@ -35,13 +35,9 @@ public sealed partial class LinkInterface(
 {
     // Information about the code channels
     internal int BytesReserved, BufferSpace;
-    internal readonly Queue<ModelQueryRequest> ModelQueryRequests = new();
-    internal readonly List<string> UpdatedObjectModelKeys = [];
 
-    // Expression evaluation and variable requests
-    internal readonly List<SetLastCodeResultRequest> SetLastCodeResultRequests = [];
-    internal readonly List<EvaluateExpressionRequest> EvaluateExpressionRequests = [];
-    internal readonly List<VariableRequest> VariableRequests = [];
+    // CAN bus requests
+    internal readonly List<CanRequest> CanRequests = [];
 
     // Firmware updates
     internal readonly AsyncLock FirmwareUpdateLock = new();
@@ -73,166 +69,22 @@ public sealed partial class LinkInterface(
     }
 
     /// <summary>
-    /// Request a specific update of the object model
-    /// </summary>
-    /// <param name="key">Key to request</param>
-    /// <param name="flags">Object model flags</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Deserialized JSON document</returns>
-    public Task<byte[]> RequestObjectModel(string key, string flags, CancellationToken cancellationToken = default)
-    {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return Task.FromCanceled<byte[]>(cancellationToken);
-        }
-
-        ModelQueryRequest request = new(key, flags);
-        lock (ModelQueryRequests)
-        {
-            ModelQueryRequests.Enqueue(request);
-        }
-        return request.Tcs.Task.WaitAsync(cancellationToken);
-    }
-
-    /// <summary>
-    /// Evaluate an arbitrary expression
-    /// </summary>
-    /// <param name="channel">Where to evaluate the expression</param>
-    /// <param name="expression">Expression to evaluate</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Result of the evaluated expression</returns>
-    /// <exception cref="CodeParserException">Failed to evaluate expression</exception>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    /// <exception cref="NotSupportedException">Incompatible firmware version</exception>
-    /// <exception cref="ArgumentException">Invalid parameter</exception>
-    public Task<object?> EvaluateExpressionAsync(CodeChannel channel, string expression, CancellationToken cancellationToken = default)
-    {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return Task.FromCanceled<object?>(cancellationToken);
-        }
-        if (linkAdapter.ProtocolVersion == 1)
-        {
-            throw new NotSupportedException("Incompatible firmware version");
-        }
-        if (Encoding.UTF8.GetByteCount(expression) >= Consts.MaxExpressionLength)
-        {
-            throw new ArgumentException($"Expression too long (max {Consts.MaxExpressionLength} chars)", nameof(expression));
-        }
-
-        lock (EvaluateExpressionRequests)
-        {
-            foreach (EvaluateExpressionRequest item in EvaluateExpressionRequests)
-            {
-                if (item.Channel == channel && item.Expression == expression)
-                {
-                    // There is no reason to evaluate the same expression twice...
-                    return item.Task.WaitAsync(cancellationToken);
-                }
-            }
-
-            EvaluateExpressionRequest request = new(channel, expression);
-            EvaluateExpressionRequests.Add(request);
-            logger.LogDebug("Evaluating {Expression} on channel {Channel}", expression, channel);
-            return request.Task.WaitAsync(cancellationToken);
-        }
-    }
-
-    /// <summary>
-    /// Set or delete a global or local variable
-    /// </summary>
-    /// <param name="channel">Where to evaluate the expression</param>
-    /// <param name="createVariable">Whether the variable shall be created</param>
-    /// <param name="varName">Name of the variable</param>
-    /// <param name="expression">Expression to evaluate</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Result of the evaluated expression</returns>
-    /// <exception cref="CodeParserException">Failed to assign or delete variable</exception>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    /// <exception cref="NotSupportedException">Incompatible firmware version</exception>
-    /// <exception cref="ArgumentException">Invalid parameter</exception>
-    public Task<object?> SetVariableAsync(CodeChannel channel, bool createVariable, string varName, string? expression, CancellationToken cancellationToken = default)
-    {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return Task.FromCanceled<object?>(cancellationToken);
-        }
-        if (linkAdapter.ProtocolVersion < 5)
-        {
-            throw new NotSupportedException("Incompatible firmware version");
-        }
-        if (Encoding.UTF8.GetByteCount(varName) >= Consts.MaxVariableLength)
-        {
-            throw new ArgumentException($"Variable too long (max {Consts.MaxVariableLength} chars)");
-        }
-        if (expression is not null && Encoding.UTF8.GetByteCount(expression) >= Consts.MaxExpressionLength)
-        {
-            throw new ArgumentException($"Expression too long (max {Consts.MaxExpressionLength} chars)");
-        }
-
-        VariableRequest request;
-        lock (VariableRequests)
-        {
-            request = new(channel, createVariable, varName, expression);
-            VariableRequests.Add(request);
-            if (expression is not null)
-            {
-                logger.LogDebug("Setting variable {Variable} to {Expression} on channel {Channel}", varName, expression, channel);
-            }
-            else
-            {
-                logger.LogDebug("Deleting local variable {Variable} on channel {Channel}", varName, channel);
-            }
-        }
-        return request.Task.WaitAsync(cancellationToken);
-    }
-
-    /// <summary>
     /// Set the last code result for a specific code channel
     /// </summary>
     /// <param name="channel">Code channel</param>
     /// <param name="result">Code result</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public Task SetLastCodeResultAsync(Code code, CancellationToken cancellationToken = default)
+    public Task SendCanMessageAsync(CanMessageType messageType, CanMessageType replyType, CancellationToken cancellationToken = default)
     {
-        if (code.Result == null)
+        CanRequest request;
+        lock (CanRequests)
         {
-            // No result to update the code from. Most likely the code was cancelled
-            return Task.CompletedTask;
-        }
-
-        CodeResult result = code.Result.Type switch
-        {
-            MessageType.Success => CodeResult.Ok,
-            MessageType.Warning => CodeResult.Warning,
-            MessageType.Error => CodeResult.Error,
-            _ => throw new ArgumentOutOfRangeException(nameof(code.Result), "Unknown message type"),
-        };
-
-        SetLastCodeResultRequest request;
-        lock (SetLastCodeResultRequests)
-        {
-            request = new(code.Channel, result);
-            SetLastCodeResultRequests.Add(request);
-            logger.LogDebug("Setting last code result to {Result} on channel {Channel}", result, code.Channel);
+            request = new(messageType, replyType);
+            CanRequests.Add(request);
+            logger.LogDebug("Sending CAN message of type {MessageType} expecting reply of type {ReplyType}", messageType, replyType);
         }
         return request.Task.WaitAsync(cancellationToken);
-    }
-
-    /// <summary>
-    /// Notify that an object model key has changed
-    /// </summary>
-    /// <param name="key">Changed key</param>
-    public void ObjectModelKeyChanged(string key)
-    {
-        lock (UpdatedObjectModelKeys)
-        {
-            if (!UpdatedObjectModelKeys.Contains(key))
-            {
-                UpdatedObjectModelKeys.Add(key);
-            }
-        }
     }
 
     /// <summary>
@@ -568,32 +420,14 @@ public sealed partial class LinkInterface(
         }
         BytesReserved = BufferSpace = 0;
 
-        // Resolve pending code result, expression evaluation, and variable requests
-        lock (SetLastCodeResultRequests)
+        // Resolve pending CAN requests
+        lock (CanRequests)
         {
-            foreach (SetLastCodeResultRequest request in SetLastCodeResultRequests)
+            foreach (CanRequest request in CanRequests)
             {
                 request.SetCanceled();
             }
-            SetLastCodeResultRequests.Clear();
-        }
-
-        lock (EvaluateExpressionRequests)
-        {
-            foreach (EvaluateExpressionRequest request in EvaluateExpressionRequests)
-            {
-                request.SetCanceled();
-            }
-            EvaluateExpressionRequests.Clear();
-        }
-
-        lock (VariableRequests)
-        {
-            foreach (VariableRequest request in VariableRequests)
-            {
-                request.SetCanceled();
-            }
-            VariableRequests.Clear();
+            CanRequests.Clear();
         }
     }
 
@@ -604,21 +438,6 @@ public sealed partial class LinkInterface(
     {
         // Invalidate codes and code-relevant requests
         InvalidateCodes();
-
-        // Resolve pending object model requests
-        lock (ModelQueryRequests)
-        {
-            foreach (ModelQueryRequest request in ModelQueryRequests)
-            {
-                request.Tcs.SetCanceled();
-            }
-            ModelQueryRequests.Clear();
-        }
-
-        lock (UpdatedObjectModelKeys)
-        {
-            UpdatedObjectModelKeys.Clear();
-        }
 
         // Clear messages to send to the firmware
         lock (MessagesToSend)
@@ -658,32 +477,14 @@ public sealed partial class LinkInterface(
         }
         BytesReserved = BufferSpace = 0;
 
-        // Resolve pending code result, expression evaluation, and variable requests
-        lock (SetLastCodeResultRequests)
+        // Resolve pending CAN requests
+        lock (CanRequests)
         {
-            foreach (SetLastCodeResultRequest request in SetLastCodeResultRequests)
+            foreach (CanRequest request in CanRequests)
             {
                 request.SetCanceled();
             }
-            SetLastCodeResultRequests.Clear();
-        }
-
-        lock (EvaluateExpressionRequests)
-        {
-            foreach (EvaluateExpressionRequest request in EvaluateExpressionRequests)
-            {
-                request.SetCanceled();
-            }
-            EvaluateExpressionRequests.Clear();
-        }
-
-        lock (VariableRequests)
-        {
-            foreach (VariableRequest request in VariableRequests)
-            {
-                request.SetCanceled();
-            }
-            VariableRequests.Clear();
+            CanRequests.Clear();
         }
     }
 
@@ -695,21 +496,6 @@ public sealed partial class LinkInterface(
     {
         // Invalidate codes and code-relevant requests
         await InvalidateCodesAsync(cancellationToken);
-
-        // Resolve pending object model requests
-        lock (ModelQueryRequests)
-        {
-            foreach (ModelQueryRequest request in ModelQueryRequests)
-            {
-                request.Tcs.SetCanceled(cancellationToken);
-            }
-            ModelQueryRequests.Clear();
-        }
-
-        lock (UpdatedObjectModelKeys)
-        {
-            UpdatedObjectModelKeys.Clear();
-        }
 
         // Clear messages to send to the firmware
         lock (MessagesToSend)

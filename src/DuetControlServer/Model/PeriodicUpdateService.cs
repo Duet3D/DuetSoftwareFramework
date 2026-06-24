@@ -132,6 +132,8 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterfac
     {
         try
         {
+#if false
+// TODO this uses the old SPI interface. Some of the functionality might need to be retained
             TimeSpan measuredDelay = TimeSpan.Zero;
             string lastHostname = Environment.MachineName;
             bool updateNetworkSeq, updateVolumesSeq;
@@ -240,6 +242,12 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterfac
                 await Task.Delay(settings.Value.HostUpdateInterval, stoppingToken);
                 measuredDelay = DateTime.Now - lastUpdateTime;
             } while (!stoppingToken.IsCancellationRequested);
+#else
+            do
+            {
+                await Task.Delay(settings.Value.HostUpdateInterval, stoppingToken);
+            } while (!stoppingToken.IsCancellationRequested);
+#endif
         }
         catch (OperationCanceledException)
         {
@@ -269,14 +277,14 @@ public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterfac
             {
                 ni.Mac = BitConverter.ToString(iface.GetPhysicalAddress().GetAddressBytes()).Replace('-', ':');
                 ipAddress = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
-                                where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
-                                select unicastAddress.Address).FirstOrDefault();
+                             where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                             select unicastAddress.Address).FirstOrDefault();
                 ni.Subnet = (from unicastAddress in iface.GetIPProperties().UnicastAddresses
-                            where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
-                            select unicastAddress.IPv4Mask).FirstOrDefault()?.ToString();
+                             where unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                             select unicastAddress.IPv4Mask).FirstOrDefault()?.ToString();
                 ni.Gateway = (from gatewayAddress in iface.GetIPProperties().GatewayAddresses
-                            where gatewayAddress.Address.AddressFamily == AddressFamily.InterNetwork
-                            select gatewayAddress.Address).FirstOrDefault()?.ToString();
+                              where gatewayAddress.Address.AddressFamily == AddressFamily.InterNetwork
+                              select gatewayAddress.Address).FirstOrDefault()?.ToString();
                 ni.DnsServer = (from item in iface.GetIPProperties().DnsAddresses
                                 where item.AddressFamily == AddressFamily.InterNetwork
                                 select item).FirstOrDefault()?.ToString();

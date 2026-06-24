@@ -3,7 +3,7 @@
 /// <summary>
 /// Reasons why a CAN message has been received
 /// </summary>
-public enum CANStatus : byte
+public enum CanStatus : byte
 {
     /// <summary>
     /// Reply received without error

@@ -6,21 +6,21 @@ using System.Threading.Tasks;
 namespace DuetControlServer.Link;
 
 /// <summary>
-/// Internal storage class to update the last code result for a specific code channel
+/// Represents a request sent over the CAN bus and the expected reply.
 /// </summary>
-/// <param name="channel">Where to update the result</param>
-/// <param name="result">Code result to set</param>
-public class SetLastCodeResultRequest(CodeChannel channel, CodeResult result)
+/// <param name="messageType">Type of the CAN message</param>
+/// <param name="replyType">Type of the expected reply</param>
+/// <remarks>
+/// If no reply is expected then the task is completed immediately after the request is sent over SPI.
+/// If a reply is expected then the task is completed when the reply is received or if the request times out.
+/// </remarks>
+public class CanRequest(CanMessageType messageType, CanMessageType replyType)
 {
-    /// <summary>
-    /// Where the expression is evaluated
-    /// </summary>
-    public CodeChannel Channel { get; } = channel;
+    public CanMessageType MessageType { get; } = messageType;
 
-    /// <summary>
-    /// Expression to evaluate
-    /// </summary>
-    public CodeResult Result { get; } = result;
+    public CanMessageType ReplyType { get; } = replyType;
+
+
 
     /// <summary>
     /// Internal TCS for the task
@@ -33,9 +33,8 @@ public class SetLastCodeResultRequest(CodeChannel channel, CodeResult result)
     public Task Task => _tcs.Task;
 
     /// <summary>
-    /// Set the result of the evaluated expression
+    /// Set the result of the CAN request
     /// </summary>
-    /// <param name="result">Result to set</param>
     public void SetResult() => _tcs.TrySetResult();
 
     /// <summary>

@@ -298,18 +298,22 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
 
             if (Result is not null)
             {
+#if false // TODO: do we need to do anything now RRF is removed?
                 if (Type is CodeType.GCode or CodeType.MCode or CodeType.TCode && (Type != CodeType.MCode || MajorNumber is not 112 and not 997 and not 999))
                 {
                     // Update the last result but only if this code is no comment and if it is not shutting down the application
                     await _linkInterface.SetLastCodeResultAsync(this, CancellationToken);
                 }
+#endif
                 return true;
             }
         }
         catch (Exception e) when (e is MissingParameterException or InvalidParameterTypeException)
         {
             Result = new(MessageType.Error, e.Message);
+#if false // TODO: do we need to do anything now RRF is removed?
             await _linkInterface.SetLastCodeResultAsync(this, CancellationToken);
+#endif
             return true;
         }
 
@@ -321,7 +325,9 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
             Flags |= CodeFlags.IsPostProcessed;
             if (resolved)
             {
+#if false // TODO: do we need to do anything now RRF is removed?
                 await _linkInterface.SetLastCodeResultAsync(this, CancellationToken);
+#endif
                 return true;
             }
         }

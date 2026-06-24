@@ -32,7 +32,7 @@ public enum Request : ushort
     /// <summary>
     /// Forwarded CAN message from expansion boards
     /// </summary>
-    /// <seealso cref="CANResponseHeader"/>
+    /// <seealso cref="CanResponseHeader"/>
     CANResponse = 5,
 
     /// <summary>

@@ -93,6 +93,32 @@ public static class Writer
         return AddPadding(to, bytesWritten);
     }
 
+    public static int WriteCANMessage(Span<byte> to, ushort txToken, ushort msgType, ushort replyType, byte dstAddress, byte flags, ReadOnlySpan<byte> payload)
+    {
+        if (payload.Length < 0 || payload.Length > 64)
+        {
+            throw new ArgumentOutOfRangeException(nameof(payload), "CAN message payload must be between 0 and 64 bytes");
+        }
+        byte dataLength = (byte)payload.Length;
+
+        SendCanMessageHeader header = new()
+        {
+            TxToken = txToken,
+            MsgType = msgType,
+            ReplyType = replyType,
+            DataLength = dataLength,
+            DstAddress = dstAddress,
+            Flags = flags,
+        };
+        MemoryMarshal.Write(to, in header);
+        int bytesWritten = Marshal.SizeOf<SendCanMessageHeader>();
+
+        // Write payload
+        payload.CopyTo(to[bytesWritten..]);
+        bytesWritten += payload.Length;
+        return AddPadding(to, bytesWritten);
+    }
+
     /// <summary>
     /// Write a <see cref="MessageHeader"/> to a memory span
     /// </summary>

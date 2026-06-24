@@ -20,7 +20,7 @@ public enum Request : ushort
     /// <summary>
     /// Configure the CAN bus interface
     /// </summary>
-    /// <seealso cref="ConfigCANHeader"/>
+    /// <seealso cref="ConfigCanHeader"/>
     ConfigCAN = 2,
 
     /// <summary>
@@ -42,7 +42,7 @@ public enum Request : ushort
     /// <summary>
     /// Send a CAN message to the controller
     /// </summary>
-    /// <seealso cref="SendCANMessageHeader"/>
+    /// <seealso cref="SendCanMessageHeader"/>
     SendCANMessage = 6,
 
     /// <summary>

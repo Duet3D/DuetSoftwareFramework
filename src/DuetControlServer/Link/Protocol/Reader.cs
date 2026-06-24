@@ -42,6 +42,21 @@ public static class Reader
         return Marshal.SizeOf<CodeBufferUpdateHeader>();
     }
 
+    public static int ReadMasterClock(ReadOnlySpan<byte> from, out uint masterClock, out uint hiccupTime)
+    {
+        MasterClockHeader header = MemoryMarshal.Read<MasterClockHeader>(from);
+        masterClock = header.MasterClock;
+        hiccupTime = header.HiccupTime;
+        return Marshal.SizeOf<MasterClockHeader>();
+    }
+
+    public static int ReadCANResponse(ReadOnlySpan<byte> from, out ushort txToken)
+    {
+        CanResponseHeader header = MemoryMarshal.Read<CanResponseHeader>(from);
+        txToken = header.TxToken;
+        return Marshal.SizeOf<CanResponseHeader>();
+    }
+
     /// <summary>
     /// Read a message from a memory span
     /// </summary>

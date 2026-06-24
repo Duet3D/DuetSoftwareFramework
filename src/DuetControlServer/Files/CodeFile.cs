@@ -547,7 +547,9 @@ public class CodeFile(
         Task[] deletionTasks = new Task[codeBlock.LocalVariables.Count];
         for (int i = 0; i < codeBlock.LocalVariables.Count; i++)
         {
+#if false // TODO: delete local variables once they are stored in DCS
             deletionTasks[i] = linkInterface.SetVariableAsync(Channel, false, codeBlock.LocalVariables[i], null, cancellationToken);
+#endif
         }
         await Task.WhenAll(deletionTasks);
         codeBlock.LocalVariables.Clear();
