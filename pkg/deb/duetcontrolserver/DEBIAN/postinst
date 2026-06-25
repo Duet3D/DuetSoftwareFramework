@@ -12,8 +12,8 @@ done
 # Create /var/run/dsf now
 systemd-tmpfiles --create duetcontrolserver.conf
 
-# Trigger assignment of gpio group to the existing devices
-udevadm trigger
+# Trigger assignment of gpio group to the existing devices, but only when udev is running
+[ -d /run/udev ] && udevadm trigger || true
 
 # Set ownership and permissions
 chown -R dsf:dsf /opt/dsf/conf /opt/dsf/plugins
@@ -30,12 +30,15 @@ if ! setcap cap_sys_ptrace,cap_dac_read_search+ep /opt/dsf/bin/DuetControlServer
     echo "         (check that /opt is on a filesystem supporting capabilities and not mounted nosuid)" >&2
 fi
 
-# Update systemd services
-systemctl -q --no-ask-password daemon-reload
+# Update systemd services, but only when systemd is the running init (skips build chroots/containers)
+if [ -d /run/systemd/system ]; then
+    systemctl -q --no-ask-password daemon-reload
 
-# Start DCS again if it is enabled via systemd
-if (systemctl -q is-enabled duetcontrolserver); then
-    systemctl -q --no-ask-password start duetcontrolserver
+    # Start DCS again if it is enabled via systemd. deb-systemd-invoke honours policy-rc.d so
+    # an admin can suppress the start during automated provisioning
+    if systemctl -q is-enabled duetcontrolserver; then
+        deb-systemd-invoke start duetcontrolserver >/dev/null || true
+    fi
 fi
 
 # Ignore the return code of the DCS start request in case no board is connected

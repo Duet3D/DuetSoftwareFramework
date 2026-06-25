@@ -13,13 +13,16 @@ if ! setcap cap_net_bind_service+ep /opt/dsf/bin/DuetWebServer; then
     echo "         (check that /opt is on a filesystem supporting capabilities and not mounted nosuid)" >&2
 fi
 
-# Update systemd services
-systemctl -q --no-ask-password daemon-reload
+# Update systemd services, but only when systemd is the running init (skips build chroots/containers)
+if [ -d /run/systemd/system ]; then
+    systemctl -q --no-ask-password daemon-reload
 
-# Start DWS again if it is enabled via systemd. Ignore the return code so a failed start does not
-# abort package configuration of the meta package
-if (systemctl -q is-enabled duetwebserver); then
-    systemctl -q --no-ask-password start duetwebserver || true
+    # Start DWS again if it is enabled via systemd. deb-systemd-invoke honours policy-rc.d so an
+    # admin can suppress the start; the return code is ignored so a failed start does not abort
+    # package configuration of the meta package
+    if systemctl -q is-enabled duetwebserver; then
+        deb-systemd-invoke start duetwebserver >/dev/null || true
+    fi
 fi
 
 exit 0

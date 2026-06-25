@@ -15,9 +15,7 @@
             </summary>
         </member>
         <member name="M:DuetSharedLibrary.CommonLogFormatter.Write``1(Microsoft.Extensions.Logging.Abstractions.LogEntry{``0}@,Microsoft.Extensions.Logging.IExternalScopeProvider,System.IO.TextWriter)">
-            <summary>
-            Write a log entry
-            </summary>
+            <inheritdoc />
         </member>
         <member name="M:DuetSharedLibrary.CommonLogFormatter.GetColorCode(Microsoft.Extensions.Logging.LogLevel)">
             <summary>
@@ -132,6 +130,90 @@
             <param name="uid">User ID</param>
             <param name="gid">Group ID</param>
             <exception cref="T:System.IO.IOException">Operation failed</exception>
+        </member>
+        <member name="T:DuetSharedLibrary.InputGpioPin">
+            <summary>
+            Event-based reader for a single GPIO input line via the Linux GPIO character device.
+            Prefers the v2 chardev uAPI (kernel 5.10+) for per-edge sequence numbers and falls back to the
+            legacy v1 uAPI on older kernels. This talks to /dev/gpiochipN directly and needs no libgpiod
+            </summary>
+        </member>
+        <member name="P:DuetSharedLibrary.InputGpioPin.SupportsSequenceNumbers">
+            <summary>
+            Whether kernel-provided edge sequence numbers are available (true on the v2 uAPI)
+            </summary>
+        </member>
+        <member name="P:DuetSharedLibrary.InputGpioPin.SequenceNumber">
+            <summary>
+            Sequence number of the most recently observed edge: the kernel's per-line seqno on v2, or a
+            running count of observed edges on v1
+            </summary>
+        </member>
+        <member name="P:DuetSharedLibrary.InputGpioPin.MissedEdges">
+            <summary>
+            Number of edges the kernel had to drop before they could be read (v2 event buffer overruns).
+            A non-zero value means real TfrRdy transitions went unseen
+            </summary>
+        </member>
+        <member name="P:DuetSharedLibrary.InputGpioPin.Value">
+            <summary>
+            Pin level as of the last observed edge or read
+            </summary>
+        </member>
+        <member name="T:DuetSharedLibrary.InputGpioPin.PinChangedDelegate">
+            <summary>
+            Delegate invoked on every observed edge
+            </summary>
+            <param name="value">New pin level</param>
+            <param name="sequenceNumber">Sequence number of the edge (see <see cref="P:DuetSharedLibrary.InputGpioPin.SequenceNumber"/>)</param>
+        </member>
+        <member name="E:DuetSharedLibrary.InputGpioPin.PinChanged">
+            <summary>
+            Raised on every observed edge while monitoring
+            </summary>
+        </member>
+        <member name="M:DuetSharedLibrary.InputGpioPin.#ctor(System.String,System.Int32,System.String)">
+            <summary>
+            Open a GPIO line for both-edge event monitoring
+            </summary>
+            <param name="devNode">Path to the GPIO chip device node (e.g. /dev/gpiochip0)</param>
+            <param name="pin">Line offset to open</param>
+            <param name="consumerLabel">Consumer label reported to the kernel</param>
+            <exception cref="T:System.IO.IOException">Line could not be initialized</exception>
+        </member>
+        <member name="M:DuetSharedLibrary.InputGpioPin.TryRequestLineV2(System.String)">
+            <summary>
+            Request the line through the v2 uAPI
+            </summary>
+            <returns>True on success, false if the kernel does not support the v2 uAPI</returns>
+        </member>
+        <member name="M:DuetSharedLibrary.InputGpioPin.RequestLineV1(System.String)">
+            <summary>
+            Request the line through the legacy v1 uAPI
+            </summary>
+        </member>
+        <member name="M:DuetSharedLibrary.InputGpioPin.Read">
+            <summary>
+            Read the current level of the line directly from the kernel
+            </summary>
+            <returns>True if the line is high</returns>
+            <exception cref="T:System.IO.IOException">Value could not be read</exception>
+        </member>
+        <member name="M:DuetSharedLibrary.InputGpioPin.StartMonitoring(System.Threading.CancellationToken)">
+            <summary>
+            Start a background thread that blocks on edge events and raises <see cref="E:DuetSharedLibrary.InputGpioPin.PinChanged"/>
+            </summary>
+            <param name="cancellationToken">Cancellation token to stop monitoring</param>
+        </member>
+        <member name="M:DuetSharedLibrary.InputGpioPin.Finalize">
+            <summary>
+            Finalizer
+            </summary>
+        </member>
+        <member name="M:DuetSharedLibrary.InputGpioPin.Dispose">
+            <summary>
+            Release the GPIO line
+            </summary>
         </member>
         <member name="T:DuetSharedLibrary.InternalCommandConnection">
             <summary>
@@ -328,6 +410,39 @@
             <param name="pid">Process ID</param>
             <param name="uid">User ID</param>
             <param name="gid">Group ID</param>
+        </member>
+        <member name="T:DuetSharedLibrary.SpiDevice">
+            <summary>
+            Driver for full-duplex SPI transfers via the spidev character device
+            </summary>
+        </member>
+        <member name="M:DuetSharedLibrary.SpiDevice.#ctor(System.String,System.Int32,System.Int32)">
+            <summary>
+            Open an SPI device and configure its mode, word size and speed
+            </summary>
+            <param name="devNode">Path to the spidev node (e.g. /dev/spidev0.0)</param>
+            <param name="speed">Transfer speed in Hz</param>
+            <param name="transferMode">SPI mode (0-3)</param>
+            <exception cref="T:System.IO.IOException">Device could not be initialized</exception>
+        </member>
+        <member name="M:DuetSharedLibrary.SpiDevice.TransferFullDuplex(System.ReadOnlySpan{System.Byte},System.Span{System.Byte})">
+            <summary>
+            Perform a full-duplex SPI transfer
+            </summary>
+            <param name="writeBuffer">Data to send</param>
+            <param name="readBuffer">Buffer receiving the same number of bytes</param>
+            <exception cref="T:System.ArgumentException">Buffers differ in length</exception>
+            <exception cref="T:System.IO.IOException">Transfer failed</exception>
+        </member>
+        <member name="M:DuetSharedLibrary.SpiDevice.Finalize">
+            <summary>
+            Finalizer
+            </summary>
+        </member>
+        <member name="M:DuetSharedLibrary.SpiDevice.Dispose">
+            <summary>
+            Close the SPI device
+            </summary>
         </member>
         <member name="T:DuetSharedLibrary.VersionHelper">
             <summary>
