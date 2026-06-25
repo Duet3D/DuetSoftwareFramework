@@ -428,6 +428,14 @@ public class SPI : IDiagnostics, ILinkAdapter
     }
 
     /// <summary>
+    /// Read a forwarded CAN message (single fragment) from an expansion board
+    /// </summary>
+    public void ReadCanResponse(out ushort txToken, out CanMessageType msgType, out byte srcAddress, out byte flags, out CanStatus status, out byte[] payload)
+    {
+        Protocol.Reader.ReadCANResponse(_packetData.Span, out txToken, out msgType, out srcAddress, out flags, out status, out payload);
+    }
+
+    /// <summary>
     /// Write the last packet + content for diagnostic purposes
     /// </summary>
     public void DumpMalformedPacket()
@@ -703,6 +711,28 @@ public class SPI : IDiagnostics, ILinkAdapter
 
         // Write it
         WritePacket(Protocol.SbcRequests.Request.Message, dataLength);
+        span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
+        return true;
+    }
+
+    /// <summary>
+    /// Send a CAN message to an expansion board
+    /// </summary>
+    /// <returns>Whether the request could be written</returns>
+    public bool WriteCanMessage(ushort txToken, ushort msgType, ushort replyType, byte dstAddress, byte flags, ReadOnlySpan<byte> payload)
+    {
+        // Serialize the request first to see how much space it requires
+        Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
+        int dataLength = Protocol.Writer.WriteCANMessage(span, txToken, msgType, replyType, dstAddress, flags, payload);
+
+        // See if the request fits into the buffer
+        if (!CanWritePacket(dataLength))
+        {
+            return false;
+        }
+
+        // Write it
+        WritePacket(Protocol.SbcRequests.Request.SendCANMessage, dataLength);
         span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
         return true;
     }

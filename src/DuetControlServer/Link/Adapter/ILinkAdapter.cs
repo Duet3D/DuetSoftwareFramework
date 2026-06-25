@@ -75,6 +75,17 @@ public interface ILinkAdapter
     void ReadCodeChannel(out CodeChannel channel);
 
     /// <summary>
+    /// Read a forwarded CAN message (single fragment) from an expansion board
+    /// </summary>
+    /// <param name="txToken">Token mapping the response back to its request</param>
+    /// <param name="msgType">Type of the received CAN message</param>
+    /// <param name="srcAddress">Source address of the replying board</param>
+    /// <param name="flags">Flags of the CAN message</param>
+    /// <param name="status">Status of the CAN message</param>
+    /// <param name="payload">CAN payload of this fragment</param>
+    void ReadCanResponse(out ushort txToken, out CanMessageType msgType, out byte srcAddress, out byte flags, out CanStatus status, out byte[] payload);
+
+    /// <summary>
     /// Write the last packet + content for diagnostic purposes
     /// </summary>
     void DumpMalformedPacket();
@@ -140,4 +151,16 @@ public interface ILinkAdapter
     /// <param name="message">Message content</param>
     /// <returns>Whether the firmware has been written successfully</returns>
     bool WriteMessage(MessageTypeFlags flags, string message);
+
+    /// <summary>
+    /// Send a CAN message to an expansion board
+    /// </summary>
+    /// <param name="txToken">Token used to map the response back to the request</param>
+    /// <param name="msgType">CanMessageType to place in the CAN id</param>
+    /// <param name="replyType">Expected reply type (0xFFFF if no reply is expected)</param>
+    /// <param name="dstAddress">CAN destination: 0..126, or 127 for broadcast</param>
+    /// <param name="flags">Flags for the CAN message</param>
+    /// <param name="payload">CAN payload (0..64 bytes)</param>
+    /// <returns>Whether the request could be written</returns>
+    bool WriteCanMessage(ushort txToken, ushort msgType, ushort replyType, byte dstAddress, byte flags, ReadOnlySpan<byte> payload);
 }

@@ -50,11 +50,34 @@ public static class Reader
         return Marshal.SizeOf<MasterClockHeader>();
     }
 
-    public static int ReadCANResponse(ReadOnlySpan<byte> from, out ushort txToken)
+    /// <summary>
+    /// Read a forwarded CAN message (single fragment) from a memory span
+    /// </summary>
+    /// <param name="from">Origin</param>
+    /// <param name="txToken">Token mapping the response back to its request</param>
+    /// <param name="msgType">Type of the received CAN message</param>
+    /// <param name="srcAddress">Source address of the replying board</param>
+    /// <param name="flags">Flags of the CAN message</param>
+    /// <param name="status">Status of the CAN message</param>
+    /// <param name="payload">CAN payload of this fragment</param>
+    /// <returns>Number of bytes read</returns>
+    /// <remarks>
+    /// The HAT no longer reassembles fragmented replies, so each packet carries exactly one CAN
+    /// frame (<see cref="CanResponseHeader.DataLength"/> &lt;= 64). Reassembly is done by the caller.
+    /// </remarks>
+    public static int ReadCANResponse(ReadOnlySpan<byte> from, out ushort txToken, out CanMessageType msgType, out byte srcAddress, out byte flags, out CanStatus status, out byte[] payload)
     {
         CanResponseHeader header = MemoryMarshal.Read<CanResponseHeader>(from);
         txToken = header.TxToken;
-        return Marshal.SizeOf<CanResponseHeader>();
+        msgType = (CanMessageType)header.MsgType;
+        srcAddress = header.SrcAddress;
+        flags = header.Flags;
+        status = header.Status;
+
+        int bytesRead = Marshal.SizeOf<CanResponseHeader>();
+        payload = header.DataLength > 0 ? from.Slice(bytesRead, header.DataLength).ToArray() : [];
+        bytesRead += header.DataLength;
+        return AddPadding(bytesRead);
     }
 
     /// <summary>

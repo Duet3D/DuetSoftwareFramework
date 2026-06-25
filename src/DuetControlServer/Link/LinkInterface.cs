@@ -10,8 +10,11 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
 using DuetControlServer.Link.Adapter;
+using DuetControlServer.Link.Protocol.Can;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Utility;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
@@ -37,7 +40,14 @@ public sealed partial class LinkInterface(
     internal int BytesReserved, BufferSpace;
 
     // CAN bus requests
+
+    /// <summary>
+    /// Reserved transmission token used for CAN messages that are not a reply to one of our requests
+    /// </summary>
+    internal const ushort UnsolicitedTxToken = 0xFFFF;
+
     internal readonly List<CanRequest> CanRequests = [];
+    private ushort _canTxToken;
 
     // Firmware updates
     internal readonly AsyncLock FirmwareUpdateLock = new();
@@ -69,22 +79,71 @@ public sealed partial class LinkInterface(
     }
 
     /// <summary>
-    /// Set the last code result for a specific code channel
+    /// Send a typed CAN message to an expansion board and wait for the (optional) reply
     /// </summary>
-    /// <param name="channel">Code channel</param>
-    /// <param name="result">Code result</param>
+    /// <typeparam name="TReq">Type of the CAN message body</typeparam>
+    /// <param name="dstAddress">CAN destination: 0..126, or 127 for broadcast</param>
+    /// <param name="message">CAN message body to send</param>
+    /// <param name="replyType">Expected reply type (<see cref="CanMessageType.NoReply"/> if none)</param>
+    /// <param name="flags">Flags for the CAN message</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public Task SendCanMessageAsync(CanMessageType messageType, CanMessageType replyType, CancellationToken cancellationToken = default)
+    /// <returns>Reassembled reply (empty if no reply was expected)</returns>
+    public Task<CanResponse> SendCanMessageAsync<TReq>(byte dstAddress, in TReq message, CanMessageType replyType = CanMessageType.NoReply, byte flags = 0, CancellationToken cancellationToken = default)
+        where TReq : struct, ICanMessage
+    {
+        byte[] payload = new byte[Unsafe.SizeOf<TReq>()];
+        MemoryMarshal.Write(payload, in message);
+        return SendCanMessageAsync(TReq.MessageType, replyType, dstAddress, payload, flags, cancellationToken);
+    }
+
+    /// <summary>
+    /// Send a raw CAN message to an expansion board and wait for the (optional) reply
+    /// </summary>
+    /// <param name="messageType">Type of the CAN message</param>
+    /// <param name="replyType">Expected reply type (<see cref="CanMessageType.NoReply"/> if none)</param>
+    /// <param name="dstAddress">CAN destination: 0..126, or 127 for broadcast</param>
+    /// <param name="payload">Serialized CAN message payload</param>
+    /// <param name="flags">Flags for the CAN message</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Reassembled reply (empty if no reply was expected)</returns>
+    public async Task<CanResponse> SendCanMessageAsync(CanMessageType messageType, CanMessageType replyType, byte dstAddress, byte[] payload, byte flags = 0, CancellationToken cancellationToken = default)
     {
         CanRequest request;
         lock (CanRequests)
         {
-            request = new(messageType, replyType);
+            request = new(messageType, replyType, NextCanTxToken(), dstAddress, flags, payload);
             CanRequests.Add(request);
-            logger.LogDebug("Sending CAN message of type {MessageType} expecting reply of type {ReplyType}", messageType, replyType);
+            logger.LogDebug("Sending CAN message of type {MessageType} to address {DstAddress} expecting reply of type {ReplyType}", messageType, dstAddress, replyType);
         }
-        return request.Task.WaitAsync(cancellationToken);
+
+        try
+        {
+            await request.Task.WaitAsync(cancellationToken);
+        }
+        catch
+        {
+            lock (CanRequests)
+            {
+                CanRequests.Remove(request);
+            }
+            throw;
+        }
+        return CanResponse.FromRequest(request);
+    }
+
+    /// <summary>
+    /// Allocate the next CAN transmission token, skipping <see cref="UnsolicitedTxToken"/>.
+    /// Must be called while holding the <see cref="CanRequests"/> lock.
+    /// </summary>
+    /// <returns>Token to use for the next request</returns>
+    private ushort NextCanTxToken()
+    {
+        ushort token = _canTxToken++;
+        if (_canTxToken == UnsolicitedTxToken)
+        {
+            _canTxToken = 0;
+        }
+        return token;
     }
 
     /// <summary>

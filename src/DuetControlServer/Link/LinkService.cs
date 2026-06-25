@@ -9,6 +9,7 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
 using DuetControlServer.Link.Adapter;
+using DuetControlServer.Link.Protocol.Can;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Utility;
@@ -369,6 +370,12 @@ public sealed class LinkService(
                 }
             }
 
+            // Send pending CAN messages
+            if (!skipChannels)
+            {
+                SendCanMessages();
+            }
+
             // Do another full SPI transfer
             linkAdapter.PerformFullTransfer(cancellationToken: lifetime.ApplicationStopped);
         }
@@ -394,6 +401,9 @@ public sealed class LinkService(
             case Request.Message:
                 HandleMessage();
                 break;
+            case Request.CANResponse:
+                HandleCanResponse();
+                break;
 #if false
 // TODO: re-enable these if we need them. Delete if not.
             case Request.WaitForAcknowledgement:
@@ -404,6 +414,108 @@ public sealed class LinkService(
                 break;
 #endif
         }
+    }
+
+    /// <summary>
+    /// Send pending CAN requests to the firmware and complete those that expect no reply
+    /// </summary>
+    private void SendCanMessages()
+    {
+        lock (linkInterface.CanRequests)
+        {
+            // Write each unsent request once, in order, until the transfer buffer is full
+            foreach (CanRequest request in linkInterface.CanRequests)
+            {
+                if (request.Sent)
+                {
+                    continue;
+                }
+
+                if (!linkAdapter.WriteCanMessage(request.TxToken, (ushort)request.MessageType, (ushort)request.ReplyType, request.DstAddress, request.Flags, request.RequestPayload))
+                {
+                    // Buffer full -- retry on the next transfer
+                    break;
+                }
+                request.Sent = true;
+            }
+
+            // Requests that expect no reply are complete as soon as they have been written
+            linkInterface.CanRequests.RemoveAll(request =>
+            {
+                if (request.Sent && !request.ExpectsReply)
+                {
+                    request.SetResult();
+                    return true;
+                }
+                return false;
+            });
+        }
+    }
+
+    /// <summary>
+    /// Process a forwarded CAN message and complete the matching request once fully reassembled
+    /// </summary>
+    private void HandleCanResponse()
+    {
+        linkAdapter.ReadCanResponse(out ushort txToken, out CanMessageType msgType, out byte srcAddress, out byte flags, out CanStatus status, out byte[] payload);
+
+        // Messages that are not a reply to one of our requests carry the reserved token
+        if (txToken == LinkInterface.UnsolicitedTxToken)
+        {
+            HandleUnsolicitedCanMessage(msgType, srcAddress, flags, status, payload);
+            return;
+        }
+
+        lock (linkInterface.CanRequests)
+        {
+            CanRequest? request = linkInterface.CanRequests.FirstOrDefault(r => r.TxToken == txToken);
+            if (request is null)
+            {
+                // A non-reserved token with no matching request is unexpected (late/duplicate/timed-out reply)
+                logger.LogWarning("Received CAN response with unknown token {TxToken}", txToken);
+                return;
+            }
+
+            // The reply type must match what we expected when sending the request
+            if (msgType != request.ReplyType)
+            {
+                logger.LogError("Received CAN response of type {MsgType} but expected {ReplyType}", msgType, request.ReplyType);
+                request.SetException(new InvalidOperationException($"Expected CAN reply of type {request.ReplyType} but received {msgType}"));
+                linkInterface.CanRequests.Remove(request);
+                return;
+            }
+
+            // Propagate transport-level failures immediately
+            if (status != CanStatus.Ok)
+            {
+                request.SetResult(status, msgType, srcAddress);
+                linkInterface.CanRequests.Remove(request);
+                return;
+            }
+
+            // Reassemble the (possibly fragmented) reply
+            CanFragmentation.GetFragmentInfo(request.ReplyType, payload, out int fragmentNumber, out bool moreFollows, out ReadOnlySpan<byte> content);
+            request.AddFragment(fragmentNumber, content);
+            if (!moreFollows)
+            {
+                request.SetResult(status, msgType, srcAddress);
+                linkInterface.CanRequests.Remove(request);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Process a CAN message that is not a reply to any outstanding request (reserved token 0xFFFF)
+    /// </summary>
+    /// <param name="msgType">Type of the received CAN message</param>
+    /// <param name="srcAddress">Source address of the sending board</param>
+    /// <param name="flags">Flags of the CAN message</param>
+    /// <param name="status">Status of the CAN message</param>
+    /// <param name="payload">CAN payload</param>
+    private void HandleUnsolicitedCanMessage(CanMessageType msgType, byte srcAddress, byte flags, CanStatus status, byte[] payload)
+    {
+        // TODO: route unsolicited CAN messages (e.g. events, status reports, announcements) to their consumers
+        logger.LogDebug("Received unsolicited CAN message of type {MsgType} from address {SrcAddress} ({Length} bytes)", msgType, srcAddress, payload.Length);
     }
 
     /// <summary>

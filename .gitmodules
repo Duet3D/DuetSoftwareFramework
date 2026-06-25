@@ -1,0 +1,4 @@
+[submodule "lib/CANlib"]
+	path = lib/CANlib
+	url = https://github.com/Duet3D/CANlib.git
+	branch = 3.7-docker

@@ -20,7 +20,8 @@ public struct CanResponseHeader
     public ushort MsgType;
 
     /// <summary>
-    /// CAN payload bytes that follow the header. May be > 64 because of reply reassembly.
+    /// CAN payload bytes that follow the header. Always &lt;= 64: the HAT no longer reassembles
+    /// fragmented replies, so each packet carries exactly one CAN frame and DSF does the reassembly.
     /// </summary>
     public ushort DataLength;
 

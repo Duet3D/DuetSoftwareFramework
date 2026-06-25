@@ -136,5 +136,10 @@ public enum CanMessageType : ushort
 	FirmwareBlockRequest = 5000,
 	FirmwareBlockResponse = 5001,
 
-	UnusedMessageType = 0xFFFF
+	UnusedMessageType = 0xFFFF,
+
+	/// <summary>
+	/// Alias used as the <c>ReplyType</c> of a CAN request when no reply is expected
+	/// </summary>
+	NoReply = UnusedMessageType
 }
