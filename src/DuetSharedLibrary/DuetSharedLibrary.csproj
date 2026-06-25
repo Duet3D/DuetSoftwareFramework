@@ -16,8 +16,4 @@
 		<ProjectReference Include="..\DuetAPIClient\DuetAPIClient.csproj" />
 		<ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
 	</ItemGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-		<DocumentationFile>DuetSharedLibrary.xml</DocumentationFile>
-	</PropertyGroup>
 </Project>
