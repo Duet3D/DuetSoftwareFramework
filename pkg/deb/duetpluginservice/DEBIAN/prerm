@@ -3,11 +3,11 @@
 # Stop DPS instances
 if [ -d /run/systemd/system ]; then
     if systemctl -q is-active duetpluginservice; then
-        deb-systemd-invoke stop duetpluginservice >/dev/null || true
+        systemctl -q --no-ask-password stop duetpluginservice || true
     fi
 
     if systemctl -q is-active duetpluginservice-root; then
-        deb-systemd-invoke stop duetpluginservice-root >/dev/null || true
+        systemctl -q --no-ask-password stop duetpluginservice-root || true
     fi
 fi
 

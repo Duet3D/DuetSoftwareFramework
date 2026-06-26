@@ -13,14 +13,13 @@ rm -f /etc/apparmor.d/dsf.*
 if [ -d /run/systemd/system ]; then
     systemctl -q --no-ask-password daemon-reload
 
-    # Start DPS instances again if they are enabled via systemd. deb-systemd-invoke honours
-    # policy-rc.d so an admin can suppress the start during automated provisioning
+    # Start DPS instances again if they are enabled via systemd
     if systemctl -q is-enabled duetpluginservice; then
-        deb-systemd-invoke start duetpluginservice >/dev/null || true
+        systemctl -q --no-ask-password --no-block start duetpluginservice || true
     fi
 
     if systemctl -q is-enabled duetpluginservice-root; then
-        deb-systemd-invoke start duetpluginservice-root >/dev/null || true
+        systemctl -q --no-ask-password --no-block start duetpluginservice-root || true
     fi
 fi
 
