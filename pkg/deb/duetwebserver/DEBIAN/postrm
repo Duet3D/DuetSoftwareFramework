@@ -1,4 +1,6 @@
 #!/bin/sh
 
 # Reload systemd services
-systemctl -q --no-ask-password daemon-reload
+if [ -d /run/systemd/system ]; then
+    systemctl -q --no-ask-password daemon-reload
+fi

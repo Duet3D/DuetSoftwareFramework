@@ -12,8 +12,11 @@ using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
+
+[assembly: UnsupportedOSPlatform("windows")]
 
 namespace DuetPiManagementPlugin
 {
@@ -123,6 +126,9 @@ namespace DuetPiManagementPlugin
                 await commandConnection.ConnectAsync(socketPath);
                 await commandConnection.NotifyPluginStartedAsync();
             }
+
+            // Serve the close-browser endpoint for the local DWC kiosk in the background
+            _ = Browser.RunAsync(socketPath);
 
             // Keep intercepting codes until the plugin is stopped
             do

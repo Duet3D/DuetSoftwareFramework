@@ -632,15 +632,12 @@ public class USB : IDiagnostics, ILinkAdapter
         // USB with a bare-metal CDC driver. This causes a USB disconnect + reconnect
         _updating = true;
 
-        // Remember the current port so we don't try the IAPR handshake on the RRF port
-        // (which would inject garbage into RRF's G-code input buffer if the board reboots into RRF)
-        string mainPortName = _serialPort.PortName;
         _serialPort.Close();
 
         try
         {
             _logger.LogDebug("IAP: Scanning for IAP USB device (firmware length {Length} bytes)...", firmwareLength);
-            _iapSerialPort = FindIapDevice(mainPortName, Consts.IapTimeout, firmwareLength, cancellationToken);
+            _iapSerialPort = FindIapDevice(Consts.IapTimeout, firmwareLength, cancellationToken);
             if (_iapSerialPort == null)
             {
                 throw new OperationCanceledException("IAP: Timed out waiting for IAP USB device to appear");
@@ -670,12 +667,11 @@ public class USB : IDiagnostics, ILinkAdapter
     /// Scan for the IAP serial port by trying the IAPR handshake on each available ttyACM port.
     /// Ports are retried each scan cycle since the IAP device may reappear on the same path.
     /// </summary>
-    /// <param name="excludePort">Port name to skip (the original RRF port)</param>
     /// <param name="timeoutMs">Maximum time to wait in milliseconds</param>
     /// <param name="firmwareLength">Length of the firmware binary, sent as part of the handshake</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The opened serial port, or null if not found</returns>
-    private SerialPort? FindIapDevice(string excludePort, int timeoutMs, uint firmwareLength, CancellationToken cancellationToken)
+    private SerialPort? FindIapDevice(int timeoutMs, uint firmwareLength, CancellationToken cancellationToken)
     {
         Stopwatch sw = Stopwatch.StartNew();
 
@@ -704,16 +700,10 @@ public class USB : IDiagnostics, ILinkAdapter
                     break;
                 }
 
-                // Never send the handshake to the original RRF port -- if the board
-                // rebooted back into RRF instead of IAP, this would inject garbage
-                if (port == excludePort)
-                {
-                    continue;
-                }
-
                 // Check the USB product string via sysfs -- only try ports that
-                // identify as "IAP". This avoids sending the handshake to unrelated
-                // CDC devices or to RRF if it re-enumerated on a different port
+                // identify as "IAP". This is what tells the IAP device apart from RRF
+                // (whether RRF stayed put or re-enumerated on a different port), so the
+                // handshake is never sent to a running RRF instance
                 string? product = GetUsbProductString(port);
                 if (product == null || !product.Equals("IAP", StringComparison.OrdinalIgnoreCase))
                 {
@@ -728,7 +718,7 @@ public class USB : IDiagnostics, ILinkAdapter
                 }
             }
         }
-        _logger.LogWarning("IAP: Device not found after {Elapsed}ms (excluded: {ExcludePort})", sw.ElapsedMilliseconds, excludePort);
+        _logger.LogWarning("IAP: Device not found after {Elapsed}ms", sw.ElapsedMilliseconds);
         return null;
     }
 

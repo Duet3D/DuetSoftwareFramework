@@ -15,10 +15,6 @@ using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
-using System.Device.Spi;
-using SpiDevice = System.Device.Spi.SpiDevice;
-using System.Device.Gpio;
-using System.Device.Gpio.Drivers;
 
 namespace DuetControlServer.Link.Adapter;
 
@@ -35,11 +31,10 @@ public class SPI : IDiagnostics, ILinkAdapter
     private readonly Settings _settings;
 
     // General transfer variables
-    private readonly GpioController _gpioController;
-    private readonly int _transferReadyPin;
+    private readonly InputGpioPin _transferReadyPin;
     private readonly ManualResetEventSlim _transferReadyEvent = new(false);
-    private PinValue _expectedTfrRdyPinValue;
-    private volatile int _lastPinValueFromCallback;
+    private bool _expectedTfrRdyPinValue;
+    private volatile bool _lastPinValueFromCallback;
     private readonly SpiDevice _spiDevice;
     private bool _waitingForFirstTransfer = true, _connected, _hadTimeout, _resetting, _updating;
     private ushort _lastTransferNumber;
@@ -101,32 +96,19 @@ public class SPI : IDiagnostics, ILinkAdapter
         }
         _txBuffer = _txBuffers.First!;
 
-        // Initialize transfer ready pin
-        _transferReadyPin = settings.Value.TransferReadyPin;
-        int chipNumber = int.Parse(settings.Value.GpioChipDevice.Replace("/dev/gpiochip", ""));
-        _gpioController = new GpioController(new LibGpiodDriver(chipNumber));
-        _gpioController.OpenPin(_transferReadyPin, PinMode.Input);
-        _lastPinValueFromCallback = (int)_gpioController.Read(_transferReadyPin);
-        _gpioController.RegisterCallbackForPinValueChangedEvent(_transferReadyPin, PinEventTypes.Rising | PinEventTypes.Falling, (sender, args) =>
+        // Initialize transfer ready pin via the kernel GPIO character device (v1/v2 uAPI, no libgpiod)
+        int transferReadyPin = settings.Value.TransferReadyPin;
+        _transferReadyPin = new InputGpioPin(settings.Value.GpioChipDevice, transferReadyPin, $"dcs-trp-{transferReadyPin}");
+        _lastPinValueFromCallback = _transferReadyPin.Value;
+        _transferReadyPin.PinChanged += (value, sequenceNumber) =>
         {
-            // Read pin value in callback to capture the state at the time of the interrupt
-            _lastPinValueFromCallback = (int)_gpioController.Read(_transferReadyPin);
+            _lastPinValueFromCallback = value;
             _transferReadyEvent.Set();
-        });
-
-        // Parse SPI device path (e.g., /dev/spidev0.0 -> busId=0, chipSelectLine=0)
-        string spiPath = settings.Value.SpiDevice;
-        string[] parts = Path.GetFileName(spiPath).Replace("spidev", "").Split('.');
-        int busId = int.Parse(parts[0]);
-        int chipSelectLine = int.Parse(parts[1]);
-
-        var spiSettings = new SpiConnectionSettings(busId, chipSelectLine)
-        {
-            ClockFrequency = settings.Value.SpiFrequency,
-            Mode = (SpiMode)settings.Value.SpiTransferMode,
-            DataBitLength = 8
         };
-        _spiDevice = SpiDevice.Create(spiSettings);
+        _transferReadyPin.StartMonitoring();
+
+        // Open the SPI device directly through the spidev character device
+        _spiDevice = new SpiDevice(settings.Value.SpiDevice, settings.Value.SpiFrequency, settings.Value.SpiTransferMode);
     }
 
     /// <summary>
@@ -229,7 +211,7 @@ public class SPI : IDiagnostics, ILinkAdapter
             return;
         }
 
-        builder.AppendLine($"Configured SPI speed: {_settings.SpiFrequency}Hz, TfrRdy pin glitches: {_numTfrPinGlitches}");
+        builder.AppendLine($"Configured SPI speed: {_settings.SpiFrequency}Hz, TfrRdy pin glitches: {_numTfrPinGlitches}, missed edges: {_transferReadyPin.MissedEdges}");
         builder.AppendLine($"Full transfers per second: {GetFullTransfersPerSecond():F2}, max time between full transfers: {GetMaxFullTransferDelay():0.0}ms, max pin wait times: {GetMaxPinWaitDuration(true):0.0}ms/{GetMaxPinWaitDuration(false):0.0}ms");
         builder.AppendLine($"Codes per second: {GetCodesPerSecond():F2}");
         builder.AppendLine($"Maximum length of RX/TX data transfers: {_maxRxSize}/{_maxTxSize}");
@@ -759,7 +741,7 @@ public class SPI : IDiagnostics, ILinkAdapter
         if (_waitingForFirstTransfer)
         {
             // When a connection is established for the first time, the TfrRdy pin must be high
-            _expectedTfrRdyPinValue = PinValue.High;
+            _expectedTfrRdyPinValue = true;
         }
 
         // Flush pending events by consuming them until the event stays reset
@@ -769,7 +751,7 @@ public class SPI : IDiagnostics, ILinkAdapter
         }
         
         // Check if the pin is already at the expected value
-        PinValue currentValue = _gpioController.Read(_transferReadyPin);
+        bool currentValue = _transferReadyPin.Read();
         if (currentValue != _expectedTfrRdyPinValue)
         {
             // Determine how long to wait for the pin level transition
@@ -777,7 +759,7 @@ public class SPI : IDiagnostics, ILinkAdapter
             if (_waitingForFirstTransfer)
             {
                 timeout = _updating ? Consts.IapTimeout : _settings.SbcConnectTimeout;
-                _expectedTfrRdyPinValue = PinValue.High;
+                _expectedTfrRdyPinValue = true;
             }
             else
             {
@@ -802,13 +784,13 @@ public class SPI : IDiagnostics, ILinkAdapter
                         _transferReadyEvent.Reset();
                         
                         // Use the pin value captured in the callback
-                        currentValue = (PinValue)_lastPinValueFromCallback;
-                        
+                        currentValue = _lastPinValueFromCallback;
+
                         // Check if this is the transition we're waiting for
                         if (currentValue == _expectedTfrRdyPinValue)
                         {
                             // Verify by reading again to ensure it's stable
-                            PinValue verifyValue = _gpioController.Read(_transferReadyPin);
+                            bool verifyValue = _transferReadyPin.Read();
                             if (verifyValue == _expectedTfrRdyPinValue)
                             {
                                 break;
@@ -854,7 +836,7 @@ public class SPI : IDiagnostics, ILinkAdapter
         }
 
         // Transition complete
-        _expectedTfrRdyPinValue = (_expectedTfrRdyPinValue == PinValue.High) ? PinValue.Low : PinValue.High;
+        _expectedTfrRdyPinValue = !_expectedTfrRdyPinValue;
         _waitingForFirstTransfer = false;
     }
 

@@ -1,7 +1,9 @@
 #!/bin/sh
 
 # Reload systemd services
-systemctl -q --no-ask-password daemon-reload
+if [ -d /run/systemd/system ]; then
+    systemctl -q --no-ask-password daemon-reload
+fi
 
 # On full removal (purge or remove), unload per-plugin AppArmor profiles from the kernel and delete the profile files
 if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then

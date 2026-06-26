@@ -146,6 +146,11 @@ it there and relays the plugin's response back to the HTTP client. Setting `endp
 unregisters it. The `CustomHttpEndpoint`
 [example](components.md#command-line-tools-and-example-plugins) is a complete reference.
 
+The forwarded request carries the transport peer's `remoteIPAddress` (null if it could not be
+determined) and `remotePort`. DuetWebServer sets both from the real connection, so a remote caller
+cannot spoof them - this lets an endpoint restrict actions to the local machine, e.g. by accepting a
+request only when `remoteIPAddress` is a loopback address.
+
 ## See also
 
 - [Components](components.md#client-libraries) - the client libraries that speak this protocol

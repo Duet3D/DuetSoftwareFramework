@@ -1,6 +1,6 @@
 #!/bin/sh
 
 # Stop DCS
-if (systemctl -q is-active duetcontrolserver); then
-    systemctl -q --no-ask-password stop duetcontrolserver
+if [ -d /run/systemd/system ] && systemctl -q is-active duetcontrolserver; then
+    deb-systemd-invoke stop duetcontrolserver >/dev/null || true
 fi

@@ -51,11 +51,11 @@ fi
 
 %postun
 if [ $1 -eq 1 ] && systemctl -q is-enabled %{name}.service ; then
-# upgrade
-	systemctl start %{name}.service
+# upgrade. Ignore the return code so a failed start does not error the scriptlet
+	systemctl start %{name}.service || :
 fi
 if [ $1 -eq 1 ] && systemctl -q is-enabled %{name}-root.service ; then
-	systemctl start %{name}-root.service
+	systemctl start %{name}-root.service || :
 fi
 # On full removal, unload per-plugin AppArmor profiles from the kernel and delete the profile files
 if [ $1 -eq 0 ] ; then
