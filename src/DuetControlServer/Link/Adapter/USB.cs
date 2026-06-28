@@ -257,6 +257,9 @@ public class USB : IDiagnostics, ILinkAdapter
         // Attempt reconnection if needed (but not during initial connection)
         if (_needsReconnect && !connecting)
         {
+            // Wait out the firmware's USB disconnect dwell before re-probing, otherwise re-opening the
+            // port can keep the old ttyACM minor referenced and shift the indices on re-enumeration
+            Thread.Sleep(Consts.UsbReconnectDelay);
             try
             {
                 _logger.LogDebug("USB: Attempting reconnection...");
