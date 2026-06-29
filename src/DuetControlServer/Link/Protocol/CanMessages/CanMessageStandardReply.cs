@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using DuetControlServer.Link.Protocol.Shared;
 
-namespace DuetControlServer.Link.Protocol.Can;
+namespace DuetControlServer.Link.Protocol.CanMessages;
 
 /// <summary>
 /// Standard reply used by many calls. It carries a GCodeResult, some text, and occasionally 8 bits

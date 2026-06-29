@@ -249,7 +249,7 @@
         {
             "label": "Deploy To",
             "type": "shell",
-            "command": "./scripts/deploy.sh --skip-build --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} ${input:project_name}",
+            "command": "./scripts/deploy.sh --skip-build --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services ${input:project_name}",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
@@ -267,7 +267,7 @@
         {
             "label": "Build and Deploy To",
             "type": "shell",
-            "command": "./scripts/deploy.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} ${input:project_name}",
+            "command": "./scripts/deploy.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services ${input:project_name}",
             "problemMatcher": [
                 "$msCompile"
             ],
@@ -289,7 +289,7 @@
         {
             "label": "Build and Deploy DCS to",
             "type": "shell",
-            "command": "./scripts/deploy.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} DuetControlServer",
+            "command": "./scripts/deploy.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services DuetControlServer",
             "problemMatcher": [
                 "$msCompile"
             ],

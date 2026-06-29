@@ -1,6 +1,6 @@
 using DuetControlServer.Link.Protocol.Shared;
 
-namespace DuetControlServer.Link.Protocol.Can;
+namespace DuetControlServer.Link.Protocol.CanMessages;
 
 /// <summary>
 /// Common interface implemented by all CAN message body structs that mirror the

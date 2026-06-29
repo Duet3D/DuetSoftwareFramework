@@ -1,7 +1,7 @@
 using System;
 using DuetControlServer.Link.Protocol.Shared;
 
-namespace DuetControlServer.Link.Protocol.Can;
+namespace DuetControlServer.Link.Protocol.CanMessages;
 
 /// <summary>
 /// Helper that decodes per-reply-type fragmentation information from a received CAN payload.

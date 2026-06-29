@@ -26,10 +26,10 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     // Private fields
     private readonly Codes.CodeProcessor _codeProcessor;
     private readonly Codes.Meta.Expressions _expressions;
-    private readonly ICodeHandler _gCodes;
-    private readonly ICodeHandler _mCodes;
-    private readonly ICodeHandler _tCodes;
-    private readonly ICodeHandler _keywords;
+    private readonly GCodeHandler _gCodes;
+    private readonly MCodeHandler _mCodes;
+    private readonly TCodeHandler _tCodes;
+    private readonly KeywordHandler _keywords;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly LinkInterface _linkInterface;
     private readonly ILogger<Code> _logger;
@@ -61,10 +61,10 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     {
         _codeProcessor = codeProcessor;
         _expressions = expressions;
-        _gCodes = gCodes;
-        _mCodes = mCodes;
-        _tCodes = tCodes;
-        _keywords = keywords;
+        _gCodes = (GCodeHandler)gCodes;
+        _mCodes = (MCodeHandler)mCodes;
+        _tCodes = (TCodeHandler)tCodes;
+        _keywords = (KeywordHandler)keywords;
         _lifetime = lifetime;
         _linkInterface = linkInterface;
         _logger = logger;
@@ -99,10 +99,10 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     {
         _codeProcessor = codeProcessor;
         _expressions = expressions;
-        _gCodes = gCodes;
-        _mCodes = mCodes;
-        _tCodes = tCodes;
-        _keywords = keywords;
+        _gCodes = (GCodeHandler)gCodes;
+        _mCodes = (MCodeHandler)mCodes;
+        _tCodes = (TCodeHandler)tCodes;
+        _keywords = (KeywordHandler)keywords;
         _lifetime = lifetime;
         _linkInterface = linkInterface;
         _logger = logger;

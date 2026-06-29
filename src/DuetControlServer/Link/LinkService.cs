@@ -9,7 +9,7 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
 using DuetControlServer.Link.Adapter;
-using DuetControlServer.Link.Protocol.Can;
+using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Utility;
@@ -229,6 +229,7 @@ public sealed class LinkService(
             }
         })
         {
+            Name = "DuetControlServer LinkService",
             Priority = ThreadPriority.Highest,
             IsBackground = true
         };

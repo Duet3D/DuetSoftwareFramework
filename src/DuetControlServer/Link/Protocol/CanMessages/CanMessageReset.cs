@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using DuetControlServer.Link.Protocol.Shared;
 
-namespace DuetControlServer.Link.Protocol.Can;
+namespace DuetControlServer.Link.Protocol.CanMessages;
 
 /// <summary>
 /// Reset an expansion board.

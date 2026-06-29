@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol;
-using DuetControlServer.Link.Protocol.Can;
+using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link.Protocol.SbcRequests;

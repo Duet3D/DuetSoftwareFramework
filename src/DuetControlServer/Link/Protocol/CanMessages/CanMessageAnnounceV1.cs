@@ -2,7 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using DuetControlServer.Link.Protocol.Shared;
 
-namespace DuetControlServer.Link.Protocol.Can;
+namespace DuetControlServer.Link.Protocol.CanMessages;
 
 /// <summary>
 /// Message used by expansion boards (firmware 3.4.0beta5 and later) to announce their presence on
