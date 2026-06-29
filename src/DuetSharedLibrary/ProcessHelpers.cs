@@ -63,6 +63,36 @@ public static class ProcessHelpers
     }
 
     /// <summary>
+    /// Pin the calling thread to a specific CPU core using sched_setaffinity.
+    /// </summary>
+    /// <param name="coreId">Zero-based CPU core index to pin to</param>
+    /// <returns>True if the affinity was set successfully</returns>
+    public static bool PinCurrentThreadToCore(int coreId)
+    {
+        ulong mask = 1UL << coreId;
+        return Interop.sched_setaffinity(0, (IntPtr)sizeof(ulong), ref mask) == 0;
+    }
+
+    public static bool IsRaspberryPi()
+    {
+        try
+        {
+            foreach (string line in File.ReadLines("/proc/cpuinfo"))
+            {
+                if (line.StartsWith("Hardware", StringComparison.OrdinalIgnoreCase) && line.Contains("BCM"))
+                    return true;
+                if (line.StartsWith("Model", StringComparison.OrdinalIgnoreCase) && line.Contains("Raspberry Pi"))
+                    return true;
+            }
+        }
+        catch (IOException)
+        {
+            // Not on Linux or /proc/cpuinfo unavailable
+        }
+        return false;
+    }
+
+    /// <summary>
     /// Check whether the process was exec'd with <c>AT_SECURE=1</c>. Parses /proc/{pid}/auxv looking for the AT_SECURE
     /// entry (type 23) set to non-zero. The kernel sets this when the exec crosses a privilege boundary (setuid,
     /// setgid, or file capabilities), causing glibc to ignore LD_PRELOAD and related environment variables. The bit is

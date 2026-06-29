@@ -26,7 +26,7 @@
                 "/workspaces/DuetSoftwareFramework": "${workspaceFolder}"
             },
             "justMyCode": false,
-            "preLaunchTask": "Build and Deploy DCS to",
+            "preLaunchTask": "Stop Remote DuetControlServer",
             "postDebugTask": "Start Remote DuetControlServer"
         },
         {
