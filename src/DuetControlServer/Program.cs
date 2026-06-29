@@ -29,11 +29,21 @@ string? startErrorFile = Defaults.StartErrorFile;
 /// <param name="loggerFactory">Optional logger factory for logging</param>
 void Terminate(Exception e, string reason, int exitCode, ILoggerFactory? loggerFactory = null)
 {
+    bool logged = false;
     if (loggerFactory != null)
     {
-        loggerFactory.CreateLogger("DuetControlServer").LogCritical(e, reason);
+        try
+        {
+            loggerFactory.CreateLogger("DuetControlServer").LogCritical(e, reason);
+            logged = true;
+        }
+        catch (ObjectDisposedException)
+        {
+            // host.Run() disposes the logger factory as part of its shutdown, so a startup
+            // failure surfacing afterwards hits an already-disposed factory; fall back to the console
+        }
     }
-    else
+    if (!logged)
     {
         Console.Error.WriteLine($"[fatal] {reason}");
         Console.Error.WriteLine($"   {e}");
