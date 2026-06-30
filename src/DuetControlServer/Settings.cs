@@ -193,6 +193,11 @@ public sealed class Settings
     public int MaxSbcRetries { get; set; } = 3;
 
     /// <summary>
+    /// Timeout for CAN requests that expect a reply (in ms).
+    /// </summary>
+    public int CanRequestTimeout { get; set; } = 2000;
+
+    /// <summary>
     /// Path to the GPIO chip device node
     /// </summary>
     public string GpioChipDevice { get; set; } = "/dev/gpiochip0";

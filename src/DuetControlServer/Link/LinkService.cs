@@ -354,11 +354,13 @@ public sealed class LinkService(
             }
             linkInterface.BytesReserved = 0;
 
+#if false
             // Process pending codes, macro files and requests for resource locks/unlocks as well as flush requests
             if (!skipChannels)
             {
                 channels.Spin();
             }
+#endif
 
             // Request object model updates
             if (linkAdapter.ProtocolVersion == 1)
@@ -446,8 +448,10 @@ public sealed class LinkService(
                 if (!linkAdapter.WriteCanMessage(request.TxToken, (ushort)request.MessageType, (ushort)request.ReplyType, request.DstAddress, request.Flags, request.RequestPayload))
                 {
                     // Buffer full -- retry on the next transfer
+                    logger.LogWarning("Could not send CAN request {TxToken} to address {DstAddress} (type {MessageType}) -- buffer full, will retry", request.TxToken, request.DstAddress, request.MessageType);
                     break;
                 }
+                logger.LogDebug("Sent CAN request {TxToken} to address {DstAddress} (type {MessageType})", request.TxToken, request.DstAddress, request.MessageType);
                 request.Sent = true;
             }
 
@@ -507,6 +511,7 @@ public sealed class LinkService(
 
             // Reassemble the (possibly fragmented) reply
             CanFragmentation.GetFragmentInfo(request.ReplyType, payload, out int fragmentNumber, out bool moreFollows, out ReadOnlySpan<byte> content);
+            logger.LogDebug("Received CAN response fragment {FragmentNumber} of type {MsgType} from address {SrcAddress} ({Length} bytes, more follows: {MoreFollows})", fragmentNumber, msgType, srcAddress, content.Length, moreFollows);
             request.AddFragment(fragmentNumber, content);
             if (!moreFollows)
             {

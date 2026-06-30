@@ -6,6 +6,8 @@ using DuetControlServer.Commands;
 using DuetControlServer.Files;
 using DuetControlServer.Files.Parser;
 using DuetControlServer.Link;
+using DuetControlServer.Link.Protocol.CanMessages;
+using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Model;
 using DuetControlServer.Utility;
 using DuetSharedLibrary;
@@ -678,6 +680,30 @@ public class MCodeHandler(
                     return new Message();
                 }
                 throw new OperationCanceledException();
+            
+            case 115:
+                int board = code.GetInt('B', 0);
+                if (board == 0)
+                {
+                    // TODO reply with DSF firmware info
+                }
+                else if (board > 0 && board <= 127)
+                {
+                    logger.LogDebug("Requesting firmware version for board {Board}", board);
+                    CanMessageReturnInfo msg = new()
+                    {
+                        Type = CanMessageReturnInfo.TypeFirmwareVersion,
+                        Param = 0
+                    };
+                    CanResponse response = await linkInterface.SendCanMessageAsync((byte)board, msg, CanMessageType.StandardReply, cancellationToken: cancellationToken);
+                    logger.LogDebug("Received firmware version for board {Board}: {Payload}", board, response.PayloadString);
+                    return new Message(MessageType.Success, response.PayloadString);
+                }
+                else
+                {
+                    return new Message(MessageType.Error, $"Invalid board number {board}");
+                }
+                break;
 
             // Publish MQTT message
             case 118:

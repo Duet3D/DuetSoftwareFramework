@@ -111,14 +111,28 @@ public sealed partial class LinkInterface(
         CanRequest request;
         lock (CanRequests)
         {
+            if (replyType != CanMessageType.NoReply)
+            {
+                // set the RID (first 12 bits) to 0x7FF to indicate to the HAT that the firmware should allocate the RID for us.
+                payload[0] = 0xFF;
+                payload[1] |= 0x07;
+            }
             request = new(messageType, replyType, NextCanTxToken(), dstAddress, flags, payload);
             CanRequests.Add(request);
-            logger.LogDebug("Sending CAN message of type {MessageType} to address {DstAddress} expecting reply of type {ReplyType}", messageType, dstAddress, replyType);
+            logger.LogDebug("Queueing CAN message of type {MessageType} to address {DstAddress} expecting reply of type {ReplyType}", messageType, dstAddress, replyType);
         }
 
         try
         {
-            await request.Task.WaitAsync(cancellationToken);
+            if (request.ExpectsReply)
+            {
+                // If no reply is received within the timeout, the request will be canceled and an exception will be thrown
+                await request.Task.WaitAsync(TimeSpan.FromMilliseconds(settings.Value.CanRequestTimeout), cancellationToken);
+            }
+            else
+            {
+                await request.Task.WaitAsync(cancellationToken);
+            }
         }
         catch
         {

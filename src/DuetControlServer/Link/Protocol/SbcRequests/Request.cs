@@ -29,21 +29,16 @@ public enum Request : ushort
     EnableCAN = 3,
 
     /// <summary>
-    /// Disable the CAN bus interface
-    /// </summary>
-    DisableCAN = 4,
-
-    /// <summary>
     /// Schedule a move on the controller
     /// </summary>
     /// <seealso cref="ScheduleMoveHeader"/>
-    ScheduleMove = 5,
+    ScheduleMove = 4,
 
     /// <summary>
     /// Send a CAN message to the controller
     /// </summary>
     /// <seealso cref="SendCanMessageHeader"/>
-    SendCANMessage = 6,
+    SendCANMessage = 5,
 
     /// <summary>
     /// Write another chunk of the IAP binary to the designated Flash area
@@ -52,16 +47,16 @@ public enum Request : ushort
     /// There is no discrete header for this request but be aware that only multiples
     /// of IFLASH_PAGE_SIZE must be transmitted (except for the last sector)
     /// </remarks>
-    WriteIap = 7,
+    WriteIap = 6,
 
     /// <summary>
     /// Launch the IAP binary
     /// </summary>
-    StartIap = 8,
+    StartIap = 7,
 
     /// <summary>
     /// Send an arbitrary RepRapFirmware message
     /// </summary>
     /// <seealso cref="Shared.MessageHeader"/>
-    Message = 9,
+    Message = 8,
 }

@@ -1,6 +1,7 @@
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace DuetControlServer.Link;
 
@@ -26,4 +27,6 @@ public readonly record struct CanResponse(CanStatus Status, CanMessageType Respo
     /// <typeparam name="T">CAN message body type</typeparam>
     /// <returns>Deserialized message body</returns>
     public readonly T As<T>() where T : struct => MemoryMarshal.Read<T>(Payload);
+
+    public string PayloadString => Encoding.ASCII.GetString(Payload);
 }

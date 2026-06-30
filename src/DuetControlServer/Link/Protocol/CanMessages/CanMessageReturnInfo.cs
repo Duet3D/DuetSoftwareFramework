@@ -8,7 +8,7 @@ namespace DuetControlServer.Link.Protocol.CanMessages;
 /// Mirrors <c>CanMessageReturnInfo</c> in CANlib's <c>CanMessageFormats.h</c>:
 /// <code>uint16_t requestId : 12, zero : 4;</code>
 /// </summary>
-[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 2)]
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 3)]
 public struct CanMessageReturnInfo : ICanMessage
 {
     /// <inheritdoc cref="ICanMessage.MessageType" />
