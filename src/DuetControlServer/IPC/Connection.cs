@@ -103,8 +103,11 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
             return true;
         }
 
-        // If a plugin is currently being started its PID may not yet have propagated to the object model - ask DPS first
-        if (Commands.StartPlugin.IsAnyStarting)
+        // If a plugin is currently being started its PID may not yet have propagated to the object model - ask DPS first.
+        // Skip this for DPS's own PID: DPS is never a plugin, and its internal connections (e.g. SetPluginProcessAsync)
+        // arrive while its single command channel is still busy handling the very StartPlugin call that spawned them -
+        // asking DPS to resolve itself would enqueue onto that same blocked channel and deadlock
+        if (Commands.StartPlugin.IsAnyStarting && pid != Processors.PluginService.ServicePid)
         {
             string? resolvedPluginId = await ResolvePluginViaServiceAsync(pid, false);
             if (resolvedPluginId is not null)
