@@ -5,6 +5,7 @@ using DuetControlServer.Commands;
 using DuetControlServer.Files;
 using DuetControlServer.IPC;
 using DuetControlServer.Link;
+using DuetControlServer.Motion;
 using DuetControlServer.Model;
 using DuetControlServer.Utility;
 using DuetSharedLibrary;
@@ -176,6 +177,7 @@ rootCommand.SetAction(async (parserResult) =>
                     .AddLink()
                     .AddModel()
                     .AddLinkAdapter()
+                    .AddMotion()
                     .AddUtility();
             })
             .Build();

@@ -10,6 +10,7 @@ ENV PATH="${ARM_GNU_TOOLCHAIN_DIR}/bin:${PATH}"
 COPY scripts/install-arm-gcc.sh /tmp/
 
 RUN echo "Installing ARM GNU Toolchain version ${ARM_GNU_TOOLCHAIN_VERSION}..." \
+    && sed -i 's/\r$//' /tmp/install-arm-gcc.sh \
     && chmod +x /tmp/install-arm-gcc.sh \
     && /tmp/install-arm-gcc.sh \
     && rm -f /tmp/install-arm-gcc.sh

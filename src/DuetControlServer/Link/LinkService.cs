@@ -177,6 +177,7 @@ public sealed class LinkService(
         {
             try
             {
+#if true
                 if (DuetSharedLibrary.ProcessHelpers.IsRaspberryPi())
                 {
                     if (DuetSharedLibrary.ProcessHelpers.PinCurrentThreadToCore(3))
@@ -188,6 +189,7 @@ public sealed class LinkService(
                         logger.LogWarning("Failed to pin SPI thread to CPU core 3");
                     }
                 }
+#endif
                 Execute(stoppingToken);
                 tcs.SetResult();
             }
@@ -717,24 +719,5 @@ public sealed class LinkService(
 
         // Notify the updater task about the lost connection
         model.ConnectionLost();
-    }
-
-    private static bool IsRaspberryPi()
-    {
-        try
-        {
-            foreach (string line in File.ReadLines("/proc/cpuinfo"))
-            {
-                if (line.StartsWith("Hardware", StringComparison.OrdinalIgnoreCase) && line.Contains("BCM"))
-                    return true;
-                if (line.StartsWith("Model", StringComparison.OrdinalIgnoreCase) && line.Contains("Raspberry Pi"))
-                    return true;
-            }
-        }
-        catch (IOException)
-        {
-            // Not on Linux or /proc/cpuinfo unavailable
-        }
-        return false;
     }
 }

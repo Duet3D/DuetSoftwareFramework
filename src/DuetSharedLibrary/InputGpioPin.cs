@@ -205,10 +205,12 @@ public sealed class InputGpioPin : IDisposable
 
     private unsafe void MonitorLoop(CancellationToken cancellationToken)
     {
+#if true
         if (ProcessHelpers.IsRaspberryPi())
         {
             ProcessHelpers.PinCurrentThreadToCore(3);
         }
+#endif
 
         PollFd pollData = new() { Fd = _reqFd, Events = (short)PollFlags.POLLIN };
         gpio_v2_line_event eventV2 = new();

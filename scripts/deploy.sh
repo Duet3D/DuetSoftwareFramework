@@ -143,8 +143,9 @@ for project in "${SELECTED[@]}"; do
     if $LOCAL; then
         sudo sh "$postinst"
     else
-        rsync -av "$postinst" "${SSH_USER}@${TARGET}:/tmp/dsf-postinst"
-        ssh "${SSH_USER}@${TARGET}" 'chmod +x /tmp/dsf-postinst && /tmp/dsf-postinst; rm -f /tmp/dsf-postinst'
+        postinst_name=$project-postinst
+        rsync -av "$postinst" "${SSH_USER}@${TARGET}:/tmp/$postinst_name"
+        ssh "${SSH_USER}@${TARGET}" "chmod +x /tmp/$postinst_name && /tmp/$postinst_name; rm -f /tmp/$postinst_name"
     fi
 done
 
