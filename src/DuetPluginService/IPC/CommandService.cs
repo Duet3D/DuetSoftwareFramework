@@ -11,14 +11,27 @@ namespace DuetPluginService.IPC;
 /// Service which interacts with DCS to perform plugin-specific tasks
 /// </summary>
 /// <param name="connection">Plugin service connection</param>
+/// <param name="lifetime">Application lifetime used to shut down cleanly when DCS is unavailable</param>
 /// <param name="logger">Logger</param>
-public class CommandService(PluginServiceConnection connection, ILogger<CommandService> logger) : BackgroundService
+public class CommandService(PluginServiceConnection connection, IHostApplicationLifetime lifetime, ILogger<CommandService> logger) : BackgroundService
 {
     /// <inheritdoc />
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
         // Connect to DCS
-        await connection.ConnectAsync(cancellationToken);
+        try
+        {
+            await connection.ConnectAsync(cancellationToken);
+        }
+        catch (SocketException e)
+        {
+            // DCS isn't up yet (we may be starting in parallel with it). Keep the log short and let systemd
+            // restart us to retry; the full stack trace is only emitted at debug level
+            logger.LogDebug(e, "Failed to connect to DCS");
+            logger.LogError("Failed to connect to DCS: {Message}", e.Message);
+            lifetime.StopApplication();
+            return;
+        }
 
         // Start the main service
         await base.StartAsync(cancellationToken);
