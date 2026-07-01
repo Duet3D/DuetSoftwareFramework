@@ -44,6 +44,16 @@ public partial class RestorePoint : ModelObject, IStaticModelObject
     private float _feedRate;
 
     /// <summary>
+    /// Which of G0/G1/G2/G3 generated the move at this restore point
+    /// </summary>
+    public int GCommandNumber
+    {
+        get => _gCommandNumber;
+        set => SetPropertyValue(ref _gCommandNumber, value);
+    }
+    private int _gCommandNumber;
+
+    /// <summary>
     /// The output port bits setting for this move or null if not applicable
     /// </summary>
     public int? IoBits
