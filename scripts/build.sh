@@ -87,10 +87,10 @@ if [[ ${#SELECTED[@]} -eq 0 ]]; then
     exit 1
 fi
 
+DEPLOY=true
+
 if ! $LOCAL && [[ -z "$TARGET" ]]; then
-    echo "Error: --target <ip> is required for remote deploy (or use --local)." >&2
-    usage
-    exit 1
+    DEPLOY=false
 fi
 
 # Validate project names
@@ -110,13 +110,18 @@ if ! $SKIP_BUILD; then
     done
 fi
 
+if ! $DEPLOY; then
+    echo "=== Build complete. No deployment target specified. ==="
+    exit 0
+fi
+
 # --- Stop services ---
 SERVICES="duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root"
 if $LOCAL; then
     echo "=== Stopping DSF services ==="
     sudo systemctl stop $SERVICES || true
 else
-    echo "=== Stopping DSF services on $TARGET ==="
+    echo "=== Stopping DSF services on $SSH_USER@$TARGET ==="
     ssh "${SSH_USER}@${TARGET}" "systemctl stop $SERVICES || true"
 fi
 
@@ -133,21 +138,37 @@ else
     rsync $RSYNC_OPTS "$BUILD_DIR/" "${SSH_USER}@${TARGET}:/opt/dsf/bin/"
 fi
 
-# --- Run postinst scripts for selected projects that have one ---
-for project in "${SELECTED[@]}"; do
-    postinst="${PROJECT_POSTINST[$project]+}"
-    [[ -z "${PROJECT_POSTINST[$project]+x}" ]] && continue
-    postinst="$REPO_ROOT/${PROJECT_POSTINST[$project]}"
+# --- Run postinst scripts for selected projects that have one (in parallel) ---
+run_postinst() {
+    local project="$1"
+    local postinst="$REPO_ROOT/${PROJECT_POSTINST[$project]}"
 
     echo "=== Running $project postinst ==="
     if $LOCAL; then
         sudo sh "$postinst"
     else
-        postinst_name=$project-postinst
+        local postinst_name=$project-postinst
         rsync -av "$postinst" "${SSH_USER}@${TARGET}:/tmp/$postinst_name"
         ssh "${SSH_USER}@${TARGET}" "chmod +x /tmp/$postinst_name && /tmp/$postinst_name; rm -f /tmp/$postinst_name"
+        echo "=== $project postinst completed on $TARGET ==="
+    fi
+}
+
+declare -A POSTINST_PIDS=()
+for project in "${SELECTED[@]}"; do
+    [[ -z "${PROJECT_POSTINST[$project]+x}" ]] && continue
+    run_postinst "$project" &
+    POSTINST_PIDS[$project]=$!
+done
+
+postinst_failed=false
+for project in "${!POSTINST_PIDS[@]}"; do
+    if ! wait "${POSTINST_PIDS[$project]}"; then
+        echo "Error: $project postinst failed" >&2
+        postinst_failed=true
     fi
 done
+$postinst_failed && exit 1
 
 # --- Start services if requested ---
 if $START_SERVICES; then
@@ -155,7 +176,7 @@ if $START_SERVICES; then
         echo "=== Starting DSF services ==="
         sudo systemctl start $SERVICES || true
     else
-        echo "=== Starting DSF services on $TARGET ==="
+        echo "=== Starting DSF services on $SSH_USER@$TARGET ==="
         ssh "${SSH_USER}@${TARGET}" "systemctl start $SERVICES || true"
     fi
 fi
