@@ -35,7 +35,7 @@ public class USB : IDiagnostics, ILinkAdapter
     // General transfer variables
     private readonly SerialPort _serialPort;
     private SerialPort? _iapSerialPort;
-    private bool _connected, _hadTimeout, _resetting, _updating, _needsReconnect;
+    private bool _connected, _hadTimeout, _resetting, _updating, _needsReconnect, _hadReset;
     private int _consecutiveFailures;
 
     private DateTime _lastTransferMeasureTime = DateTime.Now, _lastCodesMeasureTime = DateTime.Now;
@@ -271,7 +271,11 @@ public class USB : IDiagnostics, ILinkAdapter
                 _packetId = 0;
                 _needsReconnect = false;
                 Connect(cancellationToken);
-                // Connect succeeded and performed the first transfer already
+                // Connect succeeded and performed the first transfer already. Flag the reset so the link
+                // service invalidates once now that the link is back: any request that was orphaned during
+                // the reconnect (e.g. a model query left with QuerySent set but its bytes discarded) must be
+                // cancelled here, otherwise the waiter deadlocks because it is only cancellable on shutdown
+                _hadReset = true;
                 _consecutiveFailures = 0;
                 return;
             }
@@ -374,6 +378,14 @@ public class USB : IDiagnostics, ILinkAdapter
             _connected = false;
             _needsReconnect = true;
 
+            // ExchangeHeader() may have already read a legitimate new header before ExchangeData() timed out,
+            // leaving NumPackets/DataLength non-zero while _rxBuffer still holds the previous cycle's stale
+            // data (ReadExactly only commits into _rxBuffer once a read completes in full). Reset both so the
+            // next Execute() iteration doesn't parse stale bytes as if they matched this cycle's header
+            _rxHeader.NumPackets = 0;
+            _rxHeader.DataLength = 0;
+            _rxPointer = 0;
+
             // Close the port to ensure clean state for reconnection
             try
             {
@@ -393,11 +405,18 @@ public class USB : IDiagnostics, ILinkAdapter
     }
 
     /// <summary>
-    /// Check if the controller has been reset or disconnected.
-    /// Unlike SPI (which uses sequence numbers), USB detects this via communication failure.
+    /// Check if the controller has been reset since the last call.
+    /// Edge-triggered like the SPI adapter: reports true once after a reconnection has completed so the
+    /// link service invalidates stale state (pending requests, job, model) exactly once with the link back
+    /// up, rather than repeatedly while disconnected or never at all.
     /// </summary>
     /// <returns>Whether the controller has been reset</returns>
-    public bool HadReset() => _needsReconnect;
+    public bool HadReset()
+    {
+        bool result = _hadReset;
+        _hadReset = false;
+        return result;
+    }
 
     #region Read functions
     /// <summary>
@@ -1651,18 +1670,20 @@ public class USB : IDiagnostics, ILinkAdapter
                     : $"Duet sent only {totalRead} of {buffer.Length} {what} bytes in {sw.ElapsedMilliseconds}ms (transfer truncated, stream desynced)");
             }
 
-            int bytesRead;
             try
             {
-                bytesRead = _serialPort.Read(tempBuffer, totalRead, buffer.Length - totalRead);
+                int bytesRead = _serialPort.Read(tempBuffer, totalRead, buffer.Length - totalRead);
+                if (bytesRead == 0)
+                {
+                    throw new OperationCanceledException("Timeout reading from USB device");
+                }
+                totalRead += bytesRead;
             }
             catch (TimeoutException)
             {
-                throw new TimeoutException(totalRead == 0
-                    ? $"Duet sent no {what} within {_serialPort.ReadTimeout}ms (no response)"
-                    : $"Duet sent only {totalRead} of {buffer.Length} {what} bytes before timing out (transfer truncated, stream desynced)");
+                // SerialPort.Read() throws immediately once its own ReadTimeout elapses without any data,
+                // rather than returning 0. Let the cumulative check above decide whether to keep waiting
             }
-            totalRead += bytesRead;
         }
 
         tempBuffer.AsSpan().CopyTo(buffer);

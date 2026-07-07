@@ -1157,6 +1157,10 @@ public class MCodeHandler(
                             await linkInterface.UpdateFirmware(iapStream, firmwareStream, lifetime.ApplicationStopped);
                         }
 
+                        // Updating the firmware resets the controller, which invalidates every channel and cancels
+                        // this very code. Reassign its cancellation token so it can report success instead of cancelled
+                        code.ResetCancellationToken();
+
                         // Terminate the program once this code has finished
                         _ = code.Task.ContinueWith(async task =>
                         {
