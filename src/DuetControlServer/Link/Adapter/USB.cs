@@ -1626,7 +1626,7 @@ public class USB : IDiagnostics, ILinkAdapter
         _serialPort.BaseStream.Flush();
 
         // Receive RX header
-        ReadExactly(_rxHeaderBuffer.Span);
+        ReadExactly(_rxHeaderBuffer.Span, "header");
         _rxHeader = MemoryMarshal.Read<UsbTransferHeader>(_rxHeaderBuffer.Span);
     }
 
@@ -1634,7 +1634,8 @@ public class USB : IDiagnostics, ILinkAdapter
     /// Read exactly the specified number of bytes from the serial port
     /// </summary>
     /// <param name="buffer">Buffer to read into</param>
-    private void ReadExactly(Span<byte> buffer)
+    /// <param name="what">What is being read, used in the timeout message to distinguish a silent Duet from a truncated/desynced transfer</param>
+    private void ReadExactly(Span<byte> buffer, string what)
     {
         int totalRead = 0;
         byte[] tempBuffer = new byte[buffer.Length];
@@ -1645,12 +1646,21 @@ public class USB : IDiagnostics, ILinkAdapter
         {
             if (sw.ElapsedMilliseconds > totalTimeout)
             {
-                throw new OperationCanceledException($"Total timeout reading from USB device ({totalRead}/{buffer.Length} bytes in {sw.ElapsedMilliseconds}ms)");
+                throw new TimeoutException(totalRead == 0
+                    ? $"Duet sent no {what} within {totalTimeout}ms (no response)"
+                    : $"Duet sent only {totalRead} of {buffer.Length} {what} bytes in {sw.ElapsedMilliseconds}ms (transfer truncated, stream desynced)");
             }
-            int bytesRead = _serialPort.Read(tempBuffer, totalRead, buffer.Length - totalRead);
-            if (bytesRead == 0)
+
+            int bytesRead;
+            try
             {
-                throw new OperationCanceledException("Timeout reading from USB device");
+                bytesRead = _serialPort.Read(tempBuffer, totalRead, buffer.Length - totalRead);
+            }
+            catch (TimeoutException)
+            {
+                throw new TimeoutException(totalRead == 0
+                    ? $"Duet sent no {what} within {_serialPort.ReadTimeout}ms (no response)"
+                    : $"Duet sent only {totalRead} of {buffer.Length} {what} bytes before timing out (transfer truncated, stream desynced)");
             }
             totalRead += bytesRead;
         }
@@ -1673,7 +1683,7 @@ public class USB : IDiagnostics, ILinkAdapter
         // Receive RX data
         if (_rxHeader.DataLength > 0)
         {
-            ReadExactly(_rxBuffer[.._rxHeader.DataLength].Span);
+            ReadExactly(_rxBuffer[.._rxHeader.DataLength].Span, "transfer data");
         }
     }
     #endregion
