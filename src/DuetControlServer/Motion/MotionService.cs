@@ -150,10 +150,11 @@ public sealed class MotionService(
                 UseLateInputShaping = false
             };
             byte dstAddress = 2;
-            linkInterface.SendCanMessageAsync(dstAddress, msg);
+            // linkInterface.SendCanMessageAsync(dstAddress, msg);
+            // linkInterface.SendCanMessageAsync(dstAddress, msg);
 
-            // 500us delay
-            Thread.Sleep(TimeSpan.FromMicroseconds(1000));
+            // 5ms delay
+            Thread.Sleep(TimeSpan.FromMilliseconds(5));
         }
         while (!stoppingToken.IsCancellationRequested);
     }

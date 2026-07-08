@@ -32,6 +32,12 @@ public interface ILinkAdapter
     void PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Notify the transfer loop that there is a reason to initiate a full transfer, e.g. because new data
+    /// has been queued for transmission. Adapters that block while idle use this to wake up promptly
+    /// </summary>
+    void RequestTransfer();
+
+    /// <summary>
     /// Get the maximum time between two full transfers
     /// </summary>
     /// <returns>Time in ms</returns>

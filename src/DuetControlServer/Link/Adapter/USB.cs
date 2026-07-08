@@ -248,6 +248,14 @@ public class USB : IDiagnostics, ILinkAdapter
     private readonly Stopwatch _fullTransferStopwatch = new();
 
     /// <summary>
+    /// Notify the transfer loop that there is a reason to initiate a full transfer. The USB adapter does not
+    /// gate transfers while idle, so this is a no-op
+    /// </summary>
+    public void RequestTransfer()
+    {
+    }
+
+    /// <summary>
     /// Perform a full data transfer synchronously
     /// </summary>
     /// <param name="connecting">Whether this an initial connection is being established</param>

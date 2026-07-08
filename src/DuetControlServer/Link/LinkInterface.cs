@@ -121,6 +121,7 @@ public sealed partial class LinkInterface(
             CanRequests.Add(request);
             logger.LogDebug("Queueing CAN message of type {MessageType} to address {DstAddress} expecting reply of type {ReplyType}", messageType, dstAddress, replyType);
         }
+        linkAdapter.RequestTransfer();
 
         try
         {
@@ -243,6 +244,7 @@ public sealed partial class LinkInterface(
             FirmwareHaltRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             onFirmwareHalted = FirmwareHaltRequest.Task;
         }
+        linkAdapter.RequestTransfer();
         await onFirmwareHalted.WaitAsync(cancellationToken);
     }
 
@@ -261,6 +263,7 @@ public sealed partial class LinkInterface(
             FirmwareResetRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             onFirmwareReset = FirmwareResetRequest.Task;
         }
+        linkAdapter.RequestTransfer();
         await onFirmwareReset.WaitAsync(cancellationToken);
     }
 
@@ -446,6 +449,7 @@ public sealed partial class LinkInterface(
         {
             MessagesToSend.Enqueue(new Tuple<MessageTypeFlags, string>(flags, message));
         }
+        linkAdapter.RequestTransfer();
     }
 
     /// <summary>

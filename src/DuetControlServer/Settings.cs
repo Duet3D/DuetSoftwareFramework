@@ -188,6 +188,14 @@ public sealed class Settings
     public int SbcConnectionTimeout { get; set; } = 4000;
 
     /// <summary>
+    /// Maximum time to wait for a reason to initiate a full transfer before performing a keep-alive
+    /// transfer anyway (in ms). When idle a transfer is only started once DSF has data to send or the
+    /// controller raises the data available pin, but a transfer is forced at least this often so that
+    /// disconnects are still detected
+    /// </summary>
+    public int SbcConnectionKeepAliveInterval { get; set; } = 25;
+
+    /// <summary>
     /// Maximum number of sequential transfer retries
     /// </summary>
     public int MaxSbcRetries { get; set; } = 3;
@@ -206,6 +214,13 @@ public sealed class Settings
     /// Number of the GPIO pin that is used by RepRapFirmware to flag its ready state
     /// </summary>
     public int TransferReadyPin { get; set; } = 25;      // Pin 22 on the RaspPi expansion header
+
+    /// <summary>
+    /// Number of the GPIO pin that is used by DuetCANMaster to flag that it has data to send to the DSF
+    /// </summary>
+    public int DataAvailablePin { get; set; } = 24;      // Pin 18 on the RaspPi expansion header
+
+    public int SbcDataAvailablePin { get; set; } = 23;    // Pin 16 on the RaspPi expansion header
 
     /// <summary>
     /// USB device that is connected to RepRapFirmware (e.g., /dev/ttyACM1)

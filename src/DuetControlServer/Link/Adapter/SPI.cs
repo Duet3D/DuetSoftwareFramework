@@ -32,9 +32,14 @@ public class SPI : IDiagnostics, ILinkAdapter
 
     // General transfer variables
     private readonly InputGpioPin _transferReadyPin;
+    private readonly InputGpioPin _dataAvailablePin;
     private readonly ManualResetEventSlim _transferReadyEvent = new(false);
-    private bool _expectedTfrRdyPinValue;
     private volatile bool _lastPinValueFromCallback;
+
+    // Signalled when there is a reason to initiate a full transfer: the data available pin has risen or
+    // new data has been queued for transmission (see RequestTransfer). Kept separate from the transfer
+    // ready event so that transfer ready pin edges do not needlessly wake the transfer gate
+    private readonly AutoResetEvent _transferRequestEvent = new(false);
     private readonly SpiDevice _spiDevice;
     private bool _waitingForFirstTransfer = true, _connected, _hadTimeout, _resetting, _updating;
     private ushort _lastTransferNumber;
@@ -98,6 +103,8 @@ public class SPI : IDiagnostics, ILinkAdapter
 
         // Initialize transfer ready pin via the kernel GPIO character device (v1/v2 uAPI, no libgpiod)
         int transferReadyPin = settings.Value.TransferReadyPin;
+        int dataAvailablePin = settings.Value.DataAvailablePin;
+        _dataAvailablePin = new InputGpioPin(settings.Value.GpioChipDevice, dataAvailablePin, $"dcs-dap-{dataAvailablePin}");
         _transferReadyPin = new InputGpioPin(settings.Value.GpioChipDevice, transferReadyPin, $"dcs-trp-{transferReadyPin}");
         _lastPinValueFromCallback = _transferReadyPin.Value;
         _transferReadyPin.PinChanged += (value, sequenceNumber) =>
@@ -105,7 +112,15 @@ public class SPI : IDiagnostics, ILinkAdapter
             _lastPinValueFromCallback = value;
             _transferReadyEvent.Set();
         };
+        _dataAvailablePin.PinChanged += (value, sequenceNumber) =>
+        {
+            if (value)
+            {
+                _transferRequestEvent.Set();
+            }
+        };
         _transferReadyPin.StartMonitoring();
+        _dataAvailablePin.StartMonitoring();
 
         // Open the SPI device directly through the spidev character device
         _spiDevice = new SpiDevice(settings.Value.SpiDevice, settings.Value.SpiFrequency, settings.Value.SpiTransferMode);
@@ -223,6 +238,11 @@ public class SPI : IDiagnostics, ILinkAdapter
     private readonly Stopwatch _fullTransferStopwatch = new();
 
     /// <summary>
+    /// Stopwatch tracking the time elapsed since the last full transfer, used to force keep-alive transfers
+    /// </summary>
+    private readonly Stopwatch _keepAliveStopwatch = new();
+
+    /// <summary>
     /// Perform a full data transfer synchronously
     /// </summary>
     /// <param name="connecting">Whether this an initial connection is being established</param>
@@ -245,6 +265,15 @@ public class SPI : IDiagnostics, ILinkAdapter
         _txHeader.SequenceNumber++;
         _txHeader.DataLength = (ushort)_txPointer;
         WriteCRC();
+
+        // The updated firmware asserts the transfer ready pin as soon as it can perform a transfer, so
+        // only initiate one when there is an actual reason to: DSF has data queued to send, the controller
+        // has raised the data available pin, or a keep-alive transfer is due. This is skipped while
+        // connecting, reconnecting or updating so the protocol can always make progress in those states
+        if (!connecting && _connected && !_hadTimeout && !_waitingForFirstTransfer && !_updating && !_resetting)
+        {
+            WaitForTransferReason(cancellationToken);
+        }
 
         // Perform the transfer
         int retry = 0;
@@ -322,6 +351,7 @@ public class SPI : IDiagnostics, ILinkAdapter
                 _txBuffer = _txBuffer.Next ?? _txBuffers.First!;
                 _rxPointer = _txPointer = 0;
                 _packetId = 0;
+                _keepAliveStopwatch.Restart();
                 break;
             }
             catch (OperationCanceledException e)
@@ -732,41 +762,73 @@ public class SPI : IDiagnostics, ILinkAdapter
 
     #region Functions for data transfers
     /// <summary>
-    /// Wait for the Duet to flag when it is ready to transfer data
+    /// Wait until there is a reason to initiate a full transfer. The transfer itself is still gated by the
+    /// transfer ready pin in <see cref="WaitForTransfer"/>; this only decides whether to start one at all.
+    /// A transfer is started once any of the following holds:
+    /// <list type="number">
+    /// <item>DSF has data queued to send</item>
+    /// <item>the controller has raised the data available pin to signal that it wants to send</item>
+    /// <item>the keep-alive interval (<see cref="Settings.SbcConnectionKeepAliveInterval"/>) has elapsed
+    /// since the last full transfer, so disconnects are still detected while idle</item>
+    /// </list>
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token to cancel the wait</param>
+    private void WaitForTransferReason(CancellationToken cancellationToken)
+    {
+        // A reason is already present if DSF has data staged for transmission or the controller is holding
+        // the data available pin high, so start the transfer straight away
+        if (_txPointer != 0 || _dataAvailablePin.Read())
+        {
+            return;
+        }
+
+        // Otherwise block until a reason appears or the keep-alive interval elapses since the last transfer.
+        // The event is raised when the data available pin rises or new data is queued for transmission
+        // (RequestTransfer); being an AutoResetEvent it stays signalled if raised just before the wait, so a
+        // wake-up cannot be lost, and the single kernel wait avoids busy-polling
+        int timeToWait = _settings.SbcConnectionKeepAliveInterval - (int)_keepAliveStopwatch.ElapsedMilliseconds;
+        if (timeToWait > 0)
+        {
+            WaitHandle.WaitAny([_transferRequestEvent, cancellationToken.WaitHandle], timeToWait);
+        }
+    }
+
+    /// <summary>
+    /// Notify the transfer loop that there is a reason to initiate a full transfer, e.g. because new data
+    /// has been queued for transmission. This wakes up <see cref="WaitForTransferReason"/> if it is waiting
+    /// </summary>
+    public void RequestTransfer() => _transferRequestEvent.Set();
+
+    /// <summary>
+    /// Wait for the controller to flag via the transfer ready pin that a transfer can be initiated.
+    /// The pin is a level signal: the controller drives it high while it is ready to transfer, so this
+    /// simply waits for the pin to be high. It no longer toggles state between individual data exchanges
     /// </summary>
     /// <param name="inTransfer">Whether a full transfer is being performed</param>
     /// <param name="cancellationToken">Cancellation token to cancel the wait</param>
     private void WaitForTransfer(bool inTransfer = true, CancellationToken cancellationToken = default)
     {
-        if (_waitingForFirstTransfer)
-        {
-            // When a connection is established for the first time, the TfrRdy pin must be high
-            _expectedTfrRdyPinValue = true;
-        }
-
         // Flush pending events by consuming them until the event stays reset
         while (_transferReadyEvent.Wait(0))
         {
             _transferReadyEvent.Reset();
         }
-        
-        // Check if the pin is already at the expected value
-        bool currentValue = _transferReadyPin.Read();
-        if (currentValue != _expectedTfrRdyPinValue)
+
+        // Proceed immediately if the pin is already high, otherwise wait for it to be driven high
+        if (!_transferReadyPin.Read())
         {
-            // Determine how long to wait for the pin level transition
+            // Determine how long to wait for the pin to go high
             int timeout;
             if (_waitingForFirstTransfer)
             {
                 timeout = _updating ? Consts.IapTimeout : _settings.SbcConnectTimeout;
-                _expectedTfrRdyPinValue = true;
             }
             else
             {
                 timeout = _updating ? Consts.IapTimeout : (inTransfer ? _settings.SbcTransferTimeout : _settings.SbcConnectionTimeout);
             }
 
-            // Wait for the expected pin level, ignoring glitches
+            // Wait for the pin to be driven high, ignoring glitches
             Stopwatch stopwatch = Stopwatch.StartNew();
             try
             {
@@ -782,26 +844,17 @@ public class SPI : IDiagnostics, ILinkAdapter
                     if (_transferReadyEvent.Wait(timeToWait))
                     {
                         _transferReadyEvent.Reset();
-                        
-                        // Use the pin value captured in the callback
-                        currentValue = _lastPinValueFromCallback;
 
-                        // Check if this is the transition we're waiting for
-                        if (currentValue == _expectedTfrRdyPinValue)
+                        // Only a rising edge is of interest; ignore falling edges
+                        if (_lastPinValueFromCallback)
                         {
-                            // Verify by reading again to ensure it's stable
-                            bool verifyValue = _transferReadyPin.Read();
-                            if (verifyValue == _expectedTfrRdyPinValue)
+                            // Verify by reading again to ensure the high level is stable
+                            if (_transferReadyPin.Read())
                             {
                                 break;
                             }
                             // Pin changed again between callback and now, count as glitch
                             _numTfrPinGlitches++;
-                        }
-                        else
-                        {
-                            // This was a transition in the wrong direction, ignore it
-                            // Don't count as glitch since this is expected with both edges registered
                         }
                     }
                 } while (true);
@@ -835,8 +888,6 @@ public class SPI : IDiagnostics, ILinkAdapter
             }
         }
 
-        // Transition complete
-        _expectedTfrRdyPinValue = !_expectedTfrRdyPinValue;
         _waitingForFirstTransfer = false;
     }
 
