@@ -11,10 +11,13 @@ internal partial class Interop
     // _IOWR(type, nr, size) = dir(READ|WRITE)<<30 | size<<16 | type<<8 | nr
     private static uint IOWR(uint type, uint nr, uint size) => (3u << 30) | (size << 16) | (type << 8) | nr;
 
+    internal static uint GPIO_GET_LINEHANDLE_IOCTL { get; } = IOWR(0xB4, 0x03, (uint)Marshal.SizeOf<gpiohandle_request>());
     internal static uint GPIO_GET_LINEEVENT_IOCTL { get; } = IOWR(0xB4, 0x04, (uint)Marshal.SizeOf<gpioevent_request>());
     internal static uint GPIOHANDLE_GET_LINE_VALUES_IOCTL { get; } = IOWR(0xB4, 0x08, (uint)Marshal.SizeOf<gpiohandle_data>());
+    internal static uint GPIOHANDLE_SET_LINE_VALUES_IOCTL { get; } = IOWR(0xB4, 0x09, (uint)Marshal.SizeOf<gpiohandle_data>());
     internal static uint GPIO_V2_GET_LINE_IOCTL { get; } = IOWR(0xB4, 0x07, (uint)Marshal.SizeOf<gpio_v2_line_request>());
     internal static uint GPIO_V2_LINE_GET_VALUES_IOCTL { get; } = IOWR(0xB4, 0x0E, (uint)Marshal.SizeOf<gpio_v2_line_values>());
+    internal static uint GPIO_V2_LINE_SET_VALUES_IOCTL { get; } = IOWR(0xB4, 0x0F, (uint)Marshal.SizeOf<gpio_v2_line_values>());
 }
 
 [Flags]

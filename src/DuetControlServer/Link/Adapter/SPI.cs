@@ -33,6 +33,9 @@ public class SPI : IDiagnostics, ILinkAdapter
     // General transfer variables
     private readonly InputGpioPin _transferReadyPin;
     private readonly InputGpioPin _dataAvailablePin;
+#if DEBUG
+    private readonly OutputGpioPin _sbcDataAvailablePin;
+#endif
     private readonly ManualResetEventSlim _transferReadyEvent = new(false);
     private volatile bool _lastPinValueFromCallback;
 
@@ -119,6 +122,10 @@ public class SPI : IDiagnostics, ILinkAdapter
                 _transferRequestEvent.Set();
             }
         };
+#if DEBUG
+        int sbcDataAvailablePin = settings.Value.SbcDataAvailablePin;
+        _sbcDataAvailablePin = new OutputGpioPin(settings.Value.GpioChipDevice, sbcDataAvailablePin, $"dcs-sbc-dap-{sbcDataAvailablePin}");
+#endif
         _transferReadyPin.StartMonitoring();
         _dataAvailablePin.StartMonitoring();
 
@@ -274,6 +281,10 @@ public class SPI : IDiagnostics, ILinkAdapter
         {
             WaitForTransferReason(cancellationToken);
         }
+
+#if DEBUG
+        _sbcDataAvailablePin?.Write(false);
+#endif
 
         // Perform the transfer
         int retry = 0;
@@ -797,7 +808,13 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// Notify the transfer loop that there is a reason to initiate a full transfer, e.g. because new data
     /// has been queued for transmission. This wakes up <see cref="WaitForTransferReason"/> if it is waiting
     /// </summary>
-    public void RequestTransfer() => _transferRequestEvent.Set();
+    public void RequestTransfer()
+    {
+        _transferRequestEvent.Set();
+#if DEBUG
+        _sbcDataAvailablePin?.Write(true);
+#endif
+    }
 
     /// <summary>
     /// Wait for the controller to flag via the transfer ready pin that a transfer can be initiated.

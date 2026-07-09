@@ -220,8 +220,9 @@ public sealed class Settings
     /// </summary>
     public int DataAvailablePin { get; set; } = 24;      // Pin 18 on the RaspPi expansion header
 
+#if DEBUG
     public int SbcDataAvailablePin { get; set; } = 23;    // Pin 16 on the RaspPi expansion header
-
+#endif
     /// <summary>
     /// USB device that is connected to RepRapFirmware (e.g., /dev/ttyACM1)
     /// </summary>

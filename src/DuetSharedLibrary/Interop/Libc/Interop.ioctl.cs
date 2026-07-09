@@ -77,6 +77,17 @@ internal enum GpioEventFlags : uint
 }
 
 [StructLayout(LayoutKind.Sequential)]
+internal unsafe struct gpiohandle_request
+{
+    public fixed uint lineoffsets[64];      // GPIOHANDLES_MAX
+    public uint flags;
+    public fixed byte default_values[64];   // GPIOHANDLES_MAX
+    public fixed byte consumer_label[32];   // GPIO_MAX_NAME_SIZE
+    public uint lines;
+    public int fd;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal unsafe struct gpioevent_request
 {
     public uint line_offset;
