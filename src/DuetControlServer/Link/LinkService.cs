@@ -370,6 +370,10 @@ public sealed class LinkService(
                 throw new Exception("Unsupported firmware version. Upgrade your firmware manually");
             }
 
+            // Wait until there is a reason to perform another transfer before staging outgoing data, so that
+            // data queued while idle is sent in the next transfer rather than triggering an empty one first
+            linkAdapter.WaitForTransferReason(lifetime.ApplicationStopped);
+
             // Send pending messages
             lock (linkInterface.MessagesToSend)
             {

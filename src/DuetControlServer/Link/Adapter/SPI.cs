@@ -273,15 +273,6 @@ public class SPI : IDiagnostics, ILinkAdapter
         _txHeader.DataLength = (ushort)_txPointer;
         WriteCRC();
 
-        // The updated firmware asserts the transfer ready pin as soon as it can perform a transfer, so
-        // only initiate one when there is an actual reason to: DSF has data queued to send, the controller
-        // has raised the data available pin, or a keep-alive transfer is due. This is skipped while
-        // connecting, reconnecting or updating so the protocol can always make progress in those states
-        if (!connecting && _connected && !_hadTimeout && !_waitingForFirstTransfer && !_updating && !_resetting)
-        {
-            WaitForTransferReason(cancellationToken);
-        }
-
 #if DEBUG
         _sbcDataAvailablePin?.Write(false);
 #endif
@@ -773,8 +764,10 @@ public class SPI : IDiagnostics, ILinkAdapter
 
     #region Functions for data transfers
     /// <summary>
-    /// Wait until there is a reason to initiate a full transfer. The transfer itself is still gated by the
-    /// transfer ready pin in <see cref="WaitForTransfer"/>; this only decides whether to start one at all.
+    /// Wait until there is a reason to initiate a full transfer. This must be called by the transfer loop
+    /// before it stages outgoing data so that a wake-up caused by newly queued data results in that data
+    /// being sent in the very next transfer rather than an empty one. The transfer itself is still gated by
+    /// the transfer ready pin in <see cref="WaitForTransfer"/>; this only decides whether to start one at all.
     /// A transfer is started once any of the following holds:
     /// <list type="number">
     /// <item>DSF has data queued to send</item>
@@ -784,8 +777,15 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// </list>
     /// </summary>
     /// <param name="cancellationToken">Cancellation token to cancel the wait</param>
-    private void WaitForTransferReason(CancellationToken cancellationToken)
+    public void WaitForTransferReason(CancellationToken cancellationToken = default)
     {
+        // Only gate transfers during normal operation; while connecting, reconnecting, resetting or updating
+        // the protocol must always be free to make progress
+        if (!_connected || _hadTimeout || _waitingForFirstTransfer || _updating || _resetting)
+        {
+            return;
+        }
+
         // A reason is already present if DSF has data staged for transmission or the controller is holding
         // the data available pin high, so start the transfer straight away
         if (_txPointer != 0 || _dataAvailablePin.Read())

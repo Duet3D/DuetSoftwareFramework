@@ -38,6 +38,14 @@ public interface ILinkAdapter
     void RequestTransfer();
 
     /// <summary>
+    /// Wait until there is a reason to initiate a full transfer. This must be called by the transfer loop
+    /// before it stages outgoing data so that data queued while idle is sent in the next transfer rather
+    /// than an empty one. Adapters that do not gate transfers while idle return immediately
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    void WaitForTransferReason(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get the maximum time between two full transfers
     /// </summary>
     /// <returns>Time in ms</returns>
