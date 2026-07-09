@@ -256,13 +256,12 @@ public class USB : IDiagnostics, ILinkAdapter
     }
 
     /// <summary>
-    /// Wait until there is a reason to initiate a full transfer. The USB adapter does not gate transfers
-    /// while idle, so this is a no-op
+    /// Decide whether a full transfer should be started. The USB adapter does not gate transfers while idle,
+    /// so it always returns true
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
-    public void WaitForTransferReason(CancellationToken cancellationToken = default)
-    {
-    }
+    /// <returns>Always true</returns>
+    public bool WaitForTransferReason(CancellationToken cancellationToken = default) => true;
 
     /// <summary>
     /// Perform a full data transfer synchronously

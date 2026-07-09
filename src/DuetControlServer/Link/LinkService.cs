@@ -370,31 +370,34 @@ public sealed class LinkService(
                 throw new Exception("Unsupported firmware version. Upgrade your firmware manually");
             }
 
-            // Wait until there is a reason to perform another transfer before staging outgoing data, so that
-            // data queued while idle is sent in the next transfer rather than triggering an empty one first
-            linkAdapter.WaitForTransferReason(lifetime.ApplicationStopped);
-
-            // Send pending messages
-            lock (linkInterface.MessagesToSend)
+            // Stage outgoing data and wait until there is a reason to perform another transfer. Data is
+            // (re-)staged before every decision so that data queued while idle is sent in the next transfer
+            // without triggering an empty one either before or after it
+            do
             {
-                while (linkInterface.MessagesToSend.TryPeek(out Tuple<MessageTypeFlags, string>? message))
+                // Send pending messages
+                lock (linkInterface.MessagesToSend)
                 {
-                    if (linkAdapter.WriteMessage(message.Item1, message.Item2))
+                    while (linkInterface.MessagesToSend.TryPeek(out Tuple<MessageTypeFlags, string>? message))
                     {
-                        linkInterface.MessagesToSend.Dequeue();
-                    }
-                    else
-                    {
-                        break;
+                        if (linkAdapter.WriteMessage(message.Item1, message.Item2))
+                        {
+                            linkInterface.MessagesToSend.Dequeue();
+                        }
+                        else
+                        {
+                            break;
+                        }
                     }
                 }
-            }
 
-            // Send pending CAN messages
-            if (!skipChannels)
-            {
-                SendCanMessages();
+                // Send pending CAN messages
+                if (!skipChannels)
+                {
+                    SendCanMessages();
+                }
             }
+            while (!linkAdapter.WaitForTransferReason(lifetime.ApplicationStopped));
 
             // Do another full SPI transfer
             linkAdapter.PerformFullTransfer(cancellationToken: lifetime.ApplicationStopped);

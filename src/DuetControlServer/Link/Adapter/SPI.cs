@@ -764,44 +764,54 @@ public class SPI : IDiagnostics, ILinkAdapter
 
     #region Functions for data transfers
     /// <summary>
-    /// Wait until there is a reason to initiate a full transfer. This must be called by the transfer loop
-    /// before it stages outgoing data so that a wake-up caused by newly queued data results in that data
-    /// being sent in the very next transfer rather than an empty one. The transfer itself is still gated by
-    /// the transfer ready pin in <see cref="WaitForTransfer"/>; this only decides whether to start one at all.
-    /// A transfer is started once any of the following holds:
+    /// Decide whether a full transfer should be started, blocking while idle until there is a reason to.
+    /// The transfer loop must call this in a loop after staging outgoing data, transferring only once this
+    /// returns <c>true</c>, e.g. <c>do { StageOutgoingData(); } while (!WaitForTransferReason());</c>. When
+    /// it returns <c>false</c> the caller should stage any newly queued data and call again; because the
+    /// data is (re-)staged immediately before every decision, this avoids both a leading and a trailing
+    /// empty transfer. The transfer itself is still gated by the transfer ready pin in
+    /// <see cref="WaitForTransfer"/>; this only decides whether to start one at all. A transfer is started
+    /// (returns <c>true</c>) once any of the following holds:
     /// <list type="number">
-    /// <item>DSF has data queued to send</item>
+    /// <item>DSF has data staged to send</item>
     /// <item>the controller has raised the data available pin to signal that it wants to send</item>
     /// <item>the keep-alive interval (<see cref="Settings.SbcConnectionKeepAliveInterval"/>) has elapsed
     /// since the last full transfer, so disconnects are still detected while idle</item>
     /// </list>
     /// </summary>
     /// <param name="cancellationToken">Cancellation token to cancel the wait</param>
-    public void WaitForTransferReason(CancellationToken cancellationToken = default)
+    /// <returns>True if a transfer should be started now, false if the caller should re-stage data and retry</returns>
+    public bool WaitForTransferReason(CancellationToken cancellationToken = default)
     {
         // Only gate transfers during normal operation; while connecting, reconnecting, resetting or updating
         // the protocol must always be free to make progress
         if (!_connected || _hadTimeout || _waitingForFirstTransfer || _updating || _resetting)
         {
-            return;
+            return true;
         }
 
-        // A reason is already present if DSF has data staged for transmission or the controller is holding
-        // the data available pin high, so start the transfer straight away
+        // Start the transfer straight away if DSF has data staged for transmission or the controller is
+        // holding the data available pin high
         if (_txPointer != 0 || _dataAvailablePin.Read())
         {
-            return;
+            return true;
         }
 
-        // Otherwise block until a reason appears or the keep-alive interval elapses since the last transfer.
-        // The event is raised when the data available pin rises or new data is queued for transmission
-        // (RequestTransfer); being an AutoResetEvent it stays signalled if raised just before the wait, so a
-        // wake-up cannot be lost, and the single kernel wait avoids busy-polling
+        // Perform a keep-alive transfer if the keep-alive interval has elapsed since the last transfer
         int timeToWait = _settings.SbcConnectionKeepAliveInterval - (int)_keepAliveStopwatch.ElapsedMilliseconds;
-        if (timeToWait > 0)
+        if (timeToWait <= 0)
         {
-            WaitHandle.WaitAny([_transferRequestEvent, cancellationToken.WaitHandle], timeToWait);
+            return true;
         }
+
+        // Otherwise block until a reason appears or the remaining keep-alive interval elapses, then let the
+        // caller re-stage data and call again. The event is raised when the data available pin rises or new
+        // data is queued for transmission (RequestTransfer); being an AutoResetEvent it stays signalled if
+        // raised just before the wait, so a wake-up cannot be lost, and the single kernel wait avoids polling
+        WaitHandle.WaitAny([_transferRequestEvent, cancellationToken.WaitHandle], timeToWait);
+
+        // Proceed on cancellation so the caller can handle shutdown normally; otherwise re-stage and retry
+        return cancellationToken.IsCancellationRequested;
     }
 
     /// <summary>
