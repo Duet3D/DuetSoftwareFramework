@@ -39,6 +39,9 @@ public class SPI : IDiagnostics, ILinkAdapter
     private bool _waitingForFirstTransfer = true, _connected, _hadTimeout, _resetting, _updating;
     private ushort _lastTransferNumber;
 
+    private enum TransferPhase { Header, HeaderChecksum, Data, DataChecksum }
+    private TransferPhase _transferPhase;
+
     private DateTime _lastTransferMeasureTime = DateTime.Now, _lastCodesMeasureTime = DateTime.Now;
     private volatile int _numMeasuredTransfers, _numMeasuredCodes, _maxRxSize, _maxTxSize, _numTfrPinGlitches;
     private TimeSpan _maxFullTransferDelay = TimeSpan.Zero, _maxPinWaitDurationFull = TimeSpan.Zero, _maxPinWaitDuration = TimeSpan.Zero;
@@ -1512,6 +1515,7 @@ public class SPI : IDiagnostics, ILinkAdapter
 
             // Wait for the expected pin level, ignoring glitches
             Stopwatch stopwatch = Stopwatch.StartNew();
+            int glitchesAtStart = _numTfrPinGlitches;
             try
             {
                 do
@@ -1559,7 +1563,9 @@ public class SPI : IDiagnostics, ILinkAdapter
                     // In case the CTS is triggered very late, this application may not have gotten enough CPU time. Log this
                     _eventLogger.LogOutput(MessageType.Warning, "Did not get enough CPU time during SPI transfer, your SBC may be overloaded");
                 }
-                throw new OperationCanceledException($"{(inTransfer ? "Transfer" : "Connection")} timeout while waiting for TfrRdy pin");
+                string phase = (inTransfer && !_updating) ? $" in phase {_transferPhase}" : "";
+                throw new OperationCanceledException($"{(inTransfer ? "Transfer" : "Connection")} timeout while waiting for TfrRdy pin{phase} " +
+                    $"(waited {stopwatch.ElapsedMilliseconds}ms, {_numTfrPinGlitches - glitchesAtStart} glitches during wait)");
             }
 
             // Keep track of the maximum wait times
@@ -1614,6 +1620,7 @@ public class SPI : IDiagnostics, ILinkAdapter
         for (int retry = 0; retry < _settings.MaxSbcRetries; retry++)
         {
             // Perform SPI header exchange
+            _transferPhase = TransferPhase.Header;
             WaitForTransfer(false);
             if (_txHeader.ProtocolVersion >= 4)
             {
@@ -1741,6 +1748,7 @@ public class SPI : IDiagnostics, ILinkAdapter
             }
 
             // Acknowledge receipt
+            _transferPhase = TransferPhase.HeaderChecksum;
             uint response = ExchangeResponse(TransferResponse.Success);
             switch (response)
             {
@@ -1803,6 +1811,7 @@ public class SPI : IDiagnostics, ILinkAdapter
         int bytesToTransfer = Math.Max(_rxHeader.DataLength, _txPointer);
         for (int retry = 0; retry < _settings.MaxSbcRetries; retry++)
         {
+            _transferPhase = TransferPhase.Data;
             WaitForTransfer();
             _spiDevice.TransferFullDuplex(_txBuffer.Value[..bytesToTransfer].Span, _rxBuffer[..bytesToTransfer].Span);
 
@@ -1880,6 +1889,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     {
         for (int retry = 0; retry < _settings.MaxSbcRetries; retry++)
         {
+            _transferPhase = TransferPhase.DataChecksum;
             uint responseCode = ExchangeResponse(TransferResponse.Success);
             switch (responseCode)
             {
