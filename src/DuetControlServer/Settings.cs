@@ -173,6 +173,21 @@ public sealed class Settings
     public int SpiFrequency { get; set; } = 8_000_000;
 
     /// <summary>
+    /// Whether to isolate the SPI thread on a dedicated CPU core (only relevant on Raspberry Pi)
+    /// </summary>
+    public bool IsolateInterfaceThread { get; set; } = true;
+
+    /// <summary>
+    /// Whether to isolate the motion thread on a dedicated CPU core (only relevant on Raspberry Pi)
+    /// </summary>
+    public bool IsolateMotionThread { get; set; } = true;
+
+    /// <summary>
+    /// The CPU core which has been isolated from the OS scheduler
+    /// </summary>
+    public int IsolatedCoreId { get; set; } = 3;
+
+    /// <summary>
     /// Maximum allowed time when waiting for the first transfer (in ms)
     /// </summary>
     public int SbcConnectTimeout { get; set; } = 500;

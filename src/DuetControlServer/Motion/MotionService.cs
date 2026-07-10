@@ -59,19 +59,17 @@ public sealed class MotionService(
         {
             try
             {
-#if true
-                if (DuetSharedLibrary.ProcessHelpers.IsRaspberryPi())
+                if (settings.Value.IsolateMotionThread && DuetSharedLibrary.ProcessHelpers.IsRaspberryPi())
                 {
-                    if (DuetSharedLibrary.ProcessHelpers.PinCurrentThreadToCore(3))
+                    if (DuetSharedLibrary.ProcessHelpers.PinCurrentThreadToCore(settings.Value.IsolatedCoreId))
                     {
-                        logger.LogInformation("Motion thread pinned to CPU core 3");
+                        logger.LogInformation("Motion thread pinned to CPU core {CoreId}", settings.Value.IsolatedCoreId);
                     }
                     else
                     {
-                        logger.LogWarning("Failed to pin motion thread to CPU core 3");
+                        logger.LogWarning("Failed to pin Motion thread to CPU core {CoreId}", settings.Value.IsolatedCoreId);
                     }
                 }
-#endif
                 Execute(stoppingToken);
                 tcs.SetResult();
             }

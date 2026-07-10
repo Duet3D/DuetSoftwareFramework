@@ -177,19 +177,17 @@ public sealed class LinkService(
         {
             try
             {
-#if true
-                if (DuetSharedLibrary.ProcessHelpers.IsRaspberryPi())
+                if (settings.Value.IsolateInterfaceThread && DuetSharedLibrary.ProcessHelpers.IsRaspberryPi())
                 {
-                    if (DuetSharedLibrary.ProcessHelpers.PinCurrentThreadToCore(3))
+                    if (DuetSharedLibrary.ProcessHelpers.PinCurrentThreadToCore(settings.Value.IsolatedCoreId))
                     {
-                        logger.LogInformation("SPI thread pinned to CPU core 3");
+                        logger.LogInformation("SPI thread pinned to CPU core {CoreId}", settings.Value.IsolatedCoreId);
                     }
                     else
                     {
-                        logger.LogWarning("Failed to pin SPI thread to CPU core 3");
+                        logger.LogWarning("Failed to pin SPI thread to CPU core {CoreId}", settings.Value.IsolatedCoreId);
                     }
                 }
-#endif
                 Execute(stoppingToken);
                 tcs.SetResult();
             }
