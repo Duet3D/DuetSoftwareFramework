@@ -62,6 +62,25 @@ generator below**:
 - Fixed C arrays → blittable `[InlineArray(N)]` buffers, so the whole struct stays unmanaged and can
   be (de)serialized with `MemoryMarshal.Read`/`Write` and `Unsafe.SizeOf`.
 - Each body implements `ICanMessage` exposing a static `MessageType`.
+- Some CAN bodies end with a trailing inline array, so the on-wire payload can be shorter than the
+   struct's maximum size; the missing tail bytes are interpreted as zeroes during deserialization.
+
+### Deserializing payloads into `ICanMessage`
+
+`CanMessageSerializer` ([`CanMessageSerializer.cs`](../../src/DuetControlServer/Link/Protocol/CanMessages/CanMessageSerializer.cs))
+is the central helper for turning raw payload bytes into CAN body structs:
+
+- `CanMessageSerializer.Deserialize<T>(payload)` for typed deserialization when `T` is known.
+- `CanMessageSerializer.Deserialize(messageType, payload)` when only `CanMessageType` is known.
+- `CanMessageSerializer.TryDeserialize(messageType, payload, out message)` for non-throwing lookup.
+
+The runtime mapping is discovered from all value types implementing `ICanMessage` by reading each
+type's static `MessageType` property, so newly added message body structs become deserializable
+without adding a manual switch table.
+
+`LinkService.HandleUnsolicitedCanMessage(...)` now uses this serializer before routing to specific
+handlers, and `CanResponse` exposes `AsCanMessage<T>()` / `AsCanMessage()` convenience methods for
+reply payloads.
 
 Only a representative subset is hand-written today (`CanMessageReset`, `CanMessageStandardReply`,
 `CanMessageAnnounceV1`) to prove the end-to-end path and give the generator a concrete target.

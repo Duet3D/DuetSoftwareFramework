@@ -38,7 +38,7 @@ public struct CanMessageAnnounceV1 : ICanMessage
     /// <summary>
     /// Type short name of the board followed by '|' and the firmware version
     /// </summary>
-    public BoardTypeBuffer BoardTypeAndFirmwareVersion;
+    public BoardTypeAndFirmwareVersionBuffer BoardTypeAndFirmwareVersion;
 
     /// <summary>
     /// Number of motor drivers on this board (4-bit field)
@@ -72,7 +72,7 @@ public struct UniqueIdBuffer
 /// Blittable inline buffer for <c>char boardTypeAndFirmwareVersion[43]</c>
 /// </summary>
 [InlineArray(43)]
-public struct BoardTypeBuffer
+public struct BoardTypeAndFirmwareVersionBuffer
 {
     private byte _element0;
 }

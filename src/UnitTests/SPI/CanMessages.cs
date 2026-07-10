@@ -77,6 +77,31 @@ public class CanMessages
     }
 
     [Test]
+    public void FirmwareUpdateRequestCanBeDeserializedFromShortPayload()
+    {
+        byte[] payload = [
+            0x56, 0x34, 0x12, 0x01,
+            0x78, 0x56, 0x34, 0x00,
+            (byte)'E', (byte)'X', (byte)'P', (byte)'1', (byte)'H', (byte)'C', (byte)'L', 0x00
+        ];
+
+        CanMessageFirmwareUpdateRequest request = CanMessageSerializer.Deserialize<CanMessageFirmwareUpdateRequest>(payload);
+
+        Assert.That(request.FileOffset, Is.EqualTo(0x123456));
+        Assert.That(request.BootloaderVersion, Is.EqualTo(0x01));
+        Assert.That(request.UsesUf2Binary, Is.False);
+        Assert.That(request.FileWanted, Is.EqualTo(0x00));
+        Assert.That(request.LengthRequested, Is.EqualTo(0x345678));
+        Assert.That(request.BoardVersion, Is.EqualTo(0x00));
+        Assert.That(request.BoardTypeString, Is.EqualTo("EXP1HCL"));
+
+        Span<byte> boardTypeBytes = stackalloc byte[56];
+        MemoryMarshal.Write(boardTypeBytes, in request.BoardType);
+        Assert.That(boardTypeBytes[..8].ToArray(), Is.EqualTo(new byte[] { (byte)'E', (byte)'X', (byte)'P', (byte)'1', (byte)'H', (byte)'C', (byte)'L', 0x00 }));
+        Assert.That(boardTypeBytes[8..].ToArray(), Is.EqualTo(new byte[48]));
+    }
+
+    [Test]
     public void WriteCanMessageHeader()
     {
         Span<byte> span = new byte[128];

@@ -1,4 +1,5 @@
 using DuetControlServer.Link.Protocol.FirmwareRequests;
+using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -27,6 +28,19 @@ public readonly record struct CanResponse(CanStatus Status, CanMessageType Respo
     /// <typeparam name="T">CAN message body type</typeparam>
     /// <returns>Deserialized message body</returns>
     public readonly T As<T>() where T : struct => MemoryMarshal.Read<T>(Payload);
+
+    /// <summary>
+    /// Interpret the reply payload as a specific CAN message body type.
+    /// </summary>
+    /// <typeparam name="T">CAN message body type.</typeparam>
+    /// <returns>Deserialized message body.</returns>
+    public readonly T AsCanMessage<T>() where T : struct, ICanMessage => CanMessageSerializer.Deserialize<T>(Payload);
+
+    /// <summary>
+    /// Interpret the reply payload as the CAN message body type registered for <see cref="ResponseType"/>.
+    /// </summary>
+    /// <returns>Deserialized CAN message body.</returns>
+    public readonly ICanMessage AsCanMessage() => CanMessageSerializer.Deserialize(ResponseType, Payload);
 
     public string PayloadString => Encoding.ASCII.GetString(Payload);
 }

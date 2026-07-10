@@ -16,6 +16,7 @@ using DuetControlServer.Utility;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Text;
 
 namespace DuetControlServer.Link;
 
@@ -38,6 +39,7 @@ public sealed class LinkService(
     ILinkAdapter linkAdapter,
     LinkInterface linkInterface,
     Model.ObjectModel model,
+    FilePathResolver filePathResolver,
     IHostApplicationLifetime lifetime,
     ILogger<LinkService> logger,
     IOptions<Settings> settings) : BackgroundService
@@ -540,6 +542,24 @@ public sealed class LinkService(
     {
         // TODO: route unsolicited CAN messages (e.g. events, status reports, announcements) to their consumers
         logger.LogDebug("Received unsolicited CAN message of type {MsgType} from address {SrcAddress} ({Length} bytes)", msgType, srcAddress, payload.Length);
+
+        if (!CanMessageSerializer.TryDeserialize(msgType, payload, out ICanMessage? canMessage))
+        {
+            logger.LogWarning("No deserializer registered for unsolicited CAN message type {MsgType}", msgType);
+            return;
+        }
+
+        switch (canMessage)
+        {
+            case CanMessageFirmwareUpdateRequest request:
+                {
+                    HandleFirmwareBlockRequestAsync(request, srcAddress);
+                    break;
+                }
+            default:
+                logger.LogDebug("No unsolicited CAN handler implemented for message type {MsgType}", msgType);
+                break;
+        }
     }
 
     /// <summary>
@@ -608,6 +628,64 @@ public sealed class LinkService(
                     : MessageType.Success;
             IPC.Processors.CodeStream.RecordMessage(flags, new Message(type, reply));
             IPC.Processors.ModelSubscription.RecordMessage(flags, new Message(type, reply));
+        }
+    }
+
+    private async void HandleFirmwareBlockRequestAsync(CanMessageFirmwareUpdateRequest request, byte srcAddress, CancellationToken cancellationToken = default)
+    {
+        logger.LogInformation("Received firmware block request: FileOffset={FileOffset}, BootloaderVersion={BootloaderVersion}, UsesUf2Binary={UsesUf2Binary}, FileWanted={FileWanted}, LengthRequested={LengthRequested}, BoardType={BoardType}", request.FileOffset, request.BootloaderVersion, request.UsesUf2Binary, request.FileWanted, request.LengthRequested, request.BoardType);
+
+        if (request.BootloaderVersion == CanMessageFirmwareUpdateRequest.BootloaderVersion0 && (request.FileWanted == 0 || request.FileWanted == 3))
+        {
+            // Firmware or bootloader requested
+            string filename = request.FileWanted switch
+            {
+                0 => settings.Value.FirmwareFilePrefix,
+                3 => settings.Value.BootloaderFilePrefix,
+                _ => throw new InvalidOperationException($"Invalid FileWanted value: {request.FileWanted}")
+            };
+
+            // Add board type suffix
+            filename += request.BoardTypeString;
+
+            // Add file extension
+            filename += request.UsesUf2Binary ? ".uf2" : ".bin";
+
+            string filepath = await filePathResolver.ToPhysicalAsync(filename, FileDirectory.Firmware, cancellationToken);
+
+            if (!File.Exists(filepath))
+            {
+                logger.LogError("Requested firmware file does not exist: {Filepath}", filepath);
+                return;
+            }
+
+            using FileStream fs = new(filepath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (request.FileOffset >= fs.Length)
+            {
+                logger.LogError("Requested file offset {FileOffset} is beyond the end of the file {Filepath} (length {Length})", request.FileOffset, filepath, fs.Length);
+                return;
+            }
+
+            fs.Seek(request.FileOffset, SeekOrigin.Begin);
+            byte[] buffer = new byte[request.LengthRequested];
+            int bytesRead = fs.Read(buffer, 0, buffer.Length);
+
+            // Send the requested block back to the firmware
+            CanMessageFirmwareUpdateResponse response = new()
+            {
+                FileOffset = request.FileOffset,
+                DataLength = (uint)bytesRead,
+                Err = CanMessageFirmwareUpdateResponse.ErrNone,
+                FileLength = (uint)fs.Length,
+                Data = new CanMessageFirmwareUpdateResponseDataBuffer()
+            };
+            // Array.Copy(buffer, 0, response.Data.AsSpan().ToArray(), 0, bytesRead);
+
+            // await linkInterface.SendCanMessageAsync(srcAddress, response, CanMessageType.NoReply, cancellationToken: cancellationToken);
+        }
+        else
+        {
+            logger.LogWarning("Unsupported firmware update request: BootloaderVersion={BootloaderVersion}, FileWanted={FileWanted}", request.BootloaderVersion, request.FileWanted);
         }
     }
 

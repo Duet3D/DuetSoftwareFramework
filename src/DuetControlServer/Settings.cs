@@ -323,6 +323,10 @@ public sealed class Settings
     /// </summary>
     public int ModelUpdateInterval { get; set; } = 100;
 
+    public string FirmwareFilePrefix { get; set; } = "Duet3Firmware_";
+
+    public string BootloaderFilePrefix { get; set; } = "Duet3Bootloader_";
+
     /// <summary>
     /// Maximum lock time of the object model. If this time is exceeded, a deadlock is reported and the application is terminated.
     /// Set this to -1 to disable the automatic deadlock detection
