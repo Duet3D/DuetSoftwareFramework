@@ -25,7 +25,6 @@ namespace DuetControlServer.Files;
 /// <param name="codeFactory">Factory to create new codes</param>
 /// <param name="codeProcessor">Code processor to process the codes</param>
 /// <param name="expressions">Expressions to evaluate the codes</param>
-/// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model to access the machine state</param>
 /// <param name="loggerFactory">Logger factory</param>
 /// <param name="settings">Settings to use</param>
@@ -35,7 +34,6 @@ public class CodeFile(
     CodeFactory codeFactory,
     CodeProcessor codeProcessor,
     Expressions expressions,
-    LinkInterface linkInterface,
     Model.ObjectModel model,
     ILoggerFactory loggerFactory,
     IOptions<Settings> settings) : IDisposable
@@ -174,10 +172,9 @@ public class CodeFile(
         CodeFactory codeFactory,
         CodeProcessor codeProcessor,
         Expressions expressions,
-        LinkInterface linkInterface,
         Model.ObjectModel model,
         ILoggerFactory loggerFactory,
-        IOptions<Settings> settings) : this(copyFrom.FilePath, channel, codeFactory, codeProcessor, expressions, linkInterface, model, loggerFactory, settings)
+        IOptions<Settings> settings) : this(copyFrom.FilePath, channel, codeFactory, codeProcessor, expressions, model, loggerFactory, settings)
     {
         // Copy conditional states
         _codeBlocks.Clear();

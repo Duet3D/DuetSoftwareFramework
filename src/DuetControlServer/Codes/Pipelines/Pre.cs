@@ -14,10 +14,9 @@ namespace DuetControlServer.Codes.Pipelines;
 /// </summary>
 /// <param name="channelProcessor">Channel processor</param>
 /// <param name="codeProcessor">Code processor</param>
-/// <param name="linkInterface">Link interface</param>
 /// <param name="lifetime">Application lifetime</param>
 /// <param name="settings">Application settings</param>
-public sealed class Pre(ChannelProcessor channelProcessor, CodeProcessor codeProcessor, LinkInterface linkInterface, IHostApplicationLifetime lifetime, IOptions<Settings> settings)
+public sealed class Pre(ChannelProcessor channelProcessor, CodeProcessor codeProcessor, IHostApplicationLifetime lifetime, IOptions<Settings> settings)
     : PipelineBase(PipelineStage.Pre, channelProcessor, codeProcessor, lifetime, settings)
 {
     /// <inheritdoc />

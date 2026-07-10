@@ -30,10 +30,10 @@ namespace DuetControlServer.Motion;
 /// <param name="logger">Logger</param>
 /// <param name="settings">Settings</param>
 public sealed class MotionService(
-    EventLogger eventLogger,
+    // EventLogger eventLogger,
     LinkInterface linkInterface,
-    Model.ObjectModel model,
-    IHostApplicationLifetime lifetime,
+    // Model.ObjectModel model,
+    // IHostApplicationLifetime lifetime,
     ILogger<MotionService> logger,
     IOptions<Settings> settings) : BackgroundService
 {
@@ -148,11 +148,9 @@ public sealed class MotionService(
                 UseLateInputShaping = false
             };
             byte dstAddress = 2;
-            // linkInterface.SendCanMessageAsync(dstAddress, msg);
-            // linkInterface.SendCanMessageAsync(dstAddress, msg);
+            linkInterface.SendCanMessageAsync(dstAddress, msg);
 
-            // 5ms delay
-            Thread.Sleep(TimeSpan.FromMilliseconds(5));
+            Thread.Sleep(TimeSpan.FromMilliseconds(217));
         }
         while (!stoppingToken.IsCancellationRequested);
     }

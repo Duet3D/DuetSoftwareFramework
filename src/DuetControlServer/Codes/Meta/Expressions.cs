@@ -22,8 +22,7 @@ namespace DuetControlServer.Codes.Meta;
 /// </summary>
 /// <param name="filter">Object model filter</param>
 /// <param name="model">Object model</param>
-/// <param name="linkInterface">Link interface</param>
-public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, LinkInterface linkInterface)
+public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
 {
     /// <summary>
     /// Delegate for asynchronously resolving custom meta G-code fuctions

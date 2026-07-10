@@ -30,7 +30,12 @@ namespace DuetControlServer.Model;
 /// <param name="model">Object model</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings of the application</param>
-public partial class PeriodicUpdateService(CodeFactory codeFactory, LinkInterface linkInterface, ObjectModel model, ILogger<PeriodicUpdateService> logger, IOptions<Settings> settings) : BackgroundService
+public partial class PeriodicUpdateService(
+    // CodeFactory codeFactory,
+    // LinkInterface linkInterface,
+    ObjectModel model,
+    ILogger<PeriodicUpdateService> logger,
+    IOptions<Settings> settings) : BackgroundService
 {
     /// <summary>
     /// List of enabled protocols

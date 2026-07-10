@@ -16,7 +16,7 @@ namespace DuetControlServer.Codes.Meta;
 /// <summary>
 /// Service to provide SBC-dependent meta G-code function implementations
 /// </summary>
-public class Functions(Expressions expressions, FilePathResolver filePathResolver, Filter filter, LinkInterface linkInterface) : IHostedService
+public class Functions(Expressions expressions, FilePathResolver filePathResolver, Filter filter) : IHostedService
 {
     /// <summary>
     /// Start the hosted service and register custom functions
