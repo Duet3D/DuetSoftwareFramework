@@ -39,6 +39,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     private readonly ManualResetEventSlim _transferReadyEvent = new(false);
     private volatile bool _lastPinValueFromCallback;
 
+    // Sequence number of the most recently observed transfer ready rising edge, and the one already consumed
+    // for the previous data exchange. The controller pulses the pin per sub-exchange, so a sub-exchange must
+    // wait for a rising edge newer than the last consumed one rather than trusting a possibly stale high level
+    private volatile uint _lastRisingEdgeSeq;
+    private uint _consumedRisingEdgeSeq;
+
     // Signalled when there is a reason to initiate a full transfer: the data available pin has risen or
     // new data has been queued for transmission (see RequestTransfer). Kept separate from the transfer
     // ready event so that transfer ready pin edges do not needlessly wake the transfer gate
@@ -113,6 +119,10 @@ public class SPI : IDiagnostics, ILinkAdapter
         _transferReadyPin.PinChanged += (value, sequenceNumber) =>
         {
             _lastPinValueFromCallback = value;
+            if (value)
+            {
+                _lastRisingEdgeSeq = sequenceNumber;
+            }
             _transferReadyEvent.Set();
         };
         _dataAvailablePin.PinChanged += (value, sequenceNumber) =>
@@ -273,10 +283,6 @@ public class SPI : IDiagnostics, ILinkAdapter
         _txHeader.DataLength = (ushort)_txPointer;
         WriteCRC();
 
-#if DEBUG
-        _sbcDataAvailablePin?.Write(false);
-#endif
-
         // Perform the transfer
         int retry = 0;
         while (!cancellationToken.IsCancellationRequested)
@@ -376,6 +382,10 @@ public class SPI : IDiagnostics, ILinkAdapter
                 _connected = false;
             }
         }
+
+#if DEBUG
+        _sbcDataAvailablePin?.Write(false);
+#endif
     }
 
     /// <summary>
@@ -827,24 +837,35 @@ public class SPI : IDiagnostics, ILinkAdapter
     }
 
     /// <summary>
-    /// Wait for the controller to flag via the transfer ready pin that a transfer can be initiated.
-    /// The pin is a level signal: the controller drives it high while it is ready to transfer, so this
-    /// simply waits for the pin to be high. It no longer toggles state between individual data exchanges
+    /// Wait for the controller to flag via the transfer ready pin that the next exchange can be performed.
+    /// Within a transfer the controller pulses the pin per sub-exchange: it lowers the pin while it processes
+    /// each exchange and raises it again when ready for the next. A sub-exchange (<paramref name="inTransfer"/>
+    /// is true) must therefore wait for a rising edge newer than the one consumed for the previous exchange -
+    /// trusting a high level alone would let a stale high left over from the previous exchange clock the next
+    /// one before the controller is ready, which desynchronises the two sides. The header exchange
+    /// (<paramref name="inTransfer"/> is false) and the first transfer after connecting instead run against
+    /// the steady "ready" high level
     /// </summary>
     /// <param name="inTransfer">Whether a full transfer is being performed</param>
     /// <param name="cancellationToken">Cancellation token to cancel the wait</param>
     private void WaitForTransfer(bool inTransfer = true, CancellationToken cancellationToken = default)
     {
+        // Sub-exchanges require a fresh rising edge; the header and the first transfer run against the level
+        bool needFreshEdge = inTransfer && !_waitingForFirstTransfer;
+
+        // Whether the transfer ready pin currently signals readiness for this exchange
+        bool IsReady() => _transferReadyPin.Read() && (!needFreshEdge || (int)(_lastRisingEdgeSeq - _consumedRisingEdgeSeq) > 0);
+
         // Flush pending events by consuming them until the event stays reset
         while (_transferReadyEvent.Wait(0))
         {
             _transferReadyEvent.Reset();
         }
 
-        // Proceed immediately if the pin is already high, otherwise wait for it to be driven high
-        if (!_transferReadyPin.Read())
+        // Proceed immediately if already ready, otherwise wait for the controller to (re-)assert the pin
+        if (!IsReady())
         {
-            // Determine how long to wait for the pin to go high
+            // Determine how long to wait for the pin to be (re-)asserted
             int timeout;
             if (_waitingForFirstTransfer)
             {
@@ -855,7 +876,7 @@ public class SPI : IDiagnostics, ILinkAdapter
                 timeout = _updating ? Consts.IapTimeout : (inTransfer ? _settings.SbcTransferTimeout : _settings.SbcConnectionTimeout);
             }
 
-            // Wait for the pin to be driven high, ignoring glitches
+            // Wait for the pin to be (re-)asserted, ignoring glitches
             Stopwatch stopwatch = Stopwatch.StartNew();
             try
             {
@@ -875,13 +896,15 @@ public class SPI : IDiagnostics, ILinkAdapter
                         // Only a rising edge is of interest; ignore falling edges
                         if (_lastPinValueFromCallback)
                         {
-                            // Verify by reading again to ensure the high level is stable
-                            if (_transferReadyPin.Read())
+                            if (IsReady())
                             {
                                 break;
                             }
-                            // Pin changed again between callback and now, count as glitch
-                            _numTfrPinGlitches++;
+                            // Callback reported a rising edge but the pin is no longer stably high, count as glitch
+                            if (!_transferReadyPin.Read())
+                            {
+                                _numTfrPinGlitches++;
+                            }
                         }
                     }
                 } while (true);
@@ -915,6 +938,8 @@ public class SPI : IDiagnostics, ILinkAdapter
             }
         }
 
+        // Record the rising edge consumed for this exchange so the next sub-exchange waits for a newer one
+        _consumedRisingEdgeSeq = _lastRisingEdgeSeq;
         _waitingForFirstTransfer = false;
     }
 
