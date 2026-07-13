@@ -1182,7 +1182,7 @@ public class MCodeHandler(
                         changeTiming = true;
                         if (bitRateMultiplier == 0 || bitRateMultiplier == 5 || bitRateMultiplier == 7)
                         {
-                            return new Message(MessageType.Error, $"Invalid bit rate multiplier {bitRateMultiplier}. Valid values are 1, 2, 3, 4, 6, 8, 9");
+                            return new Message(MessageType.Error, $"Invalid bit rate multiplier {bitRateMultiplier}. Valid values are 1, 2, 3, 4, 6, 8");
                         }
                         
                         timing.EnableBrs((byte)bitRateMultiplier);
