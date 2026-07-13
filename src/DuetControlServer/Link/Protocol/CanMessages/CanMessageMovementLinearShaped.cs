@@ -8,7 +8,7 @@ namespace DuetControlServer.Link.Protocol.CanMessages;
 /// Mirrors <c>CanMessageMovementLinearShaped</c> in CANlib's <c>CanMessageFormats.h</c>:
 /// </summary>
 [StructLayout(LayoutKind.Sequential, Pack = 1, Size = 20)]
-public struct CanMessageMovementLinearShaped : ICanMessage
+public struct CanMessageMovementLinearShaped : ICanMessage<CanMessageMovementLinearShaped>
 {
     /// <inheritdoc cref="ICanMessage.MessageType" />
     public static CanMessageType MessageType => CanMessageType.MovementLinearShaped;

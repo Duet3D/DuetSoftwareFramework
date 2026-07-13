@@ -9,7 +9,7 @@ namespace DuetControlServer.Link.Protocol.CanMessages;
 /// <code>uint16_t requestId : 12, zero : 4;</code>
 /// </summary>
 [StructLayout(LayoutKind.Sequential, Pack = 1, Size = 2)]
-public struct CanMessageReset : ICanMessage
+public struct CanMessageReset : ICanMessage<CanMessageReset>
 {
     /// <inheritdoc cref="ICanMessage.MessageType" />
     public static CanMessageType MessageType => CanMessageType.Reset;

@@ -18,7 +18,7 @@ namespace DuetControlServer.Link.Protocol.CanMessages;
 /// </code>
 /// </summary>
 [StructLayout(LayoutKind.Sequential, Pack = 1, Size = 16)]
-public struct CanMessageSetAddressAndNormalTiming : ICanMessage
+public struct CanMessageSetAddressAndNormalTiming : ICanMessage<CanMessageSetAddressAndNormalTiming>
 {
     /// <inheritdoc cref="ICanMessage.MessageType" />
     public static CanMessageType MessageType => CanMessageType.SetAddressAndNormalTiming;

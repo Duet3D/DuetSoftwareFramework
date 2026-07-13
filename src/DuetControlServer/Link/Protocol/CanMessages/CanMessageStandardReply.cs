@@ -13,7 +13,7 @@ namespace DuetControlServer.Link.Protocol.CanMessages;
 /// <code>uint32_t requestId : 12, resultCode : 4, fragmentNumber : 7, moreFollows : 1, extra : 8; char text[60];</code>
 /// </summary>
 [StructLayout(LayoutKind.Sequential, Pack = 1, Size = 64)]
-public struct CanMessageStandardReply : ICanMessage
+public struct CanMessageStandardReply : ICanMessage<CanMessageStandardReply>
 {
     /// <inheritdoc cref="ICanMessage.MessageType" />
     public static CanMessageType MessageType => CanMessageType.StandardReply;

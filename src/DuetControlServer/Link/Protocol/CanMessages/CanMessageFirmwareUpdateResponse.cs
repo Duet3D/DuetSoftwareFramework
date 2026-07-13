@@ -17,7 +17,7 @@ namespace DuetControlServer.Link.Protocol.CanMessages;
 /// </code>
 /// </summary>
 [StructLayout(LayoutKind.Sequential, Pack = 1, Size = 64)]
-public struct CanMessageFirmwareUpdateResponse : ICanMessage
+public struct CanMessageFirmwareUpdateResponse : ICanMessage<CanMessageFirmwareUpdateResponse>
 {
     /// <inheritdoc cref="ICanMessage.MessageType" />
     public static CanMessageType MessageType => CanMessageType.FirmwareBlockResponse;
@@ -70,6 +70,8 @@ public struct CanMessageFirmwareUpdateResponse : ICanMessage
         readonly get => _bitField2 & 0xFFFFFF;
         set => _bitField2 = (_bitField2 & 0xFF000000) | (value & 0xFFFFFF);
     }
+
+    public readonly uint GetActualDataLength() => 2 * sizeof(uint) + DataLength;
 }
 
 /// <summary>

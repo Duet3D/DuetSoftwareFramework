@@ -13,8 +13,6 @@ using DuetControlServer.Link.Adapter;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Utility;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
@@ -133,10 +131,12 @@ public sealed partial class LinkInterface(
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Reassembled reply (empty if no reply was expected)</returns>
     public Task<CanResponse> SendCanMessageAsync<TReq>(byte dstAddress, in TReq message, CanMessageType replyType = CanMessageType.NoReply, byte flags = 0, CancellationToken cancellationToken = default)
-        where TReq : struct, ICanMessage
+        where TReq : struct, ICanMessage<TReq>
     {
-        byte[] payload = new byte[Unsafe.SizeOf<TReq>()];
-        MemoryMarshal.Write(payload, in message);
+        // Only the leading GetActualDataLength() bytes are transmitted; variable-length messages report fewer
+        // bytes than sizeof(TReq), so writing the whole struct here would overrun a shorter payload buffer.
+        byte[] payload = new byte[message.GetActualDataLength()];
+        CanMessageSerializer.Serialize(in message, payload);
         return SendCanMessageAsync(TReq.MessageType, replyType, dstAddress, payload, flags, cancellationToken);
     }
 

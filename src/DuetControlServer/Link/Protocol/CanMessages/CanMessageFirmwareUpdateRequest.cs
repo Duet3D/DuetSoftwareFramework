@@ -20,7 +20,7 @@ namespace DuetControlServer.Link.Protocol.CanMessages;
 /// </code>
 /// </summary>
 [StructLayout(LayoutKind.Sequential, Pack = 1, Size = 64)]
-public struct CanMessageFirmwareUpdateRequest : ICanMessage
+public struct CanMessageFirmwareUpdateRequest : ICanMessage<CanMessageFirmwareUpdateRequest>
 {
     /// <inheritdoc cref="ICanMessage.MessageType" />
     public static CanMessageType MessageType => CanMessageType.FirmwareBlockRequest;

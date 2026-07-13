@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DuetControlServer.Link.Protocol.Shared;
 
 namespace DuetControlServer.Link.Protocol.CanMessages;
@@ -15,10 +16,12 @@ namespace DuetControlServer.Link.Protocol.CanMessages;
 /// and fixed C arrays represented as blittable <see cref="System.Runtime.CompilerServices.InlineArrayAttribute"/>
 /// buffers so they can be (de)serialized with <c>MemoryMarshal</c>.
 /// </remarks>
-public interface ICanMessage
+public interface ICanMessage<TSelf> where TSelf : struct, ICanMessage<TSelf>
 {
     /// <summary>
     /// CAN message type identifying this message (placed in the CAN id)
     /// </summary>
     static abstract CanMessageType MessageType { get; }
+
+    virtual uint GetActualDataLength() => (uint)Unsafe.SizeOf<TSelf>();
 }

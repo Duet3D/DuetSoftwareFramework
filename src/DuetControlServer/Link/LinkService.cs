@@ -559,21 +559,15 @@ public sealed class LinkService(
         // TODO: route unsolicited CAN messages (e.g. events, status reports, announcements) to their consumers
         logger.LogDebug("Received unsolicited CAN message of type {MsgType} from address {SrcAddress} ({Length} bytes)", msgType, srcAddress, payload.Length);
 
-        if (!CanMessageSerializer.TryDeserialize(msgType, payload, out ICanMessage? canMessage))
+        // Route on the message type and deserialize straight into the concrete struct. Switching here rather than
+        // on the runtime type keeps this allocation-free (no boxing) on a path that runs in the kHz range.
+        switch (msgType)
         {
-            logger.LogWarning("No deserializer registered for unsolicited CAN message type {MsgType}", msgType);
-            return;
-        }
-
-        switch (canMessage)
-        {
-            case CanMessageFirmwareUpdateRequest request:
-                {
-                    HandleFirmwareBlockRequestAsync(request, srcAddress);
-                    break;
-                }
+            case CanMessageType.FirmwareBlockRequest:
+                HandleFirmwareBlockRequestAsync(CanMessageSerializer.Deserialize<CanMessageFirmwareUpdateRequest>(payload), srcAddress);
+                break;
             default:
-                logger.LogDebug("No unsolicited CAN handler implemented for message type {MsgType}", msgType);
+                logger.LogWarning("No unsolicited CAN handler implemented for message type {MsgType}", msgType);
                 break;
         }
     }
@@ -679,6 +673,14 @@ public sealed class LinkService(
             if (request.FileOffset >= fs.Length)
             {
                 logger.LogError("Requested file offset {FileOffset} is beyond the end of the file {Filepath} (length {Length})", request.FileOffset, filepath, fs.Length);
+                await linkInterface.SendCanMessageAsync(srcAddress, new CanMessageFirmwareUpdateResponse
+                {
+                    FileOffset = request.FileOffset,
+                    DataLength = 0,
+                    Err = CanMessageFirmwareUpdateResponse.ErrBadOffset,
+                    FileLength = (uint)fs.Length,
+                    Data = new CanMessageFirmwareUpdateResponseDataBuffer()
+                });
                 return;
             }
 
