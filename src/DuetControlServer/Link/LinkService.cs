@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
@@ -470,7 +471,7 @@ public sealed class LinkService(
                     continue;
                 }
 
-                if (!linkAdapter.WriteCanMessage(request.TxToken, (ushort)request.MessageType, (ushort)request.ReplyType, request.DstAddress, request.Flags, request.RequestPayload))
+                if (!linkAdapter.WriteCanMessage(request.TxToken, (ushort)request.MessageType, (ushort)request.ReplyType, request.DstAddress, request.IsResponse, request.RequestPayload))
                 {
                     // Buffer full -- retry on the next transfer
                     logger.LogWarning("Could not send CAN request {TxToken} to address {DstAddress} (type {MessageType}) -- buffer full, will retry", request.TxToken, request.DstAddress, request.MessageType);
@@ -660,6 +661,8 @@ public sealed class LinkService(
 
             // Add file extension
             filename += request.UsesUf2Binary ? ".uf2" : ".bin";
+            uint fileOffset = request.FileOffset;
+            uint lengthRequested = request.LengthRequested;
 
             string filepath = await filePathResolver.ToPhysicalAsync(filename, FileDirectory.Firmware, cancellationToken);
 
@@ -670,36 +673,74 @@ public sealed class LinkService(
             }
 
             using FileStream fs = new(filepath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            if (request.FileOffset >= fs.Length)
+            if (fileOffset >= fs.Length)
             {
-                logger.LogError("Requested file offset {FileOffset} is beyond the end of the file {Filepath} (length {Length})", request.FileOffset, filepath, fs.Length);
+                logger.LogError("Requested file offset {FileOffset} is beyond the end of the file {Filepath} (length {Length})", fileOffset, filepath, fs.Length);
                 await linkInterface.SendCanMessageAsync(srcAddress, new CanMessageFirmwareUpdateResponse
                 {
-                    FileOffset = request.FileOffset,
+                    FileOffset = fileOffset,
                     DataLength = 0,
                     Err = CanMessageFirmwareUpdateResponse.ErrBadOffset,
                     FileLength = (uint)fs.Length,
                     Data = new CanMessageFirmwareUpdateResponseDataBuffer()
-                });
+                },
+                isResponse: true,
+                cancellationToken: cancellationToken);
                 return;
             }
 
-            fs.Seek(request.FileOffset, SeekOrigin.Begin);
-            byte[] buffer = new byte[request.LengthRequested];
-            int bytesRead = fs.Read(buffer, 0, buffer.Length);
-
-            // Send the requested block back to the firmware
-            CanMessageFirmwareUpdateResponse response = new()
+            fs.Seek(fileOffset, SeekOrigin.Begin);
+            if (fs.Length - fileOffset < lengthRequested)
             {
-                FileOffset = request.FileOffset,
-                DataLength = (uint)bytesRead,
-                Err = CanMessageFirmwareUpdateResponse.ErrNone,
-                FileLength = (uint)fs.Length,
-                Data = new CanMessageFirmwareUpdateResponseDataBuffer()
-            };
-            // Array.Copy(buffer, 0, response.Data.AsSpan().ToArray(), 0, bytesRead);
+                lengthRequested = (uint)(fs.Length - fileOffset);
+            }
 
-            // await linkInterface.SendCanMessageAsync(srcAddress, response, CanMessageType.NoReply, cancellationToken: cancellationToken);
+            for (;;)
+            {
+                uint lengthToSend = Math.Min(lengthRequested, CanMessageFirmwareUpdateResponseDataBuffer.Length);
+                
+                byte[] buffer = new byte[lengthToSend];
+                int bytesRead = fs.Read(buffer, 0, buffer.Length);
+                
+                if (bytesRead != lengthToSend)
+                {
+                    logger.LogError("Read {BytesRead} bytes from firmware file {Filepath} but expected {LengthToSend} bytes", bytesRead, filepath, lengthToSend);
+                    await linkInterface.SendCanMessageAsync(srcAddress, new CanMessageFirmwareUpdateResponse
+                    {
+                        DataLength = 0,
+                        Err = CanMessageFirmwareUpdateResponse.ErrOther,
+                        FileLength = (uint)fs.Length,
+                        FileOffset = 0,
+                        Data = new CanMessageFirmwareUpdateResponseDataBuffer()
+                    },
+                    isResponse: true,
+                    cancellationToken: cancellationToken);
+                    // TODO update OM that the firmware update failed
+                    return;
+                }
+
+                
+                // Send the requested block back to the firmware
+                CanMessageFirmwareUpdateResponse response = new()
+                {
+                    DataLength = (uint)bytesRead,
+                    Err = CanMessageFirmwareUpdateResponse.ErrNone,
+                    FileLength = (uint)fs.Length,
+                    FileOffset = fileOffset,
+                    Data = new CanMessageFirmwareUpdateResponseDataBuffer()
+                };
+                buffer.AsSpan(0, bytesRead).CopyTo(response.Data);
+
+                await linkInterface.SendCanMessageAsync(srcAddress, response, CanMessageType.NoReply, isResponse: true, cancellationToken: cancellationToken);
+
+                fileOffset += (uint)bytesRead;
+                lengthRequested -= (uint)bytesRead;
+                if (lengthRequested == 0)
+                {
+                    break;
+                }
+            }
+
         }
         else
         {

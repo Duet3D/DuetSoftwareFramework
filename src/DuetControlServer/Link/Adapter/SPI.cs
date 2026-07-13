@@ -760,11 +760,11 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// Send a CAN message to an expansion board
     /// </summary>
     /// <returns>Whether the request could be written</returns>
-    public bool WriteCanMessage(ushort txToken, ushort msgType, ushort replyType, byte dstAddress, byte flags, ReadOnlySpan<byte> payload)
+    public bool WriteCanMessage(ushort txToken, ushort msgType, ushort replyType, byte dstAddress, bool isResponse, ReadOnlySpan<byte> payload)
     {
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
-        int dataLength = Protocol.Writer.WriteCANMessage(span, txToken, msgType, replyType, dstAddress, flags, payload);
+        int dataLength = Protocol.Writer.WriteCANMessage(span, txToken, msgType, replyType, dstAddress, isResponse, payload);
 
         // See if the request fits into the buffer
         if (!CanWritePacket(dataLength))

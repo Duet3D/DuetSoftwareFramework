@@ -77,9 +77,10 @@ public struct CanMessageFirmwareUpdateResponse : ICanMessage<CanMessageFirmwareU
 /// <summary>
 /// Blittable inline buffer for <c>char boardType[56]</c>
 /// </summary>
-[InlineArray(56)]
+[InlineArray(CanMessageFirmwareUpdateResponseDataBuffer.Length)]
 public struct CanMessageFirmwareUpdateResponseDataBuffer
 {
+    public const int Length = 56;
     private byte _element0;
 }
 

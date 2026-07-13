@@ -37,5 +37,11 @@ public struct SendCanMessageHeader
     /// <summary>
     /// Flags for the CAN message
     /// </summary>
-    public byte Flags;
+    private byte Flags;
+
+    public bool IsResponse
+    {
+        readonly get => (Flags & 0x01) != 0;
+        set => Flags = (byte)((Flags & ~0x01) | (value ? 0x01 : 0x00));
+    }
 }

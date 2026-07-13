@@ -21,7 +21,7 @@ namespace DuetControlServer.Link;
 /// If a reply is expected then the task is completed once the (possibly fragmented) reply has been
 /// fully received, or if the request times out or the connection is lost.
 /// </remarks>
-public class CanRequest(CanMessageType messageType, CanMessageType replyType, ushort txToken, byte dstAddress, byte flags, byte[] requestPayload)
+public class CanRequest(CanMessageType messageType, CanMessageType replyType, ushort txToken, byte dstAddress, bool isResponse, byte[] requestPayload)
 {
     /// <summary>
     /// Type of the CAN message
@@ -44,9 +44,9 @@ public class CanRequest(CanMessageType messageType, CanMessageType replyType, us
     public byte DstAddress { get; } = dstAddress;
 
     /// <summary>
-    /// Flags for the CAN message
+    /// If the request is a response to another CAN message
     /// </summary>
-    public byte Flags { get; } = flags;
+    public bool IsResponse { get; } = isResponse;
 
     /// <summary>
     /// Serialized CAN message payload to send

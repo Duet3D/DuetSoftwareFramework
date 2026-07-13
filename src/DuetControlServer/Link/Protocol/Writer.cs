@@ -103,7 +103,7 @@ public static class Writer
         return Marshal.SizeOf<EnableCanHeader>();
     }
 
-    public static int WriteCANMessage(Span<byte> to, ushort txToken, ushort msgType, ushort replyType, byte dstAddress, byte flags, ReadOnlySpan<byte> payload)
+    public static int WriteCANMessage(Span<byte> to, ushort txToken, ushort msgType, ushort replyType, byte dstAddress, bool isResponse, ReadOnlySpan<byte> payload)
     {
         if (payload.Length < 0 || payload.Length > 64)
         {
@@ -118,7 +118,7 @@ public static class Writer
             ReplyType = replyType,
             DataLength = dataLength,
             DstAddress = dstAddress,
-            Flags = flags,
+            IsResponse = isResponse,
         };
         MemoryMarshal.Write(to, in header);
         int bytesWritten = Marshal.SizeOf<SendCanMessageHeader>();

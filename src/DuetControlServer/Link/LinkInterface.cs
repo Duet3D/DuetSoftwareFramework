@@ -130,14 +130,14 @@ public sealed partial class LinkInterface(
     /// <param name="flags">Flags for the CAN message</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Reassembled reply (empty if no reply was expected)</returns>
-    public Task<CanResponse> SendCanMessageAsync<TReq>(byte dstAddress, in TReq message, CanMessageType replyType = CanMessageType.NoReply, byte flags = 0, CancellationToken cancellationToken = default)
+    public Task<CanResponse> SendCanMessageAsync<TReq>(byte dstAddress, in TReq message, CanMessageType replyType = CanMessageType.NoReply, bool isResponse = false, CancellationToken cancellationToken = default)
         where TReq : struct, ICanMessage<TReq>
     {
         // Only the leading GetActualDataLength() bytes are transmitted; variable-length messages report fewer
         // bytes than sizeof(TReq), so writing the whole struct here would overrun a shorter payload buffer.
         byte[] payload = new byte[message.GetActualDataLength()];
         CanMessageSerializer.Serialize(in message, payload);
-        return SendCanMessageAsync(TReq.MessageType, replyType, dstAddress, payload, flags, cancellationToken);
+        return SendCanMessageAsync(TReq.MessageType, replyType, dstAddress, payload, isResponse, cancellationToken);
     }
 
     /// <summary>
@@ -150,7 +150,7 @@ public sealed partial class LinkInterface(
     /// <param name="flags">Flags for the CAN message</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Reassembled reply (empty if no reply was expected)</returns>
-    private async Task<CanResponse> SendCanMessageAsync(CanMessageType messageType, CanMessageType replyType, byte dstAddress, byte[] payload, byte flags = 0, CancellationToken cancellationToken = default)
+    private async Task<CanResponse> SendCanMessageAsync(CanMessageType messageType, CanMessageType replyType, byte dstAddress, byte[] payload, bool isResponse, CancellationToken cancellationToken)
     {
         CanRequest request;
         lock (CanRequests)
@@ -161,7 +161,7 @@ public sealed partial class LinkInterface(
                 payload[0] = 0xFF;
                 payload[1] |= 0x07;
             }
-            request = new(messageType, replyType, NextCanTxToken(), dstAddress, flags, payload);
+            request = new(messageType, replyType, NextCanTxToken(), dstAddress, isResponse, payload);
             CanRequests.Add(request);
             logger.LogDebug("Queueing CAN message of type {MessageType} to address {DstAddress} expecting reply of type {ReplyType}", messageType, dstAddress, replyType);
         }

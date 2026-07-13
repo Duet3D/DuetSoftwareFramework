@@ -183,8 +183,8 @@ public interface ILinkAdapter
     /// <param name="msgType">CanMessageType to place in the CAN id</param>
     /// <param name="replyType">Expected reply type (0xFFFF if no reply is expected)</param>
     /// <param name="dstAddress">CAN destination: 0..126, or 127 for broadcast</param>
-    /// <param name="flags">Flags for the CAN message</param>
+    /// <param name="isResponse">Whether this message is a response</param>
     /// <param name="payload">CAN payload (0..64 bytes)</param>
     /// <returns>Whether the request could be written</returns>
-    bool WriteCanMessage(ushort txToken, ushort msgType, ushort replyType, byte dstAddress, byte flags, ReadOnlySpan<byte> payload);
+    bool WriteCanMessage(ushort txToken, ushort msgType, ushort replyType, byte dstAddress, bool isResponse, ReadOnlySpan<byte> payload);
 }
