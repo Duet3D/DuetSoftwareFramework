@@ -489,6 +489,250 @@ public partial class Code : Command<Message?>
     }
 
     /// <summary>
+    /// Get a float parameter value clamped between a minimum and maximum value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="min">Minimum value to clamp the parameter to</param>
+    /// <param name="max">Maximum value to clamp the parameter to</param>
+    /// <returns>Parameter value clamped between min and max</returns>
+    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public float GetFloatLimited(char letter, float min, float max) => Math.Clamp(GetFloat(letter), min, max);
+
+    /// <summary>
+    /// Get a float parameter value clamped between a minimum and maximum value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="min">Minimum value to clamp the parameter to</param>
+    /// <param name="max">Maximum value to clamp the parameter to</param>
+    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+    /// <returns>Parameter value clamped between min and max</returns>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public float GetFloatLimited(char letter, float min, float max, float defaultValue) => Math.Clamp(GetFloat(letter, defaultValue), min, max);
+
+    /// <summary>
+    /// Try to get a float parameter value by letter clamped between a minimum and maximum value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="min">Minimum value to clamp the parameter to</param>
+    /// <param name="max">Maximum value to clamp the parameter to</param>
+    /// <param name="parameter">Parameter clamped between min and max if found, else default</param>
+    /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public bool TryGetFloatLimited(char letter, float min, float max, out float parameter)
+    {
+        if (TryGetFloat(letter, out parameter))
+        {
+            parameter = Math.Clamp(parameter, min, max);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Try to get a float parameter value by letter clamped between a minimum and maximum value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="min">Minimum value to clamp the parameter to</param>
+    /// <param name="max">Maximum value to clamp the parameter to</param>
+    /// <param name="parameter">Parameter clamped between min and max if found, else null</param>
+    /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public bool TryGetFloatLimited(char letter, float min, float max, out float? parameter)
+    {
+        if (TryGetFloat(letter, out float value))
+        {
+            parameter = Math.Clamp(value, min, max);
+            return true;
+        }
+        parameter = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Get an integer parameter value clamped between a minimum and maximum value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="min">Minimum value to clamp the parameter to</param>
+    /// <param name="max">Maximum value to clamp the parameter to</param>
+    /// <returns>Parameter value clamped between min and max</returns>
+    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public int GetIntLimited(char letter, int min, int max) => Math.Clamp(GetInt(letter), min, max);
+
+    /// <summary>
+    /// Get an integer parameter value clamped between a minimum and maximum value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="min">Minimum value to clamp the parameter to</param>
+    /// <param name="max">Maximum value to clamp the parameter to</param>
+    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+    /// <returns>Parameter value clamped between min and max</returns>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public int GetIntLimited(char letter, int min, int max, int defaultValue) => Math.Clamp(GetInt(letter, defaultValue), min, max);
+
+    /// <summary>
+    /// Try to get an integer parameter value by letter clamped between a minimum and maximum value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="min">Minimum value to clamp the parameter to</param>
+    /// <param name="max">Maximum value to clamp the parameter to</param>
+    /// <param name="parameter">Parameter clamped between min and max if found, else default</param>
+    /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public bool TryGetIntLimited(char letter, int min, int max, out int parameter)
+    {
+        if (TryGetInt(letter, out parameter))
+        {
+            parameter = Math.Clamp(parameter, min, max);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Try to get an integer parameter value by letter clamped between a minimum and maximum value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="min">Minimum value to clamp the parameter to</param>
+    /// <param name="max">Maximum value to clamp the parameter to</param>
+    /// <param name="parameter">Parameter clamped between min and max if found, else null</param>
+    /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public bool TryGetIntLimited(char letter, int min, int max, out int? parameter)
+    {
+        if (TryGetInt(letter, out int value))
+        {
+            parameter = Math.Clamp(value, min, max);
+            return true;
+        }
+        parameter = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Get an unsigned integer parameter value clamped between a minimum and maximum value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="min">Minimum value to clamp the parameter to</param>
+    /// <param name="max">Maximum value to clamp the parameter to</param>
+    /// <returns>Parameter value clamped between min and max</returns>
+    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public uint GetUIntLimited(char letter, uint min, uint max) => Math.Clamp(GetUInt(letter), min, max);
+
+    /// <summary>
+    /// Get an unsigned integer parameter value clamped between a minimum and maximum value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="min">Minimum value to clamp the parameter to</param>
+    /// <param name="max">Maximum value to clamp the parameter to</param>
+    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+    /// <returns>Parameter value clamped between min and max</returns>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public uint GetUIntLimited(char letter, uint min, uint max, uint defaultValue) => Math.Clamp(GetUInt(letter, defaultValue), min, max);
+
+    /// <summary>
+    /// Try to get an unsigned integer parameter value by letter clamped between a minimum and maximum value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="min">Minimum value to clamp the parameter to</param>
+    /// <param name="max">Maximum value to clamp the parameter to</param>
+    /// <param name="parameter">Parameter clamped between min and max if found, else default</param>
+    /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public bool TryGetUIntLimited(char letter, uint min, uint max, out uint parameter)
+    {
+        if (TryGetUInt(letter, out parameter))
+        {
+            parameter = Math.Clamp(parameter, min, max);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Try to get an unsigned integer parameter value by letter clamped between a minimum and maximum value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="min">Minimum value to clamp the parameter to</param>
+    /// <param name="max">Maximum value to clamp the parameter to</param>
+    /// <param name="parameter">Parameter clamped between min and max if found, else null</param>
+    /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public bool TryGetUIntLimited(char letter, uint min, uint max, out uint? parameter)
+    {
+        if (TryGetUInt(letter, out uint value))
+        {
+            parameter = Math.Clamp(value, min, max);
+            return true;
+        }
+        parameter = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Get a long parameter value clamped between a minimum and maximum value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="min">Minimum value to clamp the parameter to</param>
+    /// <param name="max">Maximum value to clamp the parameter to</param>
+    /// <returns>Parameter value clamped between min and max</returns>
+    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public long GetLongLimited(char letter, long min, long max) => Math.Clamp(GetLong(letter), min, max);
+
+    /// <summary>
+    /// Get a long parameter value clamped between a minimum and maximum value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="min">Minimum value to clamp the parameter to</param>
+    /// <param name="max">Maximum value to clamp the parameter to</param>
+    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+    /// <returns>Parameter value clamped between min and max</returns>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public long GetLongLimited(char letter, long min, long max, long defaultValue) => Math.Clamp(GetLong(letter, defaultValue), min, max);
+
+    /// <summary>
+    /// Try to get a long parameter value by letter clamped between a minimum and maximum value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="min">Minimum value to clamp the parameter to</param>
+    /// <param name="max">Maximum value to clamp the parameter to</param>
+    /// <param name="parameter">Parameter clamped between min and max if found, else default</param>
+    /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public bool TryGetLongLimited(char letter, long min, long max, out long parameter)
+    {
+        if (TryGetLong(letter, out parameter))
+        {
+            parameter = Math.Clamp(parameter, min, max);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Try to get a long parameter value by letter clamped between a minimum and maximum value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="min">Minimum value to clamp the parameter to</param>
+    /// <param name="max">Maximum value to clamp the parameter to</param>
+    /// <param name="parameter">Parameter clamped between min and max if found, else null</param>
+    /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public bool TryGetLongLimited(char letter, long min, long max, out long? parameter)
+    {
+        if (TryGetLong(letter, out long value))
+        {
+            parameter = Math.Clamp(value, min, max);
+            return true;
+        }
+        parameter = null;
+        return false;
+    }
+
+    /// <summary>
     /// Get a boolean parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>

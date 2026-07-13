@@ -93,6 +93,16 @@ public static class Writer
         return AddPadding(to, bytesWritten);
     }
 
+    public static int WriteEnableCan(Span<byte> to, bool enable)
+    {
+        EnableCanHeader header = new()
+        {
+            Enable = Convert.ToByte(enable)
+        };
+        MemoryMarshal.Write(to, in header);
+        return Marshal.SizeOf<EnableCanHeader>();
+    }
+
     public static int WriteCANMessage(Span<byte> to, ushort txToken, ushort msgType, ushort replyType, byte dstAddress, byte flags, ReadOnlySpan<byte> payload)
     {
         if (payload.Length < 0 || payload.Length > 64)

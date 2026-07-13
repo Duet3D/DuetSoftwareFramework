@@ -739,6 +739,23 @@ public class SPI : IDiagnostics, ILinkAdapter
         return true;
     }
 
+    public bool WriteEnableCan(bool enable)
+    {
+        Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
+        int dataLength = Protocol.Writer.WriteEnableCan(span, enable);
+
+        // See if the request fits into the buffer
+        if (!CanWritePacket(dataLength))
+        {
+            return false;
+        }
+
+        // Write it
+        WritePacket(Protocol.SbcRequests.Request.EnableCAN, dataLength);
+        span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
+        return true;
+    }
+
     /// <summary>
     /// Send a CAN message to an expansion board
     /// </summary>

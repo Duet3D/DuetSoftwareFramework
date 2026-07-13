@@ -680,12 +680,13 @@ public class MCodeHandler(
                     return new Message();
                 }
                 throw new OperationCanceledException();
-            
+
             case 115:
                 int board = code.GetInt('B', 0);
                 if (board == 0)
                 {
                     // TODO reply with DSF firmware info
+                    return new Message(MessageType.Success, "DSF firmware version");
                 }
                 else if (board > 0 && board <= 127)
                 {
@@ -703,7 +704,6 @@ public class MCodeHandler(
                 {
                     return new Message(MessageType.Error, $"Invalid board number {board}");
                 }
-                break;
 
             // Publish MQTT message
             case 118:
@@ -1105,6 +1105,108 @@ public class MCodeHandler(
                     return new Message();
                 }
                 throw new OperationCanceledException();
+
+            // Configure CAN
+            case 952:
+                {
+                    uint oldAddress = code.GetUInt('B', 0);
+
+                    CanTiming timing = new();
+                    bool changeTiming = false;
+                    if (code.TryGetUIntLimited('S', 15, 5000, out uint speed)) // TODO set these as constants somewhere
+                    {
+                        changeTiming = true;
+                        timing.SetDefaults(speed * 1000);
+      
+                        if (code.TryGetFloatLimited('T', 0.5f, 0.95f, out float normalSamplePoint))
+                        {
+                            timing.SetNormalSamplePoint(normalSamplePoint);
+                        }
+
+                        if (code.TryGetFloatLimited('J', 0.05f, 0.5f, out float normalJumpWidth))
+                        {
+                            timing.SetNormalJumpWidth(normalJumpWidth);
+                        }
+                    }
+
+                    if (changeTiming)
+                    {
+                        code.TryGetUIntLimited('A', 1, 127, out uint? newAddress);
+
+                        await linkInterface.ConfigCanAsync((byte)oldAddress, (byte?)newAddress, timing, cancellationToken);
+                    }
+                    else
+                    {
+                        CanResponse response = await linkInterface.ReportCanConfigAsync((byte)oldAddress, cancellationToken);
+                        return new Message(MessageType.Success, response.PayloadString);
+                    }
+                    return new Message();
+                }
+
+            // Enable CAN
+            case 953:
+                {
+                    bool changeTiming = false;
+                    uint DefaultCanBitRate = CanTiming.DefaultCanBitRate / 1000;
+                    CanTiming timing = new();
+
+                    if (code.TryGetUIntLimited('S', 15, 5000, out uint speed))
+                    {
+                        if (speed != DefaultCanBitRate && speed != DefaultCanBitRate / 2 && speed != DefaultCanBitRate / 4)
+                        {
+                            return new Message(MessageType.Error, $"Invalid CAN speed {speed}. Valid values are {DefaultCanBitRate}, {DefaultCanBitRate / 2}, {DefaultCanBitRate / 4}");
+                        }
+
+                        changeTiming = true;
+                    }
+                    else
+                    {
+                        speed = DefaultCanBitRate;
+                    }
+                    timing.SetDefaults(speed * 1000);
+
+                    if (code.TryGetFloatLimited('T', 0.5f, 0.95f, out float normalSamplePoint))
+                    {
+                        changeTiming = true;
+                        timing.SetNormalSamplePoint(normalSamplePoint);
+                    }
+
+                    if (code.TryGetFloatLimited('J', 0.05f, 0.5f, out float normalJumpWidth))
+                    {
+                        changeTiming = true;
+                        timing.SetNormalJumpWidth(normalJumpWidth);
+                    }
+
+                    if (code.TryGetUIntLimited('R', 0, 8, out uint bitRateMultiplier))
+                    {
+                        changeTiming = true;
+                        if (bitRateMultiplier == 0 || bitRateMultiplier == 5 || bitRateMultiplier == 7)
+                        {
+                            return new Message(MessageType.Error, $"Invalid bit rate multiplier {bitRateMultiplier}. Valid values are 1, 2, 3, 4, 6, 8, 9");
+                        }
+                        
+                        timing.EnableBrs((byte)bitRateMultiplier);
+
+                        if (code.TryGetFloatLimited('U', 0.5f, 0.95f, out float dataSamplePoint))
+                        {
+                            timing.SetDataSamplePoint(dataSamplePoint);
+                        }
+
+                        if (code.TryGetFloatLimited('K', 0.05f, 0.5f, out float dataJumpWidth))
+                        {
+                            timing.SetDataJumpWidth(dataJumpWidth);
+                        }
+                    }
+
+                    if (changeTiming)
+                    {
+                        await linkInterface.ConfigCanAsync(0, null, timing, cancellationToken);
+                    }
+
+                    await linkInterface.EnableCanAsync(true, cancellationToken);
+
+                    return new Message();
+                }
 
             // Update the firmware
             case 997:

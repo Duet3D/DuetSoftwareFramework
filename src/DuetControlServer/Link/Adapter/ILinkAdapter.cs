@@ -170,6 +170,13 @@ public interface ILinkAdapter
     bool WriteMessage(MessageTypeFlags flags, string message);
 
     /// <summary>
+    /// Enable or disable the CAN bus on the DuetCANMaster board.
+    /// </summary>
+    /// <param name="enable">True to enable the CAN bus, false to disable it</param>
+    /// <returns>True if the packet could be written</returns>
+    bool WriteEnableCan(bool enable);
+
+    /// <summary>
     /// Send a CAN message to an expansion board
     /// </summary>
     /// <param name="txToken">Token used to map the response back to the request</param>

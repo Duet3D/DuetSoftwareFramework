@@ -46,6 +46,10 @@ public sealed partial class LinkInterface(
     /// </summary>
     internal const ushort UnsolicitedTxToken = 0xFFFF;
 
+    // CAN bus requests
+    internal TaskCompletionSource? CanEnableRequest;
+    internal bool? PendingCanEnable;
+
     internal readonly List<CanRequest> CanRequests = [];
     private ushort _canTxToken;
 
@@ -78,6 +82,46 @@ public sealed partial class LinkInterface(
         builder.AppendLine($"Code buffer space: {BufferSpace}");
     }
 
+    public Task<CanResponse> ConfigCanAsync(byte dstAddress, byte? newAddress, CanTiming timing, CancellationToken cancellationToken = default)
+    {
+        CanMessageSetAddressAndNormalTiming message = new()
+        {
+            oldAddress = dstAddress,
+            newAddress = newAddress ?? dstAddress,
+            newAddressInverted = (byte)~(newAddress ?? dstAddress),
+            doSetTiming = CanMessageSetAddressAndNormalTiming.DoSetTimingYes,
+            normalTiming = timing
+        };
+
+        return SendCanMessageAsync(dstAddress, in message, cancellationToken: cancellationToken);
+    }
+
+    public Task<CanResponse> ReportCanConfigAsync(byte dstAddress, CancellationToken cancellationToken = default)
+    {
+        CanMessageSetAddressAndNormalTiming message = new()
+        {
+            oldAddress = dstAddress,
+            doSetTiming = CanMessageSetAddressAndNormalTiming.DoSetTimingNo
+        };
+
+        return SendCanMessageAsync(dstAddress, message, CanMessageType.StandardReply, cancellationToken: cancellationToken);
+    }
+
+    public async Task EnableCanAsync(bool enable, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        Task onCanEnabled;
+        using (await FirmwareActionLock.LockAsync(cancellationToken))
+        {
+            PendingCanEnable = enable;
+            CanEnableRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            onCanEnabled = CanEnableRequest.Task;
+        }
+        linkAdapter.RequestTransfer();
+        await onCanEnabled.WaitAsync(cancellationToken);
+    }
+
     /// <summary>
     /// Send a typed CAN message to an expansion board and wait for the (optional) reply
     /// </summary>
@@ -106,7 +150,7 @@ public sealed partial class LinkInterface(
     /// <param name="flags">Flags for the CAN message</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Reassembled reply (empty if no reply was expected)</returns>
-    public async Task<CanResponse> SendCanMessageAsync(CanMessageType messageType, CanMessageType replyType, byte dstAddress, byte[] payload, byte flags = 0, CancellationToken cancellationToken = default)
+    private async Task<CanResponse> SendCanMessageAsync(CanMessageType messageType, CanMessageType replyType, byte dstAddress, byte[] payload, byte flags = 0, CancellationToken cancellationToken = default)
     {
         CanRequest request;
         lock (CanRequests)

@@ -301,6 +301,22 @@ public sealed class LinkService(
                     }
                     skipChannels = true;
                 }
+
+                // Check if a CAN enable request has been made
+                if (linkInterface.CanEnableRequest is not null && linkInterface.PendingCanEnable is not null)
+                {
+                    if (linkAdapter.WriteEnableCan(linkInterface.PendingCanEnable.Value))
+                    {
+                        logger.LogInformation("Sent CAN enable request: {Enable}", linkInterface.PendingCanEnable);
+                        linkInterface.CanEnableRequest.SetResult();
+                        linkInterface.CanEnableRequest = null;
+                        linkInterface.PendingCanEnable = null;
+                    }
+                    else
+                    {
+                        logger.LogWarning("Failed to send CAN enable request: {Enable}", linkInterface.PendingCanEnable);
+                    }
+                }
             }
 
             // Check if a firmware update is supposed to be performed

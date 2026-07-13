@@ -148,7 +148,7 @@ public sealed class MotionService(
                 UseLateInputShaping = false
             };
             byte dstAddress = 2;
-            linkInterface.SendCanMessageAsync(dstAddress, msg);
+            // linkInterface.SendCanMessageAsync(dstAddress, msg);
 
             Thread.Sleep(TimeSpan.FromMilliseconds(217));
         }
