@@ -107,7 +107,7 @@
     ],
     "tasks": [
         {
-            "label": "Clean Build Directory",
+            "label": "[DSF] Clean Build Directory",
             "command": "rm -rf build",
             "type": "shell",
             "args": [],
@@ -117,7 +117,7 @@
             }
         },
         {
-            "label": "Make Build Directory",
+            "label": "[DSF] Make Build Directory",
             "command": "mkdir -p build",
             "type": "shell",
             "args": [],
@@ -130,7 +130,7 @@
             }
         },
         {
-            "label": "Restore DSF Solution",
+            "label": "[DSF] Restore DSF Solution",
             "type": "shell",
             "command": "dotnet restore ./src/DuetSoftwareFramework.sln -r linux-arm64",
             "args": [],
@@ -142,7 +142,7 @@
             }
         },
         {
-            "label": "Build CodeConsole",
+            "label": "[DSF] Build CodeConsole",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/CodeConsole -o ./build",
             "args": [],
@@ -155,7 +155,7 @@
             "dependsOn": "Make Build Directory",
         },
         {
-            "label": "Build CodeLogger",
+            "label": "[DSF] Build CodeLogger",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/CodeLogger -o ./build",
             "args": [],
@@ -168,7 +168,7 @@
             "dependsOn": "Make Build Directory",
         },
         {
-            "label": "Build CodeStream",
+            "label": "[DSF] Build CodeStream",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/CodeStream -o ./build",
             "args": [],
@@ -181,7 +181,7 @@
             "dependsOn": "Make Build Directory",
         },
         {
-            "label": "Build CustomHttpEndpoint",
+            "label": "[DSF] Build CustomHttpEndpoint",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/CustomHttpEndpoint -o ./build",
             "args": [],
@@ -194,7 +194,7 @@
             "dependsOn": "Make Build Directory",
         },
         {
-            "label": "Build DuetControlServer",
+            "label": "[DSF] Build DuetControlServer",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/DuetControlServer -o ./build",
             "args": [],
@@ -207,7 +207,7 @@
             "dependsOn": "Make Build Directory",
         },
         {
-            "label": "Build DuetPiManagementPlugin",
+            "label": "[DSF] Build DuetPiManagementPlugin",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/DuetPiManagementPlugin -o ./build",
             "args": [],
@@ -220,7 +220,7 @@
             "dependsOn": "Make Build Directory",
         },
         {
-            "label": "Build DuetPluginService",
+            "label": "[DSF] Build DuetPluginService",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/DuetPluginService -o ./build",
             "args": [],
@@ -233,7 +233,7 @@
             "dependsOn": "Make Build Directory",
         },
         {
-            "label": "Build DuetWebServer",
+            "label": "[DSF] Build DuetWebServer",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/DuetWebServer -o ./build",
             "args": [],
@@ -246,7 +246,7 @@
             "dependsOn": "Make Build Directory",
         },
         {
-            "label": "Build ModelObserver",
+            "label": "[DSF] Build ModelObserver",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/ModelObserver -o ./build",
             "args": [],
@@ -259,7 +259,7 @@
             "dependsOn": "Make Build Directory",
         },
         {
-            "label": "Build PluginManager",
+            "label": "[DSF] Build PluginManager",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/PluginManager -o ./build",
             "args": [],
@@ -272,22 +272,22 @@
             "dependsOn": "Make Build Directory",
         },
         {
-            "label": "Build All",
+            "label": "[DSF] Build All",
             "type": "shell",
             "command": "echo Build Complete",
             "args": [],
             "problemMatcher": [],
             "dependsOn": [
-                "Build CodeConsole",
-                "Build CodeLogger",
-                "Build CodeStream",
-                "Build CustomHttpEndpoint",
-                "Build DuetControlServer",
-                "Build DuetPiManagementPlugin",
-                "Build DuetPluginService",
-                "Build DuetWebServer",
-                "Build ModelObserver",
-                "Build PluginManager"
+                "[DSF] Build CodeConsole",
+                "[DSF] Build CodeLogger",
+                "[DSF] Build CodeStream",
+                "[DSF] Build CustomHttpEndpoint",
+                "[DSF] Build DuetControlServer",
+                "[DSF] Build DuetPiManagementPlugin",
+                "[DSF] Build DuetPluginService",
+                "[DSF] Build DuetWebServer",
+                "[DSF] Build ModelObserver",
+                "[DSF] Build PluginManager"
             ],
             "runOptions": {
                 "instanceLimit": 1
@@ -295,14 +295,14 @@
             "dependsOrder": "sequence"
         },
         {
-            "label": "Restore & Build All",
+            "label": "[DSF] Restore & Build All",
             "type": "shell",
             "command": "echo Build Complete",
             "args": [],
             "problemMatcher": [],
             "dependsOn": [
-                "Restore DSF Solution",
-                "Build All",
+                "[DSF] Restore DSF Solution",
+                "[DSF] Build All",
             ],
             "runOptions": {
                 "instanceLimit": 1
@@ -310,13 +310,13 @@
             "dependsOrder": "sequence"
         },
         {
-            "label": "Install vsdbg on Remote",
+            "label": "[DSF] Install vsdbg on Remote",
             "type": "shell",
             "command": "ssh -o StrictHostKeyChecking=no ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} 'mkdir -p ~/vsdbg && curl -fsSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l ~/vsdbg && ~/vsdbg/vsdbg --version'",
             "problemMatcher": []
         },
         {
-            "label": "Deploy To",
+            "label": "[DSF] Deploy To",
             "type": "shell",
             "command": "./scripts/build.sh --skip-build --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services ${input:project_name}",
             "problemMatcher": [],
@@ -325,7 +325,7 @@
             }
         },
         {
-            "label": "Deploy Local",
+            "label": "[DSF] Deploy Local",
             "type": "shell",
             "command": "./scripts/build.sh --skip-build --local ${input:project_name}",
             "problemMatcher": [],
@@ -334,7 +334,7 @@
             }
         },
         {
-            "label": "Build",
+            "label": "[DSF] Build",
             "type": "shell",
             "command": "./scripts/build.sh ${input:project_name}",
             "problemMatcher": [
@@ -345,7 +345,7 @@
             }
         },
         {
-            "label": "Build and Deploy To",
+            "label": "[DSF] Build and Deploy To",
             "type": "shell",
             "command": "./scripts/build.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services ${input:project_name}",
             "problemMatcher": [
@@ -356,7 +356,7 @@
             }
         },
         {
-            "label": "Build and Deploy Local",
+            "label": "[DSF] Build and Deploy Local",
             "type": "shell",
             "command": "./scripts/build.sh --local ${input:project_name}",
             "problemMatcher": [
@@ -367,7 +367,7 @@
             }
         },
         {
-            "label": "Build and Deploy DCS to",
+            "label": "[DSF] Build and Deploy DCS to",
             "type": "shell",
             "command": "./scripts/build.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services DuetControlServer",
             "problemMatcher": [
@@ -378,7 +378,7 @@
             }
         },
         {
-            "label": "Stop DSF Services",
+            "label": "[DSF] Stop DSF Services",
             "type": "shell",
             "command": "ssh root@${config:dsf.debug.targetIp} 'systemctl stop duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
             "problemMatcher": [],
@@ -390,7 +390,7 @@
             }
         },
         {
-            "label": "Restart DSF Services",
+            "label": "[DSF] Restart DSF Services",
             "type": "shell",
             "command": "ssh root@${config:dsf.debug.targetIp} 'systemctl restart duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
             "problemMatcher": [],
@@ -399,7 +399,7 @@
             }
         },
         {
-            "label": "Stop Remote DuetControlServer",
+            "label": "[DSF] Stop Remote DuetControlServer",
             "type": "shell",
             "command": "ssh ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} 'systemctl stop duetcontrolserver'",
             "problemMatcher": [],
@@ -411,7 +411,7 @@
             }
         },
         {
-            "label": "Start Remote DuetControlServer",
+            "label": "[DSF] Start Remote DuetControlServer",
             "type": "shell",
             "command": "ssh ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} 'systemctl start duetcontrolserver'",
             "problemMatcher": [],
@@ -423,7 +423,7 @@
             }
         },
         {
-            "label": "Set Debug Target IP",
+            "label": "[DSF] Set Debug Target IP",
             "type": "shell",
             "command": "python3 scripts/create_settings.py --target-ip ${input:debug_target_ip}",
             "problemMatcher": [],
@@ -441,84 +441,84 @@
         // submodule directory and build against the shared ./lib libraries.
         // ---------------------------------------------------------------
         {
-            "label": "CANMaster: Build Selected Target",
+            "label": "[CANMaster] Build Selected Target",
             "type": "shell",
             "command": "make ${input:fw_buildType} DuetCANMaster CANMASTER_CONFIG=${input:canmaster_target} LIBRARIES_DIR=${workspaceFolder}/lib -j",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
-            "label": "CANMaster: Build Duet3_MB6HC - Debug",
+            "label": "[CANMaster] Build Duet3_MB6HC - Debug",
             "type": "shell",
             "command": "make DEBUG=1 DuetCANMaster CANMASTER_CONFIG=Duet3_MB6HC LIBRARIES_DIR=${workspaceFolder}/lib -j",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
-            "label": "CANMaster: Build Duet3_MB6HC - Release",
+            "label": "[CANMaster] Build Duet3_MB6HC - Release",
             "type": "shell",
             "command": "make DuetCANMaster CANMASTER_CONFIG=Duet3_MB6HC LIBRARIES_DIR=${workspaceFolder}/lib -j",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
-            "label": "CANMaster: Build Duet3_MB6XD - Debug",
+            "label": "[CANMaster] Build Duet3_MB6XD - Debug",
             "type": "shell",
             "command": "make DEBUG=1 DuetCANMaster CANMASTER_CONFIG=Duet3_MB6XD LIBRARIES_DIR=${workspaceFolder}/lib -j",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
-            "label": "CANMaster: Build Duet3_MB6XD - Release",
+            "label": "[CANMaster] Build Duet3_MB6XD - Release",
             "type": "shell",
             "command": "make DuetCANMaster CANMASTER_CONFIG=Duet3_MB6XD LIBRARIES_DIR=${workspaceFolder}/lib -j",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
-            "label": "CANMaster: Build Duet3Mini5plus - Debug",
+            "label": "[CANMaster] Build Duet3Mini5plus - Debug",
             "type": "shell",
             "command": "make DEBUG=1 DuetCANMaster CANMASTER_CONFIG=Duet3Mini5plus LIBRARIES_DIR=${workspaceFolder}/lib -j",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
-            "label": "CANMaster: Build Duet3Mini5plus - Release",
+            "label": "[CANMaster] Build Duet3Mini5plus - Release",
             "type": "shell",
             "command": "make DuetCANMaster CANMASTER_CONFIG=Duet3Mini5plus LIBRARIES_DIR=${workspaceFolder}/lib -j",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
-            "label": "CANMaster: Clean All",
+            "label": "[CANMaster] Clean All",
             "type": "shell",
             "command": "make DuetCANMaster.clean-all LIBRARIES_DIR=${workspaceFolder}/lib",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
-            "label": "CANMaster: Clean Duet3_MB6HC",
+            "label": "[CANMaster] Clean Duet3_MB6HC",
             "type": "shell",
             "command": "make DuetCANMaster.clean CANMASTER_CONFIG=Duet3_MB6HC LIBRARIES_DIR=${workspaceFolder}/lib",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
-            "label": "CANMaster: Clean Duet3_MB6XD",
+            "label": "[CANMaster] Clean Duet3_MB6XD",
             "type": "shell",
             "command": "make DuetCANMaster.clean CANMASTER_CONFIG=Duet3_MB6XD LIBRARIES_DIR=${workspaceFolder}/lib",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
-            "label": "CANMaster: Clean Duet3Mini5plus",
+            "label": "[CANMaster] Clean Duet3Mini5plus",
             "type": "shell",
             "command": "make DuetCANMaster.clean CANMASTER_CONFIG=Duet3Mini5plus LIBRARIES_DIR=${workspaceFolder}/lib",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
-            "label": "CANMaster: Upload Selected Target (rr_upload)",
+            "label": "[CANMaster] Upload Selected Target (rr_upload)",
             "type": "shell",
             "command": "./Scripts/rr_upload_selected_target.sh",
             "args": [
@@ -531,7 +531,7 @@
             "group": "build"
         },
         {
-            "label": "CANMaster: Flash Firmware (M997)",
+            "label": "[CANMaster] Flash Firmware (M997)",
             "type": "shell",
             "command": "./Scripts/rr_send_gcode.sh",
             "args": [
@@ -544,11 +544,11 @@
             "group": "build"
         },
         {
-            "label": "CANMaster: Build and Deploy to Target",
+            "label": "[CANMaster] Build and Deploy to Target",
             "dependsOn": [
-                "CANMaster: Build Selected Target",
-                "CANMaster: Upload Selected Target (rr_upload)",
-                "CANMaster: Flash Firmware (M997)"
+                "[CANMaster] Build Selected Target",
+                "[CANMaster] Upload Selected Target (rr_upload)",
+                "[CANMaster] Flash Firmware (M997)"
             ],
             "dependsOrder": "sequence",
             "problemMatcher": []
@@ -559,21 +559,21 @@
         // submodule directory and build against the shared ./lib libraries.
         // ---------------------------------------------------------------
         {
-            "label": "Expansion: Build Selected Target",
+            "label": "[Expansion] Build Selected Target",
             "type": "shell",
             "command": "make ${input:fw_buildType} ${input:expansion_target} LIBRARIES_DIR=${workspaceFolder}/lib -j",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
-            "label": "Expansion: Build EXP1HCL - Debug",
+            "label": "[Expansion] Build EXP1HCL - Debug",
             "type": "shell",
             "command": "make DEBUG=1 EXP1HCL LIBRARIES_DIR=${workspaceFolder}/lib -j",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
-            "label": "Expansion: Clean All",
+            "label": "[Expansion] Clean All",
             "type": "shell",
             "command": "make Duet3Expansion.clean-all LIBRARIES_DIR=${workspaceFolder}/lib",
             "problemMatcher": [ "$gcc" ],
