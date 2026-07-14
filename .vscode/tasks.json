@@ -34,6 +34,75 @@
                 "CustomHttpEndpoint",
                 "ModelObserver"
             ]
+        },
+        {
+            "id": "canmaster_target",
+            "type": "pickString",
+            "description": "DuetCANMaster board to build for",
+            "options": [
+                {
+                    "label": "Duet3 MB6HC",
+                    "value": "Duet3_MB6HC"
+                },
+                {
+                    "label": "Duet3 MB6XD",
+                    "value": "Duet3_MB6XD"
+                },
+                {
+                    "label": "Duet3 Mini 5+",
+                    "value": "Duet3Mini5plus"
+                },
+                {
+                    "label": "All",
+                    "value": "all"
+                }
+            ]
+        },
+        {
+            "id": "expansion_target",
+            "type": "pickString",
+            "description": "Duet3Expansion board to build for",
+            "options": [
+                { "label": "EXP3HC", "value": "EXP3HC" },
+                { "label": "EXP1XD", "value": "EXP1XD" },
+                { "label": "EXP1HCL", "value": "EXP1HCL" },
+                { "label": "TOOL1LC", "value": "TOOL1LC" },
+                { "label": "SAMMYC21", "value": "SAMMYC21" },
+                { "label": "SZP", "value": "SZP" },
+                { "label": "M23CL", "value": "M23CL" },
+                { "label": "F3PTB", "value": "F3PTB" },
+                { "label": "TOOL1RR", "value": "TOOL1RR" },
+                { "label": "TOOLINDX", "value": "TOOLINDX" },
+                { "label": "All", "value": "all" }
+            ]
+        },
+        {
+            "id": "fw_buildType",
+            "type": "pickString",
+            "description": "Firmware build type",
+            "options": [
+                {
+                    "label": "Debug",
+                    "value": "DEBUG=1"
+                },
+                {
+                    "label": "Release",
+                    "value": ""
+                }
+            ]
+        },
+        {
+            "id": "duetHost",
+            "type": "promptString",
+            "description": "Duet host or IP",
+            "default": "duet3.local"
+        },
+        {
+            "id": "duetPassword",
+            "type": "promptString",
+            "description": "Duet HTTP password (leave empty if disabled)",
+            "password": true,
+            "default": ""
         }
     ],
     "tasks": [
@@ -365,6 +434,150 @@
                 "reveal": "always",
                 "panel": "shared"
             }
+        },
+
+        // ---------------------------------------------------------------
+        // DuetCANMaster firmware (src/DuetCANMaster). These run in the
+        // submodule directory and build against the shared ./lib libraries.
+        // ---------------------------------------------------------------
+        {
+            "label": "CANMaster: Build Selected Target",
+            "type": "shell",
+            "command": "make ${input:fw_buildType} DuetCANMaster CANMASTER_CONFIG=${input:canmaster_target} LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "CANMaster: Build Duet3_MB6HC - Debug",
+            "type": "shell",
+            "command": "make DEBUG=1 DuetCANMaster CANMASTER_CONFIG=Duet3_MB6HC LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "CANMaster: Build Duet3_MB6HC - Release",
+            "type": "shell",
+            "command": "make DuetCANMaster CANMASTER_CONFIG=Duet3_MB6HC LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "CANMaster: Build Duet3_MB6XD - Debug",
+            "type": "shell",
+            "command": "make DEBUG=1 DuetCANMaster CANMASTER_CONFIG=Duet3_MB6XD LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "CANMaster: Build Duet3_MB6XD - Release",
+            "type": "shell",
+            "command": "make DuetCANMaster CANMASTER_CONFIG=Duet3_MB6XD LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "CANMaster: Build Duet3Mini5plus - Debug",
+            "type": "shell",
+            "command": "make DEBUG=1 DuetCANMaster CANMASTER_CONFIG=Duet3Mini5plus LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "CANMaster: Build Duet3Mini5plus - Release",
+            "type": "shell",
+            "command": "make DuetCANMaster CANMASTER_CONFIG=Duet3Mini5plus LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "CANMaster: Clean All",
+            "type": "shell",
+            "command": "make DuetCANMaster.clean-all LIBRARIES_DIR=${workspaceFolder}/lib",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "CANMaster: Clean Duet3_MB6HC",
+            "type": "shell",
+            "command": "make DuetCANMaster.clean CANMASTER_CONFIG=Duet3_MB6HC LIBRARIES_DIR=${workspaceFolder}/lib",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "CANMaster: Clean Duet3_MB6XD",
+            "type": "shell",
+            "command": "make DuetCANMaster.clean CANMASTER_CONFIG=Duet3_MB6XD LIBRARIES_DIR=${workspaceFolder}/lib",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "CANMaster: Clean Duet3Mini5plus",
+            "type": "shell",
+            "command": "make DuetCANMaster.clean CANMASTER_CONFIG=Duet3Mini5plus LIBRARIES_DIR=${workspaceFolder}/lib",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "CANMaster: Upload Selected Target (rr_upload)",
+            "type": "shell",
+            "command": "./Scripts/rr_upload_selected_target.sh",
+            "args": [
+                "${input:canmaster_target}",
+                "${input:duetHost}",
+                "${input:duetPassword}"
+            ],
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "problemMatcher": [],
+            "group": "build"
+        },
+        {
+            "label": "CANMaster: Flash Firmware (M997)",
+            "type": "shell",
+            "command": "./Scripts/rr_send_gcode.sh",
+            "args": [
+                "${input:duetHost}",
+                "${input:duetPassword}",
+                "M997"
+            ],
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "problemMatcher": [],
+            "group": "build"
+        },
+        {
+            "label": "CANMaster: Build and Deploy to Target",
+            "dependsOn": [
+                "CANMaster: Build Selected Target",
+                "CANMaster: Upload Selected Target (rr_upload)",
+                "CANMaster: Flash Firmware (M997)"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": []
+        },
+
+        // ---------------------------------------------------------------
+        // Duet3Expansion firmware (src/Duet3Expansion). These run in the
+        // submodule directory and build against the shared ./lib libraries.
+        // ---------------------------------------------------------------
+        {
+            "label": "Expansion: Build Selected Target",
+            "type": "shell",
+            "command": "make ${input:fw_buildType} ${input:expansion_target} LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "Expansion: Build EXP1HCL - Debug",
+            "type": "shell",
+            "command": "make DEBUG=1 EXP1HCL LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "Expansion: Clean All",
+            "type": "shell",
+            "command": "make Duet3Expansion.clean-all LIBRARIES_DIR=${workspaceFolder}/lib",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
         }
     ]
 }

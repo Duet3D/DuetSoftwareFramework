@@ -45,6 +45,192 @@
                 "quoteArgs": true
             },
             "justMyCode": false
+        },
+
+        // ---------------------------------------------------------------
+        // DuetCANMaster firmware (src/DuetCANMaster)
+        // ---------------------------------------------------------------
+        {
+            "name": "[DuetCANMaster_MB6HC] Build, Flash & Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/DuetCANMaster/Duet3_MB6HC/Duet3Firmware_MB6HC.elf",
+            "cwd": "${workspaceFolder}/src/DuetCANMaster",
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "miDebuggerServerAddress": "${input:canmaster_gdb_server}",
+            "launchCompleteCommand": "exec-continue",
+            "stopAtEntry": false,
+            "preLaunchTask": "CANMaster: Build Duet3_MB6HC - Debug",
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "postRemoteConnectCommands": [
+                { "text": "monitor reset" },
+                { "text": "monitor halt" },
+                { "text": "load" },
+                { "text": "monitor reset" },
+                { "text": "monitor halt" }
+            ]
+        },
+        {
+            "name": "[DuetCANMaster_MB6HC] Debug Only",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/DuetCANMaster/Duet3_MB6HC/Duet3Firmware_MB6HC.elf",
+            "cwd": "${workspaceFolder}/src/DuetCANMaster",
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "miDebuggerServerAddress": "${input:canmaster_gdb_server}",
+            "launchCompleteCommand": "None",
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "[DuetCANMaster_MB6XD] Build, Flash & Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/DuetCANMaster/Duet3_MB6XD/Duet3Firmware_MB6XD.elf",
+            "cwd": "${workspaceFolder}/src/DuetCANMaster",
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "miDebuggerServerAddress": "${input:canmaster_gdb_server}",
+            "preLaunchTask": "CANMaster: Build Duet3_MB6XD - Debug",
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "postRemoteConnectCommands": [
+                { "text": "monitor reset" },
+                { "text": "monitor halt" },
+                { "text": "load" },
+                { "text": "monitor reset" },
+                { "text": "monitor halt" }
+            ]
+        },
+        {
+            "name": "[DuetCANMaster_MB6XD] Debug Only",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/DuetCANMaster/Duet3_MB6XD/Duet3Firmware_MB6XD.elf",
+            "cwd": "${workspaceFolder}/src/DuetCANMaster",
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "miDebuggerServerAddress": "${input:canmaster_gdb_server}",
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "[DuetCANMaster_Mini5plus] Build, Flash & Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/DuetCANMaster/Duet3Mini5plus/Duet3Firmware_Mini5plus.elf",
+            "cwd": "${workspaceFolder}/src/DuetCANMaster",
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "miDebuggerServerAddress": "${input:canmaster_gdb_server}",
+            "preLaunchTask": "CANMaster: Build Duet3Mini5plus - Debug",
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "postRemoteConnectCommands": [
+                { "text": "monitor reset" },
+                { "text": "monitor halt" },
+                { "text": "load" },
+                { "text": "monitor reset" },
+                { "text": "monitor halt" }
+            ]
+        },
+        {
+            "name": "[DuetCANMaster_Mini5plus] Debug Only",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/DuetCANMaster/Duet3Mini5plus/Duet3Firmware_Mini5plus.elf",
+            "cwd": "${workspaceFolder}/src/DuetCANMaster",
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "miDebuggerServerAddress": "${input:canmaster_gdb_server}",
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+
+        // ---------------------------------------------------------------
+        // Duet3Expansion firmware (src/Duet3Expansion)
+        // ---------------------------------------------------------------
+        {
+            "name": "[EXP1HCL] Build, Flash & Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Duet3Expansion/EXP1HCL/Duet3Firmware_EXP1HCL.elf",
+            "cwd": "${workspaceFolder}/src/Duet3Expansion",
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "miDebuggerServerAddress": "${input:expansion_gdb_server}",
+            "launchCompleteCommand": "exec-continue",
+            "stopAtEntry": false,
+            "preLaunchTask": "Expansion: Build EXP1HCL - Debug",
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "postRemoteConnectCommands": [
+                { "text": "monitor reset" },
+                { "text": "monitor halt" },
+                { "text": "load" }
+            ]
+        },
+        {
+            "name": "[EXP1HCL] Debug Only",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Duet3Expansion/EXP1HCL/Duet3Firmware_EXP1HCL.elf",
+            "cwd": "${workspaceFolder}/src/Duet3Expansion",
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "miDebuggerServerAddress": "${input:expansion_gdb_server}",
+            "launchCompleteCommand": "None",
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ],
+    "inputs": [
+        {
+            "id": "canmaster_gdb_server",
+            "type": "promptString",
+            "description": "GDB server host for DuetCANMaster (use \"host.docker.internal:port\" from inside the container)",
+            "default": "host.docker.internal:2331"
+        },
+        {
+            "id": "expansion_gdb_server",
+            "type": "promptString",
+            "description": "GDB server host for Duet3Expansion (use \"host.docker.internal:port\" from inside the container)",
+            "default": "host.docker.internal:2331"
         }
     ]
 }
