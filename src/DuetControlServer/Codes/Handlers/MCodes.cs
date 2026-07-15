@@ -443,7 +443,7 @@ namespace DuetControlServer.Codes.Handlers
                 case 37:
                     if (await Processor.FlushAsync(code, syncFileStreams: true))
                     {
-                        if (code.Channel != CodeChannel.File2)
+                        if (code.Channel != CodeChannel.File2 && code.HasParameter('P'))
                         {
                             string fileName = code.GetString('P');
                             string physicalFile = await FilePath.ToPhysicalAsync(fileName, FileDirectory.GCodes);
@@ -460,6 +460,8 @@ namespace DuetControlServer.Codes.Handlers
                                 }
 
                                 await JobProcessor.SelectFile(fileName, physicalFile, true);
+                                // F0 suppresses writing the simulated time back to the file; absent or F1 updates it, as in standalone mode
+                                JobProcessor.UpdateSimulatedTime = code.GetInt('F', 1) == 1;
                                 // Simulation is started when M37 has been processed by the firmware
                             }
                         }

@@ -114,6 +114,11 @@ namespace DuetControlServer.Files
         private static volatile bool _isSimulating;
 
         /// <summary>
+        /// Whether the simulated time is written back to the file when a simulation completes (cleared by M37 F0)
+        /// </summary>
+        public static bool UpdateSimulatedTime { get; set; } = true;
+
+        /// <summary>
         /// Indicates if the file print has been paused
         /// </summary>
         public static bool IsPaused { get; private set; }
@@ -567,13 +572,14 @@ namespace DuetControlServer.Files
                     }
 
                     // Get the last print result
-                    bool isCancelled, isAborted, isSimulating;
+                    bool isCancelled, isAborted, isSimulating, updateSimulatedTime;
                     string physicalFileName;
                     using (await LockAsync())
                     {
                         isCancelled = IsCancelled;
                         isAborted = IsAborted;
                         isSimulating = IsSimulating;
+                        updateSimulatedTime = UpdateSimulatedTime;
                         physicalFileName = _file.PhysicalFileName;
                     }
 
@@ -612,7 +618,7 @@ namespace DuetControlServer.Files
                     }
 
                     // Update the last simulated time
-                    if (isSimulating && !isAborted && !isCancelled)
+                    if (isSimulating && updateSimulatedTime && !isAborted && !isCancelled)
                     {
                         // Wait for the simulation time to be available
                         int? lastDuration = null;
