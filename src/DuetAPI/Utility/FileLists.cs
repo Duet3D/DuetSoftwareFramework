@@ -186,7 +186,7 @@ namespace DuetAPI.Utility
                             if (startAt >= 0)
                             {
                                 writer.WriteEndArray();
-                                writer.WriteNumber("next", Math.Min(startAt, numItems - 1));
+                                writer.WriteNumber("next", numItems - 1);
                                 writer.WriteNumber("err", 0);
                                 writer.WriteEndObject();
                                 writer.Flush();
@@ -219,7 +219,7 @@ namespace DuetAPI.Utility
                             if (startAt >= 0)
                             {
                                 writer.WriteEndArray();
-                                writer.WriteNumber("next", Math.Min(startAt, numItems - 1));
+                                writer.WriteNumber("next", numItems - 1);
                                 writer.WriteNumber("err", 0);
                                 writer.WriteEndObject();
                                 writer.Flush();
