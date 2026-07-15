@@ -113,7 +113,7 @@ namespace DuetControlServer.IPC.Processors
         {
             InterceptInitMessage interceptInitMessage = (InterceptInitMessage)initMessage;
             _mode = interceptInitMessage.InterceptionMode;
-            _channels = (interceptInitMessage.Channels is not null) ? [.. interceptInitMessage.Channels] : Inputs.ValidChannels;
+            _channels = (interceptInitMessage.Channels is { Count: > 0 }) ? [.. interceptInitMessage.Channels] : Inputs.ValidChannels;
             _autoFlush = interceptInitMessage.AutoFlush && (interceptInitMessage.Filters?.Count ?? 0) > 0;
             _autoEvaluateExpressions = _autoFlush && interceptInitMessage.AutoEvaluateExpressions;
             _filters = interceptInitMessage.Filters ?? [];
