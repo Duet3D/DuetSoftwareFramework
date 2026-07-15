@@ -196,8 +196,10 @@ namespace DuetAPI.Commands
             {
                 StringValue = longValue.ToString("G", CultureInfo.InvariantCulture);
             }
-            else if (value is int[] intArray)
+            else if (value is int[] intArray && intArray.GetType() == typeof(int[]))
             {
+                // Note the extra type checks: the CLR treats int[] and uint[] as interchangeable array types,
+                // so the patterns alone cannot tell them apart
                 StringValue = string.Join(":", intArray.Select(intVal => intVal.ToString("G", CultureInfo.InvariantCulture)));
             }
             else if (value is uint[] uintArray)
@@ -570,7 +572,7 @@ namespace DuetAPI.Commands
             {
                 return [Convert.ToSingle(uintValue)];
             }
-            if (codeParameter.ParsedValue is int[] intArray)
+            if (codeParameter.ParsedValue is int[] intArray && intArray.GetType() == typeof(int[]))
             {
                 return intArray.Select(Convert.ToSingle).ToArray();
             }
@@ -595,7 +597,7 @@ namespace DuetAPI.Commands
             {
                 return null;
             }
-            if (codeParameter.ParsedValue is int[] intArray)
+            if (codeParameter.ParsedValue is int[] intArray && intArray.GetType() == typeof(int[]))
             {
                 return intArray;
             }
@@ -628,7 +630,7 @@ namespace DuetAPI.Commands
             {
                 return null;
             }
-            if (codeParameter.ParsedValue is uint[] uintArray)
+            if (codeParameter.ParsedValue is uint[] uintArray && uintArray.GetType() == typeof(uint[]))
             {
                 return uintArray;
             }
@@ -697,11 +699,11 @@ namespace DuetAPI.Commands
             {
                 return [Convert.ToInt64(floatValue)];
             }
-            if (codeParameter.ParsedValue is int[] intArray)
+            if (codeParameter.ParsedValue is int[] intArray && intArray.GetType() == typeof(int[]))
             {
                 return intArray.Select(Convert.ToInt64).ToArray();
             }
-            if (codeParameter.ParsedValue is int[] uintArray)
+            if (codeParameter.ParsedValue is uint[] uintArray)
             {
                 return uintArray.Select(Convert.ToInt64).ToArray();
             }
@@ -733,7 +735,7 @@ namespace DuetAPI.Commands
             {
                 return [driverId];
             }
-            if (codeParameter.ParsedValue is uint[] uintArray)
+            if (codeParameter.ParsedValue is uint[] uintArray && uintArray.GetType() == typeof(uint[]))
             {
                 return uintArray.Select(value => new DriverId(value)).ToArray();
             }
@@ -753,15 +755,15 @@ namespace DuetAPI.Commands
         /// <returns>True if both objects are equal</returns>
         public static bool operator ==(CodeParameter? a, object? b)
         {
-            if (a is null || a.ParsedValue is null)
+            if (a is null)
             {
                 return b is null;
             }
             if (b is CodeParameter other)
             {
-                return a.Letter.Equals(other.Letter) && a.ParsedValue.Equals(other.ParsedValue);
+                return a.Letter.Equals(other.Letter) && Equals(a.ParsedValue, other.ParsedValue);
             }
-            return a.ParsedValue.Equals(b);
+            return a.ParsedValue is null ? b is null : a.ParsedValue.Equals(b);
         }
 
         /// <summary>
