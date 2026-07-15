@@ -1,28 +1,28 @@
-[submodule "lib/CANlib"]
-	path = lib/CANlib
-	url = https://github.com/Duet3D/CANlib.git
-[submodule "lib/CoreN2G"]
-	path = lib/CoreN2G
-	url = https://github.com/Duet3D/CoreN2G.git
-[submodule "lib/FreeRTOS"]
-	path = lib/FreeRTOS
-	url = https://github.com/Duet3D/FreeRTOS.git
-[submodule "lib/RRFLibraries"]
-	path = lib/RRFLibraries
-	url = https://github.com/Duet3D/RRFLibraries.git
-[submodule "lib/LibTinyusb"]
-	path = lib/LibTinyusb
-	url = https://github.com/Duet3D/LibTinyusb.git
-[submodule "lib/LibMbedTls"]
-	path = lib/LibMbedTls
-	url = https://github.com/Duet3D/LibMbedTls.git
-[submodule "lib/Qfplib-M0-full"]
-	path = lib/Qfplib-M0-full
-	url = https://github.com/Duet3D/Qfplib-M0-full.git
 [submodule "src/DuetCANMaster"]
 	path = src/DuetCANMaster
-	url = https://github.com/Duet3D/DuetCANMaster.git
+	url = git@github.com:Duet3D/DuetCANMaster.git
 [submodule "src/Duet3Expansion"]
 	path = src/Duet3Expansion
-	url = https://github.com/Duet3D/Duet3Expansion.git
+	url = git@github.com:Duet3D/Duet3Expansion.git
 	branch = 3.7-docker
+[submodule "lib/CANlib"]
+	path = lib/CANlib
+	url = git@github.com:Duet3D/CANlib.git
+[submodule "lib/CoreN2G"]
+	path = lib/CoreN2G
+	url = git@github.com:Duet3D/CoreN2G.git
+[submodule "lib/FreeRTOS"]
+	path = lib/FreeRTOS
+	url = git@github.com:Duet3D/FreeRTOS.git
+[submodule "lib/RRFLibraries"]
+	path = lib/RRFLibraries
+	url = git@github.com:Duet3D/RRFLibraries.git
+[submodule "lib/LibTinyusb"]
+	path = lib/LibTinyusb
+	url = git@github.com:Duet3D/LibTinyusb.git
+[submodule "lib/LibMbedTls"]
+	path = lib/LibMbedTls
+	url = git@github.com:Duet3D/LibMbedTls.git
+[submodule "lib/Qfplib-M0-full"]
+	path = lib/Qfplib-M0-full
+	url = git@github.com:Duet3D/Qfplib-M0-full.git
