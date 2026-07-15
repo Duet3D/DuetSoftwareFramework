@@ -91,7 +91,11 @@ namespace DuetAPIClient
         {
             // Create a new connection
             UnixDomainSocketEndPoint endPoint = new(socketPath);
-            _unixSocket.Connect(endPoint);
+#if NET6_0_OR_GREATER
+            await _unixSocket.ConnectAsync(endPoint, cancellationToken);
+#else
+            await _unixSocket.ConnectAsync(endPoint);
+#endif
 
             // Read the server init message
             ServerInitMessage ownMessage = new();
@@ -148,7 +152,7 @@ namespace DuetAPIClient
             if (response is not null && !response.Success)
             {
                 ErrorResponse errorResponse = (ErrorResponse)response;
-                if (errorResponse.ErrorType == nameof(TaskCanceledException))
+                if (errorResponse.ErrorType is nameof(TaskCanceledException) or nameof(OperationCanceledException))
                 {
                     throw new TaskCanceledException(errorResponse.ErrorMessage);
                 }
@@ -226,6 +230,10 @@ namespace DuetAPIClient
                             else if (reader.TokenType == JsonTokenType.False)
                             {
                                 ErrorResponse errorResponse = JsonSerializer.Deserialize(jsonSpan, CommandContext.Default.ErrorResponse)!;
+                                if (errorResponse.ErrorType is nameof(TaskCanceledException) or nameof(OperationCanceledException))
+                                {
+                                    throw new TaskCanceledException(errorResponse.ErrorMessage);
+                                }
                                 throw new InternalServerException(command.Command, errorResponse.ErrorType, errorResponse.ErrorMessage);
                             }
                             else
@@ -241,8 +249,10 @@ namespace DuetAPIClient
                             }
                             else
                             {
+                                // Save the reader state and skip the value so the loop does not descend into it
                                 resultSeen = true;
                                 resultReader = reader;
+                                reader.Skip();
                             }
                         }
                         else
@@ -254,6 +264,11 @@ namespace DuetAPIClient
                     {
                         reader.Skip();
                     }
+                }
+                if (isSuccess)
+                {
+                    // Success response without a result (e.g. from an asynchronously executed code)
+                    return default!;
                 }
                 throw new ArgumentException("missing success key");
             }

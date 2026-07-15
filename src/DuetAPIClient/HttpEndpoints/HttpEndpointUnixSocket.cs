@@ -134,13 +134,22 @@ namespace DuetAPIClient
         /// </summary>
         private async void AcceptConnections()
         {
-            try
+            do
             {
-                do
+                Socket socket;
+                try
                 {
-                    Socket socket = await _unixSocket.AcceptAsync();
-                    HttpEndpointConnection connection = new(socket, EndpointType == HttpEndpointType.WebSocket);
+                    socket = await _unixSocket.AcceptAsync();
+                }
+                catch (Exception e) when (e is SocketException or ObjectDisposedException)
+                {
+                    // Listening socket has been closed, stop accepting new connections
+                    break;
+                }
 
+                try
+                {
+                    HttpEndpointConnection connection = new(socket, EndpointType == HttpEndpointType.WebSocket);
                     if (OnEndpointRequestReceived is not null)
                     {
                         // Invoke the event handler and forward the wrapped connection for dealing with a single endpoint connection
@@ -154,12 +163,12 @@ namespace DuetAPIClient
                         connection.Dispose();
                     }
                 }
-                while (true);
+                catch
+                {
+                    // A faulty connection or event handler must not terminate the accept loop
+                }
             }
-            catch (SocketException)
-            {
-                // may happen if an endpoint handler deals with a terminated connection synchronously
-            }
+            while (!disposed);
         }
     }
 }
