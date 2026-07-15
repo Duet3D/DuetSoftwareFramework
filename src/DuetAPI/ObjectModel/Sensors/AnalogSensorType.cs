@@ -81,7 +81,7 @@ namespace DuetAPI.ObjectModel
         CurrentLoop,
 
         /// <summary>
-        /// ADS131 channel 0
+        /// ADS131 channel 0 (unipolar)
         /// </summary>
         ADS131Chan0,
 
@@ -108,7 +108,15 @@ namespace DuetAPI.ObjectModel
         /// <summary>
         /// Unknown temperature sensor
         /// </summary>
-        Unknown
+        Unknown,
+
+        /// <summary>
+        /// ADS131 channel 0 (bipolar)
+        /// </summary>
+        /// <remarks>
+        /// Appended after Unknown so the values of the other members remain unchanged
+        /// </remarks>
+        ADS131Chan0Bipolar
 	}
 
     /// <summary>
@@ -142,12 +150,13 @@ namespace DuetAPI.ObjectModel
                     "bmepressure" => AnalogSensorType.BME280Pressure,
                     "bmehumidity" => AnalogSensorType.BME280Humidity,
                     "dhthumidity" => AnalogSensorType.DHTHumidity,
-                    "currentlooppyro" => AnalogSensorType.CurrentLoop,
-                    "ads131.chan0" => AnalogSensorType.ADS131Chan0,
+                    "currentloop" or "currentlooppyro" => AnalogSensorType.CurrentLoop,
+                    "ads131.chan0.u" or "ads131.chan0" => AnalogSensorType.ADS131Chan0,
+                    "ads131.chan0.b" => AnalogSensorType.ADS131Chan0Bipolar,
                     "ads131.chan1" => AnalogSensorType.ADS131Chan1,
                     "mcutemp" => AnalogSensorType.McuTemp,
                     "drivers" => AnalogSensorType.Drivers,
-                    "driversduex" => AnalogSensorType.DriversDuex,
+                    "drivers-duex" or "driversduex" => AnalogSensorType.DriversDuex,
                     _ => AnalogSensorType.Unknown,
                 };
             }
@@ -204,10 +213,13 @@ namespace DuetAPI.ObjectModel
                     writer.WriteStringValue("bmehumidity");
                     break;
                 case AnalogSensorType.CurrentLoop:
-                    writer.WriteStringValue("currentlooppyro");
+                    writer.WriteStringValue("currentloop");
                     break;
                 case AnalogSensorType.ADS131Chan0:
-                    writer.WriteStringValue("ads131.chan0");
+                    writer.WriteStringValue("ads131.chan0.u");
+                    break;
+                case AnalogSensorType.ADS131Chan0Bipolar:
+                    writer.WriteStringValue("ads131.chan0.b");
                     break;
                 case AnalogSensorType.ADS131Chan1:
                     writer.WriteStringValue("ads131.chan1");
@@ -219,7 +231,7 @@ namespace DuetAPI.ObjectModel
                     writer.WriteStringValue("drivers");
                     break;
                 case AnalogSensorType.DriversDuex:
-                    writer.WriteStringValue("driversduex");
+                    writer.WriteStringValue("drivers-duex");
                     break;
                 default:
                     writer.WriteStringValue("unknown");

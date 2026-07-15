@@ -1,4 +1,6 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Calibrated properties of a laser filament monitor
@@ -8,6 +10,7 @@
         /// <summary>
         /// Calibration factor of this sensor
         /// </summary>
+        [Obsolete("Use Configured.CalibrationFactor instead, RRF does not report this value here")]
         public float CalibrationFactor
         {
             get => _calibrationFactor;
@@ -36,14 +39,14 @@
         private float _percentMin;
 
         /// <summary>
-        /// Calibrated sensivity
+        /// Calibrated sensitivity
         /// </summary>
-        public float Sensivity
+        public float Sensitivity
         {
-            get => _sensivity;
-            set => SetPropertyValue(ref _sensivity, value);
+            get => _sensitivity;
+            set => SetPropertyValue(ref _sensitivity, value);
         }
-        private float _sensivity;
+        private float _sensitivity;
 
         /// <summary>
         /// Total extruded distance (in mm)
@@ -70,6 +73,16 @@
 			set => SetPropertyValue(ref _allMoves, value);
         }
 		private bool _allMoves;
+
+		/// <summary>
+		/// Calibration factor of this sensor
+		/// </summary>
+		public float CalibrationFactor
+		{
+			get => _calibrationFactor;
+			set => SetPropertyValue(ref _calibrationFactor, value);
+		}
+		private float _calibrationFactor;
 
 		/// <summary>
 		/// Maximum percentage (0..1 or greater)
