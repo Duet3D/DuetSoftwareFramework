@@ -61,13 +61,29 @@ public sealed class MotionService(
             {
                 if (settings.Value.IsolateMotionThread && DuetSharedLibrary.ProcessHelpers.IsRaspberryPi())
                 {
-                    if (DuetSharedLibrary.ProcessHelpers.PinCurrentThreadToCore(settings.Value.IsolatedCoreId))
+                    // Use a dedicated motion core if configured, otherwise share the interface core
+                    int motionCore = settings.Value.MotionCoreId >= 0 ? settings.Value.MotionCoreId : settings.Value.IsolatedCoreId;
+                    if (DuetSharedLibrary.ProcessHelpers.PinCurrentThreadToCore(motionCore))
                     {
-                        logger.LogInformation("Motion thread pinned to CPU core {CoreId}", settings.Value.IsolatedCoreId);
+                        logger.LogInformation("Motion thread pinned to CPU core {CoreId}", motionCore);
                     }
                     else
                     {
-                        logger.LogWarning("Failed to pin Motion thread to CPU core {CoreId}", settings.Value.IsolatedCoreId);
+                        logger.LogWarning("Failed to pin Motion thread to CPU core {CoreId}", motionCore);
+                    }
+
+                    if (settings.Value.UseRealtimeScheduling)
+                    {
+                        // Keep motion below the interface priority so an SPI transfer is never starved by
+                        // motion computation when the two share a core
+                        if (DuetSharedLibrary.ProcessHelpers.SetCurrentThreadRealtimePriority(settings.Value.MotionRtPriority))
+                        {
+                            logger.LogInformation("Motion thread set to SCHED_FIFO priority {Priority}", settings.Value.MotionRtPriority);
+                        }
+                        else
+                        {
+                            logger.LogWarning("Failed to set Motion thread to real-time priority (needs CAP_SYS_NICE)");
+                        }
                     }
                 }
                 Execute(stoppingToken);
