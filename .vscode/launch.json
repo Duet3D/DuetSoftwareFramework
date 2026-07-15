@@ -61,7 +61,7 @@
             "miDebuggerServerAddress": "${input:canmaster_gdb_server}",
             "launchCompleteCommand": "exec-continue",
             "stopAtEntry": false,
-            "preLaunchTask": "CANMaster: Build Duet3_MB6HC - Debug",
+            "preLaunchTask": "[CANMaster] Build Duet3_MB6HC - Debug",
             "setupCommands": [
                 {
                     "text": "-enable-pretty-printing",
@@ -102,7 +102,7 @@
             "MIMode": "gdb",
             "miDebuggerPath": "arm-none-eabi-gdb",
             "miDebuggerServerAddress": "${input:canmaster_gdb_server}",
-            "preLaunchTask": "CANMaster: Build Duet3_MB6XD - Debug",
+            "preLaunchTask": "[CANMaster] Build Duet3_MB6XD - Debug",
             "setupCommands": [
                 {
                     "text": "-enable-pretty-printing",
@@ -142,7 +142,7 @@
             "MIMode": "gdb",
             "miDebuggerPath": "arm-none-eabi-gdb",
             "miDebuggerServerAddress": "${input:canmaster_gdb_server}",
-            "preLaunchTask": "CANMaster: Build Duet3Mini5plus - Debug",
+            "preLaunchTask": "[CANMaster] Build Duet3Mini5plus - Debug",
             "setupCommands": [
                 {
                     "text": "-enable-pretty-printing",
@@ -188,7 +188,7 @@
             "miDebuggerServerAddress": "${input:expansion_gdb_server}",
             "launchCompleteCommand": "exec-continue",
             "stopAtEntry": false,
-            "preLaunchTask": "Expansion: Build EXP1HCL - Debug",
+            "preLaunchTask": "[Expansion] Build EXP1HCL - Debug",
             "setupCommands": [
                 {
                     "text": "-enable-pretty-printing",
