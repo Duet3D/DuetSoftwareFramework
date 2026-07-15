@@ -18,6 +18,7 @@ public sealed class InputGpioPin : IDisposable
     private readonly bool _useV2;
     private uint _lastSeqno;
     private bool _haveSeqno, _disposed;
+    private int _monitorCoreId = -1, _monitorRtPriority;
 
     /// <summary>
     /// Whether kernel-provided edge sequence numbers are available (true on the v2 uAPI)
@@ -188,14 +189,18 @@ public sealed class InputGpioPin : IDisposable
     /// <summary>
     /// Start a background thread that blocks on edge events and raises <see cref="PinChanged"/>
     /// </summary>
+    /// <param name="coreId">CPU core to pin the monitor thread to, or negative to leave it unpinned (Raspberry Pi only)</param>
+    /// <param name="realtimePriority">SCHED_FIFO priority for the monitor thread, or 0 to leave it under CFS (Raspberry Pi only)</param>
     /// <param name="cancellationToken">Cancellation token to stop monitoring</param>
-    public void StartMonitoring(CancellationToken cancellationToken = default)
+    public void StartMonitoring(int coreId = -1, int realtimePriority = 0, CancellationToken cancellationToken = default)
     {
         if (_reqFd < 0)
         {
             throw new IOException("GPIO line is not configured");
         }
 
+        _monitorCoreId = coreId;
+        _monitorRtPriority = realtimePriority;
         Thread thread = new(() => MonitorLoop(cancellationToken)) { Name = "GpioMonitor", IsBackground = true, Priority = ThreadPriority.AboveNormal };
         thread.Start();
     }
@@ -205,12 +210,17 @@ public sealed class InputGpioPin : IDisposable
 
     private unsafe void MonitorLoop(CancellationToken cancellationToken)
     {
-#if true
         if (ProcessHelpers.IsRaspberryPi())
         {
-            ProcessHelpers.PinCurrentThreadToCore(3);
+            if (_monitorCoreId >= 0)
+            {
+                ProcessHelpers.PinCurrentThreadToCore(_monitorCoreId);
+            }
+            if (_monitorRtPriority > 0)
+            {
+                ProcessHelpers.SetCurrentThreadRealtimePriority(_monitorRtPriority);
+            }
         }
-#endif
 
         PollFd pollData = new() { Fd = _reqFd, Events = (short)PollFlags.POLLIN };
         gpio_v2_line_event eventV2 = new();

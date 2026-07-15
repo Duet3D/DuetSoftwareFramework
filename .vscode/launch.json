@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Remote DuetControlServer",
+            "name": "[DSF] Launch Remote DuetControlServer",
             "type": "coreclr",
             "request": "launch",
             "program": "/opt/dsf/bin/DuetControlServer",
@@ -26,11 +26,11 @@
                 "/workspaces/DuetSoftwareFramework": "${workspaceFolder}"
             },
             "justMyCode": false,
-            "preLaunchTask": "Stop Remote DuetControlServer",
-            "postDebugTask": "Start Remote DuetControlServer"
+            "preLaunchTask": "[DSF] Stop Remote DuetControlServer",
+            "postDebugTask": "[DSF] Start Remote DuetControlServer"
         },
         {
-            "name": "Attach Remote DuetControlServer",
+            "name": "[DSF] Attach Remote DuetControlServer",
             "type": "coreclr",
             "request": "attach",
             "processName": "DuetControlServer",

@@ -183,9 +183,52 @@ public sealed class Settings
     public bool IsolateMotionThread { get; set; } = true;
 
     /// <summary>
-    /// The CPU core which has been isolated from the OS scheduler
+    /// The CPU core which has been isolated from the OS scheduler. The SPI interface thread and the GPIO
+    /// monitor threads are pinned here; the motion thread is pinned here too unless <see cref="MotionCoreId"/>
+    /// is set. For best latency this should be a core reserved via the kernel <c>isolcpus</c> boot parameter
     /// </summary>
     public int IsolatedCoreId { get; set; } = 3;
+
+    /// <summary>
+    /// CPU core to pin the motion thread to. When negative, the motion thread shares
+    /// <see cref="IsolatedCoreId"/> with the SPI interface thread. Placing motion on its own isolated core
+    /// avoids the two real-time threads competing for the same CPU
+    /// </summary>
+    public int MotionCoreId { get; set; } = -1;
+
+    /// <summary>
+    /// CPU core to pin the GPIO edge-monitor threads (TfrRdy/DataAvailable) to. When negative, they share
+    /// <see cref="IsolatedCoreId"/> with the SPI interface thread so that waking the interface thread is a
+    /// cheap local context switch rather than a cross-core wake-up
+    /// </summary>
+    public int GpioMonitorCoreId { get; set; } = -1;
+
+    /// <summary>
+    /// Whether to run the interface, motion and GPIO monitor threads under the SCHED_FIFO real-time
+    /// scheduling policy (only relevant on Raspberry Pi and requires CAP_SYS_NICE). This is what actually
+    /// bounds scheduling jitter on a PREEMPT_RT kernel; without it these threads run under CFS and can be
+    /// preempted for tens of milliseconds
+    /// </summary>
+    public bool UseRealtimeScheduling { get; set; } = true;
+
+    /// <summary>
+    /// SCHED_FIFO priority for the GPIO edge-monitor threads. This must be the highest of the three because
+    /// the interface thread cannot make progress until a monitor thread has delivered the pin edge that
+    /// unblocks it
+    /// </summary>
+    public int GpioMonitorRtPriority { get; set; } = 60;
+
+    /// <summary>
+    /// SCHED_FIFO priority for the SPI interface thread. Should sit below <see cref="GpioMonitorRtPriority"/>
+    /// and above <see cref="MotionRtPriority"/>
+    /// </summary>
+    public int InterfaceRtPriority { get; set; } = 50;
+
+    /// <summary>
+    /// SCHED_FIFO priority for the motion thread. Should sit below <see cref="InterfaceRtPriority"/> so that
+    /// the SPI transfer is never starved by motion computation when they share a core
+    /// </summary>
+    public int MotionRtPriority { get; set; } = 40;
 
     /// <summary>
     /// Maximum allowed time when waiting for the first transfer (in ms)

@@ -190,6 +190,18 @@ public sealed class LinkService(
                     {
                         logger.LogWarning("Failed to pin SPI thread to CPU core {CoreId}", settings.Value.IsolatedCoreId);
                     }
+
+                    if (settings.Value.UseRealtimeScheduling)
+                    {
+                        if (DuetSharedLibrary.ProcessHelpers.SetCurrentThreadRealtimePriority(settings.Value.InterfaceRtPriority))
+                        {
+                            logger.LogInformation("SPI thread set to SCHED_FIFO priority {Priority}", settings.Value.InterfaceRtPriority);
+                        }
+                        else
+                        {
+                            logger.LogWarning("Failed to set SPI thread to real-time priority (needs CAP_SYS_NICE); latency may suffer");
+                        }
+                    }
                 }
                 Execute(stoppingToken);
                 tcs.SetResult();

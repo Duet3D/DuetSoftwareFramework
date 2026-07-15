@@ -49,6 +49,13 @@ public class SPI : IDiagnostics, ILinkAdapter
     // new data has been queued for transmission (see RequestTransfer). Kept separate from the transfer
     // ready event so that transfer ready pin edges do not needlessly wake the transfer gate
     private readonly AutoResetEvent _transferRequestEvent = new(false);
+
+    // Cached wait-handle array for WaitForTransferReason so the idle wait does not allocate a new array on
+    // every iteration (that allocation feeds GC pressure on the real-time interface thread). Rebuilt only if
+    // the cancellation token changes, which in practice it does not
+    private WaitHandle[]? _transferReasonWaitHandles;
+    private CancellationToken _transferReasonToken;
+
     private readonly SpiDevice _spiDevice;
     private bool _waitingForFirstTransfer = true, _connected, _hadTimeout, _resetting, _updating;
     private ushort _lastTransferNumber;
@@ -136,8 +143,14 @@ public class SPI : IDiagnostics, ILinkAdapter
         int sbcDataAvailablePin = settings.Value.SbcDataAvailablePin;
         _sbcDataAvailablePin = new OutputGpioPin(settings.Value.GpioChipDevice, sbcDataAvailablePin, $"dcs-sbc-dap-{sbcDataAvailablePin}");
 #endif
-        _transferReadyPin.StartMonitoring();
-        _dataAvailablePin.StartMonitoring();
+        // Pin the GPIO monitor threads to the same isolated core as the interface thread (so waking it is a
+        // cheap local context switch) and, when requested, run them at the highest real-time priority so a
+        // pin edge is delivered without waiting behind the interface or motion thread
+        bool isolate = _settings.IsolateInterfaceThread && DuetSharedLibrary.ProcessHelpers.IsRaspberryPi();
+        int monitorCore = isolate ? (_settings.GpioMonitorCoreId >= 0 ? _settings.GpioMonitorCoreId : _settings.IsolatedCoreId) : -1;
+        int monitorPriority = (isolate && _settings.UseRealtimeScheduling) ? _settings.GpioMonitorRtPriority : 0;
+        _transferReadyPin.StartMonitoring(monitorCore, monitorPriority);
+        _dataAvailablePin.StartMonitoring(monitorCore, monitorPriority);
 
         // Open the SPI device directly through the spidev character device
         _spiDevice = new SpiDevice(settings.Value.SpiDevice, settings.Value.SpiFrequency, settings.Value.SpiTransferMode);
@@ -835,7 +848,12 @@ public class SPI : IDiagnostics, ILinkAdapter
         // caller re-stage data and call again. The event is raised when the data available pin rises or new
         // data is queued for transmission (RequestTransfer); being an AutoResetEvent it stays signalled if
         // raised just before the wait, so a wake-up cannot be lost, and the single kernel wait avoids polling
-        WaitHandle.WaitAny([_transferRequestEvent, cancellationToken.WaitHandle], timeToWait);
+        if (_transferReasonWaitHandles is null || _transferReasonToken != cancellationToken)
+        {
+            _transferReasonToken = cancellationToken;
+            _transferReasonWaitHandles = [_transferRequestEvent, cancellationToken.WaitHandle];
+        }
+        WaitHandle.WaitAny(_transferReasonWaitHandles, timeToWait);
 
         // Proceed on cancellation so the caller can handle shutdown normally; otherwise re-stage and retry
         return cancellationToken.IsCancellationRequested;
