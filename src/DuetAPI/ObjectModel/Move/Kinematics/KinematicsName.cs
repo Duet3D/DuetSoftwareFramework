@@ -106,9 +106,9 @@ namespace DuetAPI.ObjectModel
                     "markforged" => KinematicsName.MarkForged,
                     "fivebarscara" => KinematicsName.FiveBarScara,
                     "hangprinter" => KinematicsName.Hangprinter,
-                    "delta" => KinematicsName.Delta,
+                    "delta" or "lineardelta" => KinematicsName.Delta,
                     "polar" => KinematicsName.Polar,
-                    "rotary delta" => KinematicsName.RotaryDelta,
+                    "rotary delta" or "rotarydelta" => KinematicsName.RotaryDelta,
                     "scara" => KinematicsName.Scara,
                     _ => KinematicsName.Unknown,
                 };
