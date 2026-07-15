@@ -38,6 +38,7 @@ RUN apt-get update \
         lldb \
         llvm \
         gdb \
+        crossbuild-essential-arm64 \
     && add-apt-repository -y ppa:ubuntu-toolchain-r/test \
     && apt-get update \
     && apt-get install -y --no-install-recommends \

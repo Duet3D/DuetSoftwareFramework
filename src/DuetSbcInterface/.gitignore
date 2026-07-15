@@ -1,0 +1,6 @@
+build/
+build-arm64/
+pi-sysroot/
+*.o
+*.so
+*.a
