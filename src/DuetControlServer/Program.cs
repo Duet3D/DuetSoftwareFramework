@@ -17,7 +17,10 @@ using Microsoft.Extensions.Options;
 using System;
 using System.CommandLine;
 using System.IO;
+using System.Runtime;
 using System.Text.Json;
+
+GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
 
 string? startErrorFile = Defaults.StartErrorFile;
 

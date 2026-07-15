@@ -96,6 +96,44 @@ DESTDIR = $(TOPDIR)/bin
 CONFIGDIR = $(DESTDIR)/$(CONFIG)
 BINDIR = $(CONFIGDIR)/$(BUILD_ARCH)
 
+# Root of the RepRapFirmware libraries used to build the DuetCANMaster
+# firmware (src/DuetCANMaster). The libraries are vendored as submodules
+# under ./lib in this repository.
+LIBRARIES_DIR ?= ./lib
+# Firmware configuration built by the DuetCANMaster target.
+CANMASTER_CONFIG ?= Duet3_MB6HC
+# Duet3Expansion firmware configurations (see src/Duet3Expansion). Each name
+# is exposed as its own build target; the Duet3Expansion target builds them all.
+EXPANSION_CONFIGS := EXP3HC EXP1XD EXP1HCL TOOL1LC SAMMYC21 SZP M23CL F3PTB TOOL1RR TOOLINDX
+
+# Cross-compiler toolchain (relative to project root)
+ARM_GNU_TOOLCHAIN_VERSION ?= 15.2.rel1
+HOST_OS_RAW := $(shell uname -s)
+HOST_ARCH_RAW := $(shell uname -m)
+
+ifeq ($(HOST_OS_RAW),Linux)
+HOST_OS := linux
+else ifeq ($(HOST_OS_RAW),Darwin)
+HOST_OS := macos
+else
+HOST_OS := $(HOST_OS_RAW)
+endif
+
+ifeq ($(HOST_ARCH_RAW),aarch64)
+ARM_GNU_TOOLCHAIN_HOST_ARCH := aarch64
+else ifeq ($(HOST_ARCH_RAW),arm64)
+ARM_GNU_TOOLCHAIN_HOST_ARCH := aarch64
+else ifeq ($(HOST_ARCH_RAW),x86_64)
+ARM_GNU_TOOLCHAIN_HOST_ARCH := x86_64
+else ifeq ($(HOST_ARCH_RAW),amd64)
+ARM_GNU_TOOLCHAIN_HOST_ARCH := x86_64
+else
+ARM_GNU_TOOLCHAIN_HOST_ARCH := $(HOST_ARCH_RAW)
+endif
+
+CROSS_COMPILE ?= $(abspath ../arm-gnu-toolchain-$(ARM_GNU_TOOLCHAIN_VERSION)-$(ARM_GNU_TOOLCHAIN_HOST_ARCH)-arm-none-eabi/bin/arm-none-eabi-)
+export CROSS_COMPILE
+
 # These variables are static and only need to be expanded once
 # so we use the ":=" assignment
 DIRS := CodeConsole CodeLogger CodeStream CustomHttpEndpoint DuetControlServer DuetPiManagementPlugin DuetPluginService DuetWebServer ModelObserver PluginManager 
@@ -158,6 +196,49 @@ endif
 
 # build is the default unless you override it in your Makefile.local
 build: $(DIRS_BUILD) DuetWebControl.build
+
+# Build the DuetCANMaster firmware (RepRapFirmware). This is a native ARM
+# firmware build, separate from the dotnet projects, so it does not go
+# through the generic %.build rule. LIBRARIES_DIR is resolved to an
+# absolute path because the sub-make runs from src/DuetCANMaster.
+DuetCANMaster:
+	$(CMD_PREFIX)$(MAKE) -C src/DuetCANMaster $(CANMASTER_CONFIG) \
+		LIBRARIES_DIR=$(abspath $(LIBRARIES_DIR)) V=$(V)
+
+DuetCANMaster.clean:
+	$(CMD_PREFIX)$(MAKE) -C src/DuetCANMaster clean-$(CANMASTER_CONFIG) \
+		LIBRARIES_DIR=$(abspath $(LIBRARIES_DIR)) V=$(V)
+
+DuetCANMaster.clean-all:
+	$(CMD_PREFIX)$(MAKE) -C src/DuetCANMaster clean-all \
+		LIBRARIES_DIR=$(abspath $(LIBRARIES_DIR)) V=$(V)
+
+# Build the Duet3Expansion firmware (RepRapFirmware). Like DuetCANMaster these
+# are native ARM firmware builds that bypass the generic %.build rule, and
+# LIBRARIES_DIR is made absolute because the sub-make runs from src/Duet3Expansion.
+# Each board in EXPANSION_CONFIGS gets its own target (e.g. "make EXP3HC"), and
+# the Duet3Expansion target builds every board in one sub-make invocation.
+Duet3Expansion:
+	$(CMD_PREFIX)$(MAKE) -C src/Duet3Expansion all \
+		LIBRARIES_DIR=$(abspath $(LIBRARIES_DIR)) V=$(V)
+
+$(EXPANSION_CONFIGS):
+	$(CMD_PREFIX)$(MAKE) -C src/Duet3Expansion $@ \
+		LIBRARIES_DIR=$(abspath $(LIBRARIES_DIR)) V=$(V)
+
+# Per-board clean targets (clean-EXP3HC, ...) matching the sub-make's naming,
+# plus Duet3Expansion.clean / .clean-all to clean every board at once.
+$(addprefix clean-,$(EXPANSION_CONFIGS)):
+	$(CMD_PREFIX)$(MAKE) -C src/Duet3Expansion $@ \
+		LIBRARIES_DIR=$(abspath $(LIBRARIES_DIR)) V=$(V)
+
+Duet3Expansion.clean:
+	$(CMD_PREFIX)$(MAKE) -C src/Duet3Expansion clean \
+		LIBRARIES_DIR=$(abspath $(LIBRARIES_DIR)) V=$(V)
+
+Duet3Expansion.clean-all:
+	$(CMD_PREFIX)$(MAKE) -C src/Duet3Expansion clean-all \
+		LIBRARIES_DIR=$(abspath $(LIBRARIES_DIR)) V=$(V)
 
 publish: $(DIRS_PUBLISH) DuetRuntime.publish DuetWebControl.publish
 

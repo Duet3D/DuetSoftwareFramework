@@ -73,6 +73,28 @@ public static class ProcessHelpers
         return Interop.sched_setaffinity(0, (IntPtr)sizeof(ulong), ref mask) == 0;
     }
 
+    /// <summary>
+    /// Switch the calling thread to the SCHED_FIFO real-time scheduling policy at the given priority.
+    /// This is what actually gives a thread deterministic, preemptive-over-CFS latency on a PREEMPT_RT
+    /// kernel; plain thread affinity or <see cref="System.Threading.ThreadPriority"/> (which only maps to
+    /// a nice value on Linux) does not. Requires CAP_SYS_NICE or a suitable RLIMIT_RTPRIO
+    /// </summary>
+    /// <param name="priority">Real-time priority (1..99); higher preempts lower</param>
+    /// <returns>True if the scheduling policy was applied successfully</returns>
+    public static bool SetCurrentThreadRealtimePriority(int priority)
+    {
+        int min = Interop.sched_get_priority_min(Interop.SCHED_FIFO);
+        int max = Interop.sched_get_priority_max(Interop.SCHED_FIFO);
+        if (min >= 0 && max >= min)
+        {
+            // Clamp to the range the kernel actually accepts for SCHED_FIFO
+            priority = Math.Clamp(priority, min, max);
+        }
+
+        Interop.sched_param param = new() { sched_priority = priority };
+        return Interop.sched_setscheduler(0, Interop.SCHED_FIFO, ref param) == 0;
+    }
+
     public static bool IsRaspberryPi()
     {
         try
