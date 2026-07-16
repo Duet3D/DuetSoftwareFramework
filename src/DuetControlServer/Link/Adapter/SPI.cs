@@ -1672,22 +1672,14 @@ public class SPI : IDiagnostics, ILinkAdapter
                 {
                     _logger.LogWarning("Bad header CRC32 (expected 0x{ExpectedChecksum:x8}, got 0x{ActualChecksum:x8})", _rxHeader.ChecksumHeader32.ToString("x8"), crc32.ToString(""));
                     responseCode = ExchangeResponse(TransferResponse.BadHeaderChecksum);
-                    if (responseCode == TransferResponse.BadHeaderChecksum)
+                    if (responseCode == TransferResponse.BadResponse)
+                    {
+                        _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad header response");
+                        return false;
+                    }
+                    if (responseCode != TransferResponse.Success)
                     {
                         _logger.LogWarning("Note: RepRapFirmware didn't receive valid data either (code 0x{ResponseCode:x8})", responseCode);
-                    }
-                    else
-                    {
-                        if (responseCode == TransferResponse.BadResponse)
-                        {
-                            _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad header response");
-                        }
-                        else
-                        {
-                            _logger.LogWarning("Restarting full transfer because an unexpected response code has been received (code 0x{ResponseCode:x8})", responseCode);
-                            ExchangeResponse(TransferResponse.BadResponse);
-                        }
-                        return false;
                     }
                     continue;
                 }
@@ -1781,8 +1773,9 @@ public class SPI : IDiagnostics, ILinkAdapter
             }
         }
 
+        // Do not send a bad response here. RepRapFirmware is expecting a new header at this point,
+        // so a single response exchange would be mistaken for a request to repeat the data response
         _logger.LogWarning("Restarting full transfer because the number of maximum retries has been exceeded");
-        ExchangeResponse(TransferResponse.BadResponse);
         return false;
     }
 
