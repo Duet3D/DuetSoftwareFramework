@@ -218,19 +218,16 @@ public sealed class ModelSubscription : IProcessor
 
                 if (waitForUpdate)
                 {
-                    using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                    cts.CancelAfter(_settings.SocketPollInterval);
                     try
                     {
-                        await _model.WaitForUpdateAsync(cts.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        if (!cancellationToken.IsCancellationRequested)
+                        if (!await _model.WaitForUpdateAsync(_settings.SocketPollInterval, cancellationToken))
                         {
                             Connection.Poll();
                             continue;
                         }
+                    }
+                    catch (OperationCanceledException)
+                    {
                         _logger.LogDebug("IPC#{Id}: Subscriber connection requested to terminate", Connection.Id);
                         throw;
                     }

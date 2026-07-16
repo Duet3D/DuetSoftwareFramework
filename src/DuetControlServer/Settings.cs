@@ -118,7 +118,7 @@ public sealed class Settings
     /// <summary>
     /// Poll interval for connected IPC clients (in ms)
     /// </summary>
-    public int SocketPollInterval { get; set; } = 2000;
+    public int SocketPollInterval { get; set; } = 60000;
 
     /// <summary>
     /// Virtual SD card directory.

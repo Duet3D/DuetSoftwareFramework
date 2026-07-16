@@ -172,22 +172,24 @@ public sealed class CodeInterception : IProcessor
             {
                 do
                 {
-                    // Wait for the next code to be intercepted
+                    // Wait for the next code to be intercepted, polling the connection on every timeout so that
+                    // dead clients are detected and unregistered even if no codes are being processed
                     do
                     {
                         using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                         cts.CancelAfter(_settings.SocketPollInterval);
-
                         try
                         {
-                            await _codeMonitor.WaitAsync(cancellationToken);
+                            await _codeMonitor.WaitAsync(cts.Token);
                             break;
                         }
-                        catch (OperationCanceledException)
+                        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
                         {
-                            if (cancellationToken.IsCancellationRequested)
+                            // A Pulse that races with the poll timeout is consumed by the cancelled wait, so check
+                            // for a pending code before waiting again or else both parties would wait forever
+                            if (_codeBeingIntercepted is not null)
                             {
-                                throw;
+                                break;
                             }
                             Connection.Poll();
                         }

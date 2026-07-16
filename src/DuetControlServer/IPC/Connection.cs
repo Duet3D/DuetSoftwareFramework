@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
@@ -183,9 +182,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     {
         try
         {
-            // Get PID's process path
-            using Process proc = Process.GetProcessById(pid);
-            string? procPath = proc.MainModule?.FileName;
+            string? procPath = ProcessHelpers.GetExecutablePath(pid);
             if (string.IsNullOrEmpty(procPath))
             {
                 return false;
@@ -210,7 +207,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
             return peerFilename switch
             {
                 "DuetPluginService" => Processors.PluginService.ServicePid == 0 || pid == Processors.PluginService.ServicePid,
-                "DuetControlServer" or "DuetWebServer" => proc.IsExecSecure(),
+                "DuetControlServer" or "DuetWebServer" => ProcessHelpers.IsExecSecure(pid),
                 _ => false,
             };
         }
