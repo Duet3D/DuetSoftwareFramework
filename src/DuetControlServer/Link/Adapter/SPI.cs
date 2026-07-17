@@ -1018,23 +1018,27 @@ public class SPI : IDiagnostics, ILinkAdapter
                 _spiDevice.TransferFullDuplex(_txHeaderBuffer[..12].Span, _rxHeaderBuffer[..12].Span);
             }
 
-            // Check for possible response code
+            // Check for possible response code. BadResponse always means "abandon this transfer and start
+            // over", and the controller only ever sends it on its way back to a header exchange. Restart
+            // the full transfer so that both sides line up on a header. Answering with a data response
+            // instead would pit our 4-byte response against its 16-byte header and oscillate: it would
+            // truncate the header, reply BadHeaderChecksum, re-arm the header, and we would repeat
             uint responseCode = MemoryMarshal.Read<uint>(_rxHeaderBuffer.Span);
             if (responseCode == TransferResponse.BadResponse)
             {
-                _logger.LogWarning("Received bad response instead of header, retrying exchange of the data response");
-                if (_connected && ExchangeDataResponse(out bool success) && success)
-                {
-                    continue;
-                }
-                throw new OperationCanceledException("SPI data transfer failed");
+                _logger.LogWarning("Restarting full transfer because RepRapFirmware sent a bad response instead of a header");
+                return false;
             }
 
-            // Read received header and verify the format code
+            // Read received header and verify the format code. The protocol is little-endian, so a response
+            // code clocked out in place of a header lands in FormatCode and NumPackets. No response code
+            // carries a valid format code in its low byte, so this rejects a stray response before any other
+            // header field is trusted - in particular the protocol version below, which is read before the
+            // header checksum can be verified
             _rxHeader = MemoryMarshal.Read<TransferHeader>(_rxHeaderBuffer.Span);
-            if (_rxHeader.FormatCode == 0 || _rxHeader.FormatCode == 0xFF)
+            if (_rxHeader.FormatCode != Consts.FormatCode && _rxHeader.FormatCode != Consts.FormatCodeStandalone)
             {
-                _logger.LogWarning("Restarting full transfer because a bad header format code was received (0x{0:x2})", _rxHeader.FormatCode);
+                _logger.LogWarning("Restarting full transfer because a bad header format code was received (0x{FormatCode:x2})", _rxHeader.FormatCode);
                 ExchangeResponse(TransferResponse.BadResponse);
                 return false;
             }
@@ -1099,20 +1103,11 @@ public class SPI : IDiagnostics, ILinkAdapter
                 }
             }
 
-            // Check format code
-            switch (_rxHeader.FormatCode)
+            // Check format code. Any other value was already rejected before the checksum was verified
+            if (_rxHeader.FormatCode == Consts.FormatCodeStandalone)
             {
-                case Consts.FormatCode:
-                    // Format code OK
-                    break;
-
-                case Consts.FormatCodeStandalone:
-                    // RRF is operating in stand-alone mode
-                    throw new Exception("RepRapFirmware is operating in stand-alone mode");
-
-                default:
-                    ExchangeResponse(TransferResponse.BadFormat);
-                    throw new Exception($"Invalid format code {_rxHeader.FormatCode:x2}");
+                // RRF is operating in stand-alone mode
+                throw new Exception("RepRapFirmware is operating in stand-alone mode");
             }
 
             // Check for changed protocol version
@@ -1154,12 +1149,6 @@ public class SPI : IDiagnostics, ILinkAdapter
                     return false;
                 default:
                     _logger.LogWarning("Restarting full transfer because a bad header response was received (0x{ResponseCode:x8})", response);
-                    if (_rxHeader.DataLength == 0 && _txPointer == 0)
-                    {
-                        // No data was transferred so we are still in sync. Continue with the next transfer
-                        _lastTransferNumber = (ushort)(_rxHeader.SequenceNumber - 1);
-                        return true;
-                    }
 
                     // Transfer bad data response to restart the transfer
                     ExchangeResponse(TransferResponse.BadResponse);
@@ -1272,29 +1261,30 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// <returns>True when done</returns>
     private bool ExchangeDataResponse(out bool success)
     {
-        for (int retry = 0; retry < _settings.MaxSbcRetries; retry++)
+        uint responseCode = ExchangeResponse(TransferResponse.Success);
+        switch (responseCode)
         {
-            uint responseCode = ExchangeResponse(TransferResponse.Success);
-            switch (responseCode)
-            {
-                case TransferResponse.Success:
-                    success = true;
-                    return true;
-                case TransferResponse.BadDataChecksum:
-                    _logger.LogWarning("RepRapFirmware got a bad data checksum");
-                    success = false;
-                    return false;
-                case TransferResponse.BadResponse:
-                    _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad data response");
-                    success = false;
-                    return true;
-                default:
-                    _logger.LogWarning("Restarting data response exchange because a bad code was received (0x{ResponseCode:x8})", responseCode);
-                    ExchangeResponse(TransferResponse.BadResponse);
-                    continue;
-            }
+            case TransferResponse.Success:
+                success = true;
+                return true;
+            case TransferResponse.BadDataChecksum:
+                _logger.LogWarning("RepRapFirmware got a bad data checksum");
+                success = false;
+                return false;
+            case TransferResponse.BadResponse:
+                _logger.LogWarning("Restarting full transfer because RepRapFirmware received a bad data response");
+                success = false;
+                return true;
+            default:
+                // Anything else means the two sides are no longer in step - typically the controller has
+                // already completed this transfer and moved on to a header, so it will never answer another
+                // data response. Retrying here would oscillate against it forever. Send BadResponse, which
+                // makes it restart from a header exchange too, and restart the full transfer
+                _logger.LogWarning("Restarting full transfer because a bad data response code was received (0x{ResponseCode:x8})", responseCode);
+                ExchangeResponse(TransferResponse.BadResponse);
+                success = false;
+                return true;
         }
-        throw new OperationCanceledException("SPI connection reset because the number of maximum retries has been exceeded");
     }
     #endregion
 }

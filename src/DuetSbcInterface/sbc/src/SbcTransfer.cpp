@@ -391,20 +391,22 @@ bool SbcTransfer::ExchangeHeader() {
         const size_t headerLen = (_txHeader.protocolVersion >= 4) ? 16 : 12;
         _spiDevice->TransferFullDuplex(txHdr, rxHdr, headerLen);
 
-        // Check for a possible response code
+        // Check for a possible response code. BadResponse always means "abandon this transfer and start
+        // over", and DuetCANMaster only ever sends it on its way back to a header exchange. Restart the
+        // full transfer so that both sides line up on a header. Answering with a data response instead
+        // would pit our 4-byte response against its 16-byte header and oscillate: it would truncate the
+        // header, reply BadHeaderChecksum, re-arm the header, and we would repeat
         const uint32_t responseCode = ReadU32(rxHdr);
         if (responseCode == proto::TransferResponse::BadResponse) {
-            if (_connected) {
-                bool success = false;
-                if (ExchangeDataResponse(success) && success) {
-                    continue;
-                }
-            }
-            throw TransferError("SPI data transfer failed");
+            return false;
         }
 
-        // Verify the format code
-        if (_rxHeader.formatCode == 0 || _rxHeader.formatCode == 0xFF) {
+        // Verify the format code. The protocol is little-endian, so a response code clocked out in place
+        // of a header lands in formatCode and numPackets. No response code carries a valid format code in
+        // its low byte, so this rejects a stray response before any other header field is trusted - in
+        // particular the protocol version below, which is read before the header checksum can be verified
+        if (_rxHeader.formatCode != proto::FormatCode &&
+            _rxHeader.formatCode != proto::FormatCodeStandalone) {
             ExchangeResponse(proto::TransferResponse::BadResponse);
             return false;
         }
@@ -424,12 +426,8 @@ bool SbcTransfer::ExchangeHeader() {
             const uint32_t crc32 = proto::Crc32(rxHdr, 12);
             if (_rxHeader.crcHeader != crc32) {
                 const uint32_t rc = ExchangeResponse(proto::TransferResponse::BadHeaderChecksum);
-                if (rc == proto::TransferResponse::BadHeaderChecksum) {
+                if (rc == proto::TransferResponse::BadResponse) {
                     // Both sides saw a bad header checksum: retry
-                } else {
-                    if (rc != proto::TransferResponse::BadResponse) {
-                        ExchangeResponse(proto::TransferResponse::BadResponse);
-                    }
                     return false;
                 }
                 continue;
@@ -445,13 +443,9 @@ bool SbcTransfer::ExchangeHeader() {
             }
         }
 
-        // Check format code
+        // Check format code. Any other value was already rejected before the checksum was verified
         if (_rxHeader.formatCode == proto::FormatCodeStandalone) {
             throw TransferError("RepRapFirmware is operating in stand-alone mode");
-        }
-        if (_rxHeader.formatCode != proto::FormatCode) {
-            ExchangeResponse(proto::TransferResponse::BadFormat);
-            throw TransferError("Invalid format code");
         }
 
         // Check for changed protocol version
@@ -482,17 +476,14 @@ bool SbcTransfer::ExchangeHeader() {
             case proto::TransferResponse::BadResponse:
                 return false;
             default:
-                if (_rxHeader.dataLength == 0 && _txPointer == 0) {
-                    // No data was transferred so we are still in sync
-                    _lastTransferNumber = static_cast<uint16_t>(_rxHeader.sequenceNumber - 1);
-                    return true;
-                }
+                // Always announce the restart with BadResponse rather than quietly completing a transfer
+                // whose header response the controller answered with something unexpected. DuetCANMaster
+                // does the same from RestartTransfer(true), so both sides restart from a header exchange
                 ExchangeResponse(proto::TransferResponse::BadResponse);
                 return false;
         }
     }
 
-    ExchangeResponse(proto::TransferResponse::BadResponse);
     return false;
 }
 
@@ -563,24 +554,26 @@ bool SbcTransfer::ExchangeData() {
 // Data response exchange (SPI.cs ExchangeDataResponse)
 // ---------------------------------------------------------------------------
 bool SbcTransfer::ExchangeDataResponse(bool &success) {
-    for (int retry = 0; retry < _config.maxSbcRetries; retry++) {
-        const uint32_t responseCode = ExchangeResponse(proto::TransferResponse::Success);
-        switch (responseCode) {
-            case proto::TransferResponse::Success:
-                success = true;
-                return true;
-            case proto::TransferResponse::BadDataChecksum:
-                success = false;
-                return false;
-            case proto::TransferResponse::BadResponse:
-                success = false;
-                return true;
-            default:
-                ExchangeResponse(proto::TransferResponse::BadResponse);
-                continue;
-        }
+    const uint32_t responseCode = ExchangeResponse(proto::TransferResponse::Success);
+    switch (responseCode) {
+        case proto::TransferResponse::Success:
+            success = true;
+            return true;
+        case proto::TransferResponse::BadDataChecksum:
+            success = false;
+            return false;
+        case proto::TransferResponse::BadResponse:
+            success = false;
+            return true;
+        default:
+            // Anything else means the two sides are no longer in step - typically DuetCANMaster has
+            // already completed this transfer and moved on to a header, so it will never answer another
+            // data response. Retrying here would oscillate against it forever. Send BadResponse, which
+            // makes it restart from a header exchange too, and restart the full transfer
+            ExchangeResponse(proto::TransferResponse::BadResponse);
+            success = false;
+            return true;
     }
-    throw TransferError("SPI connection reset because the number of maximum retries has been exceeded");
 }
 
 // ---------------------------------------------------------------------------

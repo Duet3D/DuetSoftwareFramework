@@ -147,7 +147,10 @@ int main(int argc, char **argv) {
                 std::printf("[msg 0x%08x] %s\n", flags, msg.c_str());
             }
         });
-        interface.SetErrorCallback([](const std::string &msg) { std::fprintf(stderr, "[recover] %s\n", msg.c_str()); });
+        interface.SetErrorCallback([](const std::string &msg) { 
+            std::fprintf(stderr, "[recover] %s\n", msg.c_str());
+            throw std::runtime_error(msg);
+        });
 
         std::printf("Connecting to firmware...\n");
         interface.Connect();

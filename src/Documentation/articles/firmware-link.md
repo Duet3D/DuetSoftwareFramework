@@ -102,6 +102,10 @@ Both transports keep three transmit buffers so a firmware resend request can be 
 3. `ExchangeData()` - if either side has data, swaps the payloads full-duplex and validates the CRC,
 4. rotates to the next transmit buffer and resets the pointers.
 
+Each of those steps is a separate `TfrRdy`-gated sub-exchange, and either side can reject one at any
+point. [SPI transfer state machine](spi-state-machine.md) documents both sides of that handshake in
+full, including how each side recovers when the other desynchronises.
+
 ### USB transport
 
 `Link/Adapter/USB.cs` drives a `SerialPort` on `/dev/ttyACM*` (default `/dev/ttyACM1`). Because USB

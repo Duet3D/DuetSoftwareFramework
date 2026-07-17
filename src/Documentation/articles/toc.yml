@@ -10,6 +10,8 @@
   href: gcode-flow.md
 - name: Firmware Link
   href: firmware-link.md
+- name: SPI Transfer State Machine
+  href: spi-state-machine.md
 - name: File Management
   href: file-management.md
 - name: REST API
