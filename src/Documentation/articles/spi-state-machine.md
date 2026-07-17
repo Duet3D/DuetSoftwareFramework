@@ -18,13 +18,13 @@ it, driven by DMA completion interrupts. DCS has no state variable at all - its 
 the call stack and in nested `for` loops:
 
 ```
-PerformFullTransfer()          retry loop, max MaxSbcRetries
-  └─ ExchangeHeader()          retry loop, max MaxSbcRetries
-       └─ ExchangeResponse()   single 4-byte exchange, no loop
-       └─ ExchangeDataResponse()
-  └─ ExchangeData()            retry loop, max MaxSbcRetries
+PerformFullTransfer()            retry loop, max MaxSbcRetries
+  └─ ExchangeHeader()            retry loop, max MaxSbcRetries
+       └─ ExchangeResponse()     single 4-byte exchange, no loop
+  └─ ExchangeData()              retry loop, max MaxSbcRetries
        └─ ExchangeResponse()
-       └─ ExchangeDataResponse()  retry loop, max MaxSbcRetries
+       └─ ExchangeDataResponse() single exchange, no loop - any
+                                 unexpected code restarts the transfer
 ```
 
 This asymmetry explains most of the recovery behaviour below. DCS can *unwind* (return `false`, throw)
@@ -56,6 +56,19 @@ Response codes (`TransferResponse.cs` / `SbcMessageFormats.h` - the two definiti
 | `BadHeaderChecksum` | `5` |
 | `BadDataChecksum` | `6` |
 | `BadResponse` | `0xFEFEFEFE` |
+
+### Detecting a truncated sub-exchange
+
+The SBC drives the clock, so it alone decides how many bytes a sub-exchange carries. DuetCANMaster
+samples the RX DMA residual in `disable_spi()`, before the channels are torn down and the count is lost,
+and compares it against the length it armed for in `setup_spi()`. A non-zero residual means the SBC
+clocked fewer bytes than expected: the two sides disagree about which sub-exchange this was, the DMA is
+short by the difference, and the rest of the buffer is stale from the previous exchange. There is
+nothing worth parsing, so `DoTransfer()` restarts instead of guessing. The count is reported by `M122`
+as `short transfers`.
+
+This is implemented for the XDMAC (SAME70), the only controller DuetCANMaster currently runs on; on
+other DMA controllers the check reports nothing outstanding and stays inert.
 
 ### The `BadResponse` invariant
 
@@ -339,12 +352,18 @@ designed recovery, and an **oscillation** that the state machines then cannot es
 
 #### The phase slip
 
-RRF lowers `TfrRdy` from its SPI interrupt handler. Interrupt latency means the pin can still read high
-after the peripheral has been torn down but before it has been re-armed. The SBC, seeing a stale high
-level, clocks the next sub-exchange into a peripheral that is not listening: the bytes it reads are
-whatever the previous exchange left loaded, and RRF's state machine never sees the exchange at all.
-That **ghost exchange** consumes one phase on the SBC side only, and from then on the two machines are
-one sub-exchange apart.
+RRF lowers `TfrRdy` from its SPI interrupt handler. If that only happens once the transfer has *ended*
+(on NSS rising), interrupt latency means the pin can still read high after the peripheral has been torn
+down but before it has been re-armed. The SBC, seeing a stale high level, clocks the next sub-exchange
+into a peripheral that is not listening: the bytes it reads are whatever the previous exchange left
+loaded, and RRF's state machine never sees the exchange at all. That **ghost exchange** consumes one
+phase on the SBC side only, and from then on the two machines are one sub-exchange apart.
+
+The pin must therefore go **high** in `setup_spi()` (that is the arming signal - lowering it there would
+mean the SBC never reliably sees it) and **low as soon as the transfer starts**, which on the SAME70 is
+the `TDRE`-with-CS-asserted branch of the handler. `disable_spi()` lowers it again as a backstop in case
+the interrupt has not run. A truncated ghost exchange that slips through anyway is now caught directly
+by the [residual DMA check](#detecting-a-truncated-sub-exchange).
 
 This is why the recovery that *should* handle a corrupted data response does not fire. RRF completes
 the transfer, arms a header, and waits; the SBC sends `BadResponse`; RRF - had it received it - would
@@ -513,24 +532,21 @@ sniffs rely on.
 
 ## Open questions
 
-The fixes above make the two machines re-synchronise instead of oscillating, but they treat the
-symptom. Three things are deliberately left alone:
+The controller now checks that the SBC clocked as many bytes as it armed for
+([residual DMA check](#detecting-a-truncated-sub-exchange)), which catches the size-distinguishable
+desyncs directly. Two things are deliberately left alone:
 
-- **The `TfrRdy` race is not fixed, only survived.** RRF lowers `TfrRdy` from its interrupt handler, so
-  the pin can still read high after the peripheral is torn down but before it is re-armed. The SBC then
-  clocks a ghost exchange that RRF never sees. The `BadResponse` invariant means the two sides now
-  recover from the resulting phase slip, but the slip still happens and still costs a transfer.
-  Lowering `TfrRdy` before the peripheral can be clocked - rather than from the ISR that runs after CS
-  rises - is the actual fix, and it belongs with the SPI setup code rather than the state machine.
-- **There is no framing check at all.** RRF's ISR fires on NSS rising and calls `disable_spi()`, which
-  tears down the DMA channels before `DoTransfer()` inspects anything. RRF therefore cannot tell a
-  truncated 4-byte exchange from a complete 16-byte one - it just parses whatever landed in `rxHeader`,
-  with the untouched bytes left over from the previous transfer. Every desync in this article traces
-  back to that. Tagging each sub-exchange with its type, or checking the residual DMA count in
-  `disable_spi()`, would let each side detect a mismatch directly instead of inferring it.
 - **[Finding 2](#finding-2-three-response-codes-throw-past-performfulltransfers-catch)** is unchanged.
   Turning those into `OperationCanceledException` would make them reset the connection and retry
   forever, which is not obviously better than failing loudly for what is a genuine incompatibility.
+- **A no-data transfer can still cost a connection reset.** If the SBC's header response reaches the
+  controller corrupted but the controller's reaches the SBC intact, the SBC completes transfer *N* while
+  the controller restarts it. With data, the controller's `BadResponse` lands at the head of what the SBC
+  thinks is a payload and both recover. Without data there is no such exchange, so the sequence numbers
+  diverge by one and `IsConnectionReset()` correctly reports it. No check can prevent this - the SBC's
+  information was complete and correct at the time. The controller could be taught to tolerate the skip
+  (a no-data transfer carries nothing, so losing it costs nothing), at the price of weakening genuine
+  reset detection in that window.
 
 ## See also
 

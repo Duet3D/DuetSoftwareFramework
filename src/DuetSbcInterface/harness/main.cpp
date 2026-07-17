@@ -91,6 +91,8 @@ int main(int argc, char **argv) {
     int dropLast = 16;
     int producerCore = -1;
     int producerPrio = 30;
+    int msgType = 8;
+    bool throwOnError = false;
 
     auto needArg = [&](int &i) -> const char * {
         if (i + 1 >= argc) {
@@ -121,6 +123,8 @@ int main(int argc, char **argv) {
         else if (a == "--seconds") seconds = std::stoi(needArg(i));
         else if (a == "--drop-first") dropFirst = std::stoi(needArg(i));
         else if (a == "--drop-last") dropLast = std::stoi(needArg(i));
+        else if (a == "--msg-type") msgType = std::stoi(needArg(i));
+        else if (a == "--throw-on-error") throwOnError = true;
         else if (a == "-h" || a == "--help") { PrintUsage(argv[0]); return 0; }
         else { std::fprintf(stderr, "Unknown option: %s\n", a.c_str()); PrintUsage(argv[0]); return 2; }
     }
@@ -147,9 +151,11 @@ int main(int argc, char **argv) {
                 std::printf("[msg 0x%08x] %s\n", flags, msg.c_str());
             }
         });
-        interface.SetErrorCallback([](const std::string &msg) { 
+        interface.SetErrorCallback([throwOnError](const std::string &msg) { 
             std::fprintf(stderr, "[recover] %s\n", msg.c_str());
-            throw std::runtime_error(msg);
+            if (throwOnError) {
+                throw std::runtime_error(msg);
+            }
         });
 
         std::printf("Connecting to firmware...\n");
@@ -200,9 +206,20 @@ int main(int argc, char **argv) {
                 std::memcpy(payload.data(), &msg, len);
 
                 for (int k = 0; k < msgsPerCycle; k++) {
-                    interface.QueueCanMessage(nextToken(), proto::CanMessageType::MovementLinearShaped,
-                                              proto::CanMessageType::NoReply,
-                                              static_cast<uint8_t>(dstAddress), false, payload);
+                    switch (msgType) {
+                        case 5:
+                            interface.QueueCanMessage(nextToken(), proto::CanMessageType::MovementLinearShaped,
+                                                    proto::CanMessageType::NoReply,
+                                                    static_cast<uint8_t>(dstAddress), false, payload);
+                            break;
+                        case 8:
+                            interface.QueueMessage(0, "Hello from SBC harness");
+                            break;
+                        default:
+                            std::fprintf(stderr, "Unknown message type %d\n", msgType);
+                            g_running.store(false);
+                            break;
+                    }
                 }
                 next += period;
                 std::this_thread::sleep_until(next);
