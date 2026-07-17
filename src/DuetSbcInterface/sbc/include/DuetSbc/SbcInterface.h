@@ -28,6 +28,8 @@ public:
     using MessageCallback = std::function<void(uint32_t flags, const std::string &message)>;
     using CanResponseCallback = std::function<void(const proto::CanResponseHeader &header, const uint8_t *payload)>;
     using CodeBufferCallback = std::function<void(uint16_t bufferSpace)>;
+    // Reports recovery events (lost connection, resync after an error, etc.).
+    using ErrorCallback = std::function<void(const std::string &message)>;
 
     explicit SbcInterface(const Config &config);
     ~SbcInterface();
@@ -56,6 +58,11 @@ public:
     void SetMessageCallback(MessageCallback cb) { _onMessage = std::move(cb); }
     void SetCanResponseCallback(CanResponseCallback cb) { _onCanResponse = std::move(cb); }
     void SetCodeBufferCallback(CodeBufferCallback cb) { _onCodeBuffer = std::move(cb); }
+    // Report recovery events. Also forwards to the transfer engine so its internal resyncs are seen.
+    void SetErrorCallback(ErrorCallback cb) {
+        _onError = cb;
+        _transfer.SetLogCallback(cb);
+    }
 
     SbcTransfer &Transfer() noexcept { return _transfer; }
 
@@ -94,6 +101,7 @@ private:
     MessageCallback _onMessage;
     CanResponseCallback _onCanResponse;
     CodeBufferCallback _onCodeBuffer;
+    ErrorCallback _onError;
 };
 
 } // namespace duet::sbc

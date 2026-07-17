@@ -147,6 +147,7 @@ int main(int argc, char **argv) {
                 std::printf("[msg 0x%08x] %s\n", flags, msg.c_str());
             }
         });
+        interface.SetErrorCallback([](const std::string &msg) { std::fprintf(stderr, "[recover] %s\n", msg.c_str()); });
 
         std::printf("Connecting to firmware...\n");
         interface.Connect();
@@ -250,6 +251,7 @@ int main(int argc, char **argv) {
                     interface.Transfer().MaxFullTransferDelayMs());
         std::printf("  TfrRdy pin glitches            : %d\n", interface.Transfer().TfrPinGlitches());
         std::printf("  Missed GPIO edges              : %d\n", interface.Transfer().MissedEdges());
+        std::printf("  Connection resyncs (recoveries): %d\n", interface.Transfer().ResyncCount());
         if (g_sampleIndex.load() > kMaxSamples) {
             std::printf("  NOTE: sample buffer capped at %zu; increase kMaxSamples for longer runs.\n",
                         kMaxSamples);

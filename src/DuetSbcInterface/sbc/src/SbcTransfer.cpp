@@ -188,6 +188,7 @@ void SbcTransfer::PerformFullTransfer(bool connecting) {
             _rxPointer = _txPointer = 0;
             _packetId = 0;
             _keepAliveStart = clock::now();
+            _consecutiveErrors = 0;
 
             // Transfer completed: drop the scope trigger low now that no data remains staged
             if (_sbcDataAvailablePin && _txPointer == 0) {
@@ -195,23 +196,89 @@ void SbcTransfer::PerformFullTransfer(bool connecting) {
             }
             return;
         } catch (const TransferTimeout &) {
+            // Timeout / cancellation. On stop or during the initial connect, unwind to the caller.
             if (connecting || _stop.load(std::memory_order_relaxed)) {
                 throw;
             }
-
-            // Lost connection: prepare to reconnect
-            _txHeader.protocolVersion = proto::ProtocolVersion;
-            _waitingForFirstTransfer = true;
-
-            if (!_hadTimeout && _connected) {
-                _hadTimeout = true;
+            if (!_hadTimeout && _connected && _logCallback) {
+                _logCallback("Lost connection to controller (timeout); reconnecting");
             }
-            _connected = false;
+            // The pin wait already paced this, so just resync and keep retrying
+            PrepareReconnect();
+            retry = 0;
+        } catch (const std::exception &e) {
+            // Any other transfer error (bad format/checksum/protocol, SPI/GPIO I/O error, ...). During
+            // the initial connect surface it; otherwise recover automatically rather than terminating.
+            if (connecting || _stop.load(std::memory_order_relaxed)) {
+                throw;
+            }
+            _numResyncs++;
+            _consecutiveErrors++;
+            if (_logCallback) {
+                _logCallback("Transfer error, recovering (resync #" + std::to_string(_numResyncs) +
+                             "): " + e.what());
+            }
+            PrepareReconnect();
+            retry = 0;
+            // Pace fast-failing errors (e.g. a persistent protocol mismatch) so recovery does not spin
+            // the CPU; the backoff grows with consecutive failures up to a 1 s cap
+            InterruptibleSleep(std::min(_consecutiveErrors * 50, 1000));
         }
     }
 
     // Stop requested
     throw TransferTimeout("Transfer cancelled");
+}
+
+// Put the link back into the "reconnecting" state so the next transfer re-runs the handshake. The
+// pending TX data is preserved and retransmitted; only the connection/first-transfer flags are reset.
+void SbcTransfer::PrepareReconnect() {
+    _txHeader.protocolVersion = proto::ProtocolVersion;
+    _waitingForFirstTransfer = true;
+    if (!_hadTimeout && _connected) {
+        _hadTimeout = true;
+    }
+    _connected = false;
+    _resetting = false;
+
+    // The header CRC may be stale after a partial/failed exchange or a protocol-version change
+    WriteCRC();
+
+    // Start the next handshake against a clean edge state (ignore errors while recovering)
+    try {
+        while (_transferReadyPin->ReadEvent()) {
+        }
+        _consumedRisingEdgeSeq = _transferReadyPin->RisingSequenceNumber();
+        while (_dataAvailablePin->ReadEvent()) {
+        }
+    } catch (...) {
+    }
+
+    if (_sbcDataAvailablePin) {
+        try {
+            _sbcDataAvailablePin->Write(false);
+        } catch (...) {
+        }
+    }
+}
+
+void SbcTransfer::ResetConnection() {
+    // Abandon any partially-staged transfer and force a clean handshake on the next call
+    _txPointer = 0;
+    _rxPointer = 0;
+    _packetId = 0;
+    _packetsBeingResent.clear();
+    _numResyncs++;
+    PrepareReconnect();
+}
+
+void SbcTransfer::InterruptibleSleep(int ms) {
+    if (ms <= 0 || _stop.load(std::memory_order_relaxed)) {
+        return;
+    }
+    // Sleep on the stop fd so Stop() cuts the backoff short
+    pollfd pfd{_stopEventFd, POLLIN, 0};
+    ::poll(&pfd, 1, ms);
 }
 
 // ---------------------------------------------------------------------------

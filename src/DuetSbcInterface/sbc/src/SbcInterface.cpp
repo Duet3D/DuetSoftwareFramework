@@ -83,45 +83,58 @@ void SbcInterface::Execute() {
     }
 
     while (!_stop.load(std::memory_order_relaxed)) {
-        // Invalidate on controller reset (just note it here)
-        if (_transfer.HadReset()) {
-            // Connection reset; nothing to invalidate in this test harness
-        }
+        // The whole loop body is guarded so that any error -- a transfer failure that the transfer
+        // engine could not resolve, a malformed incoming packet, an I/O error -- results in an
+        // automatic resync rather than terminating the thread.
+        try {
+            if (_transfer.HadReset()) {
+                if (_onError) {
+                    _onError("Controller was reset; resynchronising");
+                }
+            }
 
-        // Process incoming packets from the previous transfer
-        const int packets = _transfer.PacketsToRead();
-        for (int i = 0; i < packets; i++) {
-            proto::PacketHeader packet;
-            if (!_transfer.ReadNextPacket(packet)) {
+            // Process incoming packets from the previous transfer
+            const int packets = _transfer.PacketsToRead();
+            for (int i = 0; i < packets; i++) {
+                proto::PacketHeader packet;
+                if (!_transfer.ReadNextPacket(packet)) {
+                    break;
+                }
+                ProcessPacket(packet);
+            }
+
+            // Stage outgoing data and wait until there is a reason to perform another transfer
+            do {
+                StageOutgoing();
+            } while (!_transfer.WaitForTransferReason());
+
+            if (_stop.load(std::memory_order_relaxed)) {
                 break;
             }
-            ProcessPacket(packet);
-        }
 
-        // Stage outgoing data and wait until there is a reason to perform another transfer
-        do {
-            StageOutgoing();
-        } while (!_transfer.WaitForTransferReason());
-
-        if (_stop.load(std::memory_order_relaxed)) {
-            break;
-        }
-
-        // Do another full SPI transfer
-        try {
+            // Do another full SPI transfer. This recovers from transfer errors internally and only
+            // throws TransferTimeout to unwind on stop.
             _transfer.PerformFullTransfer();
+
+            // Report jitter for a served request, if any
+            const int64_t requestNs = _pendingRequestNs.exchange(0, std::memory_order_relaxed);
+            if (requestNs != 0 && _onRequestServed) {
+                _onRequestServed(NowNs() - requestNs);
+            }
         } catch (const TransferTimeout &) {
             if (_stop.load(std::memory_order_relaxed)) {
                 break;
             }
-            // Lost connection is handled internally by reconnecting; loop again
-            continue;
-        }
-
-        // Report jitter for a served request, if any
-        const int64_t requestNs = _pendingRequestNs.exchange(0, std::memory_order_relaxed);
-        if (requestNs != 0 && _onRequestServed) {
-            _onRequestServed(NowNs() - requestNs);
+            // Reconnection is handled inside PerformFullTransfer; just loop again
+        } catch (const std::exception &e) {
+            if (_stop.load(std::memory_order_relaxed)) {
+                break;
+            }
+            if (_onError) {
+                _onError(std::string("Recovering from error in interface loop: ") + e.what());
+            }
+            // Force a clean handshake on the next iteration
+            _transfer.ResetConnection();
         }
     }
 }

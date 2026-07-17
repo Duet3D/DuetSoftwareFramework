@@ -15,6 +15,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -45,11 +46,25 @@ public:
     SbcTransfer(const SbcTransfer &) = delete;
     SbcTransfer &operator=(const SbcTransfer &) = delete;
 
+    // Optional callback used to report recovery/resync events (thread: interface thread).
+    using LogCallback = std::function<void(const std::string &message)>;
+    void SetLogCallback(LogCallback cb) { _logCallback = std::move(cb); }
+
     // Establish the initial connection (performs the first full transfer). Throws on failure.
     void Connect();
 
-    // Perform a full data transfer synchronously. `connecting` is true only for the very first one.
+    // Perform a full data transfer synchronously. During normal operation this never throws for a
+    // transfer error: it recovers internally by resynchronising with the controller (with backoff).
+    // It only throws to unwind on Stop(), or from Connect() if the initial handshake fails.
+    // `connecting` is true only for the very first one.
     void PerformFullTransfer(bool connecting = false);
+
+    // Abandon the current connection and force a fresh handshake on the next transfer. Safe to call
+    // from the interface loop after any unexpected error (e.g. while processing a malformed packet).
+    void ResetConnection();
+
+    // Number of times the connection has been resynchronised after an error (diagnostics).
+    int ResyncCount() const noexcept { return _numResyncs; }
 
     int ProtocolVersion() const noexcept { return _protocolVersion; }
 
@@ -110,6 +125,11 @@ private:
 
     void ThrowIfStopped();
 
+    // Recovery: put the link back into the "reconnecting" state so the next transfer re-handshakes.
+    void PrepareReconnect();
+    // Sleep up to `ms`, returning early if Stop() is called (used to pace error retries).
+    void InterruptibleSleep(int ms);
+
     const Config _config;
     const size_t _bufferSize;
 
@@ -161,6 +181,11 @@ private:
     std::vector<uint8_t> &CurrentTxBuffer() { return _txBuffers[_txBufferIndex]; }
 
     std::atomic<bool> _stop{false};
+
+    // Error recovery
+    LogCallback _logCallback;
+    int _consecutiveErrors = 0;
+    int _numResyncs = 0;
 
     // Diagnostics
     std::chrono::steady_clock::time_point _keepAliveStart;

@@ -169,6 +169,21 @@ headers. That change touches the DuetCANMaster submodule and its Makefile and is
 as a follow-up so this project builds independently; until then, keep the two definitions in sync
 (the `static_assert`s here guard the layout).
 
+## Error recovery
+
+The interface never terminates on a transfer error. `PerformFullTransfer` recovers from any transfer
+failure (bad format/checksum/protocol, SPI/GPIO I/O errors, or a controller reset/reboot) by
+resynchronising and re-running the handshake, and the interface loop catches everything else (e.g. a
+malformed incoming packet) and forces a clean resync via `ResetConnection`. Fast-failing errors (such
+as a persistent protocol mismatch) are paced with a backoff that grows to a 1 s cap so recovery never
+spins the CPU; timeouts are already paced by the pin wait. Recoveries are reported through the error
+callback (`[recover] ...` on stderr in the harness) and counted as "Connection resyncs" in the report.
+
+Recovery relies on the device side (DuetCANMaster) resetting when the SBC restarts a transfer, which
+its `DataTransfer` state machine already does via its own transfer/connection timeouts. Only the
+initial `Connect()` still throws — a failure there means the board is absent or fundamentally
+incompatible at startup, which is worth surfacing rather than looping on.
+
 ## Notes / limitations
 
 - v2 GPIO chardev uAPI is preferred (per-edge sequence numbers, needed for the fresh-edge logic in
