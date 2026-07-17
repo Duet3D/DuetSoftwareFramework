@@ -32,16 +32,20 @@ This application may return the following codes (derived from `sysexits.h`):
 - `70`: Internal software error
 - `71`: Failed to initialize environment (OS error)
 - `73`: Failed to initialize IPC socket (Cannot create file)
-- `74`: Could not open SPI or GPIO device (IO error)
+- `74`: Could not open the SPI/GPIO or USB device (IO error)
 - `75`: Auto-update disabled or other instance already running (temporary failure)
 - `78`: Bad settings file (configuration error)
 
-### SPI Link
+### Firmware Link
 
-In order to connect to the firmware, a binary data protocol is used. DuetControlServer attaches to the Duet using an SPI connection (typically `/dev/spidev0.0`) in master mode.
+In order to connect to the firmware, a binary data protocol is used. Two transports are supported; the one to use is selected with the `CommunicationMethod` setting in `config.json`, which may be either `spi` (the default) or `usb`.
+
+In SPI mode, DuetControlServer attaches to the Duet using an SPI connection (typically `/dev/spidev0.0`, configurable via `SpiDevice`) in master mode.
 In addition, a GPIO pin (typically pin 22 on the Raspberry Pi header via `/dev/gpiochip0`) is required which is toggled by RepRapFirmware whenever the firmware is ready to exchange data.
 
-More technical documentation about this can be found [here](https://duet3d.github.io/DuetSoftwareFramework/index.html).
+In USB mode, DuetControlServer talks to the Duet over a USB serial connection instead (typically `/dev/ttyACM1`, configurable via `UsbDevice`). No GPIO pin is involved: because USB already guarantees reliable, ordered delivery, the protocol drops the CRC and readiness signalling that SPI mode relies on. This is handy on hosts that do not expose a wired SPI/GPIO header. The read and write timeouts can be tuned via `UsbReadTimeout` and `UsbWriteTimeout`.
+
+More technical documentation about this can be found [here](https://duet3d.github.io/DuetSoftwareFramework/articles/firmware-link.html).
 
 ### Inter-Process Communication
 
