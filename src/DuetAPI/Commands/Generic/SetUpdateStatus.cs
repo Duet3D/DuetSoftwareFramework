@@ -12,4 +12,14 @@ public partial class SetUpdateStatus : Command
     /// Whether an update is now in progress
     /// </summary>
     public bool Updating { get; set; }
+
+    /// <summary>
+    /// Description of the current update step, only used if <see cref="Updating"/> is true
+    /// </summary>
+    public string Message { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Progress of the current update step (0..1) or null if indeterminate, only used if <see cref="Updating"/> is true
+    /// </summary>
+    public float? Progress { get; set; }
 }

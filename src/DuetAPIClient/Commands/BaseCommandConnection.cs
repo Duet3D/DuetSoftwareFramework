@@ -830,6 +830,38 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     }
 
     /// <summary>
+    /// Override the current machine status and report the progress of the software update in progress
+    /// </summary>
+    /// <param name="message">Description of the current update step</param>
+    /// <param name="progress">Progress of the current update step (0..1) or null if indeterminate</param>
+    /// <remarks>
+    /// The object model must not be locked when this is called
+    /// </remarks>
+    /// <exception cref="SocketException">Command could not be processed</exception>
+    /// <exception cref="UnauthorizedAccessException">Insufficient permissions to modify other plugin data</exception>
+    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+    public void SetUpdateStatus(string message, float? progress = null) => PerformCommand(new SetUpdateStatus { Updating = true, Message = message, Progress = progress });
+
+    /// <summary>
+    /// Override the current machine status and report the progress of the software update in progress asynchronously
+    /// </summary>
+    /// <param name="message">Description of the current update step</param>
+    /// <param name="progress">Progress of the current update step (0..1) or null if indeterminate</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <remarks>
+    /// The object model must not be locked when this is called
+    /// </remarks>
+    /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+    /// <exception cref="SocketException">Command could not be processed</exception>
+    /// <exception cref="UnauthorizedAccessException">Insufficient permissions to modify other plugin data</exception>
+    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+    public async Task SetUpdateStatusAsync(string message, float? progress = null, CancellationToken cancellationToken = default)
+    {
+        await PerformCommandAsync(new SetUpdateStatus { Updating = true, Message = message, Progress = progress }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Start a plugin
     /// </summary>
     /// <param name="plugin">Identifier of the plugin</param>

@@ -15,5 +15,8 @@
   "sbcOutputRedirected": false,
   "sbcPermissions": [
     "superUser"
-  ]
+  ],
+  "data": {
+    "pkgFeed": null
+  }
 }

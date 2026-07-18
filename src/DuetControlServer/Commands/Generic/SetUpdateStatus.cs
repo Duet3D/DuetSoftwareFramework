@@ -10,7 +10,7 @@ namespace DuetControlServer.Commands;
 public sealed class SetUpdateStatus(Model.ObjectModel model) : DuetAPI.Commands.SetUpdateStatus
 {
     /// <summary>
-    /// Wait for all pending codes of the given channel to finish
+    /// Update the reported update status
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
@@ -19,6 +19,16 @@ public sealed class SetUpdateStatus(Model.ObjectModel model) : DuetAPI.Commands.
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             model.IsUpdating = Updating;
+            if (Updating)
+            {
+                model.SBC!.Upgrade ??= new();
+                model.SBC.Upgrade.Message = Message;
+                model.SBC.Upgrade.Progress = Progress;
+            }
+            else
+            {
+                model.SBC!.Upgrade = null;
+            }
         }
     }
 }

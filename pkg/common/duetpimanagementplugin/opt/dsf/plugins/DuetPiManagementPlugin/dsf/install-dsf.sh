@@ -16,6 +16,6 @@ fi
 
 # Install given version
 echo "Installing DSF $VERSION and RRF $RRF_VERSION"
-apt-get install -y --allow-downgrades -qq -o Dpkg::Options::="--force-confold" duetsoftwareframework=$VERSION duetcontrolserver=$VERSION duetwebserver=$VERSION duetpluginservice=$VERSION duettools=$VERSION duetruntime=$VERSION duetwebcontrol=$VERSION duetpimanagementplugin=$VERSION reprapfirmware=$RRF_VERSION < /dev/null
+apt-get install -y --allow-downgrades -o APT::Status-Fd=2 -o Dpkg::Options::="--force-confold" duetsoftwareframework=$VERSION duetcontrolserver=$VERSION duetwebserver=$VERSION duetpluginservice=$VERSION duettools=$VERSION duetruntime=$VERSION duetwebcontrol=$VERSION duetpimanagementplugin=$VERSION reprapfirmware=$RRF_VERSION < /dev/null
 echo "Done!"
 
