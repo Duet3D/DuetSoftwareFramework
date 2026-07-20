@@ -33,7 +33,7 @@ namespace DuetHttpClient
 
             try
             {
-                PollConnector pollConnector = await PollConnector.ConnectAsync(baseUri, options, cancellationToken);
+                PollConnector pollConnector = await PollConnector.ConnectAsync(baseUri, options, cancellationToken).ConfigureAwait(false);
                 return new DuetHttpSession(pollConnector);
             }
             catch (HttpRequestException)
@@ -41,7 +41,7 @@ namespace DuetHttpClient
                 // ignored
             }
 
-            RestConnector restConnector = await RestConnector.ConnectAsync(baseUri, options, cancellationToken);
+            RestConnector restConnector = await RestConnector.ConnectAsync(baseUri, options, cancellationToken).ConfigureAwait(false);
             return new DuetHttpSession(restConnector);
         }
 

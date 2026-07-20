@@ -134,19 +134,19 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
 
         // Create a new connection
         UnixDomainSocketEndPoint endPoint = new(socketPath);
-        await _unixSocket.ConnectAsync(endPoint, cancellationToken);
+        await _unixSocket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
 
         // Read the server init message
         ServerInitMessage ownMessage = new();
-        ServerInitMessage serverMessage = await ReceiveInitMessageAsync(cancellationToken);
+        ServerInitMessage serverMessage = await ReceiveInitMessageAsync(cancellationToken).ConfigureAwait(false);
         Id = serverMessage.Id;
 
         // Switch mode
         initMessage.Version = Defaults.ProtocolVersion;
-        await SendInitMessageAsync(initMessage, cancellationToken);
+        await SendInitMessageAsync(initMessage, cancellationToken).ConfigureAwait(false);
 
         // Check the result
-        BaseResponse response = await ReceiveResponseAsync(cancellationToken);
+        BaseResponse response = await ReceiveResponseAsync(cancellationToken).ConfigureAwait(false);
         if (!response.Success)
         {
             ErrorResponse errorResponse = (ErrorResponse)response;
@@ -208,9 +208,9 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
     /// <exception cref="SocketException">Connection has been closed</exception>
     protected async Task PerformCommandAsync(BaseCommand command, CancellationToken cancellationToken)
     {
-        await SendCommandAsync(command, cancellationToken);
+        await SendCommandAsync(command, cancellationToken).ConfigureAwait(false);
 
-        BaseResponse? response = await ReceiveResponseAsync(cancellationToken);
+        BaseResponse? response = await ReceiveResponseAsync(cancellationToken).ConfigureAwait(false);
         if (response is not null && !response.Success)
         {
             ErrorResponse errorResponse = (ErrorResponse)response;
@@ -343,9 +343,9 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
     /// <exception cref="SocketException">Connection has been closed</exception>
     protected async Task<T> PerformCommandAsync<T>(BaseCommand command, CancellationToken cancellationToken)
     {
-        await SendCommandAsync(command, cancellationToken);
+        await SendCommandAsync(command, cancellationToken).ConfigureAwait(false);
 
-        using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken);
+        using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken).ConfigureAwait(false);
         //Console.Write($"IN {Encoding.UTF8.GetString(jsonStream.ToArray())}");
 
         T DeserializeResponse()
@@ -465,7 +465,7 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
     /// <exception cref="SocketException">Connection has been closed</exception>
     protected async ValueTask<T> ReceiveCommandAsync<T>(CancellationToken cancellationToken) where T : BaseCommand
     {
-        using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken);
+        using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken).ConfigureAwait(false);
         //Console.Write($"IN {Encoding.UTF8.GetString(jsonStream.ToArray())}");
         return (T)JsonSerializer.Deserialize(jsonStream.ToArray(), typeof(T), CommandContext.Default)!;
     }
@@ -532,7 +532,7 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
     /// <exception cref="SocketException">Connection has been closed</exception>
     private async ValueTask<BaseResponse> ReceiveResponseAsync(CancellationToken cancellationToken)
     {
-        using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken);
+        using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken).ConfigureAwait(false);
         //Console.Write($"IN {Encoding.UTF8.GetString(jsonStream.ToArray())}");
 
         BaseResponse DeserializeResponse()
@@ -598,8 +598,8 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
     /// <exception cref="SocketException">Connection has been closed</exception>
     protected async ValueTask<JsonDocument> ReceiveJsonDocumentAsync(CancellationToken cancellationToken)
     {
-        await using MemoryStream json = await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken);
-        return await JsonDocument.ParseAsync(json, cancellationToken: cancellationToken);
+        await using MemoryStream json = await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken).ConfigureAwait(false);
+        return await JsonDocument.ParseAsync(json, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -623,7 +623,7 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
     /// <exception cref="SocketException">Connection has been closed</exception>
     private async ValueTask<ServerInitMessage> ReceiveInitMessageAsync(CancellationToken cancellationToken)
     {
-        using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken);
+        using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken).ConfigureAwait(false);
         //Console.Write($"IN {Encoding.UTF8.GetString(jsonStream.ToArray())}");
         return JsonSerializer.Deserialize(jsonStream.ToArray(), ConnectionContext.Default.ServerInitMessage)!;
     }
@@ -654,7 +654,7 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
     {
         byte[] jsonToWrite = JsonSerializer.SerializeToUtf8Bytes(message, message.GetType(), ConnectionContext.Default);
         //Console.Write($"OUT {Encoding.UTF8.GetString(jsonToWrite)}");
-        await _unixSocket.SendAsync(jsonToWrite, SocketFlags.None, cancellationToken);
+        await _unixSocket.SendAsync(jsonToWrite, SocketFlags.None, cancellationToken).ConfigureAwait(false);
         //Console.WriteLine(" OK");
     }
 
@@ -685,7 +685,7 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
     {
         byte[] jsonToWrite = JsonSerializer.SerializeToUtf8Bytes(command, command.GetType(), CommandContext.Default);
         //Console.Write($"OUT {Encoding.UTF8.GetString(jsonToWrite)}");
-        await _unixSocket.SendAsync(jsonToWrite, SocketFlags.None, cancellationToken);
+        await _unixSocket.SendAsync(jsonToWrite, SocketFlags.None, cancellationToken).ConfigureAwait(false);
         //Console.WriteLine(" OK");
     }
 }
