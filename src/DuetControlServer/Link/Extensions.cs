@@ -17,7 +17,8 @@ public static partial class ServiceCollectionExtensions
     public static IServiceCollection AddLink(this IServiceCollection services)
     {
         return services
-            .AddSingleton<Channel.Manager>();
+            .AddSingleton<Channel.Manager>()
+            .AddSingleton<IAsyncDiagnostics, Channel.Manager>(services => services.GetRequiredService<Channel.Manager>());
     }
 
     /// <summary>
@@ -38,6 +39,7 @@ public static partial class ServiceCollectionExtensions
                 .AddSingleton<Adapter.ILinkAdapter, Adapter.USB>(services => services.GetRequiredService<Adapter.USB>())
                 .AddSingleton<IDiagnostics, Adapter.USB>(services => services.GetRequiredService<Adapter.USB>())
                 .AddSingleton<LinkInterface>()
+                .AddSingleton<IDiagnostics, LinkInterface>(services => services.GetRequiredService<LinkInterface>())
                 .AddHostedService<LinkService>();
         }
         else
@@ -47,6 +49,7 @@ public static partial class ServiceCollectionExtensions
                 .AddSingleton<Adapter.ILinkAdapter, Adapter.SPI>(services => services.GetRequiredService<Adapter.SPI>())
                 .AddSingleton<IDiagnostics, Adapter.SPI>(services => services.GetRequiredService<Adapter.SPI>())
                 .AddSingleton<LinkInterface>()
+                .AddSingleton<IDiagnostics, LinkInterface>(services => services.GetRequiredService<LinkInterface>())
                 .AddHostedService<LinkService>();
         }
     }

@@ -233,6 +233,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// </summary>
     /// <param name="motionSystem">Motion system</param>
     /// <param name="filePosition">New file position</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>File position</returns>
     public async Task SetFilePositionAsync(int motionSystem, long filePosition, CancellationToken cancellationToken = default)
     {
@@ -265,6 +266,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// <param name="virtualFile">File to print</param>
     /// <param name="physicalFile">Physical file to print</param>
     /// <param name="simulating">Whether the file is being simulated</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <remarks>
     /// This class has to be locked when this method is called
@@ -671,6 +673,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// Called when the print is being paused
     /// </summary>
     /// <param name="filePosition">File position where the print was paused</param>
+    /// <param name="filePosition2">File position of the second motion system where the print was paused</param>
     /// <param name="pauseReason">Reason why the print has been paused</param>
     public void Pause(long? filePosition, long? filePosition2, PrintPausedReason pauseReason)
     {

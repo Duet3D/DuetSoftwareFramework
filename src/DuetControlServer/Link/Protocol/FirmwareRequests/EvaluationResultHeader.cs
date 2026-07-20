@@ -46,4 +46,3 @@ public struct EvaluationResultHeader
     [FieldOffset(4)]
     public float FloatValue;
 }
-

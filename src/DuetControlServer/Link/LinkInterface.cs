@@ -190,8 +190,7 @@ public sealed partial class LinkInterface(
     /// <summary>
     /// Set the last code result for a specific code channel
     /// </summary>
-    /// <param name="channel">Code channel</param>
-    /// <param name="result">Code result</param>
+    /// <param name="code">Code holding the result</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     public Task SetLastCodeResultAsync(Code code, CancellationToken cancellationToken = default)
@@ -242,9 +241,9 @@ public sealed partial class LinkInterface(
     /// <param name="flushAll">Flush everything</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
-    public async Task<bool> FlushAsync(CodeChannel channel, bool flushAll, CancellationToken cancellationToken = default)
+    public async ValueTask<bool> FlushAsync(CodeChannel channel, bool flushAll, CancellationToken cancellationToken = default)
     {
-        Task<bool> flushTask;
+        ValueTask<bool> flushTask;
         using (await channels[channel].LockAsync(cancellationToken))
         {
             flushTask = flushAll ? channels[channel].FlushAllAsync(cancellationToken) : channels[channel].FlushAsync(cancellationToken);
@@ -258,9 +257,9 @@ public sealed partial class LinkInterface(
     /// <param name="file">Code file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
-    public async Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
+    public async ValueTask<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
     {
-        Task<bool> flushTask;
+        ValueTask<bool> flushTask;
         using (await channels[file.Channel].LockAsync(cancellationToken))
         {
             flushTask = channels[file.Channel].FlushAsync(file, cancellationToken);
@@ -275,9 +274,9 @@ public sealed partial class LinkInterface(
     /// <param name="code">Code waiting for the flush</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
-    public async Task<bool> FlushAsync(Code code, CancellationToken cancellationToken = default)
+    public async ValueTask<bool> FlushAsync(Code code, CancellationToken cancellationToken = default)
     {
-        Task<bool> flushTask;
+        ValueTask<bool> flushTask;
         using (await channels[code.Channel].LockAsync(cancellationToken))
         {
             flushTask = (code.File == null) ? channels[code.Channel].FlushAsync(cancellationToken) : channels[code.Channel].FlushAsync(code.File, cancellationToken);
@@ -413,6 +412,7 @@ public sealed partial class LinkInterface(
     /// Lock all movement systems and wait for standstill
     /// </summary>
     /// <param name="channel">Code channel acquiring the lock</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Disposable lock object that releases the lock when disposed</returns>
     /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
     /// <exception cref="OperationCanceledException">Failed to get movement lock</exception>

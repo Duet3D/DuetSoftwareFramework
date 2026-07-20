@@ -29,8 +29,7 @@ public class FileFactory(ILogger<FileFactory> logger, IServiceProvider servicePr
     /// <summary>
     /// Create a code file copy for execution on the given channel
     /// </summary>
-    /// <param name="virtualFile">Virtual file path</param>
-    /// <param name="physicalFile">Physical file path</param>
+    /// <param name="copyFrom">Code file to copy</param>
     /// <param name="channel">Code channel</param>
     /// <returns>Code file instance</returns>
     public CodeFile Create(CodeFile copyFrom, CodeChannel channel)

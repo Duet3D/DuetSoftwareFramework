@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Runtime.Versioning;
@@ -273,6 +274,46 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     public async Task<ObjectModel> GetObjectModelAsync(CancellationToken cancellationToken = default)
     {
         return await PerformCommandAsync<ObjectModel>(new GetObjectModel(), cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Retrieve only the given parts of the object model of the machine
+    /// </summary>
+    /// <param name="filters">Object model key paths to retrieve, e.g. "network.interfaces"</param>
+    /// <returns>Partial machine model holding only the requested parts</returns>
+    /// <exception cref="SocketException">Command could not be processed</exception>
+    /// <seealso cref="SbcPermissions.ObjectModelRead"/>
+    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+    public ObjectModel GetObjectModel(params string[] filters) => PerformCommand<ObjectModel>(new GetObjectModel { Filters = [.. filters] });
+
+    /// <summary>
+    /// Retrieve only the given part of the object model of the machine asynchronously
+    /// </summary>
+    /// <param name="filter">Object model key path to retrieve, e.g. "network.interfaces"</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Partial machine model holding only the requested part</returns>
+    /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+    /// <exception cref="SocketException">Command could not be processed</exception>
+    /// <seealso cref="SbcPermissions.ObjectModelRead"/>
+    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+    public async Task<ObjectModel> GetObjectModelAsync(string filter, CancellationToken cancellationToken = default)
+    {
+        return await PerformCommandAsync<ObjectModel>(new GetObjectModel { Filters = [filter] }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Retrieve only the given parts of the object model of the machine asynchronously
+    /// </summary>
+    /// <param name="filters">Object model key paths to retrieve, e.g. "network.interfaces"</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Partial machine model holding only the requested parts</returns>
+    /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+    /// <exception cref="SocketException">Command could not be processed</exception>
+    /// <seealso cref="SbcPermissions.ObjectModelRead"/>
+    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+    public async Task<ObjectModel> GetObjectModelAsync(IEnumerable<string> filters, CancellationToken cancellationToken = default)
+    {
+        return await PerformCommandAsync<ObjectModel>(new GetObjectModel { Filters = [.. filters] }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

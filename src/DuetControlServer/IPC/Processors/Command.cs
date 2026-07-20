@@ -1,11 +1,14 @@
 ﻿using System;
+using System.Buffers;
 using System.Linq;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Connection.InitMessages;
 using DuetControlServer.Commands;
+using DuetControlServer.Utility;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace DuetControlServer.IPC.Processors;
 
@@ -60,6 +63,11 @@ public sealed class Command : IProcessor
     private readonly ILogger<Command> _logger;
 
     /// <summary>
+    /// Application settings
+    /// </summary>
+    private readonly Settings _settings;
+
+    /// <summary>
     /// Connection to the IPC client served by this processor
     /// </summary>
     public Connection Connection { get; }
@@ -70,10 +78,12 @@ public sealed class Command : IProcessor
     /// <param name="conn">Connection instance</param>
     /// <param name="initMessage">Initialization message from the client</param>
     /// <param name="logger">Logger instance</param>
-    public Command(Connection conn, ClientInitMessage initMessage, ILogger<Command> logger)
+    /// <param name="settings">Application settings</param>
+    public Command(Connection conn, ClientInitMessage initMessage, ILogger<Command> logger, IOptions<Settings> settings)
     {
         Connection = conn;
         _logger = logger;
+        _settings = settings.Value;
 
         _logger.LogDebug("Command processor added for IPC#{Id}", conn.Id);
     }
@@ -103,8 +113,19 @@ public sealed class Command : IProcessor
                 Connection.CheckPermissions(commandType);
 
                 // Execute it and send back the result
-                object? result = await command.InvokeAsync(cancellationToken);
-                await Connection.SendResponseAsync(result);
+                if (command is IRawJsonCommand rawJsonCommand)
+                {
+                    using PooledBufferWriter responseBuffer = new(_settings.IpcJsonBufferSize);
+                    responseBuffer.Write(Connection.SuccessResponseStart);
+                    await rawJsonCommand.ExecuteRawJsonAsync(responseBuffer, cancellationToken);
+                    responseBuffer.Write(Connection.SuccessResponseEnd);
+                    await Connection.SendRawDataAsync(responseBuffer.WrittenMemory);
+                }
+                else
+                {
+                    object? result = await command.InvokeAsync(cancellationToken);
+                    await Connection.SendResponseAsync(result);
+                }
 
                 // Shut down the socket if this was the last command
                 if (cancellationToken.IsCancellationRequested)

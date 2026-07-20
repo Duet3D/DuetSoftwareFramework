@@ -149,7 +149,7 @@ public sealed class PipelineStackItem
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
     /// <remarks>This method does not throw an exception even if the cancellation token is triggered</remarks>
-    public async Task<bool> FlushAsync(CancellationToken cancellationToken = default)
+    public async ValueTask<bool> FlushAsync(CancellationToken cancellationToken = default)
     {
         if (cancellationToken.IsCancellationRequested)
         {

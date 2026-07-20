@@ -16,17 +16,12 @@ using Microsoft.Extensions.Options;
 using System;
 using System.CommandLine;
 using System.IO;
+using System.Runtime;
 using System.Text.Json;
 
 string? startErrorFile = Defaults.StartErrorFile;
 
-/// <summary>
-/// Print the reason for the start error, write it to the start error file, and exit this application
-/// </summary>
-/// <param name="e">Exception that caused the termination</param>
-/// <param name="reason">Reason for the program termination</param>
-/// <param name="exitCode">Exit code</param>
-/// <param name="loggerFactory">Optional logger factory for logging</param>
+// Print the reason for the start error, write it to the start error file, and exit this application
 void Terminate(Exception e, string reason, int exitCode, ILoggerFactory? loggerFactory = null)
 {
     bool logged = false;
@@ -103,6 +98,10 @@ rootCommand.SetAction(async (parserResult) =>
     }
     else
     {
+        // Trade higher steady-state memory usage for fewer blocking gen2 collections, else full GC
+        // pauses may stall time-critical data exchanges with the Duet and IPC message processing
+        GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
+
         // Show startup message in regular mode
         Console.WriteLine($"Duet Control Server v{VersionHelper.GetVersion()}");
         Console.WriteLine("Written by Christian Hammacher for Duet3D");
@@ -193,6 +192,7 @@ rootCommand.SetAction(async (parserResult) =>
         // Capture logger factory and settings for error logging and dynamic log-level filtering
         loggerFactory = host.Services.GetRequiredService<ILoggerFactory>();
         capturedSettings = host.Services.GetRequiredService<IOptions<Settings>>().Value;
+        DuetAPI.Utility.JsonHelper.ReceiveBufferSize = capturedSettings.IpcJsonBufferSize;
     }
     catch (Exception e)
     {

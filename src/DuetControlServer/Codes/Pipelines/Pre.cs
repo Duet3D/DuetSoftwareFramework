@@ -21,7 +21,7 @@ public sealed class Pre(ChannelProcessor channelProcessor, CodeProcessor codePro
     : PipelineBase(PipelineStage.Pre, channelProcessor, codeProcessor, lifetime, settings)
 {
     /// <inheritdoc />
-    public override async Task ProcessCodeAsync(Commands.Code code)
+    public override async ValueTask ProcessCodeAsync(Commands.Code code)
     {
         if (!code.Flags.HasFlag(CodeFlags.IsPreProcessed))
         {

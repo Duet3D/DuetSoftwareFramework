@@ -24,7 +24,11 @@ public sealed class RequiredPermissionsAttribute(SbcPermissions requiredPermissi
     /// <returns>True if permission is granted</returns>
     public bool Check(SbcPermissions permissions)
     {
+#if NET5_0_OR_GREATER
+        foreach (SbcPermissions value in Enum.GetValues<SbcPermissions>())
+#else
         foreach (Enum value in Enum.GetValues(typeof(SbcPermissions)))
+#endif
         {
             if (_requiredPermissions.HasFlag(value) && permissions.HasFlag(value))
             {

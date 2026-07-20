@@ -308,6 +308,7 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
     /// </summary>
     /// <param name="webSocket">WebSocket to read from</param>
     /// <param name="dataAcknowledged">Event to trigger when the client has acknowledged data</param>
+    /// <param name="sendLock">Lock for writing to the WebSocket</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
     private async Task ReadFromClient(WebSocket webSocket, AsyncAutoResetEvent dataAcknowledged, AsyncLock sendLock, CancellationToken cancellationToken)
@@ -367,6 +368,7 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
     /// <param name="webSocket">WebSocket to write to</param>
     /// <param name="subscribeConnection">IPC connection to supply model updates</param>
     /// <param name="dataAcknowledged">Event that is triggered when the client has acknowledged data</param>
+    /// <param name="sendLock">Lock for writing to the WebSocket</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
     private static async Task WriteToClient(WebSocket webSocket, SubscribeConnection subscribeConnection, AsyncAutoResetEvent dataAcknowledged, AsyncLock sendLock, CancellationToken cancellationToken)

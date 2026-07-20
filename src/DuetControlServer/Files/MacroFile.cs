@@ -147,6 +147,7 @@ public sealed class MacroFile : CodeFile, IDisposable
     /// <param name="expressions">Expression evaluator</param>
     /// <param name="linkInterface">Link interface</param>
     /// <param name="model">Object model</param>
+    /// <param name="lifetime">Host application lifetime</param>
     /// <param name="loggerFactory">Logger factory</param>
     /// <param name="settings">Settings</param>
     public MacroFile(CodeFilePath filePath, CodeChannel channel, int sourceConnection,
@@ -284,7 +285,7 @@ public sealed class MacroFile : CodeFile, IDisposable
     /// Read the next available code asynchronously
     /// </summary>
     /// <returns>Read code</returns>
-    private async Task<Code?> ReadCodeAsync()
+    private async ValueTask<Code?> ReadCodeAsync()
     {
         Code? result;
 

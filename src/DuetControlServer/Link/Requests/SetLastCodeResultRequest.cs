@@ -35,7 +35,6 @@ public class SetLastCodeResultRequest(CodeChannel channel, CodeResult result)
     /// <summary>
     /// Set the result of the evaluated expression
     /// </summary>
-    /// <param name="result">Result to set</param>
     public void SetResult() => _tcs.TrySetResult();
 
     /// <summary>

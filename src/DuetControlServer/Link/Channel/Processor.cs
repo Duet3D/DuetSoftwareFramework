@@ -52,15 +52,15 @@ public sealed class Processor
     /// Constructor of a code channel processor
     /// </summary>
     /// <param name="channel">Code channel of this instance</param>
-    /// <param name="codeFactory">Code factory</param>
+    /// <param name="commandFactory">Command factory</param>
     /// <param name="codeProcessor">Code processor</param>
-    /// <param name="eventLogger">Event logger</param>
     /// <param name="filePathResolver">File path resolver</param>
     /// <param name="linkAdapter">Link adapter</param>
     /// <param name="linkInterface">Link interface</param>
     /// <param name="jobProcessor">Job processor</param>
     /// <param name="macroFileFactory">Macro file factory</param>
     /// <param name="model">Object model</param>
+    /// <param name="lifetime">Host application lifetime</param>
     /// <param name="loggerFactory">Logger factory</param>
     /// <param name="settings">Settings</param>
     public Processor(
@@ -507,7 +507,7 @@ public sealed class Processor
     /// <param name="state">Stack item</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    private Task<bool> GetFlushTask(StackState state, CancellationToken cancellationToken = default)
+    private ValueTask<bool> GetFlushTask(StackState state, CancellationToken cancellationToken = default)
     {
         // Check if we can resolve the flush request immediately if nothing is being done
         if (state == CurrentState &&
@@ -515,13 +515,13 @@ public sealed class Processor
             (state.File is not MacroFile macro || (!macro.JustStarted && macro.IsExecuting)) && !state.MacroCompleted &&
             state.SuspendedCodes.Count == 0 && !state.PendingCodes.Reader.TryPeek(out _))
         {
-            return Task.FromResult(true);
+            return ValueTask.FromResult(true);
         }
 
         // Need to wait for the SPI connector to finish other operations first
         TaskCompletionSource<bool> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         state.FlushRequests.Enqueue(tcs);
-        return tcs.Task.WaitAsync(cancellationToken);
+        return new ValueTask<bool>(tcs.Task.WaitAsync(cancellationToken));
     }
 
     /// <summary>
@@ -530,7 +530,7 @@ public sealed class Processor
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes could be flushed</returns>
-    public Task<bool> FlushAsync(CancellationToken cancellationToken = default)
+    public ValueTask<bool> FlushAsync(CancellationToken cancellationToken = default)
     {
         // Need to find the correct state for a flush request first.
         // Generic flush requests are not meant for temporary macro states
@@ -554,7 +554,7 @@ public sealed class Processor
     /// <param name="file">Optional code file for the flush target</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes could be flushed</returns>
-    public Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
+    public ValueTask<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
     {
         // Need to find the correct state for a flush request first.
         // Generic flush requests are not meant for temporary macro states
@@ -577,7 +577,7 @@ public sealed class Processor
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes could be flushed</returns>
-    public Task<bool> FlushAllAsync(CancellationToken cancellationToken = default) => GetFlushTask(BaseState, cancellationToken);
+    public ValueTask<bool> FlushAllAsync(CancellationToken cancellationToken = default) => GetFlushTask(BaseState, cancellationToken);
 
     /// <summary>
     /// Lock all movement systems and wait for standstill

@@ -234,7 +234,9 @@ namespace DuetPiManagementPlugin
                     Match match = _unattendedUpgradeProgressRegex().Match(content);
                     if (match.Success && float.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out float percentage))
                     {
-                        string package = match.Groups[2].Value.Trim();
+                        // apt separates multiple packages by bare commas, which leaves clients with one
+                        // long unbreakable word to wrap
+                        string package = string.Join(", ", match.Groups[2].Value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
                         await ReportAsync(true, string.IsNullOrEmpty(package) ? null : $"Upgrading {package}", percentage / 100f);
                     }
                 }

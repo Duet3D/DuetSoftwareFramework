@@ -116,7 +116,6 @@ public static class Reader
     /// </summary>
     /// <param name="from">Origin</param>
     /// <param name="filePosition">Position at which the print has been paused</param>
-    /// <param name="filePosition2">Position at which the second open file has been paused (if applicable)</param>
     /// <param name="reason">Reason why the print has been paused</param>
     /// <returns>Number of bytes read</returns>
     public static int ReadLegacyPrintPaused(ReadOnlySpan<byte> from, out uint filePosition, out PrintPausedReason reason)

@@ -116,11 +116,6 @@ public sealed class Settings
     public int Backlog { get; set; } = 4;
 
     /// <summary>
-    /// Poll interval for connected IPC clients (in ms)
-    /// </summary>
-    public int SocketPollInterval { get; set; } = 60000;
-
-    /// <summary>
     /// Virtual SD card directory.
     /// Paths starting with 0:/ are mapped to this directory
     /// </summary>
@@ -299,6 +294,13 @@ public sealed class Settings
     public int FileBufferSize { get; set; } = 32768;
 
     /// <summary>
+    /// Initial size of the buffers used to serialize IPC JSON responses like the object model and of the
+    /// chunks used to receive IPC JSON messages (in bytes). Serialization buffers grow automatically if
+    /// a response exceeds this size
+    /// </summary>
+    public int IpcJsonBufferSize { get; set; } = 1024;
+
+    /// <summary>
     /// How many bytes to parse max at the beginning of a file to retrieve G-code file information (in bytes)
     /// </summary>
     public int FileInfoReadLimitHeader { get; set; } = 16384;
@@ -316,14 +318,14 @@ public sealed class Settings
     /// <summary>
     /// Regular expressions for finding the layer height (case insensitive)
     /// </summary>
-    public List<Regex> LayerHeightFilters { get; set; } =
+    public List<string> LayerHeightFilters { get; set; } =
     [
-        new(@"^\s*layer_height\D+(?<mm>(\d+\.?\d*))", DefaultRegexFlags),            // Slic3r / Prusa Slicer
-        new(@"Layer height\D+(?<mm>(\d+\.?\d*))", DefaultRegexFlags),                // Cura
-        new(@"layerHeight\D+(?<mm>(\d+\.?\d*))", DefaultRegexFlags),                 // Simplify3D
-        new(@"layer_thickness_mm\D+(?<mm>(\d+\.?\d*))", DefaultRegexFlags),          // KISSlicer and Canvas
-        new(@"layerThickness\D+(?<mm>(\d+\.?\d*))", DefaultRegexFlags),              // Matter Control
-        new(@"sliceHeight\D+(?<mm>(\d+\.?\d*))", DefaultRegexFlags)                  // Kiri:Moto
+        @"^\s*layer_height\D+(?<mm>(\d+\.?\d*))",            // Slic3r / Prusa Slicer
+        @"Layer height\D+(?<mm>(\d+\.?\d*))",                // Cura
+        @"layerHeight\D+(?<mm>(\d+\.?\d*))",                 // Simplify3D
+        @"layer_thickness_mm\D+(?<mm>(\d+\.?\d*))",          // KISSlicer and Canvas
+        @"layerThickness\D+(?<mm>(\d+\.?\d*))",              // Matter Control
+        @"sliceHeight\D+(?<mm>(\d+\.?\d*))"                  // Kiri:Moto
     ];
 
     /// <summary>
@@ -332,59 +334,70 @@ public sealed class Settings
     /// <remarks>
     /// If the number of layers cannot be found, the total number of layers is calculated from the layer and object heights (if applicable)
     /// </remarks>
-    public List<Regex> NumLayersFilters { get; set; } =
+    public List<string> NumLayersFilters { get; set; } =
     [
-        new(@"NUM_LAYERS\D+(\d+)", DefaultRegexFlags)
+        @"NUM_LAYERS\D+(\d+)"
     ];
 
     /// <summary>
     /// Regular expressions for finding the filament consumption (case insensitive, single line)
     /// </summary>
-    public List<Regex> FilamentFilters { get; set; } =
+    public List<string> FilamentFilters { get; set; } =
     [
-        new(@"filament used\D+(((?<mm>\d+\.?\d*)\s*mm)(\D+)?)+", DefaultRegexFlags),                     // Slic3r and Kiri:Moto (mm)
-        new(@"filament used\D+(((?<m>\d+\.?\d*)m([^m]|$))(\D+)?)+", DefaultRegexFlags),                  // Cura (m)
-        new(@"filament length\D+(((?<mm>\d+\.?\d*)\s*mm)(\D+)?)+", DefaultRegexFlags),                   // Simplify3D (mm)
-        new(@"filament used \[mm\]\D+((?<mm>\d+\.?\d*)(\D+)?)+", DefaultRegexFlags),                     // Prusa Slicer (mm)
-        new(@"material\#(?<index>\d+)\D+(?<mm>\d+\.?\d*)", DefaultRegexFlags),                           // IdeaMaker (mm)
-        new(@"Ext\s*\#\d+\D+(?<mm>\d+\.?\d*)", DefaultRegexFlags),                                       // KISSSlicer v2.0 (mm)
-        new(@"Filament used per extruder:\r\n;\s*(?<name>.+)\s+=\s*(?<mm>[0-9.]+)", DefaultRegexFlags),  // Canvas
-        new(@"filament used extruder (?<index>\d+) \(mm\) = (?<mm>\d+\.?\d*)", DefaultRegexFlags)        // MatterControl v2
+        @"filament used\D+(((?<mm>\d+\.?\d*)\s*mm)(\D+)?)+",                     // Slic3r and Kiri:Moto (mm)
+        @"filament used\D+(((?<m>\d+\.?\d*)m([^m]|$))(\D+)?)+",                  // Cura (m)
+        @"filament length\D+(((?<mm>\d+\.?\d*)\s*mm)(\D+)?)+",                   // Simplify3D (mm)
+        @"filament used \[mm\]\D+((?<mm>\d+\.?\d*)(\D+)?)+",                     // Prusa Slicer (mm)
+        @"material\#(?<index>\d+)\D+(?<mm>\d+\.?\d*)",                           // IdeaMaker (mm)
+        @"Ext\s*\#\d+\D+(?<mm>\d+\.?\d*)",                                       // KISSSlicer v2.0 (mm)
+        @"Filament used per extruder:\r\n;\s*(?<name>.+)\s+=\s*(?<mm>[0-9.]+)",  // Canvas
+        @"filament used extruder (?<index>\d+) \(mm\) = (?<mm>\d+\.?\d*)"        // MatterControl v2
     ];
 
     /// <summary>
     /// Regular expressions for finding the slicer (case insensitive)
     /// </summary>
-    public List<Regex> GeneratedByFilters { get; set; } =
+    public List<string> GeneratedByFilters { get; set; } =
     [
-        new(@"generated by\s+(.+)", DefaultRegexFlags),                              // Slic3r, Simplify3D, Kiri:Moto
-        new(@"Sliced by\s+(.+)", DefaultRegexFlags),                                 // IdeaMaker and Canvas
-        new(@"(KISSlicer.*)", DefaultRegexFlags),                                    // KISSlicer
-        new(@"Sliced at:\s*(.+)", DefaultRegexFlags),                                // Cura (old)
-        new(@"Generated with\s*(.+)", DefaultRegexFlags)                             // Cura (new)
+        @"generated by\s+(.+)",                              // Slic3r, Simplify3D, Kiri:Moto
+        @"Sliced by\s+(.+)",                                 // IdeaMaker and Canvas
+        @"(KISSlicer.*)",                                    // KISSlicer
+        @"Sliced at:\s*(.+)",                                // Cura (old)
+        @"Generated with\s*(.+)"                             // Cura (new)
     ];
 
     /// <summary>
     /// Regular expressions for finding the print time
     /// </summary>
-    public List<Regex> PrintTimeFilters { get; set; } =
+    public List<string> PrintTimeFilters { get; set; } =
     [
-        new(@"estimated printing time .*= ((?<d>(\d+))d\s*)?((?<h>(\d+))h\s*)?((?<m>(\d+))m\s*)?((?<s>(\d+))s)?", DefaultRegexFlags),                // Slic3r PE
-        new(@"TIME:(?<s>(\d+\.?\d*))", DefaultRegexFlags),                                                                                           // Cura
-        new(@"Build Time:\s+((?<h>(\d+\.?\d*)) hour(s)?\s*)?((?<m>(\d+\.?\d*)) minute(s)?\s*)?((?<s>(\d+\.?\d*)) second(s)?)?", DefaultRegexFlags),  // Simplify3D, KISSlicer, Canvas, IceSL
-        new(@"print time:\s+(?<s>(\d+\.?\d*))(s)?", DefaultRegexFlags),                                                                              // Kiri:Moto, and IdeaMaker v4
-        new(@"Total estimated \(pre-cool\) minutes: ((?<m>\d+\.?\d*))", DefaultRegexFlags),                                                          // KISSlicer v2.0
-        new(@"total print time \(s\) = (?<s>(\d+\.?\d*))", DefaultRegexFlags),                                                                       // MatterControl v2
-        new(@"Build time:\s+(?<h>(\d+\.?\d*)):(?<m>(\d+\.?\d*)):(?<s>(\d+\.?\d*))", DefaultRegexFlags)                                               // REACTOR
+        @"estimated printing time .*= ((?<d>(\d+))d\s*)?((?<h>(\d+))h\s*)?((?<m>(\d+))m\s*)?((?<s>(\d+))s)?",                // Slic3r PE
+        @"TIME:(?<s>(\d+\.?\d*))",                                                                                           // Cura
+        @"Build Time:\s+((?<h>(\d+\.?\d*)) hour(s)?\s*)?((?<m>(\d+\.?\d*)) minute(s)?\s*)?((?<s>(\d+\.?\d*)) second(s)?)?",  // Simplify3D, KISSlicer, Canvas, IceSL
+        @"print time:\s+(?<s>(\d+\.?\d*))(s)?",                                                                              // Kiri:Moto, and IdeaMaker v4
+        @"Total estimated \(pre-cool\) minutes: ((?<m>\d+\.?\d*))",                                                          // KISSlicer v2.0
+        @"total print time \(s\) = (?<s>(\d+\.?\d*))",                                                                       // MatterControl v2
+        @"Build time:\s+(?<h>(\d+\.?\d*)):(?<m>(\d+\.?\d*)):(?<s>(\d+\.?\d*))"                                               // REACTOR
     ];
 
     /// <summary>
     /// Regular expressions for finding the simulated time
     /// </summary>
-    public List<Regex> SimulatedTimeFilters { get; set; } =
+    public List<string> SimulatedTimeFilters { get; set; } =
     [
-        new(@"Simulated print time\D+(?<s>(\d+\.?\d*))", DefaultRegexFlags)
+        @"Simulated print time\D+(?<s>(\d+\.?\d*))"
     ];
+
+    /// <summary>
+    /// Compile the given filter patterns
+    /// </summary>
+    /// <param name="patterns">Patterns to compile</param>
+    /// <returns>Compiled regular expressions</returns>
+    /// <remarks>
+    /// The filters are stored as plain patterns because <see cref="Regex"/> cannot be bound from configuration,
+    /// so options have to be given inline (for example <c>(?-i)</c> to match case-sensitively)
+    /// </remarks>
+    internal static List<Regex> CompileFilters(List<string> patterns) => patterns.ConvertAll(pattern => new Regex(pattern, DefaultRegexFlags));
 
     /// <summary>
     /// Perform final configuration steps
@@ -408,8 +421,7 @@ public sealed class Settings
         JsonSerializer.Serialize(fileStream, this, new JsonSerializerOptions()
         {
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-            WriteIndented = true,
-            Converters = { new RegexJsonConverter() }
+            WriteIndented = true
         });
     }
 }
@@ -466,6 +478,22 @@ public static class ServiceCollectionExtensions
             {
                 continue;
             }
+            // Config files written before the filters became plain patterns hold serialised Regex
+            // objects, i.e. <Filter>:<index>:Pattern next to a :Options entry. Keep the pattern and
+            // drop the flags, which CompileFilters now applies uniformly
+            if (kvp.Key.Contains("Filters:", StringComparison.OrdinalIgnoreCase))
+            {
+                if (kvp.Key.EndsWith(":Pattern", StringComparison.OrdinalIgnoreCase))
+                {
+                    configData[kvp.Key[..^":Pattern".Length]] = kvp.Value;
+                    continue;
+                }
+                if (kvp.Key.EndsWith(":Options", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+            }
+
             if (RenamedSettings.TryGetValue(kvp.Key, out string? currentKey))
             {
                 legacyData[currentKey] = kvp.Value;
@@ -486,6 +514,7 @@ public static class ServiceCollectionExtensions
             .Build();
         
         return services
+            .Configure<Settings>(settings => ReplaceConfiguredLists(filteredConfig, settings))
             .Configure<Settings>(filteredConfig)
             .PostConfigure<Settings>(settings =>
             {
@@ -518,5 +547,37 @@ public static class ServiceCollectionExtensions
                 }
                 settings.PostConfigure();
             });
+    }
+
+    /// <summary>
+    /// Empty the list settings that the configuration provides so they are replaced instead of extended
+    /// </summary>
+    /// <param name="configuration">Configuration holding the settings</param>
+    /// <param name="settings">Settings to prepare</param>
+    /// <remarks>
+    /// The configuration binder adds to an existing list rather than replacing it, so a configured list would
+    /// otherwise end up holding the defaults as well. This runs before the binder, and only clears a list that
+    /// is actually configured, so unconfigured ones keep their defaults
+    /// </remarks>
+    private static void ReplaceConfiguredLists(IConfiguration configuration, Settings settings)
+    {
+        Dictionary<string, List<string>> listSettings = new()
+        {
+            [nameof(Settings.FirmwareComments)] = settings.FirmwareComments,
+            [nameof(Settings.LayerHeightFilters)] = settings.LayerHeightFilters,
+            [nameof(Settings.NumLayersFilters)] = settings.NumLayersFilters,
+            [nameof(Settings.FilamentFilters)] = settings.FilamentFilters,
+            [nameof(Settings.GeneratedByFilters)] = settings.GeneratedByFilters,
+            [nameof(Settings.PrintTimeFilters)] = settings.PrintTimeFilters,
+            [nameof(Settings.SimulatedTimeFilters)] = settings.SimulatedTimeFilters
+        };
+
+        foreach (KeyValuePair<string, List<string>> kvp in listSettings)
+        {
+            if (configuration.GetSection(kvp.Key).Exists())
+            {
+                kvp.Value.Clear();
+            }
+        }
     }
 }

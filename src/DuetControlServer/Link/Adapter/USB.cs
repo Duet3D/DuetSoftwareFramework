@@ -1141,7 +1141,6 @@ public class USB : IDiagnostics, ILinkAdapter
     /// The IAP sends a 0x1A ready byte before each block.
     /// </summary>
     /// <param name="stream">Stream of the firmware binary</param>
-    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Whether another segment could be sent</returns>
     public bool FlashFirmwareSegment(Stream stream)
     {
@@ -1177,7 +1176,6 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <summary>
     /// Wait for the IAP ready byte (0x1A) from the IAP device
     /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
     private void WaitForIapReady()
     {
         byte[] buf = new byte[1];
@@ -1206,7 +1204,6 @@ public class USB : IDiagnostics, ILinkAdapter
     /// </summary>
     /// <param name="firmwareLength">Length of the written firmware in bytes</param>
     /// <param name="crc16">CRC16 checksum of the firmware</param>
-    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Whether the firmware has been written successfully</returns>
     public bool VerifyFirmwareChecksum(long firmwareLength, ushort crc16)
     {

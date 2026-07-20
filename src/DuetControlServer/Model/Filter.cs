@@ -294,14 +294,6 @@ public partial class Filter(ObjectModel model)
     }
 
     /// <summary>
-    /// Internal function to find a specific object in the object model
-    /// </summary>
-    /// <param name="partialModel">Partial object model</param>
-    /// <param name="partialFilter">Array consisting of item indices or case-insensitive property names</param>
-    /// <param name="queryFlags">Optional flags controlling which properties are included, or null for no attribute filtering</param>
-    /// <param name="depth">Current recursion depth (used with <see cref="QueryFlags.MaxDepth"/>)</param>
-    /// <returns>Dictionary or list holding the result or null if nothing could be found</returns>
-    /// <summary>
     /// Resolve the item type of a generic model collection, walking up the type hierarchy so that
     /// non-generic subclasses (e.g. Inputs) are resolved as well
     /// </summary>

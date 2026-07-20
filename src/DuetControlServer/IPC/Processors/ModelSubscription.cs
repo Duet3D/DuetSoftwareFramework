@@ -5,6 +5,7 @@ using DuetAPI.Connection.InitMessages;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using System;
+using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -86,9 +87,9 @@ public sealed class ModelSubscription : IProcessor
     private readonly Dictionary<string, object?> _patch = [];
 
     /// <summary>
-    /// Memory stream holding the JSON patch in UTF-8 format
+    /// Reused buffer holding the JSON patch or full object model in UTF-8 format
     /// </summary>
-    private readonly MemoryStream _patchStream = new();
+    private readonly ArrayBufferWriter<byte> _jsonWriter;
 
     /// <summary>
     /// Connection to the IPC client served by this processor
@@ -140,6 +141,7 @@ public sealed class ModelSubscription : IProcessor
         _observer = observer;
         _logger = logger;
         _settings = settings.Value;
+        _jsonWriter = new(_settings.IpcJsonBufferSize);
 
         lock (_subscriptions)
         {
@@ -164,12 +166,12 @@ public sealed class ModelSubscription : IProcessor
             }
 
             // Get the requested machine model
-            byte[]? jsonData;
+            ReadOnlyMemory<byte> jsonData;
             using (await _model.AccessReadOnlyAsync(cancellationToken))
             {
                 if (_mode == SubscriptionMode.Full || _filters.Length == 0)
                 {
-                    jsonData = JsonSerializer.SerializeToUtf8Bytes(_model, JsonHelper.DefaultJsonOptions);
+                    jsonData = SerializeFullModel();
                 }
                 else
                 {
@@ -180,19 +182,19 @@ public sealed class ModelSubscription : IProcessor
                         Model.Filter.MergeFiltered(patchModel, partialModel);
                     }
 
-                    _patchStream.SetLength(0);
+                    _jsonWriter.ResetWrittenCount();
                     SerializeJsonChanges(patchModel);
-                    jsonData = _patchStream.ToArray();
+                    jsonData = _jsonWriter.WrittenMemory;
                 }
             }
 
             do
             {
-                if (jsonData is not null)
+                if (!jsonData.IsEmpty)
                 {
                     // Send new JSON data
                     await Connection.SendRawDataAsync(jsonData);
-                    jsonData = null;
+                    jsonData = default;
 
                     // Wait for an acknowledgement from the client
                     BaseCommand command = await Connection.ReceiveCommandAsync(SupportedCommands, cancellationToken);
@@ -220,11 +222,7 @@ public sealed class ModelSubscription : IProcessor
                 {
                     try
                     {
-                        if (!await _model.WaitForUpdateAsync(_settings.SocketPollInterval, cancellationToken))
-                        {
-                            Connection.Poll();
-                            continue;
-                        }
+                        await _model.WaitForUpdateAsync(cancellationToken);
                     }
                     catch (OperationCanceledException)
                     {
@@ -240,10 +238,10 @@ public sealed class ModelSubscription : IProcessor
                     {
                         if (_patch.Count > 0)
                         {
-                            _patchStream.SetLength(0);
+                            _jsonWriter.ResetWrittenCount();
                             SerializeJsonChanges(_patch);
                             _patch.Clear();
-                            jsonData = _patchStream.ToArray();
+                            jsonData = _jsonWriter.WrittenMemory;
                         }
                     }
                 }
@@ -251,7 +249,7 @@ public sealed class ModelSubscription : IProcessor
                 {
                     using (await _model.AccessReadOnlyAsync(cancellationToken))
                     {
-                        jsonData = JsonSerializer.SerializeToUtf8Bytes(_model, JsonHelper.DefaultJsonOptions);
+                        jsonData = SerializeFullModel();
                     }
                 }
             }
@@ -602,13 +600,28 @@ public sealed class ModelSubscription : IProcessor
     }
 
     /// <summary>
+    /// Write the full object model to the JSON buffer so each push reuses the same memory.
+    /// The caller must hold a read lock on the object model
+    /// </summary>
+    /// <returns>Serialized object model in UTF-8 format</returns>
+    private ReadOnlyMemory<byte> SerializeFullModel()
+    {
+        _jsonWriter.ResetWrittenCount();
+        using (Utf8JsonWriter writer = new(_jsonWriter))
+        {
+            JsonSerializer.Serialize<DuetAPI.ObjectModel.ObjectModel>(writer, _model, JsonHelper.DefaultJsonOptions);
+        }
+        return _jsonWriter.WrittenMemory;
+    }
+
+    /// <summary>
     /// Write JSON changes to the JSON memory stream
     /// </summary>
     /// <param name="changes">Changes to write</param>
     /// <returns></returns>
     private void SerializeJsonChanges(Dictionary<string, object?> changes)
     {
-        using Utf8JsonWriter writer = new(_patchStream);
+        using Utf8JsonWriter writer = new(_jsonWriter);
         void WriteData(Dictionary<string, object?> data)
         {
             writer.WriteStartObject();

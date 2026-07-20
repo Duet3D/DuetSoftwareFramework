@@ -4,6 +4,7 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Codes;
 using DuetControlServer.Codes.Meta;
 using DuetControlServer.Link;
+using DuetControlServer.Utility;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
@@ -243,7 +244,7 @@ public class CodeFile(
     /// <remarks>
     /// This instance must NOT be locked when this is called
     /// </remarks>
-    public async Task<Code?> ReadCodeAsync(Code? sharedCode = null, CancellationToken cancellationToken = default)
+    public async ValueTask<Code?> ReadCodeAsync(Code? sharedCode = null, CancellationToken cancellationToken = default)
     {
         Code code = sharedCode ?? codeFactory.Create();
         bool resetCode = sharedCode is not null;
@@ -285,7 +286,7 @@ public class CodeFile(
 
                 if (codeRead)
                 {
-                    logger.LogTrace("Read code {Code}", code);
+                    logger.LogReadCode(code);
                 }
             }
 
@@ -333,7 +334,7 @@ public class CodeFile(
                                     readAgain = true;
                                     if (!IsClosed)
                                     {
-                                        logger.LogDebug("Restarting {Keyword} block, iterations = {Iterations}", state.Keyword, state.Iterations);
+                                        logger.LogRestartingBlock(state.Keyword, state.Iterations);
                                     }
                                 }
                                 await varDeletionTask;  // wait outside the code lock to avoid deadlocks
@@ -541,6 +542,7 @@ public class CodeFile(
     /// Delete local variables from a given code block asynchronously
     /// </summary>
     /// <param name="codeBlock">Code block</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     private async Task DeleteLocalVariablesAsync(CodeBlock codeBlock, CancellationToken cancellationToken = default)
     {

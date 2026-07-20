@@ -11,6 +11,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
@@ -535,6 +536,12 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
         if (obj is char charValue)
         {
             return encodeValues ? $"'{charValue}'" : charValue.ToString();
+        }
+        if (obj is Enum)
+        {
+            // Enums are represented by their JSON name, which does not have to match the CLR name
+            string jsonName = JsonSerializer.Serialize(obj, JsonHelper.DefaultJsonOptions).Trim('"');
+            return encodeValues ? encodeString(jsonName) : jsonName;
         }
         if (obj is string stringValue)
         {

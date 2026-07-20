@@ -41,6 +41,7 @@ public sealed class Executed : PipelineBase
     /// <param name="channelProcessor">Channel processor</param>
     /// <param name="codeProcessor">Code processor</param>
     /// <param name="eventLogger">Event logger</param>
+    /// <param name="linkInterface">Link interface</param>
     /// <param name="model">Object model</param>
     /// <param name="gCodes">G-code handler</param>
     /// <param name="mCodes">M-code handler</param>
@@ -72,7 +73,7 @@ public sealed class Executed : PipelineBase
     }
 
     /// <inheritdoc />
-    public override async Task ProcessCodeAsync(Commands.Code code)
+    public override async ValueTask ProcessCodeAsync(Commands.Code code)
     {
         if (code.Result is not null)
         {
@@ -240,10 +241,10 @@ public sealed class Executed : PipelineBase
     }
 
     /// <inheritdoc />
-    public override Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default) => _stackItem.FlushAsync(cancellationToken);
+    public override ValueTask<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default) => _stackItem.FlushAsync(cancellationToken);
 
     /// <inheritdoc />
-    public override Task<bool> FlushAsync(Commands.Code code, CancellationToken cancellationToken = default) => _stackItem.FlushAsync(cancellationToken);
+    public override ValueTask<bool> FlushAsync(Commands.Code code, CancellationToken cancellationToken = default) => _stackItem.FlushAsync(cancellationToken);
 
     /// <inheritdoc />
     public override void WriteCode(Commands.Code code) => _stackItem.WriteCode(code);

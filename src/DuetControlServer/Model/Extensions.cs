@@ -1,3 +1,4 @@
+using DuetControlServer.Utility;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DuetControlServer.Model;
@@ -17,6 +18,7 @@ public static partial class ServiceCollectionExtensions
         return services
             .AddSingleton<Filter>()
             .AddSingleton<ObjectModel>()
+            .AddSingleton<IDiagnostics, ObjectModel>(services => services.GetRequiredService<ObjectModel>())
             .AddSingleton<Observer>()
             .AddSingleton<PeriodicUpdateService>()
             .AddSingleton<SbcTriggerService>()

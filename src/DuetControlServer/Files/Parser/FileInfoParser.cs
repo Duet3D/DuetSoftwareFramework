@@ -26,9 +26,18 @@ namespace DuetControlServer.Files.Parser;
 /// <param name="codeFactory">Code factory</param>
 /// <param name="expressions">Expression evaluator</param>
 /// <param name="filePath">File path helper</param>
+/// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings</param>
 public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, FilePathResolver filePath, ILogger<FileInfoParser> logger, IOptions<Settings> settings)
 {
+    // Filters are configured as patterns, so they are compiled once here instead of on every parse
+    private readonly List<Regex> _layerHeightFilters = Settings.CompileFilters(settings.Value.LayerHeightFilters);
+    private readonly List<Regex> _numLayersFilters = Settings.CompileFilters(settings.Value.NumLayersFilters);
+    private readonly List<Regex> _filamentFilters = Settings.CompileFilters(settings.Value.FilamentFilters);
+    private readonly List<Regex> _generatedByFilters = Settings.CompileFilters(settings.Value.GeneratedByFilters);
+    private readonly List<Regex> _printTimeFilters = Settings.CompileFilters(settings.Value.PrintTimeFilters);
+    private readonly List<Regex> _simulatedTimeFilters = Settings.CompileFilters(settings.Value.SimulatedTimeFilters);
+
     /// <summary>
     /// Parse a G-code file
     /// </summary>
@@ -351,7 +360,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
     /// <returns>Whether layer height could be found</returns>
     private bool FindLayerHeight(string line, ref GCodeFileInfo fileInfo)
     {
-        foreach (Regex item in settings.Value.LayerHeightFilters)
+        foreach (Regex item in _layerHeightFilters)
         {
             Match match = item.Match(line);
             if (match.Success)
@@ -378,7 +387,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
     /// <returns>Whether number of layers could be found</returns>
     private bool FindNumLayers(string line, ref GCodeFileInfo fileInfo)
     {
-        foreach (Regex item in settings.Value.NumLayersFilters)
+        foreach (Regex item in _numLayersFilters)
         {
             Match match = item.Match(line);
             if (match.Success && match.Groups.Count > 1)
@@ -401,7 +410,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
     /// <returns>Whether filament consumption could be found</returns>
     private bool FindFilamentUsed(string line, ref GCodeFileInfo fileInfo)
     {
-        foreach (Regex item in settings.Value.FilamentFilters)
+        foreach (Regex item in _filamentFilters)
         {
             Match match = item.Match(line);
             if (match.Success)
@@ -499,7 +508,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
     /// <returns>Whether the slicer could be found</returns>
     private bool FindGeneratedBy(string line, ref GCodeFileInfo fileInfo)
     {
-        foreach (Regex item in settings.Value.GeneratedByFilters)
+        foreach (Regex item in _generatedByFilters)
         {
             Match match = item.Match(line);
             if (match.Success && match.Groups.Count > 1)
@@ -519,7 +528,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
     /// <returns>Whether the print time could be found</returns>
     private bool FindPrintTime(string line, ref GCodeFileInfo fileInfo)
     {
-        foreach (Regex item in settings.Value.PrintTimeFilters)
+        foreach (Regex item in _printTimeFilters)
         {
             Match match = item.Match(line);
             if (match.Success)
@@ -565,7 +574,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
     /// <returns>Whether the simulated time could be found</returns>
     private bool FindSimulatedTime(string line, ref GCodeFileInfo fileInfo)
     {
-        foreach (Regex item in settings.Value.SimulatedTimeFilters)
+        foreach (Regex item in _simulatedTimeFilters)
         {
             Match match = item.Match(line);
             if (match.Success)
@@ -683,7 +692,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
     /// <param name="filename">G-code file to parse</param>
     /// <param name="offset">File offset to start from</param>
     /// <param name="isThumbnail">Whether this is a thumbnail request</param>
-    /// <param name="explicitLineNumber">Explicit line number if present</param
+    /// <param name="explicitLineNumber">Explicit line number if present</param>
     /// <returns>JSON response</returns>
     public async ValueTask<string> ParseFileFragment(string filename, long offset, bool isThumbnail, long? explicitLineNumber = null)
     {

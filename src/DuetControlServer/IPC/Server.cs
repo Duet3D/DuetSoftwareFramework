@@ -100,7 +100,7 @@ public sealed class Server(CommandFactory commandFactory,
             do
             {
                 Socket socket = await _unixSocket.AcceptAsync(stoppingToken);
-                Task connectionTask = Task.Run(async () => await ProcessConnectionAsync(socket, stoppingToken), stoppingToken);
+                Task connectionTask = Task.Run(() => ProcessConnectionAsync(socket, stoppingToken), stoppingToken);
                 lock (connectionTasks)
                 {
                     for (int i = connectionTasks.Count - 1; i >= 0; i--)

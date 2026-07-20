@@ -69,8 +69,6 @@ namespace DuetPiManagementPlugin
             }
             _updatingCountryCode = true;
 
-            await Task.Delay(10000);
-
             try
             {
                 string? countryCode = null;
@@ -112,7 +110,8 @@ namespace DuetPiManagementPlugin
                     }
                 }
 
-                ObjectModel model = await _connection.GetObjectModelAsync();
+                ObjectModel model = await _connection.GetObjectModelAsync("network.interfaces");
+
                 await using (await _connection.LockObjectModelAsync())
                 {
                     for (int i = 0; i < model.Network.Interfaces.Count; i++)

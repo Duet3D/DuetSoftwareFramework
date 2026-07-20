@@ -19,4 +19,3 @@ public partial class EvaluateExpression : Command<JsonElement>
     /// </summary>
     public string Expression { get; set; } = string.Empty;
 }
-

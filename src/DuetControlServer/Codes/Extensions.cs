@@ -1,3 +1,4 @@
+using DuetControlServer.Utility;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DuetControlServer.Codes;
@@ -19,6 +20,7 @@ public static partial class ServiceCollectionExtensions
             .AddHostedService<Meta.Functions>()
             .AddSingleton<CodeFactory>()
             .AddSingleton<CodeProcessor>()
+            .AddSingleton<IDiagnostics, CodeProcessor>(services => services.GetRequiredService<CodeProcessor>())
             .AddHostedService<CodeProcessorService>()
             .AddKeyedSingleton<Handlers.ICodeHandler, Handlers.GCodeHandler>(Handlers.Keys.GCodes)
             .AddKeyedSingleton<Handlers.ICodeHandler, Handlers.MCodeHandler>(Handlers.Keys.MCodes)

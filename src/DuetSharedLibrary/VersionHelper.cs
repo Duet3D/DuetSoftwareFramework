@@ -28,7 +28,9 @@ public static class VersionHelper
         {
             var fvi = FileVersionInfo.GetVersionInfo(asm.Location).ProductVersion;
             if (!string.IsNullOrEmpty(fvi))
+            {
                 return fvi;
+            }
         }
 
         // 3) finally fall back to AssemblyName.Version

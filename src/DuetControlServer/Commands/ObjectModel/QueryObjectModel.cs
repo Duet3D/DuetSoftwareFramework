@@ -1,5 +1,6 @@
 using DuetAPI.Utility;
 using DuetControlServer.Model;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -13,7 +14,7 @@ namespace DuetControlServer.Commands;
 /// </summary>
 /// <param name="model">Object model</param>
 /// <param name="filter">Filter for JSON queries</param>
-public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : DuetAPI.Commands.QueryObjectModel
+public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : DuetAPI.Commands.QueryObjectModel, IRawJsonCommand
 {
     /// <summary>
     /// Query the object model using a key and flags
@@ -21,6 +22,20 @@ public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : D
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>JSON response compatible with M409 format</returns>
     public override async Task<JsonElement> ExecuteAsync(CancellationToken cancellationToken = default)
+    {
+        ArrayBufferWriter<byte> jsonBuffer = new();
+        await ExecuteRawJsonAsync(jsonBuffer, cancellationToken);
+        using JsonDocument response = JsonDocument.Parse(jsonBuffer.WrittenMemory);
+        return response.RootElement.Clone();
+    }
+
+    /// <summary>
+    /// Query the object model using a key and flags returning UTF-8 JSON
+    /// </summary>
+    /// <param name="destination">Buffer writer to write the JSON response to</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public async ValueTask ExecuteRawJsonAsync(IBufferWriter<byte> destination, CancellationToken cancellationToken = default)
     {
         string key = Key;
         string flags = Flags;
@@ -100,7 +115,8 @@ public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : D
                 response["result"] = finalResult;
             }
 
-            return JsonSerializer.SerializeToDocument(response, jsonOptions).RootElement.Clone();
+            using Utf8JsonWriter writer = new(destination);
+            JsonSerializer.Serialize(writer, response, jsonOptions);
         }
     }
 }

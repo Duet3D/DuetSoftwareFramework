@@ -163,7 +163,7 @@ public abstract class PipelineBase
     /// </summary>
     /// <param name="flushAll">Flush everything</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
-    public virtual Task<bool> FlushAsync(bool flushAll, CancellationToken cancellationToken = default) => flushAll ? _baseItem.FlushAsync(cancellationToken) : CurrentStackItem.FlushAsync(cancellationToken);
+    public virtual ValueTask<bool> FlushAsync(bool flushAll, CancellationToken cancellationToken = default) => flushAll ? _baseItem.FlushAsync(cancellationToken) : CurrentStackItem.FlushAsync(cancellationToken);
 
     /// <summary>
     /// Wait for the pipeline stage to become idle
@@ -171,7 +171,7 @@ public abstract class PipelineBase
     /// <param name="file">Code file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
-    public virtual Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
+    public virtual ValueTask<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
     {
         lock (_stack)
         {
@@ -182,7 +182,7 @@ public abstract class PipelineBase
                     return stackItem.FlushAsync(cancellationToken);
                 }
             }
-            return Task.FromResult(false);
+            return ValueTask.FromResult(false);
         }
     }
 
@@ -192,7 +192,7 @@ public abstract class PipelineBase
     /// <param name="code">Code waiting for the flush</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
-    public virtual Task<bool> FlushAsync(Commands.Code code, CancellationToken cancellationToken = default)
+    public virtual ValueTask<bool> FlushAsync(Commands.Code code, CancellationToken cancellationToken = default)
     {
         lock (_stack)
         {
@@ -203,7 +203,7 @@ public abstract class PipelineBase
                     return stackItem.FlushAsync(cancellationToken);
                 }
             }
-            return Task.FromResult(false);
+            return ValueTask.FromResult(false);
         }
     }
 
@@ -212,7 +212,7 @@ public abstract class PipelineBase
     /// </summary>
     /// <param name="code">Code to process</param>
     /// <returns>Asynchronous task</returns>
-    public abstract Task ProcessCodeAsync(Commands.Code code);
+    public abstract ValueTask ProcessCodeAsync(Commands.Code code);
 
     /// <summary>
     /// Enqueue a given code on this pipeline state for execution.

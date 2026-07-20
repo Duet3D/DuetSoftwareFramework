@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,7 +11,6 @@ using DuetAPI.Connection.InitMessages;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Codes;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 using Code = DuetControlServer.Commands.Code;
 
@@ -116,14 +114,15 @@ public sealed class CodeInterception : IProcessor
     private BaseCommand? _interceptionResult;
 
     /// <summary>
+    /// Indicates if <see cref="ProcessAsync"/> is still running. Only read and written while holding
+    /// <see cref="_codeMonitor"/> so that codes never wait for a pulse that can no longer come
+    /// </summary>
+    private bool _processorAlive = true;
+
+    /// <summary>
     /// Code processor
     /// </summary>
     private readonly CodeProcessor _codeProcessor;
-
-    /// <summary>
-    /// Settings
-    /// </summary>
-    private readonly Settings _settings;
 
     /// <summary>
     /// Connection to the IPC client served by this processor
@@ -136,8 +135,7 @@ public sealed class CodeInterception : IProcessor
     /// <param name="conn">Connection instance</param>
     /// <param name="initMessage">Initialization message</param>
     /// <param name="codeProcessor">Code processor</param>
-    /// <param name="settings">Settings</param>
-    public CodeInterception(Connection conn, ClientInitMessage initMessage, CodeProcessor codeProcessor, IOptions<Settings> settings)
+    public CodeInterception(Connection conn, ClientInitMessage initMessage, CodeProcessor codeProcessor)
     {
         Connection = conn;
         InterceptInitMessage interceptInitMessage = (InterceptInitMessage)initMessage;
@@ -149,7 +147,6 @@ public sealed class CodeInterception : IProcessor
         _priorityCodes = interceptInitMessage.PriorityCodes;
 
         _codeProcessor = codeProcessor;
-        _settings = settings.Value;
     }
 
     /// <summary>
@@ -172,80 +169,54 @@ public sealed class CodeInterception : IProcessor
             {
                 do
                 {
-                    // Wait for the next code to be intercepted, polling the connection on every timeout so that
-                    // dead clients are detected and unregistered even if no codes are being processed
+                    // Wait for the next code to be intercepted
+                    await _codeMonitor.WaitAsync(cancellationToken);
+
+                    // Send it to the client
+                    await Connection.SendCommandAsync(_codeBeingIntercepted!);
+
+                    // Keep processing incoming commands until a final action for the code has been received
                     do
                     {
-                        using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                        cts.CancelAfter(_settings.SocketPollInterval);
-                        try
+                        // Read another command from the IPC connection
+                        BaseCommand command = await Connection.ReceiveCommandAsync(AllSupportedCommands, cancellationToken);
+                        Type commandType = command.GetType();
+                        if (Command.SupportedCommands.Contains(commandType))
                         {
-                            await _codeMonitor.WaitAsync(cts.Token);
+                            // Make sure it is permitted
+                            Connection.CheckPermissions(commandType);
+
+                            // Execute regular commands here
+                            object? result = await command.InvokeAsync(cancellationToken);
+                            await Connection.SendResponseAsync(result);
+                        }
+                        else if (SupportedCommands.Contains(commandType))
+                        {
+                            // Make sure it is permitted
+                            Connection.CheckPermissions(commandType);
+
+                            // Send other commands to the task intercepting the code
+                            _interceptionResult = command;
+                            _codeMonitor.Pulse();
                             break;
                         }
-                        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                        else
                         {
-                            // A Pulse that races with the poll timeout is consumed by the cancelled wait, so check
-                            // for a pending code before waiting again or else both parties would wait forever
-                            if (_codeBeingIntercepted is not null)
-                            {
-                                break;
-                            }
-                            Connection.Poll();
+                            // Take care of unsupported commands
+                            throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
                         }
                     }
-                    while (true);
-
-                    try
-                    {
-                        // Send it to the client
-                        await Connection.SendCommandAsync(_codeBeingIntercepted!);
-
-                        // Keep processing incoming commands until a final action for the code has been received
-                        do
-                        {
-                            // Read another command from the IPC connection
-                            BaseCommand command = await Connection.ReceiveCommandAsync(AllSupportedCommands, cancellationToken);
-                            Type commandType = command.GetType();
-                            if (Command.SupportedCommands.Contains(commandType))
-                            {
-                                // Make sure it is permitted
-                                Connection.CheckPermissions(commandType);
-
-                                // Execute regular commands here
-                                object? result = await command.InvokeAsync(cancellationToken);
-                                await Connection.SendResponseAsync(result);
-                            }
-                            else if (SupportedCommands.Contains(commandType))
-                            {
-                                // Make sure it is permitted
-                                Connection.CheckPermissions(commandType);
-
-                                // Send other commands to the task intercepting the code
-                                _interceptionResult = command;
-                                _codeMonitor.Pulse();
-                                break;
-                            }
-                            else
-                            {
-                                // Take care of unsupported commands
-                                throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
-                            }
-                        }
-                        while (!cancellationToken.IsCancellationRequested);
-                    }
-                    catch (SocketException)
-                    {
-                        // Client has closed the connection while we're waiting for a result. Carry on...
-                        _interceptionResult = null;
-                        _codeMonitor.Pulse();
-                        throw;
-                    }
+                    while (!cancellationToken.IsCancellationRequested);
                 }
                 while (!cancellationToken.IsCancellationRequested);
             }
             finally
             {
+                // The monitor is still held here, so waking every waiter guarantees that no code can wait for
+                // a pulse from this processor after it has terminated, no matter why it terminated
+                _processorAlive = false;
+                _codeMonitor.PulseAll();
+
                 lock (_connections[_mode])
                 {
                     _connections[_mode].Remove(this);
@@ -309,10 +280,17 @@ public sealed class CodeInterception : IProcessor
         {
             using (await _codeMonitor.EnterAsync(code.CancellationToken))
             {
+                if (!_processorAlive)
+                {
+                    // Processor terminated after this code had been routed to it, so skip this interceptor
+                    return false;
+                }
+
                 try
                 {
                     // Send the code being intercepted to the IPC client
                     _codeBeingIntercepted = code;
+                    _interceptionResult = null;
                     _codeMonitor.Pulse();
 
                     try

@@ -37,6 +37,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="mqtt">MQTT provider</param>
 /// <param name="sbcTriggerService">SBC trigger service</param>
 /// <param name="logger">Logger</param>
+/// <param name="loggerFactory">Logger factory</param>
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="settings">Settings</param>
 public class MCodeHandler(
@@ -1161,10 +1162,13 @@ public class MCodeHandler(
                         // this very code. Reassign its cancellation token so it can report success instead of cancelled
                         code.ResetCancellationToken();
 
-                        // Terminate the program once this code has finished
+                        // Terminate the program once this code has finished. Give the success response a
+                        // moment to propagate through DWS to the clients first - stopping immediately tears
+                        // down the IPC connections, which lets the reply race against the shutdown
                         _ = code.Task.ContinueWith(async task =>
                         {
                             await task;
+                            await Task.Delay(1000);
                             lifetime.StopApplication();
                         }, TaskContinuationOptions.RunContinuationsAsynchronously);
 
@@ -1198,10 +1202,13 @@ public class MCodeHandler(
                             return new Message(MessageType.Error, "Reset timed out, stopping DCS");
                         }
 
-                        // Terminate the program once this code has finished
+                        // Terminate the program once this code has finished. Give the success response a
+                        // moment to propagate through DWS to the clients first - stopping immediately tears
+                        // down the IPC connections, which lets the reply race against the shutdown
                         _ = code.Task.ContinueWith(async task =>
                         {
                             await task;
+                            await Task.Delay(1000);
                             lifetime.StopApplication();
                         }, TaskContinuationOptions.RunContinuationsAsynchronously);
 
