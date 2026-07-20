@@ -15,7 +15,8 @@
         "editorconfig.editorconfig",
 				"ms-vscode.cpptools",
 				"ms-vscode.makefile-tools",
-				"ms-vscode.cmake-tools"
+				"ms-vscode.cmake-tools",
+        "ms-python.python"
       ]
     }
   },
