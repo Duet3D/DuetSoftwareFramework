@@ -34,7 +34,7 @@ enum class ResponseSource
 	Generic
 };
 
-typedef Bitmap<uint16_t> DebugFlags;
+using DebugFlags = Bitmap<uint16_t>;
 
 class RepRap final
 {

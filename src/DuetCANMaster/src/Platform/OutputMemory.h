@@ -52,11 +52,11 @@ class OutputBuffer
 	size_t Catf(const char* _ecv_array fmt, ...) noexcept __attribute__((format(printf, 2, 3)));
 	size_t Lcatf(const char* _ecv_array fmt, ...) noexcept __attribute__((format(printf, 2, 3)));
 
-	size_t Copy(const char c) noexcept;
+	size_t Copy(char c) noexcept;
 	size_t Copy(const char* _ecv_array src) noexcept;
 	size_t Copy(const char* _ecv_array src, size_t len) noexcept;
 
-	size_t Cat(const char c) noexcept;
+	size_t Cat(char c) noexcept;
 	size_t Cat(const char* _ecv_array src) noexcept;
 	size_t Lcat(const char* _ecv_array src) noexcept;
 	size_t Cat(const char* _ecv_array src, size_t len) noexcept;

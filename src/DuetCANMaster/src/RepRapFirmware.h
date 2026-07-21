@@ -81,7 +81,7 @@ constexpr unsigned int ApiLevel = 2;
 
 // Definitions needed by Pins.h and/or Configuration.h
 // Logical pins used for general output, servos, CCN and laser control
-typedef uint8_t LogicalPin; // type used to represent logical pin numbers
+using LogicalPin = uint8_t; // type used to represent logical pin numbers
 constexpr LogicalPin NoLogicalPin = 0xFF;
 constexpr const char* _ecv_array NoPinName = "nil";
 
@@ -419,7 +419,7 @@ class ExpansionManager;
 #if USE_DOUBLE_MOTIONCALC
 typedef double motioncalc_t;
 #else
-typedef float motioncalc_t;
+using motioncalc_t = float;
 #endif
 
 inline motioncalc_t Msquare(motioncalc_t a) noexcept
@@ -429,7 +429,7 @@ inline motioncalc_t Msquare(motioncalc_t a) noexcept
 
 // Define floating point type to use for calculations where we would like high precision in matrix calculations
 #if SAME70
-typedef double floatc_t; // type of matrix element used for calibration
+using floatc_t = double; // type of matrix element used for calibration
 #else
 // We are more memory-constrained on the other processors and they don't support double precision in hardware
 typedef float floatc_t; // type of matrix element used for calibration
@@ -439,10 +439,10 @@ typedef float floatc_t; // type of matrix element used for calibration
 
 #  include <Duet3Common.h>
 
-typedef Bitmap<uint32_t> AxesBitmap;	  // Type of a bitmap representing a set of axes, and sometimes extruders too
-typedef Bitmap<uint32_t> ExtrudersBitmap; // Type of a bitmap representing a set of extruder drive numbers
-typedef Bitmap<uint32_t> LogicalDrivesBitmap; // Type of a bitmap representing a set of logical drives i.e. motor sets
-typedef Bitmap<uint64_t> InputPortsBitmap;	  // Type of a bitmap representing a set of input ports
+using AxesBitmap = Bitmap<uint32_t>;	  // Type of a bitmap representing a set of axes, and sometimes extruders too
+using ExtrudersBitmap = Bitmap<uint32_t>; // Type of a bitmap representing a set of extruder drive numbers
+using LogicalDrivesBitmap = Bitmap<uint32_t>; // Type of a bitmap representing a set of logical drives i.e. motor sets
+using InputPortsBitmap = Bitmap<uint64_t>;	  // Type of a bitmap representing a set of input ports
 
 #else
 
@@ -458,12 +458,12 @@ typedef Bitmap<uint32_t> InputPortsBitmap;	  // Type of a bitmap representing a 
 
 #endif
 
-typedef Bitmap<uint32_t> TriggerNumbersBitmap; // Type of a bitmap representing a set of trigger numbers
-typedef Bitmap<uint64_t> ToolNumbersBitmap;	   // Type of a bitmap representing a set of tool numbers
+using TriggerNumbersBitmap = Bitmap<uint32_t>; // Type of a bitmap representing a set of trigger numbers
+using ToolNumbersBitmap = Bitmap<uint64_t>;	   // Type of a bitmap representing a set of tool numbers
 
 #if defined(DUET3)
-typedef Bitmap<uint64_t>
-	ParameterLettersBitmap; // Type of a bitmap representing a set of parameter letters in A..Z and a..z
+using ParameterLettersBitmap =
+	Bitmap<uint64_t>; // Type of a bitmap representing a set of parameter letters in A..Z and a..z
 constexpr char HighestAxisLetter = 'z';
 #else
 typedef Bitmap<uint32_t>
@@ -485,11 +485,11 @@ static_assert(MaxTools <= ToolNumbersBitmap::MaxBits());
 static_assert(MaxAxes + 17 <=
 			  ParameterLettersBitmap::MaxBits()); // so that we have enough letters available for all the axes
 
-typedef unsigned int MovementSystemNumber; // we could use uint8_t for this
-typedef uint16_t Pwm_t;					   // Type of a PWM value when we don't want to use floats
+using MovementSystemNumber = unsigned int; // we could use uint8_t for this
+using Pwm_t = uint16_t;					   // Type of a PWM value when we don't want to use floats
 
 #if SUPPORT_IOBITS
-typedef uint16_t IoBits_t; // Type of the port control bitmap (G1 P parameter)
+using IoBits_t = uint16_t; // Type of the port control bitmap (G1 P parameter)
 #endif
 
 // Data stored in RawMove and in the DDA to handle laser PWM and/or IOBITS
@@ -528,32 +528,32 @@ struct LaserPixelData
 #endif
 
 // Find the bit number corresponding to a parameter letter
-inline constexpr unsigned int ParameterLetterToBitNumber(char c) noexcept
+constexpr unsigned int ParameterLetterToBitNumber(char c) noexcept
 {
 	return (c <= 'Z') ? c - 'A' : c - ('a' - 26);
 }
 
 // Find the parameter letter corresponding to a  bit number
-inline constexpr char BitNumberToParameterLetter(unsigned int n) noexcept
+constexpr char BitNumberToParameterLetter(unsigned int n) noexcept
 {
 	return (n < 26) ? (char)('A' + n) : (char)('a' + (n - 26));
 }
 
 // Make a ParameterLettersBitmap representing a single letter
-inline constexpr ParameterLettersBitmap ParameterLetterToBitmap(char c) noexcept
+constexpr ParameterLettersBitmap ParameterLetterToBitmap(char c) noexcept
 {
 	return ParameterLettersBitmap::MakeFromBits(ParameterLetterToBitNumber(c));
 }
 
 // Convert a string of parameter letters to a collection of bits. Normally used with constant strings, so recursive is
 // OK.
-inline constexpr uint32_t ParameterLettersToBits(const char* _ecv_array s) noexcept
+constexpr uint32_t ParameterLettersToBits(const char* _ecv_array s) noexcept
 {
 	return (*s == 0) ? 0 : (1u << ParameterLetterToBitNumber(*s)) | ParameterLettersToBits(s + 1);
 }
 
 // Convert a string of parameter letters to a bitmap
-inline constexpr ParameterLettersBitmap ParameterLettersToBitmap(const char* _ecv_array s) noexcept
+constexpr ParameterLettersBitmap ParameterLettersToBitmap(const char* _ecv_array s) noexcept
 {
 	return ParameterLettersBitmap(ParameterLettersToBits(s));
 }
@@ -713,7 +713,7 @@ constexpr float StepClocksToMillis = 1000.0 / (float)StepClockRate;
 constexpr float StepClocksToSeconds = 1.0 / (float)StepClockRate;
 
 // Convert milliseconds to step clocks
-static inline constexpr uint32_t MillisToStepClocks(uint32_t numMillis) noexcept
+static constexpr uint32_t MillisToStepClocks(uint32_t numMillis) noexcept
 {
 	if constexpr (StepClockRate % 1000 == 0)
 	{
@@ -727,7 +727,7 @@ static inline constexpr uint32_t MillisToStepClocks(uint32_t numMillis) noexcept
 }
 
 // Convert microseconds to step clocks, rounding up to the next step clock
-static inline consteval uint32_t MicrosecondsToStepClocks(float us) noexcept
+static consteval uint32_t MicrosecondsToStepClocks(float us) noexcept
 {
 	// Rounds up without std::ceil: GCC evaluates ceil in a constant expression as a builtin
 	// extension, clang does not, so std::ceil here makes this consteval function unusable in a
@@ -738,42 +738,42 @@ static inline consteval uint32_t MicrosecondsToStepClocks(float us) noexcept
 }
 
 // Functions to convert speeds and accelerations between seconds and step clocks
-static inline constexpr float ConvertSpeedFromMmPerSec(float speed) noexcept
+static constexpr float ConvertSpeedFromMmPerSec(float speed) noexcept
 {
 	return speed * 1.0 / (float)StepClockRate;
 }
 
-static inline constexpr float ConvertSpeedFromMmPerMin(float speed) noexcept
+static constexpr float ConvertSpeedFromMmPerMin(float speed) noexcept
 {
 	return speed * (1.0 / (float)(StepClockRate * iMinutesToSeconds));
 }
 
-static inline constexpr float ConvertSpeedFromMm(float speed, bool useSeconds) noexcept
+static constexpr float ConvertSpeedFromMm(float speed, bool useSeconds) noexcept
 {
 	return speed * ((useSeconds) ? 1.0 / (float)StepClockRate : 1.0 / (float)(StepClockRate * iMinutesToSeconds));
 }
 
-static inline constexpr float InverseConvertSpeedToMmPerSec(float speed) noexcept
+static constexpr float InverseConvertSpeedToMmPerSec(float speed) noexcept
 {
 	return speed * (float)StepClockRate;
 }
 
-static inline constexpr float InverseConvertSpeedToMmPerMin(float speed) noexcept
+static constexpr float InverseConvertSpeedToMmPerMin(float speed) noexcept
 {
 	return speed * (float)(StepClockRate * iMinutesToSeconds);
 }
 
-static inline constexpr float InverseConvertSpeedToMm(float speed, bool useSeconds) noexcept
+static constexpr float InverseConvertSpeedToMm(float speed, bool useSeconds) noexcept
 {
 	return speed * (float)((useSeconds) ? StepClockRate : StepClockRate * iMinutesToSeconds);
 }
 
-static inline constexpr float ConvertAcceleration(float accel) noexcept
+static constexpr float ConvertAcceleration(float accel) noexcept
 {
 	return accel * (1.0 / (float)StepClockRateSquared);
 }
 
-static inline constexpr float InverseConvertAcceleration(float accel) noexcept
+static constexpr float InverseConvertAcceleration(float accel) noexcept
 {
 	return accel * (float)StepClockRateSquared;
 }
@@ -786,7 +786,7 @@ constexpr size_t NumCoordinateSystems = 9; // G54 up to G59.3
 #define DEGREE_SYMBOL "\xC2\xB0" // degree-symbol encoding in UTF8
 
 // Type of an offset in a file
-typedef uint32_t FilePosition;
+using FilePosition = uint32_t;
 const FilePosition noFilePosition = 0xFFFFFFFFu;
 
 //-------------------------------------------------------------------------------------------------

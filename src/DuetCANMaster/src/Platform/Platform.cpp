@@ -93,12 +93,12 @@ uint16_t Platform::PowerVoltageToAdcReading(float voltage) const noexcept
 
 #  else
 
-inline constexpr float AdcReadingToPowerVoltage(uint16_t adcVal) noexcept
+constexpr float AdcReadingToPowerVoltage(uint16_t adcVal) noexcept
 {
 	return adcVal * (PowerMonitorVoltageRange / (1u << AnalogIn::AdcBits));
 }
 
-inline constexpr uint16_t PowerVoltageToAdcReading(float voltage) noexcept
+constexpr uint16_t PowerVoltageToAdcReading(float voltage) noexcept
 {
 	return (uint16_t)(voltage * ((1u << AnalogIn::AdcBits) / PowerMonitorVoltageRange));
 }

@@ -12,7 +12,7 @@
 
 #if SUPPORT_CAN_EXPANSION
 
-typedef Bitmap<uint16_t> CanDriversBitmap;
+using CanDriversBitmap = Bitmap<uint16_t>;
 
 // Class to accumulate a set of values relating to CAN-connected drivers
 template <class T>

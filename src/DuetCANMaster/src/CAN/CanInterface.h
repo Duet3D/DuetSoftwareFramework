@@ -114,11 +114,11 @@ namespace CanInterface
 	namespace ODrive
 	{
 		CanId ArbitrationId(DriverId driver, uint8_t cmd) noexcept;
-		CanMessageBuffer* _ecv_null PrepareSimpleMessage(const DriverId driver, const StringRef& reply) noexcept;
+		CanMessageBuffer* _ecv_null PrepareSimpleMessage(DriverId driver, const StringRef& reply) noexcept;
 		void FlushCanReceiveHardware() noexcept;
 		bool GetExpectedSimpleMessage(CanMessageBuffer* buf,
-									  const DriverId driver,
-									  const uint8_t cmd,
+									  DriverId driver,
+									  uint8_t cmd,
 									  const StringRef& reply) noexcept;
 	} // namespace ODrive
 #  endif

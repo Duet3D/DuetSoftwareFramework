@@ -168,7 +168,7 @@ enum class DiagnosticTestType : unsigned int
 
 /***************************************************************************************************************/
 
-typedef AveragingFilter<ThermistorAverageReadings> ThermistorAveragingFilter;
+using ThermistorAveragingFilter = AveragingFilter<ThermistorAverageReadings>;
 
 // Enumeration of error condition bits
 enum class ErrorCode : uint32_t

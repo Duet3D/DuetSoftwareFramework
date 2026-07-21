@@ -44,7 +44,7 @@ class ExpansionManager
 
 	// Firmware update and related functions
 	GCodeResult ResetRemote(uint32_t boardAddress, const StringRef& reply) THROWS(GCodeException);
-	GCodeResult UpdateRemoteFirmware(uint32_t boardAddress, const StringRef& reply, const uint16_t moduleNumber = 0)
+	GCodeResult UpdateRemoteFirmware(uint32_t boardAddress, const StringRef& reply, uint16_t moduleNumber = 0)
 		THROWS(GCodeException);
 
 	void UpdateFinished(CanAddress address) noexcept;

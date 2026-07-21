@@ -33,12 +33,12 @@ enum class PinCapability : uint8_t
 	NpDmaW = 4u | 16u
 };
 
-constexpr inline PinCapability operator|(PinCapability a, PinCapability b) noexcept
+constexpr PinCapability operator|(PinCapability a, PinCapability b) noexcept
 {
 	return (PinCapability)((uint8_t)a | (uint8_t)b);
 }
 
-constexpr inline PinCapability operator&(PinCapability a, PinCapability b) noexcept
+constexpr PinCapability operator&(PinCapability a, PinCapability b) noexcept
 {
 	return (PinCapability)((uint8_t)a & (uint8_t)b);
 }

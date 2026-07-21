@@ -21,8 +21,8 @@ class CanMessageTimeSync;
 class StepTimer final
 {
   public:
-	typedef uint32_t Ticks;
-	typedef void (*TimerCallbackFunction)(CallbackParameter) noexcept;
+	using Ticks = uint32_t;
+	using TimerCallbackFunction = void (*)(CallbackParameter) noexcept;
 
 	StepTimer() noexcept;
 

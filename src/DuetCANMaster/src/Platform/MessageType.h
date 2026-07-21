@@ -72,14 +72,14 @@ enum MessageType : uint32_t
 		ErrorMessageFlag // A message that conveys information about the state of the network interface
 };
 
-inline constexpr MessageType AddLogDebug(MessageType mt) noexcept
+constexpr MessageType AddLogDebug(MessageType mt) noexcept
 {
 	// Debug level has no flags set such that any non-flagged message automatically
 	// is part of this log level - force it by removing the existing flags
 	return (MessageType)((uint32_t)mt & ~((uint32_t)LogMessageLowBit | (uint32_t)LogMessageHighBit));
 }
 
-inline constexpr MessageType AddLogWarn(MessageType mt) noexcept
+constexpr MessageType AddLogWarn(MessageType mt) noexcept
 {
 	// Since increasing log levels have lower numbers we need to delete
 	// any existing log flags first - otherwise this could lead to MessageLogLevel
@@ -87,7 +87,7 @@ inline constexpr MessageType AddLogWarn(MessageType mt) noexcept
 	return (MessageType)((uint32_t)AddLogDebug(mt) | (uint32_t)LogWarn);
 }
 
-inline constexpr MessageType AddLogInfo(MessageType mt) noexcept
+constexpr MessageType AddLogInfo(MessageType mt) noexcept
 {
 	// Since increasing log levels have lower numbers we need to delete
 	// any existing log flags first - otherwise this could lead to MessageLogLevel
@@ -95,17 +95,17 @@ inline constexpr MessageType AddLogInfo(MessageType mt) noexcept
 	return (MessageType)((uint32_t)AddLogDebug(mt) | (uint32_t)LogInfo);
 }
 
-inline constexpr MessageType RemoveLogging(MessageType mt) noexcept
+constexpr MessageType RemoveLogging(MessageType mt) noexcept
 {
 	return (MessageType)((uint32_t)mt | (uint32_t)LogOff);
 }
 
-inline constexpr MessageType AddError(MessageType mt) noexcept
+constexpr MessageType AddError(MessageType mt) noexcept
 {
 	return AddLogWarn((MessageType)((uint32_t)mt | (uint32_t)ErrorMessageFlag));
 }
 
-inline constexpr MessageType AddWarning(MessageType mt) noexcept
+constexpr MessageType AddWarning(MessageType mt) noexcept
 {
 	return AddLogWarn((MessageType)((uint32_t)mt | (uint32_t)WarningMessageFlag));
 }

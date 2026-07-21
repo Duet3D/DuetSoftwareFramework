@@ -48,6 +48,7 @@ Checks: >
   -readability-avoid-unconditional-preprocessor-if,
   -bugprone-unhandled-exception-at-new,
   -bugprone-macro-parentheses,
+  -readability-redundant-declaration,
 
 # Checks switched off because they conflict with deliberate choices in this codebase rather
 # than flagging defects:
@@ -61,6 +62,16 @@ Checks: >
 #   readability-avoid-unconditional-preprocessor-if - `#if 0` guards debug-only code on purpose
 #   bugprone-unhandled-exception-at-new - the firmware runs without exceptions; allocation
 #                                     failure is handled by the fault path, not a catch
+#   readability-redundant-declaration - the forward declarations of the fault handlers in
+#                                     ExceptionHandlers.cpp are not redundant: they carry
+#                                     __attribute__((naked)) and (noreturn) that the definitions
+#                                     below them do not repeat, and the check deletes the whole
+#                                     declaration. Losing 'naked' makes GCC wrap hand-written
+#                                     assembly that reads MSP/PSP and r0/r1 in a prologue and
+#                                     epilogue. It happens to still work on GCC 15 -- the emitted
+#                                     epilogue is unreachable and no prologue is needed -- but the
+#                                     asm is only correct because of the attribute, and nothing
+#                                     would warn if a future compiler decided to save a register.
 #   bugprone-macro-parentheses      - the only hits are the build's own command-line -D flags
 #                                     (-DMQTTC_PAL_FILE=Networking/MQTT/mqtt_pal.h); it fires once
 #                                     per TU with no source location, and parenthesising that
