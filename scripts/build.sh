@@ -16,7 +16,16 @@ declare -A PROJECT_SRC=(
     [CustomHttpEndpoint]="src/CustomHttpEndpoint"
     [ModelObserver]="src/ModelObserver"
     [PluginManager]="src/PluginManager"
+    [DuetSbcInterface]="src/DuetSbcInterface"
 )
+
+# DuetSbcInterface is native (CMake), not a dotnet project: it builds libduet_sbc.so, the SPI
+# transfer loop that DuetControlServer P/Invokes into. It is built separately below.
+SBC_SRC_DIR="$REPO_ROOT/src/DuetSbcInterface"
+SBC_BUILD_DIR="$SBC_SRC_DIR/build-deploy-arm64"
+SBC_TOOLCHAIN="$SBC_SRC_DIR/cmake/aarch64-linux-gnu.cmake"
+SBC_LIB_NAME="libduet_sbc.so"
+DEFAULT_SYSROOT="$SBC_SRC_DIR/pi-sysroot"
 
 declare -A PROJECT_POSTINST=(
     [DuetControlServer]="pkg/deb/duetcontrolserver/DEBIAN/postinst"
@@ -25,7 +34,7 @@ declare -A PROJECT_POSTINST=(
     [DuetWebServer]="pkg/deb/duetwebserver/DEBIAN/postinst"
 )
 
-ALL_PROJECTS=(DuetControlServer DuetPiManagementPlugin DuetPluginService DuetWebServer CodeConsole CodeLogger CodeStream CustomHttpEndpoint ModelObserver PluginManager)
+ALL_PROJECTS=(DuetControlServer DuetSbcInterface DuetPiManagementPlugin DuetPluginService DuetWebServer CodeConsole CodeLogger CodeStream CustomHttpEndpoint ModelObserver PluginManager)
 
 SSH_USER="root"
 TARGET=""
@@ -34,6 +43,8 @@ ALL=false
 LOCAL=false
 SKIP_BUILD=false
 START_SERVICES=false
+SYSROOT=""
+FETCH_SYSROOT=false
 
 usage() {
     cat <<EOF
@@ -48,16 +59,30 @@ Options:
   -l, --local          Deploy locally to /opt/dsf/bin instead of a remote target
       --skip-build     Skip the build step; only sync binaries and run postinst scripts
       --start-services  Start DSF services after deployment
+      --sysroot <dir>  Pi sysroot to cross-link libduet_sbc.so against
+                       (default: $DEFAULT_SYSROOT if it exists)
+      --fetch-sysroot  (Re-)fetch the sysroot from the deploy target before building
   -h, --help           Show this help
 
 Projects (specify one or more, or use --all):
 $(printf '  %s\n' "${ALL_PROJECTS[@]}")
+
+Notes:
+  DuetSbcInterface is the native SPI transfer loop (libduet_sbc.so) that DuetControlServer
+  P/Invokes into. DCS cannot run without it, so selecting DuetControlServer builds it too.
+
+  Because a shared library links glibc dynamically, the .so must be built against the *target's*
+  glibc. The devcontainer toolchain targets a newer glibc than Raspberry Pi OS Bookworm, so a
+  plain cross-build produces a .so that fails to load on the Pi. This script therefore links
+  against a sysroot copied from the Pi, fetching it automatically on first use when a deploy
+  target is given.
 
 Examples:
   $(basename "$0") --all --target 192.168.4.27
   $(basename "$0") -t 192.168.4.27 DuetControlServer DuetWebServer
   $(basename "$0") --all --local
   $(basename "$0") --skip-build --target 192.168.4.27 DuetControlServer
+  $(basename "$0") -t 192.168.4.27 --fetch-sysroot DuetSbcInterface
 EOF
 }
 
@@ -70,6 +95,8 @@ while [[ $# -gt 0 ]]; do
         -l|--local)   LOCAL=true;     shift   ;;
         --skip-build) SKIP_BUILD=true; shift  ;;
         --start-services) START_SERVICES=true; shift ;;
+        --sysroot)    SYSROOT="$2";   shift 2 ;;
+        --fetch-sysroot) FETCH_SYSROOT=true; shift ;;
         -h|--help)    usage; exit 0           ;;
         -*)           echo "Unknown option: $1"; usage; exit 1 ;;
         All)          ALL=true; shift ;;
@@ -101,10 +128,82 @@ for project in "${SELECTED[@]}"; do
     fi
 done
 
+# DuetControlServer P/Invokes into libduet_sbc.so and will not start without it, so building or
+# deploying DCS always implies the native interface too.
+if [[ " ${SELECTED[*]} " == *" DuetControlServer "* && " ${SELECTED[*]} " != *" DuetSbcInterface "* ]]; then
+    echo "=== DuetControlServer selected: including DuetSbcInterface (libduet_sbc.so) ==="
+    SELECTED+=(DuetSbcInterface)
+fi
+
+# --- Native SPI interface (libduet_sbc.so) ---
+# Cross-compiled here rather than on the Pi so a deploy needs no toolchain on the target. The catch
+# is glibc: a .so links it dynamically, and the devcontainer toolchain targets a newer glibc than
+# Raspberry Pi OS Bookworm, so linking against the container's libraries yields a .so that fails at
+# dlopen with "GLIBC_2.3x not found". Linking against a sysroot copied from the Pi avoids that.
+resolve_sysroot() {
+    # An explicit --sysroot always wins
+    if [[ -n "$SYSROOT" ]]; then
+        if [[ ! -d "$SYSROOT" ]]; then
+            echo "Error: sysroot '$SYSROOT' does not exist" >&2
+            exit 1
+        fi
+        return
+    fi
+
+    if $FETCH_SYSROOT || [[ ! -d "$DEFAULT_SYSROOT" ]]; then
+        if [[ -n "$TARGET" ]]; then
+            if $FETCH_SYSROOT; then
+                echo "=== Fetching sysroot from ${SSH_USER}@${TARGET} (--fetch-sysroot) ==="
+            else
+                echo "=== No sysroot at $DEFAULT_SYSROOT; fetching one from ${SSH_USER}@${TARGET} ==="
+                echo "    (one-off; subsequent builds reuse it. Refresh with --fetch-sysroot)"
+            fi
+            "$SBC_SRC_DIR/scripts/fetch-pi-sysroot.sh" "${SSH_USER}@${TARGET}" "$DEFAULT_SYSROOT"
+        fi
+    fi
+
+    if [[ -d "$DEFAULT_SYSROOT" ]]; then
+        SYSROOT="$DEFAULT_SYSROOT"
+    fi
+}
+
+build_sbc_interface() {
+    echo "=== Building DuetSbcInterface (libduet_sbc.so) ==="
+
+    local cmake_args=(-DCMAKE_BUILD_TYPE=Release)
+    if [[ "$(uname -m)" == "aarch64" ]]; then
+        # Already on the target architecture (e.g. building on the Pi itself with --local): build
+        # natively. That needs no toolchain and no sysroot, and gets glibc right by construction.
+        echo "    Host is aarch64; building natively"
+    else
+        cmake_args+=("-DCMAKE_TOOLCHAIN_FILE=$SBC_TOOLCHAIN")
+        resolve_sysroot
+        if [[ -n "$SYSROOT" ]]; then
+            echo "    Linking against sysroot: $SYSROOT"
+            cmake_args+=("-DDUET_SBC_SYSROOT=$SYSROOT")
+        else
+            echo "WARNING: no Pi sysroot available, linking against the container's aarch64 libraries." >&2
+            echo "         The resulting $SBC_LIB_NAME may fail to load on the Pi with a GLIBC version error." >&2
+            echo "         Re-run with a deploy target (-t) to fetch one, or pass --sysroot <dir>." >&2
+        fi
+    fi
+
+    cmake -S "$SBC_SRC_DIR" -B "$SBC_BUILD_DIR" "${cmake_args[@]}"
+    cmake --build "$SBC_BUILD_DIR" --target duet_sbc_shared -j"$(nproc)"
+
+    # Land it next to the managed assemblies so default P/Invoke probing resolves it
+    cp "$SBC_BUILD_DIR/sbc/$SBC_LIB_NAME" "$BUILD_DIR/"
+    echo "=== $SBC_LIB_NAME -> $BUILD_DIR/ ==="
+}
+
 # --- Build ---
 if ! $SKIP_BUILD; then
     mkdir -p "$BUILD_DIR"
     for project in "${SELECTED[@]}"; do
+        if [[ "$project" == "DuetSbcInterface" ]]; then
+            build_sbc_interface
+            continue
+        fi
         echo "=== Building $project ==="
         dotnet build -r linux-arm64 --self-contained "$REPO_ROOT/${PROJECT_SRC[$project]}" -o "$BUILD_DIR"
     done

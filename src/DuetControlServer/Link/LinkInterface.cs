@@ -9,7 +9,7 @@ using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
-using DuetControlServer.Link.Adapter;
+using DuetControlServer.Link.Native;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Utility;
@@ -24,13 +24,13 @@ namespace DuetControlServer.Link;
 /// Main firmware interface
 /// </summary>
 /// <param name="channels">Channel manager</param>
-/// <param name="linkAdapter">Firmware link adapter</param>
+/// <param name="nativeLink">Native SPI transfer loop</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings</param>
 [DiagnosticsPriority(-5)]
 public sealed partial class LinkInterface(
     Channel.Manager channels,
-    ILinkAdapter linkAdapter,
+    NativeLink nativeLink,
     ILogger<LinkInterface> logger,
     IOptions<Settings> settings) : IDiagnostics
 {
@@ -44,31 +44,43 @@ public sealed partial class LinkInterface(
     /// </summary>
     internal const ushort UnsolicitedTxToken = 0xFFFF;
 
-    // CAN bus requests
-    internal TaskCompletionSource? CanEnableRequest;
-    internal bool? PendingCanEnable;
-
     internal readonly List<CanRequest> CanRequests = [];
     private ushort _canTxToken;
 
-    // Firmware updates
+    // Firmware updates. LinkService watches FirmwareUpdateRequested and performs the flash, because
+    // only it owns the resource invalidation and object model updates an update implies
     internal readonly AsyncLock FirmwareUpdateLock = new();
     internal Stream? IapStream, FirmwareStream;
     internal TaskCompletionSource? FirmwareUpdateRequest;
 
-    // Firmware halt/restart requests
+    /// <summary>
+    /// Raised when a firmware update has been staged for <see cref="LinkService"/> to perform
+    /// </summary>
+    internal readonly SemaphoreSlim FirmwareUpdateRequested = new(0);
+
+    // Serialises firmware halt/restart requests against each other
     internal readonly AsyncLock FirmwareActionLock = new();
-    internal TaskCompletionSource? FirmwareHaltRequest;
-    internal TaskCompletionSource? FirmwareResetRequest;
+
+    /// <summary>
+    /// Invalidate pending codes and code-relevant requests, set by <see cref="LinkService"/>
+    /// </summary>
+    /// <remarks>
+    /// An emergency stop voids everything in flight, and that teardown spans the job processor and
+    /// channel processors which this class does not own. Rather than reach across, it calls back into
+    /// <see cref="LinkService"/>, which owns them
+    /// </remarks>
+    internal Action? InvalidateCodesCallback;
+
+    /// <summary>
+    /// Invalidate every resource, set by <see cref="LinkService"/>
+    /// </summary>
+    internal Action? InvalidateCallback;
 
     // Print handling
     internal readonly AsyncLock PrintStateLock = new();
     internal TaskCompletionSource? SetPrintInfoRequest;
     internal PrintStoppedReason StopPrintReason;
     internal TaskCompletionSource? StopPrintRequest;
-
-    // Miscellaneous requests
-    internal readonly Queue<Tuple<MessageTypeFlags, string>> MessagesToSend = new();
 
     /// <summary>
     /// Print diagnostics of this class
@@ -109,15 +121,9 @@ public sealed partial class LinkInterface(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        Task onCanEnabled;
-        using (await FirmwareActionLock.LockAsync(cancellationToken))
-        {
-            PendingCanEnable = enable;
-            CanEnableRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            onCanEnabled = CanEnableRequest.Task;
-        }
-        linkAdapter.RequestTransfer();
-        await onCanEnabled.WaitAsync(cancellationToken);
+        // The native loop stages this into the next transfer and reports back once it has been written
+        await nativeLink.EnableCanAsync(enable, cancellationToken);
+        logger.LogInformation("Sent CAN enable request: {Enable}", enable);
     }
 
     /// <summary>
@@ -165,7 +171,36 @@ public sealed partial class LinkInterface(
             CanRequests.Add(request);
             logger.LogDebug("Queueing CAN message of type {MessageType} to address {DstAddress} expecting reply of type {ReplyType}", messageType, dstAddress, replyType);
         }
-        linkAdapter.RequestTransfer();
+
+        try
+        {
+            // Hand the message to the native loop, which stages it into the next transfer. The reply
+            // (if any) arrives as a CanResponse event and is matched back to this request by its token
+            nativeLink.QueueCanMessage(request.TxToken, (ushort)request.MessageType, (ushort)request.ReplyType,
+                request.DstAddress, request.IsResponse, request.RequestPayload);
+            request.Sent = true;
+
+            // A request expecting no reply is complete as soon as the native loop has taken it: there
+            // is nothing further to wait for, and no CanResponse event will ever arrive to resolve it.
+            // It must also be dropped from the list here, because only a matching response would
+            // otherwise remove it -- leaving it to accumulate for every fire-and-forget message.
+            if (!request.ExpectsReply)
+            {
+                lock (CanRequests)
+                {
+                    CanRequests.Remove(request);
+                }
+                request.SetResult();
+            }
+        }
+        catch
+        {
+            lock (CanRequests)
+            {
+                CanRequests.Remove(request);
+            }
+            throw;
+        }
 
         try
         {
@@ -282,14 +317,14 @@ public sealed partial class LinkInterface(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        Task onFirmwareHalted;
         using (await FirmwareActionLock.LockAsync(cancellationToken))
         {
-            FirmwareHaltRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            onFirmwareHalted = FirmwareHaltRequest.Task;
+            // Everything pending is void the moment the controller halts, so tear it down before the
+            // request goes out rather than racing the halt
+            InvalidateCodesCallback?.Invoke();
+            await nativeLink.EmergencyStopAsync(cancellationToken);
         }
-        linkAdapter.RequestTransfer();
-        await onFirmwareHalted.WaitAsync(cancellationToken);
+        logger.LogWarning("Emergency stop");
     }
 
     /// <summary>
@@ -301,14 +336,13 @@ public sealed partial class LinkInterface(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        Task onFirmwareReset;
         using (await FirmwareActionLock.LockAsync(cancellationToken))
         {
-            FirmwareResetRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            onFirmwareReset = FirmwareResetRequest.Task;
+            // A reset invalidates every resource, not just the code-related ones
+            InvalidateCallback?.Invoke();
+            await nativeLink.ResetAsync(cancellationToken);
         }
-        linkAdapter.RequestTransfer();
-        await onFirmwareReset.WaitAsync(cancellationToken);
+        logger.LogWarning("Resetting controller");
     }
 
     /// <summary>
@@ -467,6 +501,9 @@ public sealed partial class LinkInterface(
             FirmwareStream = firmwareStream;
             FirmwareUpdateRequest = tcs;
         }
+
+        // Hand off to LinkService, which owns the invalidation and object model changes an update implies
+        FirmwareUpdateRequested.Release();
         await tcs.Task.WaitAsync(cancellationToken);
     }
 
@@ -480,7 +517,7 @@ public sealed partial class LinkInterface(
     /// <exception cref="ArgumentException">Invalid parameter</exception>
     public void SendMessage(MessageTypeFlags flags, string message)
     {
-        if (linkAdapter.ProtocolVersion == 1)
+        if (nativeLink.ProtocolVersion == 1)
         {
             throw new NotSupportedException("Incompatible firmware version");
         }
@@ -489,11 +526,7 @@ public sealed partial class LinkInterface(
             throw new ArgumentException($"{nameof(message)} too long");
         }
 
-        lock (MessagesToSend)
-        {
-            MessagesToSend.Enqueue(new Tuple<MessageTypeFlags, string>(flags, message));
-        }
-        linkAdapter.RequestTransfer();
+        nativeLink.QueueMessage(flags, message);
     }
 
     /// <summary>
@@ -557,14 +590,9 @@ public sealed partial class LinkInterface(
     /// </summary>
     internal void Invalidate()
     {
-        // Invalidate codes and code-relevant requests
+        // Invalidate codes and code-relevant requests. Messages no longer need clearing here: they go
+        // straight into the native outbound ring, which the transfer loop discards on a reset
         InvalidateCodes();
-
-        // Clear messages to send to the firmware
-        lock (MessagesToSend)
-        {
-            MessagesToSend.Clear();
-        }
     }
 
     /// <summary>
@@ -615,13 +643,8 @@ public sealed partial class LinkInterface(
     /// <returns>Asynchronous task</returns>
     internal async Task InvalidateAsync(CancellationToken cancellationToken)
     {
-        // Invalidate codes and code-relevant requests
+        // Invalidate codes and code-relevant requests. See Invalidate() on why messages need no
+        // clearing here
         await InvalidateCodesAsync(cancellationToken);
-
-        // Clear messages to send to the firmware
-        lock (MessagesToSend)
-        {
-            MessagesToSend.Clear();
-        }
     }
 }

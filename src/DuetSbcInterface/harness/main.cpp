@@ -146,17 +146,6 @@ int main(int argc, char **argv) {
     try {
         SbcInterface interface(config);
         interface.SetRequestServedCallback(RecordSample);
-        interface.SetMessageCallback([](uint32_t flags, const std::string &msg) {
-            if (!msg.empty()) {
-                std::printf("[msg 0x%08x] %s\n", flags, msg.c_str());
-            }
-        });
-        interface.SetErrorCallback([throwOnError](const std::string &msg) { 
-            std::fprintf(stderr, "[recover] %s\n", msg.c_str());
-            if (throwOnError) {
-                throw std::runtime_error(msg);
-            }
-        });
 
         std::printf("Connecting to firmware...\n");
         interface.Connect();
@@ -164,6 +153,55 @@ int main(int argc, char **argv) {
                     interface.Transfer().ProtocolVersion());
 
         interface.Start();
+
+        // Drain the inbound ring. DuetControlServer does the same from a managed dispatcher thread;
+        // here it just reports messages and recovery events. Deliberately a separate, normal-priority
+        // thread so printing never runs on the real-time interface thread.
+        std::thread reporter([&] {
+            duet::sbc::RingBuffer &inbound = interface.Inbound();
+            while (g_running.load(std::memory_order_relaxed)) {
+                const uint8_t *record;
+                uint32_t length;
+                if (!inbound.Peek(record, length)) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+                    continue;
+                }
+
+                duet::sbc::InboundEventHeader header{};
+                if (length >= sizeof(header)) {
+                    std::memcpy(&header, record, sizeof(header));
+                    switch (static_cast<duet::sbc::InboundEventType>(header.type)) {
+                        case duet::sbc::InboundEventType::Message: {
+                            duet::sbc::MessageEvent event;
+                            std::memcpy(&event, record, sizeof(event));
+                            std::printf("[msg 0x%08x] %.*s\n", event.flags,
+                                        static_cast<int>(length - sizeof(event)),
+                                        reinterpret_cast<const char *>(record) + sizeof(event));
+                            break;
+                        }
+                        case duet::sbc::InboundEventType::Log: {
+                            duet::sbc::LogEvent event;
+                            std::memcpy(&event, record, sizeof(event));
+                            std::fprintf(stderr, "[recover] %.*s\n", static_cast<int>(length - sizeof(event)),
+                                         reinterpret_cast<const char *>(record) + sizeof(event));
+                            if (throwOnError) {
+                                g_running.store(false);
+                            }
+                            break;
+                        }
+                        case duet::sbc::InboundEventType::ConnectionLost:
+                            std::fprintf(stderr, "[link] connection lost\n");
+                            break;
+                        case duet::sbc::InboundEventType::ConnectionEstablished:
+                            std::fprintf(stderr, "[link] connection established\n");
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                inbound.Consume();
+            }
+        });
 
         // Producer: queue a batch of CanMessageMovementLinearShaped per cycle, like MotionService.cs.
         std::thread producer([&] {
@@ -210,11 +248,14 @@ int main(int argc, char **argv) {
                         case 5:
                             interface.QueueCanMessage(nextToken(), proto::CanMessageType::MovementLinearShaped,
                                                     proto::CanMessageType::NoReply,
-                                                    static_cast<uint8_t>(dstAddress), false, payload);
+                                                    static_cast<uint8_t>(dstAddress), false, payload.data(),
+                                                    payload.size());
                             break;
-                        case 8:
-                            interface.QueueMessage(0, "Hello from SBC harness");
+                        case 8: {
+                            static constexpr char kGreeting[] = "Hello from SBC harness";
+                            interface.QueueMessage(0, kGreeting, sizeof(kGreeting) - 1);
                             break;
+                        }
                         default:
                             std::fprintf(stderr, "Unknown message type %d\n", msgType);
                             g_running.store(false);
@@ -240,6 +281,7 @@ int main(int argc, char **argv) {
         producer.join();
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         interface.Stop();
+        reporter.join();
 
         // ---- Report ----
         size_t count = std::min(g_sampleIndex.load(), kMaxSamples);

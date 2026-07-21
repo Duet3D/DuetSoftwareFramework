@@ -1,6 +1,19 @@
 // C ABI wrapping the SBC interface so it can be consumed from C# via P/Invoke (or any other
 // language). Kept intentionally small and free of C++ types on the boundary. Built into
-// libduet_sbc_shared.so. All functions are thread-safe with respect to distinct handles.
+// libduet_sbc.so.
+//
+// The design point is that the caller's threads and the SPI interface thread never block each other:
+// work is exchanged through lock-free ring buffers, so the interface thread can hold SCHED_FIFO on an
+// isolated core while the caller runs a garbage-collected runtime. Incoming events are drained with
+// the zero-copy Peek/Consume pair; outgoing work is pushed with the Queue*/Request* calls.
+//
+// The record layouts carried by the rings are defined in LinkEvents.h and mirrored in C# by
+// DuetControlServer/Link/Native/LinkEvents.cs.
+//
+// Threading:
+//   - Queue*/Request*/RequestTransfer are safe to call from any thread, concurrently.
+//   - PeekEvent/ConsumeEvent/WaitForEvent form a SINGLE-consumer API: exactly one thread may use them.
+//   - Create/Connect/Start/Stop/Destroy are expected to be called from one owning thread.
 #pragma once
 
 #include <stdint.h>
@@ -34,14 +47,9 @@ typedef struct {
     int32_t sbcConnectionTimeout;
     int32_t sbcConnectionKeepAliveInterval;
     int32_t maxSbcRetries;
-} DuetSbcConfig;
 
-// Callback types (all receive the user context registered alongside them).
-typedef void (*DuetSbcRequestServedCb)(int64_t latencyNs, void *ctx);
-typedef void (*DuetSbcMessageCb)(uint32_t flags, const char *message, int32_t length, void *ctx);
-typedef void (*DuetSbcCanResponseCb)(uint16_t txToken, uint16_t msgType, uint16_t dataLength,
-                                     uint8_t srcAddress, uint8_t flags, uint8_t status,
-                                     const uint8_t *payload, void *ctx);
+    int32_t updateOnly; // bool: tolerate a newer-than-supported protocol version so it can be flashed
+} DuetSbcConfig;
 
 // Fill `config` with the default values.
 void DuetSbc_DefaultConfig(DuetSbcConfig *config);
@@ -50,11 +58,6 @@ void DuetSbc_DefaultConfig(DuetSbcConfig *config);
 // errorBuf (if non-null). The instance must be freed with DuetSbc_Destroy.
 DuetSbcHandle *DuetSbc_Create(const DuetSbcConfig *config, char *errorBuf, int32_t errorBufLen);
 
-// Register callbacks (may be null to clear). Must be called before DuetSbc_Start.
-void DuetSbc_SetRequestServedCallback(DuetSbcHandle *h, DuetSbcRequestServedCb cb, void *ctx);
-void DuetSbc_SetMessageCallback(DuetSbcHandle *h, DuetSbcMessageCb cb, void *ctx);
-void DuetSbc_SetCanResponseCallback(DuetSbcHandle *h, DuetSbcCanResponseCb cb, void *ctx);
-
 // Connect to the firmware (blocking). Returns 0 on success, non-zero on failure (message in errorBuf).
 int32_t DuetSbc_Connect(DuetSbcHandle *h, char *errorBuf, int32_t errorBufLen);
 
@@ -62,18 +65,49 @@ int32_t DuetSbc_Connect(DuetSbcHandle *h, char *errorBuf, int32_t errorBufLen);
 void DuetSbc_Start(DuetSbcHandle *h);
 void DuetSbc_Stop(DuetSbcHandle *h);
 
-// Queue outgoing data (returns immediately; the transfer loop sends it).
-void DuetSbc_QueueMessage(DuetSbcHandle *h, uint32_t flags, const char *message, int32_t length);
-void DuetSbc_QueueCanMessage(DuetSbcHandle *h, uint16_t txToken, uint16_t msgType, uint16_t replyType,
-                             uint8_t dstAddress, int32_t isResponse, const uint8_t *payload, int32_t length);
-void DuetSbc_QueueEnableCan(DuetSbcHandle *h, int32_t enable);
+// --- Outbound: queue work for the transfer loop (any thread) ---
+
+// These return 0 on success and non-zero if the outbound ring is full (i.e. the message was NOT
+// queued and the caller must surface that rather than lose it).
+int32_t DuetSbc_QueueMessage(DuetSbcHandle *h, uint32_t flags, const char *message, int32_t length);
+int32_t DuetSbc_QueueCanMessage(DuetSbcHandle *h, uint16_t txToken, uint16_t msgType, uint16_t replyType,
+                                uint8_t dstAddress, int32_t isResponse, const uint8_t *payload, int32_t length);
+// requestId may be 0 for fire-and-forget; otherwise the outcome arrives as a RequestCompleted event.
+int32_t DuetSbc_QueueEnableCan(DuetSbcHandle *h, int32_t enable, uint32_t requestId);
+void DuetSbc_RequestEmergencyStop(DuetSbcHandle *h, uint32_t requestId);
+void DuetSbc_RequestReset(DuetSbcHandle *h, uint32_t requestId);
+
+// Stage a firmware update. `iap` and `firmware` must remain valid and pinned until the matching
+// RequestCompleted event arrives. Returns 0 on success, non-zero if an update is already running.
+int32_t DuetSbc_RequestFirmwareUpdate(DuetSbcHandle *h, const uint8_t *iap, int32_t iapLength,
+                                      const uint8_t *firmware, int32_t firmwareLength, uint16_t firmwareCrc16,
+                                      uint32_t requestId);
+
+// Ask for a transfer without new data (e.g. to flush a queued request promptly).
 void DuetSbc_RequestTransfer(DuetSbcHandle *h);
 
-// Diagnostics.
+// --- Inbound: drain events (single consumer thread only) ---
+
+// Point `data`/`length` at the next event record without copying it. Returns 1 if an event is
+// available, 0 otherwise. The pointer stays valid until the next DuetSbc_ConsumeEvent call.
+int32_t DuetSbc_PeekEvent(DuetSbcHandle *h, const uint8_t **data, int32_t *length);
+
+// Release the event most recently returned by DuetSbc_PeekEvent.
+void DuetSbc_ConsumeEvent(DuetSbcHandle *h);
+
+// Block until an event is available, the timeout elapses, or the loop is stopped.
+// Returns 1 if an event is (probably) available, 0 on timeout.
+int32_t DuetSbc_WaitForEvent(DuetSbcHandle *h, int32_t timeoutMs);
+
+// --- Diagnostics ---
+int32_t DuetSbc_GetProtocolVersion(DuetSbcHandle *h);
 double DuetSbc_GetMaxPinWaitMs(DuetSbcHandle *h);
 double DuetSbc_GetMaxFullTransferDelayMs(DuetSbcHandle *h);
 int32_t DuetSbc_GetTfrPinGlitches(DuetSbcHandle *h);
 int32_t DuetSbc_GetMissedEdges(DuetSbcHandle *h);
+int32_t DuetSbc_GetResyncCount(DuetSbcHandle *h);
+// Events dropped because the inbound ring was full (i.e. the consumer could not keep up).
+uint64_t DuetSbc_GetDroppedEvents(DuetSbcHandle *h);
 
 // Destroy the instance (stops the loop first).
 void DuetSbc_Destroy(DuetSbcHandle *h);

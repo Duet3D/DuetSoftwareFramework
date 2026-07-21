@@ -145,7 +145,8 @@ void SbcTransfer::PerformFullTransfer(bool connecting) {
             }
 
             // Track the maximum time between regular full transfers
-            if (!connecting && !_waitingForFirstTransfer && _connected && !_hadTimeout && !_resetting) {
+            if (!connecting && !_waitingForFirstTransfer && _connected && !_hadTimeout && !_updating &&
+                !_resetting) {
                 if (_fullTransferTimerRunning) {
                     const double elapsed = ElapsedMs(_fullTransferStart);
                     if (elapsed > _maxFullTransferDelay) {
@@ -312,9 +313,13 @@ void SbcTransfer::WaitForTransfer(bool inTransfer) {
     }
 
     if (!isReady()) {
-        const int timeout = _waitingForFirstTransfer
-                                ? _config.sbcConnectTimeout
-                                : (inTransfer ? _config.sbcTransferTimeout : _config.sbcConnectionTimeout);
+        // While IAP is running every wait uses IapTimeout: it erases flash between segments and can
+        // leave TfrRdy low for far longer than any regular transfer timeout allows
+        const int timeout =
+            _updating ? proto::IapTimeout
+                      : (_waitingForFirstTransfer
+                             ? _config.sbcConnectTimeout
+                             : (inTransfer ? _config.sbcTransferTimeout : _config.sbcConnectionTimeout));
 
         const auto start = clock::now();
         // Only the TfrRdy edge fd and the stop fd matter here; RequestTransfer wakeups are irrelevant
@@ -412,9 +417,11 @@ bool SbcTransfer::ExchangeHeader() {
         }
 
         // Change the protocol version if necessary
+        // In update-only mode a newer-than-supported protocol version is adopted rather than refused,
+        // so an incompatible firmware can still be flashed
         const uint16_t lastProtocolVersion = _txHeader.protocolVersion;
         if (_rxHeader.protocolVersion != lastProtocolVersion &&
-            _rxHeader.protocolVersion <= proto::ProtocolVersion) {
+            (_rxHeader.protocolVersion <= proto::ProtocolVersion || _config.updateOnly)) {
             _txHeader.protocolVersion = _rxHeader.protocolVersion;
             WriteCRC();
             ExchangeResponse(proto::TransferResponse::BadResponse);
@@ -448,8 +455,9 @@ bool SbcTransfer::ExchangeHeader() {
             throw TransferError("RepRapFirmware is operating in stand-alone mode");
         }
 
-        // Check for changed protocol version
-        if (_rxHeader.protocolVersion > proto::ProtocolVersion) {
+        // Check for changed protocol version. Update-only mode tolerates a newer firmware so that it
+        // can be reflashed rather than refused outright
+        if (_rxHeader.protocolVersion > proto::ProtocolVersion && !_config.updateOnly) {
             ExchangeResponse(proto::TransferResponse::BadProtocolVersion);
             throw TransferError("Invalid protocol version");
         }
@@ -580,8 +588,9 @@ bool SbcTransfer::ExchangeDataResponse(bool &success) {
 // Transfer gating (SPI.cs WaitForTransferReason / RequestTransfer)
 // ---------------------------------------------------------------------------
 bool SbcTransfer::WaitForTransferReason() {
-    // Only gate during normal operation
-    if (!_connected || _hadTimeout || _waitingForFirstTransfer || _resetting) {
+    // Only gate during normal operation; while connecting, reconnecting, resetting or updating the
+    // protocol must always be free to make progress
+    if (!_connected || _hadTimeout || _waitingForFirstTransfer || _updating || _resetting) {
         return true;
     }
 
@@ -756,6 +765,12 @@ bool SbcTransfer::WriteCanMessage(uint16_t txToken, uint16_t msgType, uint16_t r
 }
 
 bool SbcTransfer::WriteMessage(uint32_t messageFlags, const std::string &message) {
+    // Don't send a new request if another one is still pending
+    if (std::find(_packetsBeingResent.begin(), _packetsBeingResent.end(), proto::SbcRequest::Message) !=
+        _packetsBeingResent.end()) {
+        return false;
+    }
+
     const size_t dataLength = sizeof(proto::MessageHeader) + message.size();
     if (!CanWritePacket(proto::AddPadding(dataLength))) {
         return false;
@@ -808,6 +823,90 @@ void SbcTransfer::ResendPacket(const proto::PacketHeader &packet, proto::SbcRequ
     }
 
     throw TransferError("Firmware requested resend for invalid packet");
+}
+
+// ---------------------------------------------------------------------------
+// IAP / firmware update (SPI.cs WriteIapSegment .. WaitForIapReset)
+// ---------------------------------------------------------------------------
+bool SbcTransfer::WriteIapSegment(const uint8_t *data, size_t length) {
+    if (data == nullptr || length == 0) {
+        return false;
+    }
+    if (length > proto::IapSegmentSize) {
+        throw TransferError("IAP segment too large");
+    }
+
+    WritePacketHeader(proto::SbcRequest::WriteIap, length);
+    std::memcpy(GetWriteBuffer(length), data, length);
+    PerformFullTransfer();
+    return true;
+}
+
+void SbcTransfer::StartIap() {
+    // Tell the firmware to boot the IAP program
+    WritePacketHeader(proto::SbcRequest::StartIap);
+    PerformFullTransfer();
+
+    // From here on the controller runs IAP, which speaks a much simpler protocol: bare full-duplex
+    // transfers gated by TfrRdy only. It raises the pin once it is ready to receive the firmware.
+    _waitingForFirstTransfer = _updating = true;
+}
+
+bool SbcTransfer::FlashFirmwareSegment(const uint8_t *data, size_t length) {
+    if (data == nullptr || length == 0) {
+        return false;
+    }
+    if (length > proto::FirmwareSegmentSize) {
+        throw TransferError("Firmware segment too large");
+    }
+
+    uint8_t writeBuffer[proto::FirmwareSegmentSize];
+    uint8_t readBuffer[proto::FirmwareSegmentSize];
+    std::memcpy(writeBuffer, data, length);
+    if (length < proto::FirmwareSegmentSize) {
+        // Fill the remaining space with 0xFF, as the IAP program does once complete
+        std::memset(writeBuffer + length, 0xFF, proto::FirmwareSegmentSize - length);
+    }
+
+    WaitForTransfer();
+    _spiDevice->TransferFullDuplex(writeBuffer, readBuffer, proto::FirmwareSegmentSize);
+    return true;
+}
+
+bool SbcTransfer::VerifyFirmwareChecksum(uint32_t firmwareLength, uint16_t crc16) {
+    // At this point IAP expects another segment, so wait for it to be ready first. After that give it
+    // a moment to acknowledge that we are done before sending the verification request.
+    WaitForTransfer();
+    InterruptibleSleep(proto::FirmwareFinishedDelay);
+
+    // Send the final firmware size plus CRC16 checksum to IAP
+    proto::FlashVerify verifyRequest{};
+    verifyRequest.firmwareLength = firmwareLength;
+    verifyRequest.crc16 = crc16;
+    verifyRequest.padding = 0;
+
+    uint8_t transferData[sizeof(proto::FlashVerify)];
+    std::memcpy(transferData, &verifyRequest, sizeof(verifyRequest));
+    WaitForTransfer();
+    _spiDevice->TransferFullDuplex(transferData, transferData, sizeof(transferData));
+
+    // Check whether IAP can confirm our CRC16 checksum
+    uint8_t writeOk[1] = {0};
+    WaitForTransfer();
+    _spiDevice->TransferFullDuplex(writeOk, writeOk, sizeof(writeOk));
+    return writeOk[0] == proto::FlashVerifyOk;
+}
+
+void SbcTransfer::WaitForIapReset() {
+    // Wait a moment for the firmware to start
+    InterruptibleSleep(proto::IapRebootDelay);
+
+    // Wait for the first data transfer from the newly-started firmware. Seeding the sequence numbers
+    // this way makes the next exchange look like a fresh connection rather than a reset.
+    _updating = _connected = false;
+    _waitingForFirstTransfer = true;
+    _rxHeader.sequenceNumber = 1;
+    _txHeader.sequenceNumber = 0;
 }
 
 } // namespace duet::sbc

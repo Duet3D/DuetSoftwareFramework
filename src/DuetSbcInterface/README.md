@@ -1,19 +1,21 @@
 # DuetSbcInterface — C++ SBC-side SPI replica & jitter test
 
-A standalone C++ reimplementation of the **SBC side** of the RepRapFirmware SPI protocol — the side
-implemented in C# by [`DuetControlServer/Link/Adapter/SPI.cs`](../DuetControlServer/Link/Adapter/SPI.cs)
-and the transfer loop in [`LinkService.cs`](../DuetControlServer/Link/LinkService.cs).
+The C++ implementation of the **SBC side** of the RepRapFirmware SPI protocol. It is the transport
+DuetControlServer uses: the managed SPI adapter and its transfer loop have been replaced by this
+library, which DCS drives over a small C ABI.
 
-Its purpose is to **measure the jitter** between a `RequestTransfer()` and the completion of the SPI
-transfer that serves it, **without the .NET runtime**. If the C++ implementation shows the same
-~430 µs mean but no 40 ms outliers, the outliers are coming from the managed runtime (GC / scheduling
-of managed threads) rather than the kernel or hardware. If the C++ version jitters too, the cause is
-below .NET (kernel, PREEMPT_RT config, SPI/DMA, GPIO, contention).
+It began as a jitter experiment — a reimplementation of the then-C# `SPI.cs` and `LinkService.cs`
+used to **measure the latency** between a `RequestTransfer()` and the completion of the SPI transfer
+that serves it, **without the .NET runtime**, to determine whether the observed 40 ms outliers came
+from the managed runtime (GC / thread scheduling) or from below it (kernel, PREEMPT_RT config,
+SPI/DMA, GPIO, contention). The bundled [jitter harness](#run-the-jitter-test) still measures exactly
+that, and the transfer loop now runs in production on its own pinned real-time thread.
 
 The device side of this same protocol already exists in C++ in
-[`DuetCANMaster/src/SBC`](../DuetCANMaster/src/SBC) (RepRapFirmware). This project deliberately does
-**not** implement USB transport, IAP/firmware update, file handling, IPC or the object model — only
-what is needed to exercise the SPI transport end to end.
+[`DuetCANMaster/src/SBC`](../DuetCANMaster/src/SBC) (RepRapFirmware). This project implements the SPI
+transport and the IAP/firmware-update handshake; file handling, IPC and the object model stay in
+DuetControlServer, which drives this library through the C ABI described below. USB transport is not
+implemented (and is no longer supported by DCS).
 
 ## Layout
 
@@ -143,22 +145,59 @@ Compare the tail (p99.9 / max) directly against the C# instrumentation. Useful A
 the C# fixes: `--no-rt` (drop SCHED_FIFO), `--no-isolate` (drop core pinning), `--monitor-core`,
 `--if-prio` / `--mon-prio`.
 
-## Using it from C# (if the C++ side is clean)
+## Using it from DuetControlServer
 
-If the C++ implementation has no jitter, the same core can back DCS via P/Invoke instead of the
-managed SPI adapter. `libduet_sbc.so` exports a small C ABI ([`sbc/include/DuetSbc/CApi.h`](sbc/include/DuetSbc/CApi.h)):
+DCS **does** use this library: it is the only SPI transport. The managed SPI adapter it replaced
+(`DuetControlServer/Link/Adapter/SPI.cs`) has been removed, and `libduet_sbc.so` is built and shipped
+alongside DuetControlServer by its `Makefile` (see [Packaging](#packaging)).
 
-```csharp
-[DllImport("duet_sbc")] static extern IntPtr DuetSbc_Create(ref DuetSbcConfig cfg, byte[] err, int len);
-[DllImport("duet_sbc")] static extern int    DuetSbc_Connect(IntPtr h, byte[] err, int len);
-[DllImport("duet_sbc")] static extern void   DuetSbc_Start(IntPtr h);
-[DllImport("duet_sbc")] static extern void   DuetSbc_QueueMessage(IntPtr h, uint flags, byte[] msg, int len);
-// ... register callbacks with DuetSbc_SetMessageCallback / DuetSbc_SetCanResponseCallback ...
+The managed side lives in [`DuetControlServer/Link/Native`](../DuetControlServer/Link/Native):
+
+| File | Role |
+| --- | --- |
+| `NativeMethods.cs` | P/Invoke declarations for the C ABI |
+| `LinkEvents.cs` | Managed mirror of `LinkEvents.h`, the ring record layouts |
+| `NativeLink.cs` | Owns the handle, marshals the config, maps request ids to `TaskCompletionSource` |
+
+`LinkService` starts the loop and runs one dispatcher thread that drains the inbound ring;
+`LinkInterface` queues outgoing work. Nothing above `Link/` is aware the transport is native.
+
+### Why rings instead of callbacks
+
+The interface thread runs pinned and `SCHED_FIFO`. If it invoked managed callbacks directly, then
+managed allocation, lock acquisition and GC pauses would all execute *on that thread*, mid-transfer —
+reintroducing (and worsening) the very jitter this project exists to remove. So the boundary is two
+lock-free ring buffers ([`RingBuffer.h`](sbc/include/DuetSbc/RingBuffer.h)):
+
+```
+managed threads --> [outbound ring] --> interface thread (RT)   <- drained while staging a transfer
+managed dispatcher <-- [inbound ring] <-- interface thread (RT) <- written as packets arrive
 ```
 
-A DCS `ILinkAdapter` implementation would wrap this handle; incoming packets arrive via the
-registered callbacks and outgoing data goes through the `Queue*` functions. Because the protocol
-structs here match the C# ones byte-for-byte, the two sides stay compatible.
+Producers serialise among themselves with a mutex the consumer never takes, so a producer can never
+block the real-time thread. Record layouts are defined in
+[`LinkEvents.h`](sbc/include/DuetSbc/LinkEvents.h) and asserted on both sides — `NativeLink` verifies
+the managed struct sizes at startup so a drift fails loudly instead of silently corrupting events.
+
+The ring is covered by [`tests/RingBufferTests.cpp`](tests/RingBufferTests.cpp) (framing, wrap/skip
+marker, full-ring rejection, and a threaded ordering/integrity soak); run it with `ctest` from the
+build directory.
+
+### Packaging
+
+`src/DuetControlServer/Makefile` builds the `.so` for the package `ARCH` and copies it next to the
+managed assemblies, so default P/Invoke probing finds it with no `DllImportResolver`:
+
+```sh
+cd src/DuetControlServer
+make ARCH=arm64 CONFIG=Release publish
+```
+
+> **glibc:** a `.so` must link glibc dynamically, so a cross-built one needs the *target's* glibc. The
+> devcontainer toolchain targets a newer glibc than Raspberry Pi OS Bookworm, so for release packages
+> either build on the Pi or pass a matching sysroot:
+> `make ARCH=arm64 DUET_SBC_SYSROOT=/path/to/pi-sysroot publish`
+> (see `scripts/fetch-pi-sysroot.sh`). A native-`ARCH` build needs no sysroot.
 
 ## Sharing with DuetCANMaster
 
@@ -190,5 +229,5 @@ incompatible at startup, which is worth surfacing rather than looping on.
   `WaitForTransfer`); it falls back to the legacy v1 uAPI on kernels < 5.10.
 - The jitter metric is captured on the interface thread immediately after `PerformFullTransfer`
   returns, into a lock-free preallocated sample buffer, so measurement does not perturb the result.
-- This is a diagnostic tool: the reconnection/error paths mirror `SPI.cs` but the higher-level
-  behaviours (code channels, locks, model) are intentionally absent.
+- Higher-level behaviours (code channels, locks, object model, file requests) stay in
+  DuetControlServer; this library handles the transport, the packet framing and IAP only.

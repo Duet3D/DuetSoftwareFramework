@@ -24,6 +24,7 @@
             "options": [
                 "All",
                 "DuetControlServer",
+                "DuetSbcInterface",
                 "DuetPiManagementPlugin",
                 "DuetPluginService",
                 "DuetWebServer",
@@ -152,7 +153,7 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
             "label": "[DSF] Build CodeLogger",
@@ -165,7 +166,7 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
             "label": "[DSF] Build CodeStream",
@@ -178,7 +179,7 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
             "label": "[DSF] Build CustomHttpEndpoint",
@@ -191,7 +192,7 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
             "label": "[DSF] Build DuetControlServer",
@@ -204,7 +205,12 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            // DCS P/Invokes into libduet_sbc.so and will not start without it
+            "dependsOn": [
+                "[DSF] Make Build Directory",
+                "[DSF] Build DuetSbcInterface"
+            ],
+            "dependsOrder": "sequence",
         },
         {
             "label": "[DSF] Build DuetPiManagementPlugin",
@@ -217,7 +223,7 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
             "label": "[DSF] Build DuetPluginService",
@@ -230,7 +236,7 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
             "label": "[DSF] Build DuetWebServer",
@@ -243,7 +249,7 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
             "label": "[DSF] Build ModelObserver",
@@ -256,7 +262,7 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
             "label": "[DSF] Build PluginManager",
@@ -269,7 +275,7 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
             "label": "[DSF] Build All",
@@ -282,6 +288,7 @@
                 "[DSF] Build CodeLogger",
                 "[DSF] Build CodeStream",
                 "[DSF] Build CustomHttpEndpoint",
+                "[DSF] Build DuetSbcInterface",
                 "[DSF] Build DuetControlServer",
                 "[DSF] Build DuetPiManagementPlugin",
                 "[DSF] Build DuetPluginService",
@@ -372,6 +379,71 @@
             "command": "./scripts/build.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services DuetControlServer",
             "problemMatcher": [
                 "$msCompile"
+            ],
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        },
+        {
+            // Native SPI transfer loop (libduet_sbc.so). Cross-compiled for aarch64; needs a Pi
+            // sysroot to link against the target's glibc, which is fetched automatically the first
+            // time a deploy target is available (see "[DSF] Fetch Pi Sysroot").
+            "label": "[DSF] Build DuetSbcInterface",
+            "type": "shell",
+            "command": "./scripts/build.sh DuetSbcInterface",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        },
+        {
+            "label": "[DSF] Build and Deploy DuetSbcInterface to",
+            "type": "shell",
+            "command": "./scripts/build.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services DuetSbcInterface",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        },
+        {
+            // Refresh the cached sysroot, e.g. after upgrading the Pi's OS or glibc
+            "label": "[DSF] Fetch Pi Sysroot",
+            "type": "shell",
+            "command": "./src/DuetSbcInterface/scripts/fetch-pi-sysroot.sh ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} ./src/DuetSbcInterface/pi-sysroot",
+            "problemMatcher": [],
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        },
+        {
+            // Host-side unit tests for the native interface (ring buffer framing/concurrency).
+            // Builds natively for the host, so no Pi or sysroot is involved.
+            "label": "[DSF] Run Native Tests",
+            "type": "shell",
+            "command": "cmake -S ./src/DuetSbcInterface -B ./src/DuetSbcInterface/build -DCMAKE_BUILD_TYPE=Release && cmake --build ./src/DuetSbcInterface/build -j && ctest --test-dir ./src/DuetSbcInterface/build --output-on-failure",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": "test",
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        },
+        {
+            // Builds and deploys the jitter harness, which measures RequestTransfer -> transfer
+            // latency without the .NET runtime. Statically linked, so it needs no sysroot.
+            "label": "[DSF] Build and Deploy Jitter Harness to",
+            "type": "shell",
+            "command": "cmake --preset pi-arm64 && cmake --build --preset pi-arm64 --target sbc_jitter_test -j && scp build-arm64/harness/sbc_jitter_test ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp}:~/",
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetSbcInterface"
+            },
+            "problemMatcher": [
+                "$gcc"
             ],
             "runOptions": {
                 "instanceLimit": 1

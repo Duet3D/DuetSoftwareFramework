@@ -68,8 +68,18 @@ public:
 
     int ProtocolVersion() const noexcept { return _protocolVersion; }
 
+    // True once the handshake has completed and the link is up.
+    bool IsConnected() const noexcept { return _connected; }
+
     // True if the controller has been reset (sequence number discontinuity).
     bool HadReset() const noexcept;
+
+    // The offset the read cursor is currently at, and the received data as a whole. Used to dump a
+    // malformed packet for diagnostics (SPI.cs DumpMalformedPacket).
+    size_t RxPointer() const noexcept { return _rxPointer; }
+    const uint8_t *RxBuffer() const noexcept { return _rxBuffer.data(); }
+    uint16_t RxDataLength() const noexcept { return _rxHeader.dataLength; }
+    const proto::PacketHeader &LastPacket() const noexcept { return _lastPacket; }
 
     // --- Transfer gating (see SPI.cs WaitForTransferReason / RequestTransfer) ---
 
@@ -98,6 +108,31 @@ public:
 
     // Resend a packet the firmware asked for. Throws TransferError if the id is unknown.
     void ResendPacket(const proto::PacketHeader &packet, proto::SbcRequest &sbcRequestOut);
+
+    // --- IAP / firmware update (SPI.cs WriteIapSegment .. WaitForIapReset) ---
+    //
+    // These run the flashing handshake, which bypasses the regular header/data protocol: once IAP is
+    // running, each segment is a bare full-duplex SPI transfer gated only by the TfrRdy pin. While
+    // `_updating` is set the pin waits use the much longer IapTimeout, because IAP erases flash
+    // between segments.
+
+    // Send one chunk of the IAP binary as a WriteIap packet and perform a full transfer.
+    // Returns false if `length` is zero (i.e. the binary has been sent in full).
+    bool WriteIapSegment(const uint8_t *data, size_t length);
+
+    // Tell the firmware to boot the IAP program, then wait for IAP to raise TfrRdy.
+    void StartIap();
+
+    // Clock out one firmware chunk to the running IAP program. Chunks shorter than
+    // FirmwareSegmentSize are padded with 0xFF, as IAP itself does once complete.
+    // Returns false if `length` is zero.
+    bool FlashFirmwareSegment(const uint8_t *data, size_t length);
+
+    // Send the firmware length + CRC16 to IAP and read back its verdict.
+    bool VerifyFirmwareChecksum(uint32_t firmwareLength, uint16_t crc16);
+
+    // Wait for IAP to reboot the controller and re-arm the handshake state.
+    void WaitForIapReset();
 
     // Request cooperative shutdown of any in-progress wait.
     void Stop() noexcept;
@@ -154,6 +189,9 @@ private:
     bool _connected = false;
     bool _hadTimeout = false;
     bool _resetting = false;
+    // True between StartIap() and WaitForIapReset(): the controller is running the IAP program, so the
+    // regular transfer protocol is suspended and pin waits use IapTimeout
+    bool _updating = false;
     int _protocolVersion = 0;
     uint16_t _lastTransferNumber = 0;
 

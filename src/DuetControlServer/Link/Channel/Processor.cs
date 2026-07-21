@@ -3,7 +3,6 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Codes;
 using DuetControlServer.Files;
-using DuetControlServer.Link.Adapter;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link.Requests;
 
@@ -38,7 +37,7 @@ public sealed class Processor
     private readonly Commands.CommandFactory _commandFactory;
     private readonly CodeProcessor _codeProcessor;
     private readonly FilePathResolver _filePathResolver;
-    private readonly ILinkAdapter _linkAdapter;
+    private readonly Native.NativeLink _nativeLink;
     private readonly LinkInterface _linkInterface;
     private readonly JobProcessor _jobProcessor;
 
@@ -56,7 +55,7 @@ public sealed class Processor
     /// <param name="codeProcessor">Code processor</param>
     /// <param name="eventLogger">Event logger</param>
     /// <param name="filePathResolver">File path resolver</param>
-    /// <param name="linkAdapter">Link adapter</param>
+    /// <param name="nativeLink">Native SPI transfer loop</param>
     /// <param name="linkInterface">Link interface</param>
     /// <param name="jobProcessor">Job processor</param>
     /// <param name="macroFileFactory">Macro file factory</param>
@@ -68,7 +67,7 @@ public sealed class Processor
         Commands.CommandFactory commandFactory,
         CodeProcessor codeProcessor,
         FilePathResolver filePathResolver,
-        ILinkAdapter linkAdapter,
+        Native.NativeLink nativeLink,
         LinkInterface linkInterface,
         JobProcessor jobProcessor,
         FileFactory macroFileFactory,
@@ -82,7 +81,7 @@ public sealed class Processor
         _codeProcessor = codeProcessor;
         _filePathResolver = filePathResolver;
         _jobProcessor = jobProcessor;
-        _linkAdapter = linkAdapter;
+        _nativeLink = nativeLink;
         _linkInterface = linkInterface;
         _macroFileFactory = macroFileFactory;
         _model = model;
@@ -785,7 +784,7 @@ public sealed class Processor
         }
 
         // Cancel pending codes and requests
-        _allFilesAborted = _linkAdapter.ProtocolVersion >= 3;
+        _allFilesAborted = _nativeLink.ProtocolVersion >= 3;
         InvalidateRegular();
 
         // Abort the job files if necessary
@@ -904,12 +903,12 @@ public sealed class Processor
         // Check for a final empty reply for the current macro file being closed
         if (CurrentState.MacroCompleted)
         {
-            if (_linkAdapter.ProtocolVersion < 3 && string.IsNullOrEmpty(reply))
+            if (_nativeLink.ProtocolVersion < 3 && string.IsNullOrEmpty(reply))
             {
                 MacroFileClosed();
                 return true;
             }
-            else if (_linkAdapter.ProtocolVersion >= 3)
+            else if (_nativeLink.ProtocolVersion >= 3)
             {
                 PendingReplies.Enqueue(new Tuple<MessageTypeFlags, string>(flags, reply));
                 return true;
@@ -919,12 +918,12 @@ public sealed class Processor
         // Check for message boxes being closed
         if (CurrentState.WaitingForAcknowledgement)
         {
-            if (_linkAdapter.ProtocolVersion < 3 && string.IsNullOrEmpty(reply))
+            if (_nativeLink.ProtocolVersion < 3 && string.IsNullOrEmpty(reply))
             {
                 MessageAcknowledged();
                 return true;
             }
-            else if (_linkAdapter.ProtocolVersion >= 3)
+            else if (_nativeLink.ProtocolVersion >= 3)
             {
                 PendingReplies.Enqueue(new Tuple<MessageTypeFlags, string>(flags, reply));
                 return true;

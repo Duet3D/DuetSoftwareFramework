@@ -33,3 +33,10 @@ find_package(Threads REQUIRED)
 add_subdirectory(protocol)
 add_subdirectory(sbc)
 add_subdirectory(harness)
+
+# Host-side unit tests (no hardware required). Skipped when cross-compiling, since the resulting
+# binaries could not be executed here anyway.
+if(NOT CMAKE_CROSSCOMPILING)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

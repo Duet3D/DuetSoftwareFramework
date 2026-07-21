@@ -3,6 +3,7 @@
 #include "DuetSbc/Config.h"
 #include "DuetSbc/SbcInterface.h"
 
+#include <algorithm>
 #include <cstring>
 #include <exception>
 #include <string>
@@ -48,6 +49,7 @@ Config FromC(const DuetSbcConfig *c) {
     cfg.sbcConnectionTimeout = c->sbcConnectionTimeout;
     cfg.sbcConnectionKeepAliveInterval = c->sbcConnectionKeepAliveInterval;
     cfg.maxSbcRetries = c->maxSbcRetries;
+    cfg.updateOnly = c->updateOnly != 0;
     return cfg;
 }
 
@@ -77,6 +79,7 @@ void DuetSbc_DefaultConfig(DuetSbcConfig *config) {
     config->sbcConnectionTimeout = def.sbcConnectionTimeout;
     config->sbcConnectionKeepAliveInterval = def.sbcConnectionKeepAliveInterval;
     config->maxSbcRetries = def.maxSbcRetries;
+    config->updateOnly = def.updateOnly ? 1 : 0;
 }
 
 DuetSbcHandle *DuetSbc_Create(const DuetSbcConfig *config, char *errorBuf, int32_t errorBufLen) {
@@ -89,39 +92,6 @@ DuetSbcHandle *DuetSbc_Create(const DuetSbcConfig *config, char *errorBuf, int32
         CopyError(errorBuf, errorBufLen, "Unknown error creating SBC interface");
         return nullptr;
     }
-}
-
-void DuetSbc_SetRequestServedCallback(DuetSbcHandle *h, DuetSbcRequestServedCb cb, void *ctx) {
-    if (h == nullptr) return;
-    if (cb == nullptr) {
-        h->interface.SetRequestServedCallback(nullptr);
-        return;
-    }
-    h->interface.SetRequestServedCallback([cb, ctx](int64_t latencyNs) { cb(latencyNs, ctx); });
-}
-
-void DuetSbc_SetMessageCallback(DuetSbcHandle *h, DuetSbcMessageCb cb, void *ctx) {
-    if (h == nullptr) return;
-    if (cb == nullptr) {
-        h->interface.SetMessageCallback(nullptr);
-        return;
-    }
-    h->interface.SetMessageCallback([cb, ctx](uint32_t flags, const std::string &msg) {
-        cb(flags, msg.data(), static_cast<int32_t>(msg.size()), ctx);
-    });
-}
-
-void DuetSbc_SetCanResponseCallback(DuetSbcHandle *h, DuetSbcCanResponseCb cb, void *ctx) {
-    if (h == nullptr) return;
-    if (cb == nullptr) {
-        h->interface.SetCanResponseCallback(nullptr);
-        return;
-    }
-    h->interface.SetCanResponseCallback(
-        [cb, ctx](const duet::sbc::protocol::CanResponseHeader &header, const uint8_t *payload) {
-            cb(header.txToken, header.msgType, header.dataLength, header.srcAddress, header.flags,
-               header.status, payload, ctx);
-        });
 }
 
 int32_t DuetSbc_Connect(DuetSbcHandle *h, char *errorBuf, int32_t errorBufLen) {
@@ -146,27 +116,79 @@ void DuetSbc_Stop(DuetSbcHandle *h) {
     if (h != nullptr) h->interface.Stop();
 }
 
-void DuetSbc_QueueMessage(DuetSbcHandle *h, uint32_t flags, const char *message, int32_t length) {
-    if (h == nullptr) return;
-    h->interface.QueueMessage(flags, std::string(message ? message : "", message ? length : 0));
+// --- Outbound ---
+
+int32_t DuetSbc_QueueMessage(DuetSbcHandle *h, uint32_t flags, const char *message, int32_t length) {
+    if (h == nullptr) return -1;
+    return h->interface.QueueMessage(flags, message,
+                                     (message != nullptr && length > 0) ? static_cast<size_t>(length) : 0)
+               ? 0
+               : -1;
 }
 
-void DuetSbc_QueueCanMessage(DuetSbcHandle *h, uint16_t txToken, uint16_t msgType, uint16_t replyType,
-                             uint8_t dstAddress, int32_t isResponse, const uint8_t *payload, int32_t length) {
-    if (h == nullptr) return;
-    std::vector<uint8_t> data;
-    if (payload != nullptr && length > 0) {
-        data.assign(payload, payload + length);
-    }
-    h->interface.QueueCanMessage(txToken, msgType, replyType, dstAddress, isResponse != 0, std::move(data));
+int32_t DuetSbc_QueueCanMessage(DuetSbcHandle *h, uint16_t txToken, uint16_t msgType, uint16_t replyType,
+                                uint8_t dstAddress, int32_t isResponse, const uint8_t *payload, int32_t length) {
+    if (h == nullptr) return -1;
+    return h->interface.QueueCanMessage(txToken, msgType, replyType, dstAddress, isResponse != 0, payload,
+                                        (payload != nullptr && length > 0) ? static_cast<size_t>(length) : 0)
+               ? 0
+               : -1;
 }
 
-void DuetSbc_QueueEnableCan(DuetSbcHandle *h, int32_t enable) {
-    if (h != nullptr) h->interface.QueueEnableCan(enable != 0);
+int32_t DuetSbc_QueueEnableCan(DuetSbcHandle *h, int32_t enable, uint32_t requestId) {
+    if (h == nullptr) return -1;
+    return h->interface.QueueEnableCan(enable != 0, requestId) ? 0 : -1;
+}
+
+void DuetSbc_RequestEmergencyStop(DuetSbcHandle *h, uint32_t requestId) {
+    if (h != nullptr) h->interface.RequestEmergencyStop(requestId);
+}
+
+void DuetSbc_RequestReset(DuetSbcHandle *h, uint32_t requestId) {
+    if (h != nullptr) h->interface.RequestReset(requestId);
+}
+
+int32_t DuetSbc_RequestFirmwareUpdate(DuetSbcHandle *h, const uint8_t *iap, int32_t iapLength,
+                                      const uint8_t *firmware, int32_t firmwareLength, uint16_t firmwareCrc16,
+                                      uint32_t requestId) {
+    if (h == nullptr || iapLength <= 0 || firmwareLength <= 0) return -1;
+    return h->interface.RequestFirmwareUpdate(iap, static_cast<size_t>(iapLength), firmware,
+                                              static_cast<size_t>(firmwareLength), firmwareCrc16, requestId)
+               ? 0
+               : -1;
 }
 
 void DuetSbc_RequestTransfer(DuetSbcHandle *h) {
     if (h != nullptr) h->interface.RequestTransfer();
+}
+
+// --- Inbound ---
+
+int32_t DuetSbc_PeekEvent(DuetSbcHandle *h, const uint8_t **data, int32_t *length) {
+    if (h == nullptr || data == nullptr || length == nullptr) return 0;
+    const uint8_t *record = nullptr;
+    uint32_t recordLength = 0;
+    if (!h->interface.Inbound().Peek(record, recordLength)) {
+        return 0;
+    }
+    *data = record;
+    *length = static_cast<int32_t>(recordLength);
+    return 1;
+}
+
+void DuetSbc_ConsumeEvent(DuetSbcHandle *h) {
+    if (h != nullptr) h->interface.Inbound().Consume();
+}
+
+int32_t DuetSbc_WaitForEvent(DuetSbcHandle *h, int32_t timeoutMs) {
+    if (h == nullptr) return 0;
+    return h->interface.WaitForInbound(timeoutMs) ? 1 : 0;
+}
+
+// --- Diagnostics ---
+
+int32_t DuetSbc_GetProtocolVersion(DuetSbcHandle *h) {
+    return h != nullptr ? h->interface.Transfer().ProtocolVersion() : 0;
 }
 
 double DuetSbc_GetMaxPinWaitMs(DuetSbcHandle *h) {
@@ -183,6 +205,14 @@ int32_t DuetSbc_GetTfrPinGlitches(DuetSbcHandle *h) {
 
 int32_t DuetSbc_GetMissedEdges(DuetSbcHandle *h) {
     return h != nullptr ? h->interface.Transfer().MissedEdges() : 0;
+}
+
+int32_t DuetSbc_GetResyncCount(DuetSbcHandle *h) {
+    return h != nullptr ? h->interface.Transfer().ResyncCount() : 0;
+}
+
+uint64_t DuetSbc_GetDroppedEvents(DuetSbcHandle *h) {
+    return h != nullptr ? h->interface.Inbound().DroppedRecords() : 0;
 }
 
 void DuetSbc_Destroy(DuetSbcHandle *h) {

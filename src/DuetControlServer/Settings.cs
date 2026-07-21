@@ -152,11 +152,6 @@ public sealed class Settings
     public string SpiDevice { get; set; } = "/dev/spidev0.0";
 
     /// <summary>
-    /// Communication method to use for connection to RepRapFirmware
-    /// </summary>
-    public CommunicationMethod CommunicationMethod { get; set; } = CommunicationMethod.SPI;
-
-    /// <summary>
     /// Tx and Rx buffer size for SBC protocol transfers.
     /// Only respected in SPI mode and must not exceed the kernel spidev buffer size
     /// </summary>

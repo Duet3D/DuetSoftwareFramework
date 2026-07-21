@@ -1,10 +1,26 @@
-// SBC-side communication loop: a trimmed C++ port of DuetControlServer/Link/LinkService.cs.
-// Owns an SbcTransfer, runs the transfer loop on a pinned real-time thread, dispatches incoming
-// packets and stages outgoing messages / CAN requests. Firmware update, IAP, file handling, IPC
-// and object-model concerns are intentionally omitted; this exists to exercise the SPI transport.
+// SBC-side communication loop: the C++ port of DuetControlServer/Link/LinkService.cs.
+//
+// Owns an SbcTransfer and runs the transfer loop on a pinned real-time thread. All communication with
+// the caller goes through two lock-free RingBuffers rather than callbacks, so the loop thread never
+// blocks on -- or executes -- foreign code. That is what lets DuetControlServer drive this from C#
+// without managed allocation, locks or GC pauses landing on a SCHED_FIFO thread mid-transfer.
+//
+//   Outbound ring (caller -> loop): messages, CAN messages, CAN enable, emergency stop, reset.
+//                                   Drained while staging the next transfer.
+//   Inbound ring  (loop -> caller): incoming messages/CAN responses, code buffer updates, connection
+//                                   state changes, request completions, diagnostics.
+//
+// Requests that the caller awaits carry a request id; the loop answers with a RequestCompleted event
+// quoting that id. See LinkEvents.h for the record formats.
+//
+// Firmware update is deliberately NOT a ring record: the binaries are megabytes. The caller stages
+// them with RequestFirmwareUpdate() and the loop takes them over for the duration of the flash,
+// reporting completion through the usual request id.
 #pragma once
 
 #include "DuetSbc/Config.h"
+#include "DuetSbc/LinkEvents.h"
+#include "DuetSbc/RingBuffer.h"
 #include "DuetSbc/SbcTransfer.h"
 #include "DuetSbcProtocol/MessageFormats.h"
 
@@ -12,7 +28,6 @@
 #include <cstdint>
 #include <functional>
 #include <mutex>
-#include <queue>
 #include <string>
 #include <thread>
 #include <vector>
@@ -21,18 +36,17 @@ namespace duet::sbc {
 
 class SbcInterface {
 public:
-    // Called after each full transfer completes that served a request, with the measured latency
-    // from RequestTransfer() to transfer completion (nanoseconds). This is the jitter metric.
+    // Called after each full transfer that served a request, with the measured latency from
+    // RequestTransfer() to transfer completion (nanoseconds). This is the jitter metric, and it stays
+    // a direct callback on purpose: it is consumed natively by the jitter harness, and routing it
+    // through the ring would add exactly the scheduling noise it exists to measure.
     using RequestServedCallback = std::function<void(int64_t latencyNs)>;
-    // Incoming firmware -> SBC notifications.
-    using MessageCallback = std::function<void(uint32_t flags, const std::string &message)>;
-    using CanResponseCallback = std::function<void(const proto::CanResponseHeader &header, const uint8_t *payload)>;
-    using CodeBufferCallback = std::function<void(uint16_t bufferSpace)>;
-    // Reports recovery events (lost connection, resync after an error, etc.).
-    using ErrorCallback = std::function<void(const std::string &message)>;
 
     explicit SbcInterface(const Config &config);
     ~SbcInterface();
+
+    SbcInterface(const SbcInterface &) = delete;
+    SbcInterface &operator=(const SbcInterface &) = delete;
 
     // Connect to the firmware (blocks until the first transfer succeeds). Throws on failure.
     void Connect();
@@ -43,26 +57,36 @@ public:
     // Stop the transfer loop and join the thread.
     void Stop();
 
-    // Queue an arbitrary message for transmission and request a transfer.
-    void QueueMessage(uint32_t messageFlags, std::string message);
-    // Queue a CAN message for transmission and request a transfer.
-    void QueueCanMessage(uint16_t txToken, uint16_t msgType, uint16_t replyType, uint8_t dstAddress,
-                         bool isResponse, std::vector<uint8_t> payload);
-    // Queue a CAN enable/disable request and request a transfer.
-    void QueueEnableCan(bool enable);
+    // --- Outbound: queue work for the transfer loop ---
+    //
+    // These return false if the outbound ring is full, i.e. the loop is not draining it. The caller
+    // must treat that as an error rather than silently losing the message.
+    bool QueueMessage(uint32_t messageFlags, const char *message, size_t length);
+    bool QueueCanMessage(uint16_t txToken, uint16_t msgType, uint16_t replyType, uint8_t dstAddress,
+                         bool isResponse, const uint8_t *payload, size_t payloadLength);
+    bool QueueEnableCan(bool enable, uint32_t requestId = kNoRequestId);
+    void RequestEmergencyStop(uint32_t requestId = kNoRequestId);
+    void RequestReset(uint32_t requestId = kNoRequestId);
+
+    // Stage a firmware update. The buffers must stay valid until the matching RequestCompleted event
+    // arrives. Returns false if an update is already in progress.
+    bool RequestFirmwareUpdate(const uint8_t *iap, size_t iapLength, const uint8_t *firmware,
+                               size_t firmwareLength, uint16_t firmwareCrc16, uint32_t requestId);
 
     // Force a transfer without new data (records the request timestamp for jitter measurement).
     void RequestTransfer();
 
+    // --- Inbound: drained by the caller ---
+    RingBuffer &Inbound() noexcept { return _inbound; }
+
+    // Block until at least one inbound event is available, the timeout elapses, or Stop() is called.
+    // Returns true if events are (probably) available. Only the single consumer may call this.
+    //
+    // The interface thread only performs the wake-up syscall while a consumer is actually parked, so
+    // a busy dispatcher costs the real-time thread nothing.
+    bool WaitForInbound(int timeoutMs);
+
     void SetRequestServedCallback(RequestServedCallback cb) { _onRequestServed = std::move(cb); }
-    void SetMessageCallback(MessageCallback cb) { _onMessage = std::move(cb); }
-    void SetCanResponseCallback(CanResponseCallback cb) { _onCanResponse = std::move(cb); }
-    void SetCodeBufferCallback(CodeBufferCallback cb) { _onCodeBuffer = std::move(cb); }
-    // Report recovery events. Also forwards to the transfer engine so its internal resyncs are seen.
-    void SetErrorCallback(ErrorCallback cb) {
-        _onError = cb;
-        _transfer.SetLogCallback(cb);
-    }
 
     SbcTransfer &Transfer() noexcept { return _transfer; }
 
@@ -70,38 +94,58 @@ private:
     void Execute();
     void ProcessPacket(const proto::PacketHeader &packet);
     void StageOutgoing();
+    void HandleCommand(const uint8_t *record, uint32_t length);
     void MarkRequest();
+    void PerformFirmwareUpdate();
 
-    struct OutgoingMessage {
-        uint32_t flags;
-        std::string text;
-    };
-    struct OutgoingCan {
-        uint16_t txToken, msgType, replyType;
-        uint8_t dstAddress;
-        bool isResponse;
-        std::vector<uint8_t> payload;
-    };
+    // Inbound helpers. All of these are called on the interface thread and never allocate.
+    void PostEvent(InboundEventType type, const void *header, size_t headerLength, const void *tail = nullptr,
+                   size_t tailLength = 0);
+    void PostLog(LogLevel level, const char *text, size_t length);
+    void PostLog(LogLevel level, const std::string &text) { PostLog(level, text.data(), text.size()); }
+    void CompleteRequest(uint32_t requestId, RequestResult result, const char *error = nullptr,
+                         size_t errorLength = 0);
 
     Config _config;
     SbcTransfer _transfer;
     std::thread _thread;
     std::atomic<bool> _stop{false};
 
-    std::mutex _outgoingMutex;
-    std::queue<OutgoingMessage> _messages;
-    std::queue<OutgoingCan> _canMessages;
-    bool _pendingEnableCan = false;
-    bool _enableCanValue = false;
+    // Sized to hold a comfortable backlog of full-size transfers so a scheduling hiccup on the managed
+    // dispatcher thread cannot make the interface thread drop incoming data.
+    RingBuffer _inbound;
+    RingBuffer _outbound;
+
+    // Emergency stop / reset are latched rather than queued: they are unconditional and must survive a
+    // full transfer buffer, retrying on each iteration until they are written.
+    std::atomic<bool> _pendingEmergencyStop{false};
+    std::atomic<uint32_t> _emergencyStopRequestId{kNoRequestId};
+    std::atomic<bool> _pendingReset{false};
+    std::atomic<uint32_t> _resetRequestId{kNoRequestId};
+
+    // Firmware update staging. `_pendingFirmwareUpdate` is checked on every loop iteration, so it is
+    // an atomic flag: the mutex is only taken once an update is actually pending.
+    std::atomic<bool> _pendingFirmwareUpdate{false};
+    std::mutex _firmwareMutex;
+    const uint8_t *_iapData = nullptr;
+    size_t _iapLength = 0;
+    const uint8_t *_firmwareData = nullptr;
+    size_t _firmwareLength = 0;
+    uint16_t _firmwareCrc16 = 0;
+    uint32_t _firmwareRequestId = kNoRequestId;
 
     // Jitter measurement: timestamp of the first RequestTransfer since the last completed transfer
     std::atomic<int64_t> _pendingRequestNs{0};
 
+    // Connection state, so ConnectionLost/ConnectionEstablished are reported on transitions only
+    bool _wasConnected = false;
+
+    // Wake-up channel for a consumer parked in WaitForInbound. `_consumerWaiting` keeps the interface
+    // thread from issuing a write() syscall when nobody is parked.
+    int _inboundEventFd = -1;
+    std::atomic<bool> _consumerWaiting{false};
+
     RequestServedCallback _onRequestServed;
-    MessageCallback _onMessage;
-    CanResponseCallback _onCanResponse;
-    CodeBufferCallback _onCodeBuffer;
-    ErrorCallback _onError;
 };
 
 } // namespace duet::sbc

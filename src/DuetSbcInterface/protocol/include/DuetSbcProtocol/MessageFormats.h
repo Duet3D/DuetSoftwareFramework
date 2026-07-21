@@ -35,6 +35,24 @@ static_assert(BufferSize % sizeof(uint32_t) == 0, "BufferSize must be a whole nu
 static_assert(BufferSize <= UINT16_MAX, "BufferSize must fit in the uint16_t dataLength field");
 
 // ---------------------------------------------------------------------------
+// IAP / firmware update constants (Shared/Consts.cs)
+// ---------------------------------------------------------------------------
+
+// Size of a single chunk of the IAP binary sent via a WriteIap packet
+inline constexpr size_t IapSegmentSize = 1536;
+// Time to wait for the IAP program to raise TfrRdy (ms). IAP erases flash between segments, so this
+// is far longer than a regular transfer timeout.
+inline constexpr int IapTimeout = 8000;
+// Size of a single firmware chunk clocked out to the running IAP program
+inline constexpr size_t FirmwareSegmentSize = 2048;
+// Time to wait after the last firmware segment before sending the verification request (ms)
+inline constexpr int FirmwareFinishedDelay = 750;
+// Time to wait for IAP to reboot the controller once the firmware has been verified (ms)
+inline constexpr int IapRebootDelay = 2000;
+// Byte IAP sends back to confirm that the written firmware matches the supplied CRC16
+inline constexpr uint8_t FlashVerifyOk = 0x0C;
+
+// ---------------------------------------------------------------------------
 // Result codes for header and data transfers (Shared/TransferResponse.cs)
 // ---------------------------------------------------------------------------
 namespace TransferResponse {
@@ -145,6 +163,15 @@ struct SendCanMessageHeader {
     uint16_t padding2;
 };
 
+// Final message to the IAP program, checking whether the firmware was flashed successfully
+// (SbcRequests/FlashVerify.cs). The C# struct declares Size = 8, so the two trailing padding bytes
+// after crc16 are part of the wire format and must be transmitted.
+struct FlashVerify {
+    uint32_t firmwareLength;
+    uint16_t crc16;
+    uint16_t padding;
+};
+
 // Update about the available code buffer size (FirmwareRequests/CodeBufferUpdateHeader.cs)
 struct CodeBufferUpdateHeader {
     uint16_t bufferSpace;
@@ -186,6 +213,7 @@ static_assert(sizeof(MessageHeader) == 8, "MessageHeader must be 8 bytes");
 static_assert(sizeof(StringHeader) == 4, "StringHeader must be 4 bytes");
 static_assert(sizeof(EnableCanHeader) == 4, "EnableCanHeader must be 4 bytes");
 static_assert(sizeof(SendCanMessageHeader) == 12, "SendCanMessageHeader must be 12 bytes");
+static_assert(sizeof(FlashVerify) == 8, "FlashVerify must be 8 bytes");
 static_assert(sizeof(CodeBufferUpdateHeader) == 4, "CodeBufferUpdateHeader must be 4 bytes");
 static_assert(sizeof(MasterClockHeader) == 8, "MasterClockHeader must be 8 bytes");
 static_assert(sizeof(CanResponseHeader) == 12, "CanResponseHeader must be 12 bytes");

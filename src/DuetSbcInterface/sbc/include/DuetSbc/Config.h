@@ -37,6 +37,11 @@ struct Config {
     int sbcConnectionTimeout = 4000;
     int sbcConnectionKeepAliveInterval = 25;
     int maxSbcRetries = 3;
+
+    // When set, DCS is running in update-only mode: a firmware reporting a newer protocol version
+    // than this build understands is accepted rather than rejected, so it can still be flashed
+    // (Settings.UpdateOnly, see ExchangeHeader).
+    bool updateOnly = false;
 };
 
 } // namespace duet::sbc

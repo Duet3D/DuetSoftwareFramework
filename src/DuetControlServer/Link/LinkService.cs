@@ -2,14 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Runtime.InteropServices;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
-using DuetControlServer.Link.Adapter;
+using DuetControlServer.Link.Native;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
@@ -17,19 +18,32 @@ using DuetControlServer.Utility;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Text;
 
 namespace DuetControlServer.Link;
 
 /// <summary>
-/// This class accesses RepRapFirmware via SPI and deals with general communication
+/// Drives the native SPI transfer loop and dispatches everything it reports
 /// </summary>
+/// <remarks>
+/// <para>
+/// The SPI protocol itself lives in C++ (<c>src/DuetSbcInterface</c>): it owns the transfer state
+/// machine and runs it on a pinned, real-time thread. This service starts that loop and then runs a
+/// single normal-priority dispatcher thread which drains the native inbound ring and hands each event
+/// to the same handlers DCS has always used.
+/// </para>
+/// <para>
+/// The split matters: because the dispatcher is an ordinary managed thread, managed allocation, lock
+/// acquisition and GC pauses all happen here rather than on the real-time thread, so none of them can
+/// stall an SPI transfer in flight.
+/// </para>
+/// </remarks>
 /// <param name="channels">Channel manager</param>
 /// <param name="eventLogger">Event logger</param>
 /// <param name="jobProcessor">Job processor</param>
-/// <param name="linkAdapter">Firmware link adapter</param>
+/// <param name="nativeLink">Native SPI transfer loop</param>
 /// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model</param>
+/// <param name="filePathResolver">File path resolver</param>
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="logger">Logger</param>
 /// <param name="settings">Settings</param>
@@ -37,7 +51,7 @@ public sealed class LinkService(
     Channel.Manager channels,
     EventLogger eventLogger,
     JobProcessor jobProcessor,
-    ILinkAdapter linkAdapter,
+    NativeLink nativeLink,
     LinkInterface linkInterface,
     Model.ObjectModel model,
     FilePathResolver filePathResolver,
@@ -45,6 +59,11 @@ public sealed class LinkService(
     ILogger<LinkService> logger,
     IOptions<Settings> settings) : BackgroundService
 {
+    /// <summary>
+    /// How long the dispatcher blocks waiting for a native event before looping to re-check shutdown
+    /// </summary>
+    private const int EventWaitTimeout = 250;
+
     /// <summary>
     /// Open files requested by the firmware
     /// </summary>
@@ -55,200 +74,57 @@ public sealed class LinkService(
     /// </summary>
     public uint _openFileHandleCounter = Consts.NoFileHandle;
 
-    /// <summary>
-    /// Perform the firmware update internally
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    private void PerformFirmwareUpdate(CancellationToken cancellationToken = default)
-    {
-        using (model.AccessReadWrite(cancellationToken))
-        {
-            model.State.Status = MachineStatus.Updating;
-        }
-
-        // Get the CRC16 checksum of the firmware binary
-        ushort crc16 = CRC16.Calculate(linkInterface.FirmwareStream!);
-
-        // Send the IAP binary to the firmware. Cancellation is safe at this stage
-        logger.LogInformation("Sending IAP binary");
-        bool dataSent;
-        do
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            dataSent = linkAdapter.WriteIapSegment(linkInterface.IapStream!, cancellationToken);
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                Console.Write('.');
-            }
-        }
-        while (dataSent);
-        if (logger.IsEnabled(LogLevel.Debug))
-        {
-            Console.WriteLine();
-        }
-
-        // Start the IAP binary. This is the point of no return -- after this,
-        // the board is running IAP and we must complete the firmware transfer
-        // or the board will need manual recovery
-        // The firmware length is sent as part of the USB handshake so IAP knows
-        // exactly how many bytes to expect (SPI ignores this)
-        uint firmwareLength = (uint)linkInterface.FirmwareStream!.Length;
-        linkAdapter.StartIap(firmwareLength, cancellationToken);
-
-        // From here on, do not honor the cancellation token for data transfer
-        // Interrupting a flash-in-progress would brick the board
-        // Only check cancellation between CRC retries as a last resort
-        int numRetries = 0;
-        do
-        {
-            if (numRetries != 0)
-            {
-                // Check cancellation between retries -- if DSF is being shut down
-                // and the board is unresponsive, there's no point in retrying
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    eventLogger.LogOutput(MessageType.Error, "Firmware update cancelled during retry. The board may need manual recovery.");
-                    logger.LogError("Firmware update cancelled during CRC retry");
-                    throw new OperationCanceledException("Firmware update cancelled during retry");
-                }
-                logger.LogError("Firmware checksum verification failed");
-            }
-
-            logger.LogInformation("Updating RepRapFirmware");
-            linkInterface.FirmwareStream!.Seek(0, SeekOrigin.Begin);
-
-            try
-            {
-                while (linkAdapter.FlashFirmwareSegment(linkInterface.FirmwareStream))
-                {
-                    if (logger.IsEnabled(LogLevel.Debug))
-                    {
-                        Console.Write('.');
-                    }
-                }
-                if (logger.IsEnabled(LogLevel.Debug))
-                {
-                    Console.WriteLine();
-                }
-            }
-            catch (Exception e)
-            {
-                eventLogger.LogOutput(MessageType.Error, "Failed to update firmware. Please install it manually.");
-                logger.LogError(e, "Failed to update firmware");
-                throw;
-            }
-
-            logger.LogInformation("Verifying checksum");
-        }
-        while (!linkAdapter.VerifyFirmwareChecksum(linkInterface.FirmwareStream.Length, crc16) && ++numRetries < 3);
-
-        if (numRetries == 3)
-        {
-            // Failed to flash the firmware
-            eventLogger.LogOutput(MessageType.Error, "Could not update firmware after 3 attempts. Please install it manually.");
-            throw new OperationCanceledException("Failed to update firmware after 3 attempts");
-        }
-
-        // Wait for the IAP binary to restart the controller
-        linkAdapter.WaitForIapReset();
-        logger.LogInformation("Firmware update successful");
-    }
-
     /// <inheritdoc />
     public override Task StartAsync(CancellationToken cancellationToken)
     {
-        // Initialize the link interface
-        linkAdapter.Connect(cancellationToken);
+        // An emergency stop or reset raised through LinkInterface has to tear down resources this
+        // service owns (job processor, channel processors, open files), so hand it the entry points
+        linkInterface.InvalidateCodesCallback = InvalidateCodes;
+        linkInterface.InvalidateCallback = Invalidate;
+
+        // Create the native interface and complete the initial handshake. This throws if the
+        // controller is absent or fundamentally incompatible, which is worth failing startup over
+        nativeLink.Connect();
 
         // Run this service
         return base.StartAsync(cancellationToken);
     }
 
     /// <summary>
-    /// Start a thread that performs the communication with the firmware
+    /// Start the native transfer loop and dispatch the events it produces
     /// </summary>
-    /// <remarks>
-    /// This effectively starts a thread with higher priority in order to ensure
-    /// that the communication with the controller is not blocked by other tasks
-    /// </remarks>
     /// <param name="stoppingToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Watch for firmware update requests alongside the dispatcher
+        _ = WatchForFirmwareUpdatesAsync(stoppingToken);
+
         TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        Thread wrapper = new(() =>
+        Thread dispatcher = new(() =>
         {
             try
             {
-                if (settings.Value.IsolateInterfaceThread && DuetSharedLibrary.ProcessHelpers.IsRaspberryPi())
-                {
-                    if (DuetSharedLibrary.ProcessHelpers.PinCurrentThreadToCore(settings.Value.IsolatedCoreId))
-                    {
-                        logger.LogInformation("SPI thread pinned to CPU core {CoreId}", settings.Value.IsolatedCoreId);
-                    }
-                    else
-                    {
-                        logger.LogWarning("Failed to pin SPI thread to CPU core {CoreId}", settings.Value.IsolatedCoreId);
-                    }
-
-                    if (settings.Value.UseRealtimeScheduling)
-                    {
-                        if (DuetSharedLibrary.ProcessHelpers.SetCurrentThreadRealtimePriority(settings.Value.InterfaceRtPriority))
-                        {
-                            logger.LogInformation("SPI thread set to SCHED_FIFO priority {Priority}", settings.Value.InterfaceRtPriority);
-                        }
-                        else
-                        {
-                            logger.LogWarning("Failed to set SPI thread to real-time priority (needs CAP_SYS_NICE); latency may suffer");
-                        }
-                    }
-                }
-                Execute(stoppingToken);
+                // The native loop places its own thread on an isolated core at real-time priority;
+                // this dispatcher deliberately stays an ordinary thread
+                nativeLink.Start();
+                Dispatch(stoppingToken);
+                tcs.SetResult();
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
                 tcs.SetResult();
             }
             catch (Exception e)
             {
-                if (e is AggregateException ae)
-                {
-                    if (ae.InnerException is OperationCanceledException)
-                    {
-                        if (stoppingToken.IsCancellationRequested)
-                        {
-                            tcs.SetResult();
-                        }
-                        else
-                        {
-                            tcs.SetCanceled();
-                        }
-                    }
-                    else
-                    {
-                        tcs.SetException(ae.InnerException!);
-                    }
-                }
-                else if (e is OperationCanceledException)
-                {
-                    if (stoppingToken.IsCancellationRequested)
-                    {
-                        tcs.SetResult();
-                    }
-                    else
-                    {
-                        tcs.SetCanceled();
-                    }
-                }
-                else
-                {
-                    tcs.SetException(e);
-                }
+                tcs.SetException(e);
             }
         })
         {
             Name = "DuetControlServer LinkService",
-            Priority = ThreadPriority.Highest,
             IsBackground = true
         };
-        wrapper.Start();
+        dispatcher.Start();
         return tcs.Task;
     }
 
@@ -264,7 +140,10 @@ public sealed class LinkService(
         // Shut down the link subsystem
         await linkInterface.InvalidateAsync(stoppingToken);
 
-        // Shut down this service. This terminates the transfer thread, which may still be serving file
+        // Stop the native transfer loop, which releases the dispatcher from its wait
+        nativeLink.Stop();
+
+        // Shut down this service. This terminates the dispatcher, which may still be serving file
         // requests, so the open files must not be closed before this call
         await base.StopAsync(stoppingToken);
 
@@ -277,246 +156,310 @@ public sealed class LinkService(
     }
 
     /// <summary>
-    /// Perform communication with the RepRapFirmware controller over SPI
+    /// Drain the native inbound ring and dispatch every event until shutdown
     /// </summary>
     /// <param name="stoppingToken">Cancellation token</param>
-    private void Execute(CancellationToken stoppingToken)
+    private void Dispatch(CancellationToken stoppingToken)
     {
-        do
+        while (!stoppingToken.IsCancellationRequested)
         {
-            bool skipChannels = false;
-            using (linkInterface.FirmwareActionLock.Lock(stoppingToken))
+            // Block until the native loop reports something. The timeout only exists so shutdown is
+            // noticed promptly; the native side wakes us as soon as an event is posted
+            if (!nativeLink.WaitForEvent(EventWaitTimeout))
             {
-                // Check if an emergency stop has been requested
-                if (linkInterface.FirmwareHaltRequest is not null)
-                {
-                    InvalidateCodes();
-                    if (linkAdapter.WriteEmergencyStop())
-                    {
-                        logger.LogWarning("Emergency stop");
-                        linkInterface.FirmwareHaltRequest.SetResult();
-                        linkInterface.FirmwareHaltRequest = null;
-                    }
-                    skipChannels = true;
-                }
-
-                // Check if a firmware reset has been requested
-                if (linkInterface.FirmwareResetRequest is not null)
-                {
-                    Invalidate();
-                    if (linkAdapter.WriteReset())
-                    {
-                        logger.LogWarning("Resetting controller");
-                        linkAdapter.PerformFullTransfer(cancellationToken: lifetime.ApplicationStopped);
-                        linkInterface.FirmwareResetRequest.SetResult();
-                        linkInterface.FirmwareResetRequest = null;
-                        break;
-                    }
-                    skipChannels = true;
-                }
-
-                // Check if a CAN enable request has been made
-                if (linkInterface.CanEnableRequest is not null && linkInterface.PendingCanEnable is not null)
-                {
-                    if (linkAdapter.WriteEnableCan(linkInterface.PendingCanEnable.Value))
-                    {
-                        logger.LogInformation("Sent CAN enable request: {Enable}", linkInterface.PendingCanEnable);
-                        linkInterface.CanEnableRequest.SetResult();
-                        linkInterface.CanEnableRequest = null;
-                        linkInterface.PendingCanEnable = null;
-                    }
-                    else
-                    {
-                        logger.LogWarning("Failed to send CAN enable request: {Enable}", linkInterface.PendingCanEnable);
-                    }
-                }
+                continue;
             }
 
-            // Check if a firmware update is supposed to be performed
-            using (linkInterface.FirmwareUpdateLock.Lock(stoppingToken))
-            {
-                if (linkInterface.IapStream is not null && linkInterface.FirmwareStream is not null)
-                {
-                    Invalidate();
-
-                    try
-                    {
-                        PerformFirmwareUpdate(lifetime.ApplicationStopped);
-                        linkInterface.FirmwareUpdateRequest?.SetResult();
-                        linkInterface.FirmwareUpdateRequest = null;
-                    }
-                    catch (Exception e)
-                    {
-                        linkInterface.FirmwareUpdateRequest?.SetException(e);
-                        linkInterface.FirmwareUpdateRequest = null;
-                        throw;
-                    }
-
-                    linkInterface.IapStream = linkInterface.FirmwareStream = null;
-                    break;
-                }
-            }
-
-            // Invalidate data if a controller reset has been performed
-            if (linkAdapter.HadReset())
-            {
-                Invalidate();
-                eventLogger.LogOutput(MessageType.Warning, "Connection to controller has been reset");
-            }
-
-            // Process incoming packets
-            for (int i = 0; i < linkAdapter.PacketsToRead; i++)
+            while (!stoppingToken.IsCancellationRequested && nativeLink.TryReadEvent(out ReadOnlySpan<byte> record))
             {
                 try
                 {
-                    PacketHeader? packet = linkAdapter.ReadNextPacket();
-                    if (packet is null)
-                    {
-                        logger.LogError("Read invalid packet");
-                        break;
-                    }
-                    ProcessPacket(packet.Value);
+                    ProcessEvent(record);
                 }
-                catch (ArgumentOutOfRangeException)
+                catch (Exception e)
                 {
-                    linkAdapter.DumpMalformedPacket();
-                    throw;
+                    // A handler failing must not wedge the dispatcher; the link itself is still fine
+                    logger.LogError(e, "Failed to process native link event");
                 }
-            }
-            linkInterface.BytesReserved = 0;
-
-#if false
-            // Process pending codes, macro files and requests for resource locks/unlocks as well as flush requests
-            if (!skipChannels)
-            {
-                channels.Spin();
-            }
-#endif
-
-            // Request object model updates
-            if (linkAdapter.ProtocolVersion == 1)
-            {
-                throw new Exception("Unsupported firmware version. Upgrade your firmware manually");
-            }
-
-            // Stage outgoing data and wait until there is a reason to perform another transfer. Data is
-            // (re-)staged before every decision so that data queued while idle is sent in the next transfer
-            // without triggering an empty one either before or after it
-            do
-            {
-                // Send pending messages
-                lock (linkInterface.MessagesToSend)
+                finally
                 {
-                    while (linkInterface.MessagesToSend.TryPeek(out Tuple<MessageTypeFlags, string>? message))
-                    {
-                        if (linkAdapter.WriteMessage(message.Item1, message.Item2))
-                        {
-                            linkInterface.MessagesToSend.Dequeue();
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
-                }
-
-                // Send pending CAN messages
-                if (!skipChannels)
-                {
-                    SendCanMessages();
+                    nativeLink.ConsumeEvent();
                 }
             }
-            while (!linkAdapter.WaitForTransferReason(lifetime.ApplicationStopped));
-
-            // Do another full SPI transfer
-            linkAdapter.PerformFullTransfer(cancellationToken: lifetime.ApplicationStopped);
-        }
-        while (!stoppingToken.IsCancellationRequested);
-    }
-
-    /// <summary>
-    /// Process a packet from RepRapFirmware
-    /// </summary>
-    /// <param name="packet">Received packet</param>
-    /// <returns>Asynchronous task</returns>
-    private void ProcessPacket(PacketHeader packet)
-    {
-        switch ((Request)packet.Request)
-        {
-            case Request.ResendPacket:
-                linkAdapter.ResendPacket(packet, out Protocol.SbcRequests.Request sbcRequest);
-                logger.LogWarning("Resending packet #{Id} (request {Request})", packet.Id, sbcRequest);
-                break;
-            case Request.CodeBufferUpdate:
-                HandleCodeBufferUpdate();
-                break;
-            case Request.Message:
-                HandleMessage();
-                break;
-            case Request.CANResponse:
-                HandleCanResponse();
-                break;
-#if false
-// TODO: re-enable these if we need them. Delete if not.
-            case Request.WaitForAcknowledgement:
-                HandleWaitForAcknowledgement();
-                break;
-            case Request.MessageAcknowledged:
-                HandleMessageAcknowledgement();
-                break;
-#endif
         }
     }
 
     /// <summary>
-    /// Send pending CAN requests to the firmware and complete those that expect no reply
+    /// Dispatch a single event record read from the native inbound ring
     /// </summary>
-    private void SendCanMessages()
+    /// <param name="record">Raw event record</param>
+    private void ProcessEvent(ReadOnlySpan<byte> record)
     {
-        lock (linkInterface.CanRequests)
+        if (record.Length < Marshal.SizeOf<InboundEventHeader>())
         {
-            // Write each unsent request once, in order, until the transfer buffer is full
-            foreach (CanRequest request in linkInterface.CanRequests)
-            {
-                if (request.Sent)
-                {
-                    continue;
-                }
+            logger.LogError("Discarding truncated native link event ({Length} bytes)", record.Length);
+            return;
+        }
 
-                if (!linkAdapter.WriteCanMessage(request.TxToken, (ushort)request.MessageType, (ushort)request.ReplyType, request.DstAddress, request.IsResponse, request.RequestPayload))
+        InboundEventHeader header = MemoryMarshal.Read<InboundEventHeader>(record);
+        switch ((InboundEventType)header.Type)
+        {
+            case InboundEventType.Message:
+                HandleMessage(record);
+                break;
+            case InboundEventType.CanResponse:
+                HandleCanResponse(record);
+                break;
+            case InboundEventType.CodeBufferUpdate:
+                HandleCodeBufferUpdate(record);
+                break;
+            case InboundEventType.ControllerReset:
+                Invalidate();
+                eventLogger.LogOutput(MessageType.Warning, "Connection to controller has been reset");
+                break;
+            case InboundEventType.ConnectionLost:
+                HandleConnectionLost(record);
+                break;
+            case InboundEventType.ConnectionEstablished:
+                HandleConnectionEstablished(record);
+                break;
+            case InboundEventType.RequestCompleted:
+                HandleRequestCompleted(record);
+                break;
+            case InboundEventType.Log:
+                HandleLog(record);
+                break;
+            case InboundEventType.MalformedPacket:
+                DumpMalformedPacket(record);
+                break;
+            case InboundEventType.FatalError:
+                HandleFatalError(record);
+                break;
+            default:
+                logger.LogWarning("Received unknown native link event type {Type}", header.Type);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Decode the UTF-8 tail that follows a fixed-size event header
+    /// </summary>
+    /// <typeparam name="T">Header type</typeparam>
+    /// <param name="record">Raw event record</param>
+    /// <returns>Decoded text</returns>
+    private static string ReadTailString<T>(ReadOnlySpan<byte> record) where T : struct
+    {
+        int headerSize = Marshal.SizeOf<T>();
+        return record.Length > headerSize ? Encoding.UTF8.GetString(record[headerSize..]) : string.Empty;
+    }
+
+    /// <summary>
+    /// Handle the link coming up
+    /// </summary>
+    /// <param name="record">Raw event record</param>
+    private void HandleConnectionEstablished(ReadOnlySpan<byte> record)
+    {
+        ConnectionEstablishedEvent connectionEvent = MemoryMarshal.Read<ConnectionEstablishedEvent>(record);
+        nativeLink.SetProtocolVersion(connectionEvent.ProtocolVersion);
+
+        if (connectionEvent.ProtocolVersion != Consts.ProtocolVersion)
+        {
+            eventLogger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
+        }
+        eventLogger.LogOutput(MessageType.Success, "Connection to Duet established");
+    }
+
+    /// <summary>
+    /// Handle the link dropping
+    /// </summary>
+    /// <param name="record">Raw event record</param>
+    private void HandleConnectionLost(ReadOnlySpan<byte> record)
+    {
+        string reason = ReadTailString<InboundEventHeader>(record);
+        logger.LogDebug("Lost connection to Duet: {Reason}", reason);
+
+        Invalidate();
+        eventLogger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({reason})");
+    }
+
+    /// <summary>
+    /// Resolve a request the native loop has finished serving
+    /// </summary>
+    /// <param name="record">Raw event record</param>
+    private void HandleRequestCompleted(ReadOnlySpan<byte> record)
+    {
+        RequestCompletedEvent completed = MemoryMarshal.Read<RequestCompletedEvent>(record);
+        string? error = record.Length > Marshal.SizeOf<RequestCompletedEvent>()
+            ? ReadTailString<RequestCompletedEvent>(record)
+            : null;
+        nativeLink.CompleteRequest(completed.RequestId, (RequestResult)completed.Result, error);
+    }
+
+    /// <summary>
+    /// Log a diagnostic reported by the native transfer loop
+    /// </summary>
+    /// <param name="record">Raw event record</param>
+    private void HandleLog(ReadOnlySpan<byte> record)
+    {
+        LogEvent logEvent = MemoryMarshal.Read<LogEvent>(record);
+        string message = ReadTailString<LogEvent>(record);
+
+        switch ((NativeLogLevel)logEvent.Level)
+        {
+            case NativeLogLevel.Debug:
+                logger.LogDebug("{Message}", message);
+                break;
+            case NativeLogLevel.Info:
+                logger.LogInformation("{Message}", message);
+                break;
+            case NativeLogLevel.Warning:
+                logger.LogWarning("{Message}", message);
+                break;
+            default:
+                logger.LogError("{Message}", message);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Handle an unrecoverable error from the native loop by terminating the application
+    /// </summary>
+    /// <param name="record">Raw event record</param>
+    private void HandleFatalError(ReadOnlySpan<byte> record)
+    {
+        string message = ReadTailString<InboundEventHeader>(record);
+        logger.LogError("Fatal error in native SPI interface: {Message}", message);
+        eventLogger.LogOutput(MessageType.Error, $"Fatal SPI error: {message}");
+        lifetime.StopApplication();
+    }
+
+    /// <summary>
+    /// Write a malformed packet to disk and log it for diagnostic purposes
+    /// </summary>
+    /// <param name="record">Raw event record</param>
+    private void DumpMalformedPacket(ReadOnlySpan<byte> record)
+    {
+        MalformedPacketEvent packet = MemoryMarshal.Read<MalformedPacketEvent>(record);
+        ReadOnlySpan<byte> packetData = record[Marshal.SizeOf<MalformedPacketEvent>()..];
+
+        try
+        {
+            using FileStream stream = new(Path.Combine(settings.Value.BaseDirectory, "sys/transferDump.bin"), FileMode.Create, FileAccess.Write);
+            stream.Write(packetData);
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Failed to write transfer dump");
+        }
+
+        StringBuilder dump = new();
+        dump.AppendLine($"=== Packet #{packet.PacketId} from offset {packet.Offset} request {packet.Request} (length {packet.Length}) ===");
+        foreach (byte c in packetData)
+        {
+            dump.Append(c.ToString("x2"));
+        }
+        dump.AppendLine();
+        foreach (char c in Encoding.UTF8.GetString(packetData))
+        {
+            dump.Append(char.IsLetterOrDigit(c) ? c : '.');
+        }
+        dump.AppendLine();
+        dump.Append("====================");
+        logger.LogError("Received malformed packet: {SpiDump}", dump.ToString());
+    }
+
+    /// <summary>
+    /// Update the amount of buffer space
+    /// </summary>
+    /// <param name="record">Raw event record</param>
+    private void HandleCodeBufferUpdate(ReadOnlySpan<byte> record)
+    {
+        CodeBufferEvent bufferEvent = MemoryMarshal.Read<CodeBufferEvent>(record);
+        linkInterface.BufferSpace = bufferEvent.BufferSpace - linkInterface.BytesReserved;
+        logger.LogTrace("Buffer space available: {BufferSpace}", linkInterface.BufferSpace);
+    }
+
+    /// <summary>
+    /// Buffer for truncated log messages
+    /// </summary>
+    private string? _partialLogMessage;
+
+    /// <summary>
+    /// Process an incoming message
+    /// </summary>
+    /// <param name="record">Raw event record</param>
+    private void HandleMessage(ReadOnlySpan<byte> record)
+    {
+        MessageEvent messageEvent = MemoryMarshal.Read<MessageEvent>(record);
+        MessageTypeFlags flags = (MessageTypeFlags)messageEvent.Flags;
+        string reply = ReadTailString<MessageEvent>(record);
+        logger.LogTrace("Received message [{Flags}] {Message}", flags, reply);
+
+        // Deal with log messages
+        if ((flags & MessageTypeFlags.LogOff) != MessageTypeFlags.LogOff)
+        {
+            _partialLogMessage += reply;
+            if (!flags.HasFlag(MessageTypeFlags.PushFlag))
+            {
+                if (!string.IsNullOrWhiteSpace(_partialLogMessage))
                 {
-                    // Buffer full -- retry on the next transfer
-                    logger.LogWarning("Could not send CAN request {TxToken} to address {DstAddress} (type {MessageType}) -- buffer full, will retry", request.TxToken, request.DstAddress, request.MessageType);
-                    break;
+                    MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
+                                        : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
+                                            : MessageType.Success;
+                    EventLogLevel level = flags.HasFlag(MessageTypeFlags.LogOff) ? EventLogLevel.Off
+                                        : flags.HasFlag(MessageTypeFlags.LogWarn) ? EventLogLevel.Warn
+                                            : flags.HasFlag(MessageTypeFlags.LogInfo) ? EventLogLevel.Info
+                                                : EventLogLevel.Debug;
+                    eventLogger.Log(level, type, _partialLogMessage.TrimEnd());
                 }
-                logger.LogDebug("Sent CAN request {TxToken} to address {DstAddress} (type {MessageType})", request.TxToken, request.DstAddress, request.MessageType);
-                request.Sent = true;
+                _partialLogMessage = null;
             }
+        }
 
-            // Requests that expect no reply are complete as soon as they have been written
-            linkInterface.CanRequests.RemoveAll(request =>
+        // Check if this is a code reply
+        if (flags.HasFlag(MessageTypeFlags.BinaryCodeReplyFlag))
+        {
+            if (!channels.HandleReply(flags, reply))
             {
-                if (request.Sent && !request.ExpectsReply)
-                {
-                    request.SetResult();
-                    return true;
-                }
-                return false;
-            });
+                // Must be a left-over error message...
+                OutputGenericMessage(flags, reply);
+            }
+        }
+        else if ((flags & MessageTypeFlags.GenericMessage) == MessageTypeFlags.GenericMessage)
+        {
+            // Generic messages to the main object model
+            OutputGenericMessage(flags, reply);
+        }
+        else
+        {
+            // Targeted messages are handled by the IPC processors
+            MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
+                : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
+                    : MessageType.Success;
+            IPC.Processors.CodeStream.RecordMessage(flags, new Message(type, reply));
+            IPC.Processors.ModelSubscription.RecordMessage(flags, new Message(type, reply));
         }
     }
 
     /// <summary>
     /// Process a forwarded CAN message and complete the matching request once fully reassembled
     /// </summary>
-    private void HandleCanResponse()
+    /// <param name="record">Raw event record</param>
+    private void HandleCanResponse(ReadOnlySpan<byte> record)
     {
-        linkAdapter.ReadCanResponse(out ushort txToken, out CanMessageType msgType, out byte srcAddress, out byte flags, out CanStatus status, out byte[] payload);
+        CanResponseEvent response = MemoryMarshal.Read<CanResponseEvent>(record);
+        int headerSize = Marshal.SizeOf<CanResponseEvent>();
+        byte[] payload = record.Length > headerSize ? record[headerSize..].ToArray() : [];
+
+        ushort txToken = response.TxToken;
+        CanMessageType msgType = (CanMessageType)response.MsgType;
+        byte srcAddress = response.SrcAddress;
+        CanStatus status = (CanStatus)response.Status;
 
         // Messages that are not a reply to one of our requests carry the reserved token
         if (txToken == LinkInterface.UnsolicitedTxToken)
         {
-            HandleUnsolicitedCanMessage(msgType, srcAddress, flags, status, payload);
+            HandleUnsolicitedCanMessage(msgType, srcAddress, response.Flags, status, payload);
             return;
         }
 
@@ -585,75 +528,6 @@ public sealed class LinkService(
         }
     }
 
-    /// <summary>
-    /// Update the amount of buffer space
-    /// </summary>
-    private void HandleCodeBufferUpdate()
-    {
-        linkAdapter.ReadCodeBufferUpdate(out ushort bufferSpace);
-        linkInterface.BufferSpace = bufferSpace - linkInterface.BytesReserved;
-        logger.LogTrace("Buffer space available: {BufferSpace}", linkInterface.BufferSpace);
-    }
-
-    /// <summary>
-    /// Buffer for truncated log messages
-    /// </summary>
-    private string? _partialLogMessage;
-
-    /// <summary>
-    /// Process an incoming message
-    /// </summary>
-    private void HandleMessage()
-    {
-        linkAdapter.ReadMessage(out MessageTypeFlags flags, out string reply);
-        logger.LogTrace("Received message [{Flags}] {Message}", flags, reply);
-
-        // Deal with log messages
-        if ((flags & MessageTypeFlags.LogOff) != MessageTypeFlags.LogOff)
-        {
-            _partialLogMessage += reply;
-            if (!flags.HasFlag(MessageTypeFlags.PushFlag))
-            {
-                if (!string.IsNullOrWhiteSpace(_partialLogMessage))
-                {
-                    MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
-                                        : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
-                                            : MessageType.Success;
-                    EventLogLevel level = flags.HasFlag(MessageTypeFlags.LogOff) ? EventLogLevel.Off
-                                        : flags.HasFlag(MessageTypeFlags.LogWarn) ? EventLogLevel.Warn
-                                            : flags.HasFlag(MessageTypeFlags.LogInfo) ? EventLogLevel.Info
-                                                : EventLogLevel.Debug;
-                    eventLogger.Log(level, type, _partialLogMessage.TrimEnd());
-                }
-                _partialLogMessage = null;
-            }
-        }
-
-        // Check if this is a code reply
-        if (flags.HasFlag(MessageTypeFlags.BinaryCodeReplyFlag))
-        {
-            if (!channels.HandleReply(flags, reply))
-            {
-                // Must be a left-over error message...
-                OutputGenericMessage(flags, reply);
-            }
-        }
-        else if ((flags & MessageTypeFlags.GenericMessage) == MessageTypeFlags.GenericMessage)
-        {
-            // Generic messages to the main object model
-            OutputGenericMessage(flags, reply);
-        }
-        else
-        {
-            // Targeted messages are handled by the IPC processors
-            MessageType type = flags.HasFlag(MessageTypeFlags.ErrorMessageFlag) ? MessageType.Error
-                : flags.HasFlag(MessageTypeFlags.WarningMessageFlag) ? MessageType.Warning
-                    : MessageType.Success;
-            IPC.Processors.CodeStream.RecordMessage(flags, new Message(type, reply));
-            IPC.Processors.ModelSubscription.RecordMessage(flags, new Message(type, reply));
-        }
-    }
-
     private async void HandleFirmwareBlockRequestAsync(CanMessageFirmwareUpdateRequest request, byte srcAddress, CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Received firmware block request: FileOffset={FileOffset}, BootloaderVersion={BootloaderVersion}, UsesUf2Binary={UsesUf2Binary}, FileWanted={FileWanted}, LengthRequested={LengthRequested}, BoardType={BoardType}", request.FileOffset, request.BootloaderVersion, request.UsesUf2Binary, request.FileWanted, request.LengthRequested, request.BoardType);
@@ -710,10 +584,10 @@ public sealed class LinkService(
             for (;;)
             {
                 uint lengthToSend = Math.Min(lengthRequested, CanMessageFirmwareUpdateResponseDataBuffer.Length);
-                
+
                 byte[] buffer = new byte[lengthToSend];
                 int bytesRead = fs.Read(buffer, 0, buffer.Length);
-                
+
                 if (bytesRead != lengthToSend)
                 {
                     logger.LogError("Read {BytesRead} bytes from firmware file {Filepath} but expected {LengthToSend} bytes", bytesRead, filepath, lengthToSend);
@@ -731,7 +605,6 @@ public sealed class LinkService(
                     return;
                 }
 
-                
                 // Send the requested block back to the firmware
                 CanMessageFirmwareUpdateResponse response = new()
                 {
@@ -752,14 +625,12 @@ public sealed class LinkService(
                     break;
                 }
             }
-
         }
         else
         {
             logger.LogWarning("Unsupported firmware update request: BootloaderVersion={BootloaderVersion}, FileWanted={FileWanted}", request.BootloaderVersion, request.FileWanted);
         }
     }
-
 
     /// <summary>
     /// Partial incoming message (if any)
@@ -787,47 +658,108 @@ public sealed class LinkService(
         }
     }
 
+    #region Firmware update
     /// <summary>
-    /// Handle a firmware request to wait for a message to be acknowledged
+    /// Serve firmware update requests raised through <see cref="LinkInterface.UpdateFirmware"/>
     /// </summary>
-    private void HandleWaitForAcknowledgement()
+    /// <remarks>
+    /// The flash itself runs inside the native loop, which suspends the regular transfer protocol for
+    /// its duration. This only stages the binaries and reports the outcome
+    /// </remarks>
+    /// <param name="stoppingToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    private async Task WatchForFirmwareUpdatesAsync(CancellationToken stoppingToken)
     {
-        linkAdapter.ReadCodeChannel(out CodeChannel channel);
-        logger.LogTrace("Received wait for message acknowledgement on channel {Channel}", channel);
-
-        if (channel < CodeChannel.Unknown)
+        while (!stoppingToken.IsCancellationRequested)
         {
-            using (channels[channel].Lock())
+            try
             {
-                channels[channel].WaitForAcknowledgement();
+                await linkInterface.FirmwareUpdateRequested.WaitAsync(stoppingToken);
             }
-        }
-        else if (!settings.Value.UpdateOnly)
-        {
-            logger.LogError("Received wait for message acknowledgement on invalid channel {Channel}", channel);
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            TaskCompletionSource? request;
+            Stream? iapStream, firmwareStream;
+            using (await linkInterface.FirmwareUpdateLock.LockAsync(stoppingToken))
+            {
+                request = linkInterface.FirmwareUpdateRequest;
+                iapStream = linkInterface.IapStream;
+                firmwareStream = linkInterface.FirmwareStream;
+            }
+
+            if (request is null || iapStream is null || firmwareStream is null)
+            {
+                continue;
+            }
+
+            try
+            {
+                await PerformFirmwareUpdateAsync(iapStream, firmwareStream, stoppingToken);
+                request.TrySetResult();
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Firmware update failed");
+                request.TrySetException(e);
+            }
+            finally
+            {
+                using (await linkInterface.FirmwareUpdateLock.LockAsync(CancellationToken.None))
+                {
+                    linkInterface.IapStream = linkInterface.FirmwareStream = null;
+                    linkInterface.FirmwareUpdateRequest = null;
+                }
+            }
         }
     }
 
     /// <summary>
-    /// Handle a firmware request that is sent when RRF has successfully acknowledged a blocking message
+    /// Perform the firmware update
     /// </summary>
-    private void HandleMessageAcknowledgement()
+    /// <param name="iapStream">IAP binary</param>
+    /// <param name="firmwareStream">Firmware binary</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    private async Task PerformFirmwareUpdateAsync(Stream iapStream, Stream firmwareStream, CancellationToken cancellationToken)
     {
-        linkAdapter.ReadCodeChannel(out CodeChannel channel);
-        logger.LogTrace("Received message acknowledgement on channel {Channel}", channel);
+        using (model.AccessReadWrite(cancellationToken))
+        {
+            model.State.Status = MachineStatus.Updating;
+        }
 
-        if (channel < CodeChannel.Unknown)
+        // Everything in flight is about to become invalid: the controller is going to reboot into IAP
+        Invalidate();
+
+        // Get the CRC16 checksum of the firmware binary before handing it to the native side
+        ushort crc16 = CRC16.Calculate(firmwareStream);
+
+        firmwareStream.Seek(0, SeekOrigin.Begin);
+        iapStream.Seek(0, SeekOrigin.Begin);
+
+        byte[] iap = new byte[iapStream.Length];
+        await iapStream.ReadExactlyAsync(iap, cancellationToken);
+        byte[] firmware = new byte[firmwareStream.Length];
+        await firmwareStream.ReadExactlyAsync(firmware, cancellationToken);
+
+        logger.LogInformation("Starting firmware update ({IapLength} byte IAP, {FirmwareLength} byte firmware)", iap.Length, firmware.Length);
+
+        try
         {
-            using (channels[channel].Lock())
-            {
-                channels[channel].MessageAcknowledged();
-            }
+            await nativeLink.UpdateFirmwareAsync(iap, firmware, crc16, cancellationToken);
         }
-        else if (!settings.Value.UpdateOnly)
+        catch (Exception e)
         {
-            logger.LogError("Received message acknowledgement on invalid channel {Channel}", channel);
+            eventLogger.LogOutput(MessageType.Error, "Failed to update firmware. Please install it manually.");
+            logger.LogError(e, "Failed to update firmware");
+            throw;
         }
+
+        logger.LogInformation("Firmware update successful");
     }
+    #endregion
 
     /// <summary>
     /// Invalidate pending codes and code-relevant requests due to an emergency stop
@@ -863,6 +795,9 @@ public sealed class LinkService(
 
         // Invalidate remaining link interface requests
         linkInterface.Invalidate();
+
+        // Fail anything still waiting on the native loop
+        nativeLink.CancelPendingRequests();
 
         // Close all the files
         foreach (var kv in _openFiles)
