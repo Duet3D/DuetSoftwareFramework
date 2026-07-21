@@ -436,6 +436,7 @@ constexpr unsigned int CanDeviceNumber = 1; // CAN-FD device number
 constexpr unsigned int SecondaryCanDeviceNumber = 0; // plan CAN device number
 #endif
 
+constexpr Pin SbcDataAvailablePin = PortEPin(1);
 constexpr Pin SbcTfrReadyPin = PortEPin(2);
 // Note, the DMAC peripheral IDs are hard-coded in DataTransfer
 

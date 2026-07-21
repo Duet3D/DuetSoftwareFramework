@@ -170,9 +170,9 @@ void* Tasks::GetNVMBuffer(const uint32_t* _ecv_array _ecv_null stk) noexcept
 {
 #if defined(DUET3_MB6HC) // for MB6HC the Status and Activity pins and polarity depend on the board version
 	const BoardType bt = Platform::GetMB6HCBoardType();
-	const Pin diagPin = (bt >= BoardType::Duet3_6HC_v102) ? DiagPin102 : DiagPinPre102;
-	const Pin actLedPin = (bt >= BoardType::Duet3_6HC_v102) ? ActLedPin102 : ActLedPinPre102;
-	const bool diagOnPolarity = (bt >= BoardType::Duet3_6HC_v102) ? DiagOnPolarity102 : DiagOnPolarityPre102;
+	const Pin DiagPin = (bt >= BoardType::Duet3_6HC_v102) ? DiagPin102 : DiagPinPre102;
+	const Pin ActLedPin = (bt >= BoardType::Duet3_6HC_v102) ? ActLedPin102 : ActLedPinPre102;
+	const bool DiagOnPolarity = (bt >= BoardType::Duet3_6HC_v102) ? DiagOnPolarity102 : DiagOnPolarityPre102;
 	if (bt >= BoardType::Duet3_6HC_v102)
 	{
 		SetPinMode(UsbPowerSwitchPin, OUTPUT_LOW); // turn USB power off
@@ -187,9 +187,9 @@ void* Tasks::GetNVMBuffer(const uint32_t* _ecv_array _ecv_null stk) noexcept
 		SetPinMode(UsbModePin, OUTPUT_LOW);		   // USB mode = device/UFP
 	}
 #endif
-	SetPinMode(diagPin, (diagOnPolarity) ? OUTPUT_LOW : OUTPUT_HIGH); // set up status LED for debugging and turn it off
+	SetPinMode(DiagPin, (DiagOnPolarity) ? OUTPUT_LOW : OUTPUT_HIGH); // set up status LED for debugging and turn it off
 #if defined(DUET3MINI) || defined(DUET3_MB6HC) || defined(DUET3_MB6XD)
-	SetPinMode(actLedPin, (ActOnPolarity) ? OUTPUT_LOW : OUTPUT_HIGH); // set up activity LED and turn it off
+	SetPinMode(ActLedPin, (ActOnPolarity) ? OUTPUT_LOW : OUTPUT_HIGH); // set up activity LED and turn it off
 #endif
 
 #ifdef INDX
@@ -220,7 +220,7 @@ void* Tasks::GetNVMBuffer(const uint32_t* _ecv_array _ecv_null stk) noexcept
 				const bool on =
 					(i & 1) == 0 &&
 					(i & 15) < 6; // turn LED on if count is 0, 2, 4 or 16, 18, 20 etc. otherwise turn it off
-				digitalWrite(diagPin, XNor(on, diagOnPolarity));
+				digitalWrite(DiagPin, XNor(on, DiagOnPolarity));
 				for (unsigned int j = 0; j < 250; ++j)
 				{
 					delayMicroseconds(
