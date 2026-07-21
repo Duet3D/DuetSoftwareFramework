@@ -35,6 +35,21 @@ public sealed partial class LinkInterface(
 {
     // Information about the code channels
     internal int BytesReserved, BufferSpace;
+    internal int MaxReportedBufferSpace;
+
+    /// <summary>
+    /// Get the maximum number of bytes that may be buffered per channel. Shares the reported firmware code buffer among
+    /// the active job streams, keeping spare room for time-critical codes on other channels
+    /// </summary>
+    /// <param name="numJobStreams">Number of active job file streams</param>
+    /// <returns>Maximum number of bytes to buffer per channel</returns>
+    internal int GetMaxBufferSpacePerChannel(int numJobStreams) => (MaxReportedBufferSpace > 0) ? (MaxReportedBufferSpace - 2 * settings.Value.MaxCodeBufferSize) / numJobStreams : FallbackBufferSpacePerChannel;
+
+    /// <summary>
+    /// Fallback buffer space per channel until the firmware has reported its code buffer size
+    /// </summary>
+    private const int FallbackBufferSpacePerChannel = 1536;
+
     internal readonly Queue<ModelQueryRequest> ModelQueryRequests = new();
     internal readonly List<string> UpdatedObjectModelKeys = [];
 
@@ -583,7 +598,7 @@ public sealed partial class LinkInterface(
                 channel.Invalidate();
             }
         }
-        BytesReserved = BufferSpace = 0;
+        BytesReserved = BufferSpace = MaxReportedBufferSpace = 0;
 
         // Resolve pending code result, expression evaluation, and variable requests
         lock (SetLastCodeResultRequests)
@@ -673,7 +688,7 @@ public sealed partial class LinkInterface(
                 channel.Invalidate();
             }
         }
-        BytesReserved = BufferSpace = 0;
+        BytesReserved = BufferSpace = MaxReportedBufferSpace = 0;
 
         // Resolve pending code result, expression evaluation, and variable requests
         lock (SetLastCodeResultRequests)

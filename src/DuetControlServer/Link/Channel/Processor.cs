@@ -1019,12 +1019,13 @@ public sealed class Processor
             }
 
             // Try to send it to RepRapFirmware
-            if ((BytesBuffered == 0 || BytesBuffered + pendingCode.BinarySize <= _settings.MaxBufferSpacePerChannel) &&
+            int maxBufferSpace = _linkInterface.GetMaxBufferSpacePerChannel(_jobProcessor.NumJobStreams);
+            if ((BytesBuffered == 0 || BytesBuffered + pendingCode.BinarySize <= maxBufferSpace) &&
                 _linkInterface.SendCode(pendingCode, pendingCode.BinarySize))
             {
                 BytesBuffered += pendingCode.BinarySize;
                 BufferedCodes.Add(pendingCode);
-                _logger.LogDebug("Sent {Code}, remaining space {BytesRemaining}, needed {BytesNeeded}", pendingCode, _settings.MaxBufferSpacePerChannel - BytesBuffered, pendingCode.BinarySize);
+                _logger.LogDebug("Sent {Code}, remaining space {BytesRemaining}, needed {BytesNeeded}", pendingCode, maxBufferSpace - BytesBuffered, pendingCode.BinarySize);
                 return true;
             }
             return false;

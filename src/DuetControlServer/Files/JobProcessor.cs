@@ -134,6 +134,11 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     private CodeFile? _file2;
 
     /// <summary>
+    /// Number of active job file streams. Two while the job file is forked, else one
+    /// </summary>
+    public int NumJobStreams => (_file2 is not null) ? 2 : 1;
+
+    /// <summary>
     /// Second job task (if any)
     /// </summary>
     private Task? _secondFileTask;

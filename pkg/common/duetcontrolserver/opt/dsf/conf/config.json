@@ -33,7 +33,6 @@
   "BufferedPrintCodes": 32,
   "BufferedMacroCodes": 16,
   "MaxCodesPerInput": 32,
-  "MaxBufferSpacePerChannel": 1536,
   "MaxCodeBufferSize": 384,
   "MaxMessageLength": 4096,
   "AllowCustomModelPatches": false,

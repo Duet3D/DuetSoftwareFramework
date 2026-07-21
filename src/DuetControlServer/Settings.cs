@@ -238,11 +238,6 @@ public sealed class Settings
     public int MaxCodesPerInput { get; set; } = 32;
 
     /// <summary>
-    /// Maximum space of buffered codes per channel (in bytes)
-    /// </summary>
-    public int MaxBufferSpacePerChannel { get; set; } = 1536;
-
-    /// <summary>
     /// Maximum size of a binary encoded G/M/T-code. This is limited by RepRapFirmware (see code queue)
     /// </summary>
     public int MaxCodeBufferSize { get; set; } = 384;

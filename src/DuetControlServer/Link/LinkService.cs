@@ -630,6 +630,10 @@ public sealed class LinkService(
     private void HandleCodeBufferUpdate()
     {
         linkAdapter.ReadCodeBufferUpdate(out ushort bufferSpace);
+        if (bufferSpace > linkInterface.MaxReportedBufferSpace)
+        {
+            linkInterface.MaxReportedBufferSpace = bufferSpace;
+        }
         linkInterface.BufferSpace = bufferSpace - linkInterface.BytesReserved;
         logger.LogTrace("Buffer space available: {BufferSpace}", linkInterface.BufferSpace);
     }
