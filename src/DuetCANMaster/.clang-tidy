@@ -1,0 +1,125 @@
+---
+Checks: >
+  -*,
+  bugprone-*,
+  cppcoreguidelines-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-narrowing-conversions,
+  -cppcoreguidelines-avoid-c-arrays,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-avoid-non-const-global-variables,
+  -cppcoreguidelines-macro-usage,
+  -cppcoreguidelines-narrowing-conversions,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-cstyle-cast,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-type-union-access,
+  -cppcoreguidelines-pro-type-vararg,
+  -misc-confusable-identifiers,
+  -misc-no-recursion,
+  -misc-use-internal-linkage,
+  -modernize-avoid-c-arrays,
+  -modernize-use-default-member-init,
+  -modernize-use-designated-initializers,
+  -modernize-use-trailing-return-type,
+  -readability-braces-around-statements,
+  -readability-else-after-return,
+  -readability-function-cognitive-complexity,
+  -readability-function-size,
+  -readability-identifier-length,
+  -readability-implicit-bool-conversion,
+  -readability-magic-numbers,
+  -readability-math-missing-parentheses,
+  -readability-qualified-auto,
+  -readability-uppercase-literal-suffix,
+  -misc-include-cleaner,
+  -misc-use-anonymous-namespace,
+  -misc-non-private-member-variables-in-classes,
+  -cppcoreguidelines-avoid-do-while,
+  -readability-avoid-unconditional-preprocessor-if,
+  -bugprone-unhandled-exception-at-new,
+  -bugprone-macro-parentheses,
+
+# Checks switched off because they conflict with deliberate choices in this codebase rather
+# than flagging defects:
+#   misc-include-cleaner            - demands a direct #include for build-system macros (SAME70),
+#                                     eCv annotations (_ecv_array) and toolchain typedefs; the
+#                                     include chain here is deliberate and order-sensitive
+#   misc-use-anonymous-namespace    - file-scope `static` is the established RepRapFirmware idiom
+#   misc-non-private-member-variables-in-classes - duplicate of the cppcoreguidelines check
+#                                     already disabled above
+#   cppcoreguidelines-avoid-do-while - do/while(0) is the standard multi-statement macro idiom
+#   readability-avoid-unconditional-preprocessor-if - `#if 0` guards debug-only code on purpose
+#   bugprone-unhandled-exception-at-new - the firmware runs without exceptions; allocation
+#                                     failure is handled by the fault path, not a catch
+#   bugprone-macro-parentheses      - the only hits are the build's own command-line -D flags
+#                                     (-DMQTTC_PAL_FILE=Networking/MQTT/mqtt_pal.h); it fires once
+#                                     per TU with no source location, and parenthesising that
+#                                     value would break the `#include MQTTC_PAL_FILE` that uses it
+
+WarningsAsErrors: ''
+
+# Anchored to this project's own first-party sources. Two things are deliberately excluded:
+#   - lib/{CANlib,CoreN2G,FreeRTOS,LibTinyusb,RRFLibraries}/src/, which a bare 'src/.*' would
+#     match. Duet3Expansion compiles those same headers from this checkout, so fixing them here
+#     would silently change a project that is out of scope for this style guide.
+#   - src/libc/ and src/libcpp/, which are vendored newlib and GCC runtime sources (FSF
+#     copyright); they are upstream code and must keep upstream formatting.
+# clang-tidy 18 has no ExcludeHeaderFilterRegex and its regex engine has no negative lookahead,
+# so the first-party directories are enumerated instead.
+HeaderFilterRegex: '/src/DuetCANMaster/src/((CAN|Config|Hardware|Movement|Platform|SBC|Storage)/.*|[A-Za-z]+\.h)$'
+
+# The firmware is GCC-built; clang hits a handful of constexpr/overload divergences it cannot
+# resolve. Without this it stops at 20 errors and silently leaves the rest of the TU unanalysed.
+ExtraArgs: ['-ferror-limit=0']
+
+FormatStyle: file
+
+CheckOptions:
+  - key: modernize-loop-convert.MinConfidence
+    value: reasonable
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
+  - key: performance-move-const-arg.CheckTriviallyCopyableMove
+    value: 'false'
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: CamelCase
+  - key: readability-identifier-naming.NamespaceCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.VariableCase
+    value: camelBack
+  - key: readability-identifier-naming.ConstantCase
+    value: camelBack
+  - key: readability-identifier-naming.ParameterCase
+    value: camelBack
+  # Symbols whose spelling is ABI, not style. Renaming these compiles cleanly and then fails
+  # at link time -- or worse, silently changes a vector-table slot:
+  #   VersionText     - CoreN2G's SAME70 Vectors.c stores its address in pfnReserved2_Handler
+  #   exception_table - CoreN2G's DeviceVectors instance
+  #   _estack         - defined by same70q20b_flash.ld
+  #   *_Handler       - CMSIS interrupt vector names, matched by the startup vector table
+  - key: readability-identifier-naming.GlobalVariableIgnoredRegexp
+    value: '^(VersionText|exception_table|_estack|_firmware_crc)$'
+  - key: readability-identifier-naming.GlobalConstantIgnoredRegexp
+    value: '^(VersionText|exception_table|_estack|_firmware_crc)$'
+  - key: readability-identifier-naming.FunctionIgnoredRegexp
+    value: '^(.*_Handler|vAssertCalled|atoi)$'
+  - key: readability-identifier-naming.PrivateMemberPrefix
+    value: 'm_'
+  - key: readability-identifier-naming.StaticVariablePrefix
+    value: 's_'

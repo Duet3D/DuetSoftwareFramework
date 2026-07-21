@@ -72,7 +72,7 @@ export DEBUG_FLAGS
 .DEFAULT_GOAL := help
 
 # Available build configurations
-CONFIGS := Duet3_MB6HC Duet3_MB6XD Duet3_CAN0 Duet3Mini5plus Duet3_MB6HC_no_SD FMDC_V03
+CONFIGS := Duet3_MB6HC Duet3_MB6XD
 
 # Print available targets
 .PHONY: help
@@ -84,10 +84,6 @@ help:
 	$(Q)echo "Build targets:"
 	$(Q)echo "  Duet3_MB6HC         - Duet 3 MB6HC (SAME70)"
 	$(Q)echo "  Duet3_MB6XD         - Duet 3 MB6XD expansion (SAME70)"
-	$(Q)echo "  Duet3_CAN0          - Duet 3 CAN expansion (SAME70)"
-	$(Q)echo "  Duet3Mini5plus      - Duet 3 Mini 5+ (SAME51)"
-	$(Q)echo "  FMDC_V03            - FMDC version 0.3"
-	$(Q)echo "  Duet3_MB6HC_no_SD   - Duet 3 MB6HC without SD card support"
 	$(Q)echo ""
 	$(Q)echo "Other targets:"
 	$(Q)echo "  all                 - Build all configurations"
@@ -106,7 +102,7 @@ help:
 	$(Q)echo "Examples:"
 	$(Q)echo "  make init-submodules                      # Prepare library submodules after clone"
 	$(Q)echo "  make Duet3_MB6HC                          # Build Duet 3 MB6HC firmware"
-	$(Q)echo "  make Duet3Mini5plus V=1                   # Build with verbose output"
+	$(Q)echo "  make Duet3_MB6HC V=1                   	  # Build with verbose output"
 	$(Q)echo "  make Duet3_MB6HC DEBUG=1                  # Build with debug symbols"
 	$(Q)echo "  make CROSS_COMPILE=/path/to/arm-none-eabi- Duet3_MB6HC  # Custom toolchain"
 	$(Q)echo ""
@@ -244,10 +240,6 @@ $(LIBRARIES_DIR)/CANlib/SAM4S_RTOS/libCANlib.a:
 # Include dependency makefiles
 -include Makefiles/Duet3_MB6HC.mk
 -include Makefiles/Duet3_MB6XD.mk
--include Makefiles/Duet3_CAN0.mk
--include Makefiles/Duet3Mini5plus.mk
--include Makefiles/FMDC_V03.mk
--include Makefiles/Duet3_MB6HC_no_SD.mk
 
 # Generic clean target
 .PHONY: clean

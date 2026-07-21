@@ -7,22 +7,25 @@
 
 #include "StepTimer.h"
 #include <RTOSIface/RTOSIface.h>
+
 #include <Platform/RepRap.h>
+
 #include <Platform/Platform.h>
+
 #include "MoveTiming.h"
 
 #if SAME5x
-# include <CoreIO.h>
-# include <hri_tc_e54.h>
+#  include <CoreIO.h>
+#  include <hri_tc_e54.h>
 #else
-# include <tc/tc.h>
-# if SAME70 || SAM4E || SAM4S
-#  include <pmc/pmc.h>
-# endif
+#  include <tc/tc.h>
+#  if SAME70 || SAM4E || SAM4S
+#	include <pmc/pmc.h>
+#  endif
 #endif
 
-StepTimer *_ecv_null volatile StepTimer::pendingList = nullptr;
-uint32_t StepTimer::movementDelay = 0;											// how many timer ticks the move timer is behind the raw timer
+StepTimer* volatile _ecv_null StepTimer::pendingList = nullptr;
+uint32_t StepTimer::movementDelay = 0; // how many timer ticks the move timer is behind the raw timer
 
 #if SUPPORT_CAN_EXPANSION
 uint32_t StepTimer::ownMovementDelay = 0;
@@ -32,11 +35,11 @@ bool StepTimer::ownMovementDelayIncreased = false;
 void StepTimer::Init() noexcept
 {
 	// Timer interrupt for stepper motors
-	// The clock rate we use is a compromise. Too fast and the 64-bit square roots take a long time to execute. Too slow and we lose resolution.
-	// On Duet WiFi/Ethernet, Duet Maestro and legacy Duets we use a clock prescaler of 128 which gives
-	// 1.524us resolution on the Duet 085 (84MHz clock)
-	// 1.067us resolution on the Duet WiFi/Ethernet/Maestro (120MHz clock)
-	// On Duet 3 we need a step clock rate that can be programmed on SAME70, SAME5x and SAMC21 processors. We choose 750kHz (1.333us resolution)
+	// The clock rate we use is a compromise. Too fast and the 64-bit square roots take a long time to execute. Too slow
+	// and we lose resolution. On Duet WiFi/Ethernet, Duet Maestro and legacy Duets we use a clock prescaler of 128
+	// which gives 1.524us resolution on the Duet 085 (84MHz clock) 1.067us resolution on the Duet WiFi/Ethernet/Maestro
+	// (120MHz clock) On Duet 3 we need a step clock rate that can be programmed on SAME70, SAME5x and SAMC21
+	// processors. We choose 750kHz (1.333us resolution)
 
 #if SAME5x
 	// Step clock runs at 750KHz, same as other Duet 3 boards
@@ -61,40 +64,50 @@ void StepTimer::Init() noexcept
 
 	hri_tc_set_CTRLA_ENABLE_bit(StepTc);
 
-	NVIC_SetPriority(StepTcIRQn, NvicPriorityStep);			    // Set the priority for this IRQ
+	NVIC_SetPriority(StepTcIRQn, NvicPriorityStep); // Set the priority for this IRQ
 	NVIC_ClearPendingIRQ(StepTcIRQn);
 	NVIC_EnableIRQ(StepTcIRQn);
 #else
 	pmc_set_writeprotect(false);
 	pmc_enable_periph_clk(STEP_TC_ID);
 
-# if SAME70 || SAM4S
+#  if SAME70 || SAM4S
 	// These processors have 16-bit TCs but we can chain 2 of them together
 	pmc_enable_periph_clk(STEP_TC_ID_UPPER);
 
-#  if SAME70
+#	if SAME70
 	// Step clock runs at 48MHz/64 for compatibility with the Tool board
-	constexpr uint32_t divisor = (64ull * (SystemCoreClockFreq/2))/(48000000u);
+	constexpr uint32_t divisor = (64ull * (SystemCoreClockFreq / 2)) / (48000000u);
 	static_assert(divisor <= 256 && divisor >= 100);
 
-	// TC0 channel 0 can use either PCLK6 or PCLK7 depending on the setting in the bus matrix Peripheral Clock Configuration Register. Default is PCLK6.
+	// TC0 channel 0 can use either PCLK6 or PCLK7 depending on the setting in the bus matrix Peripheral Clock
+	// Configuration Register. Default is PCLK6.
 	pmc_disable_pck(PMC_PCK_6);
 	pmc_switch_pck_to_mck(PMC_PCK_6, PMC_PCK_PRES(divisor - 1));
 	pmc_enable_pck(PMC_PCK_6);
 
 	// Chain TC0 and TC2 together. TC0 provides the lower 16 bits, TC2 the upper 16 bits. CLOCK1 is PCLK6.
-	tc_init(STEP_TC, STEP_TC_CHAN, TC_CMR_WAVE | TC_CMR_WAVSEL_UP | TC_CMR_TCCLKS_TIMER_CLOCK1 | TC_CMR_ACPA_SET | TC_CMR_ACPC_CLEAR | TC_CMR_EEVT_XC0);	// must set TC_CMR_EEVT nonzero to get RB compare interrupts
-	tc_init(STEP_TC, STEP_TC_CHAN_UPPER, TC_CMR_WAVE | TC_CMR_WAVSEL_UP | TC_CMR_TCCLKS_TIMER_CLOCK1 | TC_CMR_BURST_XC2);
+	tc_init(STEP_TC,
+			STEP_TC_CHAN,
+			TC_CMR_WAVE | TC_CMR_WAVSEL_UP | TC_CMR_TCCLKS_TIMER_CLOCK1 | TC_CMR_ACPA_SET | TC_CMR_ACPC_CLEAR |
+				TC_CMR_EEVT_XC0); // must set TC_CMR_EEVT nonzero to get RB compare interrupts
+	tc_init(
+		STEP_TC, STEP_TC_CHAN_UPPER, TC_CMR_WAVE | TC_CMR_WAVSEL_UP | TC_CMR_TCCLKS_TIMER_CLOCK1 | TC_CMR_BURST_XC2);
 	tc_set_block_mode(STEP_TC, TC_BMR_TC2XC2S_TIOA0);
-#  elif SAM4S
+#	elif SAM4S
 	// Chain TC0 and TC2 together. TC0 provides the lower 16 bits, TC2 the upper 16 bits. CLOCK4 is MCLK/128.
-	tc_init(STEP_TC, STEP_TC_CHAN, TC_CMR_WAVE | TC_CMR_WAVSEL_UP | TC_CMR_TCCLKS_TIMER_CLOCK4 | TC_CMR_ACPA_SET | TC_CMR_ACPC_CLEAR | TC_CMR_EEVT_XC0);	// must set TC_CMR_EEVT nonzero to get RB compare interrupts
-	tc_init(STEP_TC, STEP_TC_CHAN_UPPER, TC_CMR_WAVE | TC_CMR_WAVSEL_UP | TC_CMR_TCCLKS_TIMER_CLOCK4 | TC_CMR_BURST_XC2);
+	tc_init(STEP_TC,
+			STEP_TC_CHAN,
+			TC_CMR_WAVE | TC_CMR_WAVSEL_UP | TC_CMR_TCCLKS_TIMER_CLOCK4 | TC_CMR_ACPA_SET | TC_CMR_ACPC_CLEAR |
+				TC_CMR_EEVT_XC0); // must set TC_CMR_EEVT nonzero to get RB compare interrupts
+	tc_init(
+		STEP_TC, STEP_TC_CHAN_UPPER, TC_CMR_WAVE | TC_CMR_WAVSEL_UP | TC_CMR_TCCLKS_TIMER_CLOCK4 | TC_CMR_BURST_XC2);
 	tc_set_block_mode(STEP_TC, TC_BMR_TC2XC2S_TIOA0);
-#  endif
+#	endif
 
-	// Multiple sources claim there is a bug in both SAM4E and SAME70: the first time that the lower counter wraps round, the upper counter doesn't increment.
-	// Workaround from https://www.at91.com/viewtopic.php?t=24000: set up TC0 to generate an output pulse almost immediately
+	// Multiple sources claim there is a bug in both SAM4E and SAME70: the first time that the lower counter wraps
+	// round, the upper counter doesn't increment. Workaround from https://www.at91.com/viewtopic.php?t=24000: set up
+	// TC0 to generate an output pulse almost immediately
 	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RA = 0x0001;
 	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RC = 0x0002;
 
@@ -103,21 +116,26 @@ void StepTimer::Init() noexcept
 	tc_start(STEP_TC, STEP_TC_CHAN);
 
 	// Wait until first (lost) pulse is generated, then reset compare trip to TC0 wrap
-	while (STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_CV < 0x0002) { }
+	while (STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_CV < 0x0002)
+	{
+	}
 
 	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RA = 0xFFFF;
 	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RC = 0;
 	IrqEnable();
 
-# else
+#  else
 	// Use a single 32-bit timer. CLOCK4 is MCLK/128.
-	tc_init(STEP_TC, STEP_TC_CHAN, TC_CMR_WAVE | TC_CMR_WAVSEL_UP | TC_CMR_TCCLKS_TIMER_CLOCK4 | TC_CMR_EEVT_XC0);	// must set TC_CMR_EEVT nonzero to get RB compare interrupts
+	tc_init(STEP_TC,
+			STEP_TC_CHAN,
+			TC_CMR_WAVE | TC_CMR_WAVSEL_UP | TC_CMR_TCCLKS_TIMER_CLOCK4 |
+				TC_CMR_EEVT_XC0); // must set TC_CMR_EEVT nonzero to get RB compare interrupts
 	tc_start(STEP_TC, STEP_TC_CHAN);
-# endif
+#  endif
 
-	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_IDR = ~(uint32_t)0;	// interrupts disabled for now
-	tc_get_status(STEP_TC, STEP_TC_CHAN);						// clear any pending interrupt
-	NVIC_SetPriority(STEP_TC_IRQN, NvicPriorityStep);			// set priority for this IRQ
+	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_IDR = ~(uint32_t)0; // interrupts disabled for now
+	tc_get_status(STEP_TC, STEP_TC_CHAN);					 // clear any pending interrupt
+	NVIC_SetPriority(STEP_TC_IRQN, NvicPriorityStep);		 // set priority for this IRQ
 	NVIC_EnableIRQ(STEP_TC_IRQN);
 #endif
 }
@@ -127,12 +145,12 @@ void StepTimer::Init() noexcept
 // Get the step timer clock count
 /*static*/ uint32_t StepTimer::GetTimerTicks() noexcept
 {
-	AtomicCriticalSectionLocker lock;
+	const AtomicCriticalSectionLocker lock;
 	// The TCs on the SAM4S and SAME70 are only 16 bits wide, so we maintain the upper 16 bits in a chained counter
-	uint16_t highWord = STEP_TC->TC_CHANNEL[STEP_TC_CHAN_UPPER].TC_CV;		// get the timer high word
+	uint16_t highWord = STEP_TC->TC_CHANNEL[STEP_TC_CHAN_UPPER].TC_CV; // get the timer high word
 	do
 	{
-		const uint16_t lowWord = STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_CV;	// get the timer low word
+		const uint16_t lowWord = STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_CV; // get the timer low word
 		const uint16_t highWordAgain = STEP_TC->TC_CHANNEL[STEP_TC_CHAN_UPPER].TC_CV;
 		if (highWordAgain == highWord)
 		{
@@ -146,10 +164,10 @@ void StepTimer::Init() noexcept
 /*static*/ uint32_t StepTimer::GetTimerTicksWhenInterruptsDisabled() noexcept
 {
 	// The TCs on the SAM4S and SAME70 are only 16 bits wide, so we maintain the upper 16 bits in a chained counter
-	uint16_t highWord = STEP_TC->TC_CHANNEL[STEP_TC_CHAN_UPPER].TC_CV;		// get the timer high word
+	uint16_t highWord = STEP_TC->TC_CHANNEL[STEP_TC_CHAN_UPPER].TC_CV; // get the timer high word
 	do
 	{
-		const uint16_t lowWord = STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_CV;	// get the timer low word
+		const uint16_t lowWord = STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_CV; // get the timer low word
 		const uint16_t highWordAgain = STEP_TC->TC_CHANNEL[STEP_TC_CHAN_UPPER].TC_CV;
 		if (highWordAgain == highWord)
 		{
@@ -169,9 +187,14 @@ void StepTimer::Init() noexcept
 {
 	AtomicCriticalSectionLocker lock;
 	StepTc->CTRLBSET.reg = TC_CTRLBSET_CMD_READSYNC;
-	// On the SAME5x it isn't enough just to wait for SYNCBUSY.COUNT here, nor is it enough just to use a DSB instruction first
-	while (StepTc->CTRLBSET.bit.CMD != 0) { }
-	while (StepTc->SYNCBUSY.bit.COUNT) { }
+	// On the SAME5x it isn't enough just to wait for SYNCBUSY.COUNT here, nor is it enough just to use a DSB
+	// instruction first
+	while (StepTc->CTRLBSET.bit.CMD != 0)
+	{
+	}
+	while (StepTc->SYNCBUSY.bit.COUNT)
+	{
+	}
 	return StepTc->COUNT.reg;
 }
 
@@ -179,36 +202,45 @@ void StepTimer::Init() noexcept
 /*static*/ uint32_t StepTimer::GetTimerTicksWhenInterruptsDisabled() noexcept
 {
 	StepTc->CTRLBSET.reg = TC_CTRLBSET_CMD_READSYNC;
-	// On the SAME5x it isn't enough just to wait for SYNCBUSY.COUNT here, nor is it enough just to use a DSB instruction first
-	while (StepTc->CTRLBSET.bit.CMD != 0) { }
-	while (StepTc->SYNCBUSY.bit.COUNT) { }
+	// On the SAME5x it isn't enough just to wait for SYNCBUSY.COUNT here, nor is it enough just to use a DSB
+	// instruction first
+	while (StepTc->CTRLBSET.bit.CMD != 0)
+	{
+	}
+	while (StepTc->SYNCBUSY.bit.COUNT)
+	{
+	}
 	return StepTc->COUNT.reg;
 }
 
 #endif
 
-// Schedule an interrupt at the specified clock count and return false, or return true if that time is imminent or has passed already.
-// On entry, interrupts must be disabled or the base priority must be <= step interrupt priority.
+// Schedule an interrupt at the specified clock count and return false, or return true if that time is imminent or has
+// passed already. On entry, interrupts must be disabled or the base priority must be <= step interrupt priority.
 bool StepTimer::ScheduleTimerInterrupt(uint32_t tim) noexcept
 {
-	// We need to disable all interrupts, because once we read the current step clock we have only 6us to set up the interrupt, or we will miss it
-	AtomicCriticalSectionLocker lock;
+	// We need to disable all interrupts, because once we read the current step clock we have only 6us to set up the
+	// interrupt, or we will miss it
+	const AtomicCriticalSectionLocker lock;
 
-	const int32_t diff = (int32_t)(tim - GetTimerTicksWhenInterruptsDisabled());	// see how long we have to go
-	if (diff < (int32_t)MoveTiming::MinInterruptInterval)			// if less than about 6us or already passed
+	const auto diff = (int32_t)(tim - GetTimerTicksWhenInterruptsDisabled()); // see how long we have to go
+	if (diff < (int32_t)MoveTiming::MinInterruptInterval) // if less than about 6us or already passed
 	{
-		return true;												// tell the caller to simulate an interrupt instead
+		return true; // tell the caller to simulate an interrupt instead
 	}
 
 #if SAME5x
 	StepTc->CC[0].reg = tim;
-	while (StepTc->SYNCBUSY.reg & TC_SYNCBUSY_CC0) { }
-	StepTc->INTFLAG.reg = TC_INTFLAG_MC0;							// clear any existing compare match
+	while (StepTc->SYNCBUSY.reg & TC_SYNCBUSY_CC0)
+	{
+	}
+	StepTc->INTFLAG.reg = TC_INTFLAG_MC0; // clear any existing compare match
 	StepTc->INTENSET.reg = TC_INTFLAG_MC0;
 #else
-	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RB = tim;					// set up the compare register
-	(void)STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_SR;					// read the status register, which clears the status bits and any pending interrupt
-	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_IER = TC_IER_CPBS;			// enable the interrupt
+	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RB = tim; // set up the compare register
+	(void)STEP_TC->TC_CHANNEL[STEP_TC_CHAN]
+		.TC_SR; // read the status register, which clears the status bits and any pending interrupt
+	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_IER = TC_IER_CPBS; // enable the interrupt
 #endif
 
 	return false;
@@ -227,26 +259,27 @@ void StepTimer::DisableTimerInterrupt() noexcept
 // The guts of the ISR
 /*static*/ inline void StepTimer::Interrupt() noexcept
 {
-	StepTimer *_ecv_null tmr = pendingList;
+	StepTimer* _ecv_null tmr = pendingList;
 	if (tmr != nullptr)
 	{
 		for (;;)
 		{
-			StepTimer *_ecv_null const nextTimer = tmr->next;
-			pendingList = nextTimer;								// remove it from the pending list
+			StepTimer* const _ecv_null nextTimer = tmr->next;
+			pendingList = nextTimer; // remove it from the pending list
 
 			tmr->active = false;
-			tmr->callback(tmr->cbParam);							// execute its callback. This may schedule another callback and hence change the pending list.
+			tmr->callback(tmr->cbParam); // execute its callback. This may schedule another callback and hence change
+										 // the pending list.
 
 			tmr = pendingList;
 			if (tmr == nullptr || tmr != nextTimer)
 			{
-				break;												// no more timers, or another timer has been inserted and an interrupt scheduled
+				break; // no more timers, or another timer has been inserted and an interrupt scheduled
 			}
 
 			if (!StepTimer::ScheduleTimerInterrupt(tmr->whenDue))
 			{
-				break;												// interrupt isn't due yet and a new one has been scheduled
+				break; // interrupt isn't due yet and a new one has been scheduled
 			}
 		}
 	}
@@ -258,20 +291,21 @@ extern "C" void STEP_TC_HANDLER() noexcept SPEED_CRITICAL;
 void STEP_TC_HANDLER() noexcept
 {
 #if SAME5x
-	uint8_t tcsr = StepTc->INTFLAG.reg;								// read the status register, which clears the status bits
-	tcsr &= StepTc->INTENSET.reg;									// select only enabled interrupts
+	uint8_t tcsr = StepTc->INTFLAG.reg; // read the status register, which clears the status bits
+	tcsr &= StepTc->INTENSET.reg;		// select only enabled interrupts
 
-	if (likely((tcsr & TC_INTFLAG_MC0) != 0))						// the step interrupt uses MC0 compare
+	if (likely((tcsr & TC_INTFLAG_MC0) != 0)) // the step interrupt uses MC0 compare
 	{
-		StepTc->INTENCLR.reg = TC_INTFLAG_MC0;						// disable the interrupt (no need to clear it, we do that before we re-enable it)
+		StepTc->INTENCLR.reg =
+			TC_INTFLAG_MC0; // disable the interrupt (no need to clear it, we do that before we re-enable it)
 #else
 	// ATSAM processor code
-	uint32_t tcsr = STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_SR;		// read the status register, which clears the status bits
-	tcsr &= STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_IMR;				// select only enabled interrupts
+	uint32_t tcsr = STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_SR; // read the status register, which clears the status bits
+	tcsr &= STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_IMR;		 // select only enabled interrupts
 
-	if (likely((tcsr & TC_SR_CPBS) != 0))							// the timer interrupt uses RB compare
+	if (likely((tcsr & TC_SR_CPBS) != 0)) // the timer interrupt uses RB compare
 	{
-		STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_IDR = TC_IER_CPBS;		// disable the interrupt
+		STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_IDR = TC_IER_CPBS; // disable the interrupt
 #endif
 
 #ifdef TIMER_DEBUG
@@ -281,7 +315,10 @@ void STEP_TC_HANDLER() noexcept
 	}
 }
 
-StepTimer::StepTimer() noexcept : next(nullptr), callback(nullptr), active(false)
+StepTimer::StepTimer() noexcept
+	: next(nullptr)
+	, callback(nullptr)
+	, active(false)
 {
 }
 
@@ -292,7 +329,8 @@ void StepTimer::SetCallback(TimerCallbackFunction cb, CallbackParameter param) n
 	cbParam = param;
 }
 
-// Schedule a callback at a particular tick count, returning true if it was not scheduled because it is already due or imminent.
+// Schedule a callback at a particular tick count, returning true if it was not scheduled because it is already due or
+// imminent.
 bool StepTimer::ScheduleCallbackFromIsr(Ticks when) noexcept
 {
 	whenDue = when;
@@ -314,7 +352,7 @@ bool StepTimer::ScheduleCallbackFromIsr() noexcept
 	}
 
 	// Optimise the common case i.e. no other timer is pending
-	StepTimer *_ecv_null tmr = pendingList;			// capture volatile variable
+	StepTimer* _ecv_null tmr = pendingList; // capture volatile variable
 	if (tmr == nullptr)
 	{
 		if (ScheduleTimerInterrupt(whenDue))
@@ -328,7 +366,7 @@ bool StepTimer::ScheduleCallbackFromIsr() noexcept
 	{
 		// Another timer is already pending
 		const Ticks now = GetTimerTicks();
-		const int32_t howSoon = (int32_t)(whenDue - now);
+		const auto howSoon = (int32_t)(whenDue - now);
 		if (howSoon < (int32_t)(tmr->whenDue - now))
 		{
 			// This one is due earlier than the first existing one
@@ -356,18 +394,19 @@ bool StepTimer::ScheduleCallbackFromIsr() noexcept
 
 bool StepTimer::ScheduleCallback(Ticks when) noexcept
 {
-	BasePriorityBooster booster(NvicPriorityStep);
+	const BasePriorityBooster booster(NvicPriorityStep);
 	return ScheduleCallbackFromIsr(when);
 }
 
 // Cancel any scheduled callback for this timer. Harmless if there is no callback scheduled.
 void StepTimer::CancelCallbackFromIsr() noexcept
 {
-	for (StepTimer *_ecv_null * ppst = const_cast<StepTimer *_ecv_null *>(&pendingList); *ppst != nullptr; ppst = &((*ppst)->next))
+	for (auto* _ecv_null* ppst = const_cast<StepTimer * _ecv_null*>(&pendingList); *ppst != nullptr;
+		 ppst = &((*ppst)->next))
 	{
 		if (*ppst == this)
 		{
-			*ppst = this->next;		// unlink this from the pending list
+			*ppst = this->next; // unlink this from the pending list
 			this->next = nullptr;
 			break;
 		}
@@ -377,13 +416,13 @@ void StepTimer::CancelCallbackFromIsr() noexcept
 
 void StepTimer::CancelCallback() noexcept
 {
-	BasePriorityBooster booster(NvicPriorityStep);
+	const BasePriorityBooster booster(NvicPriorityStep);
 	CancelCallbackFromIsr();
 }
 
 /*static*/ void StepTimer::Diagnostics(const StringRef& reply) noexcept
 {
-	const StepTimer *_ecv_null const pst = pendingList;
+	const StepTimer* const _ecv_null pst = pendingList;
 	if (pst == nullptr)
 	{
 		reply.lcat("No step interrupt scheduled");
@@ -392,19 +431,20 @@ void StepTimer::CancelCallback() noexcept
 	{
 		reply.lcatf("Next step interrupt due in %" PRIu32 " ticks, %s",
 					pst->whenDue - GetTimerTicks(),
-# if SAME5x
+#if SAME5x
 					((StepTc->INTENSET.reg & TC_INTFLAG_MC0) == 0)
-# elif SAME70 || SAM4E || SAM4S
+#elif SAME70 || SAM4E || SAM4S
 					((STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_IER & TC_IER_CPBS) == 0)
-# endif
-						? "disabled" : "enabled");
-# if SAME5x
+#endif
+						? "disabled"
+						: "enabled");
+#if SAME5x
 		if (StepTc->CC[0].reg != pst->whenDue)
-# elif SAM4E
+#elif SAM4E
 		if (STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RB != pst->whenDue)
-# elif SAME70 || SAM4S
+#elif SAME70 || SAM4S
 		if (STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RB != (uint16_t)pst->whenDue)
-# endif
+#endif
 		{
 			reply.cat(", CC0 mismatch!!");
 		}
@@ -416,13 +456,13 @@ void StepTimer::CancelCallback() noexcept
 // Handle a request for movement delay received from an expansion board
 void StepTimer::ProcessMovementDelayRequest(uint32_t delayRequested) noexcept
 {
-	AtomicCriticalSectionLocker lock;
+	const AtomicCriticalSectionLocker lock;
 
 	if (delayRequested > movementDelay)
 	{
 		movementDelay = delayRequested;
 	}
-	ownMovementDelayIncreased = true;						// always set this to ensure that we acknowledge the request
+	ownMovementDelayIncreased = true; // always set this to ensure that we acknowledge the request
 }
 
 #endif

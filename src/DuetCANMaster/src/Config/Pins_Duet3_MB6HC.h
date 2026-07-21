@@ -5,104 +5,105 @@
 #include <SPI/SpiParameters.h>
 #include <UART/UartParameters.h>
 
-#define BOARD_SHORT_NAME		"MB6HC"
-#define BOARD_NAME				"Duet 3 MB6HC"
-#define DEFAULT_BOARD_TYPE		BoardType::Auto
-#define FIRMWARE_NAME			"RepRapFirmware for Duet 3 MB6HC"
-#define IAP_FIRMWARE_FILE		"Duet3Firmware_" BOARD_SHORT_NAME ".bin"
+#define BOARD_SHORT_NAME "MB6HC"
+#define BOARD_NAME "Duet 3 MB6HC"
+#define DEFAULT_BOARD_TYPE BoardType::Auto
+#define FIRMWARE_NAME "RepRapFirmware for Duet 3 MB6HC"
+#define IAP_FIRMWARE_FILE "Duet3Firmware_" BOARD_SHORT_NAME ".bin"
 
-#define IAP_UPDATE_FILE			"Duet3_SDiap32_" BOARD_SHORT_NAME ".bin"
-#define IAP_UPDATE_FILE_SBC		"Duet3_SBCiap32_" BOARD_SHORT_NAME ".bin"
-#define IAP_CAN_LOADER_FILE		"Duet3_CANiap32_" BOARD_SHORT_NAME ".bin"
-constexpr uint32_t IAP_IMAGE_START = 0x20458000;		// last 32kb of RAM
+#define IAP_UPDATE_FILE "Duet3_SDiap32_" BOARD_SHORT_NAME ".bin"
+#define IAP_UPDATE_FILE_SBC "Duet3_SBCiap32_" BOARD_SHORT_NAME ".bin"
+#define IAP_CAN_LOADER_FILE "Duet3_CANiap32_" BOARD_SHORT_NAME ".bin"
+constexpr uint32_t IAP_IMAGE_START = 0x20458000; // last 32kb of RAM
 
-#define WIFI_FIRMWARE_FILE		"DuetWiFiModule_32S3.bin"
+#define WIFI_FIRMWARE_FILE "DuetWiFiModule_32S3.bin"
 
 // Features definition
 // Networking support
-#define HAS_LWIP_NETWORKING		1
-#define HAS_WIFI_NETWORKING		1
-#define WIFI_USES_ESP32			1
+#define HAS_LWIP_NETWORKING 1
+#define HAS_WIFI_NETWORKING 1
+#define WIFI_USES_ESP32 1
 
 #ifndef NO_S_CURVE
-# define SUPPORT_S_CURVE		1		// by default we support 3rd-order motion control on the 6HC
+#  define SUPPORT_S_CURVE 1 // by default we support 3rd-order motion control on the 6HC
 #endif
 
 // Storage support
 #ifdef USE_EMBEDDED_FILES
-# define HAS_EMBEDDED_FILES		1
-# define HAS_SBC_INTERFACE		0
-# define SUPPORTS_SBC_OVER_SPI	0
-# define SUPPORTS_SBC_OVER_USB	0
-# define HAS_MASS_STORAGE		0
-# define HAS_HIGH_SPEED_SD		0
+#  define HAS_EMBEDDED_FILES 1
+#  define HAS_SBC_INTERFACE 0
+#  define SUPPORTS_SBC_OVER_SPI 0
+#  define SUPPORTS_SBC_OVER_USB 0
+#  define HAS_MASS_STORAGE 0
+#  define HAS_HIGH_SPEED_SD 0
 #else
-# define HAS_SBC_INTERFACE		1
-# define SUPPORTS_SBC_OVER_SPI	1
-# define SUPPORTS_SBC_OVER_USB	CORE_USES_TINYUSB
-# define HAS_MASS_STORAGE		1
-# define HAS_HIGH_SPEED_SD		1
+#  define HAS_SBC_INTERFACE 1
+#  define SUPPORTS_SBC_OVER_SPI 1
+#  define SUPPORTS_SBC_OVER_USB CORE_USES_TINYUSB
+#  define HAS_MASS_STORAGE 1
+#  define HAS_HIGH_SPEED_SD 1
 #endif
 
-#define HAS_CPU_TEMP_SENSOR		1
+#define HAS_CPU_TEMP_SENSOR 1
 
-#define SUPPORT_TMC51xx			1
-#define TMC_USES_USART			1
-#define SINGLE_DRIVER			0
+#define SUPPORT_TMC51xx 1
+#define TMC_USES_USART 1
+#define SINGLE_DRIVER 0
 
-#define HAS_VOLTAGE_MONITOR		1
-#define ENFORCE_MAX_VIN			0
-#define HAS_12V_MONITOR			1
-#define ENFORCE_MIN_V12			1
-#define HAS_VREF_MONITOR		1
+#define HAS_VOLTAGE_MONITOR 1
+#define ENFORCE_MAX_VIN 0
+#define HAS_12V_MONITOR 1
+#define ENFORCE_MIN_V12 1
+#define HAS_VREF_MONITOR 1
 
-#define SUPPORT_CAN_EXPANSION	1
-#define SUPPORT_BRS				1
-#define DUAL_CAN				1					// support the second CAN interface as simple CAN (not FD)
-#define SUPPORT_LED_STRIPS		1
-#define SUPPORT_DMA_DOTSTAR		1
-#define SUPPORT_DMA_NEOPIXEL	1
-#define SUPPORT_LASER			1					// support laser cutters and engravers using G1 S parameter
-#define SUPPORT_IOBITS			1					// set to support P parameter in G0/G1 commands
-#define SUPPORT_DHT_SENSOR		1					// set nonzero to support DHT temperature/humidity sensors
-#define SUPPORT_BME280			1
-#define SUPPORT_BME68X			1
-#define SUPPORT_ADS131A02		1
+#define SUPPORT_CAN_EXPANSION 1
+#define SUPPORT_BRS 1
+#define DUAL_CAN 1 // support the second CAN interface as simple CAN (not FD)
+#define SUPPORT_LED_STRIPS 1
+#define SUPPORT_DMA_DOTSTAR 1
+#define SUPPORT_DMA_NEOPIXEL 1
+#define SUPPORT_LASER 1		 // support laser cutters and engravers using G1 S parameter
+#define SUPPORT_IOBITS 1	 // set to support P parameter in G0/G1 commands
+#define SUPPORT_DHT_SENSOR 1 // set nonzero to support DHT temperature/humidity sensors
+#define SUPPORT_BME280 1
+#define SUPPORT_BME68X 1
+#define SUPPORT_ADS131A02 1
 
 #ifdef USE_EMBEDDED_FILES
-#define SUPPORT_ACCELEROMETERS	0
-# define SUPPORT_FTP			0
-# define SUPPORT_MULTICAST_DISCOVERY	0
-# define SUPPORT_REMOTE_COMMANDS		0
-# define SUPPORT_PROBE_POINTS_FILE		0
+#  define SUPPORT_ACCELEROMETERS 0
+#  define SUPPORT_FTP 0
+#  define SUPPORT_MULTICAST_DISCOVERY 0
+#  define SUPPORT_REMOTE_COMMANDS 0
+#  define SUPPORT_PROBE_POINTS_FILE 0
 #else
-#define SUPPORT_ACCELEROMETERS	1
-# define SUPPORT_FTP			1
-# define SUPPORT_MULTICAST_DISCOVERY	1
-# define SUPPORT_PROBE_POINTS_FILE		1
+#  define SUPPORT_ACCELEROMETERS 1
+#  define SUPPORT_FTP 1
+#  define SUPPORT_MULTICAST_DISCOVERY 1
+#  define SUPPORT_PROBE_POINTS_FILE 1
 #endif
 
-#define SUPPORT_TELNET			1
-#define SUPPORT_MQTT			1
-#define SUPPORT_ASYNC_MOVES		1
-#define SUPPORT_BRAKE_PWM		1
-#define SUPPORT_KEEPOUT_ZONES	1
-#define SUPPORT_MODBUS_RTU		1
-#define SUPPORT_PHASE_STEPPING	1
+#define SUPPORT_TELNET 1
+#define SUPPORT_MQTT 1
+#define SUPPORT_ASYNC_MOVES 1
+#define SUPPORT_BRAKE_PWM 1
+#define SUPPORT_KEEPOUT_ZONES 1
+#define SUPPORT_MODBUS_RTU 1
+#define SUPPORT_PHASE_STEPPING 1
 
-#define USE_MPU					1					// Needed if USE_CACHE is set, so that we can have non-cacheable memory regions
-#define USE_CACHE				1
+#define USE_MPU 1 // Needed if USE_CACHE is set, so that we can have non-cacheable memory regions
+#define USE_CACHE 1
 
 // The physical capabilities of the machine
 
-#include <Duet3Common.h>							// this file is in the CANlib project because both main and expansion boards need it
+#include <Duet3Common.h> // this file is in the CANlib project because both main and expansion boards need it
 
-constexpr size_t NumDirectDrivers = 6;				// The maximum number of drives supported by the electronics inc. direct expansion
-constexpr size_t MaxSmartDrivers = 6;				// The maximum number of direct smart drivers
+constexpr size_t NumDirectDrivers =
+	6;								  // The maximum number of drives supported by the electronics inc. direct expansion
+constexpr size_t MaxSmartDrivers = 6; // The maximum number of direct smart drivers
 constexpr size_t MaxCanDrivers = 30;
 constexpr size_t MaxCanBoards = 20;
 
-constexpr float MaxMotorCurrent = 6300.0;			// The maximum current we allow the TMC5160/5161 drivers to be set to
+constexpr float MaxMotorCurrent = 6300.0; // The maximum current we allow the TMC5160/5161 drivers to be set to
 constexpr float Tmc5160SenseResistor = 0.050;
 
 constexpr size_t MaxPortsPerHeater = 3;
@@ -115,65 +116,57 @@ constexpr size_t MaxHeatersPerChamber = 4;
 constexpr size_t NumThermistorInputs = 4;
 constexpr size_t NumTmcDriversSenseChannels = 1;
 
-constexpr size_t MinAxes = 3;						// The minimum and default number of axes
-constexpr size_t MaxAxes = 30;						// The maximum number of movement axes in the machine
-constexpr size_t MaxDriversPerAxis = 8;				// The maximum number of stepper drivers assigned to one axis
+constexpr size_t MinAxes = 3;			// The minimum and default number of axes
+constexpr size_t MaxAxes = 30;			// The maximum number of movement axes in the machine
+constexpr size_t MaxDriversPerAxis = 8; // The maximum number of stepper drivers assigned to one axis
 
-constexpr size_t MaxExtruders = 20;					// The maximum number of extruders
-constexpr size_t MaxAxesPlusExtruders = 32;			// May be <= MaxAxes + MaxExtruders
+constexpr size_t MaxExtruders = 20;			// The maximum number of extruders
+constexpr size_t MaxAxesPlusExtruders = 32; // May be <= MaxAxes + MaxExtruders
 
-constexpr size_t MaxHeatersPerTool = 20;			// Increased in 3.4 due to OEM requirement
-constexpr size_t MaxExtrudersPerTool = 12;			// Increased in 3.5.2 because a user needs 12 on a 6HC
+constexpr size_t MaxHeatersPerTool = 20;   // Increased in 3.4 due to OEM requirement
+constexpr size_t MaxExtrudersPerTool = 12; // Increased in 3.5.2 because a user needs 12 on a 6HC
 
-constexpr unsigned int MaxTriggers = 32;			// Must be <= 32 because we store a bitmap of pending triggers in a uint32_t
+constexpr unsigned int MaxTriggers = 32; // Must be <= 32 because we store a bitmap of pending triggers in a uint32_t
 
 // USB and other serial devices
 #define SERIAL_USB_DEVICE (serialUSB)
 #if CORE_USES_TINYUSB
 constexpr size_t NumUsbChannels = 2;
-# define SERIAL_USB2_DEVICE (serialUSB2)
+#  define SERIAL_USB2_DEVICE (serialUSB2)
 #else
 constexpr size_t NumUsbChannels = 1;
 #endif
 
-#define NUM_ASYNC_PORTS			(2)
-#define NUM_ASYNC_CHANNELS		(2)
+#define NUM_ASYNC_PORTS (2)
+#define NUM_ASYNC_CHANNELS (2)
 
-constexpr size_t NumSerialChannels = NumUsbChannels + NUM_ASYNC_CHANNELS;				// The number of serial IO channels not counting the WiFi serial connection (USB, USB2, and two auxiliary UARTs)
+constexpr size_t NumSerialChannels =
+	NumUsbChannels + NUM_ASYNC_CHANNELS; // The number of serial IO channels not counting the WiFi serial connection
+										 // (USB, USB2, and two auxiliary UARTs)
 
-constexpr UartParameters Serial0Params =
-{
-	.uartOrUsartInstance = 2,						// uart 2
-	.rxPin = PortDPin(25),
-	.txPin = PortDPin(26),
-	.pinFunction = GpioPinFunction::C,
-	.numRxSlots = 512,
-	.numTxSlots = 512
-};
+constexpr UartParameters Serial0Params = {.uartOrUsartInstance = 2, // uart 2
+										  .rxPin = PortDPin(25),
+										  .txPin = PortDPin(26),
+										  .pinFunction = GpioPinFunction::C,
+										  .numRxSlots = 512,
+										  .numTxSlots = 512};
 
-constexpr UartParameters Serial1Params =
-{
-	.uartOrUsartInstance = 2 | 0x80,				// usart 2
-	.rxPin = PortDPin(15),
-	.txPin = PortDPin(16),
-	.pinFunction = GpioPinFunction::B,
-	.numRxSlots = 512,
-	.numTxSlots = 512
-};
+constexpr UartParameters Serial1Params = {.uartOrUsartInstance = 2 | 0x80, // usart 2
+										  .rxPin = PortDPin(15),
+										  .txPin = PortDPin(16),
+										  .pinFunction = GpioPinFunction::B,
+										  .numRxSlots = 512,
+										  .numTxSlots = 512};
 
-constexpr UartParameters SerialWiFiParams =
-{
-	.uartOrUsartInstance = 4,						// uart 4
-	.rxPin = PortDPin(18),
-	.txPin = PortDPin(19),
-	.pinFunction = GpioPinFunction::C,
-	.numRxSlots = 512,
-	.numTxSlots = 512
-};
+constexpr UartParameters SerialWiFiParams = {.uartOrUsartInstance = 4, // uart 4
+											 .rxPin = PortDPin(18),
+											 .txPin = PortDPin(19),
+											 .pinFunction = GpioPinFunction::C,
+											 .numRxSlots = 512,
+											 .numTxSlots = 512};
 
 // Shared SPI definitions
-constexpr SpiParameters SharedSpiParams =
-{
+constexpr SpiParameters SharedSpiParams = {
 	.usartNumber = 0,
 	.mosiPin = PortBPin(1),
 	.misoPin = PortBPin(0),
@@ -181,26 +174,29 @@ constexpr SpiParameters SharedSpiParams =
 	.pinFunction = GpioPinFunction::C,
 };
 
-constexpr Pin UsbVBusPin = PortCPin(21);			// Pin used to monitor VBUS on USB port
+constexpr Pin UsbVBusPin = PortCPin(21); // Pin used to monitor VBUS on USB port
 
 // Drivers
-constexpr Pin STEP_PINS[NumDirectDrivers] =			{ PortCPin(18), PortCPin(16), PortCPin(28), PortCPin(01), PortCPin(04), PortCPin(9) };
-constexpr Pin DIRECTION_PINS[NumDirectDrivers] =	{ PortBPin(05), PortDPin(10), PortAPin(04), PortAPin(22), PortCPin(03), PortDPin(14) };
+constexpr Pin STEP_PINS[NumDirectDrivers] = {
+	PortCPin(18), PortCPin(16), PortCPin(28), PortCPin(01), PortCPin(04), PortCPin(9)};
+constexpr Pin DIRECTION_PINS[NumDirectDrivers] = {
+	PortBPin(05), PortDPin(10), PortAPin(04), PortAPin(22), PortCPin(03), PortDPin(14)};
 
 // The DIAG pins are currently not used by RRF because we can get the stall status often enough over SPI.
 // The last DIAG pin is reallocated to be the RS485 Tx/Rx pin on v1.0c boards.
-//constexpr Pin DIAG_PINS[NumDirectDrivers] =			{ PortDPin(29), PortCPin(17), PortDPin(13), PortCPin(02), PortDPin(31), PortCPin(10) };
+// constexpr Pin DIAG_PINS[NumDirectDrivers] =			{ PortDPin(29), PortCPin(17), PortDPin(13), PortCPin(02),
+// PortDPin(31), PortCPin(10) };
 
 // Pin assignments etc. using USART1 in SPI mode
-constexpr Pin GlobalTmcEnablePin = PortAPin(9);		// The pin that drives ENN of all TMC drivers
-constexpr Pin GlobalTmcCSPin = PortDPin(17);		// The pin that drives CS of all TMC drivers
-Usart * const USART_TMC = USART1;
-constexpr uint32_t  ID_TMC_SPI = ID_USART1;
+constexpr Pin GlobalTmcEnablePin = PortAPin(9); // The pin that drives ENN of all TMC drivers
+constexpr Pin GlobalTmcCSPin = PortDPin(17);	// The pin that drives CS of all TMC drivers
+Usart* const USART_TMC = USART1;
+constexpr uint32_t ID_TMC_SPI = ID_USART1;
 constexpr IRQn TMC_SPI_IRQn = USART1_IRQn;
 
 // These next two are #defines to avoid the need to #include DmacManager.h here
-#define TMC_DmaTxPerid	((uint32_t)DmaTrigSource::usart1tx)
-#define TMC_DmaRxPerid	((uint32_t)DmaTrigSource::usart1rx)
+#define TMC_DmaTxPerid ((uint32_t)DmaTrigSource::usart1tx)
+#define TMC_DmaRxPerid ((uint32_t)DmaTrigSource::usart1rx)
 
 constexpr Pin TMCMosiPin = PortBPin(4);
 constexpr GpioPinFunction TMCMosiPinPeriphMode = GpioPinFunction::D;
@@ -212,25 +208,29 @@ constexpr GpioPinFunction TMCSclkPinPeriphMode = GpioPinFunction::A;
 constexpr uint32_t DefaultStandstillCurrentPercent = 71;
 
 // Thermistor/PT1000 inputs
-constexpr Pin TEMP_SENSE_PINS[NumThermistorInputs] = { PortCPin(15), PortCPin(29), PortCPin(30), PortCPin(31) };	// Thermistor/PT1000 pins
+constexpr Pin TEMP_SENSE_PINS[NumThermistorInputs] = {
+	PortCPin(15), PortCPin(29), PortCPin(30), PortCPin(31)}; // Thermistor/PT1000 pins
 constexpr Pin VssaSensePin = PortCPin(13);
 constexpr Pin VrefSensePin = PortCPin(0);
 
 // Thermistor series resistor value in Ohms
 constexpr float DefaultThermistorSeriesR = 2200.0;
-constexpr float MinVrefLoadR = (DefaultThermistorSeriesR / NumThermistorInputs) * 4700.0/((DefaultThermistorSeriesR / NumThermistorInputs) + 4700.0);
-																			// there are 4 temperature sensing channels and a 4K7 load resistor
+constexpr float MinVrefLoadR = (DefaultThermistorSeriesR / NumThermistorInputs) * 4700.0 /
+							   ((DefaultThermistorSeriesR / NumThermistorInputs) + 4700.0);
+// there are 4 temperature sensing channels and a 4K7 load resistor
 constexpr float VrefSeriesR = 15.0;
 
 // Digital pins the SPI temperature sensors have their select lines tied to
-constexpr Pin SpiTempSensorCsPins[] = { PortAPin(5), PortAPin(6), PortDPin(20), PortCPin(22) };
+constexpr Pin SpiTempSensorCsPins[] = {PortAPin(5), PortAPin(6), PortDPin(20), PortCPin(22)};
 
 // Analogue pin numbers
 constexpr Pin PowerMonitorVinDetectPin = PortAPin(20);
 constexpr Pin PowerMonitorV12DetectPin = PortEPin(4);
-constexpr float PowerMonitorVoltageRange_v102 = (100.0 + 5.1)/5.1 * 3.3;	// voltage divider ratio times the reference voltage
-constexpr float PowerMonitorVoltageRange_v101 = (60.4 + 4.7)/4.7 * 3.3;		// voltage divider ratio times the reference voltage
-constexpr float V12MonitorVoltageRange = (60.4 + 4.7)/4.7 * 3.3;			// voltage divider ratio times the reference voltage
+constexpr float PowerMonitorVoltageRange_v102 =
+	(100.0 + 5.1) / 5.1 * 3.3; // voltage divider ratio times the reference voltage
+constexpr float PowerMonitorVoltageRange_v101 =
+	(60.4 + 4.7) / 4.7 * 3.3;									   // voltage divider ratio times the reference voltage
+constexpr float V12MonitorVoltageRange = (60.4 + 4.7) / 4.7 * 3.3; // voltage divider ratio times the reference voltage
 
 // Digital pin number to turn the IR LED on (high) or off (low), also controls the DIAG LED
 constexpr Pin DiagPinPre102 = PortCPin(20);
@@ -249,21 +249,23 @@ constexpr Pin UsbDetectPin = PortCPin(19);
 
 // RS485 control
 // Modbus (board version 1.02 and later)
-constexpr Pin ModbusTxPin = PortCPin(10);										// was Driver 5 diag0 prior to version 1.06c board
-constexpr const char *_ecv_array ModbusTxPinName = "rs485.tx";
+constexpr Pin ModbusTxPin = PortCPin(10); // was Driver 5 diag0 prior to version 1.06c board
+constexpr const char* _ecv_array ModbusTxPinName = "rs485.tx";
 
 // SD cards
 // PD24 is SWD_EXT_RESET on pre-1.02 boards, PanelDue Card Detect on 1.20 and later
 // PD24 is not connected on pre-1.02 boards, SPI_CS4 on 1.02 and later
-constexpr size_t NumSdCards = 2;												// we now allow one SPI-connected SD card to be configured at boot time
-constexpr Pin SdCardDetectPins[NumSdCards] = { PortAPin(29), PortDPin(24) };	// the CD pin for the second SD card is allocated using M950 on MB6HC boards before version 1.02
-constexpr Pin SdWriteProtectPins[NumSdCards] = { NoPin, NoPin };
-constexpr Pin SdSpiCSPins[1] = { PortDPin(22) };								// this one is allocated using M950 on MB6HC boards before version 1.02
+constexpr size_t NumSdCards = 2; // we now allow one SPI-connected SD card to be configured at boot time
+constexpr Pin SdCardDetectPins[NumSdCards] = {
+	PortAPin(29),
+	PortDPin(24)}; // the CD pin for the second SD card is allocated using M950 on MB6HC boards before version 1.02
+constexpr Pin SdWriteProtectPins[NumSdCards] = {NoPin, NoPin};
+constexpr Pin SdSpiCSPins[1] = {PortDPin(22)}; // this one is allocated using M950 on MB6HC boards before version 1.02
 constexpr uint32_t ExpectedSdCardSpeed = 25000000;
 constexpr IRQn SdhcIRQn = HSMCI_IRQn;
 
 // DotStar LED control
-#define LEDSTRIP_USES_USART	0
+#define LEDSTRIP_USES_USART 0
 
 constexpr Pin DotStarMosiPin = PortAPin(13);
 constexpr Pin DotStarSclkPin = PortAPin(14);
@@ -274,18 +276,29 @@ constexpr IRQn DotStarIRQn = QSPI_IRQn;
 // Ethernet
 constexpr Pin EthernetPhyInterruptPinPre102 = PortCPin(6);
 constexpr Pin EthernetPhyResetPin = PortDPin(11);
-constexpr Pin EthernetPhyOtherPins[] = {
-		PortDPin(0), PortDPin(1), PortDPin(2), PortDPin(3), PortDPin(4),
-		PortDPin(5), PortDPin(6), PortDPin(7), PortDPin(8), PortDPin(9)
-};
+constexpr Pin EthernetPhyOtherPins[] = {PortDPin(0),
+										PortDPin(1),
+										PortDPin(2),
+										PortDPin(3),
+										PortDPin(4),
+										PortDPin(5),
+										PortDPin(6),
+										PortDPin(7),
+										PortDPin(8),
+										PortDPin(9)};
 constexpr auto EthernetPhyOtherPinsFunction = GpioPinFunction::A;
 
 // List of assignable pins and their mapping from names to MPU ports. This is indexed by logical pin number.
 // The names must match user input that has been concerted to lowercase and had _ and - characters stripped out.
 // Aliases are separate by the , character.
-// If a pin name is prefixed by ! then this means the pin is hardware inverted. The same pin may have names for both the inverted and non-inverted cases,
-// for example the inverted heater pins on the expansion connector are available as non-inverted servo pins on a DueX.
-//TODO change the table below for the V0.6 board
+// If a pin name is prefixed by ! then this means the pin is hardware inverted. The same pin may have names for both the
+// inverted and non-inverted cases, for example the inverted heater pins on the expansion connector are available as
+// non-inverted servo pins on a DueX.
+// TODO change the table below for the V0.6 board
+// clang-format off
+// The PinTable is a hand-aligned column layout: one row per MCU pin, with the trailing
+// comment naming the physical pin. clang-format collapses the alignment and explodes longer
+// rows across five lines each, which makes the table unreviewable against the schematic.
 constexpr PinDescription PinTable[] =
 {
 	//	TC					PWM					ADC				Capability				PinNames
@@ -433,9 +446,10 @@ constexpr PinDescription PinTable[] =
 	{ TcOutput::none,	PwmOutput::none,	AdcInput::adc0_4,	PinCapability::none,	nullptr				},	// PE04 V12 detect
 	{ TcOutput::none,	PwmOutput::none,	AdcInput::adc0_3,	PinCapability::ainr,	"io3.in"			},	// PE05 IO3_IN
 };
+// clang-format on
 
 constexpr size_t NumNamedPins = ARRAY_SIZE(PinTable);
-constexpr size_t NumRealPins = 32+32+32+32+6;
+constexpr size_t NumRealPins = 32 + 32 + 32 + 32 + 6;
 constexpr size_t NumVirtualPins = 0;
 
 static_assert(NumNamedPins == NumRealPins + NumVirtualPins);
@@ -443,14 +457,14 @@ static_assert(NumNamedPins == NumRealPins + NumVirtualPins);
 // SD Card
 constexpr Pin HsmciMclkPin = PortAPin(25);
 constexpr auto HsmciMclkPinFunction = GpioPinFunction::D;
-constexpr Pin HsmciOtherPins[] = { PortAPin(26), PortAPin(27), PortAPin(28), PortAPin(30), PortAPin(31) };
+constexpr Pin HsmciOtherPins[] = {PortAPin(26), PortAPin(27), PortAPin(28), PortAPin(30), PortAPin(31)};
 constexpr auto HsmciOtherPinsFunction = GpioPinFunction::C;
 
 // Duet pin numbers for the SBC interface
-#define SBC_SPI					SPI1
-#define SBC_SPI_INTERFACE_ID	ID_SPI1
-#define SBC_SPI_IRQn			SPI1_IRQn
-#define SBC_SPI_HANDLER			SPI1_Handler
+#define SBC_SPI SPI1
+#define SBC_SPI_INTERFACE_ID ID_SPI1
+#define SBC_SPI_IRQn SPI1_IRQn
+#define SBC_SPI_HANDLER SPI1_Handler
 
 constexpr Pin APIN_SBC_SPI_MOSI = PortCPin(27);
 constexpr Pin APIN_SBC_SPI_MISO = PortCPin(26);
@@ -463,26 +477,28 @@ constexpr Pin SbcTfrReadyPin = PortEPin(2);
 // Note, the DMAC peripheral IDs are hard-coded in DataTransfer
 
 // WiFi pins, mostly shared with the SBC interface
-#define ESP_SPI					SPI1
-#define ESP_SPI_INTERFACE_ID	ID_SPI1
-#define ESP_SPI_IRQn			SPI1_IRQn
+#define ESP_SPI SPI1
+#define ESP_SPI_INTERFACE_ID ID_SPI1
+#define ESP_SPI_IRQn SPI1_IRQn
 
 #if HAS_SBC_INTERFACE
-#define ESP_SPI_HANDLER			SPI1_WiFi_Handler	// SBC interface redirects the interrupt to here
+#  define ESP_SPI_HANDLER SPI1_WiFi_Handler // SBC interface redirects the interrupt to here
 #else
-#define ESP_SPI_HANDLER			SPI1_Handler		// SBC interface redirects the interrupt to here
+#  define ESP_SPI_HANDLER SPI1_Handler // SBC interface redirects the interrupt to here
 #endif
 
 constexpr Pin APIN_ESP_SPI_MOSI = PortCPin(27);
 constexpr Pin APIN_ESP_SPI_MISO = PortCPin(26);
-constexpr Pin APIN_ESP_SPI_SCK  = PortCPin(24);
-constexpr Pin APIN_ESP_SPI_SS0  = PortCPin(25);
+constexpr Pin APIN_ESP_SPI_SCK = PortCPin(24);
+constexpr Pin APIN_ESP_SPI_SS0 = PortCPin(25);
 constexpr GpioPinFunction SPIPeriphMode = GpioPinFunction::C;
 
-constexpr Pin EspEnablePin = PortCPin(14);			// Low on this in holds the WiFi module in reset (ESP_EN)
-constexpr Pin EspDataReadyPin = PortAPin(2);		// Input from the WiFi module indicating that it wants to transfer data (ESP GPIO0)
-constexpr Pin SamTfrReadyPin = PortEPin(2);			// Output from the SAM to the WiFi module indicating we can accept a data transfer (ESP GPIO8)
-constexpr Pin SamCsPin = PortCPin(25);				// SPI NPCS pin, input from WiFi module
+constexpr Pin EspEnablePin = PortCPin(14); // Low on this in holds the WiFi module in reset (ESP_EN)
+constexpr Pin EspDataReadyPin =
+	PortAPin(2); // Input from the WiFi module indicating that it wants to transfer data (ESP GPIO0)
+constexpr Pin SamTfrReadyPin =
+	PortEPin(2); // Output from the SAM to the WiFi module indicating we can accept a data transfer (ESP GPIO8)
+constexpr Pin SamCsPin = PortCPin(25); // SPI NPCS pin, input from WiFi module
 // Note, the DMAC peripheral IDs are hard-coded in WiFiInterface
 
 // CAN
@@ -495,24 +511,24 @@ constexpr GpioPinFunction CAN1RXPinPeriphMode = GpioPinFunction::C;
 constexpr Pin APIN_CAN1_TX = PortDPin(12);
 constexpr GpioPinFunction CAN1TXPinPeriphMode = GpioPinFunction::B;
 
-constexpr unsigned int CanDeviceNumber = 1;				// CAN-FD device number
+constexpr unsigned int CanDeviceNumber = 1; // CAN-FD device number
 
 #if defined(DUAL_CAN) && DUAL_CAN
-constexpr unsigned int SecondaryCanDeviceNumber = 0;	// plan CAN device number
+constexpr unsigned int SecondaryCanDeviceNumber = 0; // plan CAN device number
 #endif
 
 // Timer allocation
 // Step timer is timer 0 aka TC0 channel 0. Also used as the CAN timestamp counter.
-#define STEP_TC				(TC0)
-#define STEP_TC_CHAN		(0)					// channel for lower 16 bits
-#define STEP_TC_CHAN_UPPER	(2)					// channel for upper 16 bits
-#define STEP_TC_IRQN		TC0_IRQn
-#define STEP_TC_HANDLER		TC0_Handler
-#define STEP_TC_ID			ID_TC0
-#define STEP_TC_ID_UPPER	ID_TC2
+#define STEP_TC (TC0)
+#define STEP_TC_CHAN (0)	   // channel for lower 16 bits
+#define STEP_TC_CHAN_UPPER (2) // channel for upper 16 bits
+#define STEP_TC_IRQN TC0_IRQn
+#define STEP_TC_HANDLER TC0_Handler
+#define STEP_TC_ID ID_TC0
+#define STEP_TC_ID_UPPER ID_TC2
 
 // DMA channel allocation
-constexpr DmaChannel DmacChanHsmci = 0;			// this is hard coded in the ASF HSMCI driver
+constexpr DmaChannel DmacChanHsmci = 0; // this is hard coded in the ASF HSMCI driver
 constexpr DmaChannel DmacChanWiFiTx = 1;
 constexpr DmaChannel DmacChanWiFiRx = 2;
 constexpr DmaChannel DmacChanTmcTx = 3;
@@ -526,29 +542,27 @@ constexpr size_t NumDmaChannelsUsed = 8;
 namespace StepPins
 {
 	// *** These next three functions must use the same bit assignments in the drivers bitmap ***
-	// Each stepper driver must be assigned one bit in a 32-bit word, in such a way that multiple drivers can be stepped efficiently
-	// and more or less simultaneously by doing parallel writes to several bits in one or more output ports.
+	// Each stepper driver must be assigned one bit in a 32-bit word, in such a way that multiple drivers can be stepped
+	// efficiently and more or less simultaneously by doing parallel writes to several bits in one or more output ports.
 	// All our step pins are on port C, so the bitmap is just the map of step bits in port C.
 
 	// Calculate the step bit for a driver. This doesn't need to be fast. It must return 0 if the driver is remote.
 	static inline uint32_t CalcDriverBitmap(size_t driver) noexcept
 	{
-		return (driver < NumDirectDrivers)
-				? 1u << (STEP_PINS[driver] & 0x1Fu)
-				: 0;
+		return (driver < NumDirectDrivers) ? 1u << (STEP_PINS[driver] & 0x1Fu) : 0;
 	}
 
 	// Set the specified step pins high. This needs to be fast.
 	static inline __attribute__((always_inline)) void StepDriversHigh(uint32_t driverMap) noexcept
 	{
-		PIOC->PIO_SODR = driverMap;				// on Duet 3 all step pins are on port C
+		PIOC->PIO_SODR = driverMap; // on Duet 3 all step pins are on port C
 	}
 
 	// Set the specified step pins low. This needs to be fast.
 	static inline __attribute__((always_inline)) void StepDriversLow(uint32_t driverMap) noexcept
 	{
-		PIOC->PIO_CODR = driverMap;				// on Duet 3 all step pins are on port C
+		PIOC->PIO_CODR = driverMap; // on Duet 3 all step pins are on port C
 	}
-}
+} // namespace StepPins
 
-#endif	//ifndef PINS_DUET3_MB6HC_H__
+#endif // ifndef PINS_DUET3_MB6HC_H__

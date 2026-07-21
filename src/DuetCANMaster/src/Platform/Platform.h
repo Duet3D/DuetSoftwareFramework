@@ -25,32 +25,36 @@ Licence: GPL
 #define PLATFORM_H
 
 #include <RepRapFirmware.h>
+
 #include <Hardware/IoPorts.h>
 #include <SPI/SharedSpiDevice.h>
 
 #include <TemperatureError.h>
+
 #include "OutputMemory.h"
 #include "UniqueId.h"
+
 #include "AveragingFilter.h"
 #include <General/IPAddress.h>
 #include <General/function_ref.h>
 
 #if SUPPORT_CAN_EXPANSION
-# include <CanMessageFormats.h>
-# include <RemoteInputHandle.h>
+#  include <CanMessageFormats.h>
+#  include <RemoteInputHandle.h>
 #endif
 
 // Define the number of ADC filters and the indices of the extra ones
-// Note, the thermistor code assumes that the first N filters are used by the TEMP0 to TEMP(N-1) thermistor inputs, where N = NumThermistorInputs
+// Note, the thermistor code assumes that the first N filters are used by the TEMP0 to TEMP(N-1) thermistor inputs,
+// where N = NumThermistorInputs
 #if HAS_VREF_MONITOR
 constexpr size_t VrefFilterIndex = NumThermistorInputs;
 constexpr size_t VssaFilterIndex = NumThermistorInputs + 1;
-# if HAS_CPU_TEMP_SENSOR && !SAME5x
+#  if HAS_CPU_TEMP_SENSOR && !SAME5x
 constexpr size_t CpuTempFilterIndex = NumThermistorInputs + 2;
 constexpr size_t NumAdcFilters = NumThermistorInputs + 3;
-# else
+#  else
 constexpr size_t NumAdcFilters = NumThermistorInputs + 2;
-# endif
+#  endif
 #elif HAS_CPU_TEMP_SENSOR && !SAME5x
 constexpr size_t CpuTempFilterIndex = NumThermistorInputs;
 constexpr size_t NumAdcFilters = NumThermistorInputs + 1;
@@ -59,11 +63,13 @@ constexpr size_t NumAdcFilters = NumThermistorInputs;
 #endif
 
 // Z PROBE
-constexpr unsigned int ZProbeAverageReadings = 8;		// We average this number of readings with IR on, and the same number with IR off
+constexpr unsigned int ZProbeAverageReadings =
+	8; // We average this number of readings with IR on, and the same number with IR off
 
 // HEATERS - The bed is assumed to be the at index 0
 
-// Define the number of temperature readings we average for each thermistor. This should be a power of 2 and at least 4 ^ AD_OVERSAMPLE_BITS.
+// Define the number of temperature readings we average for each thermistor. This should be a power of 2 and at least 4
+// ^ AD_OVERSAMPLE_BITS.
 #if SAME70
 // On the SAME70 we read a thermistor on every tick so that we can average a higher number of readings
 // Keep THERMISTOR_AVERAGE_READINGS * NUM_HEATERS * 1ms no greater than HEAT_SAMPLE_TIME or the PIDs won't work well.
@@ -78,18 +84,19 @@ constexpr unsigned int ThermistorAverageReadings = 16;
 constexpr unsigned int TempSenseAverageReadings = 16;
 #endif
 
-constexpr uint32_t maxPidSpinDelay = 5000;			// Maximum elapsed time in milliseconds between successive temp samples by Pid::Spin() permitted for a temp sensor
+constexpr uint32_t maxPidSpinDelay = 5000; // Maximum elapsed time in milliseconds between successive temp samples by
+										   // Pid::Spin() permitted for a temp sensor
 
 /****************************************************************************************************/
 
 enum class BoardType : uint8_t
 {
-	Auto = 0,						// this value is no longer used
-#if defined(DUET3MINI_V04)			// we use the same values for both v0.2 and v0.4
+	Auto = 0,			   // this value is no longer used
+#if defined(DUET3MINI_V04) // we use the same values for both v0.2 and v0.4
 	Duet3Mini_Unknown,
-	Duet3Mini_WiFi,					// Duet Mini WiFi with ESP8266 module
+	Duet3Mini_WiFi, // Duet Mini WiFi with ESP8266 module
 	Duet3Mini_Ethernet,
-	Duet3Mini_WiFi_ESP32,			// Duet Mini WiFi with ESP32 module
+	Duet3Mini_WiFi_ESP32, // Duet Mini WiFi with ESP32 module
 #elif defined(DUET3_MB6HC)
 	Duet3_6HC_v06_100 = 1,
 	Duet3_6HC_v101 = 2,
@@ -117,7 +124,7 @@ enum class BoardType : uint8_t
 #elif defined(INDX)
 	Indx,
 #else
-# error Unknown board
+#  error Unknown board
 #endif
 };
 
@@ -126,37 +133,37 @@ enum class BoardType : uint8_t
 // Enumeration to describe various tests we do in response to the M122 command
 enum class DiagnosticTestType : unsigned int
 {
-	PrintTestReport = 1,			// run some tests and report the processor ID
+	PrintTestReport = 1, // run some tests and report the processor ID
 
-	PrintMoves = 100,				// print summary of recent moves (only if recording moves was enabled in firmware)
+	PrintMoves = 100, // print summary of recent moves (only if recording moves was enabled in firmware)
 #ifdef DUET_NG
-	PrintExpanderStatus = 101,		// print DueXn expander status
+	PrintExpanderStatus = 101, // print DueXn expander status
 #endif
-	TimeCalculations = 102,			// do a timing test on the square root function and sine/cosine
-	unused1 = 103,					// was TimeSinCos
-	TimeSDWrite = 104,				// do a write timing test on the SD card
-	PrintObjectSizes = 105,			// print the sizes of various objects
-	PrintObjectAddresses = 106,		// print the addresses and sizes of various objects
-	TimeCRC32 = 107,				// time how long it takes to calculate CRC32
-	TimeGetTimerTicks = 108,		// time now long it takes to read the step clock
-	UndervoltageEvent = 109,		// pretend an undervoltage condition has occurred
+	TimeCalculations = 102,		// do a timing test on the square root function and sine/cosine
+	unused1 = 103,				// was TimeSinCos
+	TimeSDWrite = 104,			// do a write timing test on the SD card
+	PrintObjectSizes = 105,		// print the sizes of various objects
+	PrintObjectAddresses = 106, // print the addresses and sizes of various objects
+	TimeCRC32 = 107,			// time how long it takes to calculate CRC32
+	TimeGetTimerTicks = 108,	// time now long it takes to read the step clock
+	UndervoltageEvent = 109,	// pretend an undervoltage condition has occurred
 #if SUPPORT_S_CURVE
 	TimeCubicSolver = 110,
 	TimeQuarticSolver = 111,
 #endif
 
-	SetWriteBuffer = 500,			// enable/disable the write buffer
+	SetWriteBuffer = 500, // enable/disable the write buffer
 
-	OutputBufferStarvation = 900,	// Allocate almost all output buffers to emulate starvation
+	OutputBufferStarvation = 900, // Allocate almost all output buffers to emulate starvation
 
-	TestWatchdog = 1001,			// test that we get a watchdog reset if the tick interrupt stops
-	TestSpinLockup = 1002,			// test that we get a software reset if a Spin() function takes too long
-	TestSerialBlock = 1003,			// test what happens when we write a blocking message via debugPrintf()
-	DivideByZero = 1004,			// do an integer divide by zero to test exception handling
-	UnalignedMemoryAccess = 1005,	// do an unaligned memory access to test exception handling
-	BusFault = 1006,				// generate a bus fault
-	AccessMemory = 1007,			// read or write  memory
-	MemoryLeak = 1008				// cause an out of memory fault
+	TestWatchdog = 1001,		  // test that we get a watchdog reset if the tick interrupt stops
+	TestSpinLockup = 1002,		  // test that we get a software reset if a Spin() function takes too long
+	TestSerialBlock = 1003,		  // test what happens when we write a blocking message via debugPrintf()
+	DivideByZero = 1004,		  // do an integer divide by zero to test exception handling
+	UnalignedMemoryAccess = 1005, // do an unaligned memory access to test exception handling
+	BusFault = 1006,			  // generate a bus fault
+	AccessMemory = 1007,		  // read or write  memory
+	MemoryLeak = 1008			  // cause an out of memory fault
 };
 
 /***************************************************************************************************************/
@@ -178,18 +185,25 @@ enum class ErrorCode : uint32_t
 // Class to manage a configurable folder, used for the sys and web folders
 class ConfigurableFolder
 {
-public:
-	explicit ConfigurableFolder(const char *_ecv_array defValue) noexcept : userValue(nullptr), defaultValue(defValue) { }
+  public:
+	explicit ConfigurableFolder(const char* _ecv_array defValue) noexcept
+		: userValue(nullptr)
+		, defaultValue(defValue)
+	{
+	}
 	ReadLockedPointer<const char> GetLockedPointer() const noexcept;
-#if HAS_MASS_STORAGE || HAS_EMBEDDED_FILES
+#  if HAS_MASS_STORAGE || HAS_EMBEDDED_FILES
 	void AppendToString(const StringRef& path) const noexcept;
-	GCodeResult Configure(const char *_ecv_array newPath, const StringRef& reply) noexcept;
-#endif
-private:
+	GCodeResult Configure(const char* _ecv_array newPath, const StringRef& reply) noexcept;
+#  endif
+  private:
 	mutable ReadWriteLock lock;
-	const char *_ecv_array GetUnlockedPointer() const noexcept { return (userValue == nullptr) ? defaultValue : _ecv_not_null(userValue); }
-	const char *_ecv_array _ecv_null userValue;
-	const char *_ecv_array defaultValue;
+	const char* _ecv_array GetUnlockedPointer() const noexcept
+	{
+		return (userValue == nullptr) ? defaultValue : _ecv_not_null(userValue);
+	}
+	const char* _ecv_array _ecv_null userValue;
+	const char* _ecv_array defaultValue;
 };
 
 #endif
@@ -197,33 +211,34 @@ private:
 // The main class that defines the RepRap machine for the benefit of the other classes
 class Platform final
 {
-public:
+  public:
 	Platform() noexcept;
 	Platform(const Platform&) = delete;
 
-//-------------------------------------------------------------------------------------------------------------
+	//-------------------------------------------------------------------------------------------------------------
 
 	// These are the functions that form the interface between Platform and the rest of the firmware.
 
-	void Init() noexcept;									// Set the machine up after a restart.  If called subsequently this should set the machine up as if
-															// it has just been restarted; it can do this by executing an actual restart if you like, but beware the loop of death...
-	void Spin() noexcept;									// This gets called in the main loop and should do any housekeeping needed
-	void Exit() noexcept;									// Shut down tidily. Calling Init after calling this should reset to the beginning
+	void Init() noexcept; // Set the machine up after a restart.  If called subsequently this should set the machine up
+						  // as if it has just been restarted; it can do this by executing an actual restart if you
+						  // like, but beware the loop of death...
+	void Spin() noexcept; // This gets called in the main loop and should do any housekeeping needed
+	void Exit() noexcept; // Shut down tidily. Calling Init after calling this should reset to the beginning
 
 	void Diagnostics(unsigned int part, const StringRef& reply) noexcept;
 	static constexpr unsigned int NumPlatformDiagnosticParts = 7;
 
 	static SharedSpiDevice& GetSharedSpiDevice() noexcept { return *_ecv_not_null(mainSharedSpiDevice); }
 
-	static const char *_ecv_array GetResetReasonText() noexcept;
+	static const char* _ecv_array GetResetReasonText() noexcept;
 	static bool WasDeliberateError() noexcept { return deliberateError; }
 
 	void LogError(ErrorCode e) noexcept { errorCodeBits |= (uint32_t)e; }
 
 	BoardType GetBoardType() const noexcept { return board; }
 	void SetBoardType() noexcept;
-	const char *_ecv_array GetElectronicsString() const noexcept;
-	const char *_ecv_array GetBoardString() const noexcept;
+	const char* _ecv_array GetElectronicsString() const noexcept;
+	const char* _ecv_array GetBoardString() const noexcept;
 
 	size_t GetNumGpInputsToReport() const noexcept;
 	size_t GetNumGpOutputsToReport() const noexcept;
@@ -234,39 +249,40 @@ public:
 #endif
 
 #if HAS_WIFI_NETWORKING
-	const char *_ecv_array GetDefaultWiFiFirmwareName() const noexcept;
+	static const char* _ecv_array GetDefaultWiFiFirmwareName() noexcept;
 #endif
 
 #ifdef DUET_NG
-	const char *_ecv_array GetBoardName() const noexcept;
-	const char *_ecv_array GetBoardShortName() const noexcept;
+	const char* _ecv_array GetBoardName() const noexcept;
+	const char* _ecv_array GetBoardShortName() const noexcept;
 
 	const float GetDefaultThermistorSeriesR(size_t inputNumber) const noexcept
 	{
 		// This is only called from one place so we may as well inline it
-		return (inputNumber >= 3 && (expansionBoard == ExpansionBoardType::DueX5_v0_11 || expansionBoard == ExpansionBoardType::DueX2_v0_11))
-			? DefaultThermistorSeriesR_DueX_v0_11
-				: DefaultThermistorSeriesR;
+		return (inputNumber >= 3 && (expansionBoard == ExpansionBoardType::DueX5_v0_11 ||
+									 expansionBoard == ExpansionBoardType::DueX2_v0_11))
+				   ? DefaultThermistorSeriesR_DueX_v0_11
+				   : DefaultThermistorSeriesR;
 	}
 #endif
 
 	// Timing
-	void Tick() noexcept SPEED_CRITICAL;			// Process a systick interrupt
+	void Tick() noexcept SPEED_CRITICAL; // Process a systick interrupt
 
 	// Real-time clock
-	bool IsDateTimeSet() const noexcept { return realTime != 0; }	// Has the RTC been set yet?
-	time_t GetDateTime() const noexcept { return realTime; }		// Retrieves the current RTC datetime
+	bool IsDateTimeSet() const noexcept { return realTime != 0; } // Has the RTC been set yet?
+	time_t GetDateTime() const noexcept { return realTime; }	  // Retrieves the current RTC datetime
 	bool GetDateTime(tm& rslt) const noexcept { return gmtime_r(&realTime, &rslt) != nullptr && realTime != 0; }
-																	// Retrieves the broken-down current RTC datetime and returns true if it's valid
-	bool SetDateTime(time_t t) noexcept;							// Sets the current RTC date and time or returns false on error
+	// Retrieves the broken-down current RTC datetime and returns true if it's valid
+	bool SetDateTime(time_t t) noexcept; // Sets the current RTC date and time or returns false on error
 
 	// Message output (see MessageType for further details)
-	void Message(MessageType type, const char *_ecv_array message) noexcept;
-	void Message(MessageType type, OutputBuffer *buffer) noexcept;
-	void MessageF(MessageType type, const char *_ecv_array fmt, ...) noexcept __attribute__ ((format (printf, 3, 4)));
-	void MessageV(MessageType type, const char *_ecv_array fmt, va_list vargs) noexcept;
-	void DebugMessage(const char *_ecv_array fmt, va_list vargs) noexcept;
-	bool FlushMessages() noexcept;								// Flush messages to USB and aux, returning true if there is more to send
+	void Message(MessageType type, const char* _ecv_array message) noexcept;
+	static void Message(MessageType type, OutputBuffer* buffer) noexcept;
+	void MessageF(MessageType type, const char* _ecv_array fmt, ...) noexcept __attribute__((format(printf, 3, 4)));
+	void MessageV(MessageType type, const char* _ecv_array fmt, va_list vargs) noexcept;
+	void DebugMessage(const char* _ecv_array fmt, va_list vargs) noexcept;
+	bool FlushMessages() noexcept; // Flush messages to USB and aux, returning true if there is more to send
 
 	// Movement
 	void EmergencyStop() noexcept;
@@ -285,7 +301,7 @@ public:
 	bool IsPowerOk() const noexcept;
 	void DisableAutoSave() noexcept;
 	void EnableAutoSave(float saveVoltage, float resumeVoltage) noexcept;
-	bool GetAutoSaveSettings(float& saveVoltage, float&resumeVoltage) noexcept;
+	bool GetAutoSaveSettings(float& saveVoltage, float& resumeVoltage) noexcept;
 #endif
 
 #if HAS_12V_MONITOR
@@ -298,7 +314,7 @@ public:
 	void ResetVoltageMonitors() noexcept;
 	float GetVinVoltage() const noexcept;
 #else
-	void ResetVoltageMonitors() noexcept { }
+	void ResetVoltageMonitors() noexcept {}
 	bool HasDriverPower() const noexcept { return true; }
 #endif
 
@@ -312,14 +328,15 @@ public:
 #endif
 
 #if SUPPORT_CAN_EXPANSION
-	void OnProcessingCanMessage() noexcept;										// called when we start processing any CAN message except for regular messages e.g. time sync
+	void OnProcessingCanMessage() noexcept; // called when we start processing any CAN message except for regular
+											// messages e.g. time sync
 #endif
 
 #if defined(DUET3_MB6HC)
-	static BoardType GetMB6HCBoardType() noexcept;								// this is safe to call before Platform has been created
+	static BoardType GetMB6HCBoardType() noexcept; // this is safe to call before Platform has been created
 #endif
 #if defined(DUET3_MB6XD)
-	static BoardType GetMB6XDBoardType() noexcept;								// this is safe to call before Platform has been created
+	static BoardType GetMB6XDBoardType() noexcept; // this is safe to call before Platform has been created
 #endif
 
 	void SetDiagLed(bool on) const noexcept;
@@ -330,7 +347,10 @@ public:
 
 #if defined(DUET3MINI) && SUPPORT_TMC2240 != 0
 	bool HasTmc2240Expansion() const noexcept { return hasTmc2240Expansion; }
-	const char *_ecv_array null GetExpansionBoardName() const noexcept { return (hasTmc2240Expansion) ? "Duet3 Mini 2+ (TMC2240)" : nullptr; }
+	const char* _ecv_array null GetExpansionBoardName() const noexcept
+	{
+		return (hasTmc2240Expansion) ? "Duet3 Mini 2+ (TMC2240)" : nullptr;
+	}
 #endif
 
 	// Debug buffer for M111
@@ -338,10 +358,11 @@ public:
 	static bool IsrDebugPutc(char c) noexcept;
 	static bool SetDebugBufferSize(uint32_t size) noexcept;
 
-private:
-	static SharedSpiDevice *_ecv_null mainSharedSpiDevice;
+  private:
+	static SharedSpiDevice* _ecv_null mainSharedSpiDevice;
 
-	void RawMessage(MessageType type, const char *_ecv_array message) noexcept;	// called by Message after handling error/warning flags
+	void RawMessage(MessageType type,
+					const char* _ecv_array message) noexcept; // called by Message after handling error/warning flags
 	float GetCpuTemperature() const noexcept;
 
 #if defined(DUET3_MB6HC)
@@ -360,49 +381,49 @@ private:
 	uint32_t errorCodeBits;
 
 	void InitialiseInterrupts() noexcept;
-	
+
 	// Thermistors and temperature monitoring
-	volatile ThermistorAveragingFilter adcFilters[NumAdcFilters];	// ADC reading averaging filters
+	volatile ThermistorAveragingFilter adcFilters[NumAdcFilters]; // ADC reading averaging filters
 
 #if HAS_CPU_TEMP_SENSOR
-	float highestMcuTemperature, lowestMcuTemperature;
-	float mcuTemperatureAdjust;
-# if SAME5x
+	float highestMcuTemperature{}, lowestMcuTemperature{};
+	float mcuTemperatureAdjust{};
+#  if SAME5x
 	TempSenseAveragingFilter tpFilter, tcFilter;
-	int32_t tempCalF1, tempCalF2, tempCalF3, tempCalF4;				// temperature calibration factors
+	int32_t tempCalF1, tempCalF2, tempCalF3, tempCalF4; // temperature calibration factors
 	void TemperatureCalibrationInit() noexcept;
-# endif
+#  endif
 #endif
 
 	// Data used by the tick interrupt handler
-	AnalogChannelNumber filteredAdcChannels[NumAdcFilters];
-	AnalogChannelNumber zProbeAdcChannel;
+	AnalogChannelNumber filteredAdcChannels[NumAdcFilters]{};
+	AnalogChannelNumber zProbeAdcChannel{};
 	uint8_t tickState;
-	size_t currentFilterNumber;
+	size_t currentFilterNumber{};
 	unsigned int debugCode;
 
 	// Hotend configuration
-	float filamentWidth;
+	float filamentWidth{};
 
 	// Power monitoring
 #if HAS_VOLTAGE_MONITOR
-	AnalogChannelNumber vInMonitorAdcChannel;
-	volatile uint16_t currentVin, highestVin, lowestVin;
-	uint16_t lastVinUnderVoltageValue, lastVinOverVoltageValue;
-	uint16_t autoPauseReading, autoResumeReading;
+	AnalogChannelNumber vInMonitorAdcChannel{};
+	volatile uint16_t currentVin{}, highestVin{}, lowestVin{};
+	uint16_t lastVinUnderVoltageValue{}, lastVinOverVoltageValue{};
+	uint16_t autoPauseReading{}, autoResumeReading{};
 	std::atomic<uint32_t> numVinUnderVoltageEvents, numVinOverVoltageEvents;
-	uint32_t previousVinUnderVoltageEvents, previousVinOverVoltageEvents;
+	uint32_t previousVinUnderVoltageEvents{}, previousVinOverVoltageEvents{};
 
-#ifdef DUET3_MB6HC
-	float powerMonitorVoltageRange;
-	uint16_t driverPowerOnAdcReading;
-	uint16_t driverPowerOffAdcReading;
-	Pin DiagPin;
-	Pin ActLedPin;
-	bool DiagOnPolarity;
-#endif
+#  ifdef DUET3_MB6HC
+	float powerMonitorVoltageRange{};
+	uint16_t driverPowerOnAdcReading{};
+	uint16_t driverPowerOffAdcReading{};
+	Pin DiagPin{};
+	Pin ActLedPin{};
+	bool DiagOnPolarity{};
+#  endif
 
-	bool autoSaveEnabled;
+	bool autoSaveEnabled{};
 
 	enum class AutoSaveState : uint8_t
 	{
@@ -410,30 +431,31 @@ private:
 		normal,
 		autoPaused
 	};
-	AutoSaveState autoSaveState;
+	AutoSaveState autoSaveState{};
 #endif
 
 #if HAS_12V_MONITOR
-	AnalogChannelNumber v12MonitorAdcChannel;
-	volatile uint16_t currentV12, highestV12, lowestV12;
-	uint16_t lastV12UnderVoltageValue;
+	AnalogChannelNumber v12MonitorAdcChannel{};
+	volatile uint16_t currentV12{}, highestV12{}, lowestV12{};
+	uint16_t lastV12UnderVoltageValue{};
 	std::atomic<uint32_t> numV12UnderVoltageEvents;
-	uint32_t previousV12UnderVoltageEvents;
+	uint32_t previousV12UnderVoltageEvents{};
 #endif
 
 	// Event handling
-	uint32_t lastDriverPollMillis;						// when we last checked the drivers and voltage monitoring
+	uint32_t lastDriverPollMillis; // when we last checked the drivers and voltage monitoring
 
 #if SUPPORT_CAN_EXPANSION
 	uint32_t whenLastCanMessageProcessed;
 #endif
 
 	// RTC
-	time_t realTime;									// the current date/time, or zero if never set
-	uint32_t timeLastUpdatedMillis;						// the milliseconds counter when we last incremented the time
+	time_t realTime{};				  // the current date/time, or zero if never set
+	uint32_t timeLastUpdatedMillis{}; // the milliseconds counter when we last incremented the time
 
 	// Misc
-	static bool deliberateError;						// true if we deliberately caused an exception for testing purposes. Must be static in case of exception during startup.
+	static bool deliberateError; // true if we deliberately caused an exception for testing purposes. Must be static in
+								 // case of exception during startup.
 };
 
 //*****************************************************************************************************************

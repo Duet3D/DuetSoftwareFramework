@@ -28,7 +28,8 @@ void CanDriversList::AddEntry(DriverId driver) noexcept
 		}
 		else if (drivers[insertPoint] != driver)
 		{
-			memmove(drivers + (insertPoint + 1), drivers + insertPoint, (numEntries - insertPoint) * sizeof(drivers[0]));
+			memmove(
+				drivers + (insertPoint + 1), drivers + insertPoint, (numEntries - insertPoint) * sizeof(drivers[0]));
 			drivers[insertPoint] = driver;
 			++numEntries;
 		}

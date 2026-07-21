@@ -6,6 +6,7 @@
  */
 
 #include "SbcInterface.h"
+
 #include "DataTransfer.h"
 
 #if HAS_SBC_INTERFACE
@@ -29,6 +30,8 @@
 #	include <CanMessageBuffer.h>
 #  endif
 
+// script (same70q20b_flash.ld); the leading underscore is part of that contract
+// NOLINTNEXTLINE(bugprone-reserved-identifier) - _estack is defined by the linker
 extern char _estack; // defined by the linker
 
 // The SBC task's stack size needs to be enough to support rr_model and expression evaluation
@@ -37,16 +40,16 @@ extern char _estack; // defined by the linker
 // In 3.5.2, the stack size is increased again to allow for nested functions to be properly evaluated (up to 7 nested
 // max calls e.g.)
 #  if defined(DEBUG)
-constexpr size_t SBCTaskStackWords = 1600; // debug builds use more stack
+constexpr size_t sbcTaskStackWords = 1600; // debug builds use more stack
 #  else
-constexpr size_t SBCTaskStackWords = 1400;
+constexpr size_t sbcTaskStackWords = 1400;
 #  endif
 
-constexpr uint32_t SbcYieldTimeout = 10;
+constexpr uint32_t sbcYieldTimeout = 10;
 
-static Task<SBCTaskStackWords>* sbcTask;
+static Task<sbcTaskStackWords>* sbcTask;
 
-extern "C" [[noreturn]] void SBCTaskStart(void* pvParameters) noexcept
+extern "C" [[noreturn]] void SBCTaskStart(void* /*pvParameters*/) noexcept
 {
 	reprap.GetSbcInterface().TaskLoop();
 }
@@ -61,14 +64,11 @@ SbcInterface::SbcInterface() noexcept
 	, txPointer(0)
 	, txEnd(0)
 	, sendBufferUpdate(true)
-	,
 #  if SUPPORTS_SBC_OVER_USB
-	pendingUsbDevice(nullptr)
+	, pendingUsbDevice(nullptr)
 	, usbDeviceIndex(0)
-	,
 #  endif
-	gcodeReply()
-	, gcodeReplyMutex()
+
 	, canResponseHead(0)
 	, canResponseTail(0)
 #  ifdef TRACK_FILE_CODES
@@ -84,7 +84,7 @@ void SbcInterface::Init() noexcept
 {
 	gcodeReplyMutex.Create("SBCReply");
 	transfer.Init();
-	sbcTask = new Task<SBCTaskStackWords>();
+	sbcTask = new Task<sbcTaskStackWords>();
 	sbcTask->Create(SBCTaskStart, "SBC", nullptr, TaskPriority::SbcPriority);
 	iapRamAvailable = (const char*)&_estack - Tasks::GetHeapTop();
 }
@@ -131,10 +131,14 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 
 [[noreturn]] void SbcInterface::TaskLoop() noexcept
 {
-	transfer.InitFromTask();
+	DataTransfer::InitFromTask();
 	transfer.StartNextTransfer();
 
-	bool busy = false, transferComplete = false, hadTimeout = false, hadSbcTimeout = false, hadReset = false;
+	bool busy = false;
+	bool transferComplete = false;
+	bool hadTimeout = false;
+	bool hadSbcTimeout = false;
+	bool hadReset = false;
 	for (;;)
 	{
 #  if SUPPORTS_SBC_OVER_USB
@@ -178,8 +182,9 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 #  endif
 				hadTimeout = !TaskBase::TakeIndexed(NotifyIndices::SbcInterface,
 													isConnected ? SbcConnectionTimeout : TaskBase::TimeoutUnlimited);
-				hadSbcTimeout = hadTimeout && millis() - transferStartTime < SbcConnectionTimeout + SbcYieldTimeout;
-				if (!hadTimeout && !transfer.DataReceived() && transfer.GetTransportType() == SbcTransportType::spi)
+				hadSbcTimeout = hadTimeout && millis() - transferStartTime < SbcConnectionTimeout + sbcYieldTimeout;
+				if (!hadTimeout && !DataTransfer::DataReceived() &&
+					transfer.GetTransportType() == SbcTransportType::spi)
 				{
 					// Woken by EventOccurred because new outgoing data was queued while we sat idle-armed
 					// (no SPI transfer has happened yet). Fold the new data into the armed buffer and
@@ -194,7 +199,7 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 				break;
 			case TransferState::doingPartialTransfer:
 				hadTimeout = !TaskBase::TakeIndexed(NotifyIndices::SbcInterface, SbcTransferTimeout);
-				hadSbcTimeout = hadTimeout && millis() - transferStartTime < SbcTransferTimeout + SbcYieldTimeout;
+				hadSbcTimeout = hadTimeout && millis() - transferStartTime < SbcTransferTimeout + sbcYieldTimeout;
 				break;
 			case TransferState::finishingTransfer:
 				busy = true;
@@ -252,7 +257,7 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 			if (hadReset)
 			{
 				// Let the main task invalidate resources before processing new data
-				TaskBase::TakeIndexed(NotifyIndices::SbcInterface, SbcYieldTimeout);
+				TaskBase::TakeIndexed(NotifyIndices::SbcInterface, sbcYieldTimeout);
 			}
 
 #  if SUPPORTS_SBC_OVER_USB
@@ -312,7 +317,7 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 // full.
 bool SbcInterface::EnqueueCanResponse(const CANResponseHeader& header, const char* _ecv_null data) noexcept
 {
-	TaskCriticalSectionLocker lock;
+	const TaskCriticalSectionLocker lock;
 	const size_t next = (canResponseHead + 1) % NumCanResponseBuffers;
 	if (next == canResponseTail)
 	{
@@ -333,7 +338,8 @@ bool SbcInterface::EnqueueCanResponse(const CANResponseHeader& header, const cha
 }
 
 // Forward a text reply to the SBC as one or more standardReply CAN responses, tagged with the request's txToken so the
-// SBC can match it back to the request. Long text is split into fragments exactly as an expansion board would send them.
+// SBC can match it back to the request. Long text is split into fragments exactly as an expansion board would send
+// them.
 void SbcInterface::EnqueueCanTextReply(uint16_t txToken, CanRequestId requestId, const char* text) noexcept
 {
 	const size_t textLength = strlen(text);
@@ -341,7 +347,7 @@ void SbcInterface::EnqueueCanTextReply(uint16_t txToken, CanRequestId requestId,
 	unsigned int fragment = 0;
 	do
 	{
-		CanMessageStandardReply msg;
+		CanMessageStandardReply msg{};
 		memset(&msg, 0, sizeof(msg));
 		msg.SetRequestId(requestId);
 		msg.resultCode = (uint16_t)GCodeResult::ok;
@@ -378,9 +384,9 @@ bool SbcInterface::ProcessCanResponses() noexcept
 	bool ret = false;
 	for (;;)
 	{
-		CanResponseBuffer* item;
+		CanResponseBuffer* item = nullptr;
 		{
-			TaskCriticalSectionLocker lock;
+			const TaskCriticalSectionLocker lock;
 			if (canResponseTail == canResponseHead)
 			{
 				break; // nothing queued
@@ -393,7 +399,7 @@ bool SbcInterface::ProcessCanResponses() noexcept
 			break; // not enough room in this transfer
 		}
 
-		TaskCriticalSectionLocker lock;
+		const TaskCriticalSectionLocker lock;
 		canResponseTail = (canResponseTail + 1) % NumCanResponseBuffers;
 		ret = true;
 	}
@@ -448,7 +454,7 @@ void SbcInterface::ExchangeData() noexcept
 		// Enable or disable the CAN interface
 		case SbcRequest::EnableCAN:
 		{
-			const EnableCANHeader* const header = transfer.ReadDataHeader<EnableCANHeader>();
+			const auto* const header = transfer.ReadDataHeader<EnableCANHeader>();
 			CanInterface::EnableCan(header->enable != 0);
 			break;
 		}
@@ -456,23 +462,24 @@ void SbcInterface::ExchangeData() noexcept
 		// Send a CAN message on behalf of the SBC
 		case SbcRequest::SendCANMessage:
 		{
-			const CANRequestHeader* header = transfer.ReadDataHeader<CANRequestHeader>();
+			const auto* header = transfer.ReadDataHeader<CANRequestHeader>();
 			const uint16_t txToken = header->txToken;
-			const CanMessageType msgType = (CanMessageType)header->msgType;		// TODO validate this is a valid CanMessageType
-			const CanMessageType replyType = (CanMessageType)header->replyType; // TODO validate this is a valid CanMessageType
+			const auto msgType = (CanMessageType)header->msgType;	  // TODO validate this is a valid CanMessageType
+			const auto replyType = (CanMessageType)header->replyType; // TODO validate this is a valid CanMessageType
 			const uint8_t dstAddress = header->dstAddress;
 			const uint8_t dataLength = header->dataLength;
 			const char* payload = transfer.ReadData(dataLength);
 
 			// A setAddressAndNormalTiming message addressed to the master (oldAddress 0) configures our own CAN timing
 			// rather than being forwarded onto the bus. newAddress is ignored in this case.
-			if (msgType == CanMessageType::setAddressAndNormalTiming
-				&& dataLength >= sizeof(CanMessageSetAddressAndNormalTiming))
+			if (msgType == CanMessageType::setAddressAndNormalTiming &&
+				dataLength >= sizeof(CanMessageSetAddressAndNormalTiming))
 			{
-				const CanMessageSetAddressAndNormalTiming* const timingMsg = reinterpret_cast<const CanMessageSetAddressAndNormalTiming*>(payload);
+				const auto* const timingMsg = reinterpret_cast<const CanMessageSetAddressAndNormalTiming*>(payload);
 				if (timingMsg->oldAddress == 0)
 				{
-					const bool doSetTiming = (timingMsg->doSetTiming == CanMessageSetAddressAndNormalTiming::DoSetTimingYes);
+					const bool doSetTiming =
+						(timingMsg->doSetTiming == CanMessageSetAddressAndNormalTiming::DoSetTimingYes);
 					String<StringLength100> reply;
 					CanInterface::ConfigLocalCanTiming(timingMsg->normalTiming, doSetTiming, reply.GetRef());
 					if (!reply.IsEmpty())
@@ -527,14 +534,14 @@ void SbcInterface::ExchangeData() noexcept
 		// These responses can get quite long (e.g. responses to M20) so receive it into an OutputBuffer.
 		case SbcRequest::Message:
 		{
-			OutputBuffer* buf;
+			OutputBuffer* buf = nullptr;
 			if (OutputBuffer::Allocate(buf))
 			{
-				MessageType type;
+				MessageType type{};
 				if (transfer.ReadMessage(type, buf))
 				{
 					// Output message to the target
-					reprap.GetPlatform().Message(type, buf);
+					Platform::Message(type, buf); // Message(MessageType, OutputBuffer*) is static
 				}
 				else
 				{
@@ -598,14 +605,15 @@ void SbcInterface::ExchangeData() noexcept
 
 [[noreturn]] void SbcInterface::ReceiveAndStartIap(const char* iapChunk, size_t length) noexcept
 {
+	// NOLINTNEXTLINE(performance-no-int-to-ptr) - IAP_IMAGE_START is a fixed RAM address
 	char* iapWritePointer = reinterpret_cast<char*>(IAP_IMAGE_START);
 	for (;;)
 	{
 		// Write the next IAP chunk
 		if (iapChunk != nullptr)
 		{
-			uint32_t* dst = reinterpret_cast<uint32_t*>(iapWritePointer);
-			const uint32_t* src = reinterpret_cast<const uint32_t*>(iapChunk);
+			auto* dst = reinterpret_cast<uint32_t*>(iapWritePointer);
+			const auto* src = reinterpret_cast<const uint32_t*>(iapChunk);
 			memcpyu32(dst, src, length / sizeof(uint32_t));
 			iapWritePointer += length;
 			iapChunk = nullptr;
@@ -675,7 +683,7 @@ void SbcInterface::InvalidateResources() noexcept
 
 	// Don't cache any messages if they cannot be sent
 	{
-		MutexLocker lock(gcodeReplyMutex);
+		const MutexLocker lock(gcodeReplyMutex);
 		gcodeReply.ReleaseAll();
 	}
 
@@ -736,7 +744,7 @@ void SbcInterface::HandleGCodeReply(MessageType mt, const char* reply) noexcept
 	}
 #  endif
 
-	MutexLocker lock(gcodeReplyMutex);
+	const MutexLocker lock(gcodeReplyMutex);
 	OutputBuffer* buffer = gcodeReply.GetLastItem();
 	if (buffer != nullptr && mt == gcodeReply.GetLastItemType() && (mt & PushFlag) != 0 && !buffer->IsReferenced())
 	{
@@ -772,12 +780,12 @@ void SbcInterface::HandleGCodeReply(MessageType mt, OutputBuffer* buffer) noexce
 	}
 #  endif
 
-	MutexLocker lock(gcodeReplyMutex);
+	const MutexLocker lock(gcodeReplyMutex);
 	gcodeReply.Push(buffer, mt);
 	EventOccurred();
 }
 
-void SbcInterface::EventOccurred(bool timeCritical) noexcept
+void SbcInterface::EventOccurred(bool timeCritical) const noexcept
 {
 	(void)timeCritical; // all events are handled the same way now that there is no inter-transfer delay
 	if (!IsConnected())

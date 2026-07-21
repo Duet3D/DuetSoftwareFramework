@@ -166,7 +166,7 @@ void CommandProcessor::ForwardMessageToSbc(CanMessageBuffer& buf) noexcept
 	uint16_t txToken = 0xFFFF; // TODO synchronise this default value with DSF
 	if (buf.id.IsResponse())
 	{
-		const CanRequestId rid = (CanRequestId)(buf.msg.generic.requestId);
+		const auto rid = (CanRequestId)(buf.msg.generic.requestId);
 		mapping = CanInterface::FindPendingRequest(src, rid);
 		if (mapping != nullptr)
 		{
@@ -219,7 +219,7 @@ void CommandProcessor::ProcessReceivedMessage(CanMessageBuffer& buf) noexcept
 		}
 
 		{
-			bool forwardToSbc = true;
+			const bool forwardToSbc = true;
 			// Handle messages received in normal operation mode
 			switch (id)
 			{
@@ -241,10 +241,6 @@ void CommandProcessor::ProcessReceivedMessage(CanMessageBuffer& buf) noexcept
 			case CanMessageType::boardStatusReportV0:
 			case CanMessageType::boardStatusReportV1:
 				reprap.GetExpansion().ProcessBoardStatusReport(buf);
-				break;
-
-			case CanMessageType::event:
-				// Event::Add(buf.msg.event, buf.id.Src(), buf.dataLength);
 				break;
 
 			default:

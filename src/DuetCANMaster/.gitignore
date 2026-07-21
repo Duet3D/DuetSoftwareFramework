@@ -29,6 +29,8 @@
 /Duet3_MB6HC_no_S_curve/
 /INDX/
 /.clangd
-/.clang-format
+# .clang-format and .clang-tidy are the project's style definition and are tracked
+# deliberately; only the generated compile database stays out of the repo.
+/compile_commands.json
 /src/Temp/
 /.settings/

@@ -11,13 +11,14 @@
 #define SRC_PLATFORM_UNIQUEID_H_
 
 #include <UniqueIdBase.h>
+
 #include <Platform/OutputMemory.h>
 
 // Unique ID class extended with some additional functions
 class UniqueId : public UniqueIdBase
 {
-public:
-	void AppendCharsToBuffer(OutputBuffer *buf) const noexcept;
+  public:
+	void AppendCharsToBuffer(OutputBuffer* buf) const noexcept;
 };
 
 #endif /* SRC_PLATFORM_UNIQUEID_H_ */

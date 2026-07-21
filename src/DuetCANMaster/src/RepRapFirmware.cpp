@@ -16,7 +16,7 @@ General design principles:
   * Make classes hide their data,
   * Make everything except the Platform class (see below) as stateless as possible,
   * No use of conditional compilation except for #include guards - if you need that, you should be
-       forking the repository to make a new branch - let the repository take the strain,
+	   forking the repository to make a new branch - let the repository take the strain,
   * Concentration of all machine-dependent definitions and code in Platform.h and Platform.cpp,
   * No specials for (X,Y) or (Z) - all movement is 3-dimensional,
   * Except in Platform.h, use real units (mm, seconds etc) throughout the rest of the code wherever possible,
@@ -113,8 +113,8 @@ simple timesharing.  No class does, or ever should, wait inside one of its funct
 any sort of delay() function.  The general rule is:
 
   Can I do a thing?
-    Yes - do it
-    No - set a flag/timer to remind me to do it next-time-I'm-called/at-a-future-time and return.
+	Yes - do it
+	No - set a flag/timer to remind me to do it next-time-I'm-called/at-a-future-time and return.
 
 The restriction this strategy places on almost all the code in the firmware (that it must execute quickly and
 never cause waits or delays) is balanced by the fact that none of that code needs to worry about synchronization,
@@ -126,15 +126,15 @@ to execute a couple of times a second.
 Most data is transferred bytewise, with classes' Spin() functions typically containing code like this:
 
   Is a byte available for me?
-    Yes
-      read it and add it to my buffer
-      Is my buffer complete?
-         Yes
-           Act on the contents of my buffer
-         No
-           Return
+	Yes
+	  read it and add it to my buffer
+	  Is my buffer complete?
+		 Yes
+		   Act on the contents of my buffer
+		 No
+		   Return
   No
-    Return
+	Return
 
 Note that it is simple to raise the "priority" of any class's activities relative to the others by calling its
 Spin() function more than once from RepRap.Spin().
@@ -164,43 +164,41 @@ Licence: GPL
 
 RepRap reprap;
 
-// Get the format string to use for printing a floating point number to the specified number of significant digits. Zero means the maximum sensible number.
-const char *_ecv_array GetFloatFormatString(float val, unsigned int numDigitsAfterPoint) noexcept
+// Get the format string to use for printing a floating point number to the specified number of significant digits. Zero
+// means the maximum sensible number.
+const char* _ecv_array GetFloatFormatString(float val, unsigned int numDigitsAfterPoint) noexcept
 {
-	// If the value is below 0.1 then use 'g' format and treat the requested number of decimal digits as the number of significant digits needed
-	// f the value is very large then use 'g' format and treat the requested number of decimal digits as the number of significant digits needed
-	// Else use 'f' format.
-	static constexpr const char *_ecv_array FormatStringsF[] = { "%.1f", "%.2f", "%.3f", "%.4f", "%.5f", "%.6f", "%.7f" };
-	static constexpr const char *_ecv_array FormatStringsG[] = { "%.1g", "%.2g", "%.3g", "%.4g", "%.5g", "%.6g", "%.7g" };
-	static constexpr float MaxValueToDisplayWithAllDecimals[] = { 999999.9, 99999.99, 9999.99, 999.99, 99.99, 9.99, 0.99 };
+	// If the value is below 0.1 then use 'g' format and treat the requested number of decimal digits as the number of
+	// significant digits needed f the value is very large then use 'g' format and treat the requested number of decimal
+	// digits as the number of significant digits needed Else use 'f' format.
+	static constexpr const char* _ecv_array formatStringsF[] = {"%.1f", "%.2f", "%.3f", "%.4f", "%.5f", "%.6f", "%.7f"};
+	static constexpr const char* _ecv_array formatStringsG[] = {"%.1g", "%.2g", "%.3g", "%.4g", "%.5g", "%.6g", "%.7g"};
+	static constexpr float maxValueToDisplayWithAllDecimals[] = {
+		999999.9, 99999.99, 9999.99, 999.99, 99.99, 9.99, 0.99};
 
-	static_assert(ARRAY_SIZE(FormatStringsF) == MaxFloatDigitsDisplayedAfterPoint);
-	static_assert(ARRAY_SIZE(FormatStringsG) == MaxFloatDigitsDisplayedAfterPoint);
+	static_assert(ARRAY_SIZE(formatStringsF) == MaxFloatDigitsDisplayedAfterPoint);
+	static_assert(ARRAY_SIZE(formatStringsG) == MaxFloatDigitsDisplayedAfterPoint);
 
-	constexpr float MinValueToDisplayInFFormat = 0.1;
+	constexpr float minValueToDisplayInFFormat = 0.1;
 
-	if (numDigitsAfterPoint == 0)
-	{
-		numDigitsAfterPoint = MaxFloatDigitsDisplayedAfterPoint;
-	}
-	else if (numDigitsAfterPoint > MaxFloatDigitsDisplayedAfterPoint)
+	if (numDigitsAfterPoint == 0 || numDigitsAfterPoint > MaxFloatDigitsDisplayedAfterPoint)
 	{
 		numDigitsAfterPoint = MaxFloatDigitsDisplayedAfterPoint;
 	}
 
 	// If the value is small or very large, use 'g' format
-	if (fabsf(val) < MinValueToDisplayInFFormat || fabsf(val) > MaxValueToDisplayWithAllDecimals[0])
+	if (fabsf(val) < minValueToDisplayInFFormat || fabsf(val) > maxValueToDisplayWithAllDecimals[0])
 	{
-		return FormatStringsG[numDigitsAfterPoint - 1];
+		return formatStringsG[numDigitsAfterPoint - 1];
 	}
 
 	// Use 'f' format, but don't print more decimal digits than may conceivably be valid
-	while (fabsf(val) > MaxValueToDisplayWithAllDecimals[numDigitsAfterPoint - 1])
+	while (fabsf(val) > maxValueToDisplayWithAllDecimals[numDigitsAfterPoint - 1])
 	{
 		--numDigitsAfterPoint;
 	}
 	// Use 'f' format, but don't print more decimal digits than may conceivably be valid
-	return FormatStringsF[numDigitsAfterPoint - 1];
+	return formatStringsF[numDigitsAfterPoint - 1];
 }
 
 //*************************************************************************************************
@@ -208,7 +206,7 @@ const char *_ecv_array GetFloatFormatString(float val, unsigned int numDigitsAft
 // Utilities and storage not part of any class
 
 // For debug use
-void debugPrintf(const char *_ecv_array fmt, ...) noexcept
+void debugPrintf(const char* _ecv_array fmt, ...) noexcept
 {
 	va_list vargs;
 	va_start(vargs, fmt);
@@ -216,14 +214,15 @@ void debugPrintf(const char *_ecv_array fmt, ...) noexcept
 	{
 		vuprintf(Platform::IsrDebugPutc, fmt, vargs);
 	}
-	else if (__get_BASEPRI() == 0 && !inInterrupt())		// we need both tests to make sure it is safe to write to USB
+	else if (__get_BASEPRI() == 0 && !inInterrupt()) // we need both tests to make sure it is safe to write to USB
 	{
 		reprap.GetPlatform().DebugMessage(fmt, vargs);
 	}
 	va_end(vargs);
 }
 
-// Convert a float to double for passing to printf etc. If it is a NaN or infinity, convert it to 9999.9 to avoid getting JSON parse errors.
+// Convert a float to double for passing to printf etc. If it is a NaN or infinity, convert it to 9999.9 to avoid
+// getting JSON parse errors.
 float HideNan(float val) noexcept
 {
 	return (std::isnan(val) || std::isinf(val)) ? 9999.9 : val;

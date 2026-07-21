@@ -93,10 +93,10 @@ const uint32_t SBC_SPI_RX_DMA_HW_ID = 2;
 #  if USE_XDMAC
 
 // XDMAC hardware, see datasheet
-constexpr uint32_t SBC_SPI_TX_PERID = (uint32_t)DmaTrigSource::spi1tx;
-constexpr uint32_t SBC_SPI_RX_PERID = (uint32_t)DmaTrigSource::spi1rx;
+constexpr uint32_t sbcSpiTxPerid = (uint32_t)DmaTrigSource::spi1tx;
+constexpr uint32_t sbcSpiRxPerid = (uint32_t)DmaTrigSource::spi1rx;
 
-static xdmac_channel_config_t xdmac_tx_cfg, xdmac_rx_cfg;
+static xdmac_channel_config_t xdmacTxCfg, xdmacRxCfg;
 
 #  endif
 
@@ -116,9 +116,9 @@ static volatile size_t spiArmedLength = 0;
 static volatile uint32_t spiRxResidual = 0;
 
 static volatile void* spiRxBuffer = nullptr;
-static volatile const void* spiTxBuffer = nullptr;
+static const volatile void* spiTxBuffer = nullptr;
 
-static uint32_t spi_dma_get_rx_residual() noexcept
+static uint32_t SpiDmaGetRxResidual() noexcept
 {
 #  if USE_XDMAC
 	// CUBC counts down the microblock length, which for this channel is configured in bytes
@@ -131,7 +131,7 @@ static uint32_t spi_dma_get_rx_residual() noexcept
 #  endif
 }
 
-static void spi_dma_disable() noexcept
+static void SpiDmaDisable() noexcept
 {
 #  if USE_DMAC
 	dmac_channel_disable(DMAC, DmacChanSbcRx);
@@ -150,7 +150,7 @@ static void spi_dma_disable() noexcept
 }
 
 #  if !SAME5x
-static bool spi_dma_check_rx_complete() noexcept
+static bool SpiDmaCheckRxComplete() noexcept
 {
 #	if USE_DMAC
 	const uint32_t status = DMAC->DMAC_CHSR;
@@ -175,7 +175,7 @@ static bool spi_dma_check_rx_complete() noexcept
 #  endif
 
 // Set up the transmit DMA but don't enable it
-static void spi_tx_dma_setup(const void* outBuffer, size_t bytesToTransfer) noexcept
+static void SpiTxDmaSetup(const void* outBuffer, size_t bytesToTransfer) noexcept
 	pre(bytesToTransfer <= outBuffer.limit)
 {
 #  if USE_DMAC
@@ -193,17 +193,17 @@ static void spi_tx_dma_setup(const void* outBuffer, size_t bytesToTransfer) noex
 #  endif
 
 #  if USE_XDMAC
-	xdmac_tx_cfg.mbr_ubc = bytesToTransfer;
-	xdmac_tx_cfg.mbr_sa = (uint32_t)outBuffer;
-	xdmac_tx_cfg.mbr_da = (uint32_t)&(SBC_SPI->SPI_TDR);
-	xdmac_tx_cfg.mbr_cfg = XDMAC_CC_TYPE_PER_TRAN | XDMAC_CC_MBSIZE_SINGLE | XDMAC_CC_DSYNC_MEM2PER |
-						   XDMAC_CC_CSIZE_CHK_1 | XDMAC_CC_DWIDTH_BYTE | XDMAC_CC_SIF_AHB_IF0 | XDMAC_CC_DIF_AHB_IF1 |
-						   XDMAC_CC_SAM_INCREMENTED_AM | XDMAC_CC_DAM_FIXED_AM | XDMAC_CC_PERID(SBC_SPI_TX_PERID);
-	xdmac_tx_cfg.mbr_bc = 0;
-	xdmac_tx_cfg.mbr_ds = 0;
-	xdmac_tx_cfg.mbr_sus = 0;
-	xdmac_tx_cfg.mbr_dus = 0;
-	xdmac_configure_transfer(XDMAC, DmacChanSbcTx, &xdmac_tx_cfg);
+	xdmacTxCfg.mbr_ubc = bytesToTransfer;
+	xdmacTxCfg.mbr_sa = (uint32_t)outBuffer;
+	xdmacTxCfg.mbr_da = (uint32_t) & (SBC_SPI->SPI_TDR);
+	xdmacTxCfg.mbr_cfg = XDMAC_CC_TYPE_PER_TRAN | XDMAC_CC_MBSIZE_SINGLE | XDMAC_CC_DSYNC_MEM2PER |
+						 XDMAC_CC_CSIZE_CHK_1 | XDMAC_CC_DWIDTH_BYTE | XDMAC_CC_SIF_AHB_IF0 | XDMAC_CC_DIF_AHB_IF1 |
+						 XDMAC_CC_SAM_INCREMENTED_AM | XDMAC_CC_DAM_FIXED_AM | XDMAC_CC_PERID(sbcSpiTxPerid);
+	xdmacTxCfg.mbr_bc = 0;
+	xdmacTxCfg.mbr_ds = 0;
+	xdmacTxCfg.mbr_sus = 0;
+	xdmacTxCfg.mbr_dus = 0;
+	xdmac_configure_transfer(XDMAC, DmacChanSbcTx, &xdmacTxCfg);
 
 	xdmac_channel_set_descriptor_control(XDMAC, DmacChanSbcTx, 0);
 	xdmac_disable_interrupt(XDMAC, DmacChanSbcTx);
@@ -221,7 +221,7 @@ static void spi_tx_dma_setup(const void* outBuffer, size_t bytesToTransfer) noex
 }
 
 // Set up the receive DMA but don't enable it
-static void spi_rx_dma_setup(void* inBuffer, size_t bytesToTransfer) noexcept pre(bytesToTransfer <= inBuffer.limit)
+static void SpiRxDmaSetup(void* inBuffer, size_t bytesToTransfer) noexcept pre(bytesToTransfer <= inBuffer.limit)
 {
 #  if USE_DMAC
 	DMAC->DMAC_EBCISR; // clear any pending interrupts
@@ -238,17 +238,17 @@ static void spi_rx_dma_setup(void* inBuffer, size_t bytesToTransfer) noexcept pr
 #  endif
 
 #  if USE_XDMAC
-	xdmac_rx_cfg.mbr_ubc = bytesToTransfer;
-	xdmac_rx_cfg.mbr_da = (uint32_t)inBuffer;
-	xdmac_rx_cfg.mbr_sa = (uint32_t)&(SBC_SPI->SPI_RDR);
-	xdmac_rx_cfg.mbr_cfg = XDMAC_CC_TYPE_PER_TRAN | XDMAC_CC_MBSIZE_SINGLE | XDMAC_CC_DSYNC_PER2MEM |
-						   XDMAC_CC_CSIZE_CHK_1 | XDMAC_CC_DWIDTH_BYTE | XDMAC_CC_SIF_AHB_IF1 | XDMAC_CC_DIF_AHB_IF0 |
-						   XDMAC_CC_SAM_FIXED_AM | XDMAC_CC_DAM_INCREMENTED_AM | XDMAC_CC_PERID(SBC_SPI_RX_PERID);
-	xdmac_rx_cfg.mbr_bc = 0;
-	xdmac_tx_cfg.mbr_ds = 0;
-	xdmac_rx_cfg.mbr_sus = 0;
-	xdmac_rx_cfg.mbr_dus = 0;
-	xdmac_configure_transfer(XDMAC, DmacChanSbcRx, &xdmac_rx_cfg);
+	xdmacRxCfg.mbr_ubc = bytesToTransfer;
+	xdmacRxCfg.mbr_da = (uint32_t)inBuffer;
+	xdmacRxCfg.mbr_sa = (uint32_t) & (SBC_SPI->SPI_RDR);
+	xdmacRxCfg.mbr_cfg = XDMAC_CC_TYPE_PER_TRAN | XDMAC_CC_MBSIZE_SINGLE | XDMAC_CC_DSYNC_PER2MEM |
+						 XDMAC_CC_CSIZE_CHK_1 | XDMAC_CC_DWIDTH_BYTE | XDMAC_CC_SIF_AHB_IF1 | XDMAC_CC_DIF_AHB_IF0 |
+						 XDMAC_CC_SAM_FIXED_AM | XDMAC_CC_DAM_INCREMENTED_AM | XDMAC_CC_PERID(sbcSpiRxPerid);
+	xdmacRxCfg.mbr_bc = 0;
+	xdmacTxCfg.mbr_ds = 0;
+	xdmacRxCfg.mbr_sus = 0;
+	xdmacRxCfg.mbr_dus = 0;
+	xdmac_configure_transfer(XDMAC, DmacChanSbcRx, &xdmacRxCfg);
 
 	xdmac_channel_set_descriptor_control(XDMAC, DmacChanSbcRx, 0);
 	xdmac_disable_interrupt(XDMAC, DmacChanSbcRx);
@@ -268,12 +268,12 @@ static void spi_rx_dma_setup(void* inBuffer, size_t bytesToTransfer) noexcept pr
 /**
  * \brief Set SPI slave transfer.
  */
-static void spi_slave_dma_setup(void* inBuffer, const void* outBuffer, size_t bytesToTransfer) noexcept
+static void SpiSlaveDmaSetup(void* inBuffer, const void* outBuffer, size_t bytesToTransfer) noexcept
 	pre(bytesToTransfer <= inBuffer.limit; bytesToTransfer <= outBuffer.limit)
 {
-	spi_dma_disable();
-	spi_tx_dma_setup(outBuffer, bytesToTransfer);
-	spi_rx_dma_setup(inBuffer, bytesToTransfer);
+	SpiDmaDisable();
+	SpiTxDmaSetup(outBuffer, bytesToTransfer);
+	SpiRxDmaSetup(inBuffer, bytesToTransfer);
 
 #  if USE_DMAC
 	dmac_channel_enable(DMAC, DmacChanSbcRx);
@@ -291,7 +291,7 @@ static void spi_slave_dma_setup(void* inBuffer, const void* outBuffer, size_t by
 #  endif
 }
 
-void disable_spi() noexcept
+void DisableSpi() noexcept
 {
 	// SPI/DMA is no longer armed, so the SBC must not initiate a transfer
 	digitalWrite(SbcTfrReadyPin,
@@ -299,9 +299,9 @@ void disable_spi() noexcept
 
 	// Sample how much of the armed length went unreceived before the channels are disabled, which
 	// discards the count
-	spiRxResidual = spi_dma_get_rx_residual();
+	spiRxResidual = SpiDmaGetRxResidual();
 
-	spi_dma_disable();
+	SpiDmaDisable();
 
 #  if SAME5x
 	SbcSpiSercom->SPI.CTRLA.reg &= ~SERCOM_SPI_CTRLA_ENABLE;
@@ -313,7 +313,7 @@ void disable_spi() noexcept
 #  endif
 }
 
-static void setup_spi(void* inBuffer, const void* outBuffer, size_t bytesToTransfer) noexcept
+static void SetupSpi(void* inBuffer, const void* outBuffer, size_t bytesToTransfer) noexcept
 	pre(bytesToTransfer <= inBuffer.limit; bytesToTransfer <= outBuffer.limit)
 {
 	// Remember what this sub-exchange expects so that DoTransfer can tell whether the SBC clocked all of
@@ -335,7 +335,7 @@ static void setup_spi(void* inBuffer, const void* outBuffer, size_t bytesToTrans
 	// Initialize channel config for transmitter and receiver
 	spiRxBuffer = inBuffer;
 	spiTxBuffer = outBuffer;
-	spi_slave_dma_setup(inBuffer, outBuffer, bytesToTransfer);
+	SpiSlaveDmaSetup(inBuffer, outBuffer, bytesToTransfer);
 
 #  if USE_DMAC
 	// Configure DMA RX channel
@@ -416,7 +416,7 @@ extern "C" void SBC_SPI_HANDLER() noexcept
 		spiTransferStarted = false;
 
 		// Data has been transferred, disable transfer ready pin and XDMAC channels
-		disable_spi();
+		DisableSpi();
 
 		// Check if any error occurred
 		if ((status & SPI_SR_OVRES) != 0)
@@ -633,14 +633,14 @@ void DataTransfer::Diagnostics(const StringRef& reply) noexcept
 	}
 }
 
-bool DataTransfer::DataReceived() const noexcept
+bool DataTransfer::DataReceived() noexcept
 {
 	return dataReceived;
 }
 
 const PacketHeader* DataTransfer::ReadPacket() noexcept
 {
-	size_t rxDataLength;
+	size_t rxDataLength = 0;
 #  if SUPPORTS_SBC_OVER_USB
 	if (transportType == SbcTransportType::usb)
 	{
@@ -657,7 +657,7 @@ const PacketHeader* DataTransfer::ReadPacket() noexcept
 		return nullptr;
 	}
 
-	const PacketHeader* header = reinterpret_cast<const PacketHeader*>(rxBuffer + rxPointer);
+	const auto* header = reinterpret_cast<const PacketHeader*>(rxBuffer + rxPointer);
 	rxPointer += sizeof(PacketHeader);
 	return header;
 }
@@ -683,14 +683,14 @@ template const EnableCANHeader* DataTransfer::ReadDataHeader<EnableCANHeader>() 
 
 bool DataTransfer::ReadBoolean() noexcept
 {
-	const BooleanHeader* header = ReadDataHeader<BooleanHeader>();
+	const auto* header = ReadDataHeader<BooleanHeader>();
 	return header->value;
 }
 
 bool DataTransfer::ReadMessage(MessageType& type, OutputBuffer* buf) noexcept
 {
 	// Read header
-	const MessageHeader* header = ReadDataHeader<MessageHeader>();
+	const auto* header = ReadDataHeader<MessageHeader>();
 	type = (MessageType)header->messageType;
 
 	// Read message data and check if the it could be fully read
@@ -703,7 +703,7 @@ void DataTransfer::ExchangeHeader() noexcept
 	Cache::FlushBeforeDMASend(&txHeader, sizeof(txHeader));
 	state = InternalTransferState::ExchangingHeader;
 	dataResendAttempts = 0;
-	setup_spi(&rxHeader, &txHeader, sizeof(SpiTransferHeader));
+	SetupSpi(&rxHeader, &txHeader, sizeof(SpiTransferHeader));
 }
 
 void DataTransfer::ExchangeResponse(uint32_t response) noexcept
@@ -712,15 +712,15 @@ void DataTransfer::ExchangeResponse(uint32_t response) noexcept
 	Cache::FlushBeforeDMASend(&txResponse, sizeof(txResponse));
 	state = (state == InternalTransferState::ExchangingHeader) ? InternalTransferState::ExchangingHeaderResponse
 															   : InternalTransferState::ExchangingDataResponse;
-	setup_spi(&rxResponse, &txResponse, sizeof(uint32_t));
+	SetupSpi(&rxResponse, &txResponse, sizeof(uint32_t));
 }
 
 void DataTransfer::ExchangeData() noexcept
 {
 	Cache::FlushBeforeDMASend(txBuffer, txHeader.dataLength);
-	size_t bytesToExchange = max<size_t>(rxHeader.dataLength, txHeader.dataLength);
+	const auto bytesToExchange = max<size_t>(rxHeader.dataLength, txHeader.dataLength);
 	state = InternalTransferState::ExchangingData;
-	setup_spi(rxBuffer, txBuffer, bytesToExchange);
+	SetupSpi(rxBuffer, txBuffer, bytesToExchange);
 }
 
 void DataTransfer::RestartTransfer(bool ownRequest) noexcept
@@ -737,7 +737,7 @@ void DataTransfer::RestartTransfer(bool ownRequest) noexcept
 		txResponse = SpiTransferResponse::BadResponse;
 		Cache::FlushBeforeDMASend(&txResponse, sizeof(txResponse));
 		state = InternalTransferState::Resetting;
-		setup_spi(&rxResponse, &txResponse, sizeof(uint32_t));
+		SetupSpi(&rxResponse, &txResponse, sizeof(uint32_t));
 	}
 	else
 	{
@@ -757,7 +757,7 @@ void DataTransfer::RestartTransfer(bool ownRequest) noexcept
 // up after MaxSbcRetries (3 by default) and resets the connection, so without a bound of our own we would
 // keep re-arming the data exchange for a peer that has already gone away. Kept above the SBC's limit so
 // that we never cut its retries short
-static constexpr unsigned int MaxDataResendAttempts = 5;
+static constexpr unsigned int maxDataResendAttempts = 5;
 
 TransferState DataTransfer::DoTransfer() noexcept
 {
@@ -778,7 +778,7 @@ TransferState DataTransfer::DoTransfer() noexcept
 		disable_spi();
 #  else
 		// Wait for the current XDMA transfer to finish. Relying on the XDMAC IRQ for this is does not work well...
-		if (!spi_dma_check_rx_complete())
+		if (!SpiDmaCheckRxComplete())
 		{
 			return TransferState::finishingTransfer;
 		}
@@ -792,7 +792,8 @@ TransferState DataTransfer::DoTransfer() noexcept
 		// and started before we re-armed, or because it is a phase ahead. Whatever the DMA did receive is
 		// short by the difference and the rest of the buffer is left over from the previous exchange, so
 		// there is nothing here worth parsing. Restart instead of guessing
-		if (spiRxResidual != 0 && state != InternalTransferState::ProcessingData && state != InternalTransferState::Resetting)
+		if (spiRxResidual != 0 && state != InternalTransferState::ProcessingData &&
+			state != InternalTransferState::Resetting)
 		{
 			if (reprap.Debug(Module::SbcInterface))
 			{
@@ -801,7 +802,8 @@ TransferState DataTransfer::DoTransfer() noexcept
 							(unsigned int)spiArmedLength);
 			}
 			++shortTransfers;
-			// If the SBC sent `BadResponse` in the just completed transfer then it is already expecting a restart, so don't send another one
+			// If the SBC sent `BadResponse` in the just completed transfer then it is already expecting a restart, so
+			// don't send another one
 			Cache::InvalidateAfterDMAReceive(spiRxBuffer, spiArmedLength - spiRxResidual);
 			const uint32_t response = *reinterpret_cast<const volatile uint32_t*>(spiRxBuffer);
 			RestartTransfer(response != SpiTransferResponse::BadResponse);
@@ -935,7 +937,7 @@ TransferState DataTransfer::DoTransfer() noexcept
 			{
 				// Resend the data if a checksum error occurred
 				checksumErrors++;
-				if (++dataResendAttempts > MaxDataResendAttempts)
+				if (++dataResendAttempts > maxDataResendAttempts)
 				{
 					// The data is not getting through. Resending it again would loop until the SBC times
 					// out, so give up and let the connection be re-established
@@ -981,7 +983,7 @@ TransferState DataTransfer::DoTransfer() noexcept
 
 void DataTransfer::SwitchToUsb(SerialCDC* dev, unsigned int devIndex) noexcept
 {
-	disable_spi();
+	DisableSpi();
 	transportType = SbcTransportType::usb;
 	usbDevice = dev;
 	usbDeviceIndex = devIndex;
@@ -991,7 +993,7 @@ void DataTransfer::SwitchToUsb(SerialCDC* dev, unsigned int devIndex) noexcept
 	memset(&usbTxHeader, 0, sizeof(usbTxHeader));
 }
 
-static constexpr uint32_t UsbTimeoutMs =
+static constexpr uint32_t usbTimeoutMs =
 	SbcConnectionTimeout; // must be long enough for DSF to process between transfers
 
 TransferState DataTransfer::DoTransferUsb() noexcept
@@ -1002,7 +1004,7 @@ TransferState DataTransfer::DoTransferUsb() noexcept
 
 	// 1) Read DSF's header (wait for DSF to initiate the transfer)
 	const size_t hdrBytes =
-		usbDevice->readDirect(reinterpret_cast<uint8_t*>(&usbRxHeader), sizeof(UsbTransferHeader), UsbTimeoutMs);
+		usbDevice->readDirect(reinterpret_cast<uint8_t*>(&usbRxHeader), sizeof(UsbTransferHeader), usbTimeoutMs);
 	if (hdrBytes != sizeof(UsbTransferHeader))
 	{
 		if (reprap.Debug(Module::SbcInterface))
@@ -1016,7 +1018,7 @@ TransferState DataTransfer::DoTransferUsb() noexcept
 	usbTxHeader.numPackets = packetId;
 	usbTxHeader.dataLength = (uint16_t)txPointer;
 	if (!usbDevice->writeDirect(
-			reinterpret_cast<const uint8_t*>(&usbTxHeader), sizeof(UsbTransferHeader), UsbTimeoutMs))
+			reinterpret_cast<const uint8_t*>(&usbTxHeader), sizeof(UsbTransferHeader), usbTimeoutMs))
 	{
 		return TransferState::connectionTimeout;
 	}
@@ -1030,7 +1032,7 @@ TransferState DataTransfer::DoTransferUsb() noexcept
 	// 3) Read DSF's data body (DSF writes first)
 	if (usbRxHeader.dataLength > 0)
 	{
-		if (usbDevice->readDirect(reinterpret_cast<uint8_t*>(rxBuffer), usbRxHeader.dataLength, UsbTimeoutMs) !=
+		if (usbDevice->readDirect(reinterpret_cast<uint8_t*>(rxBuffer), usbRxHeader.dataLength, usbTimeoutMs) !=
 			usbRxHeader.dataLength)
 		{
 			return TransferState::connectionTimeout;
@@ -1040,7 +1042,7 @@ TransferState DataTransfer::DoTransferUsb() noexcept
 	// 4) Write our data body in response
 	if (txPointer > 0)
 	{
-		if (!usbDevice->writeDirect(reinterpret_cast<const uint8_t*>(txBuffer), txPointer, UsbTimeoutMs))
+		if (!usbDevice->writeDirect(reinterpret_cast<const uint8_t*>(txBuffer), txPointer, usbTimeoutMs))
 		{
 			return TransferState::connectionTimeout;
 		}
@@ -1072,7 +1074,7 @@ void DataTransfer::StartNextTransfer(bool keepSequence) noexcept
 		// Re-arming a transfer the SBC never clocked (new outgoing data arrived while idle-armed).
 		// Tear down the stale armed DMA and keep the TX sequence number / RX tracking untouched, so
 		// the SBC sees no sequence gap when it eventually clocks this transfer.
-		disable_spi();
+		DisableSpi();
 	}
 	else
 	{
@@ -1127,7 +1129,7 @@ void DataTransfer::ResetConnection(bool fullReset) noexcept
 #  endif
 
 	// Clear the remaining data to send
-	disable_spi();
+	DisableSpi();
 	dataReceived = false;
 	rxPointer = txPointer = 0;
 	packetId = 0;
@@ -1157,7 +1159,7 @@ bool DataTransfer::WriteCodeBufferUpdate(uint16_t bufferSpace) noexcept
 	(void)WritePacketHeader(FirmwareRequest::CodeBufferUpdate, sizeof(CodeBufferUpdateHeader));
 
 	// Write header
-	CodeBufferUpdateHeader* header = WriteDataHeader<CodeBufferUpdateHeader>();
+	auto* header = WriteDataHeader<CodeBufferUpdateHeader>();
 	header->bufferSpace = bufferSpace;
 	header->padding = 0;
 	return true;
@@ -1166,7 +1168,7 @@ bool DataTransfer::WriteCodeBufferUpdate(uint16_t bufferSpace) noexcept
 bool DataTransfer::WriteCodeReply(MessageType type, OutputBuffer*& response) noexcept
 {
 	// Try to write the packet header. This packet type can deal with truncated messages
-	const size_t minBytesToWrite = min<size_t>(16, (response == nullptr) ? 0 : response->Length());
+	const auto minBytesToWrite = min<size_t>(16, (response == nullptr) ? 0 : response->Length());
 	if (!CanWritePacket(sizeof(MessageHeader) + minBytesToWrite))
 	{
 		// Not enough space left
@@ -1177,7 +1179,7 @@ bool DataTransfer::WriteCodeReply(MessageType type, OutputBuffer*& response) noe
 	PacketHeader* header = WritePacketHeader(FirmwareRequest::Message);
 
 	// Write code reply header
-	MessageHeader* replyHeader = WriteDataHeader<MessageHeader>();
+	auto* replyHeader = WriteDataHeader<MessageHeader>();
 	replyHeader->messageType = (uint32_t)type;
 	replyHeader->padding = 0;
 
@@ -1185,7 +1187,7 @@ bool DataTransfer::WriteCodeReply(MessageType type, OutputBuffer*& response) noe
 	size_t bytesWritten = 0;
 	if (response != nullptr)
 	{
-		size_t bytesToCopy;
+		size_t bytesToCopy = 0;
 		do
 		{
 			bytesToCopy = min<size_t>(FreeTxSpace(), response->BytesLeft());
@@ -1230,7 +1232,7 @@ bool DataTransfer::WriteCANResponse(const CANResponseHeader& header, const char*
 	(void)WritePacketHeader(FirmwareRequest::CANResponse, sizeof(CANResponseHeader) + header.dataLength);
 
 	// Write the CAN response header
-	CANResponseHeader* hdr = WriteDataHeader<CANResponseHeader>();
+	auto* hdr = WriteDataHeader<CANResponseHeader>();
 	*hdr = header;
 
 	// Write the payload
@@ -1250,7 +1252,7 @@ void DataTransfer::WriteMasterClock() noexcept
 	}
 
 	(void)WritePacketHeader(FirmwareRequest::MasterClock, sizeof(MasterClockHeader));
-	MasterClockHeader* header = WriteDataHeader<MasterClockHeader>();
+	auto* header = WriteDataHeader<MasterClockHeader>();
 	header->masterClock = StepTimer::GetTimerTicks();
 	header->hiccupTime = StepTimer::GetMovementDelay();
 }
@@ -1263,7 +1265,7 @@ PacketHeader* DataTransfer::WritePacketHeader(FirmwareRequest request,
 	txPointer = AddPadding(txPointer);
 
 	// Write the next packet data
-	PacketHeader* header = reinterpret_cast<PacketHeader*>(txBuffer + txPointer);
+	auto* header = reinterpret_cast<PacketHeader*>(txBuffer + txPointer);
 	header->request = static_cast<uint16_t>(request);
 	header->id = packetId++;
 	header->length = dataLength;
@@ -1287,7 +1289,7 @@ T* DataTransfer::WriteDataHeader() noexcept
 	return header;
 }
 
-uint32_t DataTransfer::CalcCRC32(const char* buffer, size_t length) const noexcept
+uint32_t DataTransfer::CalcCRC32(const char* buffer, size_t length) noexcept
 {
 	CRC32 crc;
 	crc.Update(buffer, length);

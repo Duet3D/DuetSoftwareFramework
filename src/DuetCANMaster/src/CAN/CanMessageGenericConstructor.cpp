@@ -10,21 +10,23 @@
 
 #if SUPPORT_CAN_EXPANSION
 
-#include "CanMessageBuffer.h"
-#include "CanInterface.h"
-#include <limits>
+#  include "CanMessageBuffer.h"
 
-#define STRINGIZE2(_v)	#_v
-#define STRINGIZE(_v)	STRINGIZE2(_v)
+#  include "CanInterface.h"
+#  include <limits>
 
-CanMessageGenericConstructor::CanMessageGenericConstructor(const ParamDescriptor *_ecv_array p_param) noexcept
-	: paramTable(p_param), dataLen(0)
+#  define STRINGIZE2(_v) #_v
+#  define STRINGIZE(_v) STRINGIZE2(_v)
+
+CanMessageGenericConstructor::CanMessageGenericConstructor(const ParamDescriptor* _ecv_array pParam) noexcept
+	: paramTable(pParam)
+	, dataLen(0)
 {
 	msg.paramMap = 0;
 }
 
 // Append a value to the data, throwing if it wouldn't fit
-void CanMessageGenericConstructor::StoreValue(const void *vp, size_t sz) THROWS(CanException)
+void CanMessageGenericConstructor::StoreValue(const void* vp, size_t sz) THROWS(CanException)
 {
 	if (dataLen + sz > sizeof(msg.data))
 	{
@@ -35,7 +37,7 @@ void CanMessageGenericConstructor::StoreValue(const void *vp, size_t sz) THROWS(
 }
 
 // Insert a value in the data, throwing if it wouldn't fit
-void CanMessageGenericConstructor::InsertValue(const void *vp, size_t sz, size_t pos) THROWS(CanException)
+void CanMessageGenericConstructor::InsertValue(const void* vp, size_t sz, size_t pos) THROWS(CanException)
 {
 	if (dataLen + sz > sizeof(msg.data))
 	{
@@ -46,12 +48,14 @@ void CanMessageGenericConstructor::InsertValue(const void *vp, size_t sz, size_t
 	dataLen += sz;
 }
 
-// Return the correct position in the data to insert a parameter. If successful, add the bit to the parameter map and pass back the expect5ed parameter type; else throw.
-unsigned int CanMessageGenericConstructor::FindInsertPoint(char c, ParamDescriptor::ParamType& t, size_t &sz) THROWS(CanException)
+// Return the correct position in the data to insert a parameter. If successful, add the bit to the parameter map and
+// pass back the expect5ed parameter type; else throw.
+unsigned int CanMessageGenericConstructor::FindInsertPoint(char c, ParamDescriptor::ParamType& t, size_t& sz)
+	THROWS(CanException)
 {
 	unsigned int pos = 0;
 	uint32_t paramBit = 1;
-	for (const ParamDescriptor *_ecv_array d = paramTable; d->letter != 0; ++d)
+	for (const ParamDescriptor* _ecv_array d = paramTable; d->letter != 0; ++d)
 	{
 		const bool present = (msg.paramMap & paramBit) != 0;
 		if (d->letter == c)
@@ -87,11 +91,11 @@ unsigned int CanMessageGenericConstructor::FindInsertPoint(char c, ParamDescript
 	throw "wrong parameter letter";
 }
 
-//TODO factor out the common code in the following several routines
+// TODO factor out the common code in the following several routines
 void CanMessageGenericConstructor::AddU64Param(char c, uint64_t v) THROWS(CanException)
 {
-	ParamDescriptor::ParamType t;
-	size_t sz;
+	ParamDescriptor::ParamType t{};
+	size_t sz = 0;
 	const unsigned int pos = FindInsertPoint(c, t, sz);
 	if (t != ParamDescriptor::uint64)
 	{
@@ -102,8 +106,8 @@ void CanMessageGenericConstructor::AddU64Param(char c, uint64_t v) THROWS(CanExc
 
 void CanMessageGenericConstructor::AddUParam(char c, uint32_t v) THROWS(CanException)
 {
-	ParamDescriptor::ParamType t;
-	size_t sz;
+	ParamDescriptor::ParamType t{};
+	size_t sz = 0;
 	const unsigned int pos = FindInsertPoint(c, t, sz);
 	switch (t)
 	{
@@ -134,8 +138,8 @@ void CanMessageGenericConstructor::AddUParam(char c, uint32_t v) THROWS(CanExcep
 
 void CanMessageGenericConstructor::AddIParam(char c, int32_t v) THROWS(CanException)
 {
-	ParamDescriptor::ParamType t;
-	size_t sz;
+	ParamDescriptor::ParamType t{};
+	size_t sz = 0;
 	const unsigned int pos = FindInsertPoint(c, t, sz);
 	switch (t)
 	{
@@ -165,8 +169,8 @@ void CanMessageGenericConstructor::AddIParam(char c, int32_t v) THROWS(CanExcept
 
 void CanMessageGenericConstructor::AddFParam(char c, float v) THROWS(CanException)
 {
-	ParamDescriptor::ParamType t;
-	size_t sz;
+	ParamDescriptor::ParamType t{};
+	size_t sz = 0;
 	const unsigned int pos = FindInsertPoint(c, t, sz);
 	if (t != ParamDescriptor::float_p)
 	{
@@ -177,8 +181,8 @@ void CanMessageGenericConstructor::AddFParam(char c, float v) THROWS(CanExceptio
 
 void CanMessageGenericConstructor::AddCharParam(char c, char v) THROWS(CanException)
 {
-	ParamDescriptor::ParamType t;
-	size_t sz;
+	ParamDescriptor::ParamType t{};
+	size_t sz = 0;
 	const unsigned int pos = FindInsertPoint(c, t, sz);
 	if (t != ParamDescriptor::char_p)
 	{
@@ -187,15 +191,15 @@ void CanMessageGenericConstructor::AddCharParam(char c, char v) THROWS(CanExcept
 	InsertValue(&v, sz, pos);
 }
 
-void CanMessageGenericConstructor::AddStringParam(char c, const char *_ecv_array v) THROWS(CanException)
+void CanMessageGenericConstructor::AddStringParam(char c, const char* _ecv_array v) THROWS(CanException)
 {
-	ParamDescriptor::ParamType t;
-	size_t sz;
+	ParamDescriptor::ParamType t{};
+	size_t sz = 0;
 	const unsigned int pos = FindInsertPoint(c, t, sz);
 	switch (t)
 	{
 	case ParamDescriptor::string:
-	case ParamDescriptor::reducedString:			//TODO currently we don't reduce the string, but it should already be reduced
+	case ParamDescriptor::reducedString: // TODO currently we don't reduce the string, but it should already be reduced
 		InsertValue(v, strlen(v) + 1, pos);
 		break;
 
@@ -206,8 +210,8 @@ void CanMessageGenericConstructor::AddStringParam(char c, const char *_ecv_array
 
 void CanMessageGenericConstructor::AddDriverIdParam(char c, DriverId did) THROWS(CanException)
 {
-	ParamDescriptor::ParamType t;
-	size_t sz;
+	ParamDescriptor::ParamType t{};
+	size_t sz = 0;
 	const unsigned int pos = FindInsertPoint(c, t, sz);
 	if (t != ParamDescriptor::localDriver)
 	{
@@ -217,10 +221,11 @@ void CanMessageGenericConstructor::AddDriverIdParam(char c, DriverId did) THROWS
 	InsertValue(&did.localDriver, sz, pos);
 }
 
-void CanMessageGenericConstructor::AddFloatArrayParam(char c, const float *_ecv_array v, size_t numV) THROWS(CanException)
+void CanMessageGenericConstructor::AddFloatArrayParam(char c, const float* _ecv_array v, size_t numV)
+	THROWS(CanException)
 {
-	ParamDescriptor::ParamType t;
-	size_t sz;
+	ParamDescriptor::ParamType t{};
+	size_t sz = 0;
 	const unsigned int pos = FindInsertPoint(c, t, sz);
 	if (t != ParamDescriptor::float_array || numV != sz)
 	{
@@ -230,11 +235,16 @@ void CanMessageGenericConstructor::AddFloatArrayParam(char c, const float *_ecv_
 	InsertValue(v, numV * sizeof(float), pos + sizeof(uint8_t));
 }
 
-GCodeResult CanMessageGenericConstructor::SendAndGetResponse(CanMessageType msgType, CanAddress dest, const StringRef& reply, uint8_t *_ecv_null extra) const noexcept
+GCodeResult CanMessageGenericConstructor::SendAndGetResponse(CanMessageType msgType,
+															 CanAddress dest,
+															 const StringRef& reply,
+															 const uint8_t* _ecv_null extra) noexcept
 {
 	// In SBC bridge mode this firmware no longer performs synchronous CAN request/reply transactions; the SBC owns
 	// request/reply correlation and drives generic CAN messages itself via CANRequestHeader.
-	(void)msgType; (void)dest; (void)extra;
+	(void)msgType;
+	(void)dest;
+	(void)extra;
 	reply.copy("generic CAN messages with a reply are handled by the SBC, not the firmware");
 	return GCodeResult::error;
 }

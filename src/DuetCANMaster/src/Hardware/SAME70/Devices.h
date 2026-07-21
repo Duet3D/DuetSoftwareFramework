@@ -8,7 +8,7 @@
 #ifndef SRC_HARDWARE_SAME70_DEVICES_H_
 #define SRC_HARDWARE_SAME70_DEVICES_H_
 
-#define SUPPORT_USB		1		// needed by SerialCDC.h
+#define SUPPORT_USB 1 // needed by SerialCDC.h
 #include "SerialCDC.h"
 
 extern SerialCDC serialUSB;

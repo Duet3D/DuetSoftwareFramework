@@ -10,13 +10,11 @@
 
 // Class to perform averaging of values read from the ADC
 // numAveraged should be a power of 2 for best efficiency
-template<size_t numAveraged> class AveragingFilter
+template <size_t numAveraged>
+class AveragingFilter
 {
-public:
-	AveragingFilter() noexcept
-	{
-		Init(0);
-	}
+  public:
+	AveragingFilter() noexcept { Init(0); }
 
 	void Init(uint16_t val) volatile noexcept
 	{
@@ -35,7 +33,7 @@ public:
 	// This is called by the ISR and by the ADC callback function
 	void ProcessReading(uint16_t r) volatile noexcept
 	{
-		size_t locIndex = index;				// avoid repeatedly reloading volatile variable
+		size_t locIndex = index; // avoid repeatedly reloading volatile variable
 		sum = sum - readings[locIndex] + r;
 		readings[locIndex] = r;
 		++locIndex;
@@ -48,32 +46,27 @@ public:
 	}
 
 	// Return the raw sum
-	uint32_t GetSum() const volatile noexcept
-	{
-		return sum;
-	}
+	uint32_t GetSum() const volatile noexcept { return sum; }
 
 	// Return true if we have a valid average
-	bool IsValid() const volatile noexcept
-	{
-		return isValid;
-	}
+	bool IsValid() const volatile noexcept { return isValid; }
 
 	static constexpr size_t NumAveraged() noexcept { return numAveraged; }
 
 	// Function used as an ADC callback to feed a result into an averaging filter
 	static void CallbackFeedIntoFilter(CallbackParameter cp, int32_t val) noexcept;
 
-private:
+  private:
 	uint16_t readings[numAveraged];
 	size_t index;
 	uint32_t sum;
 	bool isValid;
-	//invariant(sum == + over readings)
-	//invariant(index < numAveraged)
+	// invariant(sum == + over readings)
+	// invariant(index < numAveraged)
 };
 
-template<size_t numAveraged> void AveragingFilter<numAveraged>::CallbackFeedIntoFilter(CallbackParameter cp, int32_t val) noexcept
+template <size_t numAveraged>
+void AveragingFilter<numAveraged>::CallbackFeedIntoFilter(CallbackParameter cp, int32_t val) noexcept
 {
 	static_cast<AveragingFilter<numAveraged>*>(cp.vp)->ProcessReading((uint16_t)val);
 }

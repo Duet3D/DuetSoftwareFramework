@@ -8,7 +8,7 @@
 #include "Version.h"
 #include <General/IsoDate.h>
 
-const char *_ecv_array const DateText = IsoDate;
-const char *_ecv_array const TimeSuffix = " " __TIME__;
+const char* const _ecv_array DateText = IsoDate;
+const char* const _ecv_array TimeSuffix = " " __TIME__;
 
 // End

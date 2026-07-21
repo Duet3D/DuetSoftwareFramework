@@ -18,14 +18,15 @@
 
 #if HAS_SBC_INTERFACE
 
-#include <cstddef>
-#include <cstdint>
-#include <ctime>
+#  include <cstddef>
+#  include <cstdint>
+#  include <ctime>
 
-#include <RepRapFirmware.h>
-#include <Platform/PrintPausedReason.h>
+#  include <RepRapFirmware.h>
 
-#include <DuetSpiProtocol/MessageFormats.h>
+#  include <Platform/PrintPausedReason.h>
+
+#  include <DuetSpiProtocol/MessageFormats.h>
 
 namespace SbcProtocol = duet::spi::protocol;
 
@@ -62,10 +63,12 @@ using MasterClockHeader = SbcProtocol::MasterClockHeader;
 // Firmware-local constants and structures (never sent over SPI as-is)
 // ---------------------------------------------------------------------------
 
-constexpr uint32_t SbcTransferTimeout = 500;		// maximum allowed delay between data exchanges during a full transfer (in ms)
-constexpr uint32_t SbcMaxTransferTime = 50;			// maximum allowed time for a single SPI transfer
-constexpr uint32_t SbcConnectionTimeout = 4000;		// maximum time to wait for the next transfer (in ms)
-constexpr uint32_t SbcTxDrainTimeout = 250;			// maximum time to wait for CDC TX FIFO to drain before entering direct mode (in ms)
+constexpr uint32_t SbcTransferTimeout =
+	500; // maximum allowed delay between data exchanges during a full transfer (in ms)
+constexpr uint32_t SbcMaxTransferTime = 50;		// maximum allowed time for a single SPI transfer
+constexpr uint32_t SbcConnectionTimeout = 4000; // maximum time to wait for the next transfer (in ms)
+constexpr uint32_t SbcTxDrainTimeout =
+	250; // maximum time to wait for CDC TX FIFO to drain before entering direct mode (in ms)
 
 // Transport carrying the protocol. Chosen at runtime, not part of the wire format.
 enum class SbcTransportType : uint8_t

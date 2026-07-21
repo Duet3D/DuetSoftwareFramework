@@ -24,31 +24,37 @@ Licence: GPL
 
 #include <ecv_duet3d.h>
 
-#include <cstddef>		// for size_t
+#include <cstddef> // for size_t
+
 #include <cfloat>
 #include <cstdarg>
-#include <climits>		// for CHAR_BIT
+
+#include <climits> // for CHAR_BIT
 #include <cmath>
 
 #include <ctime>
-[[deprecated("use gmtime_r instead for thread-safety")]] tm *_ecv_null gmtime(const time_t* t);
-[[deprecated("use SafeStrptime instead")]] char *_ecv_array strptime (const char *_ecv_array buf, const char *_ecv_array format, struct tm *timeptr);
-const char *_ecv_array _ecv_null SafeStrptime(const char *_ecv_array buf, const char *_ecv_array format, struct tm *timeptr) noexcept;
+[[deprecated("use gmtime_r instead for thread-safety")]] tm* _ecv_null gmtime(const time_t* t);
+[[deprecated("use SafeStrptime instead")]] char* _ecv_array strptime(const char* _ecv_array buf,
+																	 const char* _ecv_array format,
+																	 struct tm* timeptr);
+const char* _ecv_array _ecv_null SafeStrptime(const char* _ecv_array buf,
+											  const char* _ecv_array format,
+											  struct tm* timeptr) noexcept;
 
 #include <Core.h>
 
 #ifndef SAMC21
-# error SAMC21 should be defined as 0 or 1
+#  error SAMC21 should be defined as 0 or 1
 #endif
 
 #ifndef SAME5x
-# error SAME5X should be defined as 0 or 1
+#  error SAME5X should be defined as 0 or 1
 #endif
 
 #if SAME70
-# define __nocache		__attribute__((section(".ram_nocache")))
+#  define __nocache __attribute__((section(".ram_nocache")))
 #else
-# define __nocache		// nothing
+#  define __nocache // nothing
 #endif
 
 #include <CoreIO.h>
@@ -56,15 +62,17 @@ const char *_ecv_array _ecv_null SafeStrptime(const char *_ecv_array buf, const 
 
 // The following are needed by many other files, so include them here
 #include <Platform/MessageType.h>
+
 #include <GCodeResult.h>
 
-// Convert an error or warning result into a suitable generic message type. Should only be called with GCodeResult::warning or GCodeResult::error.
+// Convert an error or warning result into a suitable generic message type. Should only be called with
+// GCodeResult::warning or GCodeResult::error.
 inline MessageType GetGenericMessageType(GCodeResult rslt)
 {
 	return (rslt == GCodeResult::warning) ? WarningMessage : ErrorMessage;
 }
 
-#define SPEED_CRITICAL	__attribute__((optimize("O2")))
+#define SPEED_CRITICAL __attribute__((optimize("O2")))
 
 // API level definition.
 // ApiLevel 1 is the first level that supports rr_model.
@@ -73,9 +81,9 @@ constexpr unsigned int ApiLevel = 2;
 
 // Definitions needed by Pins.h and/or Configuration.h
 // Logical pins used for general output, servos, CCN and laser control
-typedef uint8_t LogicalPin;				// type used to represent logical pin numbers
+typedef uint8_t LogicalPin; // type used to represent logical pin numbers
 constexpr LogicalPin NoLogicalPin = 0xFF;
-constexpr const char * _ecv_array NoPinName = "nil";
+constexpr const char* _ecv_array NoPinName = "nil";
 
 // Enumeration to describe what we want to do with a pin
 enum class PinAccess : int
@@ -110,6 +118,7 @@ enum class PinUsedBy : uint8_t
 };
 
 #include <Config/Pins.h>
+
 #include <Config/Configuration.h>
 
 static_assert(MinVisibleAxes <= MinAxes);
@@ -117,14 +126,16 @@ static_assert(NumNamedPins <= 255 || sizeof(LogicalPin) > 1, "Need 16-bit logica
 
 // Motion system choices, temporary until we finalise the choices of behaviour
 #if SUPPORT_ASYNC_MOVES
-# define PREALLOCATE_TOOL_AXES		1		// if set, when a tool is selected we preallocate and hang on to its X/Y axes and extruders
+#  define PREALLOCATE_TOOL_AXES                                                                                        \
+	  1 // if set, when a tool is selected we preallocate and hang on to its X/Y axes and extruders
 #endif
 
 #if SUPPORT_CAN_EXPANSION
 
-# include <CanId.h>
+#  include <CanId.h>
 
-// We have to declare CanInterface::GetCanAddress here because CanInterface.h needs to include this file for the declaration of DriverId
+// We have to declare CanInterface::GetCanAddress here because CanInterface.h needs to include this file for the
+// declaration of DriverId
 namespace CanInterface
 {
 	CanAddress GetCanAddress() noexcept;
@@ -134,57 +145,90 @@ namespace CanInterface
 
 namespace CanInterface
 {
-	inline CanAddress GetCanAddress() noexcept { return 0; }
-}
+	inline CanAddress GetCanAddress() noexcept
+	{
+		return 0;
+	}
+} // namespace CanInterface
 
 #endif
 
 #include <General/String.h>
 #include <General/StringFunctions.h>
+
 #include <General/Bitmap.h>
 #include <General/SafeStrtod.h>
 #include <General/SafeVsnprintf.h>
 #include <RRF3Common.h>
 
 #ifdef __ECV__
-#define THROWS(...)		_ecv_throws(__VA_ARGS__)
+#  define THROWS(...) _ecv_throws(__VA_ARGS__)
 #else
-#define THROWS(...)		noexcept(false)			// best we can do is say that it throws something
+#  define THROWS(...) noexcept(false) // best we can do is say that it throws something
 #endif
 
 // Error reporting for functions that are allowed to throw
-#define THROW_INTERNAL_ERROR	ThrowGCodeException("internal error at file " __FILE__ "(%d)", (int32_t)__LINE__)
+#define THROW_INTERNAL_ERROR ThrowGCodeException("internal error at file " __FILE__ "(%d)", (int32_t)__LINE__)
 
 // Error reporting for functions that are not allowed to throw
-#define REPORT_INTERNAL_ERROR do { reprap.ReportInternalError((__FILE__), (__func__), (__LINE__)); } while(0)
+#define REPORT_INTERNAL_ERROR                                                                                          \
+	do                                                                                                                 \
+	{                                                                                                                  \
+		reprap.ReportInternalError((__FILE__), (__func__), (__LINE__));                                                \
+	} while (0)
 
 // Assertion mechanism
-extern "C" [[noreturn]] void vAssertCalled(uint32_t line, const char *_ecv_array file) noexcept __attribute__((naked));
-#define RRF_ASSERT(_expr) do { if (!(_expr)) { vAssertCalled(__LINE__, __FILE__); } } while (false)
+// Spelled with __attribute__((noreturn)) rather than [[noreturn]] to match the earlier declaration
+// in FreeRTOSConfig.h. The standard attribute may not be introduced on a redeclaration, so using
+// [[noreturn]] here is ill-formed in any TU that sees the FreeRTOS header first.
+extern "C" void vAssertCalled(uint32_t line, const char* _ecv_array file) noexcept __attribute__((naked, noreturn));
+#define RRF_ASSERT(_expr)                                                                                              \
+	do                                                                                                                 \
+	{                                                                                                                  \
+		if (!(_expr))                                                                                                  \
+		{                                                                                                              \
+			vAssertCalled(__LINE__, __FILE__);                                                                         \
+		}                                                                                                              \
+	} while (false)
 
 // Debugging support
-extern "C" void debugPrintf(const char* fmt, ...) noexcept __attribute__ ((format (printf, 1, 2)));
-#define DEBUG_HERE do { debugPrintf("At " __FILE__ " line %d\n", __LINE__); delay(50); } while (false)
+extern "C" void debugPrintf(const char* fmt, ...) noexcept __attribute__((format(printf, 1, 2)));
+#define DEBUG_HERE                                                                                                     \
+	do                                                                                                                 \
+	{                                                                                                                  \
+		debugPrintf("At " __FILE__ " line %d\n", __LINE__);                                                            \
+		delay(50);                                                                                                     \
+	} while (false)
 
-#ifdef __ECV__			// eCv doesn't understand the gcc asm syntax in these functions
+#ifdef __ECV__ // eCv doesn't understand the gcc asm syntax in these functions
 
-# define CheckStackValue(dwordOffset, val) do { } while (false)
+#  define CheckStackValue(dwordOffset, val)                                                                            \
+	  do                                                                                                               \
+	  {                                                                                                                \
+	  } while (false)
 
 #else
 
 // Function and macro to track return address corruption
 inline uint32_t GetStackValue(uint32_t dwordOffset) noexcept
 {
-    register const volatile uint32_t* sp asm ("sp");
-    return sp[dwordOffset];
+	register const volatile uint32_t* sp asm("sp");
+	return sp[dwordOffset];
 }
 
-# define CheckStackValue(dwordOffset, val) do { if (GetStackValue(dwordOffset) != val) { vAssertCalled(__LINE__, __FILE__); } } while (false)
+#  define CheckStackValue(dwordOffset, val)                                                                            \
+	  do                                                                                                               \
+	  {                                                                                                                \
+		  if (GetStackValue(dwordOffset) != val)                                                                       \
+		  {                                                                                                            \
+			  vAssertCalled(__LINE__, __FILE__);                                                                       \
+		  }                                                                                                            \
+	  } while (false)
 
-inline volatile uint32_t *GetStackOffset(uint32_t dwordOffset) noexcept
+inline volatile uint32_t* GetStackOffset(uint32_t dwordOffset) noexcept
 {
-    register volatile uint32_t* sp asm ("sp");
-    return &sp[dwordOffset];
+	register volatile uint32_t* sp asm("sp");
+	return &sp[dwordOffset];
 }
 
 #endif
@@ -192,19 +236,20 @@ inline volatile uint32_t *GetStackOffset(uint32_t dwordOffset) noexcept
 // Functions to set and clear data watchpoints
 inline void SetWatchpoint(uint8_t number, const void* addr, unsigned int addrBits = 2) noexcept
 {
-#ifndef __ECV__		// this uses messy pointer arithmetic on a non-array, so eCv understandable doesn't like it
-	CoreDebug->DEMCR = CoreDebug_DEMCR_TRCENA_Msk | CoreDebug_DEMCR_MON_EN_Msk;		// enable tracing and debug interrupt
-	volatile uint32_t *const _ecv_array watchpointRegs = &(DWT->COMP0);				// 4 groups of (COMP, MASK, FUNCTION, reserved)
-	watchpointRegs[4 * number] = reinterpret_cast<uint32_t>(addr);					// set COMP register
-	watchpointRegs[4 * number + 1] = addrBits;										// set MASK register to ignore the least significant N bits of the address
-	watchpointRegs[4 * number + 2] = 0x06;											// set FUNCTION register
+#ifndef __ECV__ // this uses messy pointer arithmetic on a non-array, so eCv understandable doesn't like it
+	CoreDebug->DEMCR = CoreDebug_DEMCR_TRCENA_Msk | CoreDebug_DEMCR_MON_EN_Msk; // enable tracing and debug interrupt
+	volatile uint32_t* const _ecv_array watchpointRegs = &(DWT->COMP0); // 4 groups of (COMP, MASK, FUNCTION, reserved)
+	watchpointRegs[4 * number] = reinterpret_cast<uint32_t>(addr);		// set COMP register
+	watchpointRegs[4 * number + 1] =
+		addrBits;						   // set MASK register to ignore the least significant N bits of the address
+	watchpointRegs[4 * number + 2] = 0x06; // set FUNCTION register
 #endif
 }
 
 inline void ClearWatchpoint(uint8_t number) noexcept
 {
-#ifndef __ECV__		// this uses messy pointer arithmetic on a non-array, so eCv understandable doesn't like it
-	volatile uint32_t *const _ecv_array watchpointRegs = &(DWT->COMP0);						// 4 groups of (COMP, MASK, FUNCTION, reserved)
+#ifndef __ECV__ // this uses messy pointer arithmetic on a non-array, so eCv understandable doesn't like it
+	volatile uint32_t* const _ecv_array watchpointRegs = &(DWT->COMP0); // 4 groups of (COMP, MASK, FUNCTION, reserved)
 	watchpointRegs[4 * number + 2] = 0;
 #endif
 }
@@ -212,14 +257,16 @@ inline void ClearWatchpoint(uint8_t number) noexcept
 // Class to set a watchpoint and clear it when it goes out of scope
 class AutoClearingWatchpoint
 {
-public:
+  public:
 	AutoClearingWatchpoint(uint8_t p_number, const void* addr, unsigned int addrBits = 2) noexcept
 		: number(p_number)
-	{ SetWatchpoint(p_number, addr, addrBits); }
+	{
+		SetWatchpoint(p_number, addr, addrBits);
+	}
 
 	~AutoClearingWatchpoint() noexcept { ClearWatchpoint(number); }
 
-private:
+  private:
 	uint8_t number;
 };
 
@@ -232,10 +279,18 @@ struct DriverId
 
 	CanAddress boardAddress;
 
-	DriverId() noexcept : localDriver(0), boardAddress(CanInterface::GetCanAddress())  { }
+	DriverId() noexcept
+		: localDriver(0)
+		, boardAddress(CanInterface::GetCanAddress())
+	{
+	}
 
 	// Constructor used by ATE configurations and object model
-	DriverId(CanAddress addr, uint8_t drv) noexcept : localDriver(drv), boardAddress(addr) { }
+	DriverId(CanAddress addr, uint8_t drv) noexcept
+		: localDriver(drv)
+		, boardAddress(addr)
+	{
+	}
 
 	CanAddress GetBoardAddress() const noexcept { return boardAddress; }
 
@@ -257,7 +312,8 @@ struct DriverId
 
 	bool operator<(const DriverId other) const noexcept
 	{
-		return boardAddress < other.boardAddress || (boardAddress == other.boardAddress && localDriver < other.localDriver);
+		return boardAddress < other.boardAddress ||
+			   (boardAddress == other.boardAddress && localDriver < other.localDriver);
 	}
 
 	bool operator==(const DriverId other) const noexcept
@@ -270,21 +326,25 @@ struct DriverId
 		return boardAddress != other.boardAddress || localDriver != other.localDriver;
 	}
 
-	uint32_t AsU32() const noexcept
-	{
-		return (boardAddress << 8) | localDriver;
-	}
+	uint32_t AsU32() const noexcept { return (boardAddress << 8) | localDriver; }
 
 #else
 
-	DriverId() noexcept : localDriver(0)  { }
+	DriverId() noexcept
+		: localDriver(0)
+	{
+	}
 
 	// Constructor used by object model
-	explicit DriverId(uint8_t drv) noexcept : localDriver(drv) { }
+	explicit DriverId(uint8_t drv) noexcept
+		: localDriver(drv)
+	{
+	}
 
 	CanAddress GetBoardAddress() const noexcept { return 0; }
 
-	// Set the driver ID from the binary value, returning true if there was a nonzero board number so that the caller knows the address is not valid
+	// Set the driver ID from the binary value, returning true if there was a nonzero board number so that the caller
+	// knows the address is not valid
 	bool SetFromBinary(uint32_t val) noexcept
 	{
 		localDriver = val & 0x000000FFu;
@@ -292,50 +352,40 @@ struct DriverId
 		return (brdNum != 0);
 	}
 
-	void SetLocal(unsigned int driver) noexcept
-	{
-		localDriver = (uint8_t)driver;
-	}
+	void SetLocal(unsigned int driver) noexcept { localDriver = (uint8_t)driver; }
 
-	bool operator==(const DriverId other) const noexcept
-	{
-		return localDriver == other.localDriver;
-	}
+	bool operator==(const DriverId other) const noexcept { return localDriver == other.localDriver; }
 
-	bool operator!=(const DriverId other) const noexcept
-	{
-		return localDriver != other.localDriver;
-	}
+	bool operator!=(const DriverId other) const noexcept { return localDriver != other.localDriver; }
 
 	bool IsLocal() const noexcept { return true; }
 	bool IsRemote() const noexcept { return false; }
 
-	uint32_t AsU32() const noexcept
-	{
-		return localDriver;
-	}
+	uint32_t AsU32() const noexcept { return localDriver; }
 
 #endif
 };
 
 #if SUPPORT_CAN_EXPANSION
-# define PRIdriverId				"%u.%u"
-# define DRIVER_ID_PRINT_ARGS(_d)	_d.boardAddress,_d.localDriver
+#  define PRIdriverId "%u.%u"
+#  define DRIVER_ID_PRINT_ARGS(_d) _d.boardAddress, _d.localDriver
 #else
-# define PRIdriverId				"%u"
-# define DRIVER_ID_PRINT_ARGS(_d)	_d.localDriver
+#  define PRIdriverId "%u"
+#  define DRIVER_ID_PRINT_ARGS(_d) _d.localDriver
 #endif
 
 // Module numbers and names, used for diagnostics and debug
 // All of these including 'none' must be <= 31 because we 'or' the module number into the software reset code
-NamedEnum(Module, uint8_t,
-			Platform,
-			Debug, PortControl,
-			SbcInterface,
-			CAN,					// uppercase to avoid eCv clash with type Can in Microchip driver file
-			Expansion,
-			numModules				// this is one greater than the last real module number and also serves as 'none'
-		 );
+NamedEnum(Module,
+		  uint8_t,
+		  Platform,
+		  Debug,
+		  PortControl,
+		  SbcInterface,
+		  CAN, // uppercase to avoid eCv clash with type Can in Microchip driver file
+		  Expansion,
+		  numModules // this is one greater than the last real module number and also serves as 'none'
+);
 
 static_assert(Module::NumValues < 32);
 
@@ -364,7 +414,7 @@ class ExpansionManager;
 
 // Define a floating point type for recording numbers of microsteps including fractional microsteps.
 // This is normally defined as float, but we can use double to check whether rounding error is causing problems.
-#define USE_DOUBLE_MOTIONCALC		(0)	//(SAME70)
+#define USE_DOUBLE_MOTIONCALC (0) //(SAME70)
 
 #if USE_DOUBLE_MOTIONCALC
 typedef double motioncalc_t;
@@ -379,20 +429,20 @@ inline motioncalc_t msquare(motioncalc_t a) noexcept
 
 // Define floating point type to use for calculations where we would like high precision in matrix calculations
 #if SAME70
-typedef double floatc_t;							// type of matrix element used for calibration
+typedef double floatc_t; // type of matrix element used for calibration
 #else
 // We are more memory-constrained on the other processors and they don't support double precision in hardware
-typedef float floatc_t;								// type of matrix element used for calibration
+typedef float floatc_t; // type of matrix element used for calibration
 #endif
 
 #if SUPPORT_CAN_EXPANSION
 
-# include <Duet3Common.h>
+#  include <Duet3Common.h>
 
-typedef Bitmap<uint32_t> AxesBitmap;				// Type of a bitmap representing a set of axes, and sometimes extruders too
-typedef Bitmap<uint32_t> ExtrudersBitmap;			// Type of a bitmap representing a set of extruder drive numbers
-typedef Bitmap<uint32_t> LogicalDrivesBitmap;		// Type of a bitmap representing a set of logical drives i.e. motor sets
-typedef Bitmap<uint64_t> InputPortsBitmap;			// Type of a bitmap representing a set of input ports
+typedef Bitmap<uint32_t> AxesBitmap;	  // Type of a bitmap representing a set of axes, and sometimes extruders too
+typedef Bitmap<uint32_t> ExtrudersBitmap; // Type of a bitmap representing a set of extruder drive numbers
+typedef Bitmap<uint32_t> LogicalDrivesBitmap; // Type of a bitmap representing a set of logical drives i.e. motor sets
+typedef Bitmap<uint64_t> InputPortsBitmap;	  // Type of a bitmap representing a set of input ports
 
 #else
 
@@ -401,21 +451,23 @@ typedef Bitmap<uint16_t> FansBitmap;
 typedef Bitmap<uint32_t> SensorsBitmap;
 typedef Bitmap<uint16_t> LocalDriversBitmap;
 
-typedef Bitmap<uint16_t> AxesBitmap;				// Type of a bitmap representing a set of axes, and sometimes extruders too
-typedef Bitmap<uint16_t> ExtrudersBitmap;			// Type of a bitmap representing a set of extruder drive numbers
-typedef Bitmap<uint16_t> LogicalDrivesBitmap;		// Type of a bitmap representing a set of logical drives i.e. motor sets
-typedef Bitmap<uint32_t> InputPortsBitmap;			// Type of a bitmap representing a set of input ports
+typedef Bitmap<uint16_t> AxesBitmap;	  // Type of a bitmap representing a set of axes, and sometimes extruders too
+typedef Bitmap<uint16_t> ExtrudersBitmap; // Type of a bitmap representing a set of extruder drive numbers
+typedef Bitmap<uint16_t> LogicalDrivesBitmap; // Type of a bitmap representing a set of logical drives i.e. motor sets
+typedef Bitmap<uint32_t> InputPortsBitmap;	  // Type of a bitmap representing a set of input ports
 
 #endif
 
-typedef Bitmap<uint32_t> TriggerNumbersBitmap;		// Type of a bitmap representing a set of trigger numbers
-typedef Bitmap<uint64_t> ToolNumbersBitmap;			// Type of a bitmap representing a set of tool numbers
+typedef Bitmap<uint32_t> TriggerNumbersBitmap; // Type of a bitmap representing a set of trigger numbers
+typedef Bitmap<uint64_t> ToolNumbersBitmap;	   // Type of a bitmap representing a set of tool numbers
 
 #if defined(DUET3)
-typedef Bitmap<uint64_t> ParameterLettersBitmap;	// Type of a bitmap representing a set of parameter letters in A..Z and a..z
+typedef Bitmap<uint64_t>
+	ParameterLettersBitmap; // Type of a bitmap representing a set of parameter letters in A..Z and a..z
 constexpr char HighestAxisLetter = 'z';
 #else
-typedef Bitmap<uint32_t> ParameterLettersBitmap;	// Type of a bitmap representing a set of parameter letters in A..Z and a..f
+typedef Bitmap<uint32_t>
+	ParameterLettersBitmap; // Type of a bitmap representing a set of parameter letters in A..Z and a..f
 constexpr char HighestAxisLetter = 'f';
 #endif
 
@@ -430,33 +482,34 @@ static_assert(MaxSensors <= SensorsBitmap::MaxBits());
 static_assert(MaxGpInPorts <= InputPortsBitmap::MaxBits());
 static_assert(MaxTriggers <= TriggerNumbersBitmap::MaxBits());
 static_assert(MaxTools <= ToolNumbersBitmap::MaxBits());
-static_assert(MaxAxes + 17 <= ParameterLettersBitmap::MaxBits());	// so that we have enough letters available for all the axes
+static_assert(MaxAxes + 17 <=
+			  ParameterLettersBitmap::MaxBits()); // so that we have enough letters available for all the axes
 
-typedef unsigned int MovementSystemNumber;	// we could use uint8_t for this
-typedef uint16_t Pwm_t;						// Type of a PWM value when we don't want to use floats
+typedef unsigned int MovementSystemNumber; // we could use uint8_t for this
+typedef uint16_t Pwm_t;					   // Type of a PWM value when we don't want to use floats
 
 #if SUPPORT_IOBITS
-typedef uint16_t IoBits_t;					// Type of the port control bitmap (G1 P parameter)
+typedef uint16_t IoBits_t; // Type of the port control bitmap (G1 P parameter)
 #endif
 
 // Data stored in RawMove and in the DDA to handle laser PWM and/or IOBITS
 #if SUPPORT_LASER || SUPPORT_IOBITS
 union LaserPwmOrIoBits
 {
-#if SUPPORT_LASER
-	Pwm_t laserPwm;							// the laser PWM to use for this move
-#endif
-#if SUPPORT_IOBITS
-	IoBits_t ioBits;						// I/O bits to set/clear at the start of this move
-#endif
+#  if SUPPORT_LASER
+	Pwm_t laserPwm; // the laser PWM to use for this move
+#  endif
+#  if SUPPORT_IOBITS
+	IoBits_t ioBits; // I/O bits to set/clear at the start of this move
+#  endif
 
-	void Clear() noexcept					// set to zero, whichever one it is
+	void Clear() noexcept // set to zero, whichever one it is
 	{
-#if SUPPORT_LASER
+#  if SUPPORT_LASER
 		laserPwm = 0;
-#else
+#  else
 		ioBits = 0;
-#endif
+#  endif
 	}
 };
 #endif
@@ -492,22 +545,27 @@ inline constexpr ParameterLettersBitmap ParameterLetterToBitmap(char c) noexcept
 	return ParameterLettersBitmap::MakeFromBits(ParameterLetterToBitNumber(c));
 }
 
-// Convert a string of parameter letters to a collection of bits. Normally used with constant strings, so recursive is OK.
-inline constexpr uint32_t ParameterLettersToBits(const char *_ecv_array s) noexcept
+// Convert a string of parameter letters to a collection of bits. Normally used with constant strings, so recursive is
+// OK.
+inline constexpr uint32_t ParameterLettersToBits(const char* _ecv_array s) noexcept
 {
-	return (*s == 0) ? 0
-		: (1u << ParameterLetterToBitNumber(*s)) | ParameterLettersToBits(s + 1);
+	return (*s == 0) ? 0 : (1u << ParameterLetterToBitNumber(*s)) | ParameterLettersToBits(s + 1);
 }
 
 // Convert a string of parameter letters to a bitmap
-inline constexpr ParameterLettersBitmap ParameterLettersToBitmap(const char *_ecv_array s) noexcept
+inline constexpr ParameterLettersBitmap ParameterLettersToBitmap(const char* _ecv_array s) noexcept
 {
 	return ParameterLettersBitmap(ParameterLettersToBits(s));
 }
 
 // Debugging support
-extern "C" void debugPrintf(const char *_ecv_array fmt, ...) noexcept __attribute__ ((format (printf, 1, 2)));
-#define DEBUG_HERE do { debugPrintf("At " __FILE__ " line %d\n", __LINE__); delay(50); } while (false)
+extern "C" void debugPrintf(const char* _ecv_array fmt, ...) noexcept __attribute__((format(printf, 1, 2)));
+#define DEBUG_HERE                                                                                                     \
+	do                                                                                                                 \
+	{                                                                                                                  \
+		debugPrintf("At " __FILE__ " line %d\n", __LINE__);                                                            \
+		delay(50);                                                                                                     \
+	} while (false)
 
 // Functions and globals not part of any class
 
@@ -516,32 +574,46 @@ float HideNan(float val) noexcept;
 void ListDrivers(const StringRef& str, LocalDriversBitmap drivers) noexcept;
 
 // Macro to assign an array from an initialiser list
-#define ARRAY_INIT(_dest, _init) static_assert(sizeof(_dest) == sizeof(_init), "Incompatible array types"); memcpy(_dest, _init, sizeof(_init));
+#define ARRAY_INIT(_dest, _init)                                                                                       \
+	static_assert(sizeof(_dest) == sizeof(_init), "Incompatible array types");                                         \
+	memcpy(_dest, _init, sizeof(_init));
 
 // UTF8 code for the degree-symbol
-#define DEGREE_SYMBOL	"\xC2\xB0"	// Unicode degree-symbol as UTF8
+#define DEGREE_SYMBOL "\xC2\xB0" // Unicode degree-symbol as UTF8
 
 // Classes to facilitate range-based for loops that iterate from 0 up to just below a limit
-template<class T> class SimpleRangeIterator
+template <class T>
+class SimpleRangeIterator
 {
-public:
-	explicit SimpleRangeIterator(T value_) noexcept : val(value_) {}
-    bool operator != (SimpleRangeIterator<T> const& other) const noexcept { return val != other.val;     }
-    T const& operator*() const noexcept { return val; }
-    SimpleRangeIterator<T>& operator++() noexcept { ++val; return *this; }
+  public:
+	explicit SimpleRangeIterator(T value_) noexcept
+		: val(value_)
+	{
+	}
+	bool operator!=(const SimpleRangeIterator<T>& other) const noexcept { return val != other.val; }
+	const T& operator*() const noexcept { return val; }
+	SimpleRangeIterator<T>& operator++() noexcept
+	{
+		++val;
+		return *this;
+	}
 
-private:
-    T val;
+  private:
+	T val;
 };
 
-template<class T> class SimpleRange
+template <class T>
+class SimpleRange
 {
-public:
-	explicit SimpleRange(T p_limit) noexcept : limit(p_limit) {}
+  public:
+	explicit SimpleRange(T p_limit) noexcept
+		: limit(p_limit)
+	{
+	}
 	SimpleRangeIterator<T> begin() const noexcept { return SimpleRangeIterator<T>(0); }
 	SimpleRangeIterator<T> end() const noexcept { return SimpleRangeIterator<T>(limit); }
 
-private:
+  private:
 	const T limit;
 };
 
@@ -549,31 +621,36 @@ private:
 #define ARRAY_INDICES(_arr) (SimpleRange<size_t>(ARRAY_SIZE(_arr)))
 
 // Function to delete an object and clear the pointer. Safe to call even if the pointer is already null.
-template <typename T> void DeleteObject(T *_ecv_null & ptr) noexcept
+template <typename T>
+void DeleteObject(T* _ecv_null& ptr) noexcept
 {
-	T *_ecv_null p2 = nullptr;
+	T* _ecv_null p2 = nullptr;
 	std::swap(ptr, p2);
 	delete p2;
 }
 
 // Function to delete an array of objects and clear the pointer. Safe to call even if the pointer is already null.
-template <typename T> void DeleteArray(T *_ecv_array _ecv_null & ptr) noexcept
+template <typename T>
+void DeleteArray(T* _ecv_array _ecv_null& ptr) noexcept
 {
-	T *_ecv_null p2 = nullptr;
+	T* _ecv_null p2 = nullptr;
 	std::swap(ptr, p2);
 	delete[] p2;
 }
 
-// Function to make a pointer point to a new object and delete the existing object, if any. T2 must be the same as T or derived from it.
-template <typename T, typename T2> void ReplaceObject(T *_ecv_null & ptr, T2* pNew) noexcept
+// Function to make a pointer point to a new object and delete the existing object, if any. T2 must be the same as T or
+// derived from it.
+template <typename T, typename T2>
+void ReplaceObject(T* _ecv_null& ptr, T2* pNew) noexcept
 {
-	T *_ecv_null p2 = static_cast<T *_ecv_null>(pNew);
+	T* _ecv_null p2 = static_cast<T * _ecv_null>(pNew);
 	std::swap(ptr, p2);
 	delete p2;
 }
 
 // Functions to return and reset non-atomic values. Do not use on std::atomic<T> values.
-template<typename T> T Exchange(T& var, T newValue) noexcept
+template <typename T>
+T Exchange(T& var, T newValue) noexcept
 {
 	const T ret = var;
 	var = newValue;
@@ -582,85 +659,98 @@ template<typename T> T Exchange(T& var, T newValue) noexcept
 
 // Common definitions used by more than one module
 
-constexpr size_t XY_AXES = 2;										// The number of Cartesian axes
-constexpr size_t XYZ_AXES = 3;										// The number of Cartesian axes
-constexpr size_t X_AXIS = 0, Y_AXIS = 1, Z_AXIS = 2;				// The indices of the Cartesian axes in drive arrays
-constexpr size_t U_AXIS = 3;										// The assumed index of the U axis when executing M673
-constexpr size_t NO_AXIS = 0x3F;									// A value to represent no axis, must fit in 6 bits (see EndstopHitDetails and RemoteInputHandle) and not be a valid axis number
+constexpr size_t XY_AXES = 2;						 // The number of Cartesian axes
+constexpr size_t XYZ_AXES = 3;						 // The number of Cartesian axes
+constexpr size_t X_AXIS = 0, Y_AXIS = 1, Z_AXIS = 2; // The indices of the Cartesian axes in drive arrays
+constexpr size_t U_AXIS = 3;						 // The assumed index of the U axis when executing M673
+constexpr size_t NO_AXIS = 0x3F; // A value to represent no axis, must fit in 6 bits (see EndstopHitDetails and
+								 // RemoteInputHandle) and not be a valid axis number
 
 static_assert(MaxAxesPlusExtruders <= MaxAxes + MaxExtruders);
 
 // Convert between extruder drive numbers and logical drive numbers.
-// In order to save memory when MaxAxesPlusExtruders < MaxAxes + MaxExtruders, the logical drive number of an axis is the same as the axis number,
-// but the logical drive number of an extruder is MaxAxesPlusExtruders - 1 - extruder_number.
-inline size_t ExtruderToLogicalDrive(size_t extruder) noexcept { return MaxAxesPlusExtruders - 1 - extruder; }
-inline size_t LogicalDriveToExtruder(size_t drive) noexcept { return MaxAxesPlusExtruders - 1 - drive; }
+// In order to save memory when MaxAxesPlusExtruders < MaxAxes + MaxExtruders, the logical drive number of an axis is
+// the same as the axis number, but the logical drive number of an extruder is MaxAxesPlusExtruders - 1 -
+// extruder_number.
+inline size_t ExtruderToLogicalDrive(size_t extruder) noexcept
+{
+	return MaxAxesPlusExtruders - 1 - extruder;
+}
+inline size_t LogicalDriveToExtruder(size_t drive) noexcept
+{
+	return MaxAxesPlusExtruders - 1 - drive;
+}
 
-const AxesBitmap DefaultXAxisMapping = AxesBitmap::MakeFromBits(X_AXIS);	// by default, X is mapped to X
-const AxesBitmap DefaultYAxisMapping = AxesBitmap::MakeFromBits(Y_AXIS);	// by default, Y is mapped to Y
-const AxesBitmap DefaultZAxisMapping = AxesBitmap::MakeFromBits(Z_AXIS);	// by default, Z is mapped to Z
+const AxesBitmap DefaultXAxisMapping = AxesBitmap::MakeFromBits(X_AXIS); // by default, X is mapped to X
+const AxesBitmap DefaultYAxisMapping = AxesBitmap::MakeFromBits(Y_AXIS); // by default, Y is mapped to Y
+const AxesBitmap DefaultZAxisMapping = AxesBitmap::MakeFromBits(Z_AXIS); // by default, Z is mapped to Z
 const AxesBitmap XyzAxes = AxesBitmap::MakeLowestNBits(XYZ_AXES);
 const AxesBitmap XyAxes = AxesBitmap::MakeLowestNBits(XY_AXES);
 
 // Common conversion factors
 constexpr float MinutesToSeconds = 60.0;
 constexpr uint32_t iMinutesToSeconds = 60;
-constexpr float SecondsToMinutes = 1.0/MinutesToSeconds;
+constexpr float SecondsToMinutes = 1.0 / MinutesToSeconds;
 constexpr float SecondsToMillis = 1000.0;
 constexpr float MillisToSeconds = 0.001;
 constexpr float InchToMm = 25.4;
 constexpr float Pi = 3.141592653589793;
 constexpr float TwoPi = 3.141592653589793 * 2.0;
-constexpr float DegreesToRadians = 3.141592653589793/180.0;
-constexpr float RadiansToDegrees = 180.0/3.141592653589793;
+constexpr float DegreesToRadians = 3.141592653589793 / 180.0;
+constexpr float RadiansToDegrees = 180.0 / 3.141592653589793;
 
 // The step clock is used for timing step pulses and other fine-resolution timer purposes
 
 #if SAME70 || SAME5x
 // All Duet 3 boards use a common step clock rate of 750kHz so that we can sync the clocks over CAN
-constexpr uint32_t StepClockRate = 48000000/64;								// 750kHz
+constexpr uint32_t StepClockRate = 48000000 / 64; // 750kHz
 #else
-constexpr uint32_t StepClockRate = SystemCoreClockFreq/128;					// Duet 2, PCCB Maestro: use just under 1MHz
+constexpr uint32_t StepClockRate = SystemCoreClockFreq / 128; // Duet 2, PCCB Maestro: use just under 1MHz
 #endif
 
 constexpr uint64_t StepClockRateSquared = (uint64_t)StepClockRate * StepClockRate;
-constexpr float StepClocksToMillis = 1000.0/(float)StepClockRate;
-constexpr float StepClocksToSeconds = 1.0/(float)StepClockRate;
+constexpr float StepClocksToMillis = 1000.0 / (float)StepClockRate;
+constexpr float StepClocksToSeconds = 1.0 / (float)StepClockRate;
 
 // Convert milliseconds to step clocks
 static inline constexpr uint32_t MillisToStepClocks(uint32_t numMillis) noexcept
 {
 	if constexpr (StepClockRate % 1000 == 0)
 	{
-		return numMillis * (StepClockRate/1000);			// this works for Duet 3, step clock rate is 750kHz
+		return numMillis * (StepClockRate / 1000); // this works for Duet 3, step clock rate is 750kHz
 	}
 	if constexpr (StepClockRate % 500 == 0)
 	{
-		return (numMillis * (StepClockRate/500))/2;			// this works for Duet 2, step clock rate is 937500Hz
+		return (numMillis * (StepClockRate / 500)) / 2; // this works for Duet 2, step clock rate is 937500Hz
 	}
-	return (numMillis * (uint64_t)StepClockRate)/1000;		// catch-all in case of using other step clock rates
+	return (numMillis * (uint64_t)StepClockRate) / 1000; // catch-all in case of using other step clock rates
 }
 
 // Convert microseconds to step clocks, rounding up to the next step clock
 static inline consteval uint32_t MicrosecondsToStepClocks(float us) noexcept
 {
-	return (uint32_t)std::ceil((float)StepClockRate * 0.000001 * us);
+	// Rounds up without std::ceil: GCC evaluates ceil in a constant expression as a builtin
+	// extension, clang does not, so std::ceil here makes this consteval function unusable in a
+	// constant expression under clang. 'us' is always positive, so truncate-then-bump is exact.
+	const double clocks = (float)StepClockRate * 0.000001 * us; // same expression as before
+	const uint32_t truncated = (uint32_t)clocks;
+	return truncated + (((double)truncated < clocks) ? 1u : 0u);
 }
 
 // Functions to convert speeds and accelerations between seconds and step clocks
 static inline constexpr float ConvertSpeedFromMmPerSec(float speed) noexcept
 {
-	return speed * 1.0/(float)StepClockRate;
+	return speed * 1.0 / (float)StepClockRate;
 }
 
 static inline constexpr float ConvertSpeedFromMmPerMin(float speed) noexcept
 {
-	return speed * (1.0/(float)(StepClockRate * iMinutesToSeconds));
+	return speed * (1.0 / (float)(StepClockRate * iMinutesToSeconds));
 }
 
 static inline constexpr float ConvertSpeedFromMm(float speed, bool useSeconds) noexcept
 {
-	return speed * ((useSeconds) ? 1.0/(float)StepClockRate : 1.0/(float)(StepClockRate * iMinutesToSeconds));
+	return speed * ((useSeconds) ? 1.0 / (float)StepClockRate : 1.0 / (float)(StepClockRate * iMinutesToSeconds));
 }
 
 static inline constexpr float InverseConvertSpeedToMmPerSec(float speed) noexcept
@@ -680,7 +770,7 @@ static inline constexpr float InverseConvertSpeedToMm(float speed, bool useSecon
 
 static inline constexpr float ConvertAcceleration(float accel) noexcept
 {
-	return accel * (1.0/(float)StepClockRateSquared);
+	return accel * (1.0 / (float)StepClockRateSquared);
 }
 
 static inline constexpr float InverseConvertAcceleration(float accel) noexcept
@@ -689,11 +779,11 @@ static inline constexpr float InverseConvertAcceleration(float accel) noexcept
 }
 
 constexpr unsigned int MaxFloatDigitsDisplayedAfterPoint = 7;
-const char *_ecv_array GetFloatFormatString(float val, unsigned int numDigitsAfterPoint) noexcept;
+const char* _ecv_array GetFloatFormatString(float val, unsigned int numDigitsAfterPoint) noexcept;
 
-constexpr size_t NumCoordinateSystems = 9;							// G54 up to G59.3
+constexpr size_t NumCoordinateSystems = 9; // G54 up to G59.3
 
-#define DEGREE_SYMBOL	"\xC2\xB0"									// degree-symbol encoding in UTF8
+#define DEGREE_SYMBOL "\xC2\xB0" // degree-symbol encoding in UTF8
 
 // Type of an offset in a file
 typedef uint32_t FilePosition;
@@ -701,67 +791,74 @@ const FilePosition noFilePosition = 0xFFFFFFFFu;
 
 //-------------------------------------------------------------------------------------------------
 // Interrupt priorities - must be chosen with care! 0 is the highest priority, 7 or 15 is the lowest.
-// This interacts with FreeRTOS config constant configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY which is currently defined as 3 for the SAME70 and 5 for the SAM4x.
-// ISRs with better (numerically lower) priorities than this value cannot make FreeRTOS calls, but those interrupts wont be disabled even in FreeRTOS critical sections.
+// This interacts with FreeRTOS config constant configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY which is currently defined
+// as 3 for the SAME70 and 5 for the SAM4x. ISRs with better (numerically lower) priorities than this value cannot make
+// FreeRTOS calls, but those interrupts wont be disabled even in FreeRTOS critical sections.
 
 #if __NVIC_PRIO_BITS == 3
 // We have only 8 interrupt priority levels on the SAME70 and SAME5x
 // Use priority 2 or lower for interrupts where low latency is critical and FreeRTOS calls are not needed.
 
-const uint32_t NvicPriorityWatchdog = 0;			// the secondary watchdog has the highest priority
+const uint32_t NvicPriorityWatchdog = 0; // the secondary watchdog has the highest priority
 
-#if SAME5x
-const NvicPriority NvicPriorityAuxUartRx = 1;		// UART used to receive data from PanelDue or other serial input
-const NvicPriority NvicPriorityAuxUartTx = 3;		// the SAME5x driver makes FreeRTOS calls during transmission, so use a lower priority
-const NvicPriority NvicPriorityWiFiUartRx = 2;		// UART used to receive debug data from the WiFi module
-const NvicPriority NvicPriorityWiFiUartTx = 3;		// the SAME5x driver makes FreeRTOS calls during transmission, so use a lower priority
+#  if SAME5x
+const NvicPriority NvicPriorityAuxUartRx = 1; // UART used to receive data from PanelDue or other serial input
+const NvicPriority NvicPriorityAuxUartTx =
+	3; // the SAME5x driver makes FreeRTOS calls during transmission, so use a lower priority
+const NvicPriority NvicPriorityWiFiUartRx = 2; // UART used to receive debug data from the WiFi module
+const NvicPriority NvicPriorityWiFiUartTx =
+	3; // the SAME5x driver makes FreeRTOS calls during transmission, so use a lower priority
 const NvicPriority NvicPriorityDriverDiag = 4;
 const NvicPriority NvicPriorityAdc = 4;
-#else
-const NvicPriority NvicPriorityAuxUart = 3;			// UART is highest to avoid character loss (it has only a 1-character receive buffer)
-const NvicPriority NvicPriorityWiFiUart = 3;		// UART used to receive debug data from the WiFi module
-#endif
+#  else
+const NvicPriority NvicPriorityAuxUart =
+	3; // UART is highest to avoid character loss (it has only a 1-character receive buffer)
+const NvicPriority NvicPriorityWiFiUart = 3; // UART used to receive debug data from the WiFi module
+#  endif
 
-const NvicPriority NvicPriorityCan = 4;				// CAN interface
-const NvicPriority NvicPriorityPins = 4;			// priority for GPIO pin interrupts - filament sensors must be higher than step
+const NvicPriority NvicPriorityCan = 4;	 // CAN interface
+const NvicPriority NvicPriorityPins = 4; // priority for GPIO pin interrupts - filament sensors must be higher than step
 const NvicPriority NvicPriorityDriversSerialTMC = 4; // USART or UART used to control and monitor the smart drivers
 
-// We used to set the end-of-dma interrupt priority to 7 but that results in too many TMC driver transfer timeouts on the MB6HC.
-// I tried setting it to 4 but that breaks the DMA somehow, looks like the motor currents don't get set properly.
-const NvicPriority NvicPriorityDMA = 5;				// end-of-DMA interrupt, used on the SAME70 by TMC2160 drivers and HSMCI
-const NvicPriority NvicPriorityStep = 5;			// step interrupt is next highest, it can preempt most other interrupts
+// We used to set the end-of-dma interrupt priority to 7 but that results in too many TMC driver transfer timeouts on
+// the MB6HC. I tried setting it to 4 but that breaks the DMA somehow, looks like the motor currents don't get set
+// properly.
+const NvicPriority NvicPriorityDMA = 5;	 // end-of-DMA interrupt, used on the SAME70 by TMC2160 drivers and HSMCI
+const NvicPriority NvicPriorityStep = 5; // step interrupt is next highest, it can preempt most other interrupts
 
-const NvicPriority NvicPriorityUSB = 6;				// USB interrupt
-const NvicPriority NvicPriorityHSMCI = 6;			// HSMCI command complete interrupt
+const NvicPriority NvicPriorityUSB = 6;	  // USB interrupt
+const NvicPriority NvicPriorityHSMCI = 6; // HSMCI command complete interrupt
 
-# if HAS_LWIP_NETWORKING
-const NvicPriority NvicPriorityEthernet = 7;		// priority for Ethernet interface
-# endif
+#  if HAS_LWIP_NETWORKING
+const NvicPriority NvicPriorityEthernet = 7; // priority for Ethernet interface
+#  endif
 
-const NvicPriority NvicPrioritySpi = 7;				// SPI is used for network transfers on Duet WiFi/Duet Ethernet and for SBC transfers
+const NvicPriority NvicPrioritySpi =
+	7; // SPI is used for network transfers on Duet WiFi/Duet Ethernet and for SBC transfers
 
 #elif __NVIC_PRIO_BITS >= 4
 // We have at least 16 priority levels
 // Use priority 2 or lower for interrupts where low latency is critical and FreeRTOS calls are not needed.
 
-# if SAM4E
-const NvicPriority NvicPriorityWatchdog = 0;		// the secondary watchdog has the highest priority
-# endif
+#  if SAM4E
+const NvicPriority NvicPriorityWatchdog = 0; // the secondary watchdog has the highest priority
+#  endif
 
-const NvicPriority NvicPriorityAuxUart = 3;			// UART is highest to avoid character loss (it has only a 1-character receive buffer)
+const NvicPriority NvicPriorityAuxUart =
+	3; // UART is highest to avoid character loss (it has only a 1-character receive buffer)
 const NvicPriority NvicPriorityDriversSerialTMC = 5; // USART or UART used to control and monitor the smart drivers
-const NvicPriority NvicPriorityPins = 5;			// priority for GPIO pin interrupts - filament sensors must be higher than step
-const NvicPriority NvicPriorityStep = 6;			// step interrupt is next highest, it can preempt most other interrupts
-const NvicPriority NvicPriorityWiFiUart = 7;		// UART used to receive debug data from the WiFi module
-const NvicPriority NvicPriorityUSB = 7;				// USB interrupt
-const NvicPriority NvicPriorityHSMCI = 7;			// HSMCI command complete interrupt
+const NvicPriority NvicPriorityPins = 5; // priority for GPIO pin interrupts - filament sensors must be higher than step
+const NvicPriority NvicPriorityStep = 6; // step interrupt is next highest, it can preempt most other interrupts
+const NvicPriority NvicPriorityWiFiUart = 7; // UART used to receive debug data from the WiFi module
+const NvicPriority NvicPriorityUSB = 7;		 // USB interrupt
+const NvicPriority NvicPriorityHSMCI = 7;	 // HSMCI command complete interrupt
 
-# if HAS_LWIP_NETWORKING
-const NvicPriority NvicPriorityEthernet = 8;		// priority for Ethernet interface
-# endif
+#  if HAS_LWIP_NETWORKING
+const NvicPriority NvicPriorityEthernet = 8; // priority for Ethernet interface
+#  endif
 
-const NvicPriority NvicPrioritySpi = 8;				// SPI is used for network transfers on Duet WiFi/Duet vEthernet
-const NvicPriority NvicPriorityTwi = 9;				// TWI is used to read endstop and other inputs on the DueXn
+const NvicPriority NvicPrioritySpi = 8; // SPI is used for network transfers on Duet WiFi/Duet vEthernet
+const NvicPriority NvicPriorityTwi = 9; // TWI is used to read endstop and other inputs on the DueXn
 
 #endif
 

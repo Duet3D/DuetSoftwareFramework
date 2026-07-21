@@ -10,31 +10,31 @@
 #include "RepRap.h"
 #include <cstdarg>
 
-/*static*/ OutputBuffer *_ecv_null volatile OutputBuffer::freeOutputBuffers = nullptr;		// Messages may also be sent by ISRs,
-/*static*/ std::atomic<size_t> OutputBuffer::usedOutputBuffers = 0;							// so make these atomic or volatile.
+/*static*/ OutputBuffer* volatile _ecv_null OutputBuffer::freeOutputBuffers =
+	nullptr;														// Messages may also be sent by ISRs,
+/*static*/ std::atomic<size_t> OutputBuffer::usedOutputBuffers = 0; // so make these atomic or volatile.
 /*static*/ volatile size_t OutputBuffer::maxUsedOutputBuffers = 0;
 
 //*************************************************************************************************
 // OutputBuffer class implementation
 
-void OutputBuffer::Append(OutputBuffer *_ecv_null other) noexcept
+void OutputBuffer::Append(OutputBuffer* _ecv_null other) noexcept
 {
 	if (other != nullptr)
 	{
 		last->next = other;
-		OutputBuffer * const newLast = other->last;
+		OutputBuffer* const newLast = other->last;
 		if (other->hadOverflow)
 		{
 			hadOverflow = true;
 		}
 
-		OutputBuffer *item = this;
+		OutputBuffer* item = this;
 		do
 		{
 			item->last = newLast;
 			item = item->Next();
-		}
-		while (item != other);
+		} while (item != other);
 	}
 }
 
@@ -42,9 +42,9 @@ void OutputBuffer::IncreaseReferences(size_t refs) noexcept
 {
 	if (refs != 0)
 	{
-		TaskCriticalSectionLocker lock;
+		const TaskCriticalSectionLocker lock;
 
-		for (OutputBuffer *item = this; item != nullptr; item = item->Next())
+		for (OutputBuffer* item = this; item != nullptr; item = item->Next())
 		{
 			item->references += refs;
 			item->isReferenced = true;
@@ -55,7 +55,7 @@ void OutputBuffer::IncreaseReferences(size_t refs) noexcept
 size_t OutputBuffer::Length() const noexcept
 {
 	size_t totalLength = 0;
-	for (const OutputBuffer *current = this; current != nullptr; current = current->Next())
+	for (const OutputBuffer* current = this; current != nullptr; current = current->Next())
 	{
 		totalLength += current->DataLength();
 	}
@@ -65,7 +65,7 @@ size_t OutputBuffer::Length() const noexcept
 char OutputBuffer::operator[](size_t index) const noexcept
 {
 	// Get the right buffer to access
-	const OutputBuffer *itemToIndex = this;
+	const OutputBuffer* itemToIndex = this;
 	while (index >= itemToIndex->DataLength())
 	{
 		index -= itemToIndex->DataLength();
@@ -76,7 +76,7 @@ char OutputBuffer::operator[](size_t index) const noexcept
 	return itemToIndex->data[index];
 }
 
-const char *_ecv_array OutputBuffer::Read(size_t len) noexcept
+const char* _ecv_array OutputBuffer::Read(size_t len) noexcept
 {
 	const size_t offset = bytesRead;
 	bytesRead += len;
@@ -99,13 +99,13 @@ void OutputBuffer::UpdateWhenQueued() noexcept
 	whenQueued = millis();
 }
 
-size_t OutputBuffer::vprintf(const char *_ecv_array fmt, va_list vargs) noexcept
+size_t OutputBuffer::vprintf(const char* _ecv_array fmt, va_list vargs) noexcept
 {
 	Clear();
 	return vcatf(fmt, vargs);
 }
 
-size_t OutputBuffer::printf(const char *_ecv_array fmt, ...) noexcept
+size_t OutputBuffer::printf(const char* _ecv_array fmt, ...) noexcept
 {
 	va_list vargs;
 	va_start(vargs, fmt);
@@ -114,16 +114,12 @@ size_t OutputBuffer::printf(const char *_ecv_array fmt, ...) noexcept
 	return ret;
 }
 
-size_t OutputBuffer::vcatf(const char *_ecv_array fmt, va_list vargs) noexcept
+size_t OutputBuffer::vcatf(const char* _ecv_array fmt, va_list vargs) noexcept
 {
-	return vuprintf([this](char c) noexcept -> bool
-					{
-						return c != 0 && cat(c) != 0;
-					},
-					fmt, vargs);
+	return vuprintf([this](char c) noexcept -> bool { return c != 0 && cat(c) != 0; }, fmt, vargs);
 }
 
-size_t OutputBuffer::catf(const char *_ecv_array fmt, ...) noexcept
+size_t OutputBuffer::catf(const char* _ecv_array fmt, ...) noexcept
 {
 	va_list vargs;
 	va_start(vargs, fmt);
@@ -132,7 +128,7 @@ size_t OutputBuffer::catf(const char *_ecv_array fmt, ...) noexcept
 	return ret;
 }
 
-size_t OutputBuffer::lcatf(const char *_ecv_array fmt, ...) noexcept
+size_t OutputBuffer::lcatf(const char* _ecv_array fmt, ...) noexcept
 {
 	size_t extra = 0;
 	if (last->dataLength != 0 && last->data[last->dataLength - 1] != '\n')
@@ -159,12 +155,12 @@ size_t OutputBuffer::copy(const char c) noexcept
 	return 1;
 }
 
-size_t OutputBuffer::copy(const char *_ecv_array src) noexcept
+size_t OutputBuffer::copy(const char* _ecv_array src) noexcept
 {
 	return copy(src, strlen(src));
 }
 
-size_t OutputBuffer::copy(const char *_ecv_array src, size_t len) noexcept
+size_t OutputBuffer::copy(const char* _ecv_array src, size_t len) noexcept
 {
 	Clear();
 	return cat(src, len);
@@ -176,7 +172,7 @@ size_t OutputBuffer::cat(const char c) noexcept
 	if (last->dataLength == OUTPUT_BUFFER_SIZE)
 	{
 		// No - allocate a new item and copy the data
-		OutputBuffer *nextBuffer;
+		OutputBuffer* nextBuffer = nullptr;
 		if (!Allocate(nextBuffer, false))
 		{
 			// We cannot store any more data
@@ -188,7 +184,7 @@ size_t OutputBuffer::cat(const char c) noexcept
 
 		// Link the new item to this list
 		last->next = nextBuffer;
-		for (OutputBuffer *item = this; item != nextBuffer; item = item->Next())
+		for (OutputBuffer* item = this; item != nextBuffer; item = item->Next())
 		{
 			item->last = nextBuffer;
 		}
@@ -201,17 +197,17 @@ size_t OutputBuffer::cat(const char c) noexcept
 	return 1;
 }
 
-size_t OutputBuffer::cat(const char *_ecv_array src) noexcept
+size_t OutputBuffer::cat(const char* _ecv_array src) noexcept
 {
 	return cat(src, strlen(src));
 }
 
-size_t OutputBuffer::lcat(const char *_ecv_array src) noexcept
+size_t OutputBuffer::lcat(const char* _ecv_array src) noexcept
 {
 	return lcat(src, strlen(src));
 }
 
-size_t OutputBuffer::cat(const char *_ecv_array src, size_t len) noexcept
+size_t OutputBuffer::cat(const char* _ecv_array src, size_t len) noexcept
 {
 	size_t copied = 0;
 	while (copied < len)
@@ -220,7 +216,7 @@ size_t OutputBuffer::cat(const char *_ecv_array src, size_t len) noexcept
 		{
 			// Save at least some output buffers in case this buffer chain has to be sent via network.
 			// If we don't do this, the network responder may be unable to allocate enough for the header
-			OutputBuffer *nextBuffer;
+			OutputBuffer* nextBuffer = nullptr;
 			if (!Allocate(nextBuffer, false))
 			{
 				// We cannot store any more data, stop here
@@ -229,14 +225,14 @@ size_t OutputBuffer::cat(const char *_ecv_array src, size_t len) noexcept
 			}
 			nextBuffer->references = references.load();
 			last->next = nextBuffer;
-			OutputBuffer *item = this;
+			OutputBuffer* item = this;
 			do
 			{
 				item->last = nextBuffer;
 				item = item->Next();
 			} while (item != nextBuffer);
 		}
-		const size_t copyLength = min<size_t>(len - copied, OUTPUT_BUFFER_SIZE - last->dataLength);
+		const auto copyLength = min<size_t>(len - copied, OUTPUT_BUFFER_SIZE - last->dataLength);
 		memcpy(last->data + last->dataLength, src + copied, copyLength);
 		last->dataLength += copyLength;
 		copied += copyLength;
@@ -244,7 +240,7 @@ size_t OutputBuffer::cat(const char *_ecv_array src, size_t len) noexcept
 	return copied;
 }
 
-size_t OutputBuffer::lcat(const char *_ecv_array src, size_t len) noexcept
+size_t OutputBuffer::lcat(const char* _ecv_array src, size_t len) noexcept
 {
 	size_t extra = 0;
 	if (last->dataLength != 0 && last->data[last->dataLength - 1] != '\n')
@@ -259,7 +255,7 @@ size_t OutputBuffer::lcat(const char *_ecv_array src, size_t len) noexcept
 	return cat(src, len) + extra;
 }
 
-size_t OutputBuffer::cat(StringRef &str) noexcept
+size_t OutputBuffer::cat(StringRef& str) noexcept
 {
 	return cat(str.c_str(), str.strlen());
 }
@@ -267,7 +263,7 @@ size_t OutputBuffer::cat(StringRef &str) noexcept
 // Encode a character in JSON format, and append it to the buffer and return the number of bytes written
 size_t OutputBuffer::EncodeChar(char c) noexcept
 {
-	char esc;
+	char esc = 0;
 	switch (c)
 	{
 	case '\r':
@@ -282,7 +278,8 @@ size_t OutputBuffer::EncodeChar(char c) noexcept
 	case '"':
 	case '\\':
 #if 1
-	// Escaping '/' is optional in JSON, although doing so so confuses PanelDue (fixed in PanelDue firmware version 1.15 and later). As it's optional, we don't do it.
+		// Escaping '/' is optional in JSON, although doing so so confuses PanelDue (fixed in PanelDue firmware
+		// version 1.15 and later). As it's optional, we don't do it.
 #else
 	case '/':
 #endif
@@ -302,7 +299,7 @@ size_t OutputBuffer::EncodeChar(char c) noexcept
 	return cat(c);
 }
 
-size_t OutputBuffer::EncodeReply(OutputBuffer *_ecv_null src) noexcept
+size_t OutputBuffer::EncodeReply(OutputBuffer* _ecv_null src) noexcept
 {
 	size_t bytesWritten = cat('"');
 
@@ -329,11 +326,12 @@ size_t OutputBuffer::EncodeReply(OutputBuffer *_ecv_null src) noexcept
 	}
 }
 
-// Allocates an output buffer instance which can be used for (large) string outputs. This must be thread safe. Not safe to call from interrupts!
-/*static*/ bool OutputBuffer::Allocate(OutputBuffer *_ecv_null &buf, bool allowReserved) noexcept
+// Allocates an output buffer instance which can be used for (large) string outputs. This must be thread safe. Not safe
+// to call from interrupts!
+/*static*/ bool OutputBuffer::Allocate(OutputBuffer* _ecv_null& buf, bool allowReserved) noexcept
 {
 	{
-		TaskCriticalSectionLocker lock;
+		const TaskCriticalSectionLocker lock;
 
 		buf = freeOutputBuffers;
 		if (buf != nullptr && (allowReserved || OUTPUT_BUFFER_COUNT - usedOutputBuffers > RESERVED_OUTPUT_BUFFERS))
@@ -349,10 +347,10 @@ size_t OutputBuffer::EncodeReply(OutputBuffer *_ecv_null src) noexcept
 			buf->next = nullptr;
 			buf->last = buf;
 			buf->dataLength = buf->bytesRead = 0;
-			buf->references = 1;					// assume it's only used once by default
+			buf->references = 1; // assume it's only used once by default
 			buf->isReferenced = false;
 			buf->hadOverflow = false;
-			buf->UpdateWhenQueued();				// use the time of allocation as the default when-used time
+			buf->UpdateWhenQueued(); // use the time of allocation as the default when-used time
 
 			return true;
 		}
@@ -363,7 +361,7 @@ size_t OutputBuffer::EncodeReply(OutputBuffer *_ecv_null src) noexcept
 }
 
 // Get the number of bytes left for continuous writing
-/*static*/ size_t OutputBuffer::GetBytesLeft(const OutputBuffer *writingBuffer) noexcept
+/*static*/ size_t OutputBuffer::GetBytesLeft(const OutputBuffer* writingBuffer) noexcept
 {
 	const size_t freeBuffers = OUTPUT_BUFFER_COUNT - usedOutputBuffers;
 	const size_t bytesLeft = OUTPUT_BUFFER_SIZE - writingBuffer->last->DataLength();
@@ -378,8 +376,9 @@ size_t OutputBuffer::EncodeReply(OutputBuffer *_ecv_null src) noexcept
 }
 
 // Truncate an output buffer to free up more memory. Returns the number of released bytes.
-// This never releases the first buffer in the chain, so call it with a large value of bytesNeeded to release all buffers except the first.
-/*static */ size_t OutputBuffer::Truncate(OutputBuffer *_ecv_null buffer, size_t bytesNeeded) noexcept
+// This never releases the first buffer in the chain, so call it with a large value of bytesNeeded to release all
+// buffers except the first.
+/*static */ size_t OutputBuffer::Truncate(OutputBuffer* _ecv_null buffer, size_t bytesNeeded) noexcept
 {
 	// Can we free up space from this chain? Don't break it up if it's referenced anywhere else
 	if (buffer == nullptr || buffer->Next() == nullptr || buffer->IsReferenced())
@@ -390,11 +389,12 @@ size_t OutputBuffer::EncodeReply(OutputBuffer *_ecv_null src) noexcept
 
 	// Yes - free up the last entries
 	size_t releasedBytes = 0;
-	OutputBuffer *previousItem;
-	do {
+	OutputBuffer* previousItem = nullptr;
+	do
+	{
 		// Get two the last entries from the chain
 		previousItem = buffer;
-		OutputBuffer *lastItem = previousItem->Next();
+		OutputBuffer* lastItem = previousItem->Next();
 		while (lastItem->Next() != nullptr)
 		{
 			previousItem = lastItem;
@@ -407,7 +407,7 @@ size_t OutputBuffer::EncodeReply(OutputBuffer *_ecv_null src) noexcept
 	} while (previousItem != buffer && releasedBytes < bytesNeeded);
 
 	// Update all the references to the last item
-	for (OutputBuffer *_ecv_null item = buffer; item != nullptr; item = item->Next())
+	for (OutputBuffer* _ecv_null item = buffer; item != nullptr; item = item->Next())
 	{
 		item->last = previousItem;
 	}
@@ -415,10 +415,10 @@ size_t OutputBuffer::EncodeReply(OutputBuffer *_ecv_null src) noexcept
 }
 
 // Releases an output buffer instance and returns the next entry from the chain
-/*static */ OutputBuffer *OutputBuffer::Release(OutputBuffer *buf) noexcept
+/*static */ OutputBuffer* OutputBuffer::Release(OutputBuffer* buf) noexcept
 {
-	TaskCriticalSectionLocker lock;
-	OutputBuffer * const nextBuffer = buf->next;
+	const TaskCriticalSectionLocker lock;
+	OutputBuffer* const nextBuffer = buf->next;
 
 	// If this one is reused by another piece of code, don't free it up
 	if (buf->references > 1)
@@ -436,7 +436,7 @@ size_t OutputBuffer::EncodeReply(OutputBuffer *_ecv_null src) noexcept
 	return nextBuffer;
 }
 
-/*static */ void OutputBuffer::ReleaseAll(OutputBuffer *_ecv_null volatile &buf) noexcept
+/*static */ void OutputBuffer::ReleaseAll(OutputBuffer* volatile _ecv_null& buf) noexcept
 {
 	while (buf != nullptr)
 	{
@@ -446,17 +446,18 @@ size_t OutputBuffer::EncodeReply(OutputBuffer *_ecv_null src) noexcept
 
 /*static*/ void OutputBuffer::Diagnostics(const StringRef& reply) noexcept
 {
-	reply.lcatf("Used output buffers: %d of %d (%d max)", usedOutputBuffers.load(), OUTPUT_BUFFER_COUNT, maxUsedOutputBuffers);
+	reply.lcatf(
+		"Used output buffers: %d of %d (%d max)", usedOutputBuffers.load(), OUTPUT_BUFFER_COUNT, maxUsedOutputBuffers);
 }
 
 //*************************************************************************************************
 // OutputStack class implementation
 
 // Push an OutputBuffer chain. Return true if successful, else release the buffer and return false.
-bool OutputStack::Push(OutputBuffer *_ecv_null buffer, MessageType type) volatile noexcept
+bool OutputStack::Push(OutputBuffer* _ecv_null buffer, MessageType type) volatile noexcept
 {
 	{
-		TaskCriticalSectionLocker lock;
+		const TaskCriticalSectionLocker lock;
 
 		if (count < OUTPUT_STACK_DEPTH)
 		{
@@ -466,6 +467,8 @@ bool OutputStack::Push(OutputBuffer *_ecv_null buffer, MessageType type) volatil
 			}
 			items[count] = buffer;
 			types[count] = type;
+			// enclosing method is volatile and this counter is updated non-atomically on purpose
+			// NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast) - drops volatile, not const: the
 			const_cast<OutputStack*>(this)->count++;
 			return true;
 		}
@@ -476,28 +479,29 @@ bool OutputStack::Push(OutputBuffer *_ecv_null buffer, MessageType type) volatil
 }
 
 // Pop an OutputBuffer chain or return nullptr if none is available
-OutputBuffer *OutputStack::Pop() volatile noexcept
+OutputBuffer* OutputStack::Pop() volatile noexcept
 {
-	TaskCriticalSectionLocker lock;
+	const TaskCriticalSectionLocker lock;
 
 	if (count == 0)
 	{
 		return nullptr;
 	}
 
-	OutputBuffer *item = items[0];
+	OutputBuffer* item = items[0];
 	for (size_t i = 1; i < count; i++)
 	{
 		items[i - 1] = items[i];
 		types[i - 1] = types[i];
 	}
+	// NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast) - drops volatile, not const
 	const_cast<OutputStack*>(this)->count--;
 
 	return item;
 }
 
 // Returns the first item from the stack or nullptr if none is available
-OutputBuffer *OutputStack::GetFirstItem() const volatile noexcept
+OutputBuffer* OutputStack::GetFirstItem() const volatile noexcept
 {
 	return (count == 0) ? nullptr : items[0];
 }
@@ -511,7 +515,7 @@ MessageType OutputStack::GetFirstItemType() const volatile noexcept
 #if HAS_SBC_INTERFACE
 
 // Update the first item of the stack
-void OutputStack::SetFirstItem(OutputBuffer *_ecv_null buffer) volatile noexcept
+void OutputStack::SetFirstItem(OutputBuffer* _ecv_null buffer) volatile noexcept
 {
 	if (count != 0)
 	{
@@ -534,7 +538,7 @@ void OutputStack::ReleaseFirstItem() volatile noexcept
 {
 	if (count != 0)
 	{
-		OutputBuffer * const buf = items[0];					// capture volatile variable
+		OutputBuffer* const buf = items[0]; // capture volatile variable
 		if (buf != nullptr)
 		{
 			items[0] = OutputBuffer::Release(buf);
@@ -552,7 +556,7 @@ bool OutputStack::ApplyTimeout(uint32_t ticks) volatile noexcept
 	bool ret = false;
 	if (count != 0)
 	{
-		OutputBuffer * buf = items[0];							// capture volatile variable
+		OutputBuffer* buf = items[0]; // capture volatile variable
 		while (buf != nullptr && millis() - buf->WhenQueued() >= ticks)
 		{
 			items[0] = buf = OutputBuffer::Release(buf);
@@ -568,7 +572,7 @@ bool OutputStack::ApplyTimeout(uint32_t ticks) volatile noexcept
 }
 
 // Returns the last item from the stack or nullptr if none is available
-OutputBuffer *_ecv_null OutputStack::GetLastItem() const volatile noexcept
+OutputBuffer* _ecv_null OutputStack::GetLastItem() const volatile noexcept
 {
 	return (count == 0) ? nullptr : items[count - 1];
 }
@@ -584,7 +588,7 @@ size_t OutputStack::DataLength() const volatile noexcept
 {
 	size_t totalLength = 0;
 
-	TaskCriticalSectionLocker lock;
+	const TaskCriticalSectionLocker lock;
 	for (size_t i = 0; i < count; i++)
 	{
 		if (items[i] != nullptr)
@@ -606,6 +610,8 @@ void OutputStack::Append(volatile OutputStack& stack) volatile noexcept
 		{
 			items[count] = stack.items[i];
 			types[count] = stack.types[i];
+			// enclosing method is volatile and this counter is updated non-atomically on purpose
+			// NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast) - drops volatile, not const: the
 			const_cast<OutputStack*>(this)->count++;
 		}
 		else
@@ -619,7 +625,7 @@ void OutputStack::Append(volatile OutputStack& stack) volatile noexcept
 // Increase the number of references for each OutputBuffer on the stack
 void OutputStack::IncreaseReferences(size_t num) volatile noexcept
 {
-	TaskCriticalSectionLocker lock;
+	const TaskCriticalSectionLocker lock;
 	for (size_t i = 0; i < count; i++)
 	{
 		if (items[i] != nullptr)

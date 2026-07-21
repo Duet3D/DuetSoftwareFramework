@@ -9,8 +9,6 @@
 #include <CoreIO.h>
 
 // Program initialisation
-void AppInit() noexcept
-{
-}
+void AppInit() noexcept {}
 
 // End

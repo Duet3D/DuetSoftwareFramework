@@ -11,18 +11,19 @@
 
 #include <Hardware/SoftwareReset.h>
 
-// This class manages nonvolatile settings that are specific to the board, and the software reset data that is stored by the crash handler.
-// On most Duets there is a 512-byte User Page that we use for this.
-// The SAMC21 and SAME5x processors already store various data in the user page, however both those processor families support EEPROM emulation so we use 512 bytes of that instead.
+// This class manages nonvolatile settings that are specific to the board, and the software reset data that is stored by
+// the crash handler. On most Duets there is a 512-byte User Page that we use for this. The SAMC21 and SAME5x processors
+// already store various data in the user page, however both those processor families support EEPROM emulation so we use
+// 512 bytes of that instead.
 
 class NonVolatileMemory
 {
-public:
+  public:
 	NonVolatileMemory() noexcept;
 
 	void EnsureWritten() noexcept;
-	SoftwareResetData *_ecv_null GetLastWrittenResetData(unsigned int &slot) noexcept;
-	SoftwareResetData *AllocateResetDataSlot() noexcept;
+	SoftwareResetData* _ecv_null GetLastWrittenResetData(unsigned int& slot) noexcept;
+	SoftwareResetData* AllocateResetDataSlot() noexcept;
 	int8_t GetThermistorLowCalibration(unsigned int inputNumber) noexcept;
 	int8_t GetThermistorHighCalibration(unsigned int inputNumber) noexcept;
 	void SetThermistorLowCalibration(unsigned int inputNumber, int8_t val) noexcept;
@@ -31,10 +32,10 @@ public:
 	static constexpr unsigned int NumberOfResetDataSlots = 3;
 	static constexpr unsigned int MaxCalibratedThermistors = 8;
 
-private:
+  private:
 	void EnsureRead() noexcept;
-	int8_t GetThermistorCalibration(unsigned int inputNumber, uint8_t *_ecv_array calibArray) noexcept;
-	void SetThermistorCalibration(unsigned int inputNumber, int8_t val, uint8_t *_ecv_array calibArray) noexcept;
+	int8_t GetThermistorCalibration(unsigned int inputNumber, uint8_t* _ecv_array calibArray) noexcept;
+	void SetThermistorCalibration(unsigned int inputNumber, int8_t val, uint8_t* _ecv_array calibArray) noexcept;
 
 	struct NVM
 	{
@@ -43,16 +44,22 @@ private:
 		uint8_t thermistorHighCalibration[MaxCalibratedThermistors];
 		uint8_t spare[38];
 		// 56 bytes up to here
-		SoftwareResetData resetData[NumberOfResetDataSlots];			// 3 slots of 152 bytes each
+		SoftwareResetData resetData[NumberOfResetDataSlots]; // 3 slots of 152 bytes each
 
 		static constexpr uint32_t MagicValue = 0x41E5;
 	};
 
 	static_assert(sizeof(NVM) == 512);
 
-	enum class NvmState : uint8_t { notRead, clean, writeNeeded, eraseAndWriteNeeded };
+	enum class NvmState : uint8_t
+	{
+		notRead,
+		clean,
+		writeNeeded,
+		eraseAndWriteNeeded
+	};
 
-	alignas(4) NVM buffer;
+	alignas(4) NVM buffer{};
 	NvmState state;
 };
 

@@ -15,16 +15,17 @@
 typedef Bitmap<uint16_t> CanDriversBitmap;
 
 // Class to accumulate a set of values relating to CAN-connected drivers
-template<class T> class CanDriversData
+template <class T>
+class CanDriversData
 {
-public:
+  public:
 	CanDriversData() noexcept;
 	void AddEntry(DriverId id, T val) noexcept;
 	size_t GetNumEntries() const noexcept { return numEntries; }
 	CanAddress GetNextBoardDriverBitmap(size_t& startFrom, CanDriversBitmap& driversBitmap) const noexcept;
 	T GetElement(size_t n) const noexcept pre(n < GetNumEntries()) { return data[n].val; }
 
-private:
+  private:
 	struct DriverDescriptor
 	{
 		DriverId driver;
@@ -38,27 +39,32 @@ private:
 // Class to represent a set of CAN-connected drivers with no associated data
 class CanDriversList
 {
-public:
-	CanDriversList() noexcept : numEntries(0) { }
+  public:
+	CanDriversList() noexcept
+		: numEntries(0)
+	{
+	}
 	void Clear() noexcept { numEntries = 0; }
-	void AddEntry(DriverId id) noexcept;
+	void AddEntry(DriverId driver) noexcept;
 	size_t GetNumEntries() const noexcept { return numEntries; }
 	bool IsEmpty() const noexcept { return numEntries == 0; }
 	CanAddress GetNextBoardDriverBitmap(size_t& startFrom, CanDriversBitmap& driversBitmap) const noexcept;
 
-private:
+  private:
 	size_t numEntries;
 	DriverId drivers[MaxCanDrivers];
 };
 
 // Members of template class CanDriversData
-template<class T> CanDriversData<T>::CanDriversData() noexcept
+template <class T>
+CanDriversData<T>::CanDriversData() noexcept
 {
 	numEntries = 0;
 }
 
 // Insert a new entry, keeping the list ordered by driver ID
-template<class T> void CanDriversData<T>::AddEntry(DriverId driver, T val) noexcept
+template <class T>
+void CanDriversData<T>::AddEntry(DriverId driver, T val) noexcept
 {
 	if (numEntries < ARRAY_SIZE(data))
 	{
@@ -76,7 +82,9 @@ template<class T> void CanDriversData<T>::AddEntry(DriverId driver, T val) noexc
 }
 
 // Get the details of the drivers on the next board and advance startFrom beyond the entries for this board
-template<class T> CanAddress CanDriversData<T>::GetNextBoardDriverBitmap(size_t& startFrom, CanDriversBitmap& driversBitmap) const noexcept
+template <class T>
+CanAddress CanDriversData<T>::GetNextBoardDriverBitmap(size_t& startFrom,
+													   CanDriversBitmap& driversBitmap) const noexcept
 {
 	driversBitmap.Clear();
 	if (startFrom >= numEntries)

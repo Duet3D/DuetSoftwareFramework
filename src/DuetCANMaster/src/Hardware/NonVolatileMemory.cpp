@@ -8,12 +8,13 @@
 #include "NonVolatileMemory.h"
 
 #if SAM4E || SAM4S || SAME70
-# include <Cache.h>
-# include <Flash.h>
-# include <RTOSIface/RTOSIface.h>
+#  include <Cache.h>
+#  include <Flash.h>
+#  include <RTOSIface/RTOSIface.h>
 #endif
 
-NonVolatileMemory::NonVolatileMemory() noexcept : state(NvmState::notRead)
+NonVolatileMemory::NonVolatileMemory() noexcept
+	: state(NvmState::notRead)
 {
 }
 
@@ -22,15 +23,17 @@ void NonVolatileMemory::EnsureRead() noexcept
 	if (state == NvmState::notRead)
 	{
 #if SAME5x
-		memcpyu32(reinterpret_cast<uint32_t*>(&buffer), reinterpret_cast<const uint32_t *>(SEEPROM_ADDR), sizeof(buffer)/sizeof(uint32_t));
+		memcpyu32(reinterpret_cast<uint32_t*>(&buffer),
+				  reinterpret_cast<const uint32_t*>(SEEPROM_ADDR),
+				  sizeof(buffer) / sizeof(uint32_t));
 #elif SAM4E || SAM4S || SAME70
-		Flash::ReadUserSignature(reinterpret_cast<uint32_t*>(&buffer), sizeof(buffer)/sizeof(uint32_t));
+		Flash::ReadUserSignature(reinterpret_cast<uint32_t*>(&buffer), sizeof(buffer) / sizeof(uint32_t));
 #else
-# error Unsupported processor
+#  error Unsupported processor
 #endif
 		if (buffer.magic != NVM::MagicValue)
 		{
-//			debugPrintf("Invalid user area\n");
+			//			debugPrintf("Invalid user area\n");
 			memset(&buffer, 0xFF, sizeof(buffer));
 			buffer.magic = NVM::MagicValue;
 			state = NvmState::eraseAndWriteNeeded;
@@ -38,7 +41,7 @@ void NonVolatileMemory::EnsureRead() noexcept
 		else
 		{
 			state = NvmState::clean;
-//			debugPrintf("user area valid\n");
+			//			debugPrintf("user area valid\n");
 		}
 	}
 }
@@ -49,42 +52,48 @@ void NonVolatileMemory::EnsureWritten() noexcept
 	if (state >= NvmState::writeNeeded)
 	{
 		// No need to erase on the SAME5x because the EEPROM emulation manages it
-        while (NVMCTRL->SEESTAT.bit.BUSY) { }
-        memcpyu32(reinterpret_cast<uint32_t*>(SEEPROM_ADDR), reinterpret_cast<const uint32_t*>(&buffer), sizeof(buffer)/sizeof(uint32_t));
+		while (NVMCTRL->SEESTAT.bit.BUSY)
+		{
+		}
+		memcpyu32(reinterpret_cast<uint32_t*>(SEEPROM_ADDR),
+				  reinterpret_cast<const uint32_t*>(&buffer),
+				  sizeof(buffer) / sizeof(uint32_t));
 		state = NvmState::clean;
-        while (NVMCTRL->SEESTAT.bit.BUSY) { }
+		while (NVMCTRL->SEESTAT.bit.BUSY)
+		{
+		}
 	}
 #else
 	if (state == NvmState::eraseAndWriteNeeded)
 	{
 		// Erase the page
-# if SAM4E || SAM4S || SAME70
+#  if SAM4E || SAM4S || SAME70
 		Flash::EraseUserSignature();
-# endif
+#  endif
 		state = NvmState::writeNeeded;
 	}
 
 	if (state == NvmState::writeNeeded)
 	{
-# if SAM4E || SAM4S || SAME70
+#  if SAM4E || SAM4S || SAME70
 		const bool cacheEnabled = Cache::Disable();
 		Flash::WriteUserSignature(reinterpret_cast<const uint32_t*>(&buffer));
 		if (cacheEnabled)
 		{
 			Cache::Enable();
 		}
-# else
-#  error Unsupported processor
-# endif
+#  else
+#	error Unsupported processor
+#  endif
 		state = NvmState::clean;
 	}
 #endif
 }
 
-SoftwareResetData *_ecv_null NonVolatileMemory::GetLastWrittenResetData(unsigned int &slot) noexcept
+SoftwareResetData* _ecv_null NonVolatileMemory::GetLastWrittenResetData(unsigned int& slot) noexcept
 {
 	EnsureRead();
-	for (unsigned int i = NumberOfResetDataSlots; i != 0; )
+	for (unsigned int i = NumberOfResetDataSlots; i != 0;)
 	{
 		--i;
 		if (buffer.resetData[i].IsValid())
@@ -99,22 +108,23 @@ SoftwareResetData *_ecv_null NonVolatileMemory::GetLastWrittenResetData(unsigned
 SoftwareResetData* NonVolatileMemory::AllocateResetDataSlot() noexcept
 {
 	EnsureRead();
-	for (unsigned int i = 0; i < NumberOfResetDataSlots; ++i)
+	for (auto& i : buffer.resetData)
 	{
-		if (buffer.resetData[i].IsVacant())
+		if (i.IsVacant())
 		{
-			if (state == NvmState::clean)			// need this test because state may already be EraseAndWriteNeeded after EnsureRead
+			if (state ==
+				NvmState::clean) // need this test because state may already be EraseAndWriteNeeded after EnsureRead
 			{
-				state = NvmState::writeNeeded;		// assume the caller will write to the allocated slot
+				state = NvmState::writeNeeded; // assume the caller will write to the allocated slot
 			}
-			return &buffer.resetData[i];
+			return &i;
 		}
 	}
 
 	// All slots are full, so clear them out and start again
-	for (unsigned int i = 0; i < NumberOfResetDataSlots; ++i)
+	for (auto& i : buffer.resetData)
 	{
-		buffer.resetData[i].Clear();
+		i.Clear();
 	}
 	state = NvmState::eraseAndWriteNeeded;
 	return &buffer.resetData[0];
@@ -140,13 +150,17 @@ void NonVolatileMemory::SetThermistorHighCalibration(unsigned int inputNumber, i
 	SetThermistorCalibration(inputNumber, val, buffer.thermistorHighCalibration);
 }
 
-int8_t NonVolatileMemory::GetThermistorCalibration(unsigned int inputNumber, uint8_t *_ecv_array calibArray) noexcept
+int8_t NonVolatileMemory::GetThermistorCalibration(unsigned int inputNumber, uint8_t* _ecv_array calibArray) noexcept
 {
 	EnsureRead();
-	return (inputNumber >= MaxCalibratedThermistors || calibArray[inputNumber] == 0xFF) ? 0 : (int)calibArray[inputNumber] - (int)0x7F;
+	return (inputNumber >= MaxCalibratedThermistors || calibArray[inputNumber] == 0xFF)
+			   ? 0
+			   : (int)calibArray[inputNumber] - 0x7F;
 }
 
-void NonVolatileMemory::SetThermistorCalibration(unsigned int inputNumber, int8_t val, uint8_t *_ecv_array calibArray) noexcept
+void NonVolatileMemory::SetThermistorCalibration(unsigned int inputNumber,
+												 int8_t val,
+												 uint8_t* _ecv_array calibArray) noexcept
 {
 	if (inputNumber < MaxCalibratedThermistors)
 	{

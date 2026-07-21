@@ -11,9 +11,9 @@
 #define SRC_APPNOTIFYINDICES_H_
 
 #if SUPPORT_CAN_EXPANSION
-# include <CANlibNotifyIndices.h>
+#  include <CANlibNotifyIndices.h>
 #else
-# include <CoreNotifyIndices.h>
+#  include <CoreNotifyIndices.h>
 #endif
 
 namespace NotifyIndices
@@ -38,10 +38,10 @@ namespace NotifyIndices
 	constexpr uint32_t EthernetHardware = FirstAvailableApp + 3;
 	constexpr uint32_t Laser = FirstAvailableApp + 3;
 	constexpr uint32_t TotalUsed = FirstAvailableApp + 4;
-}
+} // namespace NotifyIndices
 
 #ifdef RTOS
-# include <FreeRTOSConfig.h>
+#  include <FreeRTOSConfig.h>
 static_assert(NotifyIndices::TotalUsed <= configTASK_NOTIFICATION_ARRAY_ENTRIES);
 #endif
 

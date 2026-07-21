@@ -10,10 +10,11 @@
 
 #include <cstdint>
 
-// The following values must be kept in sync with DSF! So don't change them unless making major changes to the SBC interface.
+// The following values must be kept in sync with DSF! So don't change them unless making major changes to the SBC
+// interface.
 enum class PrintPausedReason : uint8_t
 {
-	dontPause = 0,						// used by RRF but not by DSF
+	dontPause = 0, // used by RRF but not by DSF
 	user = 1,
 	gcode = 2,
 	filamentChange = 3,

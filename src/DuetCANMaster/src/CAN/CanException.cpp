@@ -12,14 +12,14 @@
 #include <Platform/Tasks.h>
 
 // Construct the error message. This will be prefixed with "Error: " when it is returned to the user.
-void CanException::GetMessage(const StringRef &reply) const noexcept
+void CanException::GetMessage(const StringRef& reply) const noexcept
 {
-    reply.Clear();
+	reply.Clear();
 
 	// Print the message and any parameter
 	if (message == nullptr)
 	{
-		reply.cat("<null error message>");					// should not happen
+		reply.cat("<null error message>"); // should not happen
 	}
 	else if (strstr(message, "%s") != nullptr)
 	{
@@ -35,12 +35,13 @@ void CanException::GetMessage(const StringRef &reply) const noexcept
 	}
 }
 
-// Print basic details for debugging. Currently called only from FileInfoParser, so don't bother printing line and column.
+// Print basic details for debugging. Currently called only from FileInfoParser, so don't bother printing line and
+// column.
 void CanException::DebugPrint() const noexcept
 {
 	if (message == nullptr)
 	{
-		debugPrintf("<null error message>");					// should not happen
+		debugPrintf("<null error message>"); // should not happen
 	}
 	else if (strstr(message, "%s") != nullptr)
 	{
@@ -57,12 +58,12 @@ void CanException::DebugPrint() const noexcept
 	debugPrintf("\n");
 }
 
-[[noreturn]] void ThrowCANException(const char *_ecv_array errMsg) THROWS(CanException)
+[[noreturn]] void ThrowCANException(const char* _ecv_array errMsg) THROWS(CanException)
 {
 	throw CanException(errMsg);
 }
 
-[[noreturn]] void ThrowCANException(const char *_ecv_array errMsg, uint32_t param) THROWS(CanException)
+[[noreturn]] void ThrowCANException(const char* _ecv_array errMsg, uint32_t param) THROWS(CanException)
 {
 	throw CanException(errMsg, param);
 }

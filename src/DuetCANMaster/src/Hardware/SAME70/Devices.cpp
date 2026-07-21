@@ -7,19 +7,21 @@
 
 #include "Devices.h"
 #include <RepRapFirmware.h>
+
 #include <AnalogIn.h>
 #include <AnalogOut.h>
 #include <matrix/matrix.h>
 
 #if CORE_USES_TINYUSB
-# include <TinyUsbInterface.h>
-# include <Platform/TaskPriorities.h>
+#  include <TinyUsbInterface.h>
+
+#  include <Platform/TaskPriorities.h>
 #endif
 
 void SdhcInit() noexcept
 {
 	SetPinFunction(HsmciMclkPin, HsmciMclkPinFunction);
-	for (Pin p : HsmciOtherPins)
+	for (const Pin p : HsmciOtherPins)
 	{
 		SetPinFunction(p, HsmciOtherPinsFunction);
 		EnablePullup(p);
@@ -29,7 +31,7 @@ void SdhcInit() noexcept
 void EthernetInit() noexcept
 {
 	// Initialize Ethernet pins
-	for (Pin p : EthernetPhyOtherPins)
+	for (const Pin p : EthernetPhyOtherPins)
 	{
 		SetPinFunction(p, EthernetPhyOtherPinsFunction);
 	}
@@ -37,8 +39,8 @@ void EthernetInit() noexcept
 
 #if CORE_USES_TINYUSB
 
-constexpr size_t UsbDeviceTaskStackWords = 200;
-static Task<UsbDeviceTaskStackWords> usbDeviceTask;
+constexpr size_t usbDeviceTaskStackWords = 200;
+static Task<usbDeviceTaskStackWords> usbDeviceTask;
 
 #endif
 
@@ -51,13 +53,13 @@ SerialCDC serialUSB2(1);
 void DeviceInit() noexcept
 {
 #if defined(DUET3_MB6HC) || defined(DUET3_MB6XD)
-# ifdef DEBUG
+#  ifdef DEBUG
 	// Set up PB4..PB5 as normal I/O, not JTAG. Leave PB6/7 pins as SWD. STATUS and ACT LEDs will not work.
 	matrix_set_system_io(CCFG_SYSIO_SYSIO4 | CCFG_SYSIO_SYSIO5);
-# else
+#  else
 	// Set up PB4..PB7 as normal I/O, not JTAG or SWD
 	matrix_set_system_io(CCFG_SYSIO_SYSIO4 | CCFG_SYSIO_SYSIO5 | CCFG_SYSIO_SYSIO6 | CCFG_SYSIO_SYSIO7);
-# endif
+#  endif
 #endif
 
 #if CORE_USES_TINYUSB
@@ -66,9 +68,7 @@ void DeviceInit() noexcept
 #endif
 }
 
-void StopAnalogTask() noexcept
-{
-}
+void StopAnalogTask() noexcept {}
 
 void StopUsbTask() noexcept
 {
