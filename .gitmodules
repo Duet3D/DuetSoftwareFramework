@@ -1,6 +1,3 @@
-[submodule "src/DuetCANMaster"]
-	path = src/DuetCANMaster
-	url = git@github.com:Duet3D/DuetCANMaster.git
 [submodule "src/Duet3Expansion"]
 	path = src/Duet3Expansion
 	url = git@github.com:Duet3D/Duet3Expansion.git
