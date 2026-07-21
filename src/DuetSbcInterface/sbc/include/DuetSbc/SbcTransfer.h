@@ -10,7 +10,7 @@
 #include "DuetSbc/GpioInputPin.h"
 #include "DuetSbc/OutputGpioPin.h"
 #include "DuetSbc/SpiDevice.h"
-#include "DuetSbcProtocol/MessageFormats.h"
+#include "DuetSpiProtocol/MessageFormats.h"
 
 #include <atomic>
 #include <chrono>
@@ -23,7 +23,7 @@
 
 namespace duet::sbc {
 
-namespace proto = duet::sbc::protocol;
+namespace proto = duet::spi::protocol;
 
 // Recoverable timeout/cancellation (maps to C# OperationCanceledException): the interface loop
 // treats this as a lost connection and reconnects, unless a stop was requested.

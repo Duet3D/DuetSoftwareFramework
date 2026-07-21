@@ -177,12 +177,13 @@ void CommandProcessor::ForwardMessageToSbc(CanMessageBuffer& buf) noexcept
 	// Single-frame message (broadcast, unsolicited, or non-standard reply): forward the raw payload
 	CANResponseHeader header;
 	header.txToken = txToken;
-	header.msgType = msgType;
+	header.msgType = (uint16_t)msgType;
 	header.dataLength = (uint16_t)buf.dataLength;
 	header.srcAddress = src;
 	header.flags = 0;
-	header.status = CanStatus::Ok;
-	header.reserved = 0;
+	header.status = (uint8_t)CanStatus::Ok;
+	header.padding = 0;
+	header.padding2 = 0;
 	if (!sbc.EnqueueCanResponse(header, reinterpret_cast<const char*>(&buf.msg)))
 	{
 		// TODO handle this error

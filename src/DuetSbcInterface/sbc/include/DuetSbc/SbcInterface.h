@@ -22,7 +22,7 @@
 #include "DuetSbc/LinkEvents.h"
 #include "DuetSbc/RingBuffer.h"
 #include "DuetSbc/SbcTransfer.h"
-#include "DuetSbcProtocol/MessageFormats.h"
+#include "DuetSpiProtocol/MessageFormats.h"
 
 #include <atomic>
 #include <cstdint>

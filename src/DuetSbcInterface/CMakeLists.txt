@@ -3,7 +3,7 @@ project(DuetSbcInterface LANGUAGES CXX)
 
 # Standalone SBC-side replica of the DuetControlServer SPI interface, used to measure SPI transfer
 # jitter without the .NET runtime. Builds:
-#   - duet_sbc_protocol  : shared wire-protocol library (also intended for the device side)
+#   - duet_spi_protocol  : shared wire-protocol library (also intended for the device side)
 #   - duet_sbc           : the SBC interface implementation (static)
 #   - duet_sbc_shared    : the same, as a .so exposing a C ABI for P/Invoke from DCS
 #   - sbc_jitter_test    : the standalone jitter test harness
@@ -30,7 +30,12 @@ option(DUET_SBC_STATIC "Statically link the standalone harness binary" ${DUET_SB
 
 find_package(Threads REQUIRED)
 
-add_subdirectory(protocol)
+# The wire protocol lives outside this project because DuetCANMaster consumes the same headers.
+# DUET_LIBRARIES_DIR mirrors the LIBRARIES_DIR variable DuetCANMaster's Makefile uses.
+set(DUET_LIBRARIES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../lib" CACHE PATH
+    "Path to the shared Duet libraries directory")
+add_subdirectory("${DUET_LIBRARIES_DIR}/DuetSpiInterface" duet_spi_protocol)
+
 add_subdirectory(sbc)
 add_subdirectory(harness)
 

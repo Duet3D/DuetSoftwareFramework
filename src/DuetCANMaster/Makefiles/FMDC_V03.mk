@@ -80,6 +80,7 @@ FMDC_V03_INCLUDES := \
 	-I$(LIBRARIES_DIR)/RRFLibraries/src \
 	-I$(LIBRARIES_DIR)/LibTinyusb \
 	-I$(LIBRARIES_DIR)/CANlib/src \
+	-I$(LIBRARIES_DIR)/DuetSpiInterface/include \
 	-I$(LIBRARIES_DIR)/WiFiSocketServerRTOS/src/include \
 	-I$(FMDC_V03_SRC_DIR) \
 	-I$(FMDC_V03_SRC_DIR)/Hardware/SAME5x \

@@ -1,6 +1,6 @@
 #include "DuetSbc/SbcTransfer.h"
 
-#include "DuetSbcProtocol/Crc.h"
+#include "DuetSpiProtocol/Crc.h"
 
 #include <poll.h>
 #include <sys/eventfd.h>

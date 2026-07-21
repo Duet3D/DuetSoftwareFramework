@@ -62,7 +62,6 @@ private:
 	TransferState state;
 	uint32_t numDisconnects, numTimeouts, numSbcTimeouts, lastTransferTime;
 
-	char *codeBuffer;
 	volatile uint16_t rxPointer, txPointer, txEnd;
 	volatile bool sendBufferUpdate;
 

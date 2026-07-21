@@ -1,6 +1,6 @@
-#include "DuetSbcProtocol/Crc.h"
+#include "DuetSpiProtocol/Crc.h"
 
-namespace duet::sbc::protocol {
+namespace duet::spi::protocol {
 
 namespace {
 
@@ -76,4 +76,4 @@ uint32_t Crc32(const uint8_t *buffer, size_t length) noexcept {
     return crc ^ 0xFFFFFFFFu;
 }
 
-} // namespace duet::sbc::protocol
+} // namespace duet::spi::protocol

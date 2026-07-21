@@ -90,6 +90,7 @@ DUET3MINI_INCLUDES := \
 	-I$(LIBRARIES_DIR)/RRFLibraries/src \
 	-I$(LIBRARIES_DIR)/LibTinyusb/src \
 	-I$(LIBRARIES_DIR)/CANlib/src \
+	-I$(LIBRARIES_DIR)/DuetSpiInterface/include \
 	-I$(LIBRARIES_DIR)/WiFiSocketServerRTOS/src/include \
 	-I$(DUET3MINI_SRC_DIR) \
 	-I$(DUET3MINI_SRC_DIR)/Hardware/SAME5x \

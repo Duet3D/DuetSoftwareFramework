@@ -99,6 +99,7 @@ DUET3CAN0_INCLUDES := \
 	-I$(LIBRARIES_DIR)/FreeRTOS/src/portable/GCC/ARM_CM7/r0p1 \
 	-I$(LIBRARIES_DIR)/RRFLibraries/src \
 	-I$(LIBRARIES_DIR)/CANlib/src \
+	-I$(LIBRARIES_DIR)/DuetSpiInterface/include \
 	-I$(LIBRARIES_DIR)/WiFiSocketServerRTOS/src/include \
 	-I$(DUET3CAN0_SRC_DIR) \
 	-I$(DUET3CAN0_SRC_DIR)/Hardware/SAME70 \

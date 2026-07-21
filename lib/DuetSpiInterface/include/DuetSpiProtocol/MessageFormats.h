@@ -12,7 +12,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace duet::sbc::protocol {
+namespace duet::spi::protocol {
 
 // ---------------------------------------------------------------------------
 // Transfer-level constants (see DuetControlServer/Link/Protocol/Shared/Consts.cs)
@@ -150,6 +150,11 @@ struct EnableCanHeader {
     uint16_t padding;
 };
 
+// Bits of SendCanMessageHeader::flags
+namespace SendCanMessageFlags {
+inline constexpr uint8_t IsResponse = 1u << 0;
+} // namespace SendCanMessageFlags
+
 // Send a CAN message to the controller (SbcRequests/SendCanMessageHeader.cs).
 // The 'flags' byte carries isResponse in bit 0.
 struct SendCanMessageHeader {
@@ -224,4 +229,4 @@ inline constexpr size_t AddPadding(size_t length) noexcept {
     return (extra == 0) ? length : length + 4 - extra;
 }
 
-} // namespace duet::sbc::protocol
+} // namespace duet::spi::protocol

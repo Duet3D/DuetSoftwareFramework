@@ -691,7 +691,7 @@ bool DataTransfer::ReadMessage(MessageType& type, OutputBuffer* buf) noexcept
 {
 	// Read header
 	const MessageHeader* header = ReadDataHeader<MessageHeader>();
-	type = header->messageType;
+	type = (MessageType)header->messageType;
 
 	// Read message data and check if the it could be fully read
 	const char* messageData = ReadData(header->length);
@@ -1178,7 +1178,7 @@ bool DataTransfer::WriteCodeReply(MessageType type, OutputBuffer*& response) noe
 
 	// Write code reply header
 	MessageHeader* replyHeader = WriteDataHeader<MessageHeader>();
-	replyHeader->messageType = type;
+	replyHeader->messageType = (uint32_t)type;
 	replyHeader->padding = 0;
 
 	// Write code reply
@@ -1207,7 +1207,7 @@ bool DataTransfer::WriteCodeReply(MessageType type, OutputBuffer*& response) noe
 		if (response != nullptr)
 		{
 			// There is more to come...
-			replyHeader->messageType = (MessageType)(replyHeader->messageType | PushFlag);
+			replyHeader->messageType = replyHeader->messageType | (uint32_t)PushFlag;
 		}
 	}
 

@@ -6,12 +6,9 @@
 // Because no .NET runtime (and therefore no GC) is involved, comparing this histogram against the C#
 // one isolates whether the 40 ms outliers come from the kernel/hardware or from the managed runtime.
 //
-// The producer sends CanMessageMovementLinearShaped messages the same way MotionService.cs does
-// (destination address 2, a batch per cycle, incrementing seq).
 #include "DuetSbc/Config.h"
 #include "DuetSbc/ProcessHelpers.h"
 #include "DuetSbc/SbcInterface.h"
-#include "DuetSbcProtocol/CanMessages.h"
 
 #include <atomic>
 #include <algorithm>
@@ -26,7 +23,7 @@
 #include <vector>
 
 using namespace duet::sbc;
-namespace proto = duet::sbc::protocol;
+namespace proto = duet::spi::protocol;
 
 namespace {
 
@@ -216,41 +213,12 @@ int main(int argc, char **argv) {
                 }
             }
 
-            proto::CanMessageMovementLinearShaped msg{};
-            msg.whenToExecute = 0;
-            msg.accelerationClocks = 0;
-            msg.steadyClocks = 1000;
-            msg.decelClocks = 0;
-            msg.bits = 0; // extruderDrives=0, numDrivers=0, seq=0, pressure/shaping off
-            msg.acceleration = 0.0f;
-            msg.deceleration = 0.0f;
-
-            uint8_t seq = 0;
-            uint16_t token = 0;
-            auto nextToken = [&]() -> uint16_t {
-                const uint16_t t = token++;
-                if (token == proto::UnsolicitedTxToken) token = 0;
-                return t;
-            };
-
             const auto period = std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::duration<double>(1.0 / rateHz));
             auto next = std::chrono::steady_clock::now();
             while (g_running.load(std::memory_order_relaxed)) {
-                msg.SetSeq(seq++); // SetSeq masks to the low 4 bits
-
-                const size_t len = msg.GetActualDataLength();
-                std::vector<uint8_t> payload(len);
-                std::memcpy(payload.data(), &msg, len);
-
                 for (int k = 0; k < msgsPerCycle; k++) {
                     switch (msgType) {
-                        case 5:
-                            interface.QueueCanMessage(nextToken(), proto::CanMessageType::MovementLinearShaped,
-                                                    proto::CanMessageType::NoReply,
-                                                    static_cast<uint8_t>(dstAddress), false, payload.data(),
-                                                    payload.size());
-                            break;
                         case 8: {
                             static constexpr char kGreeting[] = "Hello from SBC harness";
                             interface.QueueMessage(0, kGreeting, sizeof(kGreeting) - 1);

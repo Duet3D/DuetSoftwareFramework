@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace duet::sbc::protocol {
+namespace duet::spi::protocol {
 
 // CRC16-IBM/ARC, reflected, init 0xFFFF, no final XOR (matches Utility/CRC16.cs).
 // Used for protocol versions < 4.
@@ -15,4 +15,4 @@ uint16_t Crc16(const uint8_t *buffer, size_t length) noexcept;
 // (matches Utility/CRC32.cs). Used for protocol versions >= 4.
 uint32_t Crc32(const uint8_t *buffer, size_t length) noexcept;
 
-} // namespace duet::sbc::protocol
+} // namespace duet::spi::protocol

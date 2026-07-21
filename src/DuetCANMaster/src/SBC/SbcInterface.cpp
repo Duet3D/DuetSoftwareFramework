@@ -57,7 +57,6 @@ SbcInterface::SbcInterface() noexcept
 	, numTimeouts(0)
 	, numSbcTimeouts(0)
 	, lastTransferTime(0)
-	, codeBuffer(nullptr)
 	, rxPointer(0)
 	, txPointer(0)
 	, txEnd(0)
@@ -84,7 +83,6 @@ SbcInterface::SbcInterface() noexcept
 void SbcInterface::Init() noexcept
 {
 	gcodeReplyMutex.Create("SBCReply");
-	codeBuffer = (char*)new uint32_t[(SbcCodeBufferSize + 3) / 4];
 	transfer.Init();
 	sbcTask = new Task<SBCTaskStackWords>();
 	sbcTask->Create(SBCTaskStart, "SBC", nullptr, TaskPriority::SbcPriority);
@@ -360,13 +358,13 @@ void SbcInterface::EnqueueCanTextReply(uint16_t txToken, CanRequestId requestId,
 
 		CANResponseHeader header;
 		header.txToken = txToken;
-		header.msgType = CanMessageType::standardReply;
+		header.msgType = (uint16_t)CanMessageType::standardReply;
 		header.dataLength = (uint16_t)msg.GetActualDataLength(thisLength);
 		header.srcAddress = CanInterface::GetCanAddress();
 		header.flags = 0;
-		header.status = CanStatus::Ok;
-		header.reserved = 0;
+		header.status = (uint8_t)CanStatus::Ok;
 		header.padding = 0;
+		header.padding2 = 0;
 		(void)EnqueueCanResponse(header, reinterpret_cast<const char*>(&msg));
 
 		++fragment;
@@ -426,7 +424,7 @@ void SbcInterface::ExchangeData() noexcept
 			break;
 		}
 
-		if (packet->request >= (uint16_t)SbcRequest::InvalidRequest)
+		if (packet->request > (uint16_t)SbcRequest::Message)
 		{
 			REPORT_INTERNAL_ERROR;
 			break;
@@ -460,8 +458,8 @@ void SbcInterface::ExchangeData() noexcept
 		{
 			const CANRequestHeader* header = transfer.ReadDataHeader<CANRequestHeader>();
 			const uint16_t txToken = header->txToken;
-			const CanMessageType msgType = header->msgType;		// TODO validate this is a valid CanMessageType
-			const CanMessageType replyType = header->replyType; // TODO validate this is a valid CanMessageType
+			const CanMessageType msgType = (CanMessageType)header->msgType;		// TODO validate this is a valid CanMessageType
+			const CanMessageType replyType = (CanMessageType)header->replyType; // TODO validate this is a valid CanMessageType
 			const uint8_t dstAddress = header->dstAddress;
 			const uint8_t dataLength = header->dataLength;
 			const char* payload = transfer.ReadData(dataLength);
@@ -493,7 +491,7 @@ void SbcInterface::ExchangeData() noexcept
 			{
 				buf.id.SetBroadcast(msgType, CanInterface::GetCanAddress());
 			}
-			else if (header->isResponse)
+			else if ((header->flags & SbcProtocol::SendCanMessageFlags::IsResponse) != 0)
 			{
 				buf.id.SetResponse(msgType, CanInterface::GetCanAddress(), (CanAddress)dstAddress);
 			}

@@ -20,14 +20,14 @@ implemented (and is no longer supported by DCS).
 ## Layout
 
 ```
-protocol/   duet_sbc_protocol  — shared wire formats, constants, CRC16/CRC32 (firmware-agnostic)
 sbc/        duet_sbc(.a/.so)   — GPIO chardev, spidev, process helpers, transfer state machine,
                                  the interface loop, and a C ABI (CApi.h) for P/Invoke
 harness/    sbc_jitter_test    — standalone latency/jitter test program
 ```
 
-`protocol/` is the "shared code" pulled out of the interface: it is the single source of truth for
-the wire layout and checksums. Its structs are laid out byte-for-byte to match the C# definitions in
+The wire protocol itself lives outside this project, in
+[`lib/DuetSpiInterface`](../../lib/DuetSpiInterface) (`duet_spi_protocol`), because DuetCANMaster
+consumes the same headers. It is the single source of truth for the wire layout and checksums. Its structs are laid out byte-for-byte to match the C# definitions in
 `DuetControlServer/Link/Protocol/**` (verified with `static_assert` on sizes/offsets) and the device
 side's `SbcMessageFormats.h`. See [Sharing with DuetCANMaster](#sharing-with-duetcanmaster).
 
@@ -201,12 +201,11 @@ make ARCH=arm64 CONFIG=Release publish
 
 ## Sharing with DuetCANMaster
 
-`duet_sbc_protocol` is intended to become the shared definition consumed by **both** this project and
-the device side. It is header-only + a CRC `.cpp`, with no firmware/OS dependencies, so it can be
-added to the DuetCANMaster build and have `SbcMessageFormats.h` reduced to a thin alias over these
-headers. That change touches the DuetCANMaster submodule and its Makefile and is intentionally left
-as a follow-up so this project builds independently; until then, keep the two definitions in sync
-(the `static_assert`s here guard the layout).
+`duet_spi_protocol` now lives in [`lib/DuetSpiInterface`](../../lib/DuetSpiInterface) and is consumed
+by **both** this project and the device side. DuetCANMaster picks it up through its `LIBRARIES_DIR`
+include path, and its `SbcMessageFormats.h` is a thin alias over these headers plus the constants
+that never cross the link. Change the wire format in `lib/DuetSpiInterface` only, so both sides move
+together; the `static_assert`s there guard the layout.
 
 ## Error recovery
 
