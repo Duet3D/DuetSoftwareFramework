@@ -10,14 +10,15 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace duet::sbc {
+namespace Duet::Sbc
+{
 
-// CRC16-IBM/ARC, reflected, init 0xFFFF, no final XOR (matches Utility/CRC16.cs).
-// Used for protocol versions < 4.
-uint16_t Crc16(const uint8_t *buffer, size_t length) noexcept;
+	// CRC16-IBM/ARC, reflected, init 0xFFFF, no final XOR (matches Utility/CRC16.cs).
+	// Used for protocol versions < 4.
+	uint16_t Crc16(const uint8_t* buffer, size_t length) noexcept;
 
-// CRC32 (zlib / IEEE 802.3), reflected, poly 0xEDB88320, init 0xFFFFFFFF, final XOR 0xFFFFFFFF
-// (matches Utility/CRC32.cs). Used for protocol versions >= 4.
-uint32_t Crc32(const uint8_t *buffer, size_t length) noexcept;
+	// CRC32 (zlib / IEEE 802.3), reflected, poly 0xEDB88320, init 0xFFFFFFFF, final XOR 0xFFFFFFFF
+	// (matches Utility/CRC32.cs). Used for protocol versions >= 4.
+	uint32_t Crc32(const uint8_t* buffer, size_t length) noexcept;
 
-} // namespace duet::sbc
+} // namespace Duet::Sbc
