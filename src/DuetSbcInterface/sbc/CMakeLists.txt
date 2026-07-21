@@ -1,5 +1,6 @@
 # SBC-side interface implementation (port of DuetControlServer/Link SPI.cs + LinkService.cs).
 set(DUET_SBC_SOURCES
+    src/Crc.cpp
     src/ProcessHelpers.cpp
     src/SpiDevice.cpp
     src/GpioInputPin.cpp

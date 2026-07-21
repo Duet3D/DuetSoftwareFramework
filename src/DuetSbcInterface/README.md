@@ -21,13 +21,13 @@ implemented (and is no longer supported by DCS).
 
 ```
 sbc/        duet_sbc(.a/.so)   — GPIO chardev, spidev, process helpers, transfer state machine,
-                                 the interface loop, and a C ABI (CApi.h) for P/Invoke
+                                 CRC16/CRC32, the interface loop, and a C ABI (CApi.h) for P/Invoke
 harness/    sbc_jitter_test    — standalone latency/jitter test program
 ```
 
 The wire protocol itself lives outside this project, in
 [`lib/DuetSpiInterface`](../../lib/DuetSpiInterface) (`duet_spi_protocol`), because DuetCANMaster
-consumes the same headers. It is the single source of truth for the wire layout and checksums. Its structs are laid out byte-for-byte to match the C# definitions in
+consumes the same headers. It is the single source of truth for the wire layout. Its structs are laid out byte-for-byte to match the C# definitions in
 `DuetControlServer/Link/Protocol/**` (verified with `static_assert` on sizes/offsets) and the device
 side's `SbcMessageFormats.h`. See [Sharing with DuetCANMaster](#sharing-with-duetcanmaster).
 

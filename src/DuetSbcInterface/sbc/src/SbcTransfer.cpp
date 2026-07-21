@@ -1,6 +1,6 @@
 #include "DuetSbc/SbcTransfer.h"
 
-#include "DuetSpiProtocol/Crc.h"
+#include "DuetSbc/Crc.h"
 
 #include <poll.h>
 #include <sys/eventfd.h>
@@ -373,12 +373,12 @@ void SbcTransfer::WriteCRC() {
     auto *hdr = reinterpret_cast<uint8_t *>(&_txHeader);
     const uint8_t *txData = CurrentTxBuffer().data();
     if (_txHeader.protocolVersion >= 4) {
-        _txHeader.crcData = proto::Crc32(txData, _txPointer);
-        _txHeader.crcHeader = proto::Crc32(hdr, 12);
+        _txHeader.crcData = Crc32(txData, _txPointer);
+        _txHeader.crcHeader = Crc32(hdr, 12);
     } else {
-        const uint16_t data16 = proto::Crc16(txData, _txPointer);
+        const uint16_t data16 = Crc16(txData, _txPointer);
         WriteU16(hdr + 8, data16);
-        const uint16_t header16 = proto::Crc16(hdr, 10);
+        const uint16_t header16 = Crc16(hdr, 10);
         WriteU16(hdr + 10, header16);
     }
 }
@@ -430,7 +430,7 @@ bool SbcTransfer::ExchangeHeader() {
 
         // Verify header checksum
         if (_rxHeader.protocolVersion >= 4) {
-            const uint32_t crc32 = proto::Crc32(rxHdr, 12);
+            const uint32_t crc32 = Crc32(rxHdr, 12);
             if (_rxHeader.crcHeader != crc32) {
                 const uint32_t rc = ExchangeResponse(proto::TransferResponse::BadHeaderChecksum);
                 if (rc == proto::TransferResponse::BadResponse) {
@@ -440,7 +440,7 @@ bool SbcTransfer::ExchangeHeader() {
                 continue;
             }
         } else {
-            const uint16_t crc16 = proto::Crc16(rxHdr, 10);
+            const uint16_t crc16 = Crc16(rxHdr, 10);
             if (ReadU16(rxHdr + 10) != crc16) {
                 const uint32_t rc = ExchangeResponse(proto::TransferResponse::BadHeaderChecksum);
                 if (rc == proto::TransferResponse::BadResponse) {
@@ -524,7 +524,7 @@ bool SbcTransfer::ExchangeData() {
 
         // Inspect received data
         if (_rxHeader.protocolVersion >= 4) {
-            const uint32_t crc32 = proto::Crc32(_rxBuffer.data(), _rxHeader.dataLength);
+            const uint32_t crc32 = Crc32(_rxBuffer.data(), _rxHeader.dataLength);
             if (crc32 != _rxHeader.crcData) {
                 const uint32_t rc = ExchangeResponse(proto::TransferResponse::BadDataChecksum);
                 if (rc == proto::TransferResponse::BadDataChecksum) {
@@ -538,7 +538,7 @@ bool SbcTransfer::ExchangeData() {
                 continue;
             }
         } else {
-            const uint16_t crc16 = proto::Crc16(_rxBuffer.data(), _rxHeader.dataLength);
+            const uint16_t crc16 = Crc16(_rxBuffer.data(), _rxHeader.dataLength);
             const uint16_t expected = ReadU16(reinterpret_cast<uint8_t *>(&_rxHeader) + 8);
             if (crc16 != expected) {
                 const uint32_t rc = ExchangeResponse(proto::TransferResponse::BadDataChecksum);
