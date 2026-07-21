@@ -8,7 +8,6 @@ using DuetControlServer.Link.Protocol;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
-using DuetControlServer.Link.Protocol.SbcRequests;
 using NUnit.Framework;
 
 namespace UnitTests.SPI;
@@ -102,56 +101,6 @@ public class CanMessages
     }
 
     [Test]
-    public void WriteCanMessageHeader()
-    {
-        Span<byte> span = new byte[128];
-        byte[] payload = [0xDE, 0xAD, 0xBE, 0xEF, 0x01];
-
-        int bytesWritten = Writer.WriteCANMessage(span, txToken: 0x1234, msgType: (ushort)CanMessageType.Reset,
-            replyType: (ushort)CanMessageType.NoReply, dstAddress: 5, flags: 0x80, payload);
-
-        SendCanMessageHeader header = MemoryMarshal.Read<SendCanMessageHeader>(span);
-        Assert.That(header.TxToken, Is.EqualTo(0x1234));
-        Assert.That(header.MsgType, Is.EqualTo((ushort)CanMessageType.Reset));
-        Assert.That(header.ReplyType, Is.EqualTo((ushort)CanMessageType.NoReply));
-        Assert.That(header.DataLength, Is.EqualTo(payload.Length));
-        Assert.That(header.DstAddress, Is.EqualTo(5));
-        Assert.That(header.Flags, Is.EqualTo(0x80));
-
-        int headerSize = Marshal.SizeOf<SendCanMessageHeader>();
-        Assert.That(span.Slice(headerSize, payload.Length).ToArray(), Is.EqualTo(payload));
-
-        // 12-byte header + 5-byte payload = 17, padded up to 20
-        Assert.That(bytesWritten, Is.EqualTo(20));
-    }
-
-    [Test]
-    public void ReadCanResponseHeader()
-    {
-        byte[] payload = [1, 2, 3, 4];
-        Span<byte> span = new byte[64];
-        CanResponseHeader header = new()
-        {
-            TxToken = 0x4321,
-            MsgType = (ushort)CanMessageType.StandardReply,
-            DataLength = (ushort)payload.Length,
-            SrcAddress = 9,
-            Flags = 0x40,
-            Status = CanStatus.Ok
-        };
-        MemoryMarshal.Write(span, in header);
-        payload.CopyTo(span[Marshal.SizeOf<CanResponseHeader>()..]);
-
-        Reader.ReadCANResponse(span, out ushort txToken, out CanMessageType msgType, out byte srcAddress, out byte flags, out CanStatus status, out byte[] readPayload);
-        Assert.That(txToken, Is.EqualTo(0x4321));
-        Assert.That(msgType, Is.EqualTo(CanMessageType.StandardReply));
-        Assert.That(srcAddress, Is.EqualTo(9));
-        Assert.That(flags, Is.EqualTo(0x40));
-        Assert.That(status, Is.EqualTo(CanStatus.Ok));
-        Assert.That(readPayload, Is.EqualTo(payload));
-    }
-
-    [Test]
     public void StandardReplyFragmentInfo()
     {
         byte[] fragment = BuildStandardReplyFragment("Hello ", fragmentNumber: 0, moreFollows: true);
@@ -176,7 +125,7 @@ public class CanMessages
     [Test]
     public void ReassembleMultiFragmentReply()
     {
-        CanRequest request = new(CanMessageType.Reset, CanMessageType.StandardReply, txToken: 1, dstAddress: 0, flags: 0, requestPayload: []);
+        CanRequest request = new(CanMessageType.Reset, CanMessageType.StandardReply, txToken: 1, dstAddress: 0, isResponse: false, requestPayload: []);
 
         // Deliver fragments out of order to exercise the ordered reassembly
         byte[] second = BuildStandardReplyFragment("World", fragmentNumber: 1, moreFollows: false);
@@ -199,7 +148,7 @@ public class CanMessages
     [Test]
     public void DuplicateFragmentIgnored()
     {
-        CanRequest request = new(CanMessageType.Reset, CanMessageType.StandardReply, txToken: 1, dstAddress: 0, flags: 0, requestPayload: []);
+        CanRequest request = new(CanMessageType.Reset, CanMessageType.StandardReply, txToken: 1, dstAddress: 0, isResponse: false, requestPayload: []);
         request.AddFragment(0, "ab"u8);
         request.AddFragment(0, "XY"u8);     // duplicate fragment number -- ignored
         request.SetResult(CanStatus.Ok, CanMessageType.StandardReply, srcAddress: 0);

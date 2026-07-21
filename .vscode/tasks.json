@@ -420,6 +420,23 @@
             }
         },
         {
+            // The C# test suite (DCS, DuetAPI, DuetHttpClient). Runs natively for the host.
+            // Note: the HttpClient/Session tests talk to a real printer over HTTP and fail in the
+            // devcontainer unless one is reachable; append
+            //   --filter "FullyQualifiedName!~UnitTests.HttpClient"
+            // to skip them.
+            "label": "[DSF] Run C# Unit Tests",
+            "type": "shell",
+            "command": "dotnet test ./src/UnitTests/UnitTests.csproj --nologo",
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": "test",
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        },
+        {
             // Host-side unit tests for the native interface (ring buffer framing/concurrency).
             // Builds natively for the host, so no Pi or sysroot is involved.
             "label": "[DSF] Run Native Tests",

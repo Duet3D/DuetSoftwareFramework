@@ -14,7 +14,7 @@ namespace DuetControlServer.Link;
 /// <param name="replyType">Type of the expected reply (<see cref="CanMessageType.NoReply"/> if none)</param>
 /// <param name="txToken">Token used to map the response back to this request</param>
 /// <param name="dstAddress">CAN destination address (0..126, or 127 for broadcast)</param>
-/// <param name="flags">Flags for the CAN message</param>
+/// <param name="isResponse">Is the CAN message a response to an expansion board</param>
 /// <param name="requestPayload">Serialized CAN message payload to send</param>
 /// <remarks>
 /// If no reply is expected then the task is completed immediately after the request is sent over SPI.

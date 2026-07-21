@@ -7,7 +7,6 @@ together.
 ```
 include/DuetSpiProtocol/MessageFormats.h   transfer/packet headers, request indices, constants
 include/DuetSpiProtocol/Crc.h              CRC16 and CRC32 used by the transfer headers
-include/DuetSpiProtocol/CanMessages.h      64-bit-clean mirror of the CANlib structs (SBC side only)
 src/Crc.cpp                                the CRC implementations
 ```
 
