@@ -61,6 +61,17 @@ public partial class CurrentMove : ModelObject, IStaticModelObject
     private float _extrusionRate;
 
     /// <summary>
+    /// Position in the job file of the move being executed (in bytes or null)
+    /// </summary>
+    [Live]
+    public long? FilePosition
+    {
+        get => _filePosition;
+        set => SetPropertyValue(ref _filePosition, value);
+    }
+    private long? _filePosition;
+
+    /// <summary>
     /// Laser PWM of the current move (0..1) or null if not applicable
     /// </summary>
     [Live]
