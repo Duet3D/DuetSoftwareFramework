@@ -55,22 +55,22 @@ extern "C" [[noreturn]] void SBCTaskStart(void* /*pvParameters*/) noexcept
 }
 
 SbcInterface::SbcInterface() noexcept
-	: isConnected(false)
-	, numDisconnects(0)
-	, numTimeouts(0)
-	, numSbcTimeouts(0)
-	, lastTransferTime(0)
-	, rxPointer(0)
-	, txPointer(0)
-	, txEnd(0)
-	, sendBufferUpdate(true)
+	: m_isConnected(false)
+	, m_numDisconnects(0)
+	, m_numTimeouts(0)
+	, m_numSbcTimeouts(0)
+	, m_lastTransferTime(0)
+	, m_rxPointer(0)
+	, m_txPointer(0)
+	, m_txEnd(0)
+	, m_sendBufferUpdate(true)
 #  if SUPPORTS_SBC_OVER_USB
-	, pendingUsbDevice(nullptr)
-	, usbDeviceIndex(0)
+	, m_pendingUsbDevice(nullptr)
+	, m_usbDeviceIndex(0)
 #  endif
 
-	, canResponseHead(0)
-	, canResponseTail(0)
+	, m_canResponseHead(0)
+	, m_canResponseTail(0)
 #  ifdef TRACK_FILE_CODES
 	, fileCodesRead(0)
 	, fileCodesHandled(0)
@@ -82,11 +82,11 @@ SbcInterface::SbcInterface() noexcept
 
 void SbcInterface::Init() noexcept
 {
-	gcodeReplyMutex.Create("SBCReply");
-	transfer.Init();
+	m_gcodeReplyMutex.Create("SBCReply");
+	m_transfer.Init();
 	sbcTask = new Task<sbcTaskStackWords>();
 	sbcTask->Create(SBCTaskStart, "SBC", nullptr, TaskPriority::SbcPriority);
-	iapRamAvailable = (const char*)&_estack - Tasks::GetHeapTop();
+	m_iapRamAvailable = (const char*)&_estack - Tasks::GetHeapTop();
 }
 
 #  if SUPPORTS_SBC_OVER_USB
@@ -132,7 +132,7 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 [[noreturn]] void SbcInterface::TaskLoop() noexcept
 {
 	DataTransfer::InitFromTask();
-	transfer.StartNextTransfer();
+	m_transfer.StartNextTransfer();
 
 	bool busy = false;
 	bool transferComplete = false;
@@ -143,13 +143,13 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 	{
 #  if SUPPORTS_SBC_OVER_USB
 		// Check for pending USB transport switch (requested by GCode system after M576.1)
-		if (pendingUsbDevice != nullptr)
+		if (m_pendingUsbDevice != nullptr)
 		{
-			SerialCDC* dev = pendingUsbDevice;
-			pendingUsbDevice = nullptr;
+			SerialCDC* dev = m_pendingUsbDevice;
+			m_pendingUsbDevice = nullptr;
 
 			// Switch DataTransfer from SPI to USB
-			transfer.SwitchToUsb(dev, usbDeviceIndex);
+			m_transfer.SwitchToUsb(dev, m_usbDeviceIndex);
 
 			// Send init message via standard CDC I/O (before direct mode)
 			SendUsbInitMessage(dev);
@@ -166,14 +166,14 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 		do
 		{
 			busy = false;
-			state = transfer.DoTransfer();
+			m_state = m_transfer.DoTransfer();
 			const uint32_t transferStartTime = millis();
-			switch (state)
+			switch (m_state)
 			{
-			case TransferState::doingFullTransfer:
+			case TransferState::DoingFullTransfer:
 #  if SUPPORTS_SBC_OVER_USB
 				// When USB SBC is supported but not connected over SPI, use a short timeout so we can poll for M576.1
-				if (!isConnected && transfer.GetTransportType() == SbcTransportType::spi)
+				if (!m_isConnected && m_transfer.GetTransportType() == SbcTransportType::spi)
 				{
 					hadTimeout = !TaskBase::TakeIndexed(NotifyIndices::SbcInterface, SbcConnectionTimeout);
 					hadSbcTimeout = false;
@@ -181,10 +181,10 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 				}
 #  endif
 				hadTimeout = !TaskBase::TakeIndexed(NotifyIndices::SbcInterface,
-													isConnected ? SbcConnectionTimeout : TaskBase::TimeoutUnlimited);
+													m_isConnected ? SbcConnectionTimeout : TaskBase::TimeoutUnlimited);
 				hadSbcTimeout = hadTimeout && millis() - transferStartTime < SbcConnectionTimeout + sbcYieldTimeout;
 				if (!hadTimeout && !DataTransfer::DataReceived() &&
-					transfer.GetTransportType() == SbcTransportType::spi)
+					m_transfer.GetTransportType() == SbcTransportType::spi)
 				{
 					// Woken by EventOccurred because new outgoing data was queued while we sat idle-armed
 					// (no SPI transfer has happened yet). Fold the new data into the armed buffer and
@@ -192,46 +192,46 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 					// the SBC pulls it on the next clock.
 					if (ProcessCanResponses())
 					{
-						transfer.StartNextTransfer(true);
+						m_transfer.StartNextTransfer(true);
 					}
 					busy = true; // re-enter DoTransfer and keep waiting
 				}
 				break;
-			case TransferState::doingPartialTransfer:
+			case TransferState::DoingPartialTransfer:
 				hadTimeout = !TaskBase::TakeIndexed(NotifyIndices::SbcInterface, SbcTransferTimeout);
 				hadSbcTimeout = hadTimeout && millis() - transferStartTime < SbcTransferTimeout + sbcYieldTimeout;
 				break;
-			case TransferState::finishingTransfer:
+			case TransferState::FinishingTransfer:
 				busy = true;
 				break;
-			case TransferState::connectionTimeout:
+			case TransferState::ConnectionTimeout:
 				hadTimeout = hadSbcTimeout = true;
 				break;
-			case TransferState::connectionReset:
+			case TransferState::ConnectionReset:
 				hadReset = true;
 				break;
-			case TransferState::finished:
+			case TransferState::Finished:
 				transferComplete = true;
 				break;
 			}
 		} while (busy);
 
 		// Handle connection errors
-		if (isConnected && (hadReset || hadTimeout))
+		if (m_isConnected && (hadReset || hadTimeout))
 		{
-			isConnected = false;
-			numDisconnects++;
+			m_isConnected = false;
+			m_numDisconnects++;
 			if (hadTimeout)
 			{
-				numTimeouts++;
+				m_numTimeouts++;
 				if (hadSbcTimeout)
 				{
-					numSbcTimeouts++;
+					m_numSbcTimeouts++;
 				}
 #  if SUPPORTS_SBC_OVER_USB
-				if (transfer.GetTransportType() == SbcTransportType::usb)
+				if (m_transfer.GetTransportType() == SbcTransportType::Usb)
 				{
-					SerialCDC* dev = transfer.GetUsbDevice();
+					SerialCDC* dev = m_transfer.GetUsbDevice();
 					if (dev != nullptr && !dev->IsConnected())
 					{
 						reprap.GetPlatform().Message(NetworkInfoMessage, "Lost connection to SBC (port closed)\n");
@@ -262,14 +262,14 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 
 #  if SUPPORTS_SBC_OVER_USB
 			// On USB disconnect, exit direct mode and reinit the USB GCode device
-			if (transfer.GetTransportType() == SbcTransportType::usb)
+			if (m_transfer.GetTransportType() == SbcTransportType::Usb)
 			{
-				if (SerialCDC* dev = transfer.GetUsbDevice())
+				if (SerialCDC* dev = m_transfer.GetUsbDevice())
 				{
 					dev->EndDirectMode();
 				}
 				// reprap.GetPlatform().ReinitUsbDevice(usbDeviceIndex);
-				transfer.ResetConnection(true);
+				m_transfer.ResetConnection(true);
 
 				continue; // restart the task loop
 			}
@@ -279,36 +279,36 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 		// Deal with received data
 		if (transferComplete)
 		{
-			if (!isConnected)
+			if (!m_isConnected)
 			{
-				isConnected = true;
+				m_isConnected = true;
 				reprap.GetPlatform().MessageF(NetworkInfoMessage,
 											  "Connection to SBC established over %s!\n",
-											  transfer.GetTransportType() == SbcTransportType::usb ? "USB" : "SPI");
+											  m_transfer.GetTransportType() == SbcTransportType::Usb ? "USB" : "SPI");
 			}
 
 			// Handle exchanged data and kick off the next transfer
 			ExchangeData();
-			transfer.StartNextTransfer();
+			m_transfer.StartNextTransfer();
 		}
 		else if (hadTimeout || hadReset)
 		{
 #  if SUPPORTS_SBC_OVER_USB
 			// If USB transport failed, always exit direct mode and reset to SPI
-			if (transfer.GetTransportType() == SbcTransportType::usb)
+			if (m_transfer.GetTransportType() == SbcTransportType::Usb)
 			{
-				if (SerialCDC* dev = transfer.GetUsbDevice())
+				if (SerialCDC* dev = m_transfer.GetUsbDevice())
 				{
 					dev->EndDirectMode();
 				}
 				// reprap.GetPlatform().ReinitUsbDevice(usbDeviceIndex);
-				transfer.ResetConnection(true);
+				m_transfer.ResetConnection(true);
 
 				continue;
 			}
 #  endif
 			// SPI: reset the connection if no data could be exchanged
-			transfer.ResetConnection(hadTimeout);
+			m_transfer.ResetConnection(hadTimeout);
 		}
 	}
 }
@@ -318,19 +318,19 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 bool SbcInterface::EnqueueCanResponse(const CANResponseHeader& header, const char* _ecv_null data) noexcept
 {
 	const TaskCriticalSectionLocker lock;
-	const size_t next = (canResponseHead + 1) % NumCanResponseBuffers;
-	if (next == canResponseTail)
+	const size_t next = (m_canResponseHead + 1) % NumCanResponseBuffers;
+	if (next == m_canResponseTail)
 	{
 		return false; // queue full
 	}
 
-	CanResponseBuffer& item = canResponseRing[canResponseHead];
+	CanResponseBuffer& item = m_canResponseRing[m_canResponseHead];
 	item.header = header;
 	if (data != nullptr && header.dataLength <= sizeof(item.payload))
 	{
 		memcpy(item.payload, data, header.dataLength);
 	}
-	canResponseHead = next;
+	m_canResponseHead = next;
 
 	// const bool timeCritical = header.msgType <= CanMessageType::inputStateChangedV2;
 	EventOccurred(true);
@@ -387,20 +387,20 @@ bool SbcInterface::ProcessCanResponses() noexcept
 		CanResponseBuffer* item = nullptr;
 		{
 			const TaskCriticalSectionLocker lock;
-			if (canResponseTail == canResponseHead)
+			if (m_canResponseTail == m_canResponseHead)
 			{
 				break; // nothing queued
 			}
-			item = &canResponseRing[canResponseTail];
+			item = &m_canResponseRing[m_canResponseTail];
 		}
 
-		if (!transfer.WriteCANResponse(item->header, reinterpret_cast<const char*>(item->payload)))
+		if (!m_transfer.WriteCANResponse(item->header, reinterpret_cast<const char*>(item->payload)))
 		{
 			break; // not enough room in this transfer
 		}
 
 		const TaskCriticalSectionLocker lock;
-		canResponseTail = (canResponseTail + 1) % NumCanResponseBuffers;
+		m_canResponseTail = (m_canResponseTail + 1) % NumCanResponseBuffers;
 		ret = true;
 	}
 	return ret;
@@ -418,9 +418,9 @@ void SbcInterface::ExchangeData() noexcept
 #  if 0
 	bool codeBufferAvailable = true;
 #  endif
-	for (size_t i = 0; i < transfer.PacketsToRead(); i++)
+	for (size_t i = 0; i < m_transfer.PacketsToRead(); i++)
 	{
-		const PacketHeader* const packet = transfer.ReadPacket();
+		const PacketHeader* const packet = m_transfer.ReadPacket();
 		if (packet == nullptr)
 		{
 			if (reprap.Debug(Module::SbcInterface))
@@ -447,14 +447,14 @@ void SbcInterface::ExchangeData() noexcept
 		// Reset the controller
 		case SbcRequest::Reset:
 			reprap.EmergencyStop(); // turn off heaters and motors, tell expansion boards to reset
-			SoftwareReset(SoftwareResetReason::userFromSbc);
+			SoftwareReset(SoftwareResetReason::UserFromSbc);
 			break;
 
 #  if SUPPORT_CAN_EXPANSION
 		// Enable or disable the CAN interface
 		case SbcRequest::EnableCAN:
 		{
-			const auto* const header = transfer.ReadDataHeader<EnableCANHeader>();
+			const auto* const header = m_transfer.ReadDataHeader<EnableCANHeader>();
 			CanInterface::EnableCan(header->enable != 0);
 			break;
 		}
@@ -462,13 +462,13 @@ void SbcInterface::ExchangeData() noexcept
 		// Send a CAN message on behalf of the SBC
 		case SbcRequest::SendCANMessage:
 		{
-			const auto* header = transfer.ReadDataHeader<CANRequestHeader>();
+			const auto* header = m_transfer.ReadDataHeader<CANRequestHeader>();
 			const uint16_t txToken = header->txToken;
 			const auto msgType = (CanMessageType)header->msgType;	  // TODO validate this is a valid CanMessageType
 			const auto replyType = (CanMessageType)header->replyType; // TODO validate this is a valid CanMessageType
 			const uint8_t dstAddress = header->dstAddress;
 			const uint8_t dataLength = header->dataLength;
-			const char* payload = transfer.ReadData(dataLength);
+			const char* payload = m_transfer.ReadData(dataLength);
 
 			// A setAddressAndNormalTiming message addressed to the master (oldAddress 0) configures our own CAN timing
 			// rather than being forwarded onto the bus. newAddress is ignored in this case.
@@ -538,7 +538,7 @@ void SbcInterface::ExchangeData() noexcept
 			if (OutputBuffer::Allocate(buf))
 			{
 				MessageType type{};
-				if (transfer.ReadMessage(type, buf))
+				if (m_transfer.ReadMessage(type, buf))
 				{
 					// Output message to the target
 					Platform::Message(type, buf); // Message(MessageType, OutputBuffer*) is static
@@ -553,7 +553,7 @@ void SbcInterface::ExchangeData() noexcept
 			else
 			{
 				// No output memory available, skip the packet content and try again later
-				(void)transfer.ReadData(packet->length);
+				(void)m_transfer.ReadData(packet->length);
 				packetAcknowledged = false;
 			}
 			break;
@@ -561,7 +561,7 @@ void SbcInterface::ExchangeData() noexcept
 
 		// Invalid request
 		default:
-			(void)transfer.ReadData(packet->length); // skip the packet content
+			(void)m_transfer.ReadData(packet->length); // skip the packet content
 #  ifdef DEBUG
 			// Report this error only in debug builds. We may get here when the SBC sends a file response but the
 			// connection was reset
@@ -573,7 +573,7 @@ void SbcInterface::ExchangeData() noexcept
 		// Request the packet again if no response could be sent back
 		if (!packetAcknowledged)
 		{
-			transfer.ResendPacket(packet);
+			m_transfer.ResendPacket(packet);
 		}
 	}
 
@@ -620,20 +620,20 @@ void SbcInterface::ExchangeData() noexcept
 		}
 
 		// Get the next IAP chunk
-		transfer.StartNextTransfer();
+		m_transfer.StartNextTransfer();
 		bool transferComplete = false;
 		do
 		{
-			switch (transfer.DoTransfer())
+			switch (m_transfer.DoTransfer())
 			{
 #  if SAME5x
 			case TransferState::connectionTimeout:
 #  endif
-			case TransferState::connectionReset:
+			case TransferState::ConnectionReset:
 				// Perform a firmware reset, we're in an unsafe state to resume regular operation
-				SoftwareReset(SoftwareResetReason::user);
+				SoftwareReset(SoftwareResetReason::User);
 				break;
-			case TransferState::finished:
+			case TransferState::Finished:
 				transferComplete = true;
 				break;
 			default:
@@ -643,14 +643,14 @@ void SbcInterface::ExchangeData() noexcept
 		} while (!transferComplete);
 
 		// Process only IAP-related packets
-		for (size_t i = 0; i < transfer.PacketsToRead(); i++)
+		for (size_t i = 0; i < m_transfer.PacketsToRead(); i++)
 		{
-			const PacketHeader* const packet = transfer.ReadPacket();
+			const PacketHeader* const packet = m_transfer.ReadPacket();
 			switch ((SbcRequest)packet->request)
 			{
 			case SbcRequest::WriteIap: // Write another IAP chunk. It's always bound on a 4-byte boundary
 			{
-				iapChunk = transfer.ReadData(packet->length);
+				iapChunk = m_transfer.ReadData(packet->length);
 				length = packet->length;
 				break;
 			}
@@ -658,7 +658,7 @@ void SbcInterface::ExchangeData() noexcept
 #  if SUPPORTS_SBC_OVER_USB
 									   // Cleanly shut down TinyUSB before IAP re-initializes the USB peripheral
 				// with its own bare-metal driver
-				if (transfer.GetTransportType() == SbcTransportType::usb)
+				if (m_transfer.GetTransportType() == SbcTransportType::Usb)
 				{
 					serialUSB.end();
 					StopUsbTask();
@@ -676,15 +676,15 @@ void SbcInterface::ExchangeData() noexcept
 
 void SbcInterface::InvalidateResources() noexcept
 {
-	txEnd = 0;
-	txPointer = 0;
-	rxPointer = 0;
-	sendBufferUpdate = true;
+	m_txEnd = 0;
+	m_txPointer = 0;
+	m_rxPointer = 0;
+	m_sendBufferUpdate = true;
 
 	// Don't cache any messages if they cannot be sent
 	{
-		const MutexLocker lock(gcodeReplyMutex);
-		gcodeReply.ReleaseAll();
+		const MutexLocker lock(m_gcodeReplyMutex);
+		m_gcodeReply.ReleaseAll();
 	}
 
 	// TODO Turn off all the heaters
@@ -693,9 +693,9 @@ void SbcInterface::InvalidateResources() noexcept
 void SbcInterface::Diagnostics(const StringRef& reply) noexcept
 {
 	reply.copy("=== SBC interface ===");
-	if (isConnected)
+	if (m_isConnected)
 	{
-		transfer.Diagnostics(reply);
+		m_transfer.Diagnostics(reply);
 	}
 	else
 	{
@@ -703,12 +703,12 @@ void SbcInterface::Diagnostics(const StringRef& reply) noexcept
 	}
 	reply.lcatf("State: %d, disconnects: %" PRIu32 ", timeouts: %" PRIu32 " total, %" PRIu32
 				" by SBC, IAP RAM available 0x%05" PRIx32,
-				(int)state,
-				numDisconnects,
-				numTimeouts,
-				numSbcTimeouts,
-				iapRamAvailable);
-	reply.lcatf("Buffer RX/TX: %d/%d-%d", (int)rxPointer, (int)txPointer, (int)txEnd);
+				(int)m_state,
+				m_numDisconnects,
+				m_numTimeouts,
+				m_numSbcTimeouts,
+				m_iapRamAvailable);
+	reply.lcatf("Buffer RX/TX: %d/%d-%d", (int)m_rxPointer, (int)m_txPointer, (int)m_txEnd);
 #  ifdef TRACK_FILE_CODES
 	reply.lcatf("File codes read/handled: %d/%d, file macros open/closing: %d %d",
 				(int)fileCodesRead,
@@ -722,8 +722,8 @@ void SbcInterface::Diagnostics(const StringRef& reply) noexcept
 
 void SbcInterface::RequestUsbSwitch(SerialCDC* dev, unsigned int usbDevIndex) noexcept
 {
-	pendingUsbDevice = dev;
-	usbDeviceIndex = usbDevIndex;
+	m_pendingUsbDevice = dev;
+	m_usbDeviceIndex = usbDevIndex;
 	sbcTask->Give(
 		NotifyIndices::SbcInterface); // wake the SBC task directly, bypassing IsConnected() check in EventOccurred
 }
@@ -744,23 +744,23 @@ void SbcInterface::HandleGCodeReply(MessageType mt, const char* reply) noexcept
 	}
 #  endif
 
-	const MutexLocker lock(gcodeReplyMutex);
-	OutputBuffer* buffer = gcodeReply.GetLastItem();
-	if (buffer != nullptr && mt == gcodeReply.GetLastItemType() && (mt & PushFlag) != 0 && !buffer->IsReferenced())
+	const MutexLocker lock(m_gcodeReplyMutex);
+	OutputBuffer* buffer = m_gcodeReply.GetLastItem();
+	if (buffer != nullptr && mt == m_gcodeReply.GetLastItemType() && (mt & PushFlag) != 0 && !buffer->IsReferenced())
 	{
 		// Try to save some space by combining segments that have the Push flag set
-		buffer->cat(reply);
+		buffer->Cat(reply);
 	}
 	else if (reply[0] != 0 && OutputBuffer::Allocate(buffer))
 	{
 		// Attempt to allocate one G-code buffer per non-empty output message
-		buffer->cat(reply);
-		gcodeReply.Push(buffer, mt);
+		buffer->Cat(reply);
+		m_gcodeReply.Push(buffer, mt);
 	}
 	else
 	{
 		// Store nullptr to indicate an empty response. This way many OutputBuffer references can be saved
-		gcodeReply.Push(nullptr, mt);
+		m_gcodeReply.Push(nullptr, mt);
 	}
 	EventOccurred();
 }
@@ -780,8 +780,8 @@ void SbcInterface::HandleGCodeReply(MessageType mt, OutputBuffer* buffer) noexce
 	}
 #  endif
 
-	const MutexLocker lock(gcodeReplyMutex);
-	gcodeReply.Push(buffer, mt);
+	const MutexLocker lock(m_gcodeReplyMutex);
+	m_gcodeReply.Push(buffer, mt);
 	EventOccurred();
 }
 

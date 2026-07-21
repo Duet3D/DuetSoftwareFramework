@@ -60,34 +60,34 @@ const uint16_t CRC16::crc16_modbus_table[] = {
 
 void CRC16::UpdateNormal(uint8_t c, const uint16_t* _ecv_array table) noexcept
 {
-	crc = (uint16_t)((crc << 8) ^ table[((crc >> 8) ^ c) & 0x00ff]);
+	m_crc = (uint16_t)((m_crc << 8) ^ table[((m_crc >> 8) ^ c) & 0x00ff]);
 }
 
 void CRC16::UpdateNormal(const uint8_t* _ecv_array c, size_t len, const uint16_t* _ecv_array table) noexcept
 {
-	uint16_t locCrc = crc; // copy into a local variable to make it faster and smaller
+	uint16_t locCrc = m_crc; // copy into a local variable to make it faster and smaller
 	while (len != 0)
 	{
 		locCrc = (uint16_t)((locCrc << 8) ^ table[((locCrc >> 8) ^ *c++) & 0x00ff]);
 		--len;
 	}
-	crc = locCrc;
+	m_crc = locCrc;
 }
 
 void CRC16::UpdateReflected(uint8_t c, const uint16_t* _ecv_array table) noexcept
 {
-	crc = (uint16_t)((crc >> 8) ^ table[(crc ^ c) & 0x00ff]);
+	m_crc = (uint16_t)((m_crc >> 8) ^ table[(m_crc ^ c) & 0x00ff]);
 }
 
 void CRC16::UpdateReflected(const uint8_t* _ecv_array c, size_t len, const uint16_t* _ecv_array table) noexcept
 {
-	uint16_t locCrc = crc; // copy into a local variable to make it faster and smaller
+	uint16_t locCrc = m_crc; // copy into a local variable to make it faster and smaller
 	while (len != 0)
 	{
 		locCrc = (uint16_t)((locCrc >> 8) ^ table[(locCrc ^ *c++) & 0x00ff]);
 		--len;
 	}
-	crc = locCrc;
+	m_crc = locCrc;
 }
 
 // End

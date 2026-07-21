@@ -109,21 +109,21 @@ bool IoPort::AssignPort(const char* _ecv_array pinName,
 {
 	switch (access)
 	{
-	case PinAccess::read:
+	case PinAccess::Read:
 		return "digital read";
-	case PinAccess::readWithPullup_InternalUseOnly:
+	case PinAccess::ReadWithPullupInternalUseOnly:
 		return "digital read (pullup resistor enabled)";
-	case PinAccess::readNoDebounce:
+	case PinAccess::ReadNoDebounce:
 		return "digital read (no debouncing)";
-	case PinAccess::readAnalog:
+	case PinAccess::ReadAnalog:
 		return "analog read";
-	case PinAccess::write0:
+	case PinAccess::Write0:
 		return "write (initially low)";
-	case PinAccess::write1:
+	case PinAccess::Write1:
 		return "write (initially high)";
 	case PinAccess::pwm:
 		return "write PWM";
-	case PinAccess::servo:
+	case PinAccess::Servo:
 		return "servo write";
 	default:
 		return "[unknown]";
@@ -140,7 +140,7 @@ int8_t IoPort::logicalPinModes[NumNamedPins]; // what mode each logical pin is s
 {
 	for (PinUsedBy& p : portUsedBy)
 	{
-		p = PinUsedBy::notUsed;
+		p = PinUsedBy::NotUsed;
 	}
 	for (int8_t& p : logicalPinModes)
 	{
@@ -164,7 +164,7 @@ void IoPort::Release() noexcept
 #if SAME5x
 		ClearAnalogCallback();
 #endif
-		portUsedBy[logicalPin] = PinUsedBy::notUsed;
+		portUsedBy[logicalPin] = PinUsedBy::NotUsed;
 		logicalPinModes[logicalPin] = PIN_MODE_NOT_CONFIGURED;
 	}
 	logicalPin = NoLogicalPin;
@@ -220,9 +220,9 @@ bool IoPort::Allocate(const char* _ecv_array pn, const StringRef& reply, PinUsed
 			// will be reduced if the internal pullup is enabled. There are a few pins for which this doesn't apply,
 			// e.g. the CS pins on the SPI connector. Ideally we would include this info in the pin table, e.g. in the
 			// bitmap of allowed pin modes.
-			if (access == PinAccess::read)
+			if (access == PinAccess::Read)
 			{
-				access = PinAccess::readWithPullup_InternalUseOnly;
+				access = PinAccess::ReadWithPullupInternalUseOnly;
 			}
 		}
 		else if (*pn == '*')
@@ -266,15 +266,15 @@ bool IoPort::Allocate(const char* _ecv_array pn, const StringRef& reply, PinUsed
 	if (lp != NoLogicalPin) // if not assigning "nil"
 	{
 		bool doSetMode = true;
-		if (portUsedBy[lp] == PinUsedBy::notUsed ||
-			(portUsedBy[lp] == PinUsedBy::temporaryInput && neededFor != PinUsedBy::temporaryInput))
+		if (portUsedBy[lp] == PinUsedBy::NotUsed ||
+			(portUsedBy[lp] == PinUsedBy::TemporaryInput && neededFor != PinUsedBy::TemporaryInput))
 		{
 			portUsedBy[lp] = neededFor;
 		}
 		else
 		{
 			const auto pm = (PinMode)logicalPinModes[lp];
-			if (neededFor != PinUsedBy::temporaryInput || (pm != INPUT && pm != INPUT_PULLUP))
+			if (neededFor != PinUsedBy::TemporaryInput || (pm != INPUT && pm != INPUT_PULLUP))
 			{
 				reply.printf("Pin '%s' is not free", fullPinName);
 				return false;
@@ -283,7 +283,7 @@ bool IoPort::Allocate(const char* _ecv_array pn, const StringRef& reply, PinUsed
 		}
 		logicalPin = lp;
 		hardwareInvert = hwInvert;
-		isSharedInput = (neededFor == PinUsedBy::temporaryInput);
+		isSharedInput = (neededFor == PinUsedBy::TemporaryInput);
 		SetInvert(inverted);
 
 		if (doSetMode && !SetMode(access))
@@ -309,24 +309,24 @@ bool IoPort::SetMode(PinAccess access) noexcept
 	PinMode desiredMode{};
 	switch (access)
 	{
-	case PinAccess::write0:
+	case PinAccess::Write0:
 		desiredMode = (totalInvert) ? OUTPUT_HIGH : OUTPUT_LOW;
 		break;
-	case PinAccess::write1:
+	case PinAccess::Write1:
 		desiredMode = (totalInvert) ? OUTPUT_LOW : OUTPUT_HIGH;
 		break;
 	case PinAccess::pwm:
-	case PinAccess::servo:
+	case PinAccess::Servo:
 		desiredMode = (totalInvert) ? OUTPUT_PWM_HIGH : OUTPUT_PWM_LOW;
 		break;
-	case PinAccess::readAnalog:
+	case PinAccess::ReadAnalog:
 		desiredMode = AIN;
 		break;
-	case PinAccess::readWithPullup_InternalUseOnly:
+	case PinAccess::ReadWithPullupInternalUseOnly:
 		desiredMode = INPUT_PULLUP;
 		break;
-	case PinAccess::read:
-	case PinAccess::readNoDebounce:
+	case PinAccess::Read:
+	case PinAccess::ReadNoDebounce:
 	default:
 		desiredMode = INPUT;
 		break;
@@ -337,7 +337,7 @@ bool IoPort::SetMode(PinAccess access) noexcept
 		const AnalogChannelNumber chan = PinToAdcChannel(GetPinNoCheck());
 		if (chan != NO_ADC)
 		{
-			if (access == PinAccess::readAnalog)
+			if (access == PinAccess::ReadAnalog)
 			{
 				IoPort::SetPinMode(
 					GetPinNoCheck(),
@@ -351,14 +351,14 @@ bool IoPort::SetMode(PinAccess access) noexcept
 				AnalogInEnableChannel(chan, false);
 			}
 		}
-		else if (access == PinAccess::readAnalog)
+		else if (access == PinAccess::ReadAnalog)
 		{
 			return false;
 		}
 		IoPort::SetPinMode(
 			GetPinNoCheck(),
 			desiredMode,
-			access == PinAccess::read); // debounce pins with external inputs, don't debounce pins used internally
+			access == PinAccess::Read); // debounce pins with external inputs, don't debounce pins used internally
 		logicalPinModes[logicalPin] = (int8_t)desiredMode;
 	}
 	return true;
@@ -504,7 +504,7 @@ Pin IoPort::GetPin() const noexcept
 // Get the capabilities of the pin
 PinCapability IoPort::GetCapability() const noexcept
 {
-	return (IsValid()) ? PinTable[GetPinNoCheck()].cap : PinCapability::none;
+	return (IsValid()) ? PinTable[GetPinNoCheck()].cap : PinCapability::None;
 }
 
 bool IoPort::ReadDigital() const noexcept
@@ -622,7 +622,7 @@ uint16_t IoPort::ReadAnalog() const noexcept
 
 // Members of class PwmPort
 PwmPort::PwmPort() noexcept
-	: frequency(DefaultPinWritePwmFreq)
+	: m_frequency(DefaultPinWritePwmFreq)
 {
 }
 
@@ -631,7 +631,7 @@ void PwmPort::AppendFrequency(const StringRef& str) const noexcept
 {
 	if (IsValid())
 	{
-		str.catf(" frequency %uHz", frequency);
+		str.catf(" frequency %uHz", m_frequency);
 	}
 }
 
@@ -645,7 +645,7 @@ void PwmPort::WriteAnalog(float pwm) const noexcept
 {
 	if (IsValid())
 	{
-		IoPort::WriteAnalog(GetPinNoCheck(), ((totalInvert) ? 1.0 - pwm : pwm), frequency);
+		IoPort::WriteAnalog(GetPinNoCheck(), ((totalInvert) ? 1.0 - pwm : pwm), m_frequency);
 	}
 }
 

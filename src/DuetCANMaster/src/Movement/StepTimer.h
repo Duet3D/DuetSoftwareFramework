@@ -119,11 +119,11 @@ class StepTimer final
 										   // master mode) or requested it (if in expansion mode)
 #endif
 
-	StepTimer* _ecv_null next;
-	Ticks whenDue{};
-	TimerCallbackFunction _ecv_null callback;
-	CallbackParameter cbParam;
-	volatile bool active;
+	StepTimer* _ecv_null m_next;
+	Ticks m_whenDue{};
+	TimerCallbackFunction _ecv_null m_callback;
+	CallbackParameter m_cbParam;
+	volatile bool m_active;
 
 	static StepTimer* volatile _ecv_null pendingList; // list of pending callbacks, soonest first
 };

@@ -26,47 +26,47 @@ class CanException
 {
   public:
 	CanException() noexcept
-		: message(nullptr)
+		: m_message(nullptr)
 	{
 	}
 	explicit CanException(const char* _ecv_array msg) noexcept
-		: message(msg)
+		: m_message(msg)
 	{
-		param.i = 0;
+		m_param.i = 0;
 	}
 
 	CanException(const char* _ecv_array msg, const char* _ecv_array sparam) noexcept
-		: message(msg)
+		: m_message(msg)
 	{
-		stringParam.copy(sparam);
+		m_stringParam.copy(sparam);
 	}
 
 	CanException(const char* _ecv_array msg, uint32_t uparam) noexcept
-		: message(msg)
+		: m_message(msg)
 	{
-		param.u = uparam;
+		m_param.u = uparam;
 	}
 
 	CanException(const char* _ecv_array msg, int32_t iparam) noexcept
-		: message(msg)
+		: m_message(msg)
 	{
-		param.i = iparam;
+		m_param.i = iparam;
 	}
 
 	void GetMessage(const StringRef& reply) const noexcept;
 
 	void DebugPrint() const noexcept;
 
-	bool IsNull() const noexcept { return message == nullptr; }
+	bool IsNull() const noexcept { return m_message == nullptr; }
 
   private:
-	const char* _ecv_array _ecv_null message;
+	const char* _ecv_array _ecv_null m_message;
 	union
 	{
 		int32_t i;
 		uint32_t u;
-	} param;
-	String<StringLength50> stringParam;
+	} m_param;
+	String<StringLength50> m_stringParam;
 };
 
 // Functions to create and throw an exception. Using these avoids allocating the CanException object on the local stack

@@ -22,46 +22,46 @@ class OutputBuffer
 {
   public:
 	explicit OutputBuffer(OutputBuffer* _ecv_null n) noexcept
-		: next(n)
+		: m_next(n)
 	{
 	}
 	OutputBuffer(const OutputBuffer&) = delete;
 
 	void Append(OutputBuffer* _ecv_null other) noexcept;
-	OutputBuffer* null Next() const noexcept { return next; }
-	bool IsReferenced() const noexcept { return isReferenced; }
-	bool HadOverflow() const noexcept { return hadOverflow; }
+	OutputBuffer* null Next() const noexcept { return m_next; }
+	bool IsReferenced() const noexcept { return m_isReferenced; }
+	bool HadOverflow() const noexcept { return m_hadOverflow; }
 	void IncreaseReferences(size_t refs) noexcept;
 
-	const char* _ecv_array Data() const noexcept { return data; }
-	const char* _ecv_array UnreadData() const noexcept { return data + bytesRead; }
-	size_t DataLength() const noexcept { return dataLength; } // How many bytes have been written to this instance?
+	const char* _ecv_array Data() const noexcept { return m_data; }
+	const char* _ecv_array UnreadData() const noexcept { return m_data + m_bytesRead; }
+	size_t DataLength() const noexcept { return m_dataLength; } // How many bytes have been written to this instance?
 	size_t Length() const noexcept;							  // How many bytes have been written to the whole chain?
 
 	char operator[](size_t index) const noexcept;
 	const char* _ecv_array Read(size_t len) noexcept;
-	void Taken(size_t len) noexcept { bytesRead += len; }
-	size_t BytesLeft() const noexcept { return dataLength - bytesRead; } // How many bytes have not been sent yet?
+	void Taken(size_t len) noexcept { m_bytesRead += len; }
+	size_t BytesLeft() const noexcept { return m_dataLength - m_bytesRead; } // How many bytes have not been sent yet?
 
-	uint32_t WhenQueued() const noexcept { return whenQueued; }
+	uint32_t WhenQueued() const noexcept { return m_whenQueued; }
 	void UpdateWhenQueued() noexcept;
 
-	size_t vprintf(const char* _ecv_array fmt, va_list vargs) noexcept;
-	size_t printf(const char* _ecv_array fmt, ...) noexcept __attribute__((format(printf, 2, 3)));
-	size_t vcatf(const char* _ecv_array fmt, va_list vargs) noexcept;
-	size_t catf(const char* _ecv_array fmt, ...) noexcept __attribute__((format(printf, 2, 3)));
-	size_t lcatf(const char* _ecv_array fmt, ...) noexcept __attribute__((format(printf, 2, 3)));
+	size_t Vprintf(const char* _ecv_array fmt, va_list vargs) noexcept;
+	size_t Printf(const char* _ecv_array fmt, ...) noexcept __attribute__((format(printf, 2, 3)));
+	size_t Vcatf(const char* _ecv_array fmt, va_list vargs) noexcept;
+	size_t Catf(const char* _ecv_array fmt, ...) noexcept __attribute__((format(printf, 2, 3)));
+	size_t Lcatf(const char* _ecv_array fmt, ...) noexcept __attribute__((format(printf, 2, 3)));
 
-	size_t copy(const char c) noexcept;
-	size_t copy(const char* _ecv_array src) noexcept;
-	size_t copy(const char* _ecv_array src, size_t len) noexcept;
+	size_t Copy(const char c) noexcept;
+	size_t Copy(const char* _ecv_array src) noexcept;
+	size_t Copy(const char* _ecv_array src, size_t len) noexcept;
 
-	size_t cat(const char c) noexcept;
-	size_t cat(const char* _ecv_array src) noexcept;
-	size_t lcat(const char* _ecv_array src) noexcept;
-	size_t cat(const char* _ecv_array src, size_t len) noexcept;
-	size_t lcat(const char* _ecv_array src, size_t len) noexcept;
-	size_t cat(StringRef& str) noexcept;
+	size_t Cat(const char c) noexcept;
+	size_t Cat(const char* _ecv_array src) noexcept;
+	size_t Lcat(const char* _ecv_array src) noexcept;
+	size_t Cat(const char* _ecv_array src, size_t len) noexcept;
+	size_t Lcat(const char* _ecv_array src, size_t len) noexcept;
+	size_t Cat(StringRef& str) noexcept;
 
 	size_t EncodeChar(char c) noexcept;
 	size_t EncodeReply(OutputBuffer* _ecv_null src) noexcept;
@@ -96,17 +96,17 @@ class OutputBuffer
   private:
 	void Clear() noexcept;
 
-	OutputBuffer* _ecv_null next;
-	OutputBuffer* last;
+	OutputBuffer* _ecv_null m_next;
+	OutputBuffer* m_last;
 
-	uint32_t whenQueued; // milliseconds timer when this buffer was filled in
+	uint32_t m_whenQueued; // milliseconds timer when this buffer was filled in
 
-	char data[OUTPUT_BUFFER_SIZE];
-	size_t dataLength, bytesRead;
+	char m_data[OUTPUT_BUFFER_SIZE];
+	size_t m_dataLength, m_bytesRead;
 
-	bool isReferenced;
-	bool hadOverflow;
-	std::atomic<size_t> references;
+	bool m_isReferenced;
+	bool m_hadOverflow;
+	std::atomic<size_t> m_references;
 
 	static OutputBuffer* volatile _ecv_null freeOutputBuffers; // Messages may be sent by multiple tasks
 	static std::atomic<size_t> usedOutputBuffers;			   // so make these atomic.
@@ -115,7 +115,7 @@ class OutputBuffer
 
 inline uint32_t OutputBuffer::GetAge() const noexcept
 {
-	return millis() - whenQueued;
+	return millis() - m_whenQueued;
 }
 
 // This class is used to manage references to OutputBuffer chains for all output destinations.
@@ -124,16 +124,16 @@ class OutputStack
 {
   public:
 	OutputStack() noexcept
-		: count(0)
+		: m_count(0)
 	{
 	}
 	OutputStack(const OutputStack&) = delete;
 
 	// Is there anything on this stack?
-	bool IsEmpty() const volatile noexcept { return count == 0; }
+	bool IsEmpty() const volatile noexcept { return m_count == 0; }
 
 	// Clear the reference list
-	void Clear() volatile noexcept { count = 0; }
+	void Clear() volatile noexcept { m_count = 0; }
 
 	// Push an OutputBuffer chain. Return true if successful, else release the buffer and return false.
 	bool Push(OutputBuffer* _ecv_null buffer, MessageType type = NoDestinationMessage) volatile noexcept;
@@ -177,9 +177,9 @@ class OutputStack
 	void ReleaseAll() volatile noexcept;
 
   private:
-	size_t count;
-	OutputBuffer* _ecv_null items[OUTPUT_STACK_DEPTH];
-	MessageType types[OUTPUT_STACK_DEPTH];
+	size_t m_count;
+	OutputBuffer* _ecv_null m_items[OUTPUT_STACK_DEPTH];
+	MessageType m_types[OUTPUT_STACK_DEPTH];
 };
 
 #endif /* OUTPUTMEMORY_H_ */

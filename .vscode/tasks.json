@@ -57,10 +57,6 @@
                     "value": "Duet3_MB6XD"
                 },
                 {
-                    "label": "Duet3 Mini 5+",
-                    "value": "Duet3Mini5plus"
-                },
-                {
                     "label": "All",
                     "value": "all"
                 }

@@ -48,7 +48,7 @@ class CRC16
 	static const uint16_t crc16_modbus_table[];
 #endif
 
-	uint16_t crc;
+	uint16_t m_crc;
 };
 
 inline CRC16::CRC16() noexcept
@@ -58,12 +58,12 @@ inline CRC16::CRC16() noexcept
 
 inline uint16_t CRC16::Get() const noexcept
 {
-	return crc;
+	return m_crc;
 }
 
 inline void CRC16::Reset(uint16_t initialValue) noexcept
 {
-	crc = initialValue;
+	m_crc = initialValue;
 }
 
 #endif /* SRC_STORAGE_CRC16_H_ */

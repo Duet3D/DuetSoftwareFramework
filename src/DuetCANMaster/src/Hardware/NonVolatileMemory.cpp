@@ -14,33 +14,33 @@
 #endif
 
 NonVolatileMemory::NonVolatileMemory() noexcept
-	: state(NvmState::notRead)
+	: m_state(NvmState::NotRead)
 {
 }
 
 void NonVolatileMemory::EnsureRead() noexcept
 {
-	if (state == NvmState::notRead)
+	if (m_state == NvmState::NotRead)
 	{
 #if SAME5x
 		memcpyu32(reinterpret_cast<uint32_t*>(&buffer),
 				  reinterpret_cast<const uint32_t*>(SEEPROM_ADDR),
 				  sizeof(buffer) / sizeof(uint32_t));
 #elif SAM4E || SAM4S || SAME70
-		Flash::ReadUserSignature(reinterpret_cast<uint32_t*>(&buffer), sizeof(buffer) / sizeof(uint32_t));
+		Flash::ReadUserSignature(reinterpret_cast<uint32_t*>(&m_buffer), sizeof(m_buffer) / sizeof(uint32_t));
 #else
 #  error Unsupported processor
 #endif
-		if (buffer.magic != NVM::MagicValue)
+		if (m_buffer.magic != NVM::MagicValue)
 		{
 			//			debugPrintf("Invalid user area\n");
-			memset(&buffer, 0xFF, sizeof(buffer));
-			buffer.magic = NVM::MagicValue;
-			state = NvmState::eraseAndWriteNeeded;
+			memset(&m_buffer, 0xFF, sizeof(m_buffer));
+			m_buffer.magic = NVM::MagicValue;
+			m_state = NvmState::EraseAndWriteNeeded;
 		}
 		else
 		{
-			state = NvmState::clean;
+			m_state = NvmState::Clean;
 			//			debugPrintf("user area valid\n");
 		}
 	}
@@ -64,20 +64,20 @@ void NonVolatileMemory::EnsureWritten() noexcept
 		}
 	}
 #else
-	if (state == NvmState::eraseAndWriteNeeded)
+	if (m_state == NvmState::EraseAndWriteNeeded)
 	{
 		// Erase the page
 #  if SAM4E || SAM4S || SAME70
 		Flash::EraseUserSignature();
 #  endif
-		state = NvmState::writeNeeded;
+		m_state = NvmState::WriteNeeded;
 	}
 
-	if (state == NvmState::writeNeeded)
+	if (m_state == NvmState::WriteNeeded)
 	{
 #  if SAM4E || SAM4S || SAME70
 		const bool cacheEnabled = Cache::Disable();
-		Flash::WriteUserSignature(reinterpret_cast<const uint32_t*>(&buffer));
+		Flash::WriteUserSignature(reinterpret_cast<const uint32_t*>(&m_buffer));
 		if (cacheEnabled)
 		{
 			Cache::Enable();
@@ -85,7 +85,7 @@ void NonVolatileMemory::EnsureWritten() noexcept
 #  else
 #	error Unsupported processor
 #  endif
-		state = NvmState::clean;
+		m_state = NvmState::Clean;
 	}
 #endif
 }
@@ -96,10 +96,10 @@ SoftwareResetData* _ecv_null NonVolatileMemory::GetLastWrittenResetData(unsigned
 	for (unsigned int i = NumberOfResetDataSlots; i != 0;)
 	{
 		--i;
-		if (buffer.resetData[i].IsValid())
+		if (m_buffer.resetData[i].IsValid())
 		{
 			slot = i;
-			return &buffer.resetData[i];
+			return &m_buffer.resetData[i];
 		}
 	}
 	return nullptr;
@@ -108,46 +108,46 @@ SoftwareResetData* _ecv_null NonVolatileMemory::GetLastWrittenResetData(unsigned
 SoftwareResetData* NonVolatileMemory::AllocateResetDataSlot() noexcept
 {
 	EnsureRead();
-	for (auto& i : buffer.resetData)
+	for (auto& i : m_buffer.resetData)
 	{
 		if (i.IsVacant())
 		{
-			if (state ==
-				NvmState::clean) // need this test because state may already be EraseAndWriteNeeded after EnsureRead
+			if (m_state ==
+				NvmState::Clean) // need this test because state may already be EraseAndWriteNeeded after EnsureRead
 			{
-				state = NvmState::writeNeeded; // assume the caller will write to the allocated slot
+				m_state = NvmState::WriteNeeded; // assume the caller will write to the allocated slot
 			}
 			return &i;
 		}
 	}
 
 	// All slots are full, so clear them out and start again
-	for (auto& i : buffer.resetData)
+	for (auto& i : m_buffer.resetData)
 	{
 		i.Clear();
 	}
-	state = NvmState::eraseAndWriteNeeded;
-	return &buffer.resetData[0];
+	m_state = NvmState::EraseAndWriteNeeded;
+	return &m_buffer.resetData[0];
 }
 
 int8_t NonVolatileMemory::GetThermistorLowCalibration(unsigned int inputNumber) noexcept
 {
-	return GetThermistorCalibration(inputNumber, buffer.thermistorLowCalibration);
+	return GetThermistorCalibration(inputNumber, m_buffer.thermistorLowCalibration);
 }
 
 int8_t NonVolatileMemory::GetThermistorHighCalibration(unsigned int inputNumber) noexcept
 {
-	return GetThermistorCalibration(inputNumber, buffer.thermistorHighCalibration);
+	return GetThermistorCalibration(inputNumber, m_buffer.thermistorHighCalibration);
 }
 
 void NonVolatileMemory::SetThermistorLowCalibration(unsigned int inputNumber, int8_t val) noexcept
 {
-	SetThermistorCalibration(inputNumber, val, buffer.thermistorLowCalibration);
+	SetThermistorCalibration(inputNumber, val, m_buffer.thermistorLowCalibration);
 }
 
 void NonVolatileMemory::SetThermistorHighCalibration(unsigned int inputNumber, int8_t val) noexcept
 {
-	SetThermistorCalibration(inputNumber, val, buffer.thermistorHighCalibration);
+	SetThermistorCalibration(inputNumber, val, m_buffer.thermistorHighCalibration);
 }
 
 int8_t NonVolatileMemory::GetThermistorCalibration(unsigned int inputNumber, uint8_t* _ecv_array calibArray) noexcept
@@ -173,11 +173,11 @@ void NonVolatileMemory::SetThermistorCalibration(unsigned int inputNumber,
 			calibArray[inputNumber] = newVal;
 			if ((newVal & ~oldVal) != 0)
 			{
-				state = NvmState::eraseAndWriteNeeded;
+				m_state = NvmState::EraseAndWriteNeeded;
 			}
-			else if (state == NvmState::clean)
+			else if (m_state == NvmState::Clean)
 			{
-				state = NvmState::writeNeeded;
+				m_state = NvmState::WriteNeeded;
 			}
 		}
 	}

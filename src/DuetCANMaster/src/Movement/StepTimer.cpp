@@ -264,12 +264,12 @@ void StepTimer::DisableTimerInterrupt() noexcept
 	{
 		for (;;)
 		{
-			StepTimer* const _ecv_null nextTimer = tmr->next;
+			StepTimer* const _ecv_null nextTimer = tmr->m_next;
 			pendingList = nextTimer; // remove it from the pending list
 
-			tmr->active = false;
-			tmr->callback(tmr->cbParam); // execute its callback. This may schedule another callback and hence change
-										 // the pending list.
+			tmr->m_active = false;
+			tmr->m_callback(tmr->m_cbParam); // execute its callback. This may schedule another callback and hence
+											 // change the pending list.
 
 			tmr = pendingList;
 			if (tmr == nullptr || tmr != nextTimer)
@@ -277,7 +277,7 @@ void StepTimer::DisableTimerInterrupt() noexcept
 				break; // no more timers, or another timer has been inserted and an interrupt scheduled
 			}
 
-			if (!StepTimer::ScheduleTimerInterrupt(tmr->whenDue))
+			if (!StepTimer::ScheduleTimerInterrupt(tmr->m_whenDue))
 			{
 				break; // interrupt isn't due yet and a new one has been scheduled
 			}
@@ -316,37 +316,37 @@ void STEP_TC_HANDLER() noexcept
 }
 
 StepTimer::StepTimer() noexcept
-	: next(nullptr)
-	, callback(nullptr)
-	, active(false)
+	: m_next(nullptr)
+	, m_callback(nullptr)
+	, m_active(false)
 {
 }
 
 // Set up the callback function and parameter
 void StepTimer::SetCallback(TimerCallbackFunction cb, CallbackParameter param) noexcept
 {
-	callback = cb;
-	cbParam = param;
+	m_callback = cb;
+	m_cbParam = param;
 }
 
 // Schedule a callback at a particular tick count, returning true if it was not scheduled because it is already due or
 // imminent.
 bool StepTimer::ScheduleCallbackFromIsr(Ticks when) noexcept
 {
-	whenDue = when;
+	m_whenDue = when;
 	return ScheduleCallbackFromIsr();
 }
 
 // As ScheduleCallback but base priority >= NvicPriorityStep when called. Can be called from within a callback.
 bool StepTimer::ScheduleMovementCallbackFromIsr(Ticks when) noexcept
 {
-	whenDue = when + movementDelay;
+	m_whenDue = when + movementDelay;
 	return ScheduleCallbackFromIsr();
 }
 
 bool StepTimer::ScheduleCallbackFromIsr() noexcept
 {
-	if (active)
+	if (m_active)
 	{
 		CancelCallbackFromIsr();
 	}
@@ -355,40 +355,40 @@ bool StepTimer::ScheduleCallbackFromIsr() noexcept
 	StepTimer* _ecv_null tmr = pendingList; // capture volatile variable
 	if (tmr == nullptr)
 	{
-		if (ScheduleTimerInterrupt(whenDue))
+		if (ScheduleTimerInterrupt(m_whenDue))
 		{
 			return true;
 		}
-		next = nullptr;
+		m_next = nullptr;
 		pendingList = this;
 	}
 	else
 	{
 		// Another timer is already pending
 		const Ticks now = GetTimerTicks();
-		const auto howSoon = (int32_t)(whenDue - now);
-		if (howSoon < (int32_t)(tmr->whenDue - now))
+		const auto howSoon = (int32_t)(m_whenDue - now);
+		if (howSoon < (int32_t)(tmr->m_whenDue - now))
 		{
 			// This one is due earlier than the first existing one
-			if (ScheduleTimerInterrupt(whenDue))
+			if (ScheduleTimerInterrupt(m_whenDue))
 			{
 				return true;
 			}
-			next = tmr;
+			m_next = tmr;
 			pendingList = this;
 		}
 		else
 		{
-			while (tmr->next != nullptr && (int32_t)(tmr->next->whenDue - now) < howSoon)
+			while (tmr->m_next != nullptr && (int32_t)(tmr->m_next->m_whenDue - now) < howSoon)
 			{
-				tmr = tmr->next;
+				tmr = tmr->m_next;
 			}
-			next = tmr->next;
-			tmr->next = this;
+			m_next = tmr->m_next;
+			tmr->m_next = this;
 		}
 	}
 
-	active = true;
+	m_active = true;
 	return false;
 }
 
@@ -402,16 +402,16 @@ bool StepTimer::ScheduleCallback(Ticks when) noexcept
 void StepTimer::CancelCallbackFromIsr() noexcept
 {
 	for (auto* _ecv_null* ppst = const_cast<StepTimer * _ecv_null*>(&pendingList); *ppst != nullptr;
-		 ppst = &((*ppst)->next))
+		 ppst = &((*ppst)->m_next))
 	{
 		if (*ppst == this)
 		{
-			*ppst = this->next; // unlink this from the pending list
-			this->next = nullptr;
+			*ppst = this->m_next; // unlink this from the pending list
+			this->m_next = nullptr;
 			break;
 		}
 	}
-	active = false;
+	m_active = false;
 }
 
 void StepTimer::CancelCallback() noexcept
@@ -430,7 +430,7 @@ void StepTimer::CancelCallback() noexcept
 	else
 	{
 		reply.lcatf("Next step interrupt due in %" PRIu32 " ticks, %s",
-					pst->whenDue - GetTimerTicks(),
+					pst->m_whenDue - GetTimerTicks(),
 #if SAME5x
 					((StepTc->INTENSET.reg & TC_INTFLAG_MC0) == 0)
 #elif SAME70 || SAM4E || SAM4S
@@ -443,7 +443,7 @@ void StepTimer::CancelCallback() noexcept
 #elif SAM4E
 		if (STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RB != pst->whenDue)
 #elif SAME70 || SAM4S
-		if (STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RB != (uint16_t)pst->whenDue)
+		if (STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RB != (uint16_t)pst->m_whenDue)
 #endif
 		{
 			reply.cat(", CC0 mismatch!!");

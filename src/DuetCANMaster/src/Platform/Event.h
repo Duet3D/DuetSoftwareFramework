@@ -97,13 +97,14 @@ class Event
 		  const char* _ecv_array format,
 		  va_list vargs) noexcept;
 
-	Event* _ecv_null next;			// next event in a linked list
-	uint16_t param;					// details about the event, e.g. for a heater fault it is the type of the fault
-	EventType type;					// what type of event it is
-	CanAddress boardAddress;		// which board it came from
-	uint8_t deviceNumber;			// which device raised it, e.g. heater number, driver number, trigger number
-	volatile bool isBeingProcessed; // true if this event is being processed, so it must remain at the head of the queue
-	String<50> text;				// additional info to display to the user
+	Event* _ecv_null m_next;   // next event in a linked list
+	uint16_t m_param;		   // details about the event, e.g. for a heater fault it is the type of the fault
+	EventType m_type;		   // what type of event it is
+	CanAddress m_boardAddress; // which board it came from
+	uint8_t m_deviceNumber;	   // which device raised it, e.g. heater number, driver number, trigger number
+	volatile bool
+		m_isBeingProcessed; // true if this event is being processed, so it must remain at the head of the queue
+	String<50> m_text;		// additional info to display to the user
 
 	static Event* _ecv_null eventsPending; // linked list of events waiting to be processed
 	static unsigned int eventsQueued;

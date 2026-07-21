@@ -167,13 +167,13 @@ class PwmPort : public IoPort
 
 	void AppendFullDetails(const StringRef& str) const noexcept;
 	void AppendFrequency(const StringRef& str) const noexcept; // append the frequency if the port is valid
-	void SetFrequency(PwmFrequency freq) noexcept { frequency = freq; }
-	PwmFrequency GetFrequency() const noexcept { return frequency; }
+	void SetFrequency(PwmFrequency freq) noexcept { m_frequency = freq; }
+	PwmFrequency GetFrequency() const noexcept { return m_frequency; }
 	void WriteAnalog(float pwm) const noexcept;
 	bool SupportsPwm() const noexcept;
 
   private:
-	PwmFrequency frequency;
+	PwmFrequency m_frequency;
 };
 
 #endif /* SRC_PORT_H_ */

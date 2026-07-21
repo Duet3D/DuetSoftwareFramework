@@ -76,7 +76,7 @@ void PrepParams::EnsureSpeedsSet() const noexcept
 		phase1EndSpeed = phase1StartSpeed + peakAcceleration * (motioncalc_t)phaseClocks[1];
 		phase5StartSpeed = (phaseClocks[4] == 0)
 							   ? topSpeed
-							   : topSpeed - (motioncalc_t)0.5 * jerk * msquare((motioncalc_t)phaseClocks[4]);
+							   : topSpeed - (motioncalc_t)0.5 * jerk * Msquare((motioncalc_t)phaseClocks[4]);
 		phase5EndSpeed = phase5StartSpeed + peakDeceleration * (motioncalc_t)phaseClocks[5];
 		speedsCalculated = true;
 	}
@@ -270,15 +270,15 @@ CanMessageBuffer* _ecv_null CanMotion::GetBuffer(const PrepParams& params, Drive
 									 ? 0.0
 									 : (float)((params.peakAcceleration * params.TotalAccelClocks() -
 												(motioncalc_t)0.5 * params.jerk *
-													(msquare((motioncalc_t)params.phaseClocks[0]) +
-													 msquare((motioncalc_t)params.phaseClocks[2]))) /
+													(Msquare((motioncalc_t)params.phaseClocks[0]) +
+													 Msquare((motioncalc_t)params.phaseClocks[2]))) /
 											   (params.TotalAccelClocks() * params.totalDistance));
 			move->deceleration = (params.TotalDecelClocks() <= 0)
 									 ? 0.0
 									 : (float)((-params.peakDeceleration * params.TotalDecelClocks() -
 												(motioncalc_t)0.5 * params.jerk *
-													(msquare((motioncalc_t)params.phaseClocks[4]) +
-													 msquare((motioncalc_t)params.phaseClocks[6]))) /
+													(Msquare((motioncalc_t)params.phaseClocks[4]) +
+													 Msquare((motioncalc_t)params.phaseClocks[6]))) /
 											   (params.TotalDecelClocks() * params.totalDistance));
 		}
 		else

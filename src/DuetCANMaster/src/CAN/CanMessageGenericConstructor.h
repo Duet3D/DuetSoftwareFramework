@@ -56,8 +56,8 @@ class CanMessageGenericConstructor
 	void InsertValue(const void* vp, size_t sz, size_t pos) THROWS(CanException);
 
 	const ParamDescriptor* const _ecv_array paramTable;
-	size_t dataLen;
-	CanMessageGeneric msg{};
+	size_t m_dataLen;
+	CanMessageGeneric m_msg{};
 };
 
 #endif

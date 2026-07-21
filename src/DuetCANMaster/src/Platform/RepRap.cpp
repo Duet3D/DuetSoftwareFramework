@@ -111,31 +111,31 @@ constexpr unsigned int stateSubTableNumber = 3; // section number of 'state' in 
 // Do nothing more in the constructor; put what you want in RepRap:Init()
 
 RepRap::RepRap() noexcept
-	: boardsSeq(0)
-	, directoriesSeq(0)
-	, fansSeq(0)
-	, heatSeq(0)
-	, inputsSeq(0)
-	, jobSeq(0)
-	, ledStripsSeq(0)
-	, moveSeq(0)
-	, globalSeq(0)
-	, networkSeq(0)
-	, sensorsSeq(0)
-	, spindlesSeq(0)
-	, stateSeq(0)
-	, toolsSeq(0)
-	, volumesSeq(0)
-	, lastWarningMillis(0)
-	, ticksInSpinState(0)
-	, heatTaskIdleTicks(0)
-	, beepFrequency(0)
-	, beepDuration(0)
-	, beepTimer(0)
-	, spinningModule(Module::numModules)
-	, stopped(false)
-	, active(false)
-	, processingConfig(true)
+	: m_boardsSeq(0)
+	, m_directoriesSeq(0)
+	, m_fansSeq(0)
+	, m_heatSeq(0)
+	, m_inputsSeq(0)
+	, m_jobSeq(0)
+	, m_ledStripsSeq(0)
+	, m_moveSeq(0)
+	, m_globalSeq(0)
+	, m_networkSeq(0)
+	, m_sensorsSeq(0)
+	, m_spindlesSeq(0)
+	, m_stateSeq(0)
+	, m_toolsSeq(0)
+	, m_volumesSeq(0)
+	, m_lastWarningMillis(0)
+	, m_ticksInSpinState(0)
+	, m_heatTaskIdleTicks(0)
+	, m_beepFrequency(0)
+	, m_beepDuration(0)
+	, m_beepTimer(0)
+	, m_spinningModule(Module::numModules)
+	, m_stopped(false)
+	, m_active(false)
+	, m_processingConfig(true)
 {
 	// Don't call constructors for other objects here
 }
@@ -144,17 +144,17 @@ void RepRap::Init() noexcept
 {
 	OutputBuffer::Init();
 
-	platform = new Platform();
+	m_platform = new Platform();
 #if HAS_SBC_INTERFACE
-	sbcInterface =
+	m_sbcInterface =
 		new SbcInterface(); // needs to be allocated early on Duet 2 so as to avoid using any of the last 64K of RAM
 #endif
 
 #if SUPPORT_CAN_EXPANSION
-	expansion = new ExpansionManager();
+	m_expansion = new ExpansionManager();
 #endif
 
-	platform->Init();
+	m_platform->Init();
 #if SUPPORT_CAN_EXPANSION
 	CanInterface::Init();
 #endif
@@ -212,11 +212,11 @@ void RepRap::Init() noexcept
 	}
 #endif
 
-	active = true; // must do this after we initialise the watchdog but before we start the network or call Spin(), else
-				   // the watchdog may time out
+	m_active = true; // must do this after we initialise the watchdog but before we start the network or call Spin(),
+					 // else the watchdog may time out
 
 	delay(100);						  // give the tick ISR time to collect voltage readings
-	platform->ResetVoltageMonitors(); // get rid of the spurious zero minimum voltage readings
+	m_platform->ResetVoltageMonitors(); // get rid of the spurious zero minimum voltage readings
 
 #if 0 // DEBUG
 #  if !SAME70
@@ -225,7 +225,7 @@ void RepRap::Init() noexcept
 	delay(5000);										// give me time to connect YAT before much else happens
 #endif
 
-	platform->MessageF(UsbMessage, "%s\n", VersionText);
+	m_platform->MessageF(UsbMessage, "%s\n", VersionText);
 
 #if HAS_SBC_INTERFACE
 #  if defined(DUET_NG)
@@ -233,47 +233,47 @@ void RepRap::Init() noexcept
 	platform->EnablePanelDuePort();
 #  endif
 
-	sbcInterface->Init();
+	m_sbcInterface->Init();
 
 	// Keep spinning until the SBC connects
-	while (!sbcInterface->IsConnected())
+	while (!m_sbcInterface->IsConnected())
 	{
 		Spin();
 	}
 #endif
-	processingConfig = false;
+	m_processingConfig = false;
 
-	platform->MessageF(UsbMessage, "%s is up and running.\n", FIRMWARE_NAME);
+	m_platform->MessageF(UsbMessage, "%s is up and running.\n", FIRMWARE_NAME);
 
-	fastLoop = UINT32_MAX;
-	slowLoop = 0;
+	m_fastLoop = UINT32_MAX;
+	m_slowLoop = 0;
 }
 
 void RepRap::Exit() noexcept
 {
-	active = false;
-	platform->Exit();
+	m_active = false;
+	m_platform->Exit();
 }
 
 void RepRap::Spin() noexcept
 {
-	if (!active)
+	if (!m_active)
 	{
 		return;
 	}
 
-	ticksInSpinState = 0;
-	spinningModule = Module::Platform;
-	platform->Spin();
+	m_ticksInSpinState = 0;
+	m_spinningModule = Module::Platform;
+	m_platform->Spin();
 
 #if SUPPORT_CAN_EXPANSION
-	ticksInSpinState = 0;
-	spinningModule = Module::Expansion;
-	expansion->Spin();
+	m_ticksInSpinState = 0;
+	m_spinningModule = Module::Expansion;
+	m_expansion->Spin();
 #endif
 
-	ticksInSpinState = 0;
-	spinningModule = Module::numModules;
+	m_ticksInSpinState = 0;
+	m_spinningModule = Module::numModules;
 
 	RTOSIface::Yield();
 }
@@ -294,8 +294,8 @@ void RepRap::EmergencyStop() noexcept
 	Duet3Ate::PowerOffEUT();
 #endif
 
-	stopped = true; // a useful side effect of setting this is that it prevents Platform::Tick being called, which is
-					// needed when loading IAP into RAM
+	m_stopped = true; // a useful side effect of setting this is that it prevents Platform::Tick being called, which is
+					  // needed when loading IAP into RAM
 
 	// Do not turn off ATX power here. If the nozzles are still hot, don't risk melting any surrounding parts by turning
 	// fans off.
@@ -304,14 +304,14 @@ void RepRap::EmergencyStop() noexcept
 #if SUPPORT_CAN_EXPANSION
 
 	{
-		expansion->EmergencyStop();
+		m_expansion->EmergencyStop();
 	}
 #endif
 }
 
 void RepRap::ClearDebug() noexcept
 {
-	for (DebugFlags& dm : debugMaps)
+	for (DebugFlags& dm : m_debugMaps)
 	{
 		dm.Clear();
 	}
@@ -320,7 +320,7 @@ void RepRap::ClearDebug() noexcept
 void RepRap::Tick() noexcept
 {
 	// Kicking the watchdog before it has been initialised may trigger it!
-	if (active)
+	if (m_active)
 	{
 		WatchdogReset(); // kick the watchdog
 
@@ -328,14 +328,14 @@ void RepRap::Tick() noexcept
 		WatchdogResetSecondary(); // kick the secondary watchdog
 #endif
 
-		if (!stopped)
+		if (!m_stopped)
 		{
-			platform->Tick();
-			++ticksInSpinState;
-			if (ticksInSpinState >=
+			m_platform->Tick();
+			++m_ticksInSpinState;
+			if (m_ticksInSpinState >=
 				MaxMainTaskTicksInSpinState) // if we stall for 20 seconds, save diagnostic data and reset
 			{
-				stopped = true;
+				m_stopped = true;
 
 				// Save the stack of the stuck task when we get stuck in a spin loop
 				const uint32_t* _ecv_array relevantStackPtr = nullptr;
@@ -386,7 +386,7 @@ void RepRap::Tick() noexcept
 					relevantStackPtr += 8; // skip r4-r11
 #endif
 				}
-				SoftwareReset(SoftwareResetReason::stuckInSpin, relevantStackPtr);
+				SoftwareReset(SoftwareResetReason::StuckInSpin, relevantStackPtr);
 			}
 		}
 	}
@@ -395,7 +395,7 @@ void RepRap::Tick() noexcept
 // Return true if we are close to timeout
 bool RepRap::SpinTimeoutImminent() const noexcept
 {
-	return ticksInSpinState >= HighMainTaskTicksInSpinState;
+	return m_ticksInSpinState >= HighMainTaskTicksInSpinState;
 }
 
 // Helper function for diagnostic tests in Platform.cpp, to cause a deliberate divide-by-zero
@@ -440,7 +440,7 @@ bool RepRap::SpinTimeoutImminent() const noexcept
 // Report an internal error
 void RepRap::ReportInternalError(c_string file, c_string func, int line) const noexcept
 {
-	platform->MessageF(ErrorMessage, "Internal Error in %s at %s(%d)\n", func, file, line);
+	m_platform->MessageF(ErrorMessage, "Internal Error in %s at %s(%d)\n", func, file, line);
 }
 
 // End

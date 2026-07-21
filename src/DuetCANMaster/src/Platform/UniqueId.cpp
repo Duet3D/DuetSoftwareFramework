@@ -10,7 +10,7 @@
 // Append the unique ID in character form to an output buffer
 void UniqueId::AppendCharsToBuffer(OutputBuffer* buf) const noexcept
 {
-	AppendCharsTo([buf](char c) -> void { buf->cat(c); });
+	AppendCharsTo([buf](char c) -> void { buf->Cat(c); });
 }
 
 // End

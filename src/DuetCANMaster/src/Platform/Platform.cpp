@@ -83,12 +83,12 @@ static_assert(NumDmaChannelsUsed <= NumDmaChannelsSupported, "Need more DMA chan
 
 float Platform::AdcReadingToPowerVoltage(uint16_t adcVal) const noexcept
 {
-	return (adcVal * powerMonitorVoltageRange) / (1u << AnalogIn::AdcBits);
+	return (adcVal * m_powerMonitorVoltageRange) / (1u << AnalogIn::AdcBits);
 }
 
 uint16_t Platform::PowerVoltageToAdcReading(float voltage) const noexcept
 {
-	return (uint16_t)((voltage * (1u << AnalogIn::AdcBits)) / powerMonitorVoltageRange);
+	return (uint16_t)((voltage * (1u << AnalogIn::AdcBits)) / m_powerMonitorVoltageRange);
 }
 
 #  else
@@ -150,15 +150,15 @@ bool Platform::deliberateError = false; // true if we deliberately caused an exc
 SharedSpiDevice* _ecv_null Platform::mainSharedSpiDevice = nullptr;
 
 Platform::Platform() noexcept
-	: board(DEFAULT_BOARD_TYPE)
-	, active(false)
-	, errorCodeBits(0)
-	, tickState(0)
-	, debugCode(0)
-	, lastDriverPollMillis(0)
+	: m_board(DEFAULT_BOARD_TYPE)
+	, m_active(false)
+	, m_errorCodeBits(0)
+	, m_tickState(0)
+	, m_debugCode(0)
+	, m_lastDriverPollMillis(0)
 	,
 #if SUPPORT_CAN_EXPANSION
-	whenLastCanMessageProcessed(0)
+	m_whenLastCanMessageProcessed(0)
 #endif
 {
 }
@@ -229,17 +229,17 @@ void Platform::Init() noexcept
 	SetBoardType();
 
 #if MCU_HAS_UNIQUE_ID
-	uniqueId.SetFromCurrentBoard();
+	m_uniqueId.SetFromCurrentBoard();
 #endif
 
 	// Real-time clock
-	realTime = 0;
+	m_realTime = 0;
 
 	// Turn off the RS485 transmitter
 #if defined(DUET3_MB6XD)
 	SetPinMode(ModbusTxPin, OUTPUT_LOW);
 #elif defined(DUET3_MB6HC)
-	if (board == BoardType::Duet3_6HC_v102c)
+	if (m_board == BoardType::Duet36HcV102c)
 	{
 		SetPinMode(ModbusTxPin, OUTPUT_LOW);
 	}
@@ -260,17 +260,17 @@ void Platform::Init() noexcept
 #endif
 
 #if HAS_VOLTAGE_MONITOR
-	autoSaveEnabled = false;
-	autoSaveState = AutoSaveState::starting;
+	m_autoSaveEnabled = false;
+	m_autoSaveState = AutoSaveState::Starting;
 #endif
 
 #if HAS_VREF_MONITOR
 	// Set up the VSSA and VREF measurement channels
 	SetPinMode(VssaSensePin, AIN);
-	filteredAdcChannels[VssaFilterIndex] =
+	m_filteredAdcChannels[VssaFilterIndex] =
 		PinToAdcChannel(VssaSensePin); // translate the pin number to the SAM ADC channel number
 	SetPinMode(VrefSensePin, AIN);
-	filteredAdcChannels[VrefFilterIndex] =
+	m_filteredAdcChannels[VrefFilterIndex] =
 		PinToAdcChannel(VrefSensePin); // translate the pin number to the SAM ADC channel number
 #endif
 
@@ -282,7 +282,7 @@ void Platform::Init() noexcept
 	AnalogIn::EnableTemperatureSensor(1, tcFilter.CallbackFeedIntoFilter, CallbackParameter(&tcFilter), 1, 0);
 	TemperatureCalibrationInit();
 #  else
-	filteredAdcChannels[CpuTempFilterIndex] =
+	m_filteredAdcChannels[CpuTempFilterIndex] =
 #	if SAM4E || SAM4S || SAME70
 		LegacyAnalogIn::
 #	endif
@@ -293,43 +293,43 @@ void Platform::Init() noexcept
 	// Initialise all the ADC filters and enable the corresponding ADC channels
 	for (size_t filter = 0; filter < NumAdcFilters; ++filter)
 	{
-		adcFilters[filter].Init(0);
-		AnalogInEnableChannel(filteredAdcChannels[filter], true);
+		m_adcFilters[filter].Init(0);
+		AnalogInEnableChannel(m_filteredAdcChannels[filter], true);
 	}
 
 	// Hotend configuration
-	filamentWidth = FILAMENT_WIDTH;
+	m_filamentWidth = FILAMENT_WIDTH;
 
 #if HAS_CPU_TEMP_SENSOR
 	// MCU temperature monitoring
-	highestMcuTemperature = -273.0; // the highest temperature we have seen
-	lowestMcuTemperature = 2000.0;	// the lowest temperature we have seen
-	mcuTemperatureAdjust = 0.0;
+	m_highestMcuTemperature = -273.0; // the highest temperature we have seen
+	m_lowestMcuTemperature = 2000.0;  // the lowest temperature we have seen
+	m_mcuTemperatureAdjust = 0.0;
 #endif
 
 #if HAS_VOLTAGE_MONITOR
 	// Power monitoring
-	vInMonitorAdcChannel = PinToAdcChannel(PowerMonitorVinDetectPin);
+	m_vInMonitorAdcChannel = PinToAdcChannel(PowerMonitorVinDetectPin);
 	SetPinMode(PowerMonitorVinDetectPin, AIN);
-	AnalogInEnableChannel(vInMonitorAdcChannel, true);
-	currentVin = 0;
-	highestVin = 0;
-	lowestVin = 9999;
-	numVinUnderVoltageEvents = 0;
-	previousVinUnderVoltageEvents = 0;
-	numVinOverVoltageEvents = 0;
-	previousVinOverVoltageEvents = 0;
+	AnalogInEnableChannel(m_vInMonitorAdcChannel, true);
+	m_currentVin = 0;
+	m_highestVin = 0;
+	m_lowestVin = 9999;
+	m_numVinUnderVoltageEvents = 0;
+	m_previousVinUnderVoltageEvents = 0;
+	m_numVinOverVoltageEvents = 0;
+	m_previousVinOverVoltageEvents = 0;
 #endif
 
 #if HAS_12V_MONITOR
 	// Power monitoring
-	v12MonitorAdcChannel = PinToAdcChannel(PowerMonitorV12DetectPin);
+	m_v12MonitorAdcChannel = PinToAdcChannel(PowerMonitorV12DetectPin);
 	SetPinMode(PowerMonitorV12DetectPin, AIN);
-	AnalogInEnableChannel(v12MonitorAdcChannel, true);
-	currentV12 = 0;
-	highestV12 = 0;
-	lowestV12 = 9999;
-	numV12UnderVoltageEvents = previousV12UnderVoltageEvents = 0;
+	AnalogInEnableChannel(m_v12MonitorAdcChannel, true);
+	m_currentV12 = 0;
+	m_highestV12 = 0;
+	m_lowestV12 = 9999;
+	m_numV12UnderVoltageEvents = m_previousV12UnderVoltageEvents = 0;
 #endif
 
 	// Kick everything off
@@ -338,7 +338,7 @@ void Platform::Init() noexcept
 #ifdef DUET_NG
 	DuetExpansion::DueXnTaskInit(); // must initialise interrupt priorities before calling this
 #endif
-	active = true;
+	m_active = true;
 }
 
 #if HAS_VOLTAGE_MONITOR
@@ -346,18 +346,18 @@ void Platform::Init() noexcept
 // Reset the min and max recorded voltages to the current values
 void Platform::ResetVoltageMonitors() noexcept
 {
-	lowestVin = currentVin;
-	highestVin = currentVin;
+	m_lowestVin = m_currentVin;
+	m_highestVin = m_currentVin;
 
 #  if HAS_12V_MONITOR
-	lowestV12 = currentV12;
-	highestV12 = currentV12;
+	m_lowestV12 = m_currentV12;
+	m_highestV12 = m_currentV12;
 #  endif
 }
 
 float Platform::GetVinVoltage() const noexcept
 {
-	return AdcReadingToPowerVoltage(currentVin);
+	return AdcReadingToPowerVoltage(m_currentVin);
 }
 
 #endif
@@ -365,19 +365,19 @@ float Platform::GetVinVoltage() const noexcept
 void Platform::Exit() noexcept
 {
 	// Stop processing data. Don't try to send a message because it will probably never get there.
-	active = false;
+	m_active = false;
 }
 
 void Platform::Spin() noexcept
 {
-	if (!active)
+	if (!m_active)
 	{
 		return;
 	}
 
 #if SUPPORT_CAN_EXPANSION
 	// Turn off the ACT LED if it is time to do so
-	if (millis() - whenLastCanMessageProcessed > ActLedFlashTime)
+	if (millis() - m_whenLastCanMessageProcessed > ActLedFlashTime)
 	{
 		digitalWrite(ActLedPin, !ActOnPolarity);
 	}
@@ -397,17 +397,17 @@ void Platform::Spin() noexcept
 #  if SAME5x
 	if (tcFilter.IsValid() && tpFilter.IsValid())
 #  else
-	if (adcFilters[CpuTempFilterIndex].IsValid())
+	if (m_adcFilters[CpuTempFilterIndex].IsValid())
 #  endif
 	{
 		const float currentMcuTemperature = GetCpuTemperature();
-		if (currentMcuTemperature > highestMcuTemperature)
+		if (currentMcuTemperature > m_highestMcuTemperature)
 		{
-			highestMcuTemperature = currentMcuTemperature;
+			m_highestMcuTemperature = currentMcuTemperature;
 		}
-		if (currentMcuTemperature < lowestMcuTemperature)
+		if (currentMcuTemperature < m_lowestMcuTemperature)
 		{
-			lowestMcuTemperature = currentMcuTemperature;
+			m_lowestMcuTemperature = currentMcuTemperature;
 		}
 	}
 #endif
@@ -416,7 +416,7 @@ void Platform::Spin() noexcept
 	// Can this be handled by the SBC?
 
 	// Diagnostics test
-	if (debugCode == (unsigned int)DiagnosticTestType::TestSpinLockup)
+	if (m_debugCode == (unsigned int)DiagnosticTestType::TestSpinLockup)
 	{
 		delay(30000);
 	}
@@ -424,11 +424,11 @@ void Platform::Spin() noexcept
 	const uint32_t now = millis();
 
 	// Update the time
-	if (IsDateTimeSet() && now - timeLastUpdatedMillis >= 1000)
+	if (IsDateTimeSet() && now - m_timeLastUpdatedMillis >= 1000)
 	{
-		++realTime; // this assumes that time_t is a seconds-since-epoch counter, which is not guaranteed by the C
-					// standard
-		timeLastUpdatedMillis += 1000;
+		++m_realTime; // this assumes that time_t is a seconds-since-epoch counter, which is not guaranteed by the C
+					  // standard
+		m_timeLastUpdatedMillis += 1000;
 	}
 }
 
@@ -436,29 +436,29 @@ void Platform::Spin() noexcept
 
 void Platform::DisableAutoSave() noexcept
 {
-	autoSaveEnabled = false;
+	m_autoSaveEnabled = false;
 }
 
 bool Platform::IsPowerOk() const noexcept
 {
-	return !autoSaveEnabled || currentVin > autoPauseReading;
+	return !m_autoSaveEnabled || m_currentVin > m_autoPauseReading;
 }
 
 void Platform::EnableAutoSave(float saveVoltage, float resumeVoltage) noexcept
 {
-	autoPauseReading = PowerVoltageToAdcReading(saveVoltage);
-	autoResumeReading = PowerVoltageToAdcReading(resumeVoltage);
-	autoSaveEnabled = true;
+	m_autoPauseReading = PowerVoltageToAdcReading(saveVoltage);
+	m_autoResumeReading = PowerVoltageToAdcReading(resumeVoltage);
+	m_autoSaveEnabled = true;
 }
 
 bool Platform::GetAutoSaveSettings(float& saveVoltage, float& resumeVoltage) noexcept
 {
-	if (autoSaveEnabled)
+	if (m_autoSaveEnabled)
 	{
-		saveVoltage = AdcReadingToPowerVoltage(autoPauseReading);
-		resumeVoltage = AdcReadingToPowerVoltage(autoResumeReading);
+		saveVoltage = AdcReadingToPowerVoltage(m_autoPauseReading);
+		resumeVoltage = AdcReadingToPowerVoltage(m_autoResumeReading);
 	}
-	return autoSaveEnabled;
+	return m_autoSaveEnabled;
 }
 
 #endif
@@ -478,12 +478,12 @@ float Platform::GetCpuTemperature() const noexcept
 	result = (divisor == 0) ? 0 : result / divisor;
 	return (float)result / 16 + mcuTemperatureAdjust;
 #  else
-	const float voltage = (float)adcFilters[CpuTempFilterIndex].GetSum() *
+	const float voltage = (float)m_adcFilters[CpuTempFilterIndex].GetSum() *
 						  (3.3 / (float)((1u << AnalogIn::AdcBits) * ThermistorAverageReadings));
 #	if SAM4E || SAM4S
 	return (voltage - 1.44) * (1000.0 / 4.7) + 27.0 + mcuTemperatureAdjust; // accuracy at 27C is +/-13C
 #	elif SAME70
-	return (voltage - 0.72) * (1000.0 / 2.33) + 25.0 + mcuTemperatureAdjust; // accuracy at 25C is +/-34C
+	return (voltage - 0.72) * (1000.0 / 2.33) + 25.0 + m_mcuTemperatureAdjust; // accuracy at 25C is +/-34C
 #	else
 #	  error undefined CPU temp conversion
 #	endif
@@ -588,8 +588,8 @@ void Platform::InitialiseInterrupts() noexcept
 #endif
 
 	// Tick interrupt for ADC conversions
-	tickState = 0;
-	currentFilterNumber = 0;
+	m_tickState = 0;
+	m_currentFilterNumber = 0;
 }
 
 //*************************************************************************************************
@@ -714,7 +714,7 @@ void Platform::Diagnostics(unsigned int part, const StringRef& reply) noexcept
 	case 3:
 		// Show the current error codes
 		reply.printf("Error status: 0x%02" PRIx32,
-					 errorCodeBits); // we only use the bottom 5 bits at present, so print just 2 characters
+					 m_errorCodeBits); // we only use the bottom 5 bits at present, so print just 2 characters
 		break;
 
 	case 4:
@@ -723,10 +723,10 @@ void Platform::Diagnostics(unsigned int part, const StringRef& reply) noexcept
 		{
 			const float currentMcuTemperature = GetCpuTemperature();
 			reply.lcatf("MCU temperature: min %.1f, current %.1f, max %.1f",
-						(double)lowestMcuTemperature,
+						(double)m_lowestMcuTemperature,
 						(double)currentMcuTemperature,
-						(double)highestMcuTemperature);
-			lowestMcuTemperature = highestMcuTemperature = currentMcuTemperature;
+						(double)m_highestMcuTemperature);
+			m_lowestMcuTemperature = m_highestMcuTemperature = currentMcuTemperature;
 #  if HAS_VOLTAGE_MONITOR
 			// No need to call reprap.BoardsUpdated() here because that is done in ResetVoltageMonitors which is called
 			// later
@@ -740,20 +740,20 @@ void Platform::Diagnostics(unsigned int part, const StringRef& reply) noexcept
 		// Show the supply voltage
 		reply.lcatf("Supply voltage: min %.1f, current %.1f, max %.1f, under voltage events: %" PRIu32
 					", over voltage events: %" PRIu32 "",
-					(double)AdcReadingToPowerVoltage(lowestVin),
-					(double)AdcReadingToPowerVoltage(currentVin),
-					(double)AdcReadingToPowerVoltage(highestVin),
-					numVinUnderVoltageEvents.load(),
-					numVinOverVoltageEvents.load());
+					(double)AdcReadingToPowerVoltage(m_lowestVin),
+					(double)AdcReadingToPowerVoltage(m_currentVin),
+					(double)AdcReadingToPowerVoltage(m_highestVin),
+					m_numVinUnderVoltageEvents.load(),
+					m_numVinOverVoltageEvents.load());
 #endif
 
 #if HAS_12V_MONITOR
 		// Show the 12V rail voltage
 		reply.lcatf("12V rail voltage: min %.1f, current %.1f, max %.1f, under voltage events: %" PRIu32,
-					(double)AdcReadingToV12Voltage(lowestV12),
-					(double)AdcReadingToV12Voltage(currentV12),
-					(double)AdcReadingToV12Voltage(highestV12),
-					numV12UnderVoltageEvents.load());
+					(double)AdcReadingToV12Voltage(m_lowestV12),
+					(double)AdcReadingToV12Voltage(m_currentV12),
+					(double)AdcReadingToV12Voltage(m_highestV12),
+					m_numV12UnderVoltageEvents.load());
 #endif
 		ResetVoltageMonitors();
 		break;
@@ -769,7 +769,7 @@ void Platform::Diagnostics(unsigned int part, const StringRef& reply) noexcept
 			struct tm timeInfo
 			{
 			};
-			if (gmtime_r(&realTime, &timeInfo) != nullptr)
+			if (gmtime_r(&m_realTime, &timeInfo) != nullptr)
 			{
 				reply.catf("%04u-%02u-%02u %02u:%02u:%02u",
 						   timeInfo.tm_year + 1900,
@@ -1009,15 +1009,15 @@ void Platform::DebugMessage(const char* _ecv_array fmt, va_list vargs) noexcept 
 	delayMicroseconds(20); // give the pullup resistor time to work
 	if (digitalRead(DIRECTION_PINS[2]))
 	{
-		return (digitalRead(DIRECTION_PINS[0])) ? BoardType::Duet3_6HC_v101 : BoardType::Duet3_6HC_v06_100;
+		return (digitalRead(DIRECTION_PINS[0])) ? BoardType::Duet36HcV101 : BoardType::Duet36HcV06100;
 	}
 	else if (digitalRead(DIRECTION_PINS[0]))
 	{
-		return BoardType::Duet3_6HC_v102;
+		return BoardType::Duet36HcV102;
 	}
 	else
 	{
-		return (digitalRead(DIRECTION_PINS[3])) ? BoardType::Duet3_6HC_v102b : BoardType::Duet3_6HC_v102c;
+		return (digitalRead(DIRECTION_PINS[3])) ? BoardType::Duet36HcV102b : BoardType::Duet36HcV102c;
 	}
 }
 
@@ -1036,9 +1036,9 @@ void Platform::DebugMessage(const char* _ecv_array fmt, va_list vargs) noexcept 
 	delayMicroseconds(20); // give the pullup resistor time to work
 	if (digitalRead(DIRECTION_PINS[5]))
 	{
-		return (digitalRead(DIRECTION_PINS[0])) ? BoardType::Duet3_6XD_v01 : BoardType::Duet3_6XD_v100;
+		return (digitalRead(DIRECTION_PINS[0])) ? BoardType::Duet36XdV01 : BoardType::Duet36XdV100;
 	}
-	return (digitalRead(DIRECTION_PINS[1])) ? BoardType::Duet3_6XD_v101 : BoardType::Duet3_6XD_v102;
+	return (digitalRead(DIRECTION_PINS[1])) ? BoardType::Duet36XdV101 : BoardType::Duet36XdV102;
 }
 
 #endif
@@ -1056,25 +1056,25 @@ void Platform::SetBoardType() noexcept
 				? ((digitalRead(DIRECTION_PINS[2])) ? BoardType::Duet3Mini_WiFi : BoardType::Duet3Mini_WiFi_ESP32)
 				: BoardType::Duet3Mini_Ethernet;
 #elif defined(DUET3_MB6HC)
-	board = GetMB6HCBoardType();
-	if (board >= BoardType::Duet3_6HC_v102)
+	m_board = GetMB6HCBoardType();
+	if (m_board >= BoardType::Duet36HcV102)
 	{
-		powerMonitorVoltageRange = PowerMonitorVoltageRange_v102;
+		m_powerMonitorVoltageRange = PowerMonitorVoltageRange_v102;
 		DiagPin = DiagPin102;
 		ActLedPin = ActLedPin102;
 		DiagOnPolarity = DiagOnPolarity102;
 	}
 	else
 	{
-		powerMonitorVoltageRange = PowerMonitorVoltageRange_v101;
+		m_powerMonitorVoltageRange = PowerMonitorVoltageRange_v101;
 		DiagPin = DiagPinPre102;
 		ActLedPin = ActLedPinPre102;
 		DiagOnPolarity = DiagOnPolarityPre102;
 	}
-	driverPowerOnAdcReading = PowerVoltageToAdcReading(10.0);
-	driverPowerOffAdcReading = PowerVoltageToAdcReading(9.5);
+	m_driverPowerOnAdcReading = PowerVoltageToAdcReading(10.0);
+	m_driverPowerOffAdcReading = PowerVoltageToAdcReading(9.5);
 #elif defined(DUET3_MB6XD)
-	board = GetMB6XDBoardType();
+	m_board = GetMB6XDBoardType();
 #elif defined(FMDC_V03)
 	board = BoardType::FMDC;
 #elif defined(DUET_NG)
@@ -1122,7 +1122,7 @@ void Platform::SetBoardType() noexcept
 // Get a string describing the electronics
 const char* _ecv_array Platform::GetElectronicsString() const noexcept
 {
-	switch (board)
+	switch (m_board)
 	{
 #if defined(DUET3MINI_V04)
 	case BoardType::Duet3Mini_Unknown:
@@ -1134,24 +1134,24 @@ const char* _ecv_array Platform::GetElectronicsString() const noexcept
 	case BoardType::Duet3Mini_WiFi_ESP32:
 		return "Duet 3 " BOARD_SHORT_NAME " WiFi 1.03 or later";
 #elif defined(DUET3_MB6HC)
-	case BoardType::Duet3_6HC_v06_100:
+	case BoardType::Duet36HcV06100:
 		return "Duet 3 " BOARD_SHORT_NAME " v1.0 or earlier";
-	case BoardType::Duet3_6HC_v101:
+	case BoardType::Duet36HcV101:
 		return "Duet 3 " BOARD_SHORT_NAME " v1.01";
-	case BoardType::Duet3_6HC_v102:
+	case BoardType::Duet36HcV102:
 		return "Duet 3 " BOARD_SHORT_NAME " v1.02 or 1.02a";
-	case BoardType::Duet3_6HC_v102b:
+	case BoardType::Duet36HcV102b:
 		return "Duet 3 " BOARD_SHORT_NAME " v1.02b";
-	case BoardType::Duet3_6HC_v102c:
+	case BoardType::Duet36HcV102c:
 		return "Duet 3 " BOARD_SHORT_NAME " v1.02c or later";
 #elif defined(DUET3_MB6XD)
-	case BoardType::Duet3_6XD_v01:
+	case BoardType::Duet36XdV01:
 		return "Duet 3 " BOARD_SHORT_NAME " v0.1";
-	case BoardType::Duet3_6XD_v100:
+	case BoardType::Duet36XdV100:
 		return "Duet 3 " BOARD_SHORT_NAME " v1.0";
-	case BoardType::Duet3_6XD_v101:
+	case BoardType::Duet36XdV101:
 		return "Duet 3 " BOARD_SHORT_NAME " v1.01";
-	case BoardType::Duet3_6XD_v102:
+	case BoardType::Duet36XdV102:
 		return "Duet 3 " BOARD_SHORT_NAME " v1.02 or later";
 #elif defined(FMDC_V03)
 	case BoardType::FMDC:
@@ -1190,7 +1190,7 @@ const char* _ecv_array Platform::GetElectronicsString() const noexcept
 // Get the board string
 const char* _ecv_array Platform::GetBoardString() const noexcept
 {
-	switch (board)
+	switch (m_board)
 	{
 #if defined(DUET3MINI_V04)
 	case BoardType::Duet3Mini_Unknown:
@@ -1202,22 +1202,22 @@ const char* _ecv_array Platform::GetBoardString() const noexcept
 	case BoardType::Duet3Mini_Ethernet:
 		return "duet5lcethernet";
 #elif defined(DUET3_MB6HC)
-	case BoardType::Duet3_6HC_v06_100:
+	case BoardType::Duet36HcV06100:
 		return "duet3mb6hc100";
-	case BoardType::Duet3_6HC_v101:
+	case BoardType::Duet36HcV101:
 		return "duet3mb6hc101";
-	case BoardType::Duet3_6HC_v102:
+	case BoardType::Duet36HcV102:
 		return "duet3mb6hc102";
-	case BoardType::Duet3_6HC_v102b:
+	case BoardType::Duet36HcV102b:
 		return "duet3mb6hc102b";
 #elif defined(DUET3_MB6XD)
-	case BoardType::Duet3_6XD_v01:
+	case BoardType::Duet36XdV01:
 		return "duet3mb6xd001";
-	case BoardType::Duet3_6XD_v100:
+	case BoardType::Duet36XdV100:
 		return "duet3mb6xd100";
-	case BoardType::Duet3_6XD_v101:
+	case BoardType::Duet36XdV101:
 		return "duet3mb6xd101";
-	case BoardType::Duet3_6XD_v102:
+	case BoardType::Duet36XdV102:
 		return "duet3mb6xd102";
 #elif defined(FMDC_V03)
 	case BoardType::FMDC:
@@ -1309,7 +1309,7 @@ const char* _ecv_array Platform::GetDefaultWiFiFirmwareName() noexcept
 
 ReadLockedPointer<const char> ConfigurableFolder::GetLockedPointer() const noexcept
 {
-	return {lock, GetUnlockedPointer()};
+	return {m_lock, GetUnlockedPointer()};
 }
 
 #endif
@@ -1318,7 +1318,7 @@ ReadLockedPointer<const char> ConfigurableFolder::GetLockedPointer() const noexc
 
 void ConfigurableFolder::AppendToString(const StringRef& path) const noexcept
 {
-	const ReadLocker locker(lock);
+	const ReadLocker locker(m_lock);
 	path.cat(GetUnlockedPointer());
 }
 
@@ -1330,9 +1330,9 @@ void ConfigurableFolder::AppendToString(const StringRef& path) const noexcept
 MinCurMax Platform::GetMcuTemperatures() const noexcept
 {
 	MinCurMax result{};
-	result.minimum = lowestMcuTemperature;
+	result.minimum = m_lowestMcuTemperature;
 	result.current = GetCpuTemperature();
-	result.maximum = highestMcuTemperature;
+	result.maximum = m_highestMcuTemperature;
 	return result;
 }
 
@@ -1344,15 +1344,15 @@ MinCurMax Platform::GetMcuTemperatures() const noexcept
 MinCurMax Platform::GetPowerVoltages() const noexcept
 {
 	MinCurMax result{};
-	result.minimum = AdcReadingToPowerVoltage(lowestVin);
-	result.current = AdcReadingToPowerVoltage(currentVin);
-	result.maximum = AdcReadingToPowerVoltage(highestVin);
+	result.minimum = AdcReadingToPowerVoltage(m_lowestVin);
+	result.current = AdcReadingToPowerVoltage(m_currentVin);
+	result.maximum = AdcReadingToPowerVoltage(m_highestVin);
 	return result;
 }
 
 float Platform::GetCurrentPowerVoltage() const noexcept
 {
-	return AdcReadingToPowerVoltage(currentVin);
+	return AdcReadingToPowerVoltage(m_currentVin);
 }
 
 #endif
@@ -1362,15 +1362,15 @@ float Platform::GetCurrentPowerVoltage() const noexcept
 MinCurMax Platform::GetV12Voltages() const noexcept
 {
 	MinCurMax result{};
-	result.minimum = AdcReadingToV12Voltage(lowestV12);
-	result.current = AdcReadingToV12Voltage(currentV12);
-	result.maximum = AdcReadingToV12Voltage(highestV12);
+	result.minimum = AdcReadingToV12Voltage(m_lowestV12);
+	result.current = AdcReadingToV12Voltage(m_currentV12);
+	result.maximum = AdcReadingToV12Voltage(m_highestV12);
 	return result;
 }
 
 float Platform::GetCurrentV12Voltage() const noexcept
 {
-	return AdcReadingToV12Voltage(currentV12);
+	return AdcReadingToV12Voltage(m_currentV12);
 }
 
 #endif
@@ -1385,7 +1385,7 @@ bool Platform::SetDateTime(time_t tim) noexcept
 	const bool ok = (gmtime_r(&tim, &brokenDateTime) != nullptr);
 	if (ok)
 	{
-		realTime = tim; // set the date and time
+		m_realTime = tim; // set the date and time
 
 		// Write a log message, giving the time since power up in same format as the logger does
 		const auto timeSincePowerUp = (uint32_t)(millis64() / 1000u);
@@ -1394,7 +1394,7 @@ bool Platform::SetDateTime(time_t tim) noexcept
 				 timeSincePowerUp / 3600u,
 				 (timeSincePowerUp % 3600u) / 60u,
 				 timeSincePowerUp % 60u);
-		timeLastUpdatedMillis = millis();
+		m_timeLastUpdatedMillis = millis();
 	}
 	return ok;
 }
@@ -1404,7 +1404,7 @@ bool Platform::SetDateTime(time_t tim) noexcept
 // Call this when we have processed a message, other than regular broadcast messages. It causes the ACT LED to flash.
 void Platform::OnProcessingCanMessage() noexcept
 {
-	whenLastCanMessageProcessed = millis();
+	m_whenLastCanMessageProcessed = millis();
 	digitalWrite(ActLedPin, ActOnPolarity); // turn the ACT LED on
 }
 
@@ -1415,7 +1415,7 @@ void Platform::OnProcessingCanMessage() noexcept
 // Get a pseudo-random number (not a true random number)
 uint32_t Platform::Random() noexcept
 {
-	return StepTimer::GetTimerTicks() ^ uniqueId.GetHash();
+	return StepTimer::GetTimerTicks() ^ m_uniqueId.GetHash();
 }
 
 #endif
@@ -1500,32 +1500,32 @@ void Platform::Tick() noexcept
 #endif
 
 #if HAS_VOLTAGE_MONITOR || HAS_12V_MONITOR
-	if (tickState != 0)
+	if (m_tickState != 0)
 	{
 #  if HAS_VOLTAGE_MONITOR
 		// Read the power input voltage
-		currentVin = AnalogInReadChannel(vInMonitorAdcChannel);
-		if (currentVin > highestVin)
+		m_currentVin = AnalogInReadChannel(m_vInMonitorAdcChannel);
+		if (m_currentVin > m_highestVin)
 		{
-			highestVin = currentVin;
+			m_highestVin = m_currentVin;
 		}
-		if (currentVin < lowestVin ||
+		if (m_currentVin < m_lowestVin ||
 			millis64() < 1000) // don't record the lowest VIN voltage while we are still powering up
 		{
-			lowestVin = currentVin;
+			m_lowestVin = m_currentVin;
 		}
 #  endif
 
 #  if HAS_12V_MONITOR
-		currentV12 = AnalogInReadChannel(v12MonitorAdcChannel);
-		if (currentV12 > highestV12)
+		m_currentV12 = AnalogInReadChannel(m_v12MonitorAdcChannel);
+		if (m_currentV12 > m_highestV12)
 		{
-			highestV12 = currentV12;
+			m_highestV12 = m_currentV12;
 		}
-		if (currentV12 < lowestV12 ||
+		if (m_currentV12 < m_lowestV12 ||
 			millis64() < 1000) // don't record the lowest V12 voltage while we are still powering up
 		{
-			lowestV12 = currentV12;
+			m_lowestV12 = m_currentV12;
 		}
 #  endif
 	}
@@ -1534,30 +1534,30 @@ void Platform::Tick() noexcept
 #if SAME70
 	// The SAME70 ADC is noisy, so read a thermistor on every tick so that we can average a greater number of readings
 	// Because we are in the tick ISR and no other ISR reads the averaging filter, we can cast away 'volatile' here.
-	if (tickState != 0)
+	if (m_tickState != 0)
 	{
 		auto& currentFilter =
 			// that is written from the ADC callback and read here
 			// NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast) - drops volatile on an ADC filter
-			const_cast<ThermistorAveragingFilter&>(adcFilters[currentFilterNumber]); // cast away 'volatile'
-		currentFilter.ProcessReading(AnalogInReadChannel(filteredAdcChannels[currentFilterNumber]));
+			const_cast<ThermistorAveragingFilter&>(m_adcFilters[m_currentFilterNumber]); // cast away 'volatile'
+		currentFilter.ProcessReading(AnalogInReadChannel(m_filteredAdcChannels[m_currentFilterNumber]));
 
-		++currentFilterNumber;
-		if (currentFilterNumber == NumAdcFilters)
+		++m_currentFilterNumber;
+		if (m_currentFilterNumber == NumAdcFilters)
 		{
-			currentFilterNumber = 0;
+			m_currentFilterNumber = 0;
 		}
 	}
 #endif
 
-	tickState = 1;
+	m_tickState = 1;
 
 #if SAME70
 	// On Duet 3, AFEC1 is used only for thermistors and associated Vref/Vssa monitoring. AFEC0 is used for everything
 	// else. To reduce noise, we use x16 hardware averaging on AFEC0 and x256 on AFEC1. This is hard coded in file
 	// AnalogIn.cpp in project CoreNG. There is enough time to convert all AFEC0 channels in one tick, but only one
 	// AFEC1 channel because of the higher averaging.
-	LegacyAnalogIn::AnalogInStartConversion(0x0FFF | (1u << (uint8_t)filteredAdcChannels[currentFilterNumber]));
+	LegacyAnalogIn::AnalogInStartConversion(0x0FFF | (1u << (uint8_t)m_filteredAdcChannels[m_currentFilterNumber]));
 #elif !SAME5x
 	LegacyAnalogIn::AnalogInStartConversion();
 #endif

@@ -36,7 +36,7 @@ class ExpansionManager
   public:
 	ExpansionManager() noexcept;
 
-	unsigned int GetNumExpansionBoards() const noexcept { return numExpansionBoards; }
+	unsigned int GetNumExpansionBoards() const noexcept { return m_numExpansionBoards; }
 	const ExpansionBoardData* _ecv_null GetBoardDetails(uint8_t address) const noexcept;
 
 	void ProcessAnnouncement(CanMessageBuffer& buf, bool isNewFormat) noexcept;
@@ -49,7 +49,7 @@ class ExpansionManager
 
 	void UpdateFinished(CanAddress address) noexcept;
 	void UpdateFailed(CanAddress address) noexcept;
-	bool IsFlashing() const noexcept { return numBoardsFlashing != 0; }
+	bool IsFlashing() const noexcept { return m_numBoardsFlashing != 0; }
 
 	void Spin() noexcept;
 
@@ -64,12 +64,12 @@ class ExpansionManager
 
 	static ReadWriteLock boardsLock;
 
-	unsigned int numExpansionBoards;
-	unsigned int numBoardsFlashing;
-	mutable volatile unsigned int lastIndexSearched; // the last board index we searched for, or 0 if invalid
+	unsigned int m_numExpansionBoards;
+	unsigned int m_numBoardsFlashing;
+	mutable volatile unsigned int m_lastIndexSearched; // the last board index we searched for, or 0 if invalid
 	mutable volatile unsigned int
-		lastAddressFound; // if lastIndexSearched is nonzero, this is the corresponding board address we found
-	ExpansionBoardData boards[CanId::MaxCanAddress + 1]; // the first entry is a dummy one
+		m_lastAddressFound; // if lastIndexSearched is nonzero, this is the corresponding board address we found
+	ExpansionBoardData m_boards[CanId::MaxCanAddress + 1]; // the first entry is a dummy one
 };
 
 #endif // SUPPORT_CAN_EXPANSION

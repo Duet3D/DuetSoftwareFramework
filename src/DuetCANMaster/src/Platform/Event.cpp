@@ -22,14 +22,14 @@ inline Event::Event(Event* _ecv_null pNext,
 					uint8_t devNum,
 					const char* _ecv_array format,
 					va_list vargs) noexcept
-	: next(pNext)
-	, param(pParam)
-	, type(et)
-	, boardAddress(pBa)
-	, deviceNumber(devNum)
-	, isBeingProcessed(false)
+	: m_next(pNext)
+	, m_param(pParam)
+	, m_type(et)
+	, m_boardAddress(pBa)
+	, m_deviceNumber(devNum)
+	, m_isBeingProcessed(false)
 {
-	text.vprintf(format, vargs);
+	m_text.vprintf(format, vargs);
 }
 
 // Queue an event, or release it if we have a similar event pending already. Returns true if the event was added, false
@@ -60,18 +60,18 @@ inline Event::Event(Event* _ecv_null pNext,
 
 	Event* _ecv_null* pe = &eventsPending;
 	while (*pe != nullptr &&
-		   (et >= (*pe)->type ||
-			(*pe)->isBeingProcessed)) // while the next event in the list has same or higher priority than the new one
+		   (et >= (*pe)->m_type ||
+			(*pe)->m_isBeingProcessed)) // while the next event in the list has same or higher priority than the new one
 	{
-		if (et == (*pe)->type && devNum == (*pe)->deviceNumber && (*pe)->param == pParam
+		if (et == (*pe)->m_type && devNum == (*pe)->m_deviceNumber && (*pe)->m_param == pParam
 #if SUPPORT_CAN_EXPANSION
-			&& pBa == (*pe)->boardAddress
+			&& pBa == (*pe)->m_boardAddress
 #endif
 		)
 		{
 			return false; // there is a similar event already in the queue
 		}
-		pe = &((*pe)->next);
+		pe = &((*pe)->m_next);
 	}
 
 	// We didn't find a similar event, so add the new one
@@ -103,7 +103,7 @@ inline Event::Event(Event* _ecv_null pNext,
 	{
 		return false;
 	}
-	ev->isBeingProcessed = true;
+	ev->m_isBeingProcessed = true;
 	return true;
 }
 
@@ -111,9 +111,9 @@ inline Event::Event(Event* _ecv_null pNext,
 /*static*/ void Event::GetMacroFileName(const StringRef& fname) noexcept
 {
 	const Event* const _ecv_null ep = eventsPending;
-	if (ep != nullptr && ep->isBeingProcessed)
+	if (ep != nullptr && ep->m_isBeingProcessed)
 	{
-		fname.copy(ep->type.ToString());
+		fname.copy(ep->m_type.ToString());
 		fname.ReplaceAll('_', '-');
 		fname.cat(".g");
 	}
@@ -123,24 +123,24 @@ inline Event::Event(Event* _ecv_null pNext,
 /*static*/ PrintPausedReason Event::GetDefaultPauseReason() noexcept
 {
 	const Event* const _ecv_null ep = eventsPending;
-	if (ep != nullptr && ep->isBeingProcessed)
+	if (ep != nullptr && ep->m_isBeingProcessed)
 	{
-		switch (ep->type.RawValue())
+		switch (ep->m_type.RawValue())
 		{
 		case EventType::heater_fault:
-			return PrintPausedReason::heaterFault;
+			return PrintPausedReason::HeaterFault;
 
 		case EventType::filament_error:
-			return PrintPausedReason::filamentError;
+			return PrintPausedReason::FilamentError;
 
 		case EventType::driver_error:
-			return PrintPausedReason::driverError;
+			return PrintPausedReason::DriverError;
 
 		default:
 			break;
 		}
 	}
-	return PrintPausedReason::dontPause;
+	return PrintPausedReason::DontPause;
 }
 
 // Mark the highest priority event as completed
@@ -149,9 +149,9 @@ inline Event::Event(Event* _ecv_null pNext,
 	const TaskCriticalSectionLocker lock;
 
 	const Event* _ecv_null ev = eventsPending;
-	if (ev != nullptr && ev->isBeingProcessed)
+	if (ev != nullptr && ev->m_isBeingProcessed)
 	{
-		eventsPending = ev->next;
+		eventsPending = ev->m_next;
 		delete ev;
 		++eventsProcessed;
 	}
@@ -161,46 +161,46 @@ inline Event::Event(Event* _ecv_null pNext,
 /*static*/ MessageType Event::GetTextDescription(const StringRef& str) noexcept
 {
 	const Event* const _ecv_null ep = eventsPending;
-	if (ep != nullptr && ep->isBeingProcessed)
+	if (ep != nullptr && ep->m_isBeingProcessed)
 	{
-		switch (ep->type.RawValue())
+		switch (ep->m_type.RawValue())
 		{
 		case EventType::heater_fault:
 		{
 			const char* _ecv_array heaterFaultText =
-				HeaterFaultText[min<size_t>(ep->param, ARRAY_SIZE(HeaterFaultText) - 1)];
-			str.printf("Heater %u fault: %s%s", ep->deviceNumber, heaterFaultText, ep->text.c_str());
+				HeaterFaultText[min<size_t>(ep->m_param, ARRAY_SIZE(HeaterFaultText) - 1)];
+			str.printf("Heater %u fault: %s%s", ep->m_deviceNumber, heaterFaultText, ep->m_text.c_str());
 		}
 			return ErrorMessage;
 
 		case EventType::filament_error:
 			str.printf(
-				"Filament error on extruder %u: %s", ep->deviceNumber, FilamentSensorStatus(ep->param).ToString());
+				"Filament error on extruder %u: %s", ep->m_deviceNumber, FilamentSensorStatus(ep->m_param).ToString());
 			return ErrorMessage;
 
 		case EventType::driver_error:
 #if SUPPORT_CAN_EXPANSION
-			str.printf("Driver %u.%u error: ", ep->boardAddress, ep->deviceNumber);
+			str.printf("Driver %u.%u error: ", ep->m_boardAddress, ep->m_deviceNumber);
 #else
 			str.printf("Driver %u error: ", ep->deviceNumber);
 #endif
-			StandardDriverStatus(ep->param).AppendText(str, 2);
-			str.cat(ep->text.c_str());
+			StandardDriverStatus(ep->m_param).AppendText(str, 2);
+			str.cat(ep->m_text.c_str());
 			return ErrorMessage;
 
 		case EventType::driver_warning:
 #if SUPPORT_CAN_EXPANSION
-			str.printf("Driver %u.%u warning: ", ep->boardAddress, ep->deviceNumber);
+			str.printf("Driver %u.%u warning: ", ep->m_boardAddress, ep->m_deviceNumber);
 #else
 			str.printf("Driver %u warning: ", ep->deviceNumber);
 #endif
-			StandardDriverStatus(ep->param).AppendText(str, 1);
-			str.cat(ep->text.c_str());
+			StandardDriverStatus(ep->m_param).AppendText(str, 1);
+			str.cat(ep->m_text.c_str());
 			return WarningMessage;
 
 		case EventType::driver_stall:
 #if SUPPORT_CAN_EXPANSION
-			str.printf("Driver %u.%u stall", ep->boardAddress, ep->deviceNumber);
+			str.printf("Driver %u.%u stall", ep->m_boardAddress, ep->m_deviceNumber);
 #else
 			str.printf("Driver %u stall", ep->deviceNumber);
 #endif
@@ -213,8 +213,8 @@ inline Event::Event(Event* _ecv_null pNext,
 		case EventType::mcu_temperature_warning:
 #if SUPPORT_CAN_EXPANSION
 			str.printf("MCU temperature warning from board %u: temperature %.1fC",
-					   ep->boardAddress,
-					   (double)((float)ep->param / 10));
+					   ep->m_boardAddress,
+					   (double)((float)ep->m_param / 10));
 #else
 			str.printf("MCU temperature warning: temperature %.1fC", (double)((float)ep->param / 10.0));
 #endif
@@ -222,7 +222,7 @@ inline Event::Event(Event* _ecv_null pNext,
 
 		case EventType::overvoltage:
 #if SUPPORT_CAN_EXPANSION
-			str.printf("overvoltage on board %u: voltage %.1fV", ep->boardAddress, (double)((float)ep->param / 10));
+			str.printf("overvoltage on board %u: voltage %.1fV", ep->m_boardAddress, (double)((float)ep->m_param / 10));
 #else
 			str.printf("overvoltage: voltage %.1fV", (double)((float)ep->param / 10.0));
 #endif
@@ -230,18 +230,19 @@ inline Event::Event(Event* _ecv_null pNext,
 
 		case EventType::undervoltage:
 #if SUPPORT_CAN_EXPANSION
-			str.printf("undervoltage on board %u: voltage %.1fV", ep->boardAddress, (double)((float)ep->param / 10));
+			str.printf(
+				"undervoltage on board %u: voltage %.1fV", ep->m_boardAddress, (double)((float)ep->m_param / 10));
 #else
 			str.printf("undervoltage: voltage %.1fV", (double)((float)ep->param / 10.0));
 #endif
 			return WarningMessage;
 
 		case EventType::expansion_timeout:
-			str.printf("Expansion board %u stopped sending status", ep->boardAddress);
+			str.printf("Expansion board %u stopped sending status", ep->m_boardAddress);
 			return ErrorMessage;
 
 		case EventType::expansion_reconnect:
-			str.printf("Expansion board %u reconnected", ep->boardAddress);
+			str.printf("Expansion board %u reconnected", ep->m_boardAddress);
 			return ErrorMessage;
 		}
 	}

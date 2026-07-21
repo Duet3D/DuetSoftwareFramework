@@ -74,7 +74,7 @@ constexpr uint32_t SbcTxDrainTimeout =
 enum class SbcTransportType : uint8_t
 {
 	spi,
-	usb
+	Usb
 };
 
 // Framing for the USB transport. The USB link has its own header because it does not need the

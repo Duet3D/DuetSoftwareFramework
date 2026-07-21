@@ -88,33 +88,33 @@ constexpr const char* _ecv_array NoPinName = "nil";
 // Enumeration to describe what we want to do with a pin
 enum class PinAccess : int
 {
-	read,
-	readWithPullup_InternalUseOnly,
-	readNoDebounce,
-	readAnalog,
-	write0,
-	write1,
+	Read,
+	ReadWithPullupInternalUseOnly,
+	ReadNoDebounce,
+	ReadAnalog,
+	Write0,
+	Write1,
 	pwm,
-	servo
+	Servo
 };
 
 enum class PinUsedBy : uint8_t
 {
-	notUsed = 0,
-	heater,
-	fan,
-	endstop,
-	zprobe,
-	tacho,
-	spindle,
-	laser,
-	gpin,
-	gpout,
-	filamentMonitor,
-	temporaryInput,
-	sensor,
-	led,
-	sdCard
+	NotUsed = 0,
+	Heater,
+	Fan,
+	Endstop,
+	Zprobe,
+	Tacho,
+	Spindle,
+	Laser,
+	Gpin,
+	Gpout,
+	FilamentMonitor,
+	TemporaryInput,
+	Sensor,
+	Led,
+	SdCard
 };
 
 #include <Config/Pins.h>
@@ -258,16 +258,16 @@ inline void ClearWatchpoint(uint8_t number) noexcept
 class AutoClearingWatchpoint
 {
   public:
-	AutoClearingWatchpoint(uint8_t p_number, const void* addr, unsigned int addrBits = 2) noexcept
-		: number(p_number)
+	AutoClearingWatchpoint(uint8_t pNumber, const void* addr, unsigned int addrBits = 2) noexcept
+		: m_number(pNumber)
 	{
-		SetWatchpoint(p_number, addr, addrBits);
+		SetWatchpoint(pNumber, addr, addrBits);
 	}
 
-	~AutoClearingWatchpoint() noexcept { ClearWatchpoint(number); }
+	~AutoClearingWatchpoint() noexcept { ClearWatchpoint(m_number); }
 
   private:
-	uint8_t number;
+	uint8_t m_number;
 };
 
 // Type of a driver identifier
@@ -422,7 +422,7 @@ typedef double motioncalc_t;
 typedef float motioncalc_t;
 #endif
 
-inline motioncalc_t msquare(motioncalc_t a) noexcept
+inline motioncalc_t Msquare(motioncalc_t a) noexcept
 {
 	return a * a;
 }
@@ -586,32 +586,32 @@ template <class T>
 class SimpleRangeIterator
 {
   public:
-	explicit SimpleRangeIterator(T value_) noexcept
-		: val(value_)
+	explicit SimpleRangeIterator(T value) noexcept
+		: m_val(value)
 	{
 	}
-	bool operator!=(const SimpleRangeIterator<T>& other) const noexcept { return val != other.val; }
-	const T& operator*() const noexcept { return val; }
+	bool operator!=(const SimpleRangeIterator<T>& other) const noexcept { return m_val != other.m_val; }
+	const T& operator*() const noexcept { return m_val; }
 	SimpleRangeIterator<T>& operator++() noexcept
 	{
-		++val;
+		++m_val;
 		return *this;
 	}
 
   private:
-	T val;
+	T m_val;
 };
 
 template <class T>
 class SimpleRange
 {
   public:
-	explicit SimpleRange(T p_limit) noexcept
-		: limit(p_limit)
+	explicit SimpleRange(T pLimit) noexcept
+		: limit(pLimit)
 	{
 	}
-	SimpleRangeIterator<T> begin() const noexcept { return SimpleRangeIterator<T>(0); }
-	SimpleRangeIterator<T> end() const noexcept { return SimpleRangeIterator<T>(limit); }
+	SimpleRangeIterator<T> Begin() const noexcept { return SimpleRangeIterator<T>(0); }
+	SimpleRangeIterator<T> End() const noexcept { return SimpleRangeIterator<T>(limit); }
 
   private:
 	const T limit;

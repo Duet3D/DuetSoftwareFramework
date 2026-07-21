@@ -14,16 +14,16 @@
 // interface.
 enum class PrintPausedReason : uint8_t
 {
-	dontPause = 0, // used by RRF but not by DSF
-	user = 1,
-	gcode = 2,
-	filamentChange = 3,
-	trigger = 4,
-	heaterFault = 5,
-	filamentError = 6,
-	stall = 7,
-	lowVoltage = 8,
-	driverError = 9
+	DontPause = 0, // used by RRF but not by DSF
+	User = 1,
+	Gcode = 2,
+	FilamentChange = 3,
+	Trigger = 4,
+	HeaterFault = 5,
+	FilamentError = 6,
+	Stall = 7,
+	LowVoltage = 8,
+	DriverError = 9
 };
 
 #endif /* SRC_PLATFORM_PRINTPAUSEDREASON_H_ */

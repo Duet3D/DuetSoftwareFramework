@@ -26,12 +26,12 @@ struct ExpressionValue;
 
 enum class TransferState
 {
-	doingFullTransfer,
-	doingPartialTransfer,
-	finishingTransfer,
-	connectionTimeout,
-	connectionReset,
-	finished
+	DoingFullTransfer,
+	DoingPartialTransfer,
+	FinishingTransfer,
+	ConnectionTimeout,
+	ConnectionReset,
+	Finished
 };
 
 class DataTransfer
@@ -42,10 +42,10 @@ class DataTransfer
 	static void InitFromTask() noexcept;
 	void Diagnostics(const StringRef& reply) noexcept;
 
-	SbcTransportType GetTransportType() const noexcept { return transportType; }
+	SbcTransportType GetTransportType() const noexcept { return m_transportType; }
 #  if SUPPORTS_SBC_OVER_USB
 	void SwitchToUsb(SerialCDC* dev, unsigned int devIndex) noexcept; // Switch from SPI to USB transport
-	SerialCDC* GetUsbDevice() const noexcept { return usbDevice; }
+	SerialCDC* GetUsbDevice() const noexcept { return m_usbDevice; }
 #  endif
 
 	TransferState DoTransfer() noexcept; // Try to finish the current transfer
@@ -85,14 +85,14 @@ class DataTransfer
 		ExchangingDataResponse,
 		ProcessingData,
 		Resetting
-	} state;
+	} m_state;
 
 	// Transfer properties
-	uint16_t lastTransferNumber;
-	unsigned int failedTransfers, checksumErrors;
-	unsigned int dataResendAttempts; // consecutive data resends within the current transfer, bounds the
-									 // ExchangingDataResponse retry loop
-	unsigned int shortTransfers;	 // sub-exchanges the SBC clocked fewer bytes of than we armed for
+	uint16_t m_lastTransferNumber;
+	unsigned int m_failedTransfers, m_checksumErrors;
+	unsigned int m_dataResendAttempts; // consecutive data resends within the current transfer, bounds the
+									   // ExchangingDataResponse retry loop
+	unsigned int m_shortTransfers;	   // sub-exchanges the SBC clocked fewer bytes of than we armed for
 
 	// Transfer buffers
 #  if SAME70
@@ -117,25 +117,25 @@ class DataTransfer
 	uint32_t rxResponse;
 	uint32_t txResponse;
 #  endif
-	char* rxBuffer{}; // not allocated until we know we need it
-	char* txBuffer{}; // not allocated until we know we need it
-	size_t rxPointer, txPointer;
+	char* m_rxBuffer{}; // not allocated until we know we need it
+	char* m_txBuffer{}; // not allocated until we know we need it
+	size_t m_rxPointer, m_txPointer;
 
 	// Transport type
-	SbcTransportType transportType;
+	SbcTransportType m_transportType;
 
 #  if SUPPORTS_SBC_OVER_USB
 	// USB transport members
-	SerialCDC* usbDevice;
-	unsigned int usbDeviceIndex;
-	UsbTransferHeader usbRxHeader{};
-	UsbTransferHeader usbTxHeader{};
+	SerialCDC* m_usbDevice;
+	unsigned int m_usbDeviceIndex;
+	UsbTransferHeader m_usbRxHeader{};
+	UsbTransferHeader m_usbTxHeader{};
 
 	TransferState DoTransferUsb() noexcept;
 #  endif
 
 	// Packet properties
-	uint16_t packetId;
+	uint16_t m_packetId;
 
 	bool IsConnectionReset() const noexcept;
 
@@ -167,16 +167,16 @@ class DataTransfer
 
 inline bool DataTransfer::IsConnectionReset() const noexcept
 {
-	uint16_t nextTransferNumber = lastTransferNumber + 1u;
+	uint16_t nextTransferNumber = m_lastTransferNumber + 1u;
 	return (rxHeader.formatCode == SbcFormatCode) && (rxHeader.sequenceNumber != nextTransferNumber);
 }
 
 inline uint8_t DataTransfer::GetRxNumPackets() const noexcept
 {
 #  if SUPPORTS_SBC_OVER_USB
-	if (transportType == SbcTransportType::usb)
+	if (m_transportType == SbcTransportType::Usb)
 	{
-		return usbRxHeader.numPackets;
+		return m_usbRxHeader.numPackets;
 	}
 #  endif
 	return rxHeader.numPackets;
@@ -184,7 +184,7 @@ inline uint8_t DataTransfer::GetRxNumPackets() const noexcept
 
 inline size_t DataTransfer::FreeTxSpace() const noexcept
 {
-	return SbcTransferBufferSize - AddPadding(txPointer) - GetRxNumPackets() * sizeof(PacketHeader);
+	return SbcTransferBufferSize - AddPadding(m_txPointer) - GetRxNumPackets() * sizeof(PacketHeader);
 }
 
 inline size_t DataTransfer::PacketsToRead() const noexcept

@@ -36,7 +36,7 @@ class SbcInterface
 	void Init() noexcept;
 	[[noreturn]] void TaskLoop() noexcept;
 	void Diagnostics(const StringRef& reply) noexcept;
-	bool IsConnected() const noexcept { return isConnected; }
+	bool IsConnected() const noexcept { return m_isConnected; }
 
 	void EventOccurred(bool timeCritical = false) const noexcept; // Called when a new event has happened. It can
 																  // optionally start off a new transfer immediately
@@ -47,7 +47,7 @@ class SbcInterface
 		SerialCDC* dev, unsigned int usbDevIndex) noexcept; // Request a switch to USB transport (called from main task)
 #  endif
 
-	DataTransfer& GetDataTransfer() noexcept { return transfer; }
+	DataTransfer& GetDataTransfer() noexcept { return m_transfer; }
 
 	bool FillBuffer(GCodeBuffer& gb) noexcept; // Try to fill up the G-code buffer with the next available G-code
 
@@ -63,23 +63,23 @@ class SbcInterface
 		const char* text) noexcept; // Forward a text reply to the SBC as one or more standardReply CAN responses
 
   private:
-	DataTransfer transfer;
-	volatile bool isConnected;
-	TransferState state{};
-	uint32_t numDisconnects, numTimeouts, numSbcTimeouts, lastTransferTime;
+	DataTransfer m_transfer;
+	volatile bool m_isConnected;
+	TransferState m_state{};
+	uint32_t m_numDisconnects, m_numTimeouts, m_numSbcTimeouts, m_lastTransferTime;
 
-	volatile uint16_t rxPointer, txPointer, txEnd;
-	volatile bool sendBufferUpdate;
+	volatile uint16_t m_rxPointer, m_txPointer, m_txEnd;
+	volatile bool m_sendBufferUpdate;
 
-	uint32_t iapRamAvailable{}; // must be at least 32Kb otherwise the SPI IAP can't work
+	uint32_t m_iapRamAvailable{}; // must be at least 32Kb otherwise the SPI IAP can't work
 
 #  if SUPPORTS_SBC_OVER_USB
-	SerialCDC* pendingUsbDevice; // set from main task, read from SBC task
-	unsigned int usbDeviceIndex; // index of the USB device used for SBC mode (for reinit on disconnect)
+	SerialCDC* m_pendingUsbDevice; // set from main task, read from SBC task
+	unsigned int m_usbDeviceIndex; // index of the USB device used for SBC mode (for reinit on disconnect)
 #  endif
 
-	volatile OutputStack gcodeReply;
-	Mutex gcodeReplyMutex;
+	volatile OutputStack m_gcodeReply;
+	Mutex m_gcodeReplyMutex;
 
 	// Ring buffer of CAN responses waiting to be forwarded to the SBC. Producers are the CAN receiver tasks; the
 	// consumer is the SBC task.
@@ -89,9 +89,9 @@ class SbcInterface
 		CANResponseHeader header;
 		uint8_t payload[64];
 	};
-	CanResponseBuffer canResponseRing[NumCanResponseBuffers]{};
-	volatile size_t canResponseHead,
-		canResponseTail; // head = next slot to write, tail = next slot to read; empty when equal
+	CanResponseBuffer m_canResponseRing[NumCanResponseBuffers]{};
+	volatile size_t m_canResponseHead,
+		m_canResponseTail; // head = next slot to write, tail = next slot to read; empty when equal
 
 	bool ProcessCanResponses() noexcept; // Write queued CAN responses into the current transfer
 

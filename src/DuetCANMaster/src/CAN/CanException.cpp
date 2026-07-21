@@ -17,21 +17,21 @@ void CanException::GetMessage(const StringRef& reply) const noexcept
 	reply.Clear();
 
 	// Print the message and any parameter
-	if (message == nullptr)
+	if (m_message == nullptr)
 	{
 		reply.cat("<null error message>"); // should not happen
 	}
-	else if (strstr(message, "%s") != nullptr)
+	else if (strstr(m_message, "%s") != nullptr)
 	{
-		reply.catf(message, stringParam.c_str());
+		reply.catf(m_message, m_stringParam.c_str());
 	}
-	else if (strstr(message, "%u") != nullptr || strstr(message, "%c") != nullptr)
+	else if (strstr(m_message, "%u") != nullptr || strstr(m_message, "%c") != nullptr)
 	{
-		reply.catf(message, param.u);
+		reply.catf(m_message, m_param.u);
 	}
 	else
 	{
-		reply.catf(message, param.i);
+		reply.catf(m_message, m_param.i);
 	}
 }
 
@@ -39,21 +39,21 @@ void CanException::GetMessage(const StringRef& reply) const noexcept
 // column.
 void CanException::DebugPrint() const noexcept
 {
-	if (message == nullptr)
+	if (m_message == nullptr)
 	{
 		debugPrintf("<null error message>"); // should not happen
 	}
-	else if (strstr(message, "%s") != nullptr)
+	else if (strstr(m_message, "%s") != nullptr)
 	{
-		debugPrintf(message, stringParam.c_str());
+		debugPrintf(m_message, m_stringParam.c_str());
 	}
-	else if (strstr(message, "%u") != nullptr || strstr(message, "%c") != nullptr)
+	else if (strstr(m_message, "%u") != nullptr || strstr(m_message, "%c") != nullptr)
 	{
-		debugPrintf(message, param.u);
+		debugPrintf(m_message, m_param.u);
 	}
 	else
 	{
-		debugPrintf(message, param.i);
+		debugPrintf(m_message, m_param.i);
 	}
 	debugPrintf("\n");
 }

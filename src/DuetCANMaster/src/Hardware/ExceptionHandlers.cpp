@@ -38,7 +38,7 @@
 	Cache::Disable();
 
 	uint16_t fullReason = (uint16_t)initialReason;
-	if (initialReason == SoftwareResetReason::erase)
+	if (initialReason == SoftwareResetReason::Erase)
 	{
 #if SAME5x
 		// Start from uf2 bootloader next time. This pretends the reset button has been pressed twice in short succession
@@ -49,17 +49,19 @@
  	}
 	else
 	{
-		if (initialReason != SoftwareResetReason::user)
+		if (initialReason != SoftwareResetReason::User)
 		{
 			if (SERIAL_USB_DEVICE.canWrite() == 0)
 			{
-				fullReason |= (uint16_t)SoftwareResetReason::inUsbOutput;	// if we are resetting because we are stuck in a Spin function, record whether we are trying to send to USB
+				fullReason |=
+					(uint16_t)SoftwareResetReason::InUsbOutput; // if we are resetting because we are stuck in a Spin
+																// function, record whether we are trying to send to USB
 			}
 		}
 		fullReason |= reprap.GetSpinningModule().ToBaseType();
 		if (Platform::WasDeliberateError())
 		{
-			fullReason |= (uint16_t)SoftwareResetReason::deliberate;
+			fullReason |= (uint16_t)SoftwareResetReason::Deliberate;
 		}
 
 		// Record the reason for the software reset
@@ -78,7 +80,7 @@
 
 [[noreturn]] void OutOfMemoryHandler() noexcept
 {
-	SoftwareReset(SoftwareResetReason::outOfMemory, GetStackPointer());
+	SoftwareReset(SoftwareResetReason::OutOfMemory, GetStackPointer());
 }
 
 // Exception handlers
@@ -86,7 +88,7 @@
 // so they escalate to a Hard Fault and we don't need to provide separate exception handlers for them.
 extern "C" [[noreturn]] __attribute__((externally_visible)) void hardFaultDispatcher(const uint32_t *_ecv_array pulFaultStackAddress) noexcept
 {
-	SoftwareReset(SoftwareResetReason::hardFault, pulFaultStackAddress);
+	SoftwareReset(SoftwareResetReason::HardFault, pulFaultStackAddress);
 }
 
 // The fault handler implementation calls a function called hardFaultDispatcher()
@@ -110,7 +112,7 @@ void HardFault_Handler() noexcept
 
 extern "C" [[noreturn]] void memManageDispatcher(const uint32_t *_ecv_array pulFaultStackAddress) noexcept
 {
-	SoftwareReset(SoftwareResetReason::memFault, pulFaultStackAddress);
+	SoftwareReset(SoftwareResetReason::MemFault, pulFaultStackAddress);
 }
 
 // The fault handler implementation calls a function called memManageDispatcher()
@@ -134,7 +136,7 @@ void MemManage_Handler() noexcept
 
 extern "C" [[noreturn]] __attribute__((externally_visible)) void wdtFaultDispatcher(const uint32_t *_ecv_array pulFaultStackAddress) noexcept
 {
-	SoftwareReset(SoftwareResetReason::wdtFault, pulFaultStackAddress);
+	SoftwareReset(SoftwareResetReason::WdtFault, pulFaultStackAddress);
 }
 
 #if SAME70		// SAME70 has a separate interrupt line for the RSWDT
@@ -160,7 +162,7 @@ void WDT_Handler() noexcept
 
 extern "C" [[noreturn]] __attribute__((externally_visible)) void otherFaultDispatcher(const uint32_t *_ecv_array pulFaultStackAddress) noexcept
 {
-	SoftwareReset(SoftwareResetReason::otherFault, pulFaultStackAddress);
+	SoftwareReset(SoftwareResetReason::OtherFault, pulFaultStackAddress);
 }
 
 // 2017-05-25: A user is getting 'otherFault' reports, so now we do a stack dump for those too.
@@ -188,13 +190,15 @@ extern "C" void UsageFault_Handler () noexcept __attribute__((naked));
 extern "C" void DebugMon_Handler   () noexcept __attribute__((naked));
 
 extern "C" void NMI_Handler        () noexcept { SoftwareReset(SoftwareResetReason::NMI); }
-extern "C" void UsageFault_Handler () noexcept { SoftwareReset(SoftwareResetReason::usageFault); }
+extern "C" void UsageFault_Handler () noexcept {
+	SoftwareReset(SoftwareResetReason::UsageFault);
+}
 extern "C" void DebugMon_Handler   () noexcept __attribute__ ((alias("OtherFault_Handler")));
 
 // FreeRTOS hooks that we need to provide
 extern "C" [[noreturn]] __attribute__((externally_visible)) void stackOverflowDispatcher(const uint32_t *_ecv_array pulFaultStackAddress, char *_ecv_array pcTaskName) noexcept
 {
-	SoftwareReset(SoftwareResetReason::stackOverflow, pulFaultStackAddress);
+	SoftwareReset(SoftwareResetReason::StackOverflow, pulFaultStackAddress);
 }
 
 extern "C" void vApplicationStackOverflowHook(TaskHandle_t pxTask, char *pcTaskName) noexcept __attribute__((naked, noreturn));
@@ -214,7 +218,7 @@ void vApplicationStackOverflowHook(TaskHandle_t pxTask, char *pcTaskName) noexce
 
 extern "C" [[noreturn]] __attribute__((externally_visible)) void assertCalledDispatcher(const uint32_t *_ecv_array pulFaultStackAddress) noexcept
 {
-	SoftwareReset(SoftwareResetReason::assertCalled, pulFaultStackAddress);
+	SoftwareReset(SoftwareResetReason::AssertCalled, pulFaultStackAddress);
 }
 
 extern "C" [[noreturn]] void vAssertCalled(uint32_t line, const char *_ecv_array file) noexcept __attribute__((naked));
@@ -244,7 +248,7 @@ namespace std
 // The default terminate handler pulls in sprintf and lots of other functions, which makes the binary too large. So we replace it.
 [[noreturn]] void Terminate() noexcept
 {
-	SoftwareReset(SoftwareResetReason::terminateCalled, GetStackPointer());
+	SoftwareReset(SoftwareResetReason::TerminateCalled, GetStackPointer());
 }
 
 namespace __cxxabiv1
@@ -254,12 +258,12 @@ namespace __cxxabiv1
 
 extern "C" [[noreturn]] void __cxa_pure_virtual() noexcept
 {
-	SoftwareReset(SoftwareResetReason::pureOrDeletedVirtual, GetStackPointer());
+	SoftwareReset(SoftwareResetReason::PureOrDeletedVirtual, GetStackPointer());
 }
 
 extern "C" [[noreturn]] void __cxa_deleted_virtual() noexcept
 {
-	SoftwareReset(SoftwareResetReason::pureOrDeletedVirtual, GetStackPointer());
+	SoftwareReset(SoftwareResetReason::PureOrDeletedVirtual, GetStackPointer());
 }
 
 // End

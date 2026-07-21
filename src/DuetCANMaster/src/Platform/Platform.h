@@ -98,16 +98,16 @@ enum class BoardType : uint8_t
 	Duet3Mini_Ethernet,
 	Duet3Mini_WiFi_ESP32, // Duet Mini WiFi with ESP32 module
 #elif defined(DUET3_MB6HC)
-	Duet3_6HC_v06_100 = 1,
-	Duet3_6HC_v101 = 2,
-	Duet3_6HC_v102 = 3,
-	Duet3_6HC_v102b = 4,
-	Duet3_6HC_v102c = 5,
+	Duet36HcV06100 = 1,
+	Duet36HcV101 = 2,
+	Duet36HcV102 = 3,
+	Duet36HcV102b = 4,
+	Duet36HcV102c = 5,
 #elif defined(DUET3_MB6XD)
-	Duet3_6XD_v01 = 1,
-	Duet3_6XD_v100 = 2,
-	Duet3_6XD_v101 = 3,
-	Duet3_6XD_v102 = 4,
+	Duet36XdV01 = 1,
+	Duet36XdV100 = 2,
+	Duet36XdV101 = 3,
+	Duet36XdV102 = 4,
 #elif defined(FMDC_V03)
 	FMDC,
 #elif defined(DUET_NG)
@@ -140,7 +140,7 @@ enum class DiagnosticTestType : unsigned int
 	PrintExpanderStatus = 101, // print DueXn expander status
 #endif
 	TimeCalculations = 102,		// do a timing test on the square root function and sine/cosine
-	unused1 = 103,				// was TimeSinCos
+	Unused1 = 103,				// was TimeSinCos
 	TimeSDWrite = 104,			// do a write timing test on the SD card
 	PrintObjectSizes = 105,		// print the sizes of various objects
 	PrintObjectAddresses = 106, // print the addresses and sizes of various objects
@@ -187,8 +187,8 @@ class ConfigurableFolder
 {
   public:
 	explicit ConfigurableFolder(const char* _ecv_array defValue) noexcept
-		: userValue(nullptr)
-		, defaultValue(defValue)
+		: m_userValue(nullptr)
+		, m_defaultValue(defValue)
 	{
 	}
 	ReadLockedPointer<const char> GetLockedPointer() const noexcept;
@@ -197,13 +197,13 @@ class ConfigurableFolder
 	GCodeResult Configure(const char* _ecv_array newPath, const StringRef& reply) noexcept;
 #  endif
   private:
-	mutable ReadWriteLock lock;
+	mutable ReadWriteLock m_lock;
 	const char* _ecv_array GetUnlockedPointer() const noexcept
 	{
-		return (userValue == nullptr) ? defaultValue : _ecv_not_null(userValue);
+		return (m_userValue == nullptr) ? m_defaultValue : _ecv_not_null(m_userValue);
 	}
-	const char* _ecv_array _ecv_null userValue;
-	const char* _ecv_array defaultValue;
+	const char* _ecv_array _ecv_null m_userValue;
+	const char* _ecv_array m_defaultValue;
 };
 
 #endif
@@ -233,9 +233,9 @@ class Platform final
 	static const char* _ecv_array GetResetReasonText() noexcept;
 	static bool WasDeliberateError() noexcept { return deliberateError; }
 
-	void LogError(ErrorCode e) noexcept { errorCodeBits |= (uint32_t)e; }
+	void LogError(ErrorCode e) noexcept { m_errorCodeBits |= (uint32_t)e; }
 
-	BoardType GetBoardType() const noexcept { return board; }
+	BoardType GetBoardType() const noexcept { return m_board; }
 	void SetBoardType() noexcept;
 	const char* _ecv_array GetElectronicsString() const noexcept;
 	const char* _ecv_array GetBoardString() const noexcept;
@@ -270,9 +270,9 @@ class Platform final
 	void Tick() noexcept SPEED_CRITICAL; // Process a systick interrupt
 
 	// Real-time clock
-	bool IsDateTimeSet() const noexcept { return realTime != 0; } // Has the RTC been set yet?
-	time_t GetDateTime() const noexcept { return realTime; }	  // Retrieves the current RTC datetime
-	bool GetDateTime(tm& rslt) const noexcept { return gmtime_r(&realTime, &rslt) != nullptr && realTime != 0; }
+	bool IsDateTimeSet() const noexcept { return m_realTime != 0; } // Has the RTC been set yet?
+	time_t GetDateTime() const noexcept { return m_realTime; }		// Retrieves the current RTC datetime
+	bool GetDateTime(tm& rslt) const noexcept { return gmtime_r(&m_realTime, &rslt) != nullptr && m_realTime != 0; }
 	// Retrieves the broken-down current RTC datetime and returns true if it's valid
 	bool SetDateTime(time_t t) noexcept; // Sets the current RTC date and time or returns false on error
 
@@ -290,8 +290,8 @@ class Platform final
 	// MCU temperature
 #if HAS_CPU_TEMP_SENSOR
 	MinCurMax GetMcuTemperatures() const noexcept;
-	void SetMcuTemperatureAdjust(float v) noexcept { mcuTemperatureAdjust = v; }
-	float GetMcuTemperatureAdjust() const noexcept { return mcuTemperatureAdjust; }
+	void SetMcuTemperatureAdjust(float v) noexcept { m_mcuTemperatureAdjust = v; }
+	float GetMcuTemperatureAdjust() const noexcept { return m_mcuTemperatureAdjust; }
 #endif
 
 #if HAS_VOLTAGE_MONITOR
@@ -319,7 +319,7 @@ class Platform final
 #endif
 
 #if MCU_HAS_UNIQUE_ID
-	const UniqueId& GetUniqueId() const noexcept { return uniqueId; }
+	const UniqueId& GetUniqueId() const noexcept { return m_uniqueId; }
 	uint32_t Random() noexcept;
 #endif
 
@@ -372,22 +372,22 @@ class Platform final
 
 	// Board and processor
 #if MCU_HAS_UNIQUE_ID
-	UniqueId uniqueId;
+	UniqueId m_uniqueId;
 #endif
 
-	BoardType board;
+	BoardType m_board;
 
-	bool active;
-	uint32_t errorCodeBits;
+	bool m_active;
+	uint32_t m_errorCodeBits;
 
 	void InitialiseInterrupts() noexcept;
 
 	// Thermistors and temperature monitoring
-	volatile ThermistorAveragingFilter adcFilters[NumAdcFilters]; // ADC reading averaging filters
+	volatile ThermistorAveragingFilter m_adcFilters[NumAdcFilters]; // ADC reading averaging filters
 
 #if HAS_CPU_TEMP_SENSOR
-	float highestMcuTemperature{}, lowestMcuTemperature{};
-	float mcuTemperatureAdjust{};
+	float m_highestMcuTemperature{}, m_lowestMcuTemperature{};
+	float m_mcuTemperatureAdjust{};
 #  if SAME5x
 	TempSenseAveragingFilter tpFilter, tcFilter;
 	int32_t tempCalF1, tempCalF2, tempCalF3, tempCalF4; // temperature calibration factors
@@ -396,62 +396,62 @@ class Platform final
 #endif
 
 	// Data used by the tick interrupt handler
-	AnalogChannelNumber filteredAdcChannels[NumAdcFilters]{};
-	AnalogChannelNumber zProbeAdcChannel{};
-	uint8_t tickState;
-	size_t currentFilterNumber{};
-	unsigned int debugCode;
+	AnalogChannelNumber m_filteredAdcChannels[NumAdcFilters]{};
+	AnalogChannelNumber m_zProbeAdcChannel{};
+	uint8_t m_tickState;
+	size_t m_currentFilterNumber{};
+	unsigned int m_debugCode;
 
 	// Hotend configuration
-	float filamentWidth{};
+	float m_filamentWidth{};
 
 	// Power monitoring
 #if HAS_VOLTAGE_MONITOR
-	AnalogChannelNumber vInMonitorAdcChannel{};
-	volatile uint16_t currentVin{}, highestVin{}, lowestVin{};
-	uint16_t lastVinUnderVoltageValue{}, lastVinOverVoltageValue{};
-	uint16_t autoPauseReading{}, autoResumeReading{};
-	std::atomic<uint32_t> numVinUnderVoltageEvents, numVinOverVoltageEvents;
-	uint32_t previousVinUnderVoltageEvents{}, previousVinOverVoltageEvents{};
+	AnalogChannelNumber m_vInMonitorAdcChannel{};
+	volatile uint16_t m_currentVin{}, m_highestVin{}, m_lowestVin{};
+	uint16_t m_lastVinUnderVoltageValue{}, m_lastVinOverVoltageValue{};
+	uint16_t m_autoPauseReading{}, m_autoResumeReading{};
+	std::atomic<uint32_t> m_numVinUnderVoltageEvents, m_numVinOverVoltageEvents;
+	uint32_t m_previousVinUnderVoltageEvents{}, m_previousVinOverVoltageEvents{};
 
 #  ifdef DUET3_MB6HC
-	float powerMonitorVoltageRange{};
-	uint16_t driverPowerOnAdcReading{};
-	uint16_t driverPowerOffAdcReading{};
+	float m_powerMonitorVoltageRange{};
+	uint16_t m_driverPowerOnAdcReading{};
+	uint16_t m_driverPowerOffAdcReading{};
 	Pin DiagPin{};
 	Pin ActLedPin{};
 	bool DiagOnPolarity{};
 #  endif
 
-	bool autoSaveEnabled{};
+	bool m_autoSaveEnabled{};
 
 	enum class AutoSaveState : uint8_t
 	{
-		starting = 0,
-		normal,
-		autoPaused
+		Starting = 0,
+		Normal,
+		AutoPaused
 	};
-	AutoSaveState autoSaveState{};
+	AutoSaveState m_autoSaveState{};
 #endif
 
 #if HAS_12V_MONITOR
-	AnalogChannelNumber v12MonitorAdcChannel{};
-	volatile uint16_t currentV12{}, highestV12{}, lowestV12{};
-	uint16_t lastV12UnderVoltageValue{};
-	std::atomic<uint32_t> numV12UnderVoltageEvents;
-	uint32_t previousV12UnderVoltageEvents{};
+	AnalogChannelNumber m_v12MonitorAdcChannel{};
+	volatile uint16_t m_currentV12{}, m_highestV12{}, m_lowestV12{};
+	uint16_t m_lastV12UnderVoltageValue{};
+	std::atomic<uint32_t> m_numV12UnderVoltageEvents;
+	uint32_t m_previousV12UnderVoltageEvents{};
 #endif
 
 	// Event handling
-	uint32_t lastDriverPollMillis; // when we last checked the drivers and voltage monitoring
+	uint32_t m_lastDriverPollMillis; // when we last checked the drivers and voltage monitoring
 
 #if SUPPORT_CAN_EXPANSION
-	uint32_t whenLastCanMessageProcessed;
+	uint32_t m_whenLastCanMessageProcessed;
 #endif
 
 	// RTC
-	time_t realTime{};				  // the current date/time, or zero if never set
-	uint32_t timeLastUpdatedMillis{}; // the milliseconds counter when we last incremented the time
+	time_t m_realTime{};				// the current date/time, or zero if never set
+	uint32_t m_timeLastUpdatedMillis{}; // the milliseconds counter when we last incremented the time
 
 	// Misc
 	static bool deliberateError; // true if we deliberately caused an exception for testing purposes. Must be static in

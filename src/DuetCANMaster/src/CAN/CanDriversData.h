@@ -21,9 +21,9 @@ class CanDriversData
   public:
 	CanDriversData() noexcept;
 	void AddEntry(DriverId id, T val) noexcept;
-	size_t GetNumEntries() const noexcept { return numEntries; }
+	size_t GetNumEntries() const noexcept { return m_numEntries; }
 	CanAddress GetNextBoardDriverBitmap(size_t& startFrom, CanDriversBitmap& driversBitmap) const noexcept;
-	T GetElement(size_t n) const noexcept pre(n < GetNumEntries()) { return data[n].val; }
+	T GetElement(size_t n) const noexcept pre(n < GetNumEntries()) { return m_data[n].val; }
 
   private:
 	struct DriverDescriptor
@@ -32,8 +32,8 @@ class CanDriversData
 		T val;
 	};
 
-	size_t numEntries;
-	DriverDescriptor data[MaxCanDrivers];
+	size_t m_numEntries;
+	DriverDescriptor m_data[MaxCanDrivers];
 };
 
 // Class to represent a set of CAN-connected drivers with no associated data
@@ -41,43 +41,43 @@ class CanDriversList
 {
   public:
 	CanDriversList() noexcept
-		: numEntries(0)
+		: m_numEntries(0)
 	{
 	}
-	void Clear() noexcept { numEntries = 0; }
+	void Clear() noexcept { m_numEntries = 0; }
 	void AddEntry(DriverId driver) noexcept;
-	size_t GetNumEntries() const noexcept { return numEntries; }
-	bool IsEmpty() const noexcept { return numEntries == 0; }
+	size_t GetNumEntries() const noexcept { return m_numEntries; }
+	bool IsEmpty() const noexcept { return m_numEntries == 0; }
 	CanAddress GetNextBoardDriverBitmap(size_t& startFrom, CanDriversBitmap& driversBitmap) const noexcept;
 
   private:
-	size_t numEntries;
-	DriverId drivers[MaxCanDrivers];
+	size_t m_numEntries;
+	DriverId m_drivers[MaxCanDrivers];
 };
 
 // Members of template class CanDriversData
 template <class T>
 CanDriversData<T>::CanDriversData() noexcept
 {
-	numEntries = 0;
+	m_numEntries = 0;
 }
 
 // Insert a new entry, keeping the list ordered by driver ID
 template <class T>
 void CanDriversData<T>::AddEntry(DriverId driver, T val) noexcept
 {
-	if (numEntries < ARRAY_SIZE(data))
+	if (m_numEntries < ARRAY_SIZE(m_data))
 	{
 		// We could do a binary search here but the number of CAN drivers supported isn't huge, so linear search instead
 		size_t insertPoint = 0;
-		while (insertPoint < numEntries && data[insertPoint].driver < driver)
+		while (insertPoint < m_numEntries && m_data[insertPoint].driver < driver)
 		{
 			++insertPoint;
 		}
-		memmove(data + (insertPoint + 1), data + insertPoint, (numEntries - insertPoint) * sizeof(data[0]));
-		data[insertPoint].driver = driver;
-		data[insertPoint].val = val;
-		++numEntries;
+		memmove(m_data + (insertPoint + 1), m_data + insertPoint, (m_numEntries - insertPoint) * sizeof(m_data[0]));
+		m_data[insertPoint].driver = driver;
+		m_data[insertPoint].val = val;
+		++m_numEntries;
 	}
 }
 
@@ -87,16 +87,16 @@ CanAddress CanDriversData<T>::GetNextBoardDriverBitmap(size_t& startFrom,
 													   CanDriversBitmap& driversBitmap) const noexcept
 {
 	driversBitmap.Clear();
-	if (startFrom >= numEntries)
+	if (startFrom >= m_numEntries)
 	{
 		return CanId::NoAddress;
 	}
-	const CanAddress boardAddress = data[startFrom].driver.boardAddress;
+	const CanAddress boardAddress = m_data[startFrom].driver.boardAddress;
 	do
 	{
-		driversBitmap.SetBit(data[startFrom].driver.localDriver);
+		driversBitmap.SetBit(m_data[startFrom].driver.localDriver);
 		++startFrom;
-	} while (startFrom < numEntries && data[startFrom].driver.boardAddress == boardAddress);
+	} while (startFrom < m_numEntries && m_data[startFrom].driver.boardAddress == boardAddress);
 	return boardAddress;
 }
 

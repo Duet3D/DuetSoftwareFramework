@@ -53,14 +53,14 @@ class NonVolatileMemory
 
 	enum class NvmState : uint8_t
 	{
-		notRead,
-		clean,
-		writeNeeded,
-		eraseAndWriteNeeded
+		NotRead,
+		Clean,
+		WriteNeeded,
+		EraseAndWriteNeeded
 	};
 
-	alignas(4) NVM buffer{};
-	NvmState state;
+	alignas(4) NVM m_buffer{};
+	NvmState m_state;
 };
 
 #endif /* SRC_HARDWARE_NONVOLATILEMEMORY_H_ */

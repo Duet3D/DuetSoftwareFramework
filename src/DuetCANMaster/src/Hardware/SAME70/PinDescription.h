@@ -16,21 +16,21 @@
 enum class PinCapability : uint8_t
 {
 	// Individual capabilities
-	none = 0u,
-	read = 1u,	 // digital read
-	ain = 2u,	 // analog read
-	write = 4u,	 // digital write
+	None = 0u,
+	Read = 1u,	 // digital read
+	Ain = 2u,	 // analog read
+	Write = 4u,	 // digital write
 	pwm = 8u,	 // PWM write
-	npDma = 16u, // Neopixel output using DMA e.g. using SPI MOSI
+	NpDma = 16u, // Neopixel output using DMA e.g. using SPI MOSI
 
 	// Combinations
-	ainr = 1u | 2u,
-	rw = 1u | 4u,
-	wpwm = 4u | 8u,
-	rwpwm = 1u | 4u | 8u,
-	ainrw = 1u | 2u | 4u,
-	ainrwpwm = 1u | 2u | 4u | 8u,
-	npDmaW = 4u | 16u
+	Ainr = 1u | 2u,
+	Rw = 1u | 4u,
+	Wpwm = 4u | 8u,
+	Rwpwm = 1u | 4u | 8u,
+	Ainrw = 1u | 2u | 4u,
+	Ainrwpwm = 1u | 2u | 4u | 8u,
+	NpDmaW = 4u | 16u
 };
 
 constexpr inline PinCapability operator|(PinCapability a, PinCapability b) noexcept

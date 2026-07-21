@@ -20,32 +20,32 @@
 
 CanMessageGenericConstructor::CanMessageGenericConstructor(const ParamDescriptor* _ecv_array pParam) noexcept
 	: paramTable(pParam)
-	, dataLen(0)
+	, m_dataLen(0)
 {
-	msg.paramMap = 0;
+	m_msg.paramMap = 0;
 }
 
 // Append a value to the data, throwing if it wouldn't fit
 void CanMessageGenericConstructor::StoreValue(const void* vp, size_t sz) THROWS(CanException)
 {
-	if (dataLen + sz > sizeof(msg.data))
+	if (m_dataLen + sz > sizeof(m_msg.data))
 	{
 		throw "CAN message too long";
 	}
-	memcpy(msg.data + dataLen, vp, sz);
-	dataLen += sz;
+	memcpy(m_msg.data + m_dataLen, vp, sz);
+	m_dataLen += sz;
 }
 
 // Insert a value in the data, throwing if it wouldn't fit
 void CanMessageGenericConstructor::InsertValue(const void* vp, size_t sz, size_t pos) THROWS(CanException)
 {
-	if (dataLen + sz > sizeof(msg.data))
+	if (m_dataLen + sz > sizeof(m_msg.data))
 	{
 		throw "CAN message too long";
 	}
-	memmove(msg.data + pos + sz, msg.data + pos, dataLen - pos);
-	memcpy(msg.data + pos, vp, sz);
-	dataLen += sz;
+	memmove(m_msg.data + pos + sz, m_msg.data + pos, m_dataLen - pos);
+	memcpy(m_msg.data + pos, vp, sz);
+	m_dataLen += sz;
 }
 
 // Return the correct position in the data to insert a parameter. If successful, add the bit to the parameter map and
@@ -57,14 +57,14 @@ unsigned int CanMessageGenericConstructor::FindInsertPoint(char c, ParamDescript
 	uint32_t paramBit = 1;
 	for (const ParamDescriptor* _ecv_array d = paramTable; d->letter != 0; ++d)
 	{
-		const bool present = (msg.paramMap & paramBit) != 0;
+		const bool present = (m_msg.paramMap & paramBit) != 0;
 		if (d->letter == c)
 		{
 			if (present)
 			{
 				throw "duplicate parameter";
 			}
-			msg.paramMap |= paramBit;
+			m_msg.paramMap |= paramBit;
 			t = d->type;
 			sz = d->ItemSize();
 			return pos;
@@ -83,7 +83,7 @@ unsigned int CanMessageGenericConstructor::FindInsertPoint(char c, ParamDescript
 				// The only item with size 0 is string, so skip up to and including the null terminator
 				do
 				{
-				} while (msg.data[pos++] != 0);
+				} while (m_msg.data[pos++] != 0);
 			}
 		}
 		paramBit <<= 1;

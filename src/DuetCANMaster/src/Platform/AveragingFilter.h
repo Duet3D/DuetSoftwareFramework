@@ -20,12 +20,12 @@ class AveragingFilter
 	{
 		AtomicCriticalSectionLocker lock;
 
-		sum = (uint32_t)val * (uint32_t)numAveraged;
-		index = 0;
-		isValid = false;
+		m_sum = (uint32_t)val * (uint32_t)numAveraged;
+		m_index = 0;
+		m_isValid = false;
 		for (size_t i = 0; i < numAveraged; ++i)
 		{
-			readings[i] = val;
+			m_readings[i] = val;
 		}
 	}
 
@@ -33,23 +33,23 @@ class AveragingFilter
 	// This is called by the ISR and by the ADC callback function
 	void ProcessReading(uint16_t r) volatile noexcept
 	{
-		size_t locIndex = index; // avoid repeatedly reloading volatile variable
-		sum = sum - readings[locIndex] + r;
-		readings[locIndex] = r;
+		size_t locIndex = m_index; // avoid repeatedly reloading volatile variable
+		m_sum = m_sum - m_readings[locIndex] + r;
+		m_readings[locIndex] = r;
 		++locIndex;
 		if (locIndex == numAveraged)
 		{
 			locIndex = 0;
-			isValid = true;
+			m_isValid = true;
 		}
-		index = locIndex;
+		m_index = locIndex;
 	}
 
 	// Return the raw sum
-	uint32_t GetSum() const volatile noexcept { return sum; }
+	uint32_t GetSum() const volatile noexcept { return m_sum; }
 
 	// Return true if we have a valid average
-	bool IsValid() const volatile noexcept { return isValid; }
+	bool IsValid() const volatile noexcept { return m_isValid; }
 
 	static constexpr size_t NumAveraged() noexcept { return numAveraged; }
 
@@ -57,10 +57,10 @@ class AveragingFilter
 	static void CallbackFeedIntoFilter(CallbackParameter cp, int32_t val) noexcept;
 
   private:
-	uint16_t readings[numAveraged];
-	size_t index;
-	uint32_t sum;
-	bool isValid;
+	uint16_t m_readings[numAveraged];
+	size_t m_index;
+	uint32_t m_sum;
+	bool m_isValid;
 	// invariant(sum == + over readings)
 	// invariant(index < numAveraged)
 };

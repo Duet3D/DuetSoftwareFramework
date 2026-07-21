@@ -69,7 +69,7 @@ void SoftwareResetData::Populate(uint16_t reason, const uint32_t* _ecv_array _ec
 	cfsr = SCB->CFSR;
 	icsr = SCB->ICSR;
 #if USE_MPU
-	if ((reason & (uint16_t)SoftwareResetReason::mainReasonMask) == (uint16_t)SoftwareResetReason::memFault)
+	if ((reason & (uint16_t)SoftwareResetReason::MainReasonMask) == (uint16_t)SoftwareResetReason::MemFault)
 	{
 		bfar = SCB->MMFAR; // on a memory fault we store the MMFAR instead of the BFAR
 	}
@@ -133,14 +133,14 @@ void SoftwareResetData::PrintPart1(unsigned int slot, const StringRef& reply) co
 		reply.cat("time unknown");
 	}
 	reply.cat(", reason: ");
-	if (resetReason & (uint32_t)SoftwareResetReason::deliberate)
+	if (resetReason & (uint32_t)SoftwareResetReason::Deliberate)
 	{
 		reply.cat("deliberate ");
 	}
 	reply.cat(ReasonText[(resetReason >> 5) & 0x0F]);
 
 	// If it's a forced hard fault or a memory access fault, provide some more information
-	if ((resetReason & (uint16_t)SoftwareResetReason::mainReasonMask) == (uint16_t)SoftwareResetReason::hardFault &&
+	if ((resetReason & (uint16_t)SoftwareResetReason::MainReasonMask) == (uint16_t)SoftwareResetReason::HardFault &&
 		(hfsr & (1u << 30)) != 0)
 	{
 		if (cfsr & (1u << 25))
@@ -189,7 +189,7 @@ void SoftwareResetData::PrintPart1(unsigned int slot, const StringRef& reply) co
 		}
 	}
 #if USE_MPU
-	else if ((resetReason & (uint16_t)SoftwareResetReason::mainReasonMask) == (uint16_t)SoftwareResetReason::memFault)
+	else if ((resetReason & (uint16_t)SoftwareResetReason::MainReasonMask) == (uint16_t)SoftwareResetReason::MemFault)
 	{
 		if (cfsr & (1u << 7))
 		{

@@ -156,7 +156,7 @@ CRC32::CRC32() noexcept
 
 void CRC32::Update(char c) noexcept
 {
-	crc = (crc32Tab[(crc ^ (uint8_t)c) & 0xFF] ^ (crc >> 8));
+	m_crc = (crc32Tab[(m_crc ^ (uint8_t)c) & 0xFF] ^ (m_crc >> 8));
 }
 
 // A note on CRC algorithms on ARM:
@@ -231,7 +231,7 @@ void CRC32::Update(const char* _ecv_array s, size_t len) noexcept
 #endif
 	{
 		// Work on a local copy of the crc to avoid storing it all the time
-		uint32_t locCrc = crc;
+		uint32_t locCrc = m_crc;
 
 		// Process any bytes at the start until we reach a dword boundary
 		while ((reinterpret_cast<uint32_t>(s) & 3) != 0 && s != end)
@@ -273,7 +273,7 @@ void CRC32::Update(const char* _ecv_array s, size_t len) noexcept
 			locCrc = (crc32Tab[(locCrc ^ (uint8_t)*s++) & 0xFF] ^ (locCrc >> 8));
 		}
 
-		crc = locCrc;
+		m_crc = locCrc;
 	}
 }
 

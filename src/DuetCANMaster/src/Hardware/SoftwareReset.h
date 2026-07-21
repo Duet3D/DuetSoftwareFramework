@@ -15,50 +15,50 @@
 // IMPORTANT! When changing this, also update table SoftwareResetReasonText
 enum class SoftwareResetReason : uint16_t
 {
-	user = 0u,		 // M999 command
-	erase = 1u << 5, // special M999 command to erase firmware and reset
+	User = 0u,		 // M999 command
+	Erase = 1u << 5, // special M999 command to erase firmware and reset
 	NMI = 2u << 5,
-	hardFault = 3u << 5,   // most exceptions get escalated to a hard fault
-	stuckInSpin = 4u << 5, // we got stuck in a Spin() function in the Main task for too long
-	wdtFault = 5u << 5,	   // secondary watchdog
-	usageFault = 6u << 5,
-	otherFault = 7u << 5,
-	stackOverflow = 8u << 5,	// FreeRTOS detected stack overflow
-	assertCalled = 9u << 5,		// FreeRTOS assertion failure
-	heaterWatchdog = 10u << 5,	// the Heat task didn't kick the watchdog often enough
-	memFault = 11u << 5,		// the MPU raised a fault
-	terminateCalled = 12u << 5, // std::terminate was called
-	pureOrDeletedVirtual = 13u << 5,
-	outOfMemory = 14u << 5,
+	HardFault = 3u << 5,   // most exceptions get escalated to a hard fault
+	StuckInSpin = 4u << 5, // we got stuck in a Spin() function in the Main task for too long
+	WdtFault = 5u << 5,	   // secondary watchdog
+	UsageFault = 6u << 5,
+	OtherFault = 7u << 5,
+	StackOverflow = 8u << 5,	// FreeRTOS detected stack overflow
+	AssertCalled = 9u << 5,		// FreeRTOS assertion failure
+	HeaterWatchdog = 10u << 5,	// the Heat task didn't kick the watchdog often enough
+	MemFault = 11u << 5,		// the MPU raised a fault
+	TerminateCalled = 12u << 5, // std::terminate was called
+	PureOrDeletedVirtual = 13u << 5,
+	OutOfMemory = 14u << 5,
 	// unused = 15u << 5,
 
-	mainReasonMask = 0x0F << 5, // mask to pick out the  main reason in a uint16_t
+	MainReasonMask = 0x0F << 5, // mask to pick out the  main reason in a uint16_t
 
 	// Bits that are or'ed in
-	unusedBit = 0x0200,	  // spare bit
-	unused2 = 0x0400,	  // spare bit
-	inAuxOutput = 0x0800, // this bit is or'ed in if we were in aux output at the time
-	fromSbc = 0x2000,	  // means the command came from the SBC interface
-	inUsbOutput = 0x4000, // this bit is or'ed in if we were in USB output at the time
-	deliberate = 0x8000,  // this but it or'ed in if we deliberately caused a fault
+	UnusedBit = 0x0200,	  // spare bit
+	Unused2 = 0x0400,	  // spare bit
+	InAuxOutput = 0x0800, // this bit is or'ed in if we were in aux output at the time
+	FromSbc = 0x2000,	  // means the command came from the SBC interface
+	InUsbOutput = 0x4000, // this bit is or'ed in if we were in USB output at the time
+	Deliberate = 0x8000,  // this but it or'ed in if we deliberately caused a fault
 
-	userFromSbc = user | fromSbc
+	UserFromSbc = User | FromSbc
 };
 
 // Return true if a software reset with this reason has an exception stack frame. Used to skip the FP registers when
 // saving the stack frame.
 inline bool ResetReasonHasExceptionFrame(uint16_t reason) noexcept
 {
-	switch ((SoftwareResetReason)(reason & (uint16_t)SoftwareResetReason::mainReasonMask))
+	switch ((SoftwareResetReason)(reason & (uint16_t)SoftwareResetReason::MainReasonMask))
 	{
 	case SoftwareResetReason::NMI:
-	case SoftwareResetReason::hardFault:
-	case SoftwareResetReason::stuckInSpin:
-	case SoftwareResetReason::wdtFault:
-	case SoftwareResetReason::usageFault:
-	case SoftwareResetReason::otherFault:
-	case SoftwareResetReason::heaterWatchdog:
-	case SoftwareResetReason::memFault:
+	case SoftwareResetReason::HardFault:
+	case SoftwareResetReason::StuckInSpin:
+	case SoftwareResetReason::WdtFault:
+	case SoftwareResetReason::UsageFault:
+	case SoftwareResetReason::OtherFault:
+	case SoftwareResetReason::HeaterWatchdog:
+	case SoftwareResetReason::MemFault:
 		return true;
 	default:
 		return false;

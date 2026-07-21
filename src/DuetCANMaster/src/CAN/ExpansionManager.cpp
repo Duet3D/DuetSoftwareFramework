@@ -30,10 +30,10 @@ ExpansionBoardData::ExpansionBoardData() noexcept
 }
 
 ExpansionManager::ExpansionManager() noexcept
-	: numExpansionBoards(0)
-	, numBoardsFlashing(0)
-	, lastIndexSearched(0)
-	, lastAddressFound(0)
+	: m_numExpansionBoards(0)
+	, m_numBoardsFlashing(0)
+	, m_lastIndexSearched(0)
+	, m_lastAddressFound(0)
 {
 	// The boards table array is initialised by its constructor. Note, boards[0] is not used.
 }
@@ -41,7 +41,7 @@ ExpansionManager::ExpansionManager() noexcept
 // Update the state of a board. Caller should have a write lock on boardsLock before calling this.
 void ExpansionManager::UpdateBoardState(CanAddress address, const BoardState& newState) noexcept
 {
-	ExpansionBoardData& board = boards[address];
+	ExpansionBoardData& board = m_boards[address];
 	const TaskCriticalSectionLocker lock;
 
 	const BoardState oldState = board.state;
@@ -50,24 +50,24 @@ void ExpansionManager::UpdateBoardState(CanAddress address, const BoardState& ne
 		board.state = newState;
 		if (oldState == BoardState::unknown)
 		{
-			++numExpansionBoards;
-			lastIndexSearched = 0;
-			lastAddressFound = 0;
+			++m_numExpansionBoards;
+			m_lastIndexSearched = 0;
+			m_lastAddressFound = 0;
 		}
-		else if (oldState == BoardState::flashing && numBoardsFlashing != 0)
+		else if (oldState == BoardState::flashing && m_numBoardsFlashing != 0)
 		{
-			--numBoardsFlashing;
+			--m_numBoardsFlashing;
 		}
 
 		if (newState == BoardState::flashing)
 		{
-			++numBoardsFlashing;
+			++m_numBoardsFlashing;
 		}
-		else if (newState == BoardState::unknown && numExpansionBoards != 0)
+		else if (newState == BoardState::unknown && m_numExpansionBoards != 0)
 		{
-			--numExpansionBoards;
-			lastIndexSearched = 0;
-			lastAddressFound = 0;
+			--m_numExpansionBoards;
+			m_lastIndexSearched = 0;
+			m_lastAddressFound = 0;
 		}
 	}
 }
@@ -78,7 +78,7 @@ void ExpansionManager::ProcessAnnouncement(CanMessageBuffer& buf, bool isNewForm
 	const CanAddress src = buf.id.Src();
 	if (src <= CanId::MaxCanAddress)
 	{
-		ExpansionBoardData& board = boards[src];
+		ExpansionBoardData& board = m_boards[src];
 		{
 			const WriteLocker lock(boardsLock);
 
@@ -103,7 +103,7 @@ void ExpansionManager::ProcessAnnouncement(CanMessageBuffer& buf, bool isNewForm
 			{
 				// To save memory, see if we already have another board with the same type name
 				const char* _ecv_array _ecv_null newTypeName = nullptr;
-				for (const ExpansionBoardData& data : boards)
+				for (const ExpansionBoardData& data : m_boards)
 				{
 					if (data.typeName != nullptr && strcmp(boardTypeAndFirmwareVersion.c_str(), data.typeName) == 0)
 					{
@@ -142,7 +142,7 @@ void ExpansionManager::ProcessAnnouncement(CanMessageBuffer& buf, bool isNewForm
 void ExpansionManager::ProcessBoardStatusReport(const CanMessageBuffer& buf) noexcept
 {
 	const CanAddress address = buf.id.Src();
-	ExpansionBoardData& board = boards[address];
+	ExpansionBoardData& board = m_boards[address];
 	board.whenLastStatusReportReceived = millis();
 	if (board.state != BoardState::running && board.state != BoardState::flashing)
 	{
@@ -172,7 +172,8 @@ void ExpansionManager::ProcessBoardStatusReport(const CanMessageBuffer& buf) noe
 // Return a pointer to the expansion board, if it is present
 const ExpansionBoardData* _ecv_null ExpansionManager::GetBoardDetails(uint8_t address) const noexcept
 {
-	return (address < ARRAY_SIZE(boards) && boards[address].state == BoardState::running) ? &boards[address] : nullptr;
+	return (address < ARRAY_SIZE(m_boards) && m_boards[address].state == BoardState::running) ? &m_boards[address]
+																							  : nullptr;
 }
 
 // Tell an expansion board to update
@@ -209,48 +210,48 @@ void ExpansionManager::UpdateFailed(CanAddress address) noexcept
 const ExpansionBoardData& ExpansionManager::FindIndexedBoard(unsigned int index) const noexcept
 {
 	// The common case is where we are looking for the same board as last time, so check for that first
-	if (index == lastIndexSearched)
+	if (index == m_lastIndexSearched)
 	{
-		const unsigned int addr = lastAddressFound;
-		if (index == lastIndexSearched) // check it again in case we got interrupted
+		const unsigned int addr = m_lastAddressFound;
+		if (index == m_lastIndexSearched) // check it again in case we got interrupted
 		{
-			return boards[addr];
+			return m_boards[addr];
 		}
 	}
 
 	// If index 0 or out of range, return the dummy entry for the main board
-	if (index == 0 || index > numExpansionBoards)
+	if (index == 0 || index > m_numExpansionBoards)
 	{
-		return boards[0];
+		return m_boards[0];
 	}
 
 	const TaskCriticalSectionLocker lock;
 
 	// If we are looking for a board earlier in the table than the last one, restart the search from the beginning
-	if (lastIndexSearched > index)
+	if (m_lastIndexSearched > index)
 	{
-		lastIndexSearched = 0;
-		lastAddressFound = 0;
+		m_lastIndexSearched = 0;
+		m_lastAddressFound = 0;
 	}
 
-	unsigned int address = lastAddressFound;
-	unsigned int currentIndex = lastIndexSearched;
+	unsigned int address = m_lastAddressFound;
+	unsigned int currentIndex = m_lastIndexSearched;
 	while (currentIndex < index)
 	{
 		++address;
-		if (address == ARRAY_SIZE(boards))
+		if (address == ARRAY_SIZE(m_boards))
 		{
-			return boards[0];
+			return m_boards[0];
 		}
-		if (boards[address].state != BoardState::unknown)
+		if (m_boards[address].state != BoardState::unknown)
 		{
 			++currentIndex;
 		}
 	}
 
-	lastIndexSearched = index;
-	lastAddressFound = address;
-	return boards[address];
+	m_lastIndexSearched = index;
+	m_lastAddressFound = address;
+	return m_boards[address];
 }
 
 // Check whether we have lost contact with any expansion boards
@@ -258,7 +259,7 @@ void ExpansionManager::Spin() noexcept
 {
 	for (CanAddress addr = 1; addr <= CanId::MaxCanAddress; ++addr)
 	{
-		const ExpansionBoardData& board = boards[addr];
+		const ExpansionBoardData& board = m_boards[addr];
 		if (board.state == BoardState::running)
 		{
 			// We can get interrupted here by the CanReceive task, which may update
@@ -288,7 +289,7 @@ void ExpansionManager::EmergencyStop() noexcept
 	// Send an individual message to each known expansion board to ensure that they all acknowledged
 	for (CanAddress addr = 1; addr <= CanId::MaxCanAddress; ++addr)
 	{
-		if (boards[addr].state == BoardState::running)
+		if (m_boards[addr].state == BoardState::running)
 		{
 			buf.SetupRequestMessageNoRid<CanMessageEmergencyStop>(CanInterface::GetCanAddress(), addr);
 			CanInterface::SendMessageNoReplyNoFree(buf);

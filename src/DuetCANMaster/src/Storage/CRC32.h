@@ -13,7 +13,7 @@
 class CRC32
 {
   private:
-	uint32_t crc{};
+	uint32_t m_crc{};
 
   public:
 	CRC32() noexcept;
@@ -36,12 +36,12 @@ class CRC32
 
 inline uint32_t CRC32::Get() const noexcept
 {
-	return ~crc;
+	return ~m_crc;
 }
 
 inline void CRC32::Reset(uint32_t initialValue) noexcept
 {
-	crc = initialValue;
+	m_crc = initialValue;
 }
 
 #endif
