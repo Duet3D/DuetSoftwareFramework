@@ -1,0 +1,350 @@
+#ifndef PINS_H__
+#define PINS_H__
+
+// Load Pins_<platform>.h
+
+#if !defined(PLATFORM)
+# if defined(__SAM4E8E__)
+#  define PLATFORM DuetNG
+# elif defined(__SAME70Q20B__) || defined(__SAME70Q21B__) || defined(__SAMV71Q20B__)
+#  if defined(DUET3_MB6HC)
+#   define PLATFORM Duet3_MB6HC
+#   define DUET3		1
+#  elif defined(DUET3_MB6XD)
+#   define PLATFORM Duet3_MB6XD
+#   define DUET3		1
+#  else
+#   error Unknown platform
+#  endif
+# elif defined(PCCB)
+#  define PLATFORM Pccb
+# elif defined(DUET3MINI_V04)
+#  define DUET3MINI		1
+#  define PLATFORM Duet3Mini
+# elif defined(INDX)
+#  define DUET3MINI		1
+#  define PLATFORM Duet3_INDX
+# elif defined(FMDC_V03)
+#  define DUET3MINI		1
+#  define PLATFORM FMDC
+# else
+#  error Unknown platform
+# endif
+#endif
+
+#if !defined(P_INCLUDE_FILE)
+# define P_EXPAND(x) x
+# define P_CONCAT(x,y) P_EXPAND(x)y
+# define P_STR(x) #x
+# define P_XSTR(x) P_STR(x)
+# define P_INCLUDE_FILE P_XSTR(P_CONCAT(Pins_,P_CONCAT(PLATFORM,.h)))
+#endif
+
+#include P_INCLUDE_FILE
+
+// Derive channel counts from platform-specific values
+constexpr size_t FirstAuxChannel = NumUsbChannels;
+constexpr size_t NumAuxChannels = NumSerialChannels - FirstAuxChannel;
+
+// Apply default values to anything not configured
+#ifndef SUPPORT_NONLINEAR_EXTRUSION
+# define SUPPORT_NONLINEAR_EXTRUSION	1		// for now this is always enabled
+#endif
+
+#ifndef SUPPORT_COORDINATE_ROTATION
+# define SUPPORT_COORDINATE_ROTATION	1
+#endif
+
+#ifndef SUPPORT_LASER
+# define SUPPORT_LASER			0
+#endif
+
+#ifndef SUPPORT_IOBITS
+# define SUPPORT_IOBITS			0
+#endif
+
+#ifndef SUPPORT_12864_LCD
+# define SUPPORT_12864_LCD		0
+#endif
+
+#ifndef SUPPORT_ILI9488_LCD
+# define SUPPORT_ILI9488_LCD	0
+#endif
+
+#ifndef USE_FONT_CHIP
+# define USE_FONT_CHIP			0
+#endif
+
+#define SUPPORT_DIRECT_LCD		(SUPPORT_12864_LCD || SUPPORT_ILI9488_LCD)
+#define SUPPORT_ROTARY_ENCODER	SUPPORT_12864_LCD
+#define SUPPORT_RESISTIVE_TOUCH	SUPPORT_ILI9488_LCD
+
+#ifndef SUPPORT_LED_STRIPS
+# define SUPPORT_LED_STRIPS		0
+#endif
+
+#ifndef SUPPORT_DMA_DOTSTAR
+# define SUPPORT_DMA_DOTSTAR	0
+#endif
+
+#ifndef SUPPORT_DMA_NEOPIXEL
+# define SUPPORT_DMA_NEOPIXEL	0
+#endif
+
+#ifndef SUPPORT_SPI_SENSORS
+# define SUPPORT_SPI_SENSORS	1
+#endif
+
+#ifndef SUPPORT_BME280
+# define SUPPORT_BME280			0
+#endif
+
+#ifndef SUPPORT_BME68X
+# define SUPPORT_BME68X			0
+#endif
+
+#ifndef SUPPORT_ADS131A02
+# define SUPPORT_ADS131A02		0
+#endif
+
+#ifndef SUPPORT_PANELDUE_FLASH
+# define SUPPORT_PANELDUE_FLASH	(NUM_ASYNC_CHANNELS != 0)
+#endif
+
+#ifndef ALLOW_ARBITRARY_PANELDUE_PORT
+# define ALLOW_ARBITRARY_PANELDUE_PORT (0)
+#endif
+
+#ifndef USE_CACHE
+# define USE_CACHE				0
+#endif
+
+#ifndef USE_MPU
+# define USE_MPU				0
+#endif
+
+#ifndef SUPPORT_TMC2660
+# define SUPPORT_TMC2660		0
+#endif
+
+#ifndef SUPPORT_TMC22xx
+# define SUPPORT_TMC22xx		0
+#endif
+
+#ifndef SUPPORT_TMC51xx
+# define SUPPORT_TMC51xx		0
+#endif
+
+#ifndef SUPPORT_TMC2240_SPI
+# define SUPPORT_TMC2240_SPI	0
+#endif
+
+#ifndef VARIABLE_NUM_DRIVERS
+# define VARIABLE_NUM_DRIVERS	0
+#endif
+
+#ifndef SUPPORT_CAN_EXPANSION
+# define SUPPORT_CAN_EXPANSION	0
+#endif
+
+#ifndef SUPPORT_BRS
+# define SUPPORT_BRS			0
+#endif
+
+#ifndef DUAL_CAN
+# define DUAL_CAN				0
+#endif
+
+#define HAS_SMART_DRIVERS		(SUPPORT_TMC2660 || SUPPORT_TMC22xx || SUPPORT_TMC51xx || SUPPORT_TMC2240_SPI)
+#ifndef HAS_STALL_DETECT
+# define HAS_STALL_DETECT		(SUPPORT_TMC2660 || SUPPORT_TMC51xx)
+#endif
+
+#ifndef SUPPORT_SLOW_DRIVERS
+# define SUPPORT_SLOW_DRIVERS	1
+#endif
+
+#ifndef SUPPORT_BRAKE_PWM
+# define SUPPORT_BRAKE_PWM		0
+#endif
+
+#ifndef HAS_12V_MONITOR
+# define HAS_12V_MONITOR		0
+# define ENFORCE_MIN_V12		0
+#endif
+
+#if !HAS_VOLTAGE_MONITOR
+# define ENFORCE_MAX_VIN		0
+#endif
+
+// HAS_LWIP_NETWORKING refers to Lwip 2 support in the Networking folder, not legacy SAM3XA networking using Lwip 1
+#ifndef HAS_LWIP_NETWORKING
+# define HAS_LWIP_NETWORKING	0
+#endif
+
+#ifndef HAS_WIFI_NETWORKING
+# define HAS_WIFI_NETWORKING	0
+#endif
+
+#if HAS_WIFI_NETWORKING && !defined(WIFI_USES_ESP32)
+# define WIFI_USES_ESP32		0
+#endif
+
+#ifndef HAS_W5500_NETWORKING
+# define HAS_W5500_NETWORKING	0
+#endif
+
+#ifndef HAS_RTOSPLUSTCP_NETWORKING
+# define HAS_RTOSPLUSTCP_NETWORKING    0
+#endif
+
+#ifndef HAS_ESP32_NETWORKING
+# define HAS_ESP32_NETWORKING    0
+#endif
+
+#define HAS_NETWORKING			(HAS_LWIP_NETWORKING || HAS_WIFI_NETWORKING || HAS_W5500_NETWORKING || HAS_RTOSPLUSTCP_NETWORKING || HAS_ESP32_NETWORKING)
+
+#ifndef SUPPORT_HTTP
+# define SUPPORT_HTTP			HAS_NETWORKING
+#endif
+
+#ifndef SUPPORT_FTP
+# define SUPPORT_FTP			HAS_NETWORKING
+#endif
+
+#ifndef SUPPORT_TELNET
+# define SUPPORT_TELNET			HAS_NETWORKING
+#endif
+
+#ifndef SUPPORT_MQTT
+# define SUPPORT_MQTT			0
+#endif
+
+#ifndef SUPPORT_MULTICAST_DISCOVERY
+# define SUPPORT_MULTICAST_DISCOVERY	0
+#endif
+
+#ifndef HAS_SBC_INTERFACE
+# define HAS_SBC_INTERFACE		0
+#endif
+
+#ifndef HAS_MASS_STORAGE
+# define HAS_MASS_STORAGE		1
+#endif
+
+#ifndef HAS_EMBEDDED_FILES
+# define HAS_EMBEDDED_FILES		0
+#endif
+
+#if !HAS_MASS_STORAGE && !HAS_SBC_INTERFACE
+# if SUPPORT_12864_LCD
+#  error "12864 LCD support requires mass storage or SBC interface"
+# endif
+#endif
+
+#if !HAS_MASS_STORAGE
+# if SUPPORT_FTP
+#  error "FTP support requires mass storage"
+# endif
+#endif
+
+#ifndef SUPPORT_ASYNC_MOVES
+# define SUPPORT_ASYNC_MOVES	0
+#endif
+
+#ifndef SUPPORT_KEEPOUT_ZONES
+# define SUPPORT_KEEPOUT_ZONES	0
+#endif
+
+#ifndef ALLOCATE_DEFAULT_PORTS
+# define ALLOCATE_DEFAULT_PORTS	0
+#endif
+
+#ifndef SUPPORT_ACCELEROMETERS
+# define SUPPORT_ACCELEROMETERS	0
+#endif
+
+#ifndef SUPPORT_CLOSED_LOOP
+#define SUPPORT_CLOSED_LOOP		0
+#endif
+
+#ifndef SUPPORT_PHASE_STEPPING
+#define SUPPORT_PHASE_STEPPING	0
+#endif
+
+#ifdef SUPPORT_S_CURVE
+# if SUPPORT_S_CURVE && !SUPPORT_PHASE_STEPPING
+#  error Cannot support S Curve acceleration without phase stepping
+# endif
+#else
+# define SUPPORT_S_CURVE		0
+#endif
+
+#ifndef SUPPORT_PROBE_POINTS_FILE
+# define SUPPORT_PROBE_POINTS_FILE	0
+#endif
+
+// Optional kinematics support, to allow us to reduce flash memory usage
+#ifndef SUPPORT_LINEAR_DELTA
+# define SUPPORT_LINEAR_DELTA	1
+#endif
+
+#ifndef SUPPORT_ROTARY_DELTA
+# define SUPPORT_ROTARY_DELTA	1
+#endif
+
+#ifndef SUPPORT_POLAR
+# define SUPPORT_POLAR			1
+#endif
+
+#ifndef SUPPORT_SCARA
+# define SUPPORT_SCARA			1
+#endif
+
+#ifndef SUPPORT_FIVEBARSCARA
+# define SUPPORT_FIVEBARSCARA	1
+#endif
+
+#ifndef SUPPORT_HANGPRINTER
+# define SUPPORT_HANGPRINTER	1
+#endif
+
+#ifndef BOARD_USES_UF2_BINARY
+# define BOARD_USES_UF2_BINARY	0
+#endif
+
+// We must define MCU_HAS_UNIQUE_ID as either 0 or 1 so we can use it in maths
+#if SAM4E || SAM4S || SAME70 || SAME5x
+# define MCU_HAS_UNIQUE_ID		1
+#else
+# define MCU_HAS_UNIQUE_ID		0
+#endif
+
+#if SAME70 || SAME5x
+# define MCU_HAS_TRUERANDOM	1
+#else
+# define MCU_HAS_TRUERANDOM	0
+#endif
+
+// Define SUPPORT_REMOTE_COMMANDS according to whether this hardware accepts commands over CAN
+#ifndef SUPPORT_REMOTE_COMMANDS
+# define SUPPORT_REMOTE_COMMANDS		(SUPPORT_CAN_EXPANSION && !defined(DUET3_ATE))
+#endif
+
+#ifndef SUPPORT_SCANNING_PROBES
+// Currently we can only attach scanning Z probes via CAN, so to save flash memory space and a small amount of RAM on Duet 2 we disable it
+# define SUPPORT_SCANNING_PROBES		(SUPPORT_CAN_EXPANSION)
+#endif
+
+#ifndef SUPPORT_MODBUS_RTU
+# define SUPPORT_MODBUS_RTU				0
+#endif
+
+#if SUPPORT_MODBUS_RTU && (NUM_ASYNC_CHANNELS == 0)
+# error Cannot support Modbus RTU without async channels
+#endif
+
+// Function to look up a pin name pass back the corresponding index into the pin table
+bool LookupPinName(const char *_ecv_array pn, LogicalPin& lpin, bool& hardwareInverted) noexcept;
+
+#endif // PINS_H__

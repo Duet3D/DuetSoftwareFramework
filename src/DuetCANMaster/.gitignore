@@ -1,0 +1,34 @@
+# Object and intermediate files
+*.o
+*.d
+
+# Misc
+/.settings/language.settings.xml
+
+# Emacs backup and auto-save files
+*~
+\#*\#
+
+# Output folders
+/Duet2/
+/Duet2_SBC/
+/DuetMaestro/
+/PCCB_10/
+/Duet3ATE/
+/Duet3MiniATE/
+/Duet3Mini5plus/
+/Duet3Mini5plus_Debug/
+/Duet3_MB6HC/
+/Duet3_MB6XD/
+/Duet3_CAN0/
+/Duet3_Debug/
+/FMDC_V02/
+/FMDC_V02_Debug/
+/FMDC_V03/
+/Duet3_MB6HC_no_SD/
+/Duet3_MB6HC_no_S_curve/
+/INDX/
+/.clangd
+/.clang-format
+/src/Temp/
+/.settings/
