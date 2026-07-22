@@ -9,6 +9,9 @@
 *~
 \#*\#
 
+# CMake build tree (object files, CMakeCache.txt, generated Makefiles)
+/build/
+
 # Output folders
 /Duet2/
 /Duet2_SBC/

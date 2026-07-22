@@ -197,21 +197,32 @@ endif
 # build is the default unless you override it in your Makefile.local
 build: $(DIRS_BUILD) DuetWebControl.build
 
-# Build the DuetCANMaster firmware (RepRapFirmware). This is a native ARM
-# firmware build, separate from the dotnet projects, so it does not go
-# through the generic %.build rule. LIBRARIES_DIR is resolved to an
-# absolute path because the sub-make runs from src/DuetCANMaster.
+# Build the DuetCANMaster firmware (RepRapFirmware). This is a native ARM firmware build,
+# separate from the dotnet projects, so it does not go through the generic %.build rule.
+# DuetCANMaster is a CMake project (see src/DuetCANMaster/CMakeLists.txt) driven through its
+# CMakePresets: `release` / `debug`, each with its own build tree under
+# src/DuetCANMaster/build/<preset>. CANMASTER_CONFIG selects the board (also the build-preset name).
+CANMASTER_DIR := src/DuetCANMaster
+CANMASTER_CFG_PRESET := $(if $(filter 1,$(DEBUG)),debug,release)
+CANMASTER_BUILD_PRESET := $(CANMASTER_CONFIG)$(if $(filter 1,$(DEBUG)),-debug,)
+# `make -jN DuetCANMaster` doesn't parallelise a recipe's own commands, so the job count is
+# forwarded to `cmake --build` explicitly instead of relying on the outer make's -j.
+CANMASTER_JOBS ?= $(shell nproc 2>/dev/null || echo 1)
+
+# `cmake --preset` reads CMakePresets.json from the working directory, so run from CANMASTER_DIR;
+# LIBRARIES_DIR is made absolute first so it survives the directory change.
 DuetCANMaster:
-	$(CMD_PREFIX)$(MAKE) -C src/DuetCANMaster $(CANMASTER_CONFIG) \
-		LIBRARIES_DIR=$(abspath $(LIBRARIES_DIR)) V=$(V)
+	$(CMD_PREFIX)cd $(CANMASTER_DIR) && cmake --preset $(CANMASTER_CFG_PRESET) \
+		-DLIBRARIES_DIR=$(abspath $(LIBRARIES_DIR)) $(SUPPRESS_OUTPUT)
+	$(CMD_PREFIX)cd $(CANMASTER_DIR) && cmake --build --preset $(CANMASTER_BUILD_PRESET) \
+		--parallel $(CANMASTER_JOBS) $(if $(filter 1,$(V)),--verbose)
 
 DuetCANMaster.clean:
-	$(CMD_PREFIX)$(MAKE) -C src/DuetCANMaster clean-$(CANMASTER_CONFIG) \
-		LIBRARIES_DIR=$(abspath $(LIBRARIES_DIR)) V=$(V)
+	$(CMD_PREFIX)cmake --build $(CANMASTER_DIR)/build/$(CANMASTER_CFG_PRESET) --target clean \
+		$(SUPPRESS_OUTPUT)
 
 DuetCANMaster.clean-all:
-	$(CMD_PREFIX)$(MAKE) -C src/DuetCANMaster clean-all \
-		LIBRARIES_DIR=$(abspath $(LIBRARIES_DIR)) V=$(V)
+	$(CMD_PREFIX)rm -rf $(CANMASTER_DIR)/build
 
 # Build the Duet3Expansion firmware (RepRapFirmware). Like DuetCANMaster these
 # are native ARM firmware builds that bypass the generic %.build rule, and
