@@ -35,7 +35,7 @@ function(_duet_target_library_profile TARGET OUT_DEPS OUT_ARGS)
         set(_args
             COREN2G         "CAN;USB;SDHC;RTOS"
             FREERTOS        ""
-            RRFLIBRARIES    ""
+            RRFLIBRARIES    "RTOS"
             CANLIB          "RTOS"
             LIBTINYUSB      ""
             LIBMBEDTLS      ""
@@ -46,7 +46,7 @@ function(_duet_target_library_profile TARGET OUT_DEPS OUT_ARGS)
         set(_args
             COREN2G         "CAN;USB;SDHC;RTOS"
             FREERTOS        ""
-            RRFLIBRARIES    ""
+            RRFLIBRARIES    "RTOS"
             CANLIB          "RTOS"
             LIBTINYUSB      ""
             LIBMBEDTLS      ""
@@ -254,7 +254,7 @@ function(duet_add_firmware TARGET)
 
     # The six static libraries reference each other's symbols cyclically, so they must be scanned
     # as a group; supc++ (the C++ runtime support that -nostdlib excludes) goes in the group too.
-    target_link_libraries(${TARGET} PRIVATE ${_libs})
+    target_link_libraries(${TARGET} PRIVATE "$<LINK_GROUP:RESCAN,${_libs},supc++>")
 
     find_program(CRCAPPENDER CrcAppender PATHS "${CRC_APPENDER_DIR}" NO_DEFAULT_PATH)
     if(NOT CRCAPPENDER)
