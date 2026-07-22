@@ -17,7 +17,12 @@
 				"ms-vscode.makefile-tools",
 				"ms-vscode.cmake-tools",
         "ms-python.python"
-      ]
+      ],
+      "settings": {
+        "cmake.sourceDirectory": [
+          "${workspaceFolder}/src/DuetSbcInterface"
+        ]
+      }
     }
   },
   "postCreateCommand": "dotnet --info && (cd src && dotnet restore DuetSoftwareFramework.sln) && python3 scripts/create_settings.py",

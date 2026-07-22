@@ -41,6 +41,8 @@ class RepRap final
   public:
 	RepRap() noexcept;
 	RepRap(const RepRap&) = delete;
+	RepRap& operator=(const RepRap&) = delete;
+	~RepRap() = default;
 
 	void EmergencyStop() noexcept;
 	void Init() noexcept;
@@ -103,7 +105,7 @@ class RepRap final
 	struct DebugLogRecord
 	{
 		c_string _ecv_null msg;
-		uint32_t data[4];
+		uint32_t data[4]{};
 
 		DebugLogRecord() noexcept
 			: msg(nullptr)
@@ -201,14 +203,17 @@ class MemoryWatcher
 	__attribute__((noinline)) explicit MemoryWatcher(uint32_t* _ecv_array pAddress) noexcept;
 	__attribute__((noinline)) MemoryWatcher() noexcept;
 	~MemoryWatcher() noexcept;
+	// Copying would leave two watchers pointing at the same memory, both restoring it on destruction
+	MemoryWatcher(const MemoryWatcher&) = delete;
+	MemoryWatcher& operator=(const MemoryWatcher&) = delete;
 	__attribute__((noinline)) bool Check(unsigned int tag) noexcept;
 
   private:
 	void Init() noexcept;
 
 	volatile uint32_t* _ecv_array m_checkedData;
-	uint32_t m_checkSum;
-	volatile uint32_t m_dataCopy[NumWords];
+	uint32_t m_checkSum{};
+	volatile uint32_t m_dataCopy[NumWords]{};
 };
 
 // Constructor to watch memory at a specified start address
@@ -222,8 +227,8 @@ MemoryWatcher<NumWords>::MemoryWatcher(uint32_t* _ecv_array pAddress) noexcept
 // Constructor to watch memory immediately after the memory occupied by this memory watcher object
 template <size_t NumWords>
 MemoryWatcher<NumWords>::MemoryWatcher() noexcept
+	: m_checkedData(reinterpret_cast<uint32_t * _ecv_array>(this) + (sizeof(*this) / sizeof(uint32_t)))
 {
-	m_checkedData = reinterpret_cast<uint32_t * _ecv_array>(this) + (sizeof(*this) / sizeof(uint32_t));
 	Init();
 }
 

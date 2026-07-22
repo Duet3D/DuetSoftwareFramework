@@ -58,8 +58,8 @@ class CanDriversList
 // Members of template class CanDriversData
 template <class T>
 CanDriversData<T>::CanDriversData() noexcept
+	: m_numEntries(0)
 {
-	m_numEntries = 0;
 }
 
 // Insert a new entry, keeping the list ordered by driver ID

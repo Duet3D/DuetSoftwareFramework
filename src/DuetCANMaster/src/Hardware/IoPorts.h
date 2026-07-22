@@ -21,6 +21,9 @@ class IoPort
   public:
 	IoPort() noexcept;
 	~IoPort() { Release(); }
+	// Copying would let two IoPorts own the same pin and release it twice
+	IoPort(const IoPort&) = delete;
+	IoPort& operator=(const IoPort&) = delete;
 
 	bool SetMode(PinAccess access) noexcept;
 	void Release() noexcept;

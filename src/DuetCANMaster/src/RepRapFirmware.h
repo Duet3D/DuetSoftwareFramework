@@ -212,6 +212,7 @@ extern "C" void debugPrintf(const char* fmt, ...) noexcept __attribute__((format
 // Function and macro to track return address corruption
 inline uint32_t GetStackValue(uint32_t dwordOffset) noexcept
 {
+	// NOLINTNEXTLINE(cppcoreguidelines-init-variables) - bound to SP, an initialiser would overwrite the stack pointer
 	register const volatile uint32_t* sp asm("sp");
 	return sp[dwordOffset];
 }
@@ -227,6 +228,7 @@ inline uint32_t GetStackValue(uint32_t dwordOffset) noexcept
 
 inline volatile uint32_t* GetStackOffset(uint32_t dwordOffset) noexcept
 {
+	// NOLINTNEXTLINE(cppcoreguidelines-init-variables) - bound to SP, an initialiser would overwrite the stack pointer
 	register volatile uint32_t* sp asm("sp");
 	return &sp[dwordOffset];
 }
@@ -265,6 +267,9 @@ class AutoClearingWatchpoint
 	}
 
 	~AutoClearingWatchpoint() noexcept { ClearWatchpoint(m_number); }
+	// Scope guard: copying would clear the watchpoint when the first copy went out of scope
+	AutoClearingWatchpoint(const AutoClearingWatchpoint&) = delete;
+	AutoClearingWatchpoint& operator=(const AutoClearingWatchpoint&) = delete;
 
   private:
 	uint8_t m_number;

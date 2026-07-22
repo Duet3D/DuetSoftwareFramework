@@ -26,6 +26,8 @@ class OutputBuffer
 	{
 	}
 	OutputBuffer(const OutputBuffer&) = delete;
+	OutputBuffer& operator=(const OutputBuffer&) = delete;
+	~OutputBuffer() = default;
 
 	void Append(OutputBuffer* _ecv_null other) noexcept;
 	OutputBuffer* null Next() const noexcept { return m_next; }
@@ -97,15 +99,15 @@ class OutputBuffer
 	void Clear() noexcept;
 
 	OutputBuffer* _ecv_null m_next;
-	OutputBuffer* m_last;
+	OutputBuffer* m_last{};
 
-	uint32_t m_whenQueued; // milliseconds timer when this buffer was filled in
+	uint32_t m_whenQueued{}; // milliseconds timer when this buffer was filled in
 
-	char m_data[OUTPUT_BUFFER_SIZE];
-	size_t m_dataLength, m_bytesRead;
+	char m_data[OUTPUT_BUFFER_SIZE]{};
+	size_t m_dataLength{}, m_bytesRead{};
 
-	bool m_isReferenced;
-	bool m_hadOverflow;
+	bool m_isReferenced{};
+	bool m_hadOverflow{};
 	std::atomic<size_t> m_references;
 
 	static OutputBuffer* volatile _ecv_null freeOutputBuffers; // Messages may be sent by multiple tasks
@@ -128,6 +130,8 @@ class OutputStack
 	{
 	}
 	OutputStack(const OutputStack&) = delete;
+	OutputStack& operator=(const OutputStack&) = delete;
+	~OutputStack() = default;
 
 	// Is there anything on this stack?
 	bool IsEmpty() const volatile noexcept { return m_count == 0; }
@@ -178,8 +182,8 @@ class OutputStack
 
   private:
 	size_t m_count;
-	OutputBuffer* _ecv_null m_items[OUTPUT_STACK_DEPTH];
-	MessageType m_types[OUTPUT_STACK_DEPTH];
+	OutputBuffer* _ecv_null m_items[OUTPUT_STACK_DEPTH]{};
+	MessageType m_types[OUTPUT_STACK_DEPTH]{};
 };
 
 #endif /* OUTPUTMEMORY_H_ */

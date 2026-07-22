@@ -65,7 +65,7 @@ class CanException
 	{
 		int32_t i;
 		uint32_t u;
-	} m_param;
+	} m_param{};
 	String<StringLength50> m_stringParam;
 };
 

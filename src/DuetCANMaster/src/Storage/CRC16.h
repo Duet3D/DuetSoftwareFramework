@@ -48,7 +48,7 @@ class CRC16
 	static const uint16_t crc16_modbus_table[];
 #endif
 
-	uint16_t m_crc;
+	uint16_t m_crc{};
 };
 
 inline CRC16::CRC16() noexcept

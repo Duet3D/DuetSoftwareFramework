@@ -57,10 +57,10 @@ class AveragingFilter
 	static void CallbackFeedIntoFilter(CallbackParameter cp, int32_t val) noexcept;
 
   private:
-	uint16_t m_readings[numAveraged];
-	size_t m_index;
-	uint32_t m_sum;
-	bool m_isValid;
+	uint16_t m_readings[numAveraged]{};
+	size_t m_index{};
+	uint32_t m_sum{};
+	bool m_isValid{};
 	// invariant(sum == + over readings)
 	// invariant(index < numAveraged)
 };

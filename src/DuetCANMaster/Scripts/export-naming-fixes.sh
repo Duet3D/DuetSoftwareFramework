@@ -33,6 +33,14 @@ for board in "${BOARDS[@]}"; do
 
 	# Only this project's own first-party sources; src/libc and src/libcpp are vendored.
 	#
+	# lib/ must be excluded here as well, not just via HeaderFilterRegex. That regex only governs
+	# which *headers* a diagnostic may be reported in -- the main source file of a TU is always
+	# analysed and always fixable. When the prebuilt archives under lib/*/SAME70*/ are missing the
+	# Makefile compiles those libraries from source, they enter the compile database as ordinary
+	# TUs, and the export then rewrites shared code that Duet3Expansion also builds. Whether that
+	# happens depends only on whether the .a files exist when the database is generated, so it is
+	# silent and intermittent rather than reproducible.
+	#
 	# Every remaining TU must be covered, including ones clang reports errors in. A renamed
 	# declaration in a header is only useful if the use-sites are renamed too, and a use-site's
 	# replacement is emitted solely by the TU that contains it -- skipping a .cpp renames the
@@ -43,7 +51,7 @@ import json, sys
 seen = set()
 for e in json.load(open('compile_commands.json')):
     f = e['file']
-    if '/src/libc/' in f or '/src/libcpp/' in f:
+    if '/src/libc/' in f or '/src/libcpp/' in f or '/lib/' in f:
         continue
     if f.endswith(('.cpp', '.cc')) and f not in seen:
         seen.add(f)

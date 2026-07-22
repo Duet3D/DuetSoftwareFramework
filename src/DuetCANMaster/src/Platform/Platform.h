@@ -214,6 +214,8 @@ class Platform final
   public:
 	Platform() noexcept;
 	Platform(const Platform&) = delete;
+	Platform& operator=(const Platform&) = delete;
+	~Platform() = default;
 
 	//-------------------------------------------------------------------------------------------------------------
 
