@@ -744,13 +744,18 @@
             "detail": "Non-mutating check; exits non-zero if anything would be reformatted. Suitable for CI."
         },
         {
+            // CMake writes the database at configure time, so this compiles nothing and takes
+            // about a second - unlike the old bear-wrapped Makefile build, which needed a full
+            // clean rebuild to capture every TU. Hence Tidy below just depends on it.
             "label": "[Style] Generate Compile DB - DuetCANMaster",
             "type": "shell",
             "command": "Scripts/gen-compile-commands.sh ${input:canmaster_board}",
             "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
-            "problemMatcher": [ "$gcc" ],
+            "problemMatcher": [],
+            "presentation": { "reveal": "silent" },
+            "runOptions": { "instanceLimit": 1 },
             "group": "build",
-            "detail": "Export CMake's compile database for the board, then rewrite it so clang can parse it. Required before Tidy."
+            "detail": "Configure CMake into build/compile-commands, keep the chosen board's firmware TUs, and rewrite them so clang can parse the bare-metal ARM flags. Writes src/DuetCANMaster/compile_commands.json."
         },
         {
             "label": "[Style] Generate Compile DB - DuetSbcInterface",
@@ -762,18 +767,21 @@
             "detail": "CMake exports compile_commands.json into build/."
         },
         {
+            // The database is regenerated first so it always matches the board picked here; it is
+            // a CMake configure, not a build, so this costs about a second.
             "label": "[Style] Tidy DuetCANMaster",
             "type": "shell",
-            "command": "test -f compile_commands.json || { echo 'No compile_commands.json - run [Style] Generate Compile DB - DuetCANMaster first' >&2; exit 1; }; run-clang-tidy-18 -p . -j $(nproc) -quiet '^.*/src/DuetCANMaster/src/(?!libc/|libcpp/|Hardware/ExceptionHandlers).*\\.cpp$' 2>&1 | awk '/^[0-9]+ warnings?( and [0-9]+ errors?)? generated\\.$/{next} /^Suppressed [0-9]+ warnings/{next} {print} /:[0-9]+:[0-9]+: (warning|error):/{n++} END{printf \"\\n== %d diagnostics in first-party code ==\\n\", n}'",
+            "dependsOn": "[Style] Generate Compile DB - DuetCANMaster",
+            "command": "run-clang-tidy-18 -p . -j $(nproc) -quiet '^.*/src/DuetCANMaster/src/(?!libc/|libcpp/|Hardware/ExceptionHandlers).*\\.cpp$' 2>&1 | awk -f ${workspaceFolder}/scripts/tidy-report.awk",
             "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
             "problemMatcher": [ "$gcc" ],
             "group": "test",
-            "detail": "Report only. Do not add -fix: see STYLE.md, per-file fixing corrupts shared headers."
+            "detail": "Regenerates the compile DB for the chosen board, then lints src/ (minus libc, libcpp and ExceptionHandlers). Report only. Do not add -fix: see STYLE.md, per-file fixing corrupts shared headers."
         },
         {
             "label": "[Style] Tidy DuetSbcInterface",
             "type": "shell",
-            "command": "test -f build/compile_commands.json || { echo 'No build/compile_commands.json - run [Style] Generate Compile DB - DuetSbcInterface first' >&2; exit 1; }; run-clang-tidy-18 -p build -j $(nproc) -quiet '^.*/src/DuetSbcInterface/(sbc|harness|tests)/.*\\.cpp$' 2>&1 | awk '/^[0-9]+ warnings?( and [0-9]+ errors?)? generated\\.$/{next} /^Suppressed [0-9]+ warnings/{next} {print} /:[0-9]+:[0-9]+: (warning|error):/{n++} END{printf \"\\n== %d diagnostics in first-party code ==\\n\", n}'",
+            "command": "test -f build/compile_commands.json || { echo 'No build/compile_commands.json - run [Style] Generate Compile DB - DuetSbcInterface first' >&2; exit 1; }; run-clang-tidy-18 -p build -j $(nproc) -quiet '^.*/src/DuetSbcInterface/(sbc|harness|tests)/.*\\.cpp$' 2>&1 | awk -f ${workspaceFolder}/scripts/tidy-report.awk",
             "options": { "cwd": "${workspaceFolder}/src/DuetSbcInterface" },
             "problemMatcher": [ "$gcc" ],
             "group": "test",
