@@ -58,6 +58,14 @@ namespace DuetAPI.ObjectModel
 		/// <summary>
 		/// WiFi adapter is idle
 		/// </summary>
-		Idle
+		Idle,
+
+		/// <summary>
+		/// Tried to start the network but initialisation failed
+		/// </summary>
+		/// <remarks>
+		/// Appended after Idle so the values of the other members remain unchanged
+		/// </remarks>
+		InitFailed
 	}
 }

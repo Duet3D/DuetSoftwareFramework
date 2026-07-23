@@ -1,4 +1,7 @@
-﻿namespace DuetAPI.ObjectModel
+﻿using System;
+using System.Text.Json.Serialization;
+
+namespace DuetAPI.ObjectModel
 {
     /// <summary>
     /// Move segmentation parameters
@@ -18,11 +21,22 @@
         /// <summary>
         /// Minimum length of a segment (in mm)
         /// </summary>
+        public float MinSegLength
+        {
+            get => _minSegLength;
+            set => SetPropertyValue(ref _minSegLength, value);
+        }
+        private float _minSegLength;
+
+        /// <summary>
+        /// Minimum length of a segment (in mm)
+        /// </summary>
+        [JsonIgnore]
+        [Obsolete("Use MinSegLength instead")]
         public float MinSegmentLength
         {
-            get => _minSegmentLength;
-            set => SetPropertyValue(ref _minSegmentLength, value);
+            get => MinSegLength;
+            set => MinSegLength = value;
         }
-        private float _minSegmentLength;
     }
 }

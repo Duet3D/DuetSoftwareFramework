@@ -46,6 +46,74 @@ namespace DuetAPI.ObjectModel
         public event PropertyChangingEventHandler? PropertyChanging;
 
         /// <summary>
+        /// Compare two nullable JSON elements by content. JsonElement does not override Equals,
+        /// so the default comparison checks the backing document references and never matches
+        /// elements from different parses
+        /// </summary>
+        /// <param name="a">First element</param>
+        /// <param name="b">Second element</param>
+        /// <returns>Whether both elements carry the same JSON content</returns>
+        private static bool JsonElementEquals(JsonElement? a, JsonElement? b) => (a is null || b is null) ? a is null == b is null : DeepEquals(a.Value, b.Value);
+
+        /// <summary>
+        /// Compare two JSON elements by content, like JsonElement.DeepEquals from System.Text.Json 9
+        /// </summary>
+        /// <param name="a">First element</param>
+        /// <param name="b">Second element</param>
+        /// <returns>Whether both elements carry the same JSON content</returns>
+        private static bool DeepEquals(JsonElement a, JsonElement b)
+        {
+            if (a.ValueKind != b.ValueKind)
+            {
+                return false;
+            }
+
+            switch (a.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    int numProperties = 0;
+                    foreach (JsonProperty property in a.EnumerateObject())
+                    {
+                        if (!b.TryGetProperty(property.Name, out JsonElement otherValue) || !DeepEquals(property.Value, otherValue))
+                        {
+                            return false;
+                        }
+                        numProperties++;
+                    }
+                    foreach (JsonProperty _ in b.EnumerateObject())
+                    {
+                        numProperties--;
+                    }
+                    return numProperties == 0;
+
+                case JsonValueKind.Array:
+                    if (a.GetArrayLength() != b.GetArrayLength())
+                    {
+                        return false;
+                    }
+                    JsonElement.ArrayEnumerator otherItems = b.EnumerateArray();
+                    foreach (JsonElement item in a.EnumerateArray())
+                    {
+                        if (!otherItems.MoveNext() || !DeepEquals(item, otherItems.Current))
+                        {
+                            return false;
+                        }
+                    }
+                    return true;
+
+                case JsonValueKind.String:
+                    return a.ValueEquals(b.GetString());
+
+                case JsonValueKind.Number:
+                    return a.GetRawText() == b.GetRawText();
+
+                default:
+                    // True, False, Null, and Undefined are fully described by their value kind
+                    return true;
+            }
+        }
+
+        /// <summary>
         /// Get an element from the dictionary
         /// </summary>
         /// <param name="key">Key</param>
@@ -216,7 +284,7 @@ namespace DuetAPI.ObjectModel
                             this[kv.Key] = kv.Value;
                         }
                     }
-                    else if (!existingItem.Equals(kv.Value))
+                    else if (!JsonElementEquals(existingItem, kv.Value))
                     {
                         this[kv.Key] = kv.Value;
                     }
@@ -296,14 +364,14 @@ namespace DuetAPI.ObjectModel
         /// </summary>
         /// <param name="array">Destination array</param>
         /// <param name="arrayIndex">Start iondex</param>
-        public void CopyTo(KeyValuePair<string, JsonElement?>[] array, int arrayIndex) => CopyTo(array, arrayIndex);
+        public void CopyTo(KeyValuePair<string, JsonElement?>[] array, int arrayIndex) => CopyTo((Array)array, arrayIndex);
 
         /// <summary>
         /// Check if a key-value pair exists
         /// </summary>
         /// <param name="item">Item to check</param>
         /// <returns>If the item exists in the dictionary</returns>
-        public bool Contains(KeyValuePair<string, JsonElement?> item) => _dictionary.TryGetValue(item.Key, out JsonElement? value) && Equals(value, item.Value);
+        public bool Contains(KeyValuePair<string, JsonElement?> item) => _dictionary.TryGetValue(item.Key, out JsonElement? value) && JsonElementEquals(value, item.Value);
 
         /// <summary>
         /// Get an enumerator
@@ -382,7 +450,7 @@ namespace DuetAPI.ObjectModel
                     {
                         Remove(jsonProperty.Name);
                     }
-                    else if (!TryGetValue(jsonProperty.Name, out JsonElement? value) || !value!.Equals(jsonProperty.Value))
+                    else if (!TryGetValue(jsonProperty.Name, out JsonElement? value) || !JsonElementEquals(value, jsonProperty.Value))
                     {
                         this[jsonProperty.Name] = jsonProperty.Value.Clone();
                     }
@@ -414,7 +482,7 @@ namespace DuetAPI.ObjectModel
                         {
                             Remove(key);
                         }
-                        else if (!TryGetValue(key, out JsonElement? existingValue) || !existingValue!.Equals(value))
+                        else if (!TryGetValue(key, out JsonElement? existingValue) || !JsonElementEquals(existingValue, value))
                         {
                             this[key] = value;
                         }

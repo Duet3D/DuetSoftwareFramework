@@ -173,7 +173,10 @@ namespace DuetControlServer.SPI.Channel
                     {
                         if (!macro.IsAborted)
                         {
-                            _logger.Warn("Aborting orphaned macro file {0}", macro.FileName);
+                            if (!Program.CancellationToken.IsCancellationRequested)
+                            {
+                                _logger.Warn("Aborting orphaned macro file {0}", macro.FileName);
+                            }
                             macro.Abort();
                         }
                     }
@@ -250,7 +253,10 @@ namespace DuetControlServer.SPI.Channel
                     {
                         if (!macro.IsAborted)
                         {
-                            _logger.Warn("Aborting orphaned macro file {0}", macro.FileName);
+                            if (!Program.CancellationToken.IsCancellationRequested)
+                            {
+                                _logger.Warn("Aborting orphaned macro file {0}", macro.FileName);
+                            }
                             macro.Abort();
                         }
                     }

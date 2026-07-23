@@ -112,9 +112,16 @@ if (codeToExecute is null)
     }
 
     // Unregister this session again
-    if (connection.IsConnected)
+    try
     {
-        await connection.RemoveUserSession(sessionId);
+        if (connection.IsConnected)
+        {
+            await connection.RemoveUserSession(sessionId);
+        }
+    }
+    catch
+    {
+        // DCS may have shut down (e.g. after a firmware update)
     }
 }
 else if (codeToExecute.Equals("startUpdate", StringComparison.InvariantCultureIgnoreCase))

@@ -94,24 +94,6 @@ namespace DuetWebServer
             // Use static files if enabled
             if (_settings.UseStaticFiles)
             {
-                // Don't cache the index page but cache all other assets
-                app.UseStaticFiles(new StaticFileOptions
-                {
-                    OnPrepareResponse = ctx =>
-                    {
-                        if (ctx.Context.Request.Path.Equals("/"))
-                        {
-                            ctx.Context.Response.Headers[HeaderNames.CacheControl] = "no-store,no-cache,must-revalidate";
-                            ctx.Context.Response.Headers[HeaderNames.Pragma] = "no-cache";
-                        }
-                        else
-                        {
-                            ctx.Context.Response.Headers[HeaderNames.CacheControl] = $"public,max-age={_settings.MaxAge},must-revalidate";
-                            ctx.Context.Response.Headers[HeaderNames.Expires] = "0";
-                        }
-                    }
-                });
-
                 // Provide files either using the directory provided by directories.web or from the override directory
                 IFileProvider fileProvider;
                 if (_settings.OverrideWebDirectory != null)
@@ -123,10 +105,25 @@ namespace DuetWebServer
                     fileProvider = ActivatorUtilities.CreateInstance<FileProviders.DuetFileProvider>(serviceProvider);
                 }
 
-                // Configure file provider
+                // Configure file provider; don't cache the index page but cache all other assets
                 app.UseFileServer(new FileServerOptions
                 {
-                    FileProvider = fileProvider
+                    FileProvider = fileProvider,
+                    StaticFileOptions =
+                    {
+                        OnPrepareResponse = ctx =>
+                        {
+                            if (ctx.File.Name.Equals("index.html", StringComparison.OrdinalIgnoreCase))
+                            {
+                                ctx.Context.Response.Headers[HeaderNames.CacheControl] = "no-store,no-cache,must-revalidate";
+                                ctx.Context.Response.Headers[HeaderNames.Pragma] = "no-cache";
+                            }
+                            else
+                            {
+                                ctx.Context.Response.Headers[HeaderNames.CacheControl] = $"public,max-age={_settings.MaxAge},must-revalidate";
+                            }
+                        }
+                    }
                 });
             }
         }

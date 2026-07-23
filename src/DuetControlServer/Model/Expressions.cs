@@ -259,7 +259,7 @@ namespace DuetControlServer.Model
             }
 
             // Check for special variables
-            if (expression == "iterations" || expression == "line" || expression == "result")
+            if (expression == "iterations" || expression == "line")
             {
                 return true;
             }

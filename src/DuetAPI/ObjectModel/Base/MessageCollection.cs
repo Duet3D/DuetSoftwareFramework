@@ -122,13 +122,16 @@ namespace DuetAPI.ObjectModel
 
             while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
             {
+                // Save the reader state in case this item fails to deserialize
+                Utf8JsonReader itemStart = reader;
                 try
                 {
                     Add(JsonSerializer.Deserialize(ref reader, ObjectModelContext.Default.Message)!);
                 }
-                catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(Message), JsonElement.ParseValue(ref reader), e))
+                catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(Message), JsonElement.ParseValue(ref itemStart), e))
                 {
-                    // suppressed
+                    // Resume after the failed item, ParseValue has already advanced the saved reader past it
+                    reader = itemStart;
                 }
             }
         }

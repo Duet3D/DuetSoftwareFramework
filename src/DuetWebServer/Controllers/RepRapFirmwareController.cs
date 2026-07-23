@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using DuetAPI;
@@ -37,6 +38,12 @@ namespace DuetWebServer.Controllers
         /// App settings
         /// </summary>
         private readonly Settings _settings = configuration.Get<Settings>() ?? new();
+
+        /// <summary>
+        /// Lock to serialize object model queries. Each M409 is preceded by a full object model sync
+        /// so that bursts of rr_model requests cannot exhaust the output buffers in RepRapFirmware
+        /// </summary>
+        private static readonly SemaphoreSlim _modelQueryLock = new(1, 1);
 
         #region Logging
         /// <summary>
@@ -546,43 +553,57 @@ namespace DuetWebServer.Controllers
                 using CommandConnection connection = await BuildConnection();
                 string response;
 
-                if (string.IsNullOrWhiteSpace(key) && flags?.Contains('f') == true)
+                await _modelQueryLock.WaitAsync(HttpContext.RequestAborted);
+                try
                 {
-                    // Update special "seqs" values in common live query resul
-                    response = await connection.PerformSimpleCode($"M409 F\"{flags}\"");
+                    await connection.SyncObjectModel();
 
-                    // Update sequence numbers where applicable
-                    using JsonDocument jsonDoc = JsonDocument.Parse(response);
-                    if (jsonDoc.RootElement.TryGetProperty("result", out JsonElement resultElement) && resultElement.TryGetProperty("seqs", out JsonElement seqsElement))
+                    if (string.IsNullOrWhiteSpace(key) && flags?.Contains('f') == true)
                     {
-                        Dictionary<string, object> result = JsonSerializer.Deserialize<Dictionary<string, object>>(resultElement.GetRawText())!;
-                        {
-                            Dictionary<string, object> seqs = JsonSerializer.Deserialize<Dictionary<string, object>>(seqsElement.GetRawText())!;
-                            lock (modelProvider)
-                            {
-                                if (seqs.ContainsKey("reply"))
-                                {
-                                    seqs["reply"] = modelProvider.ReplySeq;
-                                }
-                            }
-                            result["seqs"] = seqs;
-                        }
+                        // Update special "seqs" values in common live query result
+                        response = await connection.PerformSimpleCode($"M409 F\"{flags}\"");
 
-                        return Content(JsonSerializer.Serialize(new
+                        // Update sequence numbers where applicable
+                        using JsonDocument jsonDoc = JsonDocument.Parse(response);
+                        if (jsonDoc.RootElement.TryGetProperty("result", out JsonElement resultElement) && resultElement.TryGetProperty("seqs", out JsonElement seqsElement))
                         {
-                            key,
-                            flags,
-                            result
-                        }, JsonHelper.DefaultJsonOptions), "application/json");
+                            Dictionary<string, object> result = JsonSerializer.Deserialize<Dictionary<string, object>>(resultElement.GetRawText())!;
+                            {
+                                Dictionary<string, object> seqs = JsonSerializer.Deserialize<Dictionary<string, object>>(seqsElement.GetRawText())!;
+                                lock (modelProvider)
+                                {
+                                    if (seqs.ContainsKey("reply"))
+                                    {
+                                        seqs["reply"] = modelProvider.ReplySeq;
+                                    }
+                                }
+                                result["seqs"] = seqs;
+                            }
+
+                            return Content(JsonSerializer.Serialize(new
+                            {
+                                key,
+                                flags,
+                                result
+                            }, JsonHelper.DefaultJsonOptions), "application/json");
+                        }
+                    }
+                    else
+                    {
+                        // Fall back to M409
+                        response = await connection.PerformSimpleCode($"M409 K\"{key}\" F\"{flags}\"");
                     }
                 }
-                else
+                finally
                 {
-                    // Fall back to M409
-                    response = await connection.PerformSimpleCode($"M409 K\"{key}\" F\"{flags}\"");
+                    _modelQueryLock.Release();
                 }
 
                 return Content(response, "application/json");
+            }
+            catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
+            {
+                // Don't log errors for queued requests that were aborted by the client
             }
             catch (Exception e)
             {

@@ -143,19 +143,29 @@ namespace DuetControlServer.Codes.Pipelines
                             }
 
                             // Split the message into multiple chunks so RRF can output it
-                            Memory<byte> encodedMessage = Encoding.UTF8.GetBytes(code.Result.ToString());
-                            for (int i = 0; i < encodedMessage.Length; i += Settings.MaxMessageLength)
+                            byte[] encodedMessage = Encoding.UTF8.GetBytes(code.Result.ToString());
+                            int i = 0;
+                            while (i < encodedMessage.Length)
                             {
-                                if (i + Settings.MaxMessageLength >= encodedMessage.Length)
+                                int chunkLength = Math.Min(Settings.MaxMessageLength, encodedMessage.Length - i);
+                                if (i + chunkLength < encodedMessage.Length)
                                 {
-                                    Memory<byte> partialMessage = encodedMessage[i..];
-                                    SPI.Interface.SendMessage(flags, Encoding.UTF8.GetString(partialMessage.ToArray()));
+                                    // Move the split back to a character boundary, else both chunks decode to
+                                    // replacement characters where a multi-byte UTF-8 sequence is divided
+                                    while (chunkLength > 0 && (encodedMessage[i + chunkLength] & 0xC0) == 0x80)
+                                    {
+                                        chunkLength--;
+                                    }
+                                    if (chunkLength == 0)
+                                    {
+                                        // Invalid UTF-8 content, fall back to a hard split to guarantee progress
+                                        chunkLength = Math.Min(Settings.MaxMessageLength, encodedMessage.Length - i);
+                                    }
                                 }
-                                else
-                                {
-                                    Memory<byte> partialMessage = encodedMessage.Slice(i, Math.Min(encodedMessage.Length - i, Settings.MaxMessageLength));
-                                    SPI.Interface.SendMessage(flags | MessageTypeFlags.PushFlag, Encoding.UTF8.GetString(partialMessage.ToArray()));
-                                }
+
+                                MessageTypeFlags chunkFlags = (i + chunkLength < encodedMessage.Length) ? flags | MessageTypeFlags.PushFlag : flags;
+                                SPI.Interface.SendMessage(chunkFlags, Encoding.UTF8.GetString(encodedMessage, i, chunkLength));
+                                i += chunkLength;
                             }
                         }
                         else if (code.IsFromFileChannel)

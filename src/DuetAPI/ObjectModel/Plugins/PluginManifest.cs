@@ -20,7 +20,9 @@ namespace DuetAPI.ObjectModel
             get => _id;
             set
             {
-                if (string.IsNullOrWhiteSpace(value) || value.Length > 32)
+                // An empty value is permitted here so that default instances can be cloned and assigned.
+                // Manifest ingestion checks that an identifier is actually present
+                if (value is null || value.Length > 32)
                 {
                     throw new ArgumentException("Invalid plugin identifier");
                 }
@@ -46,7 +48,9 @@ namespace DuetAPI.ObjectModel
             get => _name;
             set
             {
-                if (string.IsNullOrWhiteSpace(value) || value.Length > 64)
+                // An empty value is permitted here so that default instances can be cloned and assigned.
+                // Manifest ingestion checks that a name is actually present
+                if (value is null || value.Length > 64 || (value.Length > 0 && string.IsNullOrWhiteSpace(value)))
                 {
                     throw new ArgumentException("Invalid plugin name");
                 }
