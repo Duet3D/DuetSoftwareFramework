@@ -160,6 +160,7 @@ build_progs() {
 	[ -d $PACKAGER_DIR/duettools/ ] && $RSYNC $PACKAGER_DIR/duettools/. $DEST_DIR/duettools_$dsfver/
 	mv $DEST_DIR/files/CodeConsole* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
 	mv $DEST_DIR/files/CodeLogger* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
+	mv $DEST_DIR/files/CodeStream* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
 	mv $DEST_DIR/files/CustomHttpEndpoint* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
 	mv $DEST_DIR/files/ModelObserver* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
 	mv $DEST_DIR/files/PluginManager* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
