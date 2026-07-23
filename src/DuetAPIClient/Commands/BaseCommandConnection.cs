@@ -267,7 +267,9 @@ namespace DuetAPIClient
             {
                 if (connection.IsConnected)
                 {
+#pragma warning disable CS0618
                     await connection.PerformCommand(new UnlockObjectModel(), default);
+#pragma warning restore CS0618
                 }
             }
         }
@@ -294,6 +296,7 @@ namespace DuetAPIClient
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        [Obsolete("This command will be removed in v3.7")]
         public async Task<IAsyncDisposable> LockObjectModel(CancellationToken cancellationToken = default)
         {
             await PerformCommand(new LockObjectModel(), cancellationToken);
@@ -469,6 +472,7 @@ namespace DuetAPIClient
         /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
         /// <exception cref="SocketException">Command could not be processed</exception>
         /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        [Obsolete("Use PatchObjectModel instead, this command will be removed in v3.7")]
         public Task<bool> SetObjectModel(string path, string value, CancellationToken cancellationToken = default)
         {
             return PerformCommand<bool>(new SetObjectModel { PropertyPath = path, Value = value }, cancellationToken);
@@ -504,6 +508,21 @@ namespace DuetAPIClient
         public Task SetUpdateStatus(bool isUpdating, CancellationToken cancellationToken = default)
         {
             return PerformCommand(new SetUpdateStatus { Updating = isUpdating }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Set the WiFi country code. This is a global setting on Linux, so it is applied to every WiFi
+        /// interface in the object model
+        /// </summary>
+        /// <param name="countryCode">New WiFi country code, or null to clear it</param>
+        /// <param name="cancellationToken">Optional cancellation token</param>
+        /// <returns>Asynchronous task</returns>
+        /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+        /// <exception cref="SocketException">Command could not be processed</exception>
+        /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+        public Task SetWifiCountry(string? countryCode, CancellationToken cancellationToken = default)
+        {
+            return PerformCommand(new SetWifiCountry { CountryCode = countryCode }, cancellationToken);
         }
 
         /// <summary>

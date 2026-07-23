@@ -28,12 +28,19 @@ namespace DuetAPI.Commands
     [JsonSerializable(typeof(RemoveHttpEndpoint))]
     [JsonSerializable(typeof(Acknowledge))]
     [JsonSerializable(typeof(GetObjectModel))]
+#pragma warning disable CS0618
     [JsonSerializable(typeof(LockObjectModel))]
+#pragma warning restore CS0618
     [JsonSerializable(typeof(PatchObjectModel))]
     [JsonSerializable(typeof(SetNetworkProtocol))]
+#pragma warning disable CS0618
     [JsonSerializable(typeof(SetObjectModel))]
+#pragma warning restore CS0618
+    [JsonSerializable(typeof(SetWifiCountry))]
     [JsonSerializable(typeof(SyncObjectModel))]
+#pragma warning disable CS0618
     [JsonSerializable(typeof(UnlockObjectModel))]
+#pragma warning restore CS0618
     [JsonSerializable(typeof(InstallSystemPackage))]
     [JsonSerializable(typeof(UninstallSystemPackage))]
     [JsonSerializable(typeof(InstallPlugin))]

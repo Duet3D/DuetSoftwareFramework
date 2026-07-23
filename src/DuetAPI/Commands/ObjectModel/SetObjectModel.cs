@@ -1,4 +1,5 @@
 ﻿using DuetAPI.Utility;
+using System;
 
 namespace DuetAPI.Commands
 {
@@ -11,6 +12,8 @@ namespace DuetAPI.Commands
     /// </remarks>
     /// <seealso cref="LockObjectModel"/>
     /// <seealso cref="UnlockObjectModel"/>
+    /// <seealso cref="PatchObjectModel"/>
+    [Obsolete("Use PatchObjectModel instead, this command will be removed in v3.7")]
     [RequiredPermissions(SbcPermissions.ObjectModelReadWrite)]
     public class SetObjectModel : Command<bool>
     {

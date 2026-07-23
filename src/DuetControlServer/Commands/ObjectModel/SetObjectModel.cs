@@ -10,7 +10,9 @@ namespace DuetControlServer.Commands
     /// <summary>
     /// Implementation of the <see cref="DuetAPI.Commands.SetObjectModel"/> command
     /// </summary>
+#pragma warning disable CS0618
     public sealed class SetObjectModel : DuetAPI.Commands.SetObjectModel
+#pragma warning restore CS0618
     {
         /// <summary>
         /// Set an atomic property in the object model

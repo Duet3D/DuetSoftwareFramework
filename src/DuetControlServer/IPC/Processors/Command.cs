@@ -31,6 +31,7 @@ namespace DuetControlServer.IPC.Processors
             typeof(PatchObjectModel),
             typeof(SetObjectModel),
             typeof(SetUpdateStatus),
+            typeof(SetWifiCountry),
             typeof(SyncObjectModel),
             typeof(UnlockObjectModel),
             typeof(InstallPlugin),
