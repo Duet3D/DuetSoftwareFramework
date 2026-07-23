@@ -33,7 +33,8 @@ Licence: GPL
 #include <cmath>
 
 #include <ctime>
-[[deprecated("use gmtime_r instead for thread-safety")]] tm* _ecv_null gmtime(const time_t* t);
+// NOLINTNEXTLINE(readability-identifier-naming) without this we get [readability-inconsistent-declaration-parameter-name]
+[[deprecated("use gmtime_r instead for thread-safety")]] tm* _ecv_null gmtime(const time_t* _timer);
 [[deprecated("use SafeStrptime instead")]] char* _ecv_array strptime(const char* _ecv_array buf,
 																	 const char* _ecv_array format,
 																	 struct tm* timeptr);
@@ -86,7 +87,7 @@ constexpr LogicalPin NoLogicalPin = 0xFF;
 constexpr const char* _ecv_array NoPinName = "nil";
 
 // Enumeration to describe what we want to do with a pin
-enum class PinAccess : int
+enum class PinAccess : uint8_t
 {
 	Read,
 	ReadWithPullupInternalUseOnly,

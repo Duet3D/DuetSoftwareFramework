@@ -24,7 +24,7 @@ class HeightMap;
 
 struct ExpressionValue;
 
-enum class TransferState
+enum class TransferState : uint8_t
 {
 	DoingFullTransfer,
 	DoingPartialTransfer,
@@ -77,7 +77,7 @@ class DataTransfer
   private:
 	// Both sides treat BadResponse as "abandon this transfer and start over from a header", so there is no
 	// state for retrying a response exchange after one has been sent or received
-	enum class InternalTransferState
+	enum class InternalTransferState : uint8_t
 	{
 		ExchangingHeader,
 		ExchangingHeaderResponse,

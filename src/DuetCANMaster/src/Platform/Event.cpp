@@ -15,6 +15,7 @@ unsigned int Event::eventsQueued = 0;
 unsigned int Event::eventsProcessed = 0;
 
 // Private constructor, inline because it is only called from one place
+// NOLINTBEGIN(modernize-pass-by-value)
 inline Event::Event(Event* _ecv_null pNext,
 					const EventType& et,
 					uint16_t pParam,
@@ -31,6 +32,7 @@ inline Event::Event(Event* _ecv_null pNext,
 {
 	m_text.vprintf(format, vargs);
 }
+// NOLINTEND(modernize-pass-by-value)
 
 // Queue an event, or release it if we have a similar event pending already. Returns true if the event was added, false
 // if it was released.

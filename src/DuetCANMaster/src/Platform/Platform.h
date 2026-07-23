@@ -131,6 +131,7 @@ enum class BoardType : uint8_t
 /***************************************************************************************************/
 
 // Enumeration to describe various tests we do in response to the M122 command
+// NOLINTNEXTLINE(performance-enum-size)
 enum class DiagnosticTestType : unsigned int
 {
 	PrintTestReport = 1, // run some tests and report the processor ID
@@ -171,6 +172,7 @@ enum class DiagnosticTestType : unsigned int
 using ThermistorAveragingFilter = AveragingFilter<ThermistorAverageReadings>;
 
 // Enumeration of error condition bits
+// NOLINTNEXTLINE(performance-enum-size)
 enum class ErrorCode : uint32_t
 {
 	BadTemp = 1u << 0,
