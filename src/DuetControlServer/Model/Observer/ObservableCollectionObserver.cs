@@ -14,7 +14,7 @@ public partial class Observer
     /// <summary>
     /// Dictionary of collections vs change handlers
     /// </summary>
-    private readonly Dictionary<ICollection, NotifyCollectionChangedEventHandler> _observableCollectionChangeHandlers = [];
+    private readonly Dictionary<INotifyCollectionChanged, NotifyCollectionChangedEventHandler> _observableCollectionChangeHandlers = [];
 
     /// <summary>
     /// Function to generate an object collection change handler
@@ -90,7 +90,7 @@ public partial class Observer
     /// <param name="observableCollection">Collection to subscribe to</param>
     /// <param name="collectionName">Name of the collection</param>
     /// <param name="path">Path of the subscription</param>
-    private void SubscribeToObservableCollection<T>(ObservableCollection<T> observableCollection, string collectionName, object[] path)
+    private void SubscribeToObservableCollection(INotifyCollectionChanged observableCollection, string collectionName, object[] path)
     {
         NotifyCollectionChangedEventHandler changeHandler = ObservableCollectionChanged(collectionName, path);
         observableCollection.CollectionChanged += changeHandler;
@@ -101,7 +101,7 @@ public partial class Observer
     /// Unsubscribe from changes of a model collection
     /// </summary>
     /// <param name="observableCollection">Collection to unsubscribe from</param>
-    private void UnsubscribeFromObservableCollection<T>(ObservableCollection<T> observableCollection)
+    private void UnsubscribeFromObservableCollection(INotifyCollectionChanged observableCollection)
     {
         if (_observableCollectionChangeHandlers.TryGetValue(observableCollection, out NotifyCollectionChangedEventHandler? changeHandler))
         {

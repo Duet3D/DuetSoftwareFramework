@@ -9,7 +9,6 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -365,8 +364,8 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
             else if (bracketDepth == 0) strippedExpression.Append(c);
         }
 
-        // We neither read from nor write data to the OM so don't care about locking it
-        ModelObject modelItem = model;
+        // This walks the generated type descriptors, so it neither reads from nor instantiates the OM
+        IModelObjectDescriptor descriptor = model.Descriptor;
         foreach (string pathItem in strippedExpression.ToString().Split('.'))
         {
             if (string.IsNullOrEmpty(pathItem))
@@ -374,41 +373,23 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
                 return false;
             }
 
-            PropertyInfo? property = modelItem.GetType().GetProperty(pathItem, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
+            ModelPropertyDescriptor? property = descriptor.FindProperty(pathItem, true);
             if (property is null)
             {
                 return false;
             }
 
-            if (Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
+            if ((property.Flags & ModelPropertyFlags.SbcProperty) != 0)
             {
                 return true;
             }
 
-            Type propType = property.PropertyType;
-            if (propType.IsSubclassOf(typeof(ModelObject)))
+            if (property.ElementDescriptor is null)
             {
-                modelItem = (ModelObject)Activator.CreateInstance(propType)!;
-            }
-            else if (propType.IsGenericType)
-            {
-                // For collections/dictionaries the item/value type is the last generic argument
-                Type itemType = propType.GetGenericArguments()[^1];
-                if (itemType.IsSubclassOf(typeof(ModelObject)))
-                {
-                    modelItem = (ModelObject)Activator.CreateInstance(itemType)!;
-                }
-                else
-                {
-                    // Reached a leaf generic type (e.g. List<float>); no SBC property here
-                    break;
-                }
-            }
-            else
-            {
-                // Reached a scalar leaf; no SBC property found along this path
+                // Reached a scalar or non-model item type; no SBC property found along this path
                 break;
             }
+            descriptor = property.ElementDescriptor;
         }
         return false;
     }

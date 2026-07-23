@@ -6,7 +6,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading;
 using DcsModel = DuetControlServer.Model.ObjectModel;
@@ -158,6 +160,23 @@ namespace UnitTests.Machine
             _changes.Clear();
             _model.Heat.BedHeaterMapping.RemoveAt(0);
             AssertSingleChange("heat/bedHeaterMapping[0 of 0]", PropertyChangeType.Collection, null);
+        }
+
+        [Test]
+        public void UnknownPropertiesAreNotReported()
+        {
+            FieldInfo eventField = typeof(ModelObject).GetField("PropertyChanged", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.That(eventField, Is.Not.Null);
+
+            PropertyChangedEventHandler handler = (PropertyChangedEventHandler)eventField.GetValue(_model.Heat);
+            Assert.That(handler, Is.Not.Null, "observer did not subscribe to heat");
+
+            // Properties outside the DuetAPI object model must never be reported to clients
+            handler(_model.Heat, new PropertyChangedEventArgs("NotAModelProperty"));
+            Assert.That(_changes, Is.Empty);
+
+            handler(_model.Heat, new PropertyChangedEventArgs("ColdExtrudeTemperature"));
+            AssertSingleChange("heat/coldExtrudeTemperature", PropertyChangeType.Property, 160F);
         }
     }
 }

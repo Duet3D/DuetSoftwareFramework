@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Text.Json;
 using DuetAPI.Commands;
@@ -13,11 +14,31 @@ namespace DuetControlServer.Commands;
 public class CommandFactory(IServiceProvider serviceProvider)
 {
     /// <summary>
+    /// Cached activation factories per command type
+    /// </summary>
+    private static readonly ConcurrentDictionary<Type, ObjectFactory> _objectFactories = new();
+
+    /// <summary>
+    /// Get the cached activation factory for a command type, creating it on first use
+    /// </summary>
+    /// <param name="type">Command type</param>
+    /// <returns>Activation factory</returns>
+    private static ObjectFactory GetObjectFactory(Type type)
+    {
+        if (!_objectFactories.TryGetValue(type, out ObjectFactory? objectFactory))
+        {
+            objectFactory = ActivatorUtilities.CreateFactory(type, Type.EmptyTypes);
+            _objectFactories[type] = objectFactory;
+        }
+        return objectFactory;
+    }
+
+    /// <summary>
     /// Create a new command instance
     /// </summary>
     /// <typeparam name="T">Command type</typeparam>
     /// <returns>Command instance</returns>
-    public T Create<T>() where T : BaseCommand => ActivatorUtilities.CreateInstance<T>(serviceProvider);
+    public T Create<T>() where T : BaseCommand => (T)Create(typeof(T));
 
     /// <summary>
     /// Create a new command instance
@@ -25,7 +46,7 @@ public class CommandFactory(IServiceProvider serviceProvider)
     /// <param name="type">Command type</param>
     /// <returns>Command instance</returns>
     /// <exception cref="ArgumentException">Unsupported command</exception>
-    public BaseCommand Create(Type type) => (BaseCommand)ActivatorUtilities.CreateInstance(serviceProvider, type);
+    public BaseCommand Create(Type type) => (BaseCommand)GetObjectFactory(type)(serviceProvider, null);
 
     /// <summary>
     /// Create a new command instance from the given JSON data
@@ -40,7 +61,7 @@ public class CommandFactory(IServiceProvider serviceProvider)
         Type? commandType = supportedCommands.First(item => item.Name.Equals(commandName, StringComparison.InvariantCultureIgnoreCase))
                             ?? throw new ArgumentException($"Unsupported command {commandName}");
 
-        BaseCommand command = (BaseCommand)ActivatorUtilities.CreateInstance(serviceProvider, commandType);
+        BaseCommand command = (BaseCommand)GetObjectFactory(commandType)(serviceProvider, null);
         command.UpdateFromJson(commandData);
         return command;
     }
@@ -58,7 +79,7 @@ public class CommandFactory(IServiceProvider serviceProvider)
         Type? commandType = supportedCommands.First(item => item.Name.Equals(commandName, StringComparison.InvariantCultureIgnoreCase))
                             ?? throw new ArgumentException($"Unsupported command {commandName}");
 
-        BaseCommand command = (BaseCommand)ActivatorUtilities.CreateInstance(serviceProvider, commandType);
+        BaseCommand command = (BaseCommand)GetObjectFactory(commandType)(serviceProvider, null);
         command.UpdateFromJsonReader(ref reader);
         return command;
     }

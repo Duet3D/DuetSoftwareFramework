@@ -4,11 +4,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using System.Text.Json;
 using System.Threading;
 using ApiModel = DuetAPI.ObjectModel.ObjectModel;
 using DcsFilter = DuetControlServer.Model.Filter;
@@ -27,8 +24,6 @@ namespace UnitTests.Machine
         }
 
         private static DcsModel CreateModel() => new(new TestLifetime(), NullLogger<DcsModel>.Instance, Options.Create(new Settings()));
-
-        private static IEnumerable<string> JsonPropertyNames(Type type) => type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(property => JsonNamingPolicy.CamelCase.ConvertName(property.Name));
 
         private static Dictionary<string, object> SubDictionary(Dictionary<string, object> parent, string key)
         {
@@ -126,10 +121,10 @@ namespace UnitTests.Machine
 
             // A single wildcard returns every property of that level
             Dictionary<string, object> root = filter.GetFiltered("*");
-            Assert.That(root.Keys, Is.SupersetOf(JsonPropertyNames(typeof(ApiModel))));
+            Assert.That(root.Keys, Is.EquivalentTo(ApiModel.TypeDescriptor.Properties.Select(property => property.JsonName)));
 
             Dictionary<string, object> heat = SubDictionary(filter.GetFiltered("heat/*"), "heat");
-            Assert.That(heat.Keys, Is.EquivalentTo(JsonPropertyNames(typeof(DuetAPI.ObjectModel.Heat))));
+            Assert.That(heat.Keys, Is.EquivalentTo(DuetAPI.ObjectModel.Heat.TypeDescriptor.Properties.Select(property => property.JsonName)));
 
             // Sub-objects are only expanded recursively if query flags are given
             Dictionary<string, object> recursed = filter.GetFiltered("**", QueryFlags.Parse(null));
@@ -155,9 +150,9 @@ namespace UnitTests.Machine
             DcsModel model = CreateModel();
             Dictionary<string, object> result = new DcsFilter(model).GetFiltered("*", QueryFlags.Parse("f"));
 
-            IEnumerable<string> liveProperties = typeof(ApiModel).GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(property => Attribute.IsDefined(property, typeof(DuetAPI.ObjectModel.LiveAttribute)))
-                .Select(property => JsonNamingPolicy.CamelCase.ConvertName(property.Name));
+            IEnumerable<string> liveProperties = ApiModel.TypeDescriptor.Properties
+                .Where(property => (property.Flags & DuetAPI.ObjectModel.ModelPropertyFlags.Live) != 0)
+                .Select(property => property.JsonName);
             Assert.That(liveProperties, Is.Not.Empty);
             Assert.That(result.Keys, Is.EquivalentTo(liveProperties));
             Assert.That(result.ContainsKey("network"), Is.False);
