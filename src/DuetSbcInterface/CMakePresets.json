@@ -3,21 +3,42 @@
   "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
   "configurePresets": [
     {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}"
+    },
+    {
       "name": "native",
       "displayName": "Native (dev box / build on the Pi)",
-      "binaryDir": "${sourceDir}/build",
+      "inherits": "base",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
     },
     {
-      "name": "pi-arm64",
-      "displayName": "Cross-compile for 64-bit Raspberry Pi OS (aarch64)",
-      "binaryDir": "${sourceDir}/build-arm64",
+      "name": "arm64",
+      "displayName": "Cross-compile for aarch64 against this container's libraries (compile test)",
+      "description": "Checks that the code cross-compiles and lints without needing a Pi. libduet_sbc.so from this preset links the container's glibc (2.39) and will NOT load on Raspberry Pi OS Bookworm - use pi-arm64 for anything you intend to run there.",
+      "inherits": "base",
       "toolchainFile": "${sourceDir}/cmake/aarch64-linux-gnu.cmake",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "DUET_SBC_SYSROOT": ""
+      }
+    },
+    {
+      "name": "pi-arm64",
+      "displayName": "Cross-compile for aarch64 against a Pi sysroot (deployable)",
+      "description": "Links against a sysroot copied from the target, so libduet_sbc.so matches the Pi's glibc. Requires pi-sysroot/ to exist: fetch it with scripts/fetch-pi-sysroot.sh <user>@<pi-host>, or override the path with -DDUET_SBC_SYSROOT=...",
+      "inherits": "base",
+      "toolchainFile": "${sourceDir}/cmake/aarch64-linux-gnu.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "DUET_SBC_SYSROOT": "${sourceDir}/pi-sysroot"
+      }
     }
   ],
   "buildPresets": [
     { "name": "native", "configurePreset": "native" },
+    { "name": "arm64", "configurePreset": "arm64" },
     { "name": "pi-arm64", "configurePreset": "pi-arm64" }
   ]
 }

@@ -34,24 +34,48 @@ side's `SbcMessageFormats.h`. See [Sharing with DuetCANMaster](#sharing-with-due
 ## Build
 
 Requires a C++17 compiler, CMake ≥ 3.21 (for presets) and Linux UAPI headers (`linux/gpio.h`,
-`linux/spi/spidev.h`). Two presets are provided (see `CMakePresets.json`).
+`linux/spi/spidev.h`). Three presets are provided (see `CMakePresets.json`):
+
+| Preset | Builds for | glibc it links against |
+| --- | --- | --- |
+| `native` | this machine | this machine's |
+| `arm64` | aarch64 | **this container's (2.39)** — compile/lint test only |
+| `pi-arm64` | aarch64 | the Pi's, from `pi-sysroot/` — deployable |
+
+Each uses its own build tree (`build/<preset>`), and
+`scripts/build.sh` picks between them the same way: `native` when it is already running on aarch64,
+otherwise `pi-arm64` if a sysroot is available and `arm64` if not.
 
 ### Cross-compile in the devcontainer for a 64-bit Pi (recommended)
 
-The devcontainer ships the `aarch64-linux-gnu` cross toolchain (`crossbuild-essential-arm64`). The
-`pi-arm64` preset targets aarch64 and **statically links** the test binary, so it runs on Raspberry
-Pi OS Bookworm regardless of its glibc version (the container's toolchain targets a newer glibc):
+The devcontainer ships the `aarch64-linux-gnu` cross toolchain (`crossbuild-essential-arm64`). Both
+aarch64 presets **statically link** the test binary, so it runs on Raspberry Pi OS Bookworm
+regardless of its glibc version (the container's toolchain targets a newer glibc):
 
 ```sh
 cd src/DuetSbcInterface
-cmake --preset pi-arm64
-cmake --build --preset pi-arm64 -j
+cmake --preset arm64
+cmake --build --preset arm64 -j
 
 # copy the (static, self-contained) binary to the Pi
-scp build-arm64/harness/sbc_jitter_test pi@raspberrypi:~/
+scp build/arm64/harness/sbc_jitter_test pi@raspberrypi:~/
 ```
 
-`file build-arm64/harness/sbc_jitter_test` should report `ARM aarch64 ... statically linked`.
+`file build/arm64/harness/sbc_jitter_test` should report `ARM aarch64 ... statically linked`.
+
+`libduet_sbc.so` is the exception — a shared library links glibc dynamically, so one built this way
+fails to load on the Pi with a `GLIBC_2.3x not found` error. Build it with `pi-arm64`, which
+links against a copy of the Pi's own libraries and refuses to configure if that copy is missing:
+
+```sh
+scripts/fetch-pi-sysroot.sh pi@raspberrypi          # one-off, into pi-sysroot/
+cmake --preset pi-arm64
+cmake --build --preset pi-arm64 -j
+```
+
+Use `-DDUET_SBC_SYSROOT=<dir>` to point it at a sysroot kept somewhere else. `arm64` is there so
+that the code can still be compiled and linted with no Pi in reach; treat its `.so` as a build
+artifact only.
 
 ### Build natively on the Pi
 
@@ -69,6 +93,12 @@ Every source is run through `clang-tidy` as it is compiled, and any check left e
 clang-tidy` (already present in the devcontainer); if it is missing, CMake warns at configure time
 and builds without linting. Pass `-DDUET_SBC_CLANG_TIDY=OFF` for a plain, roughly 3x faster build.
 
+This applies to every preset, sysroot builds included. A cross build needs two things the plain
+`clang-tidy` command line does not carry, both of which CMake works out at configure time by asking
+the compiler: the target triple (`-dumpmachine`, otherwise clang analyses aarch64 code as x86-64),
+and the compiler's real include search path (`-E -v`, otherwise `--sysroot` sends clang looking for
+libstdc++ inside the Pi sysroot, where GCC never looks for it).
+
 ### Artifacts
 
 - `harness/sbc_jitter_test` — the test program (static under the cross preset)
@@ -80,7 +110,7 @@ and builds without linting. Pass `-DDUET_SBC_CLANG_TIDY=OFF` for a plain, roughl
 > it natively on the Pi, or fetch a Pi sysroot and do a glibc-matched dynamic build:
 > ```sh
 > scripts/fetch-pi-sysroot.sh pi@raspberrypi
-> cmake --preset pi-arm64 -DDUET_SBC_SYSROOT=$(pwd)/pi-sysroot -DDUET_SBC_STATIC=OFF
+> cmake --preset pi-arm64 -DDUET_SBC_STATIC=OFF
 > cmake --build --preset pi-arm64
 > ```
 > The standalone jitter test does not need this — it is statically linked.
@@ -92,7 +122,7 @@ GPIO access require privileges (`CAP_SYS_NICE` for SCHED_FIFO, and access to the
 nodes), so run under `sudo` or grant the capabilities.
 
 ```sh
-sudo ./build/harness/sbc_jitter_test \
+sudo ./build/native/harness/sbc_jitter_test \
     --spi-dev /dev/spidev0.0 --spi-hz 8000000 \
     --gpiochip /dev/gpiochip0 --tfr-pin 25 --dap-pin 24 \
     --core 3 --rate 1000

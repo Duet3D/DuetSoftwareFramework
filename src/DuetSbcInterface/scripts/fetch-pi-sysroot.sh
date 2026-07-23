@@ -8,7 +8,7 @@
 #   scripts/fetch-pi-sysroot.sh <user@pi-host> [dest-dir]
 #
 # Then configure with the sysroot:
-#   cmake --preset pi-arm64 -DDUET_SBC_SYSROOT=$(pwd)/pi-sysroot -DDUET_SBC_STATIC=OFF
+#   cmake --preset pi-arm64
 #   cmake --build --preset pi-arm64
 set -euo pipefail
 

@@ -455,7 +455,10 @@
             // Builds natively for the host, so no Pi or sysroot is involved.
             "label": "[DSF] Run Native Tests",
             "type": "shell",
-            "command": "cmake -S ./src/DuetSbcInterface -B ./src/DuetSbcInterface/build -DCMAKE_BUILD_TYPE=Release && cmake --build ./src/DuetSbcInterface/build -j && ctest --test-dir ./src/DuetSbcInterface/build --output-on-failure",
+            "command": "cmake --preset native && cmake --build --preset native -j && ctest --test-dir build/native --output-on-failure",
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetSbcInterface"
+            },
             "problemMatcher": [
                 "$gcc"
             ],
@@ -469,7 +472,7 @@
             // latency without the .NET runtime. Statically linked, so it needs no sysroot.
             "label": "[DSF] Build and Deploy Jitter Harness to",
             "type": "shell",
-            "command": "cmake --preset pi-arm64 && cmake --build --preset pi-arm64 --target sbc_jitter_test -j && scp build-arm64/harness/sbc_jitter_test ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp}:~/",
+            "command": "cmake --preset arm64 && cmake --build --preset arm64 --target sbc_jitter_test -j && scp build/arm64/harness/sbc_jitter_test ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp}:~/",
             "options": {
                 "cwd": "${workspaceFolder}/src/DuetSbcInterface"
             },

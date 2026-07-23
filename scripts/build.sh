@@ -22,8 +22,6 @@ declare -A PROJECT_SRC=(
 # DuetSbcInterface is native (CMake), not a dotnet project: it builds libduet_sbc.so, the SPI
 # transfer loop that DuetControlServer P/Invokes into. It is built separately below.
 SBC_SRC_DIR="$REPO_ROOT/src/DuetSbcInterface"
-SBC_BUILD_DIR="$SBC_SRC_DIR/build-deploy-arm64"
-SBC_TOOLCHAIN="$SBC_SRC_DIR/cmake/aarch64-linux-gnu.cmake"
 SBC_LIB_NAME="libduet_sbc.so"
 DEFAULT_SYSROOT="$SBC_SRC_DIR/pi-sysroot"
 
@@ -170,29 +168,39 @@ resolve_sysroot() {
 build_sbc_interface() {
     echo "=== Building DuetSbcInterface (libduet_sbc.so) ==="
 
-    local cmake_args=(-DCMAKE_BUILD_TYPE=Release)
+    # One of the presets in src/DuetSbcInterface/CMakePresets.json; they all put their build tree
+    # in build/<preset-name>.
+    local preset cmake_args=()
     if [[ "$(uname -m)" == "aarch64" ]]; then
         # Already on the target architecture (e.g. building on the Pi itself with --local): build
         # natively. That needs no toolchain and no sysroot, and gets glibc right by construction.
         echo "    Host is aarch64; building natively"
+        preset=native
     else
-        cmake_args+=("-DCMAKE_TOOLCHAIN_FILE=$SBC_TOOLCHAIN")
         resolve_sysroot
         if [[ -n "$SYSROOT" ]]; then
             echo "    Linking against sysroot: $SYSROOT"
+            preset=pi-arm64
+            # The preset defaults to pi-sysroot/; --sysroot may point somewhere else.
             cmake_args+=("-DDUET_SBC_SYSROOT=$SYSROOT")
         else
+            preset=arm64
             echo "WARNING: no Pi sysroot available, linking against the container's aarch64 libraries." >&2
             echo "         The resulting $SBC_LIB_NAME may fail to load on the Pi with a GLIBC version error." >&2
             echo "         Re-run with a deploy target (-t) to fetch one, or pass --sysroot <dir>." >&2
         fi
     fi
 
-    cmake -S "$SBC_SRC_DIR" -B "$SBC_BUILD_DIR" "${cmake_args[@]}"
-    cmake --build "$SBC_BUILD_DIR" --target duet_sbc_shared -j"$(nproc)"
+    local build_dir="$SBC_SRC_DIR/build/$preset"
+
+    # --preset must be run from the project directory (that is where CMakePresets.json lives). Only
+    # the shared library is built here; the harness and the tests are not part of a deployment.
+    (cd "$SBC_SRC_DIR" \
+        && cmake --preset "$preset" "${cmake_args[@]}" \
+        && cmake --build --preset "$preset" --target duet_sbc_shared -j"$(nproc)")
 
     # Land it next to the managed assemblies so default P/Invoke probing resolves it
-    cp "$SBC_BUILD_DIR/sbc/$SBC_LIB_NAME" "$BUILD_DIR/"
+    cp "$build_dir/sbc/$SBC_LIB_NAME" "$BUILD_DIR/"
     echo "=== $SBC_LIB_NAME -> $BUILD_DIR/ ==="
 }
 

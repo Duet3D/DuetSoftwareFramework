@@ -1,6 +1,4 @@
 build/
-build-arm64/
-build-deploy-arm64/
 pi-sysroot/
 *.o
 *.so

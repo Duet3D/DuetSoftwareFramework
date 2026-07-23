@@ -14,8 +14,20 @@ set(CMAKE_SYSTEM_PROCESSOR aarch64)
 set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
 set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
 
-# Optional Bookworm sysroot for a glibc-matched dynamic build (mainly for the .so).
-if(DEFINED DUET_SBC_SYSROOT)
+# Optional Bookworm sysroot for a glibc-matched dynamic build (mainly for the .so). An empty value
+# means "none", so the arm64 preset can pin it off and never inherit one from an earlier build in
+# the same tree. A non-empty one that is not there is always a mistake - the pi-arm64 preset
+# names a path that only exists once fetch-pi-sysroot.sh has run - and silently ignoring it would
+# produce a .so that fails to load on the Pi, so stop instead.
+if(DUET_SBC_SYSROOT)
+    if(NOT IS_DIRECTORY "${DUET_SBC_SYSROOT}")
+        message(FATAL_ERROR
+            "DUET_SBC_SYSROOT is set to '${DUET_SBC_SYSROOT}', which is not a directory.\n"
+            "Fetch one from a running Pi with:\n"
+            "  scripts/fetch-pi-sysroot.sh <user>@<pi-host> ${CMAKE_CURRENT_LIST_DIR}/../pi-sysroot\n"
+            "or configure with the arm64 preset to compile against this container's aarch64 "
+            "libraries instead (the resulting libduet_sbc.so is not loadable on the Pi).")
+    endif()
     set(CMAKE_SYSROOT "${DUET_SBC_SYSROOT}")
     set(CMAKE_FIND_ROOT_PATH "${DUET_SBC_SYSROOT}")
 endif()
