@@ -162,7 +162,7 @@ class DataTransfer
 	template <typename T>
 	T* WriteDataHeader() noexcept;
 
-	[[nodiscard]] size_t AddPadding(size_t length) const noexcept;
+	[[nodiscard]] static size_t AddPadding(size_t length) noexcept;
 };
 
 inline bool DataTransfer::IsConnectionReset() const noexcept
@@ -202,7 +202,7 @@ inline bool DataTransfer::CanWritePacket(size_t dataLength) const noexcept
 	return FreeTxSpace() >= sizeof(PacketHeader) + dataLength;
 }
 
-inline size_t DataTransfer::AddPadding(size_t length) const noexcept
+inline size_t DataTransfer::AddPadding(size_t length) noexcept
 {
 	const size_t extraBytes = (length & 3);
 	return (extraBytes == 0) ? length : length + 4 - extraBytes;
