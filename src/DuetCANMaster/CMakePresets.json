@@ -18,8 +18,8 @@
         },
         {
             "name": "release",
-            "displayName": "Release (SAME70)",
-            "description": "Optimised firmware build for the Duet 3 MB6HC / MB6XD",
+            "displayName": "Release",
+            "description": "Optimised firmware build for the DuetCANMaster",
             "inherits": "base",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
@@ -27,7 +27,7 @@
         },
         {
             "name": "debug",
-            "displayName": "Debug (SAME70)",
+            "displayName": "Debug",
             "description": "Firmware build with debug symbols and reduced optimisation",
             "inherits": "base",
             "cacheVariables": {

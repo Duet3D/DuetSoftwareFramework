@@ -46,7 +46,7 @@
         {
             "id": "canmaster_target",
             "type": "pickString",
-            "description": "DuetCANMaster board to build for",
+            "description": "DuetCANMaster board to upload",
             "options": [
                 {
                     "label": "Duet3 MB6HC",
@@ -55,12 +55,23 @@
                 {
                     "label": "Duet3 MB6XD",
                     "value": "Duet3_MB6XD"
-                },
-                {
-                    "label": "All",
-                    "value": "all"
                 }
             ]
+        },
+        {
+            // Names must match buildPresets in src/DuetCANMaster/CMakePresets.json.
+            "id": "canmaster_preset",
+            "type": "pickString",
+            "description": "DuetCANMaster CMake build preset",
+            "options": [
+                { "label": "Duet3 MB6HC (Release)", "value": "Duet3_MB6HC" },
+                { "label": "Duet3 MB6HC (Debug)", "value": "Duet3_MB6HC-debug" },
+                { "label": "Duet3 MB6XD (Release)", "value": "Duet3_MB6XD" },
+                { "label": "Duet3 MB6XD (Debug)", "value": "Duet3_MB6XD-debug" },
+                { "label": "All boards (Release)", "value": "release" },
+                { "label": "All boards (Debug)", "value": "debug" }
+            ],
+            "default": "Duet3_MB6HC"
         },
         {
             "id": "expansion_target",
@@ -529,84 +540,119 @@
         },
 
         // ---------------------------------------------------------------
-        // DuetCANMaster firmware (src/DuetCANMaster). These run in the
-        // submodule directory and build against the shared ./lib libraries.
+        // DuetCANMaster firmware (src/DuetCANMaster). CMake presets live in
+        // src/DuetCANMaster/CMakePresets.json; the "release"/"debug" configure
+        // presets point LIBRARIES_DIR at the shared ./lib checkout themselves,
+        // so nothing needs to be passed on the command line here.
+        // Artefacts land in build/<release|debug>/<target>/<target>.elf|.bin.
         // ---------------------------------------------------------------
         {
+            // Configuring is idempotent and cheap, so every build task re-runs it: that way a
+            // fresh clone (or a deleted build/ directory) just works without a separate step.
+            "label": "[CANMaster] Configure - Release",
+            "type": "shell",
+            "command": "cmake --preset release",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "problemMatcher": [],
+            "presentation": { "reveal": "silent" },
+            "runOptions": { "instanceLimit": 1 }
+        },
+        {
+            "label": "[CANMaster] Configure - Debug",
+            "type": "shell",
+            "command": "cmake --preset debug",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "problemMatcher": [],
+            "presentation": { "reveal": "silent" },
+            "runOptions": { "instanceLimit": 1 }
+        },
+        {
+            // The build preset carries the board and the build type; the matching configure
+            // preset is whichever one it inherits, i.e. debug for the "*-debug"/"debug" presets.
             "label": "[CANMaster] Build Selected Target",
             "type": "shell",
-            "command": "make ${input:fw_buildType} DuetCANMaster CANMASTER_CONFIG=${input:canmaster_target} LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "command": "case '${input:canmaster_preset}' in *debug) cfg=debug;; *) cfg=release;; esac; cmake --preset $cfg && cmake --build --preset ${input:canmaster_preset} -j $(nproc)",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
             "label": "[CANMaster] Build Duet3_MB6HC - Debug",
             "type": "shell",
-            "command": "make DEBUG=1 DuetCANMaster CANMASTER_CONFIG=Duet3_MB6HC LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "command": "cmake --build --preset Duet3_MB6HC-debug -j $(nproc)",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "dependsOn": "[CANMaster] Configure - Debug",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
             "label": "[CANMaster] Build Duet3_MB6HC - Release",
             "type": "shell",
-            "command": "make DuetCANMaster CANMASTER_CONFIG=Duet3_MB6HC LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "command": "cmake --build --preset Duet3_MB6HC -j $(nproc)",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "dependsOn": "[CANMaster] Configure - Release",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
             "label": "[CANMaster] Build Duet3_MB6XD - Debug",
             "type": "shell",
-            "command": "make DEBUG=1 DuetCANMaster CANMASTER_CONFIG=Duet3_MB6XD LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "command": "cmake --build --preset Duet3_MB6XD-debug -j $(nproc)",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "dependsOn": "[CANMaster] Configure - Debug",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
             "label": "[CANMaster] Build Duet3_MB6XD - Release",
             "type": "shell",
-            "command": "make DuetCANMaster CANMASTER_CONFIG=Duet3_MB6XD LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "command": "cmake --build --preset Duet3_MB6XD -j $(nproc)",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "dependsOn": "[CANMaster] Configure - Release",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
-            "label": "[CANMaster] Build Duet3Mini5plus - Debug",
+            "label": "[CANMaster] Build All Boards - Debug",
             "type": "shell",
-            "command": "make DEBUG=1 DuetCANMaster CANMASTER_CONFIG=Duet3Mini5plus LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "command": "cmake --build --preset debug -j $(nproc)",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "dependsOn": "[CANMaster] Configure - Debug",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
-            "label": "[CANMaster] Build Duet3Mini5plus - Release",
+            "label": "[CANMaster] Build All Boards - Release",
             "type": "shell",
-            "command": "make DuetCANMaster CANMASTER_CONFIG=Duet3Mini5plus LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "command": "cmake --build --preset release -j $(nproc)",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "dependsOn": "[CANMaster] Configure - Release",
             "problemMatcher": [ "$gcc" ],
             "group": "build"
         },
         {
+            // Drops the CMake cache too, so the next build reconfigures from scratch.
             "label": "[CANMaster] Clean All",
             "type": "shell",
-            "command": "make DuetCANMaster.clean-all LIBRARIES_DIR=${workspaceFolder}/lib",
-            "problemMatcher": [ "$gcc" ],
+            "command": "rm -rf build",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "problemMatcher": [],
             "group": "build"
         },
         {
-            "label": "[CANMaster] Clean Duet3_MB6HC",
+            "label": "[CANMaster] Clean - Release",
             "type": "shell",
-            "command": "make DuetCANMaster.clean CANMASTER_CONFIG=Duet3_MB6HC LIBRARIES_DIR=${workspaceFolder}/lib",
-            "problemMatcher": [ "$gcc" ],
+            "command": "cmake --build --preset release --target clean",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "problemMatcher": [],
             "group": "build"
         },
         {
-            "label": "[CANMaster] Clean Duet3_MB6XD",
+            "label": "[CANMaster] Clean - Debug",
             "type": "shell",
-            "command": "make DuetCANMaster.clean CANMASTER_CONFIG=Duet3_MB6XD LIBRARIES_DIR=${workspaceFolder}/lib",
-            "problemMatcher": [ "$gcc" ],
-            "group": "build"
-        },
-        {
-            "label": "[CANMaster] Clean Duet3Mini5plus",
-            "type": "shell",
-            "command": "make DuetCANMaster.clean CANMASTER_CONFIG=Duet3Mini5plus LIBRARIES_DIR=${workspaceFolder}/lib",
-            "problemMatcher": [ "$gcc" ],
+            "command": "cmake --build --preset debug --target clean",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "problemMatcher": [],
             "group": "build"
         },
         {
@@ -704,7 +750,7 @@
             "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
             "problemMatcher": [ "$gcc" ],
             "group": "build",
-            "detail": "Clean build under bear, then rewrite the database so clang can parse it. Required before Tidy."
+            "detail": "Export CMake's compile database for the board, then rewrite it so clang can parse it. Required before Tidy."
         },
         {
             "label": "[Style] Generate Compile DB - DuetSbcInterface",

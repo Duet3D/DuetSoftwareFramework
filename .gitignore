@@ -282,6 +282,7 @@ src/LinuxApi/LinuxApi.xml
 .vscode/*
 !.vscode/launch.json
 !.vscode/tasks.json
+!.vscode/c_cpp_properties.json
 
 # Source Generators
 src/DuetAPI/Generated
