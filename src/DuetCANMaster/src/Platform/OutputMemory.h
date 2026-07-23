@@ -30,22 +30,22 @@ class OutputBuffer
 	~OutputBuffer() = default;
 
 	void Append(OutputBuffer* _ecv_null other) noexcept;
-	OutputBuffer* null Next() const noexcept { return m_next; }
-	bool IsReferenced() const noexcept { return m_isReferenced; }
-	bool HadOverflow() const noexcept { return m_hadOverflow; }
+	[[nodiscard]] OutputBuffer* null Next() const noexcept { return m_next; }
+	[[nodiscard]] bool IsReferenced() const noexcept { return m_isReferenced; }
+	[[nodiscard]] bool HadOverflow() const noexcept { return m_hadOverflow; }
 	void IncreaseReferences(size_t refs) noexcept;
 
-	const char* _ecv_array Data() const noexcept { return m_data; }
-	const char* _ecv_array UnreadData() const noexcept { return m_data + m_bytesRead; }
-	size_t DataLength() const noexcept { return m_dataLength; } // How many bytes have been written to this instance?
-	size_t Length() const noexcept;							  // How many bytes have been written to the whole chain?
+	[[nodiscard]] const char* _ecv_array Data() const noexcept { return m_data; }
+	[[nodiscard]] const char* _ecv_array UnreadData() const noexcept { return m_data + m_bytesRead; }
+	[[nodiscard]] size_t DataLength() const noexcept { return m_dataLength; } // How many bytes have been written to this instance?
+	[[nodiscard]] size_t Length() const noexcept;							  // How many bytes have been written to the whole chain?
 
 	char operator[](size_t index) const noexcept;
 	const char* _ecv_array Read(size_t len) noexcept;
 	void Taken(size_t len) noexcept { m_bytesRead += len; }
-	size_t BytesLeft() const noexcept { return m_dataLength - m_bytesRead; } // How many bytes have not been sent yet?
+	[[nodiscard]] size_t BytesLeft() const noexcept { return m_dataLength - m_bytesRead; } // How many bytes have not been sent yet?
 
-	uint32_t WhenQueued() const noexcept { return m_whenQueued; }
+	[[nodiscard]] uint32_t WhenQueued() const noexcept { return m_whenQueued; }
 	void UpdateWhenQueued() noexcept;
 
 	size_t Vprintf(const char* _ecv_array fmt, va_list vargs) noexcept;
@@ -68,7 +68,7 @@ class OutputBuffer
 	size_t EncodeChar(char c) noexcept;
 	size_t EncodeReply(OutputBuffer* _ecv_null src) noexcept;
 
-	uint32_t GetAge() const noexcept;
+	[[nodiscard]] uint32_t GetAge() const noexcept;
 
 	// Initialise the output buffers manager
 	static void Init() noexcept;
@@ -134,7 +134,7 @@ class OutputStack
 	~OutputStack() = default;
 
 	// Is there anything on this stack?
-	bool IsEmpty() const volatile noexcept { return m_count == 0; }
+	[[nodiscard]] bool IsEmpty() const volatile noexcept { return m_count == 0; }
 
 	// Clear the reference list
 	void Clear() volatile noexcept { m_count = 0; }
@@ -146,10 +146,10 @@ class OutputStack
 	OutputBuffer* Pop() volatile noexcept;
 
 	// Returns the first item from the stack or NULL if none is available
-	OutputBuffer* GetFirstItem() const volatile noexcept;
+	[[nodiscard]] OutputBuffer* GetFirstItem() const volatile noexcept;
 
 	// Returns the first item's type from the stack or NoDestinationMessage if none is available
-	MessageType GetFirstItemType() const volatile noexcept;
+	[[nodiscard]] MessageType GetFirstItemType() const volatile noexcept;
 
 #if HAS_SBC_INTERFACE
 	// Set the first item of the stack. If it's NULL, then the first item will be removed
@@ -162,13 +162,13 @@ class OutputStack
 	bool ApplyTimeout(uint32_t ticks) volatile noexcept;
 
 	// Returns the last item from the stack or NULL if none is available
-	OutputBuffer* _ecv_null GetLastItem() const volatile noexcept;
+	[[nodiscard]] OutputBuffer* _ecv_null GetLastItem() const volatile noexcept;
 
 	// Returns the type of the last item from the stack or NoDestinationMessage if none is available
-	MessageType GetLastItemType() const volatile noexcept;
+	[[nodiscard]] MessageType GetLastItemType() const volatile noexcept;
 
 	// Get the total length of all queued buffers
-	size_t DataLength() const volatile noexcept;
+	[[nodiscard]] size_t DataLength() const volatile noexcept;
 
 	// Append another OutputStack to this instance. If no more space is available,
 	// all OutputBuffers that can't be added are automatically released

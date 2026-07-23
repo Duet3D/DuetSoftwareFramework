@@ -41,14 +41,14 @@ class IoPort
 					PinAccess access) noexcept;
 
 	void AppendPinName(const StringRef& str) const noexcept;
-	bool IsValid() const noexcept { return logicalPin < NumNamedPins; }
-	bool GetInvert() const noexcept;
+	[[nodiscard]] bool IsValid() const noexcept { return logicalPin < NumNamedPins; }
+	[[nodiscard]] bool GetInvert() const noexcept;
 	void SetInvert(bool pInvert) noexcept;
 	void ToggleInvert(bool pInvert) noexcept;
-	bool IsHardwareInverted() const noexcept { return hardwareInvert; }
-	bool GetTotalInvert() const noexcept { return totalInvert; }
+	[[nodiscard]] bool IsHardwareInverted() const noexcept { return hardwareInvert; }
+	[[nodiscard]] bool GetTotalInvert() const noexcept { return totalInvert; }
 
-	bool ReadDigital() const noexcept;
+	[[nodiscard]] bool ReadDigital() const noexcept;
 
 #if SAME5x
 	// Read the pin through the EIC debouncer. Only valid if an interrupt has been attached to the pin with debouncing
@@ -74,9 +74,9 @@ class IoPort
 	void ClearAnalogCallback() noexcept;
 #endif
 
-	uint16_t ReadAnalog() const noexcept;
+	[[nodiscard]] uint16_t ReadAnalog() const noexcept;
 
-	AnalogChannelNumber GetAnalogChannel() const noexcept { return PinToAdcChannel(GetPin()); }
+	[[nodiscard]] AnalogChannelNumber GetAnalogChannel() const noexcept { return PinToAdcChannel(GetPin()); }
 
 	void WriteDigital(bool high) const noexcept;
 
@@ -86,10 +86,10 @@ class IoPort
 	void FastDigitalWriteHigh() const noexcept pre(IsValid()) { fastDigitalWriteHigh(logicalPin); }
 
 	// Get the physical pin, or NoPin if the logical pin is not valid
-	Pin GetPin() const noexcept;
+	[[nodiscard]] Pin GetPin() const noexcept;
 
 	// Get the capabilities of the pin
-	PinCapability GetCapability() const noexcept;
+	[[nodiscard]] PinCapability GetCapability() const noexcept;
 
 	// Initialise static data
 	static void Init() noexcept;
@@ -114,7 +114,7 @@ class IoPort
 	bool Allocate(const char* _ecv_array pn, const StringRef& reply, PinUsedBy neededFor, PinAccess access) noexcept;
 
 	// Get the physical pin without checking the validity of the logical pin
-	Pin GetPinNoCheck() const noexcept
+	[[nodiscard]] Pin GetPinNoCheck() const noexcept
 	{
 		// New-style pin table is indexed by pin number
 		return logicalPin;
@@ -171,9 +171,9 @@ class PwmPort : public IoPort
 	void AppendFullDetails(const StringRef& str) const noexcept;
 	void AppendFrequency(const StringRef& str) const noexcept; // append the frequency if the port is valid
 	void SetFrequency(PwmFrequency freq) noexcept { m_frequency = freq; }
-	PwmFrequency GetFrequency() const noexcept { return m_frequency; }
+	[[nodiscard]] PwmFrequency GetFrequency() const noexcept { return m_frequency; }
 	void WriteAnalog(float pwm) const noexcept;
-	bool SupportsPwm() const noexcept;
+	[[nodiscard]] bool SupportsPwm() const noexcept;
 
   private:
 	PwmFrequency m_frequency;

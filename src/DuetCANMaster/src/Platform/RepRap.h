@@ -52,25 +52,25 @@ class RepRap final
 	void Diagnostics(MessageType mtype, const StringRef& reply) noexcept;
 	void Timing(const StringRef& reply) noexcept;
 
-	bool Debug(Module module) const noexcept { return m_debugMaps[module.ToBaseType()].IsNonEmpty(); }
-	DebugFlags GetDebugFlags(Module m) const noexcept { return m_debugMaps[m.ToBaseType()]; }
+	[[nodiscard]] bool Debug(Module module) const noexcept { return m_debugMaps[module.ToBaseType()].IsNonEmpty(); }
+	[[nodiscard]] DebugFlags GetDebugFlags(Module m) const noexcept { return m_debugMaps[m.ToBaseType()]; }
 
-	Module GetSpinningModule() const noexcept;
+	[[nodiscard]] Module GetSpinningModule() const noexcept;
 
-	Platform& GetPlatform() const noexcept { return *m_platform; }
+	[[nodiscard]] Platform& GetPlatform() const noexcept { return *m_platform; }
 
 	void LogDebugMessage(c_string msg, uint32_t data0, uint32_t data1, uint32_t data2, uint32_t data3) noexcept;
 
 #if HAS_SBC_INTERFACE
-	SbcInterface& GetSbcInterface() const noexcept { return *m_sbcInterface; }
+	[[nodiscard]] SbcInterface& GetSbcInterface() const noexcept { return *m_sbcInterface; }
 #endif
 #if SUPPORT_CAN_EXPANSION
-	ExpansionManager& GetExpansion() const noexcept { return *m_expansion; }
+	[[nodiscard]] ExpansionManager& GetExpansion() const noexcept { return *m_expansion; }
 #endif
 
 	void Tick() noexcept;
-	bool SpinTimeoutImminent() const noexcept;
-	bool IsStopped() const noexcept;
+	[[nodiscard]] bool SpinTimeoutImminent() const noexcept;
+	[[nodiscard]] bool IsStopped() const noexcept;
 
 #if 0 // removed because we ran out of flash memory on Duet 2
 	OutputBuffer *_ecv_null GetStatusResponse(uint8_t type, ResponseSource source) const noexcept;
@@ -79,7 +79,7 @@ class RepRap final
 
 	void Beep(unsigned int freq, unsigned int ms) noexcept;
 
-	bool IsProcessingConfig() const noexcept { return m_processingConfig; }
+	[[nodiscard]] bool IsProcessingConfig() const noexcept { return m_processingConfig; }
 
 	// Firmware update operations
 	bool CheckFirmwareUpdatePrerequisites(const StringRef& reply, const StringRef& filenameRef) noexcept;

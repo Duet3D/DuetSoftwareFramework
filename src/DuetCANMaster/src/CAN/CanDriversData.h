@@ -21,7 +21,7 @@ class CanDriversData
   public:
 	CanDriversData() noexcept;
 	void AddEntry(DriverId id, T val) noexcept;
-	size_t GetNumEntries() const noexcept { return m_numEntries; }
+	[[nodiscard]] size_t GetNumEntries() const noexcept { return m_numEntries; }
 	CanAddress GetNextBoardDriverBitmap(size_t& startFrom, CanDriversBitmap& driversBitmap) const noexcept;
 	T GetElement(size_t n) const noexcept pre(n < GetNumEntries()) { return m_data[n].val; }
 
@@ -46,8 +46,8 @@ class CanDriversList
 	}
 	void Clear() noexcept { m_numEntries = 0; }
 	void AddEntry(DriverId driver) noexcept;
-	size_t GetNumEntries() const noexcept { return m_numEntries; }
-	bool IsEmpty() const noexcept { return m_numEntries == 0; }
+	[[nodiscard]] size_t GetNumEntries() const noexcept { return m_numEntries; }
+	[[nodiscard]] bool IsEmpty() const noexcept { return m_numEntries == 0; }
 	CanAddress GetNextBoardDriverBitmap(size_t& startFrom, CanDriversBitmap& driversBitmap) const noexcept;
 
   private:

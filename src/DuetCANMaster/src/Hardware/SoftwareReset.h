@@ -87,8 +87,8 @@ struct SoftwareResetData
 	// format buffer
 	uint32_t stack[27]; // stack when the exception occurred, with the link register and program counter at the bottom
 
-	bool IsVacant() const noexcept; // return true if this struct can be written without erasing it first
-	bool IsValid() const noexcept { return magic == magicValue; }
+	[[nodiscard]] bool IsVacant() const noexcept; // return true if this struct can be written without erasing it first
+	[[nodiscard]] bool IsValid() const noexcept { return magic == magicValue; }
 	void Clear() noexcept;
 	void Populate(uint16_t reason, const uint32_t* _ecv_array _ecv_null stk) noexcept;
 	void PrintPart1(unsigned int slot, const StringRef& reply) const noexcept;

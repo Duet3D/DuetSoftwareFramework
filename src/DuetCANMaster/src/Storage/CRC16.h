@@ -18,7 +18,7 @@ class CRC16
 	CRC16() noexcept;
 
 	void Reset(uint16_t initialValue) noexcept;
-	uint16_t Get() const noexcept;
+	[[nodiscard]] uint16_t Get() const noexcept;
 
 	void Update(uint8_t c) noexcept { UpdateNormal(c, crc16_xmodem_table); }
 	void Update(const uint8_t* _ecv_array c, size_t len) noexcept pre(c.lim >= len)

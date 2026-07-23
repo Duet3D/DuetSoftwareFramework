@@ -50,8 +50,8 @@ struct PinDescription : public PinDescriptionBase
 	PinCapability cap;
 	const char* _ecv_array null pinNames;
 
-	PinCapability GetCapability() const noexcept { return cap; }
-	const char* _ecv_array null GetNames() const noexcept { return pinNames; }
+	[[nodiscard]] PinCapability GetCapability() const noexcept { return cap; }
+	[[nodiscard]] const char* _ecv_array null GetNames() const noexcept { return pinNames; }
 };
 
 #endif /* SRC_HARDWARE_SAME70_PINDESCRIPTION_H_ */

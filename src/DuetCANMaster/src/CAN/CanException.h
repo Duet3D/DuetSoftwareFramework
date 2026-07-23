@@ -57,7 +57,7 @@ class CanException
 
 	void DebugPrint() const noexcept;
 
-	bool IsNull() const noexcept { return m_message == nullptr; }
+	[[nodiscard]] bool IsNull() const noexcept { return m_message == nullptr; }
 
   private:
 	const char* _ecv_array _ecv_null m_message;

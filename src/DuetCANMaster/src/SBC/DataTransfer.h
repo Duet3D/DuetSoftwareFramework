@@ -42,10 +42,10 @@ class DataTransfer
 	static void InitFromTask() noexcept;
 	void Diagnostics(const StringRef& reply) noexcept;
 
-	SbcTransportType GetTransportType() const noexcept { return m_transportType; }
+	[[nodiscard]] SbcTransportType GetTransportType() const noexcept { return m_transportType; }
 #  if SUPPORTS_SBC_OVER_USB
 	void SwitchToUsb(SerialCDC* dev, unsigned int devIndex) noexcept; // Switch from SPI to USB transport
-	SerialCDC* GetUsbDevice() const noexcept { return m_usbDevice; }
+	[[nodiscard]] SerialCDC* GetUsbDevice() const noexcept { return m_usbDevice; }
 #  endif
 
 	TransferState DoTransfer() noexcept; // Try to finish the current transfer
@@ -56,7 +56,7 @@ class DataTransfer
 											 // without advancing the sequence number)
 	void ResetConnection(bool fullReset) noexcept; // Reset the connection after a longer timeout
 
-	size_t PacketsToRead() const noexcept;
+	[[nodiscard]] size_t PacketsToRead() const noexcept;
 	const PacketHeader* ReadPacket() noexcept; // Attempt to read the next packet header or return null. Advances the
 											   // read pointer to the next packet or the packet's data
 	const char* ReadData(size_t dataLength) noexcept; // Read the packet data and advance to the next packet (if any)
@@ -137,7 +137,7 @@ class DataTransfer
 	// Packet properties
 	uint16_t m_packetId;
 
-	bool IsConnectionReset() const noexcept;
+	[[nodiscard]] bool IsConnectionReset() const noexcept;
 
 	void ExchangeHeader() noexcept;
 	void ExchangeResponse(uint32_t response) noexcept;
@@ -151,10 +151,10 @@ class DataTransfer
 
 	// Always keep enough tx space to allow resend requests in case RRF runs out of resources and cannot process an
 	// incoming request right away
-	size_t FreeTxSpace() const noexcept;
-	uint8_t GetRxNumPackets() const noexcept;
+	[[nodiscard]] size_t FreeTxSpace() const noexcept;
+	[[nodiscard]] uint8_t GetRxNumPackets() const noexcept;
 
-	bool CanWritePacket(size_t dataLength = 0) const noexcept;
+	[[nodiscard]] bool CanWritePacket(size_t dataLength = 0) const noexcept;
 	PacketHeader* WritePacketHeader(FirmwareRequest request,
 									size_t dataLength = 0,
 									uint16_t resendPacketId = 0) noexcept;
@@ -162,7 +162,7 @@ class DataTransfer
 	template <typename T>
 	T* WriteDataHeader() noexcept;
 
-	size_t AddPadding(size_t length) const noexcept;
+	[[nodiscard]] size_t AddPadding(size_t length) const noexcept;
 };
 
 inline bool DataTransfer::IsConnectionReset() const noexcept

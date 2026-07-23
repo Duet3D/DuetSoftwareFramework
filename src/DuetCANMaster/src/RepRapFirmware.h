@@ -297,7 +297,7 @@ struct DriverId
 	{
 	}
 
-	CanAddress GetBoardAddress() const noexcept { return boardAddress; }
+	[[nodiscard]] CanAddress GetBoardAddress() const noexcept { return boardAddress; }
 
 	void SetFromBinary(uint32_t val) noexcept
 	{
@@ -312,8 +312,8 @@ struct DriverId
 		boardAddress = CanInterface::GetCanAddress();
 	}
 
-	bool IsLocal() const noexcept { return boardAddress == CanInterface::GetCanAddress(); }
-	bool IsRemote() const noexcept { return boardAddress != CanInterface::GetCanAddress(); }
+	[[nodiscard]] bool IsLocal() const noexcept { return boardAddress == CanInterface::GetCanAddress(); }
+	[[nodiscard]] bool IsRemote() const noexcept { return boardAddress != CanInterface::GetCanAddress(); }
 
 	bool operator<(const DriverId other) const noexcept
 	{
@@ -331,7 +331,7 @@ struct DriverId
 		return boardAddress != other.boardAddress || localDriver != other.localDriver;
 	}
 
-	uint32_t AsU32() const noexcept { return (boardAddress << 8) | localDriver; }
+	[[nodiscard]] uint32_t AsU32() const noexcept { return (boardAddress << 8) | localDriver; }
 
 #else
 

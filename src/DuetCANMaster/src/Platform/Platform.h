@@ -237,13 +237,13 @@ class Platform final
 
 	void LogError(ErrorCode e) noexcept { m_errorCodeBits |= (uint32_t)e; }
 
-	BoardType GetBoardType() const noexcept { return m_board; }
+	[[nodiscard]] BoardType GetBoardType() const noexcept { return m_board; }
 	void SetBoardType() noexcept;
-	const char* _ecv_array GetElectronicsString() const noexcept;
-	const char* _ecv_array GetBoardString() const noexcept;
+	[[nodiscard]] const char* _ecv_array GetElectronicsString() const noexcept;
+	[[nodiscard]] const char* _ecv_array GetBoardString() const noexcept;
 
-	size_t GetNumGpInputsToReport() const noexcept;
-	size_t GetNumGpOutputsToReport() const noexcept;
+	[[nodiscard]] size_t GetNumGpInputsToReport() const noexcept;
+	[[nodiscard]] size_t GetNumGpOutputsToReport() const noexcept;
 
 #if defined(DUET_NG) || defined(DUET3MINI)
 	bool IsDuetWiFi() const noexcept;
@@ -272,8 +272,8 @@ class Platform final
 	void Tick() noexcept SPEED_CRITICAL; // Process a systick interrupt
 
 	// Real-time clock
-	bool IsDateTimeSet() const noexcept { return m_realTime != 0; } // Has the RTC been set yet?
-	time_t GetDateTime() const noexcept { return m_realTime; }		// Retrieves the current RTC datetime
+	[[nodiscard]] bool IsDateTimeSet() const noexcept { return m_realTime != 0; } // Has the RTC been set yet?
+	[[nodiscard]] time_t GetDateTime() const noexcept { return m_realTime; }		// Retrieves the current RTC datetime
 	bool GetDateTime(tm& rslt) const noexcept { return gmtime_r(&m_realTime, &rslt) != nullptr && m_realTime != 0; }
 	// Retrieves the broken-down current RTC datetime and returns true if it's valid
 	bool SetDateTime(time_t t) noexcept; // Sets the current RTC date and time or returns false on error
@@ -291,16 +291,16 @@ class Platform final
 
 	// MCU temperature
 #if HAS_CPU_TEMP_SENSOR
-	MinCurMax GetMcuTemperatures() const noexcept;
+	[[nodiscard]] MinCurMax GetMcuTemperatures() const noexcept;
 	void SetMcuTemperatureAdjust(float v) noexcept { m_mcuTemperatureAdjust = v; }
-	float GetMcuTemperatureAdjust() const noexcept { return m_mcuTemperatureAdjust; }
+	[[nodiscard]] float GetMcuTemperatureAdjust() const noexcept { return m_mcuTemperatureAdjust; }
 #endif
 
 #if HAS_VOLTAGE_MONITOR
 	// Power in voltage
-	MinCurMax GetPowerVoltages() const noexcept;
-	float GetCurrentPowerVoltage() const noexcept;
-	bool IsPowerOk() const noexcept;
+	[[nodiscard]] MinCurMax GetPowerVoltages() const noexcept;
+	[[nodiscard]] float GetCurrentPowerVoltage() const noexcept;
+	[[nodiscard]] bool IsPowerOk() const noexcept;
 	void DisableAutoSave() noexcept;
 	void EnableAutoSave(float saveVoltage, float resumeVoltage) noexcept;
 	bool GetAutoSaveSettings(float& saveVoltage, float& resumeVoltage) noexcept;
@@ -308,20 +308,20 @@ class Platform final
 
 #if HAS_12V_MONITOR
 	// 12V rail voltage
-	MinCurMax GetV12Voltages() const noexcept;
-	float GetCurrentV12Voltage() const noexcept;
+	[[nodiscard]] MinCurMax GetV12Voltages() const noexcept;
+	[[nodiscard]] float GetCurrentV12Voltage() const noexcept;
 #endif
 
 #if HAS_VOLTAGE_MONITOR || HAS_12V_MONITOR
 	void ResetVoltageMonitors() noexcept;
-	float GetVinVoltage() const noexcept;
+	[[nodiscard]] float GetVinVoltage() const noexcept;
 #else
 	void ResetVoltageMonitors() noexcept {}
 	bool HasDriverPower() const noexcept { return true; }
 #endif
 
 #if MCU_HAS_UNIQUE_ID
-	const UniqueId& GetUniqueId() const noexcept { return m_uniqueId; }
+	[[nodiscard]] const UniqueId& GetUniqueId() const noexcept { return m_uniqueId; }
 	uint32_t Random() noexcept;
 #endif
 
@@ -365,11 +365,11 @@ class Platform final
 
 	void RawMessage(MessageType type,
 					const char* _ecv_array message) noexcept; // called by Message after handling error/warning flags
-	float GetCpuTemperature() const noexcept;
+	[[nodiscard]] float GetCpuTemperature() const noexcept;
 
 #if defined(DUET3_MB6HC)
-	float AdcReadingToPowerVoltage(uint16_t adcVal) const noexcept;
-	uint16_t PowerVoltageToAdcReading(float voltage) const noexcept;
+	[[nodiscard]] float AdcReadingToPowerVoltage(uint16_t adcVal) const noexcept;
+	[[nodiscard]] uint16_t PowerVoltageToAdcReading(float voltage) const noexcept;
 #endif
 
 	// Board and processor

@@ -36,7 +36,7 @@ class SbcInterface
 	void Init() noexcept;
 	[[noreturn]] void TaskLoop() noexcept;
 	void Diagnostics(const StringRef& reply) noexcept;
-	bool IsConnected() const noexcept { return m_isConnected; }
+	[[nodiscard]] bool IsConnected() const noexcept { return m_isConnected; }
 
 	void EventOccurred(bool timeCritical = false) const noexcept; // Called when a new event has happened. It can
 																  // optionally start off a new transfer immediately

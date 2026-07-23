@@ -23,7 +23,7 @@ class CRC32
 		__attribute__((optimize("no-unroll-loops"))); // we already optimised the loops, and on the SAME5x unrolling
 													  // them could make us feed data to the CRC unit too fast
 	void Reset(uint32_t initialValue = 0xFFFFFFFFu) noexcept;
-	uint32_t Get() const noexcept;
+	[[nodiscard]] uint32_t Get() const noexcept;
 
 #if USE_SAME5x_HARDWARE_CRC
 	// Special function used to CRC a whole number of 32-bit words aligned on a word boundary, used to check for memory

@@ -46,10 +46,10 @@ class AveragingFilter
 	}
 
 	// Return the raw sum
-	uint32_t GetSum() const volatile noexcept { return m_sum; }
+	[[nodiscard]] uint32_t GetSum() const volatile noexcept { return m_sum; }
 
 	// Return true if we have a valid average
-	bool IsValid() const volatile noexcept { return m_isValid; }
+	[[nodiscard]] bool IsValid() const volatile noexcept { return m_isValid; }
 
 	static constexpr size_t NumAveraged() noexcept { return numAveraged; }
 
