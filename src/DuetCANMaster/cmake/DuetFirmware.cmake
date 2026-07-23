@@ -18,6 +18,8 @@ set(DEFAULT_LIBRARY_ARGS
     "ARCH"      # Default interface target for the library (from duet_arch_target)
 )
 
+include("${CMAKE_CURRENT_LIST_DIR}/ClangTidy.cmake")
+
 include("${_duet_lib_root}/DuetArch.cmake")
 include("${_duet_lib_root}/CoreN2G/CoreN2G.cmake")
 include("${_duet_lib_root}/FreeRTOS/FreeRTOS.cmake")
@@ -205,6 +207,10 @@ function(duet_add_firmware TARGET)
     set_target_properties(${TARGET} PROPERTIES
         SUFFIX ".elf"
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${TARGET}")
+
+    # Lint the firmware sources as they are compiled. Only this target: the shared libraries under
+    # lib/ are out of scope for this project's style guide (see .clang-tidy).
+    duet_enable_clang_tidy(${TARGET})
 
     target_link_libraries(${TARGET} PRIVATE ${_arch})
 

@@ -10,6 +10,11 @@
 #     cmake -S . -B build --toolchain cmake/arm-none-eabi-toolchain.cmake
 #     cmake --build build
 #
+# Each first-party source is linted by clang-tidy as it is compiled, with every check left enabled
+# in .clang-tidy treated as an error; see cmake/ClangTidy.cmake, and pass -DDUET_CLANG_TIDY=OFF for
+# a plain compile. Scripts/gen-compile-commands.sh remains the way to run clang-tidy over the whole
+# tree at once (and with --fix).
+#
 # Every board is one add_executable() defined via duet_add_firmware() (see cmake/DuetFirmware.cmake).
 # The shared Duet3D libraries are compiled from source into this build tree, so a Debug and a
 # Release configuration - or DuetCANMaster and Duet3Expansion - never share object files.

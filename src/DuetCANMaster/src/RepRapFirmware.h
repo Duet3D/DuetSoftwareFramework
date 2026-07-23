@@ -696,7 +696,7 @@ const AxesBitmap XyAxes = AxesBitmap::MakeLowestNBits(XY_AXES);
 // Common conversion factors
 constexpr float MinutesToSeconds = 60.0;
 constexpr uint32_t iMinutesToSeconds = 60;
-constexpr float SecondsToMinutes = 1.0 / MinutesToSeconds;
+constexpr float SecondsToMinutes = 1.0f / MinutesToSeconds;
 constexpr float SecondsToMillis = 1000.0;
 constexpr float MillisToSeconds = 0.001;
 constexpr float InchToMm = 25.4;
@@ -715,8 +715,8 @@ constexpr uint32_t StepClockRate = SystemCoreClockFreq / 128; // Duet 2, PCCB Ma
 #endif
 
 constexpr uint64_t StepClockRateSquared = (uint64_t)StepClockRate * StepClockRate;
-constexpr float StepClocksToMillis = 1000.0 / (float)StepClockRate;
-constexpr float StepClocksToSeconds = 1.0 / (float)StepClockRate;
+constexpr float StepClocksToMillis = 1000.0f / (float)StepClockRate;
+constexpr float StepClocksToSeconds = 1.0f / (float)StepClockRate;
 
 // Convert milliseconds to step clocks
 static constexpr uint32_t MillisToStepClocks(uint32_t numMillis) noexcept
@@ -738,7 +738,7 @@ static consteval uint32_t MicrosecondsToStepClocks(float us) noexcept
 	// Rounds up without std::ceil: GCC evaluates ceil in a constant expression as a builtin
 	// extension, clang does not, so std::ceil here makes this consteval function unusable in a
 	// constant expression under clang. 'us' is always positive, so truncate-then-bump is exact.
-	const double clocks = (float)StepClockRate * 0.000001 * us; // same expression as before
+	const double clocks = StepClockRate * 0.000001 * us; // same expression as before
 	const auto truncated = (uint32_t)clocks;
 	return truncated + (((double)truncated < clocks) ? 1u : 0u);
 }
@@ -746,17 +746,17 @@ static consteval uint32_t MicrosecondsToStepClocks(float us) noexcept
 // Functions to convert speeds and accelerations between seconds and step clocks
 static constexpr float ConvertSpeedFromMmPerSec(float speed) noexcept
 {
-	return speed * 1.0 / (float)StepClockRate;
+	return speed * 1.0f / (float)StepClockRate;
 }
 
 static constexpr float ConvertSpeedFromMmPerMin(float speed) noexcept
 {
-	return speed * (1.0 / (float)(StepClockRate * iMinutesToSeconds));
+	return speed * (1.0f / (float)(StepClockRate * iMinutesToSeconds));
 }
 
 static constexpr float ConvertSpeedFromMm(float speed, bool useSeconds) noexcept
 {
-	return speed * ((useSeconds) ? 1.0 / (float)StepClockRate : 1.0 / (float)(StepClockRate * iMinutesToSeconds));
+	return speed * ((useSeconds) ? 1.0f / (float)StepClockRate : 1.0f / (float)(StepClockRate * iMinutesToSeconds));
 }
 
 static constexpr float InverseConvertSpeedToMmPerSec(float speed) noexcept
@@ -776,7 +776,7 @@ static constexpr float InverseConvertSpeedToMm(float speed, bool useSeconds) noe
 
 static constexpr float ConvertAcceleration(float accel) noexcept
 {
-	return accel * (1.0 / (float)StepClockRateSquared);
+	return accel * (1.0f / (float)StepClockRateSquared);
 }
 
 static constexpr float InverseConvertAcceleration(float accel) noexcept

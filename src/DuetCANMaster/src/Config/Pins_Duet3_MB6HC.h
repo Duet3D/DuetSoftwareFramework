@@ -215,8 +215,8 @@ constexpr Pin VrefSensePin = PortCPin(0);
 
 // Thermistor series resistor value in Ohms
 constexpr float DefaultThermistorSeriesR = 2200.0;
-constexpr float MinVrefLoadR = (DefaultThermistorSeriesR / NumThermistorInputs) * 4700.0 /
-							   ((DefaultThermistorSeriesR / NumThermistorInputs) + 4700.0);
+constexpr float MinVrefLoadR = (DefaultThermistorSeriesR / NumThermistorInputs) * 4700.0f /
+							   ((DefaultThermistorSeriesR / NumThermistorInputs) + 4700.0f);
 // there are 4 temperature sensing channels and a 4K7 load resistor
 constexpr float VrefSeriesR = 15.0;
 

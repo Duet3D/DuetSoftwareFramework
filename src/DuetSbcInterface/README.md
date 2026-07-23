@@ -62,6 +62,13 @@ cmake --preset native
 cmake --build --preset native -j
 ```
 
+### Linting
+
+Every source is run through `clang-tidy` as it is compiled, and any check left enabled in
+`.clang-tidy` fails the build (`--warnings-as-errors=*`). Install it with `sudo apt install -y
+clang-tidy` (already present in the devcontainer); if it is missing, CMake warns at configure time
+and builds without linting. Pass `-DDUET_SBC_CLANG_TIDY=OFF` for a plain, roughly 3x faster build.
+
 ### Artifacts
 
 - `harness/sbc_jitter_test` — the test program (static under the cross preset)

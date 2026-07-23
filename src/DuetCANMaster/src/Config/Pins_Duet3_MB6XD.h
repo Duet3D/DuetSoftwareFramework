@@ -491,7 +491,7 @@ namespace StepPins
 	constexpr uint32_t AllDriversBitmap = []() -> uint32_t
 	{
 		uint32_t bits = 0;
-		for (Pin p : STEP_PINS)
+		for (const Pin p : STEP_PINS)
 		{
 			bits |= 1u << (p & 0x1Fu);
 		}

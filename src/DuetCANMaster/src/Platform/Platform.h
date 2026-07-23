@@ -305,7 +305,7 @@ class Platform final
 	[[nodiscard]] bool IsPowerOk() const noexcept;
 	void DisableAutoSave() noexcept;
 	void EnableAutoSave(float saveVoltage, float resumeVoltage) noexcept;
-	bool GetAutoSaveSettings(float& saveVoltage, float& resumeVoltage) noexcept;
+	bool GetAutoSaveSettings(float& saveVoltage, float& resumeVoltage) const noexcept;
 #endif
 
 #if HAS_12V_MONITOR

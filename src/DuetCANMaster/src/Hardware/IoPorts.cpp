@@ -645,7 +645,7 @@ void PwmPort::WriteAnalog(float pwm) const noexcept
 {
 	if (IsValid())
 	{
-		IoPort::WriteAnalog(GetPinNoCheck(), ((totalInvert) ? 1.0 - pwm : pwm), m_frequency);
+		IoPort::WriteAnalog(GetPinNoCheck(), ((totalInvert) ? 1.0f - pwm : pwm), m_frequency);
 	}
 }
 

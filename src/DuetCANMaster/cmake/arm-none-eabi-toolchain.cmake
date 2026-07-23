@@ -8,8 +8,6 @@
 set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_SYSTEM_PROCESSOR arm)
 
-set(ARM_GNU_TOOLCHAIN_VERSION "15.2.rel1" CACHE STRING "Arm GNU Toolchain version")
-
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
     set(_host_os "macos")
 else()
@@ -22,8 +20,9 @@ else()
 endif()
 
 set(CROSS_COMPILE
-    "${CMAKE_CURRENT_LIST_DIR}/../../../../arm-gnu-toolchain-${ARM_GNU_TOOLCHAIN_VERSION}-${_host_arch}-arm-none-eabi/bin/arm-none-eabi-"
+    "$ENV{ARM_GNU_TOOLCHAIN_DIR}/bin/arm-none-eabi-"
     CACHE STRING "Prefix (including trailing dash) of the arm-none-eabi cross-compiler executables")
+message("CROSS_COMPILE prefix = ${CROSS_COMPILE}")
 get_filename_component(CROSS_COMPILE "${CROSS_COMPILE}" ABSOLUTE)
 
 set(CMAKE_C_COMPILER   "${CROSS_COMPILE}gcc")

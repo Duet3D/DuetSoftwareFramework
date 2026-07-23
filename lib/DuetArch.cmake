@@ -46,7 +46,11 @@ function(_duet_arch_flags MCU OUT_COMPILE_OPTIONS OUT_COMPILE_DEFINITIONS OUT_LI
         message(FATAL_ERROR "duet_arch_flags: unknown MCU token '${MCU}'")
     endif()
     # Flags shared by every Duet target regardless of core.
-    list(APPEND _compile_options -mthumb -mfp16-format=ieee -fno-math-errno)
+    list(APPEND _compile_options
+        -mthumb
+        -mfp16-format=ieee
+        -fno-math-errno
+    )
     _duet_mcu_define(${MCU} _part_define)
     set(${OUT_COMPILE_DEFINITIONS} "${_part_define}" PARENT_SCOPE)
     # The link driver only needs the machine-selection flags, not the codegen ones.
@@ -65,6 +69,7 @@ endfunction()
 function(duet_arch_target MCU OUT_TARGET)
     string(TOLOWER ${MCU} _tag)
     set(_target "duet_arch_${_tag}")
+    set(${OUT_TARGET} ${_target} PARENT_SCOPE)
     if(TARGET ${_target})
         return()  # already created, don't create again
     endif()
@@ -73,5 +78,4 @@ function(duet_arch_target MCU OUT_TARGET)
     target_compile_options(${_target} INTERFACE ${_compile_options})
     target_compile_definitions(${_target} INTERFACE ${_compile_definitions})
     target_link_options(${_target} INTERFACE ${_link_options})
-    set(${OUT_TARGET} ${_target} PARENT_SCOPE)
 endfunction()

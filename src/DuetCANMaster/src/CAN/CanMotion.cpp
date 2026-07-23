@@ -50,14 +50,14 @@ struct PrepParams
 	motioncalc_t TotalDecelDistance() const noexcept { return distances[4] + distances[5] + distances[6]; }
 	void EnsureSpeedsSet() const noexcept;
 #  else
-	uint32_t SteadyClocks() const noexcept { return steadyClocks; }
-	uint32_t TotalAccelClocks() const noexcept { return accelClocks; }
-	uint32_t TotalDecelClocks() const noexcept { return decelClocks; }
-	motioncalc_t TotalAccelDistance() const noexcept { return accelDistance; }
+	[[nodiscard]] uint32_t SteadyClocks() const noexcept { return steadyClocks; }
+	[[nodiscard]] uint32_t TotalAccelClocks() const noexcept { return accelClocks; }
+	[[nodiscard]] uint32_t TotalDecelClocks() const noexcept { return decelClocks; }
+	[[nodiscard]] motioncalc_t TotalAccelDistance() const noexcept { return accelDistance; }
 #  endif
 
 	// Get the total clocks needed
-	uint32_t TotalClocks() const noexcept { return TotalAccelClocks() + SteadyClocks() + TotalDecelClocks(); }
+	[[nodiscard]] uint32_t TotalClocks() const noexcept { return TotalAccelClocks() + SteadyClocks() + TotalDecelClocks(); }
 
 	void DebugPrint() const noexcept;
 };

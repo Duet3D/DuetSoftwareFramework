@@ -451,7 +451,7 @@ void Platform::EnableAutoSave(float saveVoltage, float resumeVoltage) noexcept
 	m_autoSaveEnabled = true;
 }
 
-bool Platform::GetAutoSaveSettings(float& saveVoltage, float& resumeVoltage) noexcept
+bool Platform::GetAutoSaveSettings(float& saveVoltage, float& resumeVoltage) const noexcept
 {
 	if (m_autoSaveEnabled)
 	{
@@ -1420,6 +1420,9 @@ uint32_t Platform::Random() noexcept
 
 #endif
 
+// DiagPin and DiagOnPolarity are Platform members on MB6HC (the pins depend on the board revision)
+// and global constants on MB6XD, so this only looks static when compiling for MB6XD.
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 void Platform::SetDiagLed(bool on) const noexcept
 {
 	digitalWrite(DiagPin, XNor(DiagOnPolarity, on));
@@ -1427,6 +1430,8 @@ void Platform::SetDiagLed(bool on) const noexcept
 
 #if SUPPORT_MULTICAST_DISCOVERY
 
+// Static on MB6XD only, for the same reason as SetDiagLed above.
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 void Platform::InvertDiagLed() const noexcept
 {
 	digitalWrite(DiagPin, !digitalRead(DiagPin));
