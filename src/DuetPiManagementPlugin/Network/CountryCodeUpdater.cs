@@ -1,5 +1,4 @@
-﻿using DuetAPI.ObjectModel;
-using DuetAPIClient;
+﻿using DuetAPIClient;
 using DuetPiManagementPlugin.Network;
 using System;
 using System.IO;
@@ -110,19 +109,7 @@ namespace DuetPiManagementPlugin
                     }
                 }
 
-                ObjectModel model = await _connection.GetObjectModelAsync("network.interfaces");
-
-                await using (await _connection.LockObjectModelAsync())
-                {
-                    for (int i = 0; i < model.Network.Interfaces.Count; i++)
-                    {
-                        NetworkInterface iface = model.Network.Interfaces[i];
-                        if (iface.Type == NetworkInterfaceType.WiFi)
-                        {
-                            await _connection.SetObjectModelAsync($"network/interfaces/{i}/wifiCountry", string.IsNullOrWhiteSpace(countryCode) ? "null" : $"\"{countryCode.Trim()}\"");
-                        }
-                    }
-                }
+                await _connection.SetWifiCountryAsync(string.IsNullOrWhiteSpace(countryCode) ? null : countryCode.Trim());
             }
             catch (Exception e)
             {

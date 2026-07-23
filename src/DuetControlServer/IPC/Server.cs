@@ -23,7 +23,6 @@ namespace DuetControlServer.IPC;
 /// </summary>
 /// <param name="commandFactory">Factory to create commands</param>
 /// <param name="processorFactory">Factory to create connection processors</param>
-/// <param name="lockManager">Lock manager to handle read/write locks</param>
 /// <param name="model">Object model</param>
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="logger">Logger instance</param>
@@ -31,7 +30,6 @@ namespace DuetControlServer.IPC;
 [DiagnosticsPriority(-2)]
 public sealed class Server(CommandFactory commandFactory,
     ProcessorFactory processorFactory,
-    LockManager lockManager,
     Model.ObjectModel model,
     IHostApplicationLifetime lifetime,
     ILogger<Server> logger,
@@ -202,9 +200,6 @@ public sealed class Server(CommandFactory commandFactory,
         finally
         {
             logger.LogDebug("IPC#{Id}: Connection closed", connection.Id);
-
-            // Unlock the machine model again in case the client application crashed
-            lockManager.UnlockMachineModel(connection);
         }
     }
 

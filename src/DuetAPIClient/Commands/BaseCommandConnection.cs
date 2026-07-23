@@ -445,62 +445,6 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
         await PerformCommandAsync(new InvalidateChannel { Channel = channel }, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Internal class representing an object model lock
-    /// </summary>
-    /// <param name="connection">Connection that acquired the lock</param>
-    public sealed class ObjectModelLock(BaseCommandConnection connection) : IDisposable, IAsyncDisposable
-    {
-        /// <summary>
-        /// Dispose the lock again
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public void Dispose()
-        {
-            if (connection.IsConnected)
-            {
-                connection.PerformCommand(new UnlockObjectModel());
-            }
-        }
-
-        /// <summary>
-        /// Dispose the lock again asynchronously
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public async ValueTask DisposeAsync()
-        {
-            if (connection.IsConnected)
-            {
-                await connection.PerformCommandAsync(new UnlockObjectModel(), default).ConfigureAwait(false);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Lock the machine model for read/write access
-    /// </summary>
-    /// <returns>Asynchronous object model lock</returns>
-    /// <exception cref="SocketException">Command could not be processed</exception>
-    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public ObjectModelLock LockObjectModel()
-    {
-        PerformCommand(new LockObjectModel());
-        return new ObjectModelLock(this);
-    }
-
-    /// <summary>
-    /// Lock the machine model for read/write access asynchronously
-    /// </summary>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous object model lock</returns>
-    /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
-    /// <exception cref="SocketException">Command could not be processed</exception>
-    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public async Task<ObjectModelLock> LockObjectModelAsync(CancellationToken cancellationToken = default)
-    {
-        await PerformCommandAsync(new LockObjectModel(), cancellationToken).ConfigureAwait(false);
-        return new ObjectModelLock(this);
-    }
 
     /// <summary>
     /// Notify the control server that a plugin has been started
@@ -780,34 +724,6 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     }
 
     /// <summary>
-    /// Set a given property to a certain value. Make sure to lock the object model before calling this
-    /// </summary>
-    /// <param name="path">Path to the property</param>
-    /// <param name="value">New value as string</param>
-    /// <returns>True if the property could be updated</returns>
-    /// <exception cref="SocketException">Command could not be processed</exception>
-    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public bool SetObjectModel(string path, string value)
-    {
-        return PerformCommand<bool>(new SetObjectModel { PropertyPath = path, Value = value });
-    }
-
-    /// <summary>
-    /// Set a given property to a certain value. Make sure to lock the object model before calling this
-    /// </summary>
-    /// <param name="path">Path to the property</param>
-    /// <param name="value">New value as string</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>True if the property could be updated</returns>
-    /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
-    /// <exception cref="SocketException">Command could not be processed</exception>
-    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public async Task<bool> SetObjectModelAsync(string path, string value, CancellationToken cancellationToken = default)
-    {
-        return await PerformCommandAsync<bool>(new SetObjectModel { PropertyPath = path, Value = value }, cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <summary>
     /// Set custom plugin data in the object model
     /// </summary>
     /// <param name="key">Key to set</param>
@@ -900,6 +816,30 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     public async Task SetUpdateStatusAsync(string message, float? progress = null, CancellationToken cancellationToken = default)
     {
         await PerformCommandAsync(new SetUpdateStatus { Updating = true, Message = message, Progress = progress }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Set the WiFi country code. This is a global setting on Linux, so it is applied to every WiFi
+    /// interface in the object model
+    /// </summary>
+    /// <param name="countryCode">New WiFi country code, or null to clear it</param>
+    /// <exception cref="SocketException">Command could not be processed</exception>
+    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+    public void SetWifiCountry(string? countryCode) => PerformCommand(new SetWifiCountry { CountryCode = countryCode });
+
+    /// <summary>
+    /// Set the WiFi country code asynchronously. This is a global setting on Linux, so it is applied to every WiFi
+    /// interface in the object model
+    /// </summary>
+    /// <param name="countryCode">New WiFi country code, or null to clear it</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+    /// <exception cref="SocketException">Command could not be processed</exception>
+    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+    public async Task SetWifiCountryAsync(string? countryCode, CancellationToken cancellationToken = default)
+    {
+        await PerformCommandAsync(new SetWifiCountry { CountryCode = countryCode }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

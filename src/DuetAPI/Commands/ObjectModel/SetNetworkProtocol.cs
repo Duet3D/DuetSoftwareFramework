@@ -6,9 +6,6 @@ namespace DuetAPI.Commands;
 /// <summary>
 /// Flag a given network protocol as enabled or disabled
 /// </summary>
-/// <remarks>
-/// The object model must not be locked from the same connection via <see cref="LockObjectModel"/> when this is called!
-/// </remarks>
 [RequiredPermissions(SbcPermissions.SuperUser)]
 public partial class SetNetworkProtocol : Command
 {

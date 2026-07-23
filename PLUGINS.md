@@ -120,10 +120,9 @@ corresponding command in DCS:
 | AddHttpEndpoint | Register a new HTTP endpoint | RegisterHttpEndpoints  |
 | RemoveHttpEndpoint | Unregister an existing HTTP endpoint | RegisterHttpEndpoints |
 | GetObjectModel | Query the full object model | ObjectModelRead, ObjectModelReadWrite |
-| LockObjectModel | Lock the object model for write access | ObjectModelReadWrite |
-| SetObjectModel | Set a single key in the object model (e.g. in Scanner) | ObjectModelReadWrite |
+| PatchObjectModel | Apply a JSON patch to a key in the object model | ObjectModelReadWrite |
+| SetWifiCountry | Set the WiFi country code | ObjectModelReadWrite |
 | SyncObjectModel | Wait for the object model to be fully synchronized | CommandExecution, ObjectModelRead, ObjectModelReadWrite |
-| UnlockObjectModel | Unlock the object model again, see LockObjectModel | ObjectModelReadWrite |
 | InstallPlugin | Install or upgrade a plugin | ManagePlugins |
 | StartPlugin | Start a plugin | ManagePlugins |
 | StartPlugins | Start all the plugins | ManagePlugins |

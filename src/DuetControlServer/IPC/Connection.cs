@@ -592,10 +592,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     private static readonly Dictionary<string, string> _legacyCommandMapping = new()
     {
         { "getmachinemodel", "GetObjectModel" },
-        { "lockmachinemodel", "LockObjectModel" },
-        { "patchmachinemodel", "PatchObjectModel" },
-        { "setmachinemodel", "SetObjectModel" },
-        { "unlockmachinemodel", "UnlockObjectModel" }
+        { "patchmachinemodel", "PatchObjectModel" }
     };
 
     /// <summary>

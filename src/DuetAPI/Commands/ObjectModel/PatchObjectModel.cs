@@ -9,8 +9,6 @@ namespace DuetAPI.Commands;
 /// </summary>
 /// <exception cref="ArgumentException">Invalid key specified</exception>
 /// <exception cref="InvalidOperationException">DCS is not running in non-SPI mode</exception>
-/// <seealso cref="LockObjectModel"/>
-/// <seealso cref="UnlockObjectModel"/>
 [RequiredPermissions(SbcPermissions.ObjectModelReadWrite)]
 public partial class PatchObjectModel : Command
 {
