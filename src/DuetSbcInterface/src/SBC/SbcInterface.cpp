@@ -1,6 +1,6 @@
-#include "DuetSbc/SbcInterface.h"
+#include "SbcInterface.h"
 
-#include "DuetSbc/ProcessHelpers.h"
+#include <Platform/ProcessHelpers.h>
 
 #include <poll.h>
 #include <sys/eventfd.h>

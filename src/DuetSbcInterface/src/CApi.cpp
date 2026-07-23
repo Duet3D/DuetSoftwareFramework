@@ -1,7 +1,7 @@
-#include "DuetSbc/CApi.h"
+#include "CApi.h"
 
-#include "DuetSbc/Config.h"
-#include "DuetSbc/SbcInterface.h"
+#include <Config/Configuration.h>
+#include <SBC/SbcInterface.h>
 
 #include <algorithm>
 #include <cstring>

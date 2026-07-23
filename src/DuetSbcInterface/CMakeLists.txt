@@ -124,7 +124,7 @@ set(DUET_LIBRARIES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../lib" CACHE PATH
     "Path to the shared Duet libraries directory")
 add_subdirectory("${DUET_LIBRARIES_DIR}/DuetSpiInterface" duet_spi_protocol)
 
-add_subdirectory(sbc)
+add_subdirectory(src)
 add_subdirectory(harness)
 
 # Host-side unit tests (no hardware required). Skipped when cross-compiling, since the resulting

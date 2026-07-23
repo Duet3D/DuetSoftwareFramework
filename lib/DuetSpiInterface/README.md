@@ -14,7 +14,7 @@ compiles for bare-metal ARM and for 64-bit Linux.
 Checksums are **not** here. CRC16 and CRC32 are standard algorithms rather than negotiated formats,
 and each side brings its own implementation tuned for its environment: the firmware uses
 `DuetCANMaster/src/Storage/CRC32.cpp` (slicing-by-4 on SAME70, DMAC hardware CRC on SAME5x), the SBC
-side `DuetSbcInterface/sbc/src/Crc.cpp`, and DCS `Utility/{CRC16,CRC32}.cs`. All three must produce
+side `DuetSbcInterface/src/Storage/Crc.cpp`, and DCS `Utility/{CRC16,CRC32}.cs`. All three must produce
 identical values.
 
 ## Consumers

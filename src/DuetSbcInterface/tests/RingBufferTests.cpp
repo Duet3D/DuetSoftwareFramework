@@ -1,6 +1,6 @@
 // Standalone validation of duet::sbc::RingBuffer: framing, wrap/skip-marker, full-ring rejection,
 // and a threaded producer/consumer soak that checks every record arrives intact and in order.
-#include "DuetSbc/RingBuffer.h"
+#include <Platform/RingBuffer.h>
 
 #include <atomic>
 #include <cassert>

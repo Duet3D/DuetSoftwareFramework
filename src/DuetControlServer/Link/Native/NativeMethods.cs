@@ -5,7 +5,7 @@ namespace DuetControlServer.Link.Native;
 
 /// <summary>
 /// Configuration passed to the native interface. Mirrors <c>DuetSbcConfig</c> in
-/// <c>DuetSbcInterface/sbc/include/DuetSbc/CApi.h</c>
+/// <c>DuetSbcInterface/src/CApi.h</c>
 /// </summary>
 /// <remarks>
 /// Kept fully blittable so the source-generated P/Invoke can pass it by reference with no marshalling

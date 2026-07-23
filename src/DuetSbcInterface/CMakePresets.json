@@ -27,7 +27,7 @@
     {
       "name": "pi-arm64",
       "displayName": "Cross-compile for aarch64 against a Pi sysroot (deployable)",
-      "description": "Links against a sysroot copied from the target, so libduet_sbc.so matches the Pi's glibc. Requires pi-sysroot/ to exist: fetch it with scripts/fetch-pi-sysroot.sh <user>@<pi-host>, or override the path with -DDUET_SBC_SYSROOT=...",
+      "description": "Links against a sysroot copied from the target, so libduet_sbc.so matches the Pi's glibc. Requires pi-sysroot/ to exist: fetch it with Scripts/fetch-pi-sysroot.sh <user>@<pi-host>, or override the path with -DDUET_SBC_SYSROOT=...",
       "inherits": "base",
       "toolchainFile": "${sourceDir}/cmake/aarch64-linux-gnu.cmake",
       "cacheVariables": {

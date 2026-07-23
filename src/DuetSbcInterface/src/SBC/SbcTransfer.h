@@ -6,11 +6,11 @@
 // RequestTransfer / WaitForTransferReason gating used by the interface loop.
 #pragma once
 
-#include "DuetSbc/Config.h"
-#include "DuetSbc/GpioInputPin.h"
-#include "DuetSbc/OutputGpioPin.h"
-#include "DuetSbc/SpiDevice.h"
-#include "DuetSpiProtocol/MessageFormats.h"
+#include <Config/Configuration.h>
+#include <DuetSpiProtocol/MessageFormats.h>
+#include <Hardware/GpioInputPin.h>
+#include <Hardware/OutputGpioPin.h>
+#include <Hardware/SpiDevice.h>
 
 #include <atomic>
 #include <chrono>

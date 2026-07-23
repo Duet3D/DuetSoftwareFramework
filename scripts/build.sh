@@ -200,7 +200,7 @@ build_sbc_interface() {
         && cmake --build --preset "$preset" --target duet_sbc_shared -j"$(nproc)")
 
     # Land it next to the managed assemblies so default P/Invoke probing resolves it
-    cp "$build_dir/sbc/$SBC_LIB_NAME" "$BUILD_DIR/"
+    cp "$build_dir/src/$SBC_LIB_NAME" "$BUILD_DIR/"
     echo "=== $SBC_LIB_NAME -> $BUILD_DIR/ ==="
 }
 

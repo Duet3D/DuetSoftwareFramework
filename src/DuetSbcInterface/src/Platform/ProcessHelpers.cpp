@@ -1,4 +1,4 @@
-#include "DuetSbc/ProcessHelpers.h"
+#include "ProcessHelpers.h"
 
 #include <sched.h>
 

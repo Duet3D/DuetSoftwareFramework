@@ -1,6 +1,6 @@
-#include "DuetSbc/SbcTransfer.h"
+#include "SbcTransfer.h"
 
-#include "DuetSbc/Crc.h"
+#include <Storage/Crc.h>
 
 #include <poll.h>
 #include <sys/eventfd.h>

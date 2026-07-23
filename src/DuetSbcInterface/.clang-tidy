@@ -86,7 +86,7 @@ CheckOptions:
     value: CamelCase
   - key: readability-identifier-naming.FunctionCase
     value: CamelCase
-  # The extern "C" ABI in DuetSbc/CApi.h is bound by symbol name from
+  # The extern "C" ABI in CApi.h is bound by symbol name from
   # DuetControlServer/Link/Native/NativeMethods.cs. Renaming these would not fail the
   # build -- it would fail at runtime when P/Invoke cannot resolve the entry point.
   - key: readability-identifier-naming.FunctionIgnoredRegexp

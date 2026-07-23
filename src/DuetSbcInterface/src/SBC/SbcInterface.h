@@ -18,11 +18,11 @@
 // reporting completion through the usual request id.
 #pragma once
 
-#include "DuetSbc/Config.h"
-#include "DuetSbc/LinkEvents.h"
-#include "DuetSbc/RingBuffer.h"
-#include "DuetSbc/SbcTransfer.h"
-#include "DuetSpiProtocol/MessageFormats.h"
+#include "LinkEvents.h"
+#include "SbcTransfer.h"
+#include <Config/Configuration.h>
+#include <DuetSpiProtocol/MessageFormats.h>
+#include <Platform/RingBuffer.h>
 
 #include <atomic>
 #include <cstdint>

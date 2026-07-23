@@ -1,4 +1,4 @@
-#include "DuetSbc/Crc.h"
+#include "Crc.h"
 
 namespace Duet::Sbc
 {

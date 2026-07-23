@@ -1,4 +1,4 @@
-#include "DuetSbc/SpiDevice.h"
+#include "SpiDevice.h"
 
 #include <fcntl.h>
 #include <linux/spi/spidev.h>

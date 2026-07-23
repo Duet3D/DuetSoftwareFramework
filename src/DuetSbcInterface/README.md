@@ -19,10 +19,22 @@ implemented (and is no longer supported by DCS).
 
 ## Layout
 
+`src/` follows the same convention as [DuetCANMaster](../DuetCANMaster): one directory per module,
+each header sitting next to the `.cpp` that implements it, with `src/` itself as the include root.
+A module includes its own headers as `"Foo.h"` and another module's as `<Module/Foo.h>`.
+
 ```
-sbc/        duet_sbc(.a/.so)   — GPIO chardev, spidev, process helpers, transfer state machine,
-                                 CRC16/CRC32, the interface loop, and a C ABI (CApi.h) for P/Invoke
-harness/    sbc_jitter_test    — standalone latency/jitter test program
+src/                 duet_sbc(.a/.so)
+  CApi.h/.cpp        C ABI for P/Invoke from DuetControlServer
+  Config/            build-time defaults and the runtime Config struct
+  Hardware/          spidev and GPIO chardev wrappers
+  Platform/          process/thread helpers (RT priority, affinity) and the lock-free ring buffer
+  SBC/               transfer state machine, the interface loop, and the LinkEvents wire format
+  Storage/           CRC16/CRC32
+harness/             sbc_jitter_test — standalone latency/jitter test program
+tests/               host-side unit tests (no hardware required)
+Scripts/             fetch-pi-sysroot.sh
+cmake/               cross-compilation toolchain files
 ```
 
 The wire protocol itself lives outside this project, in
@@ -68,7 +80,7 @@ fails to load on the Pi with a `GLIBC_2.3x not found` error. Build it with `pi-a
 links against a copy of the Pi's own libraries and refuses to configure if that copy is missing:
 
 ```sh
-scripts/fetch-pi-sysroot.sh pi@raspberrypi          # one-off, into pi-sysroot/
+Scripts/fetch-pi-sysroot.sh pi@raspberrypi          # one-off, into pi-sysroot/
 cmake --preset pi-arm64
 cmake --build --preset pi-arm64 -j
 ```
@@ -102,14 +114,14 @@ libstdc++ inside the Pi sysroot, where GCC never looks for it).
 ### Artifacts
 
 - `harness/sbc_jitter_test` — the test program (static under the cross preset)
-- `sbc/libduet_sbc.so` — shared library exposing the C ABI (for DCS P/Invoke)
-- `sbc/libduet_sbc.a` — static library
+- `src/libduet_sbc.so` — shared library exposing the C ABI (for DCS P/Invoke)
+- `src/libduet_sbc.a` — static library
 
 > **P/Invoke `.so` note:** a shared library must link glibc dynamically, so the cross-built
 > `libduet_sbc.so` requires the target's glibc. To produce a Bookworm-compatible `.so`, either build
 > it natively on the Pi, or fetch a Pi sysroot and do a glibc-matched dynamic build:
 > ```sh
-> scripts/fetch-pi-sysroot.sh pi@raspberrypi
+> Scripts/fetch-pi-sysroot.sh pi@raspberrypi
 > cmake --preset pi-arm64 -DDUET_SBC_STATIC=OFF
 > cmake --build --preset pi-arm64
 > ```
@@ -204,7 +216,7 @@ The managed side lives in [`DuetControlServer/Link/Native`](../DuetControlServer
 The interface thread runs pinned and `SCHED_FIFO`. If it invoked managed callbacks directly, then
 managed allocation, lock acquisition and GC pauses would all execute *on that thread*, mid-transfer —
 reintroducing (and worsening) the very jitter this project exists to remove. So the boundary is two
-lock-free ring buffers ([`RingBuffer.h`](sbc/include/DuetSbc/RingBuffer.h)):
+lock-free ring buffers ([`RingBuffer.h`](src/Platform/RingBuffer.h)):
 
 ```
 managed threads --> [outbound ring] --> interface thread (RT)   <- drained while staging a transfer
@@ -213,7 +225,7 @@ managed dispatcher <-- [inbound ring] <-- interface thread (RT) <- written as pa
 
 Producers serialise among themselves with a mutex the consumer never takes, so a producer can never
 block the real-time thread. Record layouts are defined in
-[`LinkEvents.h`](sbc/include/DuetSbc/LinkEvents.h) and asserted on both sides — `NativeLink` verifies
+[`LinkEvents.h`](src/SBC/LinkEvents.h) and asserted on both sides — `NativeLink` verifies
 the managed struct sizes at startup so a drift fails loudly instead of silently corrupting events.
 
 The ring is covered by [`tests/RingBufferTests.cpp`](tests/RingBufferTests.cpp) (framing, wrap/skip
@@ -234,7 +246,7 @@ make ARCH=arm64 CONFIG=Release publish
 > devcontainer toolchain targets a newer glibc than Raspberry Pi OS Bookworm, so for release packages
 > either build on the Pi or pass a matching sysroot:
 > `make ARCH=arm64 DUET_SBC_SYSROOT=/path/to/pi-sysroot publish`
-> (see `scripts/fetch-pi-sysroot.sh`). A native-`ARCH` build needs no sysroot.
+> (see `Scripts/fetch-pi-sysroot.sh`). A native-`ARCH` build needs no sysroot.
 
 ## Sharing with DuetCANMaster
 

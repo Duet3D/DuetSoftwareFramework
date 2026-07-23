@@ -6,9 +6,9 @@
 // Because no .NET runtime (and therefore no GC) is involved, comparing this histogram against the C#
 // one isolates whether the 40 ms outliers come from the kernel/hardware or from the managed runtime.
 //
-#include "DuetSbc/Config.h"
-#include "DuetSbc/ProcessHelpers.h"
-#include "DuetSbc/SbcInterface.h"
+#include <Config/Configuration.h>
+#include <Platform/ProcessHelpers.h>
+#include <SBC/SbcInterface.h>
 
 #include <algorithm>
 #include <atomic>

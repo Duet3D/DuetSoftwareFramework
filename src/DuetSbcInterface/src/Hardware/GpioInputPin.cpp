@@ -1,4 +1,4 @@
-#include "DuetSbc/GpioInputPin.h"
+#include "GpioInputPin.h"
 
 #include <fcntl.h>
 #include <linux/gpio.h>
