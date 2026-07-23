@@ -37,13 +37,19 @@ class OutputBuffer
 
 	[[nodiscard]] const char* _ecv_array Data() const noexcept { return m_data; }
 	[[nodiscard]] const char* _ecv_array UnreadData() const noexcept { return m_data + m_bytesRead; }
-	[[nodiscard]] size_t DataLength() const noexcept { return m_dataLength; } // How many bytes have been written to this instance?
-	[[nodiscard]] size_t Length() const noexcept;							  // How many bytes have been written to the whole chain?
+	[[nodiscard]] size_t DataLength() const noexcept
+	{
+		return m_dataLength;
+	}											  // How many bytes have been written to this instance?
+	[[nodiscard]] size_t Length() const noexcept; // How many bytes have been written to the whole chain?
 
 	char operator[](size_t index) const noexcept;
 	const char* _ecv_array Read(size_t len) noexcept;
 	void Taken(size_t len) noexcept { m_bytesRead += len; }
-	[[nodiscard]] size_t BytesLeft() const noexcept { return m_dataLength - m_bytesRead; } // How many bytes have not been sent yet?
+	[[nodiscard]] size_t BytesLeft() const noexcept
+	{
+		return m_dataLength - m_bytesRead;
+	} // How many bytes have not been sent yet?
 
 	[[nodiscard]] uint32_t WhenQueued() const noexcept { return m_whenQueued; }
 	void UpdateWhenQueued() noexcept;

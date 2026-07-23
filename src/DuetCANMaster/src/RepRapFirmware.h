@@ -738,7 +738,7 @@ static consteval uint32_t MicrosecondsToStepClocks(float us) noexcept
 	// extension, clang does not, so std::ceil here makes this consteval function unusable in a
 	// constant expression under clang. 'us' is always positive, so truncate-then-bump is exact.
 	const double clocks = (float)StepClockRate * 0.000001 * us; // same expression as before
-	const uint32_t truncated = (uint32_t)clocks;
+	const auto truncated = (uint32_t)clocks;
 	return truncated + (((double)truncated < clocks) ? 1u : 0u);
 }
 

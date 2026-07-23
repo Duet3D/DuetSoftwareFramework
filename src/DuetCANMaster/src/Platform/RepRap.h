@@ -52,8 +52,11 @@ class RepRap final
 	void Diagnostics(MessageType mtype, const StringRef& reply) noexcept;
 	void Timing(const StringRef& reply) noexcept;
 
-	[[nodiscard]] bool Debug(Module module) const noexcept { return m_debugMaps[module.ToBaseType()].IsNonEmpty(); }
-	[[nodiscard]] DebugFlags GetDebugFlags(Module m) const noexcept { return m_debugMaps[m.ToBaseType()]; }
+	[[nodiscard]] bool Debug(const Module& module) const noexcept
+	{
+		return m_debugMaps[module.ToBaseType()].IsNonEmpty();
+	}
+	[[nodiscard]] DebugFlags GetDebugFlags(const Module& m) const noexcept { return m_debugMaps[m.ToBaseType()]; }
 
 	[[nodiscard]] Module GetSpinningModule() const noexcept;
 
@@ -266,9 +269,9 @@ bool MemoryWatcher<NumWords>::Check(unsigned int tag) noexcept
 	{
 		const uint32_t valProtected = m_checkedData[i]; // read volatile data just once
 		const uint32_t valCopy = m_dataCopy[i];			// read volatile data just once
-		csumProtected ^= valProtected;				  // update new checksum of checked memory
-		csumCopy ^= valCopy;						  // update new checksum of the copy of the checked memory
-		if (valProtected != valCopy)				  // if the protected word and its copy are no longer the same
+		csumProtected ^= valProtected;					// update new checksum of checked memory
+		csumCopy ^= valCopy;							// update new checksum of the copy of the checked memory
+		if (valProtected != valCopy)					// if the protected word and its copy are no longer the same
 		{
 			badOffset = (int)i;
 		}

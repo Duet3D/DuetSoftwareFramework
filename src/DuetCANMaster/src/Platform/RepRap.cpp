@@ -215,7 +215,7 @@ void RepRap::Init() noexcept
 	m_active = true; // must do this after we initialise the watchdog but before we start the network or call Spin(),
 					 // else the watchdog may time out
 
-	delay(100);						  // give the tick ISR time to collect voltage readings
+	delay(100);							// give the tick ISR time to collect voltage readings
 	m_platform->ResetVoltageMonitors(); // get rid of the spurious zero minimum voltage readings
 
 #if 0 // DEBUG

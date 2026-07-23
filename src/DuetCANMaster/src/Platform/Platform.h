@@ -273,7 +273,7 @@ class Platform final
 
 	// Real-time clock
 	[[nodiscard]] bool IsDateTimeSet() const noexcept { return m_realTime != 0; } // Has the RTC been set yet?
-	[[nodiscard]] time_t GetDateTime() const noexcept { return m_realTime; }		// Retrieves the current RTC datetime
+	[[nodiscard]] time_t GetDateTime() const noexcept { return m_realTime; }	  // Retrieves the current RTC datetime
 	bool GetDateTime(tm& rslt) const noexcept { return gmtime_r(&m_realTime, &rslt) != nullptr && m_realTime != 0; }
 	// Retrieves the broken-down current RTC datetime and returns true if it's valid
 	bool SetDateTime(time_t t) noexcept; // Sets the current RTC date and time or returns false on error

@@ -167,7 +167,7 @@ class DataTransfer
 
 inline bool DataTransfer::IsConnectionReset() const noexcept
 {
-	uint16_t nextTransferNumber = m_lastTransferNumber + 1u;
+	const uint16_t nextTransferNumber = m_lastTransferNumber + 1u;
 	return (rxHeader.formatCode == SbcFormatCode) && (rxHeader.sequenceNumber != nextTransferNumber);
 }
 
@@ -204,7 +204,7 @@ inline bool DataTransfer::CanWritePacket(size_t dataLength) const noexcept
 
 inline size_t DataTransfer::AddPadding(size_t length) const noexcept
 {
-	size_t extraBytes = (length & 3);
+	const size_t extraBytes = (length & 3);
 	return (extraBytes == 0) ? length : length + 4 - extraBytes;
 }
 #endif // HAS_SBC_INTERFACE

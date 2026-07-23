@@ -182,7 +182,7 @@ inline StepTimer::Ticks StepTimer::GetMovementTimerTicks() noexcept
 // return zero.
 inline StepTimer::Ticks StepTimer::CheckMovementDelayIncreased() noexcept
 {
-	AtomicCriticalSectionLocker lock;
+	const AtomicCriticalSectionLocker lock;
 	if (ownMovementDelayIncreased)
 	{
 		ownMovementDelayIncreased = false;

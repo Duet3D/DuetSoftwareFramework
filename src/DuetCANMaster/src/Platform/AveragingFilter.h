@@ -18,7 +18,7 @@ class AveragingFilter
 
 	void Init(uint16_t val) volatile noexcept
 	{
-		AtomicCriticalSectionLocker lock;
+		const AtomicCriticalSectionLocker lock;
 
 		m_sum = (uint32_t)val * (uint32_t)numAveraged;
 		m_index = 0;
