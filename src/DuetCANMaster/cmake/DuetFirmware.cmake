@@ -25,13 +25,14 @@ include("${_duet_lib_root}/RRFLibraries/RRFLibraries.cmake")
 include("${_duet_lib_root}/CANlib/CANlib.cmake")
 include("${_duet_lib_root}/LibTinyusb/LibTinyusb.cmake")
 include("${_duet_lib_root}/LibMbedTls/LibMbedTls.cmake")
+add_subdirectory("${_duet_lib_root}/DuetSpiInterface" "${CMAKE_CURRENT_BINARY_DIR}/DuetSpiInterface") # There are no configuration options for this header only library
 
 # Which library config each MCU's firmware links against, and the firmware's own MCU-specific bits.
 # Adding a board on a new MCU is a matter of adding one block here.
 function(_duet_target_library_profile TARGET OUT_DEPS OUT_ARGS)
     if(${TARGET} STREQUAL "Duet3Firmware_MB6HC")
 
-        set(_deps CANLIB COREN2G FREERTOS RRFLIBRARIES LIBTINYUSB)
+        set(_deps CANLIB COREN2G FREERTOS RRFLIBRARIES LIBTINYUSB SPIINTERFACE)
         set(_args
             COREN2G         "CAN;USB;SDHC;RTOS"
             FREERTOS        ""
@@ -42,7 +43,7 @@ function(_duet_target_library_profile TARGET OUT_DEPS OUT_ARGS)
             HARDWARE_DIR    "SAME70"
         )
     elseif(${TARGET} STREQUAL "Duet3Firmware_MB6XD")
-        set(_deps CANLIB COREN2G FREERTOS RRFLIBRARIES LIBTINYUSB)
+        set(_deps CANLIB COREN2G FREERTOS RRFLIBRARIES LIBTINYUSB SPIINTERFACE)
         set(_args
             COREN2G         "CAN;USB;SDHC;RTOS"
             FREERTOS        ""
@@ -152,6 +153,10 @@ function(duet_provide_libraries TARGET MCU)
         )
     endif()
 
+    if(SPIINTERFACE IN_LIST _deps)
+        set(_spi_interface_target "duet_spi_protocol")
+    endif()
+
     set(DUET_LIBS_${TARGET}
         ${_coren2g_target}
         ${_rrflibraries_target}
@@ -159,6 +164,7 @@ function(duet_provide_libraries TARGET MCU)
         ${_canlib_target}
         ${_libtinyusb_target}
         ${_libmbedtls_target}
+        ${_spi_interface_target}
         PARENT_SCOPE
     )
     set(DUET_HARDWARE_DIR_${TARGET} "${P_HARDWARE_DIR}" PARENT_SCOPE)
@@ -206,14 +212,15 @@ function(duet_add_firmware TARGET)
     # linked library targets. The firmware only adds its own sources and the header-only helper
     # libraries that aren't built as targets here.
     target_include_directories(${TARGET} PRIVATE
-        "${LIBRARIES_DIR}/DuetSpiInterface/include"
-        "${LIBRARIES_DIR}/WiFiSocketServerRTOS/src/include"
         "${CMAKE_SOURCE_DIR}/src"
         "${CMAKE_SOURCE_DIR}/src/Hardware/${_hw}")
 
     target_compile_definitions(${TARGET} PRIVATE
         ${ARG_DEFINE}
         ${_compile_definitions}
+        # Tasks.cpp skips the startup firmware-CRC self-check when DEBUG is defined, because
+        # debugger breakpoints patch flash and so invalidate the CRC that CrcAppender stamped on.
+        $<$<CONFIG:Debug>:DEBUG>
         $<$<COMPILE_LANGUAGE:C>:noexcept=>
         $<$<COMPILE_LANGUAGE:CXX>:_XOPEN_SOURCE>)
 
@@ -252,9 +259,7 @@ function(duet_add_firmware TARGET)
         -Wl,--warn-unresolved-symbols
     )
 
-    # The six static libraries reference each other's symbols cyclically, so they must be scanned
-    # as a group; supc++ (the C++ runtime support that -nostdlib excludes) goes in the group too.
-    target_link_libraries(${TARGET} PRIVATE "$<LINK_GROUP:RESCAN,${_libs},supc++>")
+    target_link_libraries(${TARGET} PRIVATE ${_libs})
 
     find_program(CRCAPPENDER CrcAppender PATHS "${CRC_APPENDER_DIR}" NO_DEFAULT_PATH)
     if(NOT CRCAPPENDER)
