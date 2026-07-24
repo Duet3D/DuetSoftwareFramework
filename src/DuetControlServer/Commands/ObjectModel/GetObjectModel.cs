@@ -49,14 +49,14 @@ public sealed class GetObjectModel(Model.ObjectModel model, Model.Filter filter)
             using Utf8JsonWriter writer = new(destination);
             if (Filters.Count == 0)
             {
-                JsonSerializer.Serialize<ObjectModel>(writer, model, JsonHelper.DefaultJsonOptions);
+                JsonSerializer.Serialize(writer, model, ObjectModelContext.Default.ObjectModel);
             }
             else
             {
                 ObjectModel result = new();
                 using JsonDocument filteredJson = GetFilteredJson();
                 result.UpdateFromJson(filteredJson.RootElement, false);
-                JsonSerializer.Serialize<ObjectModel>(writer, result, JsonHelper.DefaultJsonOptions);
+                JsonSerializer.Serialize(writer, result, ObjectModelContext.Default.ObjectModel);
             }
         }
     }
@@ -73,6 +73,6 @@ public sealed class GetObjectModel(Model.ObjectModel model, Model.Filter filter)
         {
             Model.Filter.MergeFiltered(filteredModel, filter.GetFiltered(convertedFilter));
         }
-        return JsonSerializer.SerializeToDocument(filteredModel, JsonHelper.DefaultJsonOptions);
+        return JsonSerializer.SerializeToDocument(filteredModel, JsonHelper.DefaultJsonOptions.GetTypeInfo(typeof(Dictionary<string, object?>)));
     }
 }

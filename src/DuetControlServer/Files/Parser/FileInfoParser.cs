@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetAPI.Utility;
 using DuetControlServer.Codes;
 using DuetControlServer.Codes.Meta;
 using DuetControlServer.Files.ImageProcessing;
@@ -82,8 +83,9 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
             {
                 try
                 {
+                    // A user-defined key can hold anything, so the metadata for it has to be looked up at runtime
                     object? value = await kvp.Value;
-                    result.CustomInfo.Add(kvp.Key, JsonSerializer.SerializeToElement(value));
+                    result.CustomInfo.Add(kvp.Key, JsonSerializer.SerializeToElement(value, JsonHelper.DefaultJsonOptions.GetTypeInfo(value?.GetType() ?? typeof(object))));
                 }
                 catch (Exception e)
                 {
@@ -703,7 +705,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
             jsonResult.Append($"\"line\":{explicitLineNumber.Value},");
         }
         jsonResult.Append($"\"{(isThumbnail ? "thumbnail" : "fragment")}\":{{\"fileName\":");
-        jsonResult.Append(JsonSerializer.Serialize(await filePath.ToVirtualAsync(filename)));
+        jsonResult.Append(JsonSerializer.Serialize(await filePath.ToVirtualAsync(filename), CommonContext.Default.String));
         jsonResult.Append(",\"offset\":");
         jsonResult.Append(offset);
 

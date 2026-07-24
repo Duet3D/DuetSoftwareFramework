@@ -51,11 +51,9 @@ namespace DuetAPI.Commands;
 // Generic responses
 [JsonSerializable(typeof(BaseResponse))]
 [JsonSerializable(typeof(ErrorResponse))]
-// Specific command results
-[JsonSerializable(typeof(bool))]
-[JsonSerializable(typeof(int))]
-[JsonSerializable(typeof(string))]
-[JsonSerializable(typeof(JsonElement))]
+[JsonSerializable(typeof(Response<object>))]
+// Basic result types live in DuetAPI.Utility.CommonContext. Note that this only applies when resolving through
+// JsonHelper.DefaultJsonOptions: passing CommandContext.Default directly resolves through this context alone
 [JsonSourceGenerationOptions(PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 public sealed partial class CommandContext : JsonSerializerContext
 {

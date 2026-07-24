@@ -14,7 +14,7 @@ public interface IProcessor
     /// <summary>
     /// List of supported command types
     /// </summary>
-    public static Type[] SupportedCommands { get; } = [];
+    public static SupportedCommand[] SupportedCommands { get; } = [];
 
     /// <summary>
     /// Connection to the IPC client served by this processor

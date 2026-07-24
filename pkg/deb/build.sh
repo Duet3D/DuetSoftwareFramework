@@ -14,6 +14,13 @@ mkdir -p $DEST_DIR
 pkg_progs() {
 	echo "- Packaging programs..."
 
+	if [ $AOT -eq 1 ] ; then
+		sed -i -E "s/, *duetruntime \([^)]*\)//;s/duetruntime \([^)]*\), *//" \
+			$DEST_DIR/duetcontrolserver_$dsfver/DEBIAN/control \
+			$DEST_DIR/duettools_$dsfver/DEBIAN/control \
+			$DEST_DIR/duetwebserver_$dsfver/DEBIAN/control
+	fi
+
 	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetcontrolserver_$dsfver/DEBIAN/control
 	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetcontrolserver_$dsfver/DEBIAN/control
 	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetcontrolserver_$dsfver/DEBIAN/changelog
@@ -33,10 +40,12 @@ pkg_progs() {
 	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duettools_$dsfver/DEBIAN/changelog
 	dpkg-deb --build -Zxz $DEST_DIR/duettools_$dsfver $DEST_DIR
 
-	sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetruntime_$dsfver/DEBIAN/control
-	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetruntime_$dsfver/DEBIAN/control
-	sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetruntime_$dsfver/DEBIAN/changelog
-	dpkg-deb --build -Zxz $DEST_DIR/duetruntime_$dsfver $DEST_DIR
+	if [ $AOT -eq 0 ] ; then
+		sed -i "s/TARGET_ARCH/$TARGET_ARCH/g" $DEST_DIR/duetruntime_$dsfver/DEBIAN/control
+		sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetruntime_$dsfver/DEBIAN/control
+		sed -i "s/DSFVER/$(echo $dsfver | sed -e 's/-/~/g')/g" $DEST_DIR/duetruntime_$dsfver/DEBIAN/changelog
+		dpkg-deb --build -Zxz $DEST_DIR/duetruntime_$dsfver $DEST_DIR
+	fi
 }
 
 pkg_plugins() {

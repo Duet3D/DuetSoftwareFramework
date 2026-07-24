@@ -27,18 +27,18 @@ public sealed class CodeInterception : IProcessor
     /// <remarks>
     /// In addition to these commands, commands of the <see cref="Command"/> interpreter are supported while a code is being intercepted
     /// </remarks>
-    public static Type[] SupportedCommands { get; } =
+    public static SupportedCommand[] SupportedCommands { get; } =
     [
-        typeof(Cancel),
-        typeof(Ignore),
-        typeof(Resolve),
-        typeof(Rewrite)
+        SupportedCommand.For<Cancel>(),
+        SupportedCommand.For<Ignore>(),
+        SupportedCommand.For<Resolve>(),
+        SupportedCommand.For<Rewrite>()
     ];
 
     /// <summary>
     /// List of all supported commands
     /// </summary>
-    public static Type[] AllSupportedCommands { get; } = [.. Command.SupportedCommands, .. SupportedCommands];
+    public static SupportedCommand[] AllSupportedCommands { get; } = [.. Command.SupportedCommands, .. SupportedCommands];
 
     /// <summary>
     /// Logger instance
@@ -181,29 +181,18 @@ public sealed class CodeInterception : IProcessor
                         // Read another command from the IPC connection
                         BaseCommand command = await Connection.ReceiveCommandAsync(AllSupportedCommands, cancellationToken);
                         Type commandType = command.GetType();
-                        if (Command.SupportedCommands.Contains(commandType))
+                        if (SupportedCommand.IsSupported(Command.SupportedCommands, commandType))
                         {
-                            // Make sure it is permitted
-                            Connection.CheckPermissions(commandType);
-
                             // Execute regular commands here
                             object? result = await command.InvokeAsync(cancellationToken);
                             await Connection.SendResponseAsync(result);
                         }
-                        else if (SupportedCommands.Contains(commandType))
+                        else
                         {
-                            // Make sure it is permitted
-                            Connection.CheckPermissions(commandType);
-
                             // Send other commands to the task intercepting the code
                             _interceptionResult = command;
                             _codeMonitor.Pulse();
                             break;
-                        }
-                        else
-                        {
-                            // Take care of unsupported commands
-                            throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
                         }
                     }
                     while (!cancellationToken.IsCancellationRequested);

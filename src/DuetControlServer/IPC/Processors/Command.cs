@@ -20,39 +20,39 @@ public sealed class Command : IProcessor
     /// <summary>
     /// List of supported commands in this mode
     /// </summary>
-    public static Type[] SupportedCommands { get; } =
+    public static SupportedCommand[] SupportedCommands { get; } =
     [
-        typeof(GetFileInfo),
-        typeof(ResolvePath),
-        typeof(Code),
-        typeof(EvaluateExpression),
-        typeof(Flush),
-        typeof(SimpleCode),
-        typeof(WriteMessage),
-        typeof(AddHttpEndpoint),
-        typeof(RemoveHttpEndpoint),
-        typeof(CheckPassword),
-        typeof(GetObjectModel),
-        typeof(QueryObjectModel),
-        typeof(PatchObjectModel),
-        typeof(SetUpdateStatus),
-        typeof(SetWifiCountry),
-        typeof(SyncObjectModel),
-        typeof(InstallPlugin),
-        typeof(NotifyPluginStarted),
-        typeof(ReloadPlugin),
-        typeof(SetNetworkProtocol),
-        typeof(SetPluginData),
-        typeof(SetPluginProcess),
-        typeof(StartPlugin),
-        typeof(StartPlugins),
-        typeof(StopPlugin),
-        typeof(StopPlugins),
-        typeof(UninstallPlugin),
-        typeof(AddUserSession),
-        typeof(RemoveUserSession),
-        typeof(InstallSystemPackage),
-        typeof(UninstallSystemPackage)
+        SupportedCommand.For<GetFileInfo>(),
+        SupportedCommand.For<ResolvePath>(),
+        SupportedCommand.For<Code>(),
+        SupportedCommand.For<EvaluateExpression>(),
+        SupportedCommand.For<Flush>(),
+        SupportedCommand.For<SimpleCode>(),
+        SupportedCommand.For<WriteMessage>(),
+        SupportedCommand.For<AddHttpEndpoint>(),
+        SupportedCommand.For<RemoveHttpEndpoint>(),
+        SupportedCommand.For<CheckPassword>(),
+        SupportedCommand.For<GetObjectModel>(),
+        SupportedCommand.For<QueryObjectModel>(),
+        SupportedCommand.For<PatchObjectModel>(),
+        SupportedCommand.For<SetWifiCountry>(),
+        SupportedCommand.For<SetUpdateStatus>(),
+        SupportedCommand.For<SyncObjectModel>(),
+        SupportedCommand.For<InstallPlugin>(),
+        SupportedCommand.For<NotifyPluginStarted>(),
+        SupportedCommand.For<ReloadPlugin>(),
+        SupportedCommand.For<SetNetworkProtocol>(),
+        SupportedCommand.For<SetPluginData>(),
+        SupportedCommand.For<SetPluginProcess>(),
+        SupportedCommand.For<StartPlugin>(),
+        SupportedCommand.For<StartPlugins>(),
+        SupportedCommand.For<StopPlugin>(),
+        SupportedCommand.For<StopPlugins>(),
+        SupportedCommand.For<UninstallPlugin>(),
+        SupportedCommand.For<AddUserSession>(),
+        SupportedCommand.For<RemoveUserSession>(),
+        SupportedCommand.For<InstallSystemPackage>(),
+        SupportedCommand.For<UninstallSystemPackage>()
     ];
 
     /// <summary>
@@ -101,14 +101,6 @@ public sealed class Command : IProcessor
             {
                 // Read another command from the IPC connection
                 command = await Connection.ReceiveCommandAsync(SupportedCommands, cancellationToken);
-                Type commandType = command.GetType();
-
-                // Make sure it is actually supported and permitted
-                if (!SupportedCommands.Contains(commandType))
-                {
-                    throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
-                }
-                Connection.CheckPermissions(commandType);
 
                 // Execute it and send back the result
                 if (command is IRawJsonCommand rawJsonCommand)

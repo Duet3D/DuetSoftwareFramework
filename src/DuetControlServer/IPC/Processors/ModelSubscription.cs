@@ -29,9 +29,9 @@ public sealed class ModelSubscription : IProcessor
     /// <summary>
     /// List of supported commands in this mode
     /// </summary>
-    public static Type[] SupportedCommands { get; } =
+    public static SupportedCommand[] SupportedCommands { get; } =
     [
-        typeof(Acknowledge)
+        SupportedCommand.For<Acknowledge>()
     ];
 
     /// <summary>
@@ -198,14 +198,6 @@ public sealed class ModelSubscription : IProcessor
 
                     // Wait for an acknowledgement from the client
                     BaseCommand command = await Connection.ReceiveCommandAsync(SupportedCommands, cancellationToken);
-                    Type commandType = command.GetType();
-
-                    // Make sure the command is supported and permitted
-                    if (!SupportedCommands.Contains(commandType))
-                    {
-                        throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
-                    }
-                    Connection.CheckPermissions(commandType);
                 }
 
                 // Wait for an object model update to complete
@@ -609,7 +601,7 @@ public sealed class ModelSubscription : IProcessor
         _jsonWriter.ResetWrittenCount();
         using (Utf8JsonWriter writer = new(_jsonWriter))
         {
-            JsonSerializer.Serialize<DuetAPI.ObjectModel.ObjectModel>(writer, _model, JsonHelper.DefaultJsonOptions);
+            JsonSerializer.Serialize(writer, _model, ObjectModelContext.Default.ObjectModel);
         }
         return _jsonWriter.WrittenMemory;
     }
@@ -634,7 +626,7 @@ public sealed class ModelSubscription : IProcessor
                 }
                 else
                 {
-                    JsonSerializer.Serialize(writer, kv.Value, JsonHelper.DefaultJsonOptions);
+                    JsonSerializer.Serialize(writer, kv.Value, JsonHelper.DefaultJsonOptions.GetTypeInfo(kv.Value?.GetType() ?? typeof(object)));
                 }
             }
             writer.WriteEndObject();

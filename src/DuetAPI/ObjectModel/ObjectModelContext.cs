@@ -1,4 +1,5 @@
-﻿using System.Text.Encodings.Web;
+﻿using System.Collections.Generic;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -8,6 +9,7 @@ namespace DuetAPI.ObjectModel;
 /// Context for JSON handling of the main object model classes
 /// </summary>
 [JsonSerializable(typeof(ObjectModel))]
+[JsonSerializable(typeof(GCodeFileInfo))]
 [JsonSourceGenerationOptions(PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 public sealed partial class ObjectModelContext : JsonSerializerContext
 {

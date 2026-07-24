@@ -413,11 +413,7 @@ public sealed class Settings
     private void SaveToFile(string fileName)
     {
         using FileStream fileStream = new(fileName, FileMode.Create, FileAccess.Write, FileShare.None, FileBufferSize);
-        JsonSerializer.Serialize(fileStream, this, new JsonSerializerOptions()
-        {
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-            WriteIndented = true
-        });
+        JsonSerializer.Serialize(fileStream, this, SettingsContext.Default.Settings);
     }
 }
 

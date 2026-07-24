@@ -4,6 +4,9 @@
 		<OutputType>Exe</OutputType>
 		<PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
 		<PublishTrimmed>true</PublishTrimmed>
+		<PublishAot Condition="'$(AotPublish)' == 'true'">true</PublishAot>
+		<EnableAotAnalyzer>true</EnableAotAnalyzer>
+		<EnableTrimAnalyzer>true</EnableTrimAnalyzer>
 	</PropertyGroup>
 
 	<ItemGroup>

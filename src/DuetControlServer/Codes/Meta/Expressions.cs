@@ -521,7 +521,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
         if (obj is Enum)
         {
             // Enums are represented by their JSON name, which does not have to match the CLR name
-            string jsonName = JsonSerializer.Serialize(obj, JsonHelper.DefaultJsonOptions).Trim('"');
+            string jsonName = JsonSerializer.Serialize(obj, JsonHelper.DefaultJsonOptions.GetTypeInfo(obj.GetType())).Trim('"');
             return encodeValues ? encodeString(jsonName) : jsonName;
         }
         if (obj is string stringValue)

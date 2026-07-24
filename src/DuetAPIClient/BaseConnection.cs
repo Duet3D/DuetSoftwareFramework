@@ -261,7 +261,7 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
                 {
                     return (typeof(T) == typeof(Message)) ?
                         (T)JsonSerializer.Deserialize(ref reader, typeof(T), ObjectModelContext.Default)! :
-                        (T)JsonSerializer.Deserialize(ref reader, typeof(T), CommandContext.Default)!;
+                        (T)JsonSerializer.Deserialize(ref reader, JsonHelper.DefaultJsonOptions.GetTypeInfo(typeof(T)))!;
                 }
             }
 
@@ -372,7 +372,7 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
                 {
                     return (typeof(T) == typeof(Message)) ?
                         (T)JsonSerializer.Deserialize(ref reader, typeof(T), ObjectModelContext.Default)! :
-                        (T)JsonSerializer.Deserialize(ref reader, typeof(T), CommandContext.Default)!;
+                        (T)JsonSerializer.Deserialize(ref reader, JsonHelper.DefaultJsonOptions.GetTypeInfo(typeof(T)))!;
                 }
             }
 
@@ -452,7 +452,7 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
     {
         using MemoryStream jsonStream = JsonHelper.ReceiveUtf8Json(_unixSocket);
         //Console.Write($"IN {Encoding.UTF8.GetString(jsonStream.ToArray())}");
-        return (T)JsonSerializer.Deserialize(jsonStream.ToArray(), typeof(T), CommandContext.Default)!;
+        return (T)JsonSerializer.Deserialize(jsonStream.ToArray(), JsonHelper.DefaultJsonOptions.GetTypeInfo(typeof(T)))!;
     }
 
     /// <summary>
@@ -467,7 +467,7 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
     {
         using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken).ConfigureAwait(false);
         //Console.Write($"IN {Encoding.UTF8.GetString(jsonStream.ToArray())}");
-        return (T)JsonSerializer.Deserialize(jsonStream.ToArray(), typeof(T), CommandContext.Default)!;
+        return (T)JsonSerializer.Deserialize(jsonStream.ToArray(), JsonHelper.DefaultJsonOptions.GetTypeInfo(typeof(T)))!;
     }
 
     /// <summary>

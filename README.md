@@ -17,7 +17,7 @@ The following command-line arguments are available:
 - `-l`, `--log-level`: Set the minimum log level. Valid options are: `trace`, `debug` , `info` , `warn`, `error`, `fatal`, `off` Default is `info`
 - `-c`, `--config`: Override the path to the JSON configuration file. Defaults to `/opt/dsf/conf/config.json`
 - `-S`, `--socket-directory`: Override the path where DCS creates UNIX sockets. Defaults to `/run/dsf`
-- `-s`, `--socket-file`: Override the filename of DCS's UNIX socket. Defaults to `dcs.sock`
+- `-s`, `--socket-file`: Override the filename of DCS's UNIX socket, or its full path to override the directory as well. Defaults to `dcs.sock`
 - `-b`, `--base-directory`: Set the base directory of the virtual SD card directory. This is used for RepRapFirmware compatibility. Defaults to `/opt/dsf/sd`
 - `-h`, `--help`: Display all available command-line parameters
 
@@ -28,12 +28,8 @@ Note that all the command-line options are case-sensitive.
 This application may return the following codes (derived from `sysexits.h`):
 - `0`: Successful termination
 - `64`: Failed to initialize settings (usage error)
-- `69`: Could not connect to Duet (service unavailable)
-- `70`: Internal software error
 - `71`: Failed to initialize environment (OS error)
-- `73`: Failed to initialize IPC socket (Cannot create file)
-- `74`: Could not open the SPI/GPIO or USB device (IO error)
-- `75`: Auto-update disabled or other instance already running (temporary failure)
+- `74`: Failed to update the firmware remotely (IO error)
 - `78`: Bad settings file (configuration error)
 
 ### Firmware Link
@@ -93,9 +89,10 @@ Apart from these two sections, you can also customize the following settings:
 - `KeepAliveInterval`: Default keep-alive interval for WebSocket connections. This is useful if DWS is operating as a reverse proxy
 - `SessionTimeout`: Default timeout for inactive HTTP sessions
 - `ModelRetryDelay`: If DuetControlServer is not running, this specifies the delay between reconnect attempts in milliseconds
-- `ObjectModelUpdateTimeout`: When a WebSocket is connected and waiting for object model changes, this specifies the timeout after which DWS stops waiting and polls the WebSocket again
 - `UseStaticFiles`: Whether to provide web files from the virtual `www` directory. This is required for DWC if DWS is not running as a reverse proxy
 - `DefaultWebDirectory`: Default web directory to fall back to if DCS could not be contacted (requires `UseStaticFiles` to be set)
+- `OverrideWebDirectory`: Serve web files from this directory instead of the one from `directories.web`
+- `OverrideWebPassword`: Check session requests against this password instead of the configured machine password
 - `MaxAge`: Maximum cache time for static files (requires `UseStaticFiles` to be true)
 - `WebSocketBufferSize`: This defines the maximum buffer size per third-party WebSocket connection
 

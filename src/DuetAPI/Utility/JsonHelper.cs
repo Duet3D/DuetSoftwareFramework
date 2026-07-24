@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,13 +18,25 @@ namespace DuetAPI.Utility;
 public static class JsonHelper
 {
     /// <summary>
+    /// Resolver for the source-generated metadata of the object model, command and connection contexts
+    /// </summary>
+    /// <remarks>
+    /// The contexts are generated with the same naming policy and object creation handling as the options
+    /// below, so routing a type through them yields the same JSON. There is deliberately no reflection-based
+    /// fallback: a type that no context covers must fail loudly rather than depend on reflection at runtime.
+    /// This field is declared first because static initializers run in textual order
+    /// </remarks>
+    private static readonly IJsonTypeInfoResolver _typeInfoResolver = JsonTypeInfoResolver.Combine(ObjectModel.ObjectModelContext.Default, Commands.CommandContext.Default, Connection.ConnectionContext.Default, CommonContext.Default);
+
+    /// <summary>
     /// Default JSON (de-)serialization options
     /// </summary>
     public static readonly JsonSerializerOptions DefaultJsonOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        TypeInfoResolver = _typeInfoResolver
     };
 
     /// <summary>
@@ -34,7 +47,8 @@ public static class JsonHelper
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        TypeInfoResolver = _typeInfoResolver
     };
 
 #if NETSTANDARD2_1_OR_GREATER || NET6_0_OR_GREATER

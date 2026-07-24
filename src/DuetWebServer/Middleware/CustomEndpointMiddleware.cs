@@ -3,9 +3,9 @@ using DuetAPI.ObjectModel;
 using DuetSharedLibrary;
 using DuetWebServer.Singletons;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 using System;
 using System.IO;
@@ -22,26 +22,28 @@ namespace DuetWebServer.Middleware;
 /// <summary>
 /// Middleware providing with custom HTTP/WebSocket endpoints
 /// </summary>
-/// <param name="next">Next request delegate</param>
-/// <param name="configuration">Application configuration</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="applicationLifetime">Host application lifetime</param>
 /// <param name="modelProvider">Object model provider</param>
 /// <param name="sessionStorage">Session storage</param>
-public class CustomEndpointMiddleware(RequestDelegate next, IConfiguration configuration, ILogger<CustomEndpointMiddleware> logger, IHostApplicationLifetime applicationLifetime, IModelProvider modelProvider, ISessionStorage sessionStorage)
+/// <param name="settings">Application settings</param>
+public sealed class CustomEndpointMiddleware(ILogger<CustomEndpointMiddleware> logger, IHostApplicationLifetime applicationLifetime, IModelProvider modelProvider, ISessionStorage sessionStorage, IOptionsMonitor<Settings> settings) : IMiddleware
 {
-    /// <summary>
-    /// App settings
-    /// </summary>
-    private readonly Settings _settings = configuration.Get<Settings>() ?? new();
-
     /// <summary>
     /// Called when a new HTTP request is received
     /// </summary>
     /// <param name="context">HTTP context</param>
+    /// <param name="next">Next request delegate</param>
     /// <returns>Asynchronous task</returns>
-    public async Task InvokeAsync(HttpContext context)
+    public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
+        // A request matched by a mapped endpoint is dispatched by the terminal middleware
+        if (context.GetEndpoint() is not null)
+        {
+            await next(context);
+            return;
+        }
+
         // Check if this endpoint is reserved for any route
         HttpEndpoint? httpEndpoint = null;
         lock (modelProvider.Endpoints)
@@ -145,7 +147,7 @@ public class CustomEndpointMiddleware(RequestDelegate next, IConfiguration confi
     /// <returns>Asynchronous task</returns>
     private async Task ReadFromWebSocket(WebSocket webSocket, HttpEndpointConnection endpointConnection, int sessionId, CancellationToken cancellationToken)
     {
-        byte[] rxBuffer = new byte[_settings.WebSocketBufferSize];
+        byte[] rxBuffer = new byte[settings.CurrentValue.WebSocketBufferSize];
 
         do
         {

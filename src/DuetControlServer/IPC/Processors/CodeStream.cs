@@ -26,9 +26,9 @@ public sealed class CodeStream : IProcessor, IDisposable
     /// List of supported commands in this mode.
     /// This is not really used because this mode reads lines and no JSON objects
     /// </summary>
-    public static Type[] SupportedCommands { get; } =
+    public static SupportedCommand[] SupportedCommands { get; } =
     [
-        typeof(Code)
+        SupportedCommand.For<Code>()
     ];
 
     /// <summary>

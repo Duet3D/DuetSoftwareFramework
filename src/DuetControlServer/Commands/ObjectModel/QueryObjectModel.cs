@@ -4,6 +4,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -44,6 +45,7 @@ public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : D
         QueryFlags queryFlags = QueryFlags.Parse(flags);
         bool includeNulls = flags.Contains('n');
         JsonSerializerOptions jsonOptions = includeNulls ? JsonHelper.DefaultJsonOptions : JsonHelper.NoNullJsonOptions;
+        JsonTypeInfo dictionaryTypeInfo = jsonOptions.GetTypeInfo(typeof(Dictionary<string, object?>));
 
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
@@ -51,7 +53,7 @@ public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : D
             string filterExpression = string.IsNullOrEmpty(key) ? "**" : key + ".**";
 
             // Retrieve filtered OM data
-            using JsonDocument queryResult = JsonSerializer.SerializeToDocument(filter.GetFiltered(filterExpression, queryFlags), jsonOptions);
+            using JsonDocument queryResult = JsonSerializer.SerializeToDocument(filter.GetFiltered(filterExpression, queryFlags), dictionaryTypeInfo);
 
             // Get down to the requested depth
             JsonElement result = queryResult.RootElement;
@@ -74,7 +76,7 @@ public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : D
             object finalResult;
             if (string.IsNullOrEmpty(key) && result.ValueKind == JsonValueKind.Object)
             {
-                Dictionary<string, object?> resultDict = JsonSerializer.Deserialize<Dictionary<string, object?>>(result.GetRawText(), jsonOptions) ?? [];
+                Dictionary<string, object?> resultDict = (Dictionary<string, object?>?)result.Deserialize(dictionaryTypeInfo) ?? [];
                 Dictionary<string, object?> seqs = [];
                 foreach (var kvp in model.Seqs)
                 {
@@ -116,7 +118,7 @@ public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : D
             }
 
             using Utf8JsonWriter writer = new(destination);
-            JsonSerializer.Serialize(writer, response, jsonOptions);
+            JsonSerializer.Serialize(writer, response, dictionaryTypeInfo);
         }
     }
 }

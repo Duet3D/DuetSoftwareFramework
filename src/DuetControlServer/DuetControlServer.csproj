@@ -4,6 +4,10 @@
 		<TargetFramework>net10.0</TargetFramework>
 		<PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
 		<BuildTime>$([System.DateTime]::Now)</BuildTime>
+		<EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
+		<PublishAot Condition="'$(AotPublish)' == 'true'">true</PublishAot>
+		<EnableAotAnalyzer>true</EnableAotAnalyzer>
+		<EnableTrimAnalyzer>true</EnableTrimAnalyzer>
 	</PropertyGroup>
 
 	<ItemGroup>
