@@ -39,6 +39,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="mqtt">MQTT provider</param>
 /// <param name="sbcTriggerService">SBC trigger service</param>
 /// <param name="logger">Logger</param>
+/// <param name="loggerFactory">Logger factory</param>
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="settings">Settings</param>
 public class MCodeHandler(
@@ -436,7 +437,7 @@ public class MCodeHandler(
                                 string physicalFilename = await filePathResolver.ToPhysicalAsync(virtualFilename, FileDirectory.GCodes, cancellationToken);
                                 GCodeFileInfo info = await fileInfoParser.ParseAsync(physicalFilename, false, cancellationToken);
 
-                                string json = JsonSerializer.Serialize(info, JsonHelper.DefaultJsonOptions);
+                                string json = JsonSerializer.Serialize(info, ObjectModelContext.Default.GCodeFileInfo);
                                 return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":0," : "{\"err\":0,") + json[1..]);
                             }
                             else if (code.MinorNumber == 1 || code.MinorNumber == 2)
@@ -456,7 +457,7 @@ public class MCodeHandler(
                         catch (Exception e) when (e is not MissingParameterException and not InvalidParameterTypeException)
                         {
                             logger.LogDebug(e, "Failed to return file information");
-                            return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1,\"fileName:" : "{\"err\":1,\"fileName:") + JsonSerializer.Serialize(virtualFilename, JsonHelper.DefaultJsonOptions) + "}");
+                            return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1,\"fileName:" : "{\"err\":1,\"fileName:") + JsonSerializer.Serialize(virtualFilename, CommonContext.Default.String) + "}");
                         }
                     }
                     else
@@ -465,7 +466,7 @@ public class MCodeHandler(
                         {
                             if (model.Job.File.FileName != null)
                             {
-                                string json = JsonSerializer.Serialize(model.Job.File, JsonHelper.DefaultJsonOptions);
+                                string json = JsonSerializer.Serialize(model.Job.File, ObjectModelContext.Default.GCodeFileInfo);
                                 return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":0," : "{\"err\":0,") + json[1..]);
                             }
                         }
@@ -544,24 +545,18 @@ public class MCodeHandler(
                             }
 
                             Volume storage = model.Volumes[index];
-                            var output = new
+                            SDInfoDetails output = new()
                             {
-                                SDinfo = new
-                                {
-                                    slot = index,
-                                    present = 1,
-                                    capacity = storage.Capacity,
-                                    partitionSize = storage.PartitionSize,
-                                    free = storage.FreeSpace,
-                                    speed = storage.Speed
-                                }
+                                Slot = index,
+                                Present = 1,
+                                Capacity = storage.Capacity,
+                                PartitionSize = storage.PartitionSize,
+                                Free = storage.FreeSpace,
+                                Speed = storage.Speed
                             };
 
-                            if (code.ExplicitLineNumber != null)
-                            {
-                                return new Message(MessageType.Success, $"{{\"line\":{code.ExplicitLineNumber},{JsonSerializer.Serialize(output)[1..]}");
-                            }
-                            return new Message(MessageType.Success, JsonSerializer.Serialize(output));
+                            string sdInfo = JsonSerializer.Serialize(output, MCodeResponseContext.Default.SDInfoDetails);
+                            return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," : "{") + $"\"SDinfo\":{sdInfo}}}");
                         }
                         else
                         {
@@ -1285,10 +1280,17 @@ public class MCodeHandler(
                             await linkInterface.UpdateFirmware(iapStream, firmwareStream, lifetime.ApplicationStopped);
                         }
 
-                        // Terminate the program once this code has finished
+                        // Updating the firmware resets the controller, which invalidates every channel and cancels
+                        // this very code. Reassign its cancellation token so it can report success instead of cancelled
+                        code.ResetCancellationToken();
+
+                        // Terminate the program once this code has finished. Give the success response a
+                        // moment to propagate through DWS to the clients first - stopping immediately tears
+                        // down the IPC connections, which lets the reply race against the shutdown
                         _ = code.Task.ContinueWith(async task =>
                         {
                             await task;
+                            await Task.Delay(1000);
                             lifetime.StopApplication();
                         }, TaskContinuationOptions.RunContinuationsAsynchronously);
 
@@ -1322,10 +1324,13 @@ public class MCodeHandler(
                             return new Message(MessageType.Error, "Reset timed out, stopping DCS");
                         }
 
-                        // Terminate the program once this code has finished
+                        // Terminate the program once this code has finished. Give the success response a
+                        // moment to propagate through DWS to the clients first - stopping immediately tears
+                        // down the IPC connections, which lets the reply race against the shutdown
                         _ = code.Task.ContinueWith(async task =>
                         {
                             await task;
+                            await Task.Delay(1000);
                             lifetime.StopApplication();
                         }, TaskContinuationOptions.RunContinuationsAsynchronously);
 

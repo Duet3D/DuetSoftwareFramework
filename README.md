@@ -17,7 +17,7 @@ The following command-line arguments are available:
 - `-l`, `--log-level`: Set the minimum log level. Valid options are: `trace`, `debug` , `info` , `warn`, `error`, `fatal`, `off` Default is `info`
 - `-c`, `--config`: Override the path to the JSON configuration file. Defaults to `/opt/dsf/conf/config.json`
 - `-S`, `--socket-directory`: Override the path where DCS creates UNIX sockets. Defaults to `/run/dsf`
-- `-s`, `--socket-file`: Override the filename of DCS's UNIX socket. Defaults to `dcs.sock`
+- `-s`, `--socket-file`: Override the filename of DCS's UNIX socket, or its full path to override the directory as well. Defaults to `dcs.sock`
 - `-b`, `--base-directory`: Set the base directory of the virtual SD card directory. This is used for RepRapFirmware compatibility. Defaults to `/opt/dsf/sd`
 - `-h`, `--help`: Display all available command-line parameters
 
@@ -28,20 +28,20 @@ Note that all the command-line options are case-sensitive.
 This application may return the following codes (derived from `sysexits.h`):
 - `0`: Successful termination
 - `64`: Failed to initialize settings (usage error)
-- `69`: Could not connect to Duet (service unavailable)
-- `70`: Internal software error
 - `71`: Failed to initialize environment (OS error)
-- `73`: Failed to initialize IPC socket (Cannot create file)
-- `74`: Could not open SPI or GPIO device (IO error)
-- `75`: Auto-update disabled or other instance already running (temporary failure)
+- `74`: Failed to update the firmware remotely (IO error)
 - `78`: Bad settings file (configuration error)
 
-### SPI Link
+### Firmware Link
 
-In order to connect to the firmware, a binary data protocol is used. DuetControlServer attaches to the Duet using an SPI connection (typically `/dev/spidev0.0`) in master mode.
+In order to connect to the firmware, a binary data protocol is used. Two transports are supported; the one to use is selected with the `CommunicationMethod` setting in `config.json`, which may be either `spi` (the default) or `usb`.
+
+In SPI mode, DuetControlServer attaches to the Duet using an SPI connection (typically `/dev/spidev0.0`, configurable via `SpiDevice`) in master mode.
 In addition, a GPIO pin (typically pin 22 on the Raspberry Pi header via `/dev/gpiochip0`) is required which is toggled by RepRapFirmware whenever the firmware is ready to exchange data.
 
-More technical documentation about this can be found [here](https://duet3d.github.io/DuetSoftwareFramework/index.html).
+In USB mode, DuetControlServer talks to the Duet over a USB serial connection instead (typically `/dev/ttyACM1`, configurable via `UsbDevice`). No GPIO pin is involved: because USB already guarantees reliable, ordered delivery, the protocol drops the CRC and readiness signalling that SPI mode relies on. This is handy on hosts that do not expose a wired SPI/GPIO header. The read and write timeouts can be tuned via `UsbReadTimeout` and `UsbWriteTimeout`.
+
+More technical documentation about this can be found [here](https://duet3d.github.io/DuetSoftwareFramework/articles/firmware-link.html).
 
 ### Inter-Process Communication
 
@@ -89,9 +89,10 @@ Apart from these two sections, you can also customize the following settings:
 - `KeepAliveInterval`: Default keep-alive interval for WebSocket connections. This is useful if DWS is operating as a reverse proxy
 - `SessionTimeout`: Default timeout for inactive HTTP sessions
 - `ModelRetryDelay`: If DuetControlServer is not running, this specifies the delay between reconnect attempts in milliseconds
-- `ObjectModelUpdateTimeout`: When a WebSocket is connected and waiting for object model changes, this specifies the timeout after which DWS stops waiting and polls the WebSocket again
 - `UseStaticFiles`: Whether to provide web files from the virtual `www` directory. This is required for DWC if DWS is not running as a reverse proxy
 - `DefaultWebDirectory`: Default web directory to fall back to if DCS could not be contacted (requires `UseStaticFiles` to be set)
+- `OverrideWebDirectory`: Serve web files from this directory instead of the one from `directories.web`
+- `OverrideWebPassword`: Check session requests against this password instead of the configured machine password
 - `MaxAge`: Maximum cache time for static files (requires `UseStaticFiles` to be true)
 - `WebSocketBufferSize`: This defines the maximum buffer size per third-party WebSocket connection
 

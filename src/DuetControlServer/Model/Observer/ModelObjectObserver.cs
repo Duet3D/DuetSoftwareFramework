@@ -1,9 +1,7 @@
 ﻿using DuetAPI.ObjectModel;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Reflection;
-using System.Text.Json;
 
 namespace DuetControlServer.Model;
 
@@ -19,17 +17,39 @@ public partial class Observer
     /// <param name="e">Event arguments</param>
     private void VariableModelObjectChanging(object? sender, PropertyChangingEventArgs e)
     {
-        object? currentValue = sender?.GetType().GetProperty(e.PropertyName!)?.GetValue(sender);
+        ModelPropertyDescriptor? property = FindProperty(sender, e.PropertyName!, out object? currentValue);
         if (currentValue is ModelObject modelMember)
         {
             // Prevent memory leaks in case variable model objects are replaced
             UnsubscribeFromModelObject(modelMember);
         }
-        else if (currentValue?.GetType().IsGenericType == true && currentValue.GetType().GetGenericTypeDefinition() == typeof(ObservableCollection<>))
+        else if (property?.Kind == ModelPropertyKind.ObservableCollection && currentValue is not null)
         {
             // Same for observable collections
-            UnsubscribeFromObservableCollection((dynamic)currentValue);
+            UnsubscribeFromObservableCollection((INotifyCollectionChanged)currentValue);
         }
+    }
+
+    /// <summary>
+    /// Look up a property of a model object instance by its name
+    /// </summary>
+    /// <param name="instance">Model object instance</param>
+    /// <param name="propertyName">Name of the property</param>
+    /// <param name="value">Value of the property</param>
+    /// <returns>Property descriptor or null if the instance does not have such a property</returns>
+    private static ModelPropertyDescriptor? FindProperty(object? instance, string propertyName, out object? value)
+    {
+        if (instance is IModelObjectAccessor accessor)
+        {
+            ModelPropertyDescriptor? property = accessor.Descriptor.FindProperty(propertyName, false);
+            if (property is not null)
+            {
+                value = accessor.GetPropertyValue(property.Index);
+                return property;
+            }
+        }
+        value = null;
+        return null;
     }
 
     /// <summary>
@@ -48,19 +68,23 @@ public partial class Observer
     {
         return (sender, e) =>
         {
-            string propertyName = JsonNamingPolicy.CamelCase.ConvertName(e.PropertyName!);
-            object? value = sender?.GetType().GetProperty(e.PropertyName!)!.GetValue(sender);
-            OnPropertyPathChanged?.Invoke(AddToPath(path, propertyName), PropertyChangeType.Property, value);
+            ModelPropertyDescriptor? property = FindProperty(sender, e.PropertyName!, out object? value);
+            if (property is null)
+            {
+                // Properties outside the DuetAPI object model are never reported to clients
+                return;
+            }
+            OnPropertyPathChanged?.Invoke(AddToPath(path, property.JsonName), PropertyChangeType.Property, value);
 
             if (hasVariableModelObjects && value is ModelObject modelMember)
             {
                 // Subscribe to variable ModelObject events
-                SubscribeToModelObject(modelMember, AddToPath(path, propertyName));
+                SubscribeToModelObject(modelMember, AddToPath(path, property.JsonName));
             }
-            else if (hasVariableObservableCollections && value?.GetType().IsGenericType == true && value.GetType().GetGenericTypeDefinition() == typeof(ObservableCollection<>))
+            else if (hasVariableObservableCollections && property.Kind == ModelPropertyKind.ObservableCollection && value is not null)
             {
                 // Subscribe to variable ObservableCollection events
-                SubscribeToObservableCollection((dynamic)value, propertyName, path);
+                SubscribeToObservableCollection((INotifyCollectionChanged)value, property.JsonName, path);
             }
         };
     }
@@ -73,36 +97,32 @@ public partial class Observer
     private void SubscribeToModelObject(ModelObject modelObject, object[] path)
     {
         bool hasVariableModelObjects = false, hasVariableObservableCollections = false;
-        foreach (PropertyInfo property in modelObject.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        IModelObjectAccessor accessor = (IModelObjectAccessor)modelObject;
+        foreach (ModelPropertyDescriptor property in accessor.Descriptor.Properties)
         {
-            if (property.GetMethod!.GetParameters().Length != 0)
-            {
-                continue;
-            }
-            string propertyName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
-            object? value = property.GetValue(modelObject);
+            object? value = accessor.GetPropertyValue(property.Index);
 
             if (value is ModelObject objectValue)
             {
-                SubscribeToModelObject(objectValue, AddToPath(path, propertyName));
+                SubscribeToModelObject(objectValue, AddToPath(path, property.JsonName));
             }
             else if (value is IModelCollection collectionValue)
             {
-                SubscribeToModelCollection(collectionValue, propertyName, path);
+                SubscribeToModelCollection(collectionValue, property.JsonName, path);
             }
             else if (value is IModelDictionary dictionaryValue)
             {
-                SubscribeToModelDictionary(dictionaryValue, AddToPath(path, propertyName));
+                SubscribeToModelDictionary(dictionaryValue, AddToPath(path, property.JsonName));
             }
-            else if (value?.GetType().IsGenericType == true && value.GetType().GetGenericTypeDefinition() == typeof(ObservableCollection<>))
+            else if (property.Kind == ModelPropertyKind.ObservableCollection && value is not null)
             {
-                SubscribeToObservableCollection((dynamic)value, propertyName, path);
+                SubscribeToObservableCollection((INotifyCollectionChanged)value, property.JsonName, path);
             }
 
-            if (property.SetMethod is not null)
+            if ((property.Flags & ModelPropertyFlags.HasSetter) != 0)
             {
-                hasVariableModelObjects |= property.PropertyType.IsAssignableTo(typeof(ModelObject));
-                hasVariableObservableCollections |= property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(ObservableCollection<>);
+                hasVariableModelObjects |= property.Kind == ModelPropertyKind.ModelObject;
+                hasVariableObservableCollections |= property.Kind == ModelPropertyKind.ObservableCollection;
             }
         }
 
@@ -134,14 +154,10 @@ public partial class Observer
         }
 
         bool hasVariableModelObjects = false;
-        foreach (PropertyInfo property in modelObject.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        IModelObjectAccessor accessor = (IModelObjectAccessor)modelObject;
+        foreach (ModelPropertyDescriptor property in accessor.Descriptor.Properties)
         {
-            if (property.GetMethod!.GetParameters().Length != 0)
-            {
-                continue;
-            }
-
-            object? value = property.GetValue(modelObject);
+            object? value = accessor.GetPropertyValue(property.Index);
             if (value is ModelObject objectValue)
             {
                 UnsubscribeFromModelObject(objectValue);
@@ -154,12 +170,12 @@ public partial class Observer
             {
                 UnsubscribeFromModelDictionary(dictionaryValue);
             }
-            else if (value?.GetType().IsGenericType == true && value.GetType().GetGenericTypeDefinition() == typeof(ObservableCollection<>))
+            else if (property.Kind == ModelPropertyKind.ObservableCollection && value is not null)
             {
-                UnsubscribeFromObservableCollection((dynamic)value);
+                UnsubscribeFromObservableCollection((INotifyCollectionChanged)value);
             }
 
-            hasVariableModelObjects |= property.PropertyType.IsAssignableTo(typeof(ModelObject)) && (property.SetMethod is not null);
+            hasVariableModelObjects |= property.Kind == ModelPropertyKind.ModelObject && (property.Flags & ModelPropertyFlags.HasSetter) != 0;
         }
 
         if (hasVariableModelObjects)

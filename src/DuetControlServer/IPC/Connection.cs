@@ -1,7 +1,8 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Net.Sockets;
 using System.Reflection;
@@ -16,6 +17,8 @@ using DuetAPI.Connection.InitMessages;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Commands;
+using DuetControlServer.IPC.Processors;
+using DuetControlServer.Utility;
 using DuetSharedLibrary;
 using Microsoft.Extensions.Logging;
 
@@ -103,8 +106,11 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
             return true;
         }
 
-        // If a plugin is currently being started its PID may not yet have propagated to the object model - ask DPS first
-        if (Commands.StartPlugin.IsAnyStarting)
+        // If a plugin is currently being started its PID may not yet have propagated to the object model - ask DPS first.
+        // Skip this for DPS's own PID: DPS is never a plugin, and its internal connections (e.g. SetPluginProcessAsync)
+        // arrive while its single command channel is still busy handling the very StartPlugin call that spawned them -
+        // asking DPS to resolve itself would enqueue onto that same blocked channel and deadlock
+        if (Commands.StartPlugin.IsAnyStarting && pid != Processors.PluginService.ServicePid)
         {
             string? resolvedPluginId = await ResolvePluginViaServiceAsync(pid, false);
             if (resolvedPluginId is not null)
@@ -180,17 +186,16 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     {
         try
         {
-            // Get PID's process path
-            using Process proc = Process.GetProcessById(pid);
-            string? procPath = proc.MainModule?.FileName;
+            string? procPath = ProcessHelpers.GetExecutablePath(pid);
             if (string.IsNullOrEmpty(procPath))
             {
                 return false;
             }
 
-            // Make sure it is in the same directory as DCS
+            // Make sure it is in the same directory as DCS. Assembly.Location is empty in single-file and AOT
+            // builds, which would make this check reject every peer
             string? peerDir = Path.GetDirectoryName(procPath);
-            string? dcsDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string? dcsDir = Path.GetDirectoryName(Environment.ProcessPath);
             if (peerDir != dcsDir)
             {
                 return false;
@@ -207,7 +212,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
             return peerFilename switch
             {
                 "DuetPluginService" => Processors.PluginService.ServicePid == 0 || pid == Processors.PluginService.ServicePid,
-                "DuetControlServer" or "DuetWebServer" => proc.IsExecSecure(),
+                "DuetControlServer" or "DuetWebServer" => ProcessHelpers.IsExecSecure(pid),
                 _ => false,
             };
         }
@@ -224,11 +229,11 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     private void GrantExternalPermissions()
     {
         logger.LogDebug("IPC#{Id}: Granting full DSF permissions to external program", Id);
-        foreach (Enum permission in Enum.GetValues<SbcPermissions>())
+        foreach (SbcPermissions permission in Enum.GetValues<SbcPermissions>())
         {
-            if (!permission.Equals(SbcPermissions.SuperUser) && !permission.Equals(SbcPermissions.ServicePlugins))
+            if (permission != SbcPermissions.SuperUser && permission != SbcPermissions.ServicePlugins)
             {
-                Permissions |= (SbcPermissions)permission;
+                Permissions |= permission;
             }
         }
     }
@@ -277,20 +282,30 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     }
 
     /// <summary>
+    /// Cached permission attributes per command type
+    /// </summary>
+    private static readonly ConcurrentDictionary<Type, RequiredPermissionsAttribute?> _requiredPermissions = new();
+
+    /// <summary>
+    /// Get the cached permissions attribute of the given command type
+    /// </summary>
+    /// <param name="commandType">Command type to look up</param>
+    /// <returns>Permissions attribute or null if the command does not have one</returns>
+    private static RequiredPermissionsAttribute? GetRequiredPermissions(Type commandType) => _requiredPermissions.GetOrAdd(commandType, static type => type.GetCustomAttribute<RequiredPermissionsAttribute>());
+
+    /// <summary>
     /// Check if any of the given commands may be executed by this connection
     /// </summary>
     /// <param name="supportedCommands">List of supported commands</param>
     /// <returns>True if any command may be executed</returns>
-    public bool CheckCommandPermissions(Type[] supportedCommands)
+    public bool CheckCommandPermissions(SupportedCommand[] supportedCommands)
     {
-        foreach (Type commandType in supportedCommands)
+        foreach (SupportedCommand supportedCommand in supportedCommands)
         {
-            foreach (Attribute attribute in Attribute.GetCustomAttributes(commandType))
+            RequiredPermissionsAttribute? permissionsAttribute = GetRequiredPermissions(supportedCommand.Type);
+            if (permissionsAttribute is not null && permissionsAttribute.Check(Permissions))
             {
-                if (attribute is RequiredPermissionsAttribute permissionsAttribute && permissionsAttribute.Check(Permissions))
-                {
-                    return true;
-                }
+                return true;
             }
         }
         return false;
@@ -301,14 +316,12 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     /// </summary>
     /// <param name="commandType">Command type to check</param>
     /// <exception cref="UnauthorizedAccessException">Permissions are insufficient</exception>
-    public void CheckPermissions(Type commandType)
+    private void CheckPermissions(Type commandType)
     {
-        foreach (Attribute attribute in Attribute.GetCustomAttributes(commandType))
+        RequiredPermissionsAttribute? permissionsAttribute = GetRequiredPermissions(commandType);
+        if (permissionsAttribute is not null && !permissionsAttribute.Check(Permissions))
         {
-            if (attribute is RequiredPermissionsAttribute permissionsAttribute && !permissionsAttribute.Check(Permissions))
-            {
-                throw new UnauthorizedAccessException("Insufficient permissions");
-            }
+            throw new UnauthorizedAccessException("Insufficient permissions");
         }
     }
 
@@ -338,6 +351,24 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     public bool IsConnected => !disposed && UnixSocket.Connected;
 
     /// <summary>
+    /// Reused buffer for incoming JSON messages so each receive does not allocate a new stream.
+    /// Sharing it per connection is safe because the protocol permits only one reader at a time
+    /// </summary>
+    private readonly MemoryStream _receiveStream = new();
+
+    /// <summary>
+    /// Receive the next JSON message into <see cref="_receiveStream"/>
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Received UTF-8 JSON</returns>
+    private async ValueTask<ReadOnlyMemory<byte>> ReceiveJsonAsync(CancellationToken cancellationToken)
+    {
+        _receiveStream.SetLength(0);
+        await JsonHelper.ReceiveUtf8JsonAsync(UnixSocket, _receiveStream, cancellationToken);
+        return _receiveStream.GetBuffer().AsMemory(0, (int)_receiveStream.Length);
+    }
+
+    /// <summary>
     /// Read a generic response from the socket asynchronously
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
@@ -350,12 +381,15 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
         {
             try
             {
-                using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(UnixSocket, cancellationToken);
-                logger.LogTrace("IPC#{Id}: Received {Json}", Id, Encoding.UTF8.GetString(jsonStream.ToArray()));
+                ReadOnlyMemory<byte> receivedJson = await ReceiveJsonAsync(cancellationToken);
+                if (logger.IsEnabled(LogLevel.Trace))
+                {
+                    logger.LogTrace("IPC#{Id}: Received {Json}", Id, Encoding.UTF8.GetString(receivedJson.Span));
+                }
 
                 BaseResponse DeserializeResponse()
                 {
-                    Span<byte> jsonSpan = jsonStream.ToArray();
+                    ReadOnlySpan<byte> jsonSpan = receivedJson.Span;
                     Utf8JsonReader reader = new(jsonSpan);
                     if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
                     {
@@ -397,7 +431,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
             catch (JsonException e)
             {
                 logger.LogError(e, "IPC#{Id}: Received malformed JSON", Id);
-                await SendResponseAsync(e);
+                await SendExceptionAsync(e);
             }
         }
         while (true);
@@ -418,10 +452,13 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     {
         await SendCommandAsync(command);
 
-        using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(UnixSocket, cancellationToken);
-        logger.LogTrace("IPC#{Id}: Received {Json}", Id, Encoding.UTF8.GetString(jsonStream.ToArray()));
+        ReadOnlyMemory<byte> receivedJson = await ReceiveJsonAsync(cancellationToken);
+        if (logger.IsEnabled(LogLevel.Trace))
+        {
+            logger.LogTrace("IPC#{Id}: Received {Json}", Id, Encoding.UTF8.GetString(receivedJson.Span));
+        }
 
-        Span<byte> jsonSpan = jsonStream.ToArray();
+        ReadOnlySpan<byte> jsonSpan = receivedJson.Span;
         Utf8JsonReader reader = new(jsonSpan), resultReader = reader;
         bool isSuccess = false, resultSeen = false;
 
@@ -493,12 +530,15 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
         {
             try
             {
-                using MemoryStream jsonStream = await JsonHelper.ReceiveUtf8JsonAsync(UnixSocket, cancellationToken);
-                logger.LogTrace("IPC#{Id}: Received {Json}", Id, Encoding.UTF8.GetString(jsonStream.ToArray()));
+                ReadOnlyMemory<byte> receivedJson = await ReceiveJsonAsync(cancellationToken);
+                if (logger.IsEnabled(LogLevel.Trace))
+                {
+                    logger.LogTrace("IPC#{Id}: Received {Json}", Id, Encoding.UTF8.GetString(receivedJson.Span));
+                }
 
                 ClientInitMessage DeserializeInitMessage()
                 {
-                    Span<byte> jsonSpan = jsonStream.ToArray();
+                    ReadOnlySpan<byte> jsonSpan = receivedJson.Span;
                     Utf8JsonReader reader = new(jsonSpan);
                     if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
                     {
@@ -543,7 +583,7 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
             catch (JsonException e)
             {
                 logger.LogError(e, "IPC#{Id}: Received malformed JSON", Id);
-                await SendResponseAsync(e);
+                await SendExceptionAsync(e);
             }
         }
         while (true);
@@ -555,11 +595,13 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     private static readonly Dictionary<string, string> _legacyCommandMapping = new()
     {
         { "getmachinemodel", "GetObjectModel" },
-        { "lockmachinemodel", "LockObjectModel" },
-        { "patchmachinemodel", "PatchObjectModel" },
-        { "setmachinemodel", "SetObjectModel" },
-        { "unlockmachinemodel", "UnlockObjectModel" }
+        { "patchmachinemodel", "PatchObjectModel" }
     };
+
+    /// <summary>
+    /// Case-insensitive command name lookups per list of supported commands
+    /// </summary>
+    private static readonly ConcurrentDictionary<SupportedCommand[], Dictionary<string, SupportedCommand>> _commandLookups = new();
 
     /// <summary>
     /// Receive a fully-populated instance of a BaseCommand from the client
@@ -569,17 +611,17 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     /// <returns>Received command or null if nothing could be read</returns>
     /// <exception cref="ArgumentException">Received bad command</exception>
     /// <exception cref="SocketException">Connection has been closed</exception>
-    public async ValueTask<BaseCommand> ReceiveCommandAsync(Type[] supportedCommands, CancellationToken cancellationToken)
+    public async ValueTask<BaseCommand> ReceiveCommandAsync(SupportedCommand[] supportedCommands, CancellationToken cancellationToken)
     {
-        using MemoryStream receivedJson = await JsonHelper.ReceiveUtf8JsonAsync(UnixSocket, cancellationToken);
+        ReadOnlyMemory<byte> receivedJson = await ReceiveJsonAsync(cancellationToken);
         if (logger.IsEnabled(LogLevel.Trace))
         {
-            logger.LogTrace("IPC#{Id}: Received {JSON}", Id, Encoding.UTF8.GetString(receivedJson.ToArray()));
+            logger.LogTrace("IPC#{Id}: Received {JSON}", Id, Encoding.UTF8.GetString(receivedJson.Span));
         }
 
         BaseCommand DeserializeCommand()
         {
-            Span<byte> jsonSpan = receivedJson.ToArray();
+            ReadOnlySpan<byte> jsonSpan = receivedJson.Span;
             Utf8JsonReader reader = new(jsonSpan);
 
             if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
@@ -601,20 +643,20 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
 
                         // Map it in case we need to retain backwards-compatibility
                         string commandName = reader.GetString()!;
-                        if (ApiVersion <= 8 && _legacyCommandMapping.TryGetValue(commandName?.ToLowerInvariant() ?? string.Empty, out string? newCommandName))
+                        if (ApiVersion <= 8 && _legacyCommandMapping.TryGetValue(commandName.ToLowerInvariant(), out string? newCommandName))
                         {
                             commandName = newCommandName;
                         }
 
                         // Check if the received command is valid
-                        Type? commandType = supportedCommands.FirstOrDefault(item => item.Name.Equals(commandName, StringComparison.InvariantCultureIgnoreCase));
-                        if (!typeof(BaseCommand).IsAssignableFrom(commandType))
+                        Dictionary<string, SupportedCommand> commandLookup = _commandLookups.GetOrAdd(supportedCommands, static commands => commands.ToDictionary(command => command.Name, command => command, StringComparer.OrdinalIgnoreCase));
+                        if (!commandLookup.TryGetValue(commandName, out SupportedCommand? supportedCommand))
                         {
                             throw new ArgumentException($"unsupported command {commandName}");
                         }
 
                         // Log this
-                        if (commandType == typeof(Acknowledge))
+                        if (supportedCommand.Type == typeof(Acknowledge))
                         {
                             logger.LogTrace("IPC#{Id}: Received command {Command}", Id, commandName);
                         }
@@ -623,9 +665,13 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
                             logger.LogDebug("IPC#{Id}: Received command {Command}", Id, commandName);
                         }
 
+                        // Make sure the command is permitted before it is instantiated
+                        CheckPermissions(supportedCommand.Type);
+
                         // Perform final deserialization and assign source identifier to this command
                         reader = new Utf8JsonReader(jsonSpan);
-                        BaseCommand command = commandFactory.Create(commandName!, ref reader, supportedCommands);
+                        BaseCommand command = supportedCommand.Create(commandFactory);
+                        command.UpdateFromJsonReader(ref reader);
                         if (command is IConnectionCommand commandWithSourceConnection)
                         {
                             commandWithSourceConnection.Connection = this;
@@ -647,30 +693,33 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     private static readonly byte[] _successResponse = Encoding.UTF8.GetBytes("{\"success\":true}");
 
     /// <summary>
+    /// Start of a success response with a result, see <see cref="SendResponseAsync"/>
+    /// </summary>
+    internal static readonly byte[] SuccessResponseStart = Encoding.UTF8.GetBytes("{\"success\":true,\"result\":");
+
+    /// <summary>
+    /// End of a success response with a result, see <see cref="SendResponseAsync"/>
+    /// </summary>
+    internal static readonly byte[] SuccessResponseEnd = Encoding.UTF8.GetBytes("}");
+
+    /// <summary>
     /// Send a success response to the client
     /// </summary>
     /// <param name="result">Object to send</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="SocketException">Message could not be sent</exception>
-    public async Task SendResponseAsync(object? result = null)
+    public async ValueTask SendResponseAsync(object? result = null)
     {
         if (result == null)
         {
-            logger.LogTrace("IPC#{Id}: Sending success response", Id);
-            await UnixSocket.SendAsync(_successResponse, SocketFlags.None);
+            logger.LogSendingSuccessResponse(Id);
+            await UnixSocket.SendAsync(_successResponse.AsMemory(), SocketFlags.None);
         }
         else
         {
-            using MemoryStream ms = new();
-            using (Utf8JsonWriter writer = new(ms))
-            {
-                writer.WriteStartObject();
-                writer.WriteBoolean("success", true);
-                writer.WritePropertyName("result");
-                writer.WriteRawValue(JsonSerializer.SerializeToUtf8Bytes(result, JsonHelper.DefaultJsonOptions), true);
-                writer.WriteEndObject();
-            }
-            await UnixSocket.SendAsync(ms.ToArray());
+            // A command result can be of any type, so the metadata for it has to be looked up at runtime
+            byte[] rawResult = JsonSerializer.SerializeToUtf8Bytes(result, JsonHelper.DefaultJsonOptions.GetTypeInfo(result.GetType()));
+            await UnixSocket.SendAsync(new ArraySegment<byte>[] { new(SuccessResponseStart), new(rawResult), new(SuccessResponseEnd) }, SocketFlags.None);
         }
     }
 
@@ -696,6 +745,11 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     }
 
     /// <summary>
+    /// Cached DuetAPI base types used to serialize outgoing commands
+    /// </summary>
+    private static readonly ConcurrentDictionary<Type, Type> _serializationTypes = new();
+
+    /// <summary>
     /// Send a command to the client
     /// </summary>
     /// <param name="command">Command to send</param>
@@ -704,19 +758,14 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     public Task SendCommandAsync(BaseCommand command)
     {
         // Get base type for serialization
-        Type baseType;
-        if (command is Commands.Code)
+        Type baseType = _serializationTypes.GetOrAdd(command.GetType(), static type =>
         {
-            baseType = typeof(DuetAPI.Commands.Code);
-        }
-        else
-        {
-            baseType = command.GetType();
-            while (baseType.Assembly.GetName().Name != nameof(DuetAPI))
+            while (type.Assembly != typeof(BaseCommand).Assembly)
             {
-                baseType = baseType.BaseType!;
+                type = type.BaseType!;
             }
-        }
+            return type;
+        });
 
         // Serialize and send the command
         byte[] toSend = JsonSerializer.SerializeToUtf8Bytes(command, baseType, CommandContext.Default);
@@ -733,13 +782,13 @@ public sealed class Connection(Socket socket, CommandFactory commandFactory, ILo
     /// <param name="data">Data to send</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="SocketException">Message could not be sent</exception>
-    public Task SendRawDataAsync(byte[] data)
+    public async ValueTask SendRawDataAsync(ReadOnlyMemory<byte> data)
     {
         if (logger.IsEnabled(LogLevel.Trace))
         {
-            logger.LogTrace("IPC#{Id}: Sending {JSON}", Id, Encoding.UTF8.GetString(data));
+            logger.LogTrace("IPC#{Id}: Sending {JSON}", Id, Encoding.UTF8.GetString(data.Span));
         }
-        return UnixSocket.SendAsync(data, SocketFlags.None);
+        await UnixSocket.SendAsync(data, SocketFlags.None);
     }
 
     /// <summary>

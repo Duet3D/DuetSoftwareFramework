@@ -115,18 +115,36 @@ public static class ProcessHelpers
     }
 
     /// <summary>
+    /// Get the executable path of a process by resolving /proc/{pid}/exe. Unlike Process.MainModule this does not
+    /// parse the full module list from /proc/{pid}/maps, which allocates hundreds of kilobytes per call
+    /// </summary>
+    /// <param name="pid">Process ID to look up</param>
+    /// <returns>Absolute executable path, or null if it could not be resolved</returns>
+    public static string? GetExecutablePath(int pid)
+    {
+        try
+        {
+            return File.ResolveLinkTarget($"/proc/{pid}/exe", returnFinalTarget: false)?.FullName;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Check whether the process was exec'd with <c>AT_SECURE=1</c>. Parses /proc/{pid}/auxv looking for the AT_SECURE
     /// entry (type 23) set to non-zero. The kernel sets this when the exec crosses a privilege boundary (setuid,
     /// setgid, or file capabilities), causing glibc to ignore LD_PRELOAD and related environment variables. The bit is
     /// immutable for the life of the process so it cannot be stripped after the fact
     /// </summary>
-    /// <param name="process">Process</param>
+    /// <param name="pid">Process ID to look up</param>
     /// <returns>True if the process's exec was secure-mode</returns>
-    public static bool IsExecSecure(this Process process)
+    public static bool IsExecSecure(int pid)
     {
         try
         {
-            ReadOnlySpan<byte> auxv = File.ReadAllBytes($"/proc/{process.Id}/auxv");
+            ReadOnlySpan<byte> auxv = File.ReadAllBytes($"/proc/{pid}/auxv");
             int wordSize = IntPtr.Size;
             for (int offset = 0; offset + 2 * wordSize <= auxv.Length; offset += 2 * wordSize)
             {

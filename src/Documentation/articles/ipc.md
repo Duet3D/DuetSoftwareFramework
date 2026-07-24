@@ -80,7 +80,7 @@ under `src/DuetControlServer/Commands/`:
 | --- | --- | --- |
 | Generic | `Code`, `SimpleCode`, `EvaluateExpression`, `Flush`, `WriteMessage`, `CheckPassword` | `CommandExecution` |
 | Files | `GetFileInfo`, `ResolvePath` | `CommandExecution` / filesystem |
-| ObjectModel | `GetObjectModel`, `QueryObjectModel`, `LockObjectModel`/`UnlockObjectModel`, `SetObjectModel`, `PatchObjectModel`, `SyncObjectModel` | `ObjectModelRead` / `ObjectModelReadWrite` |
+| ObjectModel | `GetObjectModel`, `QueryObjectModel`, `PatchObjectModel`, `SetWifiCountry`, `SyncObjectModel` | `ObjectModelRead` / `ObjectModelReadWrite` |
 | Plugins | `InstallPlugin`, `StartPlugin(s)`, `StopPlugin(s)`, `ReloadPlugin`, `UninstallPlugin`, `SetPluginData`, `SetPluginProcess`, `NotifyPluginStarted` | `ManagePlugins` |
 | HttpEndpoints | `AddHttpEndpoint`, `RemoveHttpEndpoint` | `RegisterHttpEndpoints` |
 | UserSessions | `AddUserSession`, `RemoveUserSession` | `ManageUserSessions` |

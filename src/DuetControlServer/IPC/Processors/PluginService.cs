@@ -19,7 +19,7 @@ namespace DuetControlServer.IPC.Processors;
 /// <summary>
 /// IPC processor for plugin services
 /// </summary>
-public sealed class PluginService : IProcessor
+public sealed class PluginService : IProcessor, IDisposable
 {
     /// <summary>
     /// Monitor for the service interfaces
@@ -40,6 +40,16 @@ public sealed class PluginService : IProcessor
     /// Indicates if a service is currently connected
     /// </summary>
     private static bool _rootServiceConnected;
+
+    /// <summary>
+    /// Processor of the currently registered plugin service
+    /// </summary>
+    private static PluginService? _service;
+
+    /// <summary>
+    /// Processor of the currently registered root plugin service
+    /// </summary>
+    private static PluginService? _rootService;
 
     /// <summary>
     /// Queue of pending service commands. The TaskCompletionSource receives the deserialized result (null for
@@ -129,6 +139,11 @@ public sealed class PluginService : IProcessor
     private readonly Settings _settings;
 
     /// <summary>
+    /// Cancellation source to terminate this processor when another plugin service takes over
+    /// </summary>
+    private readonly CancellationTokenSource _terminationCts = new();
+
+    /// <summary>
     /// Constructor of the plugin runner proxy processor
     /// </summary>
     /// <param name="conn">Connection instance</param>
@@ -153,6 +168,11 @@ public sealed class PluginService : IProcessor
     }
 
     /// <summary>
+    /// Dispose this instance
+    /// </summary>
+    public void Dispose() => _terminationCts.Dispose();
+
+    /// <summary>
     /// Handles the remote connection
     /// </summary>
     /// <param name="cancellationToken">Cancellation token to cancel the worker</param>
@@ -164,25 +184,31 @@ public sealed class PluginService : IProcessor
             throw new NotSupportedException("Plugin support has been disabled");
         }
 
+        // Terminate this processor as well when another plugin service takes over this registration
+        using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _terminationCts.Token);
+        cancellationToken = cts.Token;
+
         // Try to register this plugin service
         AsyncMonitor monitor = Connection.IsRoot ? _rootMonitor : _monitor;
         using (await monitor.EnterAsync(cancellationToken))
         {
             if (Connection.IsRoot)
             {
-                if (_rootServiceConnected)
+                if (_rootServiceConnected && !TerminateIfGone(_rootService))
                 {
                     throw new InvalidOperationException("Plugin service (root) is already connected");
                 }
                 _rootServiceConnected = true;
+                _rootService = this;
             }
             else
             {
-                if (_serviceConnected)
+                if (_serviceConnected && !TerminateIfGone(_service))
                 {
                     throw new InvalidOperationException("Plugin service is already connected");
                 }
                 _serviceConnected = true;
+                _service = this;
                 Connection.UnixSocket.GetPeerCredentials(out int servicePid, out _, out _);
                 ServicePid = servicePid;
             }
@@ -206,23 +232,16 @@ public sealed class PluginService : IProcessor
             {
                 // Wait for the next request and read it
                 Tuple<BaseCommand, TaskCompletionSource<object?>>? request;
-                try
+                using (await monitor.EnterAsync(cancellationToken))
                 {
-                    using (await monitor.EnterAsync(cancellationToken))
+                    if (!pendingCommands.TryDequeue(out request))
                     {
+                        await monitor.WaitAsync(cancellationToken);
                         if (!pendingCommands.TryDequeue(out request))
                         {
-                            using CancellationTokenSource timeoutCts = new(_settings.SocketPollInterval);
-                            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, cancellationToken);
-                            await monitor.WaitAsync(cts.Token);
-                            request = pendingCommands.Dequeue();
+                            continue;
                         }
                     }
-                }
-                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-                {
-                    Connection.Poll();
-                    continue;
                 }
 
                 // Send it over to the plugin service. Exception logging should take place in the command processor
@@ -287,22 +306,28 @@ public sealed class PluginService : IProcessor
                     }
                 }
 
-                // Service is no longer available
-                bool stopPlugins = !_settings.UpdateOnly && _serviceConnected && _rootServiceConnected;
-                if (Connection.IsRoot)
+                // Service is no longer available unless another plugin service has taken over this registration
+                bool superseded = !ReferenceEquals(Connection.IsRoot ? _rootService : _service, this);
+                bool stopPlugins = !superseded && !_settings.UpdateOnly && _serviceConnected && _rootServiceConnected;
+                if (!superseded)
                 {
-                    _rootServiceConnected = false;
-                }
-                else
-                {
-                    _serviceConnected = false;
-                    ServicePid = 0;
-                }
+                    if (Connection.IsRoot)
+                    {
+                        _rootServiceConnected = false;
+                        _rootService = null;
+                    }
+                    else
+                    {
+                        _serviceConnected = false;
+                        _service = null;
+                        ServicePid = 0;
+                    }
 
-                // Invalidate pending requests
-                while (pendingCommands.TryDequeue(out Tuple<BaseCommand, TaskCompletionSource<object?>>? request))
-                {
-                    request.Item2.TrySetCanceled();
+                    // Invalidate pending requests
+                    while (pendingCommands.TryDequeue(out Tuple<BaseCommand, TaskCompletionSource<object?>>? request))
+                    {
+                        request.Item2.TrySetCanceled();
+                    }
                 }
 
                 // Stop the remaining plugins again unless they are already stopped
@@ -326,5 +351,28 @@ public sealed class PluginService : IProcessor
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Check if the plugin service holding a registration is gone and terminate its processor if it is
+    /// </summary>
+    /// <param name="service">Processor of the registered plugin service</param>
+    /// <returns>True if the registration has been released for another plugin service</returns>
+    private static bool TerminateIfGone(PluginService? service)
+    {
+        if (service is not null)
+        {
+            try
+            {
+                service.Connection.Poll();
+                return false;
+            }
+            catch (Exception e) when (e is SocketException or ObjectDisposedException)
+            {
+                // Peer is gone, so the stale processor may be terminated
+            }
+            service._terminationCts.Cancel();
+        }
+        return true;
     }
 }

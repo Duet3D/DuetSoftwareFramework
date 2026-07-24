@@ -17,7 +17,8 @@ public static partial class ServiceCollectionExtensions
     public static IServiceCollection AddLink(this IServiceCollection services)
     {
         return services
-            .AddSingleton<Channel.Manager>();
+            .AddSingleton<Channel.Manager>()
+            .AddSingleton<IAsyncDiagnostics, Channel.Manager>(services => services.GetRequiredService<Channel.Manager>());
     }
 
     /// <summary>
@@ -35,6 +36,7 @@ public static partial class ServiceCollectionExtensions
         return services
             .AddSingleton<Native.NativeLink>()
             .AddSingleton<LinkInterface>()
+            .AddSingleton<IDiagnostics, LinkInterface>(services => services.GetRequiredService<LinkInterface>())
             .AddHostedService<LinkService>();
     }
 }

@@ -10,6 +10,7 @@ declare -i HELP=0
 declare -i SIGN_PKGS=0
 declare -i PKGS=1
 declare -i BUILD=1
+declare -i AOT=0
 
 COMMON_FUNCTIONS=$(readlink -f ${BASH_SOURCE[0]})
 COMMON_DIR=$(dirname $COMMON_FUNCTIONS)
@@ -30,6 +31,7 @@ Usage: $0 [ --target-arch=< i386 | i686 | x86_64 | armhf | armhfp | arm64 | aarc
 	[ --build-type=< Debug | Release > ]
 	[ --dest-dir=< destination directory > ]
 	[ --signing-key=< key id or path to keyfile > ]
+	[ --aot ]
 	[ --no-pkgs ]
 	[ --no-build ]
 	[ --no-cleanup ]
@@ -39,6 +41,8 @@ Usage: $0 [ --target-arch=< i386 | i686 | x86_64 | armhf | armhfp | arm64 | aarc
 
 target-arch:   Defaults to "armhf" for deb packages and "armhfp" for rpm packages.
 build-type:    Defaults to "Debug".
+aot:           Publishes NativeAOT binaries and drops the duetruntime dependency.
+               Requires a cross toolchain for the target, see aot/build.sh.
 dest-dir:      Defaults to "/tmp/duet/<deb|rpm>/<build-type>/<target-arch>".
 signing-key:   A key id or a path preceeded by an '@' to a file containing a
                key id.
@@ -85,6 +89,9 @@ case $TARGET_ARCH in
 	*) echo "Unknown TARGET_ARCH: $TARGET_ARCH" ; return 1 ;;
 esac
 
+PUBLISH="dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained"
+[ $AOT -eq 1 ] && PUBLISH="$PUBLISH -p:AotPublish=true"
+
 if [ -n "$SIGNING_KEY" ] && [ "${SIGNING_KEY:0:1}" == "@" ] ; then
 	SIGNING_KEY=${SIGNING_KEY:1}
 	SIGNING_KEY=${SIGNING_KEY/#\~/$HOME}
@@ -111,6 +118,7 @@ print_debug() {
 	echo "sdver:            $sdver"
 	echo "SIGNING_KEY:      $SIGNING_KEY"
 	echo "PACKAGES:         $PACKAGES"
+	echo "AOT:              $AOT"
 	echo "CLEANUP:          $CLEANUP"
 	echo "***********************************"
 }
@@ -125,15 +133,18 @@ build_progs() {
 	mkdir -p $DEST_DIR/files
 
 	rm -rf $DEST_DIR/duetcontrolserver_$dsfver
-	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/DuetControlServer/DuetControlServer.csproj
+	$PUBLISH -o $DEST_DIR/files $SRC_DIR/DuetControlServer/DuetControlServer.csproj
 	mkdir -p $DEST_DIR/duetcontrolserver_$dsfver/opt/dsf/bin
 	mkdir -p $DEST_DIR/duetcontrolserver_$dsfver/opt/dsf/plugins
 	[ -d $COMMON_DIR/duetcontrolserver/ ] && $RSYNC $COMMON_DIR/duetcontrolserver/. $DEST_DIR/duetcontrolserver_$dsfver/
 	[ -d $PACKAGER_DIR/duetcontrolserver/ ] && $RSYNC $PACKAGER_DIR/duetcontrolserver/. $DEST_DIR/duetcontrolserver_$dsfver/
 	mv $DEST_DIR/files/DuetControlServer* $DEST_DIR/duetcontrolserver_$dsfver/opt/dsf/bin
+	# AOT does not statically link the native libraries of referenced packages, and without the shared
+	# runtime package there is nowhere else for them to go
+	[ $AOT -eq 1 ] && find $DEST_DIR/files -name '*.so' -exec mv '{}' $DEST_DIR/duetcontrolserver_$dsfver/opt/dsf/bin ';'
 
 	rm -rf $DEST_DIR/duetwebserver_$dsfver/
-	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/DuetWebServer/DuetWebServer.csproj
+	$PUBLISH -o $DEST_DIR/files $SRC_DIR/DuetWebServer/DuetWebServer.csproj
 	mkdir -p $DEST_DIR/duetwebserver_$dsfver/opt/dsf/bin
 	[ -d $COMMON_DIR/duetwebserver/ ] && $RSYNC $COMMON_DIR/duetwebserver/. $DEST_DIR/duetwebserver_$dsfver/
 	[ -d $PACKAGER_DIR/duetwebserver/ ] && $RSYNC $PACKAGER_DIR/duetwebserver/. $DEST_DIR/duetwebserver_$dsfver/
@@ -141,7 +152,7 @@ build_progs() {
 	mv $DEST_DIR/files/appsettings.* $DEST_DIR/duetwebserver_$dsfver/opt/dsf/bin
 
 	rm -rf $DEST_DIR/duetpluginservice_$dsfver
-	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/DuetPluginService/DuetPluginService.csproj
+	$PUBLISH -o $DEST_DIR/files $SRC_DIR/DuetPluginService/DuetPluginService.csproj
 	mkdir -p $DEST_DIR/duetpluginservice_$dsfver/opt/dsf/bin
 	mkdir -p $DEST_DIR/duetpluginservice_$dsfver/opt/dsf/plugins
 	[ -d $COMMON_DIR/duetpluginservice/ ] && $RSYNC $COMMON_DIR/duetpluginservice/. $DEST_DIR/duetpluginservice_$dsfver/
@@ -149,30 +160,37 @@ build_progs() {
 	mv $DEST_DIR/files/DuetPluginService* $DEST_DIR/duetpluginservice_$dsfver/opt/dsf/bin
 
 	rm -rf $DEST_DIR/duettools_$dsfver/
-	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/CodeConsole/CodeConsole.csproj
-	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/CodeLogger/CodeLogger.csproj
-	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/CodeStream/CodeStream.csproj
-	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/CustomHttpEndpoint/CustomHttpEndpoint.csproj
-	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/ModelObserver/ModelObserver.csproj
-	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/files $SRC_DIR/PluginManager/PluginManager.csproj
+	$PUBLISH -o $DEST_DIR/files $SRC_DIR/CodeConsole/CodeConsole.csproj
+	$PUBLISH -o $DEST_DIR/files $SRC_DIR/CodeLogger/CodeLogger.csproj
+	$PUBLISH -o $DEST_DIR/files $SRC_DIR/CodeStream/CodeStream.csproj
+	$PUBLISH -o $DEST_DIR/files $SRC_DIR/CustomHttpEndpoint/CustomHttpEndpoint.csproj
+	$PUBLISH -o $DEST_DIR/files $SRC_DIR/ModelObserver/ModelObserver.csproj
+	$PUBLISH -o $DEST_DIR/files $SRC_DIR/PluginManager/PluginManager.csproj
 	mkdir -p $DEST_DIR/duettools_$dsfver/opt/dsf/bin
 	[ -d $COMMON_DIR/duettools/ ] && $RSYNC $COMMON_DIR/duettools/. $DEST_DIR/duettools_$dsfver/
 	[ -d $PACKAGER_DIR/duettools/ ] && $RSYNC $PACKAGER_DIR/duettools/. $DEST_DIR/duettools_$dsfver/
 	mv $DEST_DIR/files/CodeConsole* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
 	mv $DEST_DIR/files/CodeLogger* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
+	mv $DEST_DIR/files/CodeStream* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
 	mv $DEST_DIR/files/CustomHttpEndpoint* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
 	mv $DEST_DIR/files/ModelObserver* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
 	mv $DEST_DIR/files/PluginManager* $DEST_DIR/duettools_$dsfver/opt/dsf/bin
 
-	rm -rf $DEST_DIR/duetruntime_$dsfver
-	mkdir -p $DEST_DIR/duetruntime_$dsfver/opt/dsf/bin
-	[ -d $COMMON_DIR/duetruntime/ ] && $RSYNC $COMMON_DIR/duetruntime/. $DEST_DIR/duetruntime_$dsfver/
-	[ -d $PACKAGER_DIR/duetruntime/ ] && $RSYNC $PACKAGER_DIR/duetruntime/. $DEST_DIR/duetruntime_$dsfver/
-	mv $DEST_DIR/files/* $DEST_DIR/duetruntime_$dsfver/opt/dsf/bin
+	# The separated AOT symbols are only useful next to the build host's compiler output
+	[ $AOT -eq 1 ] && find $DEST_DIR -name '*.dbg' -delete
 
-	# DuetAPI.xml is the .NET doc emitted next to DuetAPI.dll; nothing on the device consumes it
-	# (DWC bundles the object-model documentation itself), so keep it out of the package
-	rm -f $DEST_DIR/duetruntime_$dsfver/opt/dsf/bin/DuetAPI.xml
+	# AOT binaries carry their own runtime, so there is nothing left to share between them
+	if [ $AOT -eq 0 ] ; then
+		rm -rf $DEST_DIR/duetruntime_$dsfver
+		mkdir -p $DEST_DIR/duetruntime_$dsfver/opt/dsf/bin
+		[ -d $COMMON_DIR/duetruntime/ ] && $RSYNC $COMMON_DIR/duetruntime/. $DEST_DIR/duetruntime_$dsfver/
+		[ -d $PACKAGER_DIR/duetruntime/ ] && $RSYNC $PACKAGER_DIR/duetruntime/. $DEST_DIR/duetruntime_$dsfver/
+		mv $DEST_DIR/files/* $DEST_DIR/duetruntime_$dsfver/opt/dsf/bin
+
+		# DuetAPI.xml is the .NET doc emitted next to DuetAPI.dll; nothing on the device consumes it
+		# (DWC bundles the object-model documentation itself), so keep it out of the package
+		rm -f $DEST_DIR/duetruntime_$dsfver/opt/dsf/bin/DuetAPI.xml
+	fi
 }
 
 build_plugins() {
@@ -180,7 +198,10 @@ build_plugins() {
 
 	rm -rf $DEST_DIR/duetpimanagementplugin_$dsfver/
 	mkdir -p $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin/dsf
-	dotnet publish -r $DOTNET_ARCH -c $BUILD_TYPE --self-contained -o $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin/dsf $SRC_DIR/DuetPiManagementPlugin/DuetPiManagementPlugin.csproj
+	$PUBLISH -o $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin/dsf $SRC_DIR/DuetPiManagementPlugin/DuetPiManagementPlugin.csproj
+	# The separated AOT symbols are only useful next to the build host's compiler output, and they
+	# must be gone before the plugin manifest lists what got installed
+	[ $AOT -eq 1 ] && rm -f $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin/dsf/*.dbg
 	[ -d $COMMON_DIR/duetpimanagementplugin/ ] && $RSYNC $COMMON_DIR/duetpimanagementplugin/. $DEST_DIR/duetpimanagementplugin_$dsfver/
 	[ -d $PACKAGER_DIR/duetpimanagementplugin/ ] && $RSYNC $PACKAGER_DIR/duetpimanagementplugin/. $DEST_DIR/duetpimanagementplugin_$dsfver/
 	chmod +x $DEST_DIR/duetpimanagementplugin_$dsfver/opt/dsf/plugins/DuetPiManagementPlugin/dsf/gen-https-cert.sh

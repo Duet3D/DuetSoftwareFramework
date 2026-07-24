@@ -12,7 +12,11 @@ namespace DuetControlServer.Model;
 /// Wrapper around the lock which notifies subscribers whenever an update has been processed.
 /// It is also able to detect the origin of model-related deadlocks
 /// </summary>
-public sealed class LockWrapper : IDisposable
+/// <remarks>
+/// This is a struct so the object model accessors do not allocate on every lock acquisition.
+/// Do not box instances into IDisposable unless the lock is actually held long-term
+/// </remarks>
+public readonly struct LockWrapper : IDisposable
 {
     /// <summary>
     /// Internal lock
@@ -36,9 +40,6 @@ public sealed class LockWrapper : IDisposable
 
     // Private fields
     private readonly ObjectModel _model;
-    private readonly IHostApplicationLifetime _lifetime;
-    private readonly ILogger _logger;
-    private readonly Settings _settings;
 
     /// <summary>
     /// CTS to trigger when the lock is being released
@@ -61,11 +62,9 @@ public sealed class LockWrapper : IDisposable
         _isWriteLock = isWriteLock;
         _onUpdatedHandler = onUpdated;
         _model = model;
-        _lifetime = lifetime;
-        _logger = logger;
-        _settings = settings.Value;
 
-        if (_settings.MaxMachineModelLockTime > 0)
+        int maxLockTime = settings.Value.MaxMachineModelLockTime;
+        if (maxLockTime > 0)
         {
             _releaseCts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
 
@@ -75,9 +74,9 @@ public sealed class LockWrapper : IDisposable
             {
                 try
                 {
-                    await Task.Delay(_settings.MaxMachineModelLockTime, releaseToken);
-                    _logger.LogCritical("{LockType} deadlock detected, stack trace of the deadlock:\n{StackTrace}", isWriteLock ? "Writer" : "Reader", stackTrace);
-                    _lifetime.StopApplication();
+                    await Task.Delay(maxLockTime, releaseToken);
+                    logger.LogCritical("{LockType} deadlock detected, stack trace of the deadlock:\n{StackTrace}", isWriteLock ? "Writer" : "Reader", stackTrace);
+                    lifetime.StopApplication();
                 }
                 catch (OperationCanceledException)
                 {

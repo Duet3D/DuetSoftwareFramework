@@ -1,8 +1,10 @@
 using DuetAPI.Utility;
 using DuetControlServer.Model;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -13,7 +15,7 @@ namespace DuetControlServer.Commands;
 /// </summary>
 /// <param name="model">Object model</param>
 /// <param name="filter">Filter for JSON queries</param>
-public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : DuetAPI.Commands.QueryObjectModel
+public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : DuetAPI.Commands.QueryObjectModel, IRawJsonCommand
 {
     /// <summary>
     /// Query the object model using a key and flags
@@ -22,6 +24,20 @@ public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : D
     /// <returns>JSON response compatible with M409 format</returns>
     public override async Task<JsonElement> ExecuteAsync(CancellationToken cancellationToken = default)
     {
+        ArrayBufferWriter<byte> jsonBuffer = new();
+        await ExecuteRawJsonAsync(jsonBuffer, cancellationToken);
+        using JsonDocument response = JsonDocument.Parse(jsonBuffer.WrittenMemory);
+        return response.RootElement.Clone();
+    }
+
+    /// <summary>
+    /// Query the object model using a key and flags returning UTF-8 JSON
+    /// </summary>
+    /// <param name="destination">Buffer writer to write the JSON response to</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public async ValueTask ExecuteRawJsonAsync(IBufferWriter<byte> destination, CancellationToken cancellationToken = default)
+    {
         string key = Key;
         string flags = Flags;
 
@@ -29,6 +45,7 @@ public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : D
         QueryFlags queryFlags = QueryFlags.Parse(flags);
         bool includeNulls = flags.Contains('n');
         JsonSerializerOptions jsonOptions = includeNulls ? JsonHelper.DefaultJsonOptions : JsonHelper.NoNullJsonOptions;
+        JsonTypeInfo dictionaryTypeInfo = jsonOptions.GetTypeInfo(typeof(Dictionary<string, object?>));
 
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
@@ -36,7 +53,7 @@ public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : D
             string filterExpression = string.IsNullOrEmpty(key) ? "**" : key + ".**";
 
             // Retrieve filtered OM data
-            using JsonDocument queryResult = JsonSerializer.SerializeToDocument(filter.GetFiltered(filterExpression, queryFlags), jsonOptions);
+            using JsonDocument queryResult = JsonSerializer.SerializeToDocument(filter.GetFiltered(filterExpression, queryFlags), dictionaryTypeInfo);
 
             // Get down to the requested depth
             JsonElement result = queryResult.RootElement;
@@ -59,7 +76,7 @@ public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : D
             object finalResult;
             if (string.IsNullOrEmpty(key) && result.ValueKind == JsonValueKind.Object)
             {
-                Dictionary<string, object?> resultDict = JsonSerializer.Deserialize<Dictionary<string, object?>>(result.GetRawText(), jsonOptions) ?? [];
+                Dictionary<string, object?> resultDict = (Dictionary<string, object?>?)result.Deserialize(dictionaryTypeInfo) ?? [];
                 Dictionary<string, object?> seqs = [];
                 foreach (var kvp in model.Seqs)
                 {
@@ -100,7 +117,8 @@ public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : D
                 response["result"] = finalResult;
             }
 
-            return JsonSerializer.SerializeToDocument(response, jsonOptions).RootElement.Clone();
+            using Utf8JsonWriter writer = new(destination);
+            JsonSerializer.Serialize(writer, response, dictionaryTypeInfo);
         }
     }
 }

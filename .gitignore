@@ -287,4 +287,7 @@ src/LinuxApi/LinuxApi.xml
 # Source Generators
 src/DuetAPI/Generated
 
+# NativeAOT builds
+aot/out
+
 build/

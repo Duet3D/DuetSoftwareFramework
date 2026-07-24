@@ -19,7 +19,7 @@ public sealed class Post(ChannelProcessor channelProcessor, CodeProcessor codePr
     : PipelineBase(PipelineStage.Post, channelProcessor, codeProcessor, lifetime, settings)
 {
     /// <inheritdoc />
-    public override async Task ProcessCodeAsync(Commands.Code code)
+    public override async ValueTask ProcessCodeAsync(Commands.Code code)
     {
         if (!code.Flags.HasFlag(CodeFlags.IsPostProcessed))
         {

@@ -17,11 +17,10 @@ fi
 if [ -d /run/systemd/system ]; then
     systemctl -q --no-ask-password daemon-reload
 
-    # Start DWS again if it is enabled via systemd. deb-systemd-invoke honours policy-rc.d so an
-    # admin can suppress the start; the return code is ignored so a failed start does not abort
-    # package configuration of the meta package
+    # Start DWS again if it is enabled via systemd. The return code is ignored so a failed start
+    # does not abort package configuration of the meta package
     if systemctl -q is-enabled duetwebserver; then
-        deb-systemd-invoke start duetwebserver >/dev/null || true
+        systemctl -q --no-ask-password --no-block start duetwebserver || true
     fi
 fi
 

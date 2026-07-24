@@ -1,5 +1,7 @@
 # DuetHttpClient
 
+Official remote HTTP API client for Duet3D boards by Duet3D.
+
 `DuetHttpClient` is the standalone HTTP client library for talking to Duet controllers over their HTTP API. It is separate from `DuetAPIClient`: this project targets network HTTP endpoints, whereas `DuetAPIClient` targets the local DSF UNIX socket.
 
 ## What This Project Owns

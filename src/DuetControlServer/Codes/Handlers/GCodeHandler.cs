@@ -20,7 +20,7 @@ public sealed class GCodeHandler : ICodeHandler
     /// <summary>
     /// React to an executed G-code before its result is returned
     /// </summary>
-    /// <param name="code">Code processed by RepRapFirmware
+    /// <param name="code">Code processed by RepRapFirmware</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result to output</returns>
     public ValueTask CodeExecutedAsync(Commands.Code code, CancellationToken cancellationToken) => ValueTask.CompletedTask;

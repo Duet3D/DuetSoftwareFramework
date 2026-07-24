@@ -3,7 +3,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -96,19 +95,19 @@ public readonly struct QueryFlags()
     /// <summary>
     /// Check if a property should be included based on its attributes and these flags
     /// </summary>
-    /// <param name="property">Property to check</param>
+    /// <param name="flags">Attributes of the property to check</param>
     /// <returns>Whether the property should be included</returns>
-    public bool ShouldInclude(PropertyInfo property)
+    public bool ShouldInclude(ModelPropertyFlags flags)
     {
-        if (LiveOnly && !Attribute.IsDefined(property, typeof(LiveAttribute)))
+        if (LiveOnly && (flags & ModelPropertyFlags.Live) == 0)
         {
             return false;
         }
-        if (!IncludeVerbose && Attribute.IsDefined(property, typeof(VerboseAttribute)))
+        if (!IncludeVerbose && (flags & ModelPropertyFlags.Verbose) != 0)
         {
             return false;
         }
-        if (!IncludeObsolete && Attribute.IsDefined(property, typeof(ObsoleteAttribute)))
+        if (!IncludeObsolete && (flags & ModelPropertyFlags.Obsolete) != 0)
         {
             return false;
         }
@@ -294,14 +293,6 @@ public partial class Filter(ObjectModel model)
     }
 
     /// <summary>
-    /// Internal function to find a specific object in the object model
-    /// </summary>
-    /// <param name="partialModel">Partial object model</param>
-    /// <param name="partialFilter">Array consisting of item indices or case-insensitive property names</param>
-    /// <param name="queryFlags">Optional flags controlling which properties are included, or null for no attribute filtering</param>
-    /// <param name="depth">Current recursion depth (used with <see cref="QueryFlags.MaxDepth"/>)</param>
-    /// <returns>Dictionary or list holding the result or null if nothing could be found</returns>
-    /// <summary>
     /// Resolve the item type of a generic model collection, walking up the type hierarchy so that
     /// non-generic subclasses (e.g. Inputs) are resolved as well
     /// </summary>
@@ -332,7 +323,7 @@ public partial class Filter(ObjectModel model)
         // Check what kind of item to expect
         if (currentFilter is string propertyName)
         {
-            if (partialModel is ModelObject model)
+            if (partialModel is IModelObjectAccessor accessor)
             {
                 // Check if we've exceeded the maximum depth
                 if (queryFlags is not null && depth >= queryFlags.Value.MaxDepth)
@@ -341,13 +332,13 @@ public partial class Filter(ObjectModel model)
                 }
 
                 Dictionary<string, object?> result = [];
-                foreach (PropertyInfo property in model.GetType().GetProperties(BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance))
+                foreach (ModelPropertyDescriptor property in accessor.Descriptor.Properties)
                 {
-                    string jsonPropertyName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
+                    string jsonPropertyName = property.JsonName;
                     if (propertyName is "*" or "**" || propertyName == jsonPropertyName)
                     {
                         // Check if property should be included based on its attributes
-                        if (queryFlags is not null && !queryFlags.Value.ShouldInclude(property))
+                        if (queryFlags is not null && !queryFlags.Value.ShouldInclude(property.Flags))
                         {
                             continue;
                         }
@@ -360,7 +351,7 @@ public partial class Filter(ObjectModel model)
                             // so that attribute-based filtering is applied at every level
                             if (propertyName == "**" && queryFlags is not null)
                             {
-                                object? propertyValue = property.GetValue(model);
+                                object? propertyValue = accessor.GetPropertyValue(property.Index);
                                 if (propertyValue is ModelObject || propertyValue is IList)
                                 {
                                     object? subResult = InternalGetFiltered(propertyValue, ["**"], queryFlags, depth + 1);
@@ -377,16 +368,16 @@ public partial class Filter(ObjectModel model)
                             else
                             {
                                 // This is a property we've been looking for
-                                result.Add(jsonPropertyName, property.GetValue(model));
+                                result.Add(jsonPropertyName, accessor.GetPropertyValue(property.Index));
                             }
                             continue;
                         }
 
-                        if (property.PropertyType.IsSubclassOf(typeof(ModelObject)) || typeof(IList).IsAssignableFrom(property.PropertyType))
+                        object? deeperValue = accessor.GetPropertyValue(property.Index);
+                        if (deeperValue is ModelObject or IList)
                         {
                             // Property is somewhere deeper
-                            object propertyValue = property.GetValue(model)!;
-                            object? subResult = InternalGetFiltered(propertyValue, partialFilter, queryFlags, depth + 1);
+                            object? subResult = InternalGetFiltered(deeperValue, partialFilter, queryFlags, depth + 1);
                             if (subResult is not null)
                             {
                                 result.Add(jsonPropertyName, subResult);
@@ -598,12 +589,12 @@ public partial class Filter(ObjectModel model)
         if (partialFilter[0] is string propertyName)
         {
             partialFilter = partialFilter.Skip(1).ToArray();
-            if (partialModel is ModelObject model)
+            if (partialModel is IModelObjectAccessor accessor)
             {
-                PropertyInfo? property = model.GetType().GetProperty(propertyName, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
+                ModelPropertyDescriptor? property = accessor.Descriptor.FindProperty(propertyName, true);
                 if (property is not null)
                 {
-                    if (findSbcProperty && Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
+                    if (findSbcProperty && (property.Flags & ModelPropertyFlags.SbcProperty) != 0)
                     {
                         hadSbcProperty = true;
                     }
@@ -613,17 +604,14 @@ public partial class Filter(ObjectModel model)
                         if (!findSbcProperty || hadSbcProperty)
                         {
                             // This is exactly the property we've been looking for
-                            result = property.GetValue(model);
+                            result = accessor.GetPropertyValue(property.Index);
                             return true;
                         }
                     }
-                    else if (property.PropertyType == typeof(JsonElement) ||
-                                property.PropertyType.IsSubclassOf(typeof(ModelObject)) ||
-                                typeof(IModelDictionary).IsAssignableFrom(property.PropertyType) ||
-                                typeof(IList).IsAssignableFrom(property.PropertyType))
+                    else if (property.Kind != ModelPropertyKind.Value)
                     {
                         // Property is somewhere deeper
-                        object propertyValue = property.GetValue(model)!;
+                        object propertyValue = accessor.GetPropertyValue(property.Index)!;
                         return InternalGetSpecific(propertyValue, partialFilter, findSbcProperty, hadSbcProperty, out result);
                     }
                 }

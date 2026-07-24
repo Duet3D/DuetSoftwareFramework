@@ -26,23 +26,23 @@ public sealed class Firmware(
     IOptions<Settings> settings) : PipelineBase(PipelineStage.Firmware, channelProcessor, codeProcessor, lifetime, settings)
 {
     /// <inheritdoc />
-    public override Task<bool> FlushAsync(bool flushAll, CancellationToken cancellationToken = default)
+    public override ValueTask<bool> FlushAsync(bool flushAll, CancellationToken cancellationToken = default)
     {
         return linkInterface.FlushAsync(ChannelProcessor.Channel, flushAll, cancellationToken);
     }
 
     /// <inheritdoc />
-    public override Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
+    public override ValueTask<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
     {
         return linkInterface.FlushAsync(file, cancellationToken);
     }
 
     /// <inheritdoc />
-    public override Task<bool> FlushAsync(Code code, CancellationToken cancellationToken = default)
+    public override ValueTask<bool> FlushAsync(Code code, CancellationToken cancellationToken = default)
     {
         return linkInterface.FlushAsync(code, cancellationToken);
     }
 
     /// <inheritdoc />
-    public override Task ProcessCodeAsync(Code code) => Task.CompletedTask;
+    public override ValueTask ProcessCodeAsync(Code code) => ValueTask.CompletedTask;
 }

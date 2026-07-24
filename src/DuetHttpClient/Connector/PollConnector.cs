@@ -135,15 +135,15 @@ internal partial class PollConnector : BaseConnector
         // the remote end answered the connect request itself with a 401 code
         using CancellationTokenSource connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _terminateSession.Token);
         connectCts.CancelAfter(Options.Timeout);
-        using HttpResponseMessage response = await HttpClient.GetAsync($"rr_connect?password={HttpUtility.UrlEncode(Options.Password)}&time={DateTime.Now:s}", connectCts.Token);
+        using HttpResponseMessage response = await HttpClient.GetAsync($"rr_connect?password={HttpUtility.UrlEncode(Options.Password)}&time={DateTime.Now:s}", connectCts.Token).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
 #if NET6_0_OR_GREATER
-        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 #else
-        using Stream responseStream = await response.Content.ReadAsStreamAsync();
+        using Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
 #endif
-        Responses.PollConnectResponse connectResponse = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.PollConnectResponse, cancellationToken))!;
+        Responses.PollConnectResponse connectResponse = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.PollConnectResponse, cancellationToken).ConfigureAwait(false))!;
         _sessionKey = connectResponse.Err switch
         {
             0 => connectResponse.SessionKey,
@@ -171,7 +171,7 @@ internal partial class PollConnector : BaseConnector
         {
             request.Headers.Add("X-Session-Key", _sessionKey.ToString());
         }
-        HttpResponseMessage response = await base.SendRequestAsync(request, timeout, cancellationToken, completionOption);
+        HttpResponseMessage response = await base.SendRequestAsync(request, timeout, cancellationToken, completionOption).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.ServiceUnavailable &&
             (request.Method != HttpMethod.Get || request.RequestUri?.AbsolutePath != "/rr_reply"))
         {
@@ -181,7 +181,7 @@ internal partial class PollConnector : BaseConnector
             {
                 _seqs.TryGetValue("reply", out replySeq);
             }
-            await GetGCodeReplyAsync(replySeq + 1);
+            await GetGCodeReplyAsync(replySeq + 1).ConfigureAwait(false);
         }
         return response;
     }
@@ -201,11 +201,11 @@ internal partial class PollConnector : BaseConnector
             {
                 string query = string.IsNullOrEmpty(key) ? $"rr_model?flags={flags}" : $"rr_model?key={key}&flags={flags}";
                 using HttpRequestMessage request = new(HttpMethod.Get, query);
-                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, _terminateSession.Token);
+                using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, _terminateSession.Token).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
-                    using Stream stream = await response.Content.ReadAsStreamAsync();
-                    return await JsonDocument.ParseAsync(stream, cancellationToken: _terminateSession.Token);
+                    using Stream stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                    return await JsonDocument.ParseAsync(stream, cancellationToken: _terminateSession.Token).ConfigureAwait(false);
                 }
 
                 errorMessage = $"Server returned HTTP {response.StatusCode} {response.ReasonPhrase}";
@@ -293,7 +293,7 @@ internal partial class PollConnector : BaseConnector
 
                         if (isSeqsEmpty)
                         {
-                            using JsonDocument limitsDocument = await GetObjectModelAsync("limits", "d99vn");
+                            using JsonDocument limitsDocument = await GetObjectModelAsync("limits", "d99vn").ConfigureAwait(false);
                             if (limitsDocument.RootElement.TryGetProperty("key", out JsonElement limitsKey) && limitsKey.GetString()!.Equals("limits", StringComparison.InvariantCultureIgnoreCase) &&
                                 limitsDocument.RootElement.TryGetProperty("result", out JsonElement limitsResult))
                             {
@@ -305,7 +305,7 @@ internal partial class PollConnector : BaseConnector
                         }
 
                         // Request the next status update
-                        using JsonDocument statusDocument = await GetObjectModelAsync(string.Empty, "d99fn");
+                        using JsonDocument statusDocument = await GetObjectModelAsync(string.Empty, "d99fn").ConfigureAwait(false);
                         if (statusDocument.RootElement.TryGetProperty("key", out JsonElement statusKey) && string.IsNullOrEmpty(statusKey.GetString()) &&
                             statusDocument.RootElement.TryGetProperty("result", out JsonElement statusResult))
                         {
@@ -331,7 +331,7 @@ internal partial class PollConnector : BaseConnector
                                     {
                                         if (seqProperty.Name == "reply")
                                         {
-                                            await GetGCodeReplyAsync(newSeq);
+                                            await GetGCodeReplyAsync(newSeq).ConfigureAwait(false);
                                         }
                                         else
                                         {
@@ -339,7 +339,7 @@ internal partial class PollConnector : BaseConnector
                                             do
                                             {
                                                 // Request the next model chunk
-                                                using JsonDocument keyDocument = await GetObjectModelAsync(seqProperty.Name, (next == 0) ? "d99vno" : $"d99vnoa{next}");
+                                                using JsonDocument keyDocument = await GetObjectModelAsync(seqProperty.Name, (next == 0) ? "d99vno" : $"d99vnoa{next}").ConfigureAwait(false);
                                                 offset = next;
                                                 next = keyDocument.RootElement.TryGetProperty("next", out JsonElement nextValue) ? nextValue.GetInt32() : 0;
 
@@ -372,7 +372,7 @@ internal partial class PollConnector : BaseConnector
 
                                                     if (fileInfoToUpdate is not null)
                                                     {
-                                                        await GetThumbnailsAsync(fileInfoToUpdate, _terminateSession.Token);
+                                                        await GetThumbnailsAsync(fileInfoToUpdate, _terminateSession.Token).ConfigureAwait(false);
                                                         lock (Model)
                                                         {
                                                             Model.Job.File.Thumbnails.Assign(fileInfoToUpdate.Thumbnails);
@@ -385,7 +385,7 @@ internal partial class PollConnector : BaseConnector
                                                         int nextAxis = moveAxes.GetArrayLength(), axisOffset = 0;
                                                         do
                                                         {
-                                                            using JsonDocument moveAxesDocument = await GetObjectModelAsync("move.axes", $"d99vnoa{nextAxis}");
+                                                            using JsonDocument moveAxesDocument = await GetObjectModelAsync("move.axes", $"d99vnoa{nextAxis}").ConfigureAwait(false);
                                                             axisOffset = nextAxis;
                                                             nextAxis = moveAxesDocument.RootElement.TryGetProperty("next", out JsonElement nextAxisValue) ? nextAxisValue.GetInt32() : 0;
 
@@ -419,14 +419,14 @@ internal partial class PollConnector : BaseConnector
                         }
                         else
                         {
-                            await PollReplySeqAsync();
+                            await PollReplySeqAsync().ConfigureAwait(false);
                         }
                     }
                     else
                     {
                         // Even without model observation the reply seq must be polled so that
                         // SendCodeAsync gets its replies and the HTTP session stays alive
-                        await PollReplySeqAsync();
+                        await PollReplySeqAsync().ConfigureAwait(false);
                     }
                 }
                 catch (Exception e) when (e is not OperationCanceledException || !_terminateSession.IsCancellationRequested)
@@ -447,7 +447,7 @@ internal partial class PollConnector : BaseConnector
                 // Wait a moment before polling again
                 try
                 {
-                    await Task.Delay(hadError ? Options.RetryDelay : Options.UpdateInterval, _terminateSession.Token);
+                    await Task.Delay(hadError ? Options.RetryDelay : Options.UpdateInterval, _terminateSession.Token).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
@@ -468,7 +468,7 @@ internal partial class PollConnector : BaseConnector
     /// <returns>Asynchronous task</returns>
     private async Task PollReplySeqAsync()
     {
-        using JsonDocument replySeqDocument = await GetObjectModelAsync("seqs.reply", string.Empty);
+        using JsonDocument replySeqDocument = await GetObjectModelAsync("seqs.reply", string.Empty).ConfigureAwait(false);
         if (replySeqDocument.RootElement.TryGetProperty("result", out JsonElement replySeqElement) &&
             replySeqElement.ValueKind == JsonValueKind.Number)
         {
@@ -480,7 +480,7 @@ internal partial class PollConnector : BaseConnector
 
             if (newSeq > seq)
             {
-                await GetGCodeReplyAsync(newSeq);
+                await GetGCodeReplyAsync(newSeq).ConfigureAwait(false);
             }
         }
     }
@@ -651,7 +651,7 @@ internal partial class PollConnector : BaseConnector
 
         // Terminate the session and wait for it
         _terminateSession.Cancel();
-        await _sessionTaskTerminated.Task;
+        await _sessionTaskTerminated.Task.ConfigureAwait(false);
 
         // Cancel all running codes
         lock (_runningCodes)

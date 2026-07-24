@@ -12,7 +12,7 @@ namespace DuetControlServer.Commands;
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.AddHttpEndpoint"/> command
 /// </summary>
-/// <param name="model">Object model</param
+/// <param name="model">Object model</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings</param>
 public sealed class AddHttpEndpoint(Model.ObjectModel model, ILogger<AddHttpEndpoint> logger, IOptions<Settings> settings) : DuetAPI.Commands.AddHttpEndpoint

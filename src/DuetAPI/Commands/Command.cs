@@ -19,7 +19,7 @@ public abstract class Command : BaseCommand
     /// <inheritdoc />
     public override async Task<object?> InvokeAsync(CancellationToken cancellationToken = default)
     {
-        await ExecuteAsync(cancellationToken);
+        await ExecuteAsync(cancellationToken).ConfigureAwait(false);
         return null;
     }
 }
@@ -38,5 +38,5 @@ public abstract class Command<T> : BaseCommand
     public virtual Task<T> ExecuteAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException($"{Command}<{nameof(T)}> not implemented");
 
     /// <inheritdoc />
-    public override async Task<object?> InvokeAsync(CancellationToken cancellationToken = default) => await ExecuteAsync(cancellationToken);
+    public override async Task<object?> InvokeAsync(CancellationToken cancellationToken = default) => await ExecuteAsync(cancellationToken).ConfigureAwait(false);
 }

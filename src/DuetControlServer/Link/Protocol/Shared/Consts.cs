@@ -90,4 +90,12 @@ public static class Consts
     /// Time to wait when the IAP reboots to the main firmware
     /// </summary>
     public const int IapRebootDelay = 2000;
+
+    /// <summary>
+    /// Delay before re-probing the USB port after the link was lost (in ms).
+    /// The firmware drops off the bus and waits out a short dwell so the host can release both
+    /// ttyACM minors before re-enumerating; re-opening the port during that dwell can defer the
+    /// release and make the ports re-enumerate on shifted indices, so this must exceed the firmware dwell
+    /// </summary>
+    public const int UsbReconnectDelay = 250;
 }

@@ -285,6 +285,7 @@ public sealed class SbcTriggerService(
     /// Returns true if the trigger condition (R parameter) allows firing given the current print status.
     /// </summary>
     /// <param name="condition">0 = always, 1 = only while printing, 2 = only while not printing</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     private async Task<bool> IsTriggerConditionMetAsync(int condition, CancellationToken cancellationToken)
     {
         if (condition == 0)

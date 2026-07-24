@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using DuetAPI.Connection.InitMessages;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,7 +18,7 @@ public class ProcessorFactory(IServiceProvider serviceProvider)
     /// <param name="conn">Connection to use for the processor</param>
     /// <param name="initMessage">Initialization message for the processor</param>
     /// <returns>Processor instance</returns>
-    public T Create<T>(Connection conn, ClientInitMessage initMessage) where T : IProcessor
+    public T Create<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] T>(Connection conn, ClientInitMessage initMessage) where T : IProcessor
     {
         return ActivatorUtilities.CreateInstance<T>(serviceProvider, conn, initMessage);
     }
