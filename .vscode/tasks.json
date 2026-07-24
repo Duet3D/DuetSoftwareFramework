@@ -671,42 +671,6 @@
             "problemMatcher": [],
             "group": "build"
         },
-        {
-            "label": "[CANMaster] Upload Selected Target (rr_upload)",
-            "type": "shell",
-            "command": "./Scripts/rr_upload_selected_target.sh",
-            "args": [
-                "${input:canmaster_target}",
-                "${input:duetHost}",
-                "${input:duetPassword}"
-            ],
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
-            "problemMatcher": [],
-            "group": "build"
-        },
-        {
-            "label": "[CANMaster] Flash Firmware (M997)",
-            "type": "shell",
-            "command": "./Scripts/rr_send_gcode.sh",
-            "args": [
-                "${input:duetHost}",
-                "${input:duetPassword}",
-                "M997"
-            ],
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
-            "problemMatcher": [],
-            "group": "build"
-        },
-        {
-            "label": "[CANMaster] Build and Deploy to Target",
-            "dependsOn": [
-                "[CANMaster] Build Selected Target",
-                "[CANMaster] Upload Selected Target (rr_upload)",
-                "[CANMaster] Flash Firmware (M997)"
-            ],
-            "dependsOrder": "sequence",
-            "problemMatcher": []
-        },
 
         // ---------------------------------------------------------------
         // Duet3Expansion firmware (src/Duet3Expansion). These run in the
@@ -765,7 +729,7 @@
             // clean rebuild to capture every TU. Hence Tidy below just depends on it.
             "label": "[Style] Generate Compile DB - DuetCANMaster",
             "type": "shell",
-            "command": "Scripts/gen-compile-commands.sh ${input:canmaster_board}",
+            "command": "scripts/gen-compile-commands.sh ${input:canmaster_board}",
             "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
             "problemMatcher": [],
             "presentation": { "reveal": "silent" },

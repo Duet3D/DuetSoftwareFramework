@@ -80,7 +80,7 @@ fails to load on the Pi with a `GLIBC_2.3x not found` error. Build it with `pi-a
 links against a copy of the Pi's own libraries and refuses to configure if that copy is missing:
 
 ```sh
-Scripts/fetch-pi-sysroot.sh pi@raspberrypi          # one-off, into pi-sysroot/
+scripts/fetch-pi-sysroot.sh pi@raspberrypi          # one-off, into pi-sysroot/
 cmake --preset pi-arm64
 cmake --build --preset pi-arm64 -j
 ```
@@ -121,7 +121,7 @@ libstdc++ inside the Pi sysroot, where GCC never looks for it).
 > `libduet_sbc.so` requires the target's glibc. To produce a Bookworm-compatible `.so`, either build
 > it natively on the Pi, or fetch a Pi sysroot and do a glibc-matched dynamic build:
 > ```sh
-> Scripts/fetch-pi-sysroot.sh pi@raspberrypi
+> scripts/fetch-pi-sysroot.sh pi@raspberrypi
 > cmake --preset pi-arm64 -DDUET_SBC_STATIC=OFF
 > cmake --build --preset pi-arm64
 > ```
@@ -246,7 +246,7 @@ make ARCH=arm64 CONFIG=Release publish
 > devcontainer toolchain targets a newer glibc than Raspberry Pi OS Bookworm, so for release packages
 > either build on the Pi or pass a matching sysroot:
 > `make ARCH=arm64 DUET_SBC_SYSROOT=/path/to/pi-sysroot publish`
-> (see `Scripts/fetch-pi-sysroot.sh`). A native-`ARCH` build needs no sysroot.
+> (see `scripts/fetch-pi-sysroot.sh`). A native-`ARCH` build needs no sysroot.
 
 ## Sharing with DuetCANMaster
 

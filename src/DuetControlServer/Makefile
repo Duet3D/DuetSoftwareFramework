@@ -15,7 +15,7 @@ include ../../Makefile.components
 # Bookworm, so a cross-built .so will fail to load on the Pi with "GLIBC_2.3x not found". For release
 # packages, either build on the target or pass a matching sysroot:
 #
-#     make DUET_SBC_SYSROOT=/path/to/pi-sysroot   (see src/DuetSbcInterface/Scripts/fetch-pi-sysroot.sh)
+#     make DUET_SBC_SYSROOT=/path/to/pi-sysroot   (see src/DuetSbcInterface/scripts/fetch-pi-sysroot.sh)
 #
 # Building natively (ARCH matching the host) needs no sysroot and is what CI/dev use.
 # ---------------------------------------------------------------------------

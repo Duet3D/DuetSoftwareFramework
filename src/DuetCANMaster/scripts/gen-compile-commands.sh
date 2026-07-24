@@ -9,7 +9,7 @@
 # without the cross toolchain's own include paths. clang-tidy against a database in that state
 # still *reports* things, but it is parsing a broken TU, so any --fix output is untrustworthy.
 #
-# Usage:  Scripts/gen-compile-commands.sh [board-target]
+# Usage:  scripts/gen-compile-commands.sh [board-target]
 #
 set -euo pipefail
 
@@ -46,7 +46,7 @@ print(f"   kept {len(kept)}/{len(entries)} entries for {board_define}")
 PY
 
 echo ">> Rewriting compile_commands.json for clang"
-CROSS_COMPILE="${CROSS_COMPILE}" python3 "${PROJECT_DIR}/Scripts/sanitise-compile-commands.py" \
+CROSS_COMPILE="${CROSS_COMPILE}" python3 "${PROJECT_DIR}/scripts/sanitise-compile-commands.py" \
 	compile_commands.json
 
 echo ">> Done. Run: clang-tidy -p ${PROJECT_DIR} <file>"

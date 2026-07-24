@@ -43,7 +43,7 @@
     {
       "name": "pi-arm64",
       "displayName": "Cross-compile for aarch64 against a Pi sysroot (deployable)",
-      "description": "Links against a sysroot copied from the target, so libduet_sbc.so matches the Pi's glibc. Requires pi-sysroot/ to exist: fetch it with Scripts/fetch-pi-sysroot.sh <user>@<pi-host>, or override the path with -DDUET_SBC_SYSROOT=...",
+      "description": "Links against a sysroot copied from the target, so libduet_sbc.so matches the Pi's glibc. Requires pi-sysroot/ to exist: fetch it with scripts/fetch-pi-sysroot.sh <user>@<pi-host>, or override the path with -DDUET_SBC_SYSROOT=...",
       "inherits": "base",
       "toolchainFile": "${sourceDir}/cmake/aarch64-linux-gnu.cmake",
       "cacheVariables": {
@@ -58,13 +58,13 @@
     {
       "name": "arm64-debug",
       "displayName": "Cross-compile for aarch64, unoptimised with full debug info",
-      "description": "What Scripts/debug-on-pi.sh builds for the jitter harness: statically linked, so it needs no sysroot and runs under gdbserver on any Pi OS release.",
+      "description": "What scripts/debug-on-pi.sh builds for the jitter harness: statically linked, so it needs no sysroot and runs under gdbserver on any Pi OS release.",
       "inherits": ["debug", "arm64"]
     },
     {
       "name": "pi-arm64-debug",
       "displayName": "Cross-compile for aarch64 against a Pi sysroot, unoptimised with full debug info",
-      "description": "What Scripts/debug-on-pi.sh builds for libduet_sbc.so, which must match the Pi's glibc. Requires pi-sysroot/ as pi-arm64 does.",
+      "description": "What scripts/debug-on-pi.sh builds for libduet_sbc.so, which must match the Pi's glibc. Requires pi-sysroot/ as pi-arm64 does.",
       "inherits": ["debug", "pi-arm64"]
     }
   ],

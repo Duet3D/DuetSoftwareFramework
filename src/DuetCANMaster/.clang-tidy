@@ -98,7 +98,7 @@ Checks: >
 #                                     rather than a bulk clang-apply-replacements run.
 #   modernize-use-std-numbers       - it reports these as exact ("differs by 0.00e+00"), but that
 #                                     is measured without -fsingle-precision-constant, which the
-#                                     firmware does build with and Scripts/sanitise-compile-
+#                                     firmware does build with and scripts/sanitise-compile-
 #                                     commands.py has to drop because clang rejects it. Under the
 #                                     real flags 180.0 / 3.141592653589793 folds in single
 #                                     precision and std::numbers::pi (a double) does not, so

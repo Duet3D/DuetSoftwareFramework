@@ -25,7 +25,7 @@ failed=()
 for board in "${BOARDS[@]}"; do
 	echo "=============================================================="
 	echo ">> ${board}: generating compile database"
-	if ! Scripts/gen-compile-commands.sh "${board}" > "${OUT_DIR}/${board}.build.log" 2>&1; then
+	if ! scripts/gen-compile-commands.sh "${board}" > "${OUT_DIR}/${board}.build.log" 2>&1; then
 		echo "   !! build failed, see ${OUT_DIR}/${board}.build.log"
 		failed+=("${board}")
 		continue

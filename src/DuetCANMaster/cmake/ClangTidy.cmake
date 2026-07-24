@@ -5,7 +5,7 @@
 # .clang-tidy is treated as an error (--warnings-as-errors=*), matching the firmware's own -Werror.
 #
 # clang-tidy is not invoked directly: the firmware is GCC-built for bare-metal ARM, so the command
-# line CMake would hand it has to be rewritten first. Scripts/clang-tidy-wrapper.py does that (and
+# line CMake would hand it has to be rewritten first. scripts/clang-tidy-wrapper.py does that (and
 # skips the vendored src/libc and src/libcpp sources); see its docstring for the details.
 #
 # Turn the whole thing off with -DDUET_CLANG_TIDY=OFF for a plain, faster compile.
@@ -30,5 +30,5 @@ function(duet_enable_clang_tidy TARGET)
 
     set_target_properties(${TARGET} PROPERTIES
         CXX_CLANG_TIDY
-            "${Python3_EXECUTABLE};${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../Scripts/clang-tidy-wrapper.py;--clang-tidy-binary=${CLANG_TIDY_EXE};--cross-compile=${CROSS_COMPILE};--warnings-as-errors=*;--quiet")
+            "${Python3_EXECUTABLE};${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../scripts/clang-tidy-wrapper.py;--clang-tidy-binary=${CLANG_TIDY_EXE};--cross-compile=${CROSS_COMPILE};--warnings-as-errors=*;--quiet")
 endfunction()

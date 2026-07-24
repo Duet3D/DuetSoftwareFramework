@@ -6,7 +6,7 @@ CMake's CXX_CLANG_TIDY hands the linter the *GCC* command line it is about to ru
     clang-tidy-wrapper.py <tidy args> <source> -- arm-none-eabi-g++ <firmware flags> -c <source>
 
 clang cannot consume that command line as-is. It is the same pair of problems
-Scripts/sanitise-compile-commands.py exists to solve for the standalone (compile_commands.json)
+scripts/sanitise-compile-commands.py exists to solve for the standalone (compile_commands.json)
 workflow: GCC-only flags are unknown arguments and abort the whole TU, and without the cross
 toolchain's own include paths even <cstddef> is "file not found", so most of the code goes
 unanalysed while clang-tidy still reports enough to look like it worked. This wrapper applies
@@ -53,7 +53,7 @@ _spec.loader.exec_module(sanitise)
 #                                 (FreeRTOSConfig.h, libstdc++'s functexcept.h) and redeclared here
 #                                 with the standard [[noreturn]]; clang treats that as the
 #                                 attribute appearing on a later declaration.
-#                             Scripts/gen-compile-commands.sh + clang-tidy still reports the file's
+#                             scripts/gen-compile-commands.sh + clang-tidy still reports the file's
 #                             other findings, which is where these were triaged.
 SKIP = (
     os.path.join("src", "libc") + os.sep,

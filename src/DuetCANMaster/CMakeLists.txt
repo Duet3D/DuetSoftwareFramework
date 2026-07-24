@@ -12,7 +12,7 @@
 #
 # Each first-party source is linted by clang-tidy as it is compiled, with every check left enabled
 # in .clang-tidy treated as an error; see cmake/ClangTidy.cmake, and pass -DDUET_CLANG_TIDY=OFF for
-# a plain compile. Scripts/gen-compile-commands.sh remains the way to run clang-tidy over the whole
+# a plain compile. scripts/gen-compile-commands.sh remains the way to run clang-tidy over the whole
 # tree at once (and with --fix).
 #
 # Every board is one add_executable() defined via duet_add_firmware() (see cmake/DuetFirmware.cmake).
