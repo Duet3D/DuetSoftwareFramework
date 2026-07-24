@@ -8,10 +8,27 @@
       "binaryDir": "${sourceDir}/build/${presetName}"
     },
     {
+      "name": "release",
+      "hidden": true,
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "DUET_SBC_CLANG_TIDY": "OFF"
+      }
+    },
+    {
+      "name": "debug",
+      "hidden": true,
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "DUET_SBC_CLANG_TIDY": "OFF"
+      }
+    },
+    {
       "name": "native",
       "displayName": "Native (dev box / build on the Pi)",
-      "inherits": "base",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+      "inherits": "base"
     },
     {
       "name": "arm64",
@@ -20,7 +37,6 @@
       "inherits": "base",
       "toolchainFile": "${sourceDir}/cmake/aarch64-linux-gnu.cmake",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
         "DUET_SBC_SYSROOT": ""
       }
     },
@@ -31,14 +47,33 @@
       "inherits": "base",
       "toolchainFile": "${sourceDir}/cmake/aarch64-linux-gnu.cmake",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
         "DUET_SBC_SYSROOT": "${sourceDir}/pi-sysroot"
       }
+    },
+    {
+      "name": "native-debug",
+      "displayName": "Native, unoptimised with full debug info",
+      "inherits": ["debug", "native"]
+    },
+    {
+      "name": "arm64-debug",
+      "displayName": "Cross-compile for aarch64, unoptimised with full debug info",
+      "description": "What Scripts/debug-on-pi.sh builds for the jitter harness: statically linked, so it needs no sysroot and runs under gdbserver on any Pi OS release.",
+      "inherits": ["debug", "arm64"]
+    },
+    {
+      "name": "pi-arm64-debug",
+      "displayName": "Cross-compile for aarch64 against a Pi sysroot, unoptimised with full debug info",
+      "description": "What Scripts/debug-on-pi.sh builds for libduet_sbc.so, which must match the Pi's glibc. Requires pi-sysroot/ as pi-arm64 does.",
+      "inherits": ["debug", "pi-arm64"]
     }
   ],
   "buildPresets": [
     { "name": "native", "configurePreset": "native" },
     { "name": "arm64", "configurePreset": "arm64" },
-    { "name": "pi-arm64", "configurePreset": "pi-arm64" }
+    { "name": "pi-arm64", "configurePreset": "pi-arm64" },
+    { "name": "native-debug", "configurePreset": "native-debug" },
+    { "name": "arm64-debug", "configurePreset": "arm64-debug" },
+    { "name": "pi-arm64-debug", "configurePreset": "pi-arm64-debug" }
   ]
 }

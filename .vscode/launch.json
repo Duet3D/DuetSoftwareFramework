@@ -3,6 +3,16 @@
     // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
+    "compounds": [
+        {
+            // This doesn't work because C# breakpoints trigger the cppdbg to stop
+            "name": "[DSF] Attach Remote DuetControlServer + DuetSbcInterface",
+            "configurations": [
+                "[DSF] Attach Native (lib*.so)",
+                "[DSF] Attach Remote DuetControlServer",
+            ]
+        }
+    ],
     "configurations": [
         {
             "name": "[DSF] Launch Remote DuetControlServer",
@@ -46,7 +56,76 @@
             },
             "justMyCode": false
         },
-
+        {
+            "name": "[DSF] Attach Native (lib*.so)",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "/opt/dsf/bin/DuetControlServer",
+            "preLaunchTask": "[DSF] Get DuetControlServer PID",
+            "processId": "${input:dcs_pid}", // Unfortunately we can't use the process name
+            "MIMode": "gdb",
+            "pipeTransport": {
+                "pipeProgram": "ssh",
+                "pipeArgs": [
+                    "-T",
+                    "${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp}"
+                ],
+                "pipeCwd": "${workspaceFolder}",
+                "debuggerPath": "/usr/bin/gdb",
+                "quoteArgs": true
+            },
+            "setupCommands": [
+                {
+                    "description": "Enable pretty printing",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Allow pending breakpoints",
+                    "text": "set breakpoint pending on"
+                },
+                // {
+                //     "description": "Use hardware breakpoints",
+                //     "text": "set breakpoint auto-hw on",
+                //     "ignoreFailures": true
+                // },
+                // {
+                //     "description": "Do not stop on shared library events",
+                //     "text": "set stop-on-solib-events 0",
+                //     "ignoreFailures": true
+                // },
+                // {
+                //     "description": "Enable non-stop mode",
+                //     "text": "set non-stop on",
+                //     "ignoreFailures": true
+                // },
+                {
+                    "description": "Do not stop other threads unnecessarily",
+                    "text": "set scheduler-locking off",
+                    "ignoreFailures": true
+                },
+                // {
+                //     "description": "Ignore runtime debugger signals",
+                //     "text": "handle SIGTRAP nostop noprint pass",
+                //     "ignoreFailures": true
+                // },
+                // {
+                //     "description": "Ignore SIGSTOP",
+                //     "text": "handle SIGSTOP nostop noprint pass",
+                //     "ignoreFailures": true
+                // },
+                // {
+                //     "description": "Ignore SIGCHLD",
+                //     "text": "handle SIGCHLD nostop noprint pass",
+                //     "ignoreFailures": true
+                // },
+                {
+                    "description": "Ignore .NET runtime realtime signal",
+                    "text": "handle SIG34 nostop noprint pass",
+                    "ignoreFailures": true
+                }
+            ]
+        },
         // ---------------------------------------------------------------
         // DuetCANMaster firmware (src/DuetCANMaster)
         // ---------------------------------------------------------------
@@ -69,11 +148,21 @@
                 }
             ],
             "postRemoteConnectCommands": [
-                { "text": "monitor reset" },
-                { "text": "monitor halt" },
-                { "text": "load" },
-                { "text": "monitor reset" },
-                { "text": "monitor halt" }
+                {
+                    "text": "monitor reset"
+                },
+                {
+                    "text": "monitor halt"
+                },
+                {
+                    "text": "load"
+                },
+                {
+                    "text": "monitor reset"
+                },
+                {
+                    "text": "monitor halt"
+                }
             ]
         },
         {
@@ -110,11 +199,21 @@
                 }
             ],
             "postRemoteConnectCommands": [
-                { "text": "monitor reset" },
-                { "text": "monitor halt" },
-                { "text": "load" },
-                { "text": "monitor reset" },
-                { "text": "monitor halt" }
+                {
+                    "text": "monitor reset"
+                },
+                {
+                    "text": "monitor halt"
+                },
+                {
+                    "text": "load"
+                },
+                {
+                    "text": "monitor reset"
+                },
+                {
+                    "text": "monitor halt"
+                }
             ]
         },
         {
@@ -133,7 +232,6 @@
                 }
             ]
         },
-
         // ---------------------------------------------------------------
         // Duet3Expansion firmware (src/Duet3Expansion)
         // ---------------------------------------------------------------
@@ -156,9 +254,15 @@
                 }
             ],
             "postRemoteConnectCommands": [
-                { "text": "monitor reset" },
-                { "text": "monitor halt" },
-                { "text": "load" }
+                {
+                    "text": "monitor reset"
+                },
+                {
+                    "text": "monitor halt"
+                },
+                {
+                    "text": "load"
+                }
             ]
         },
         {
@@ -191,6 +295,14 @@
             "type": "promptString",
             "description": "GDB server host for Duet3Expansion (use \"host.docker.internal:port\" from inside the container)",
             "default": "host.docker.internal:2331"
+        },
+        {
+            "id": "dcs_pid",
+            "type": "command",
+            "command": "extension.commandvariable.file.content",
+            "args": {
+                "fileName": "${workspaceFolder}/.vscode/dcs.pid"
+            }
         }
     ]
 }

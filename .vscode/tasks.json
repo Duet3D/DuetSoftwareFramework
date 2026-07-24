@@ -484,6 +484,19 @@
             }
         },
         {
+            "label": "[DSF] Get DuetControlServer PID",
+            "type": "shell",
+            "command": "${workspaceFolder}/.vscode/scripts/get-remote-dsf-pid.sh",
+            "problemMatcher": [],
+            "options": {
+                "env": {
+                    "DSF_SSH_USER": "${config:dsf.debug.sshUser}",
+                    "DSF_TARGET_IP": "${config:dsf.debug.targetIp}",
+                    "WORKSPACE_FOLDER": "${workspaceFolder}"
+                }
+            }
+        },
+        {
             "label": "[DSF] Stop DSF Services",
             "type": "shell",
             "command": "ssh root@${config:dsf.debug.targetIp} 'systemctl stop duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",

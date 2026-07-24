@@ -18,6 +18,11 @@ endif()
 # Release-with-debuginfo is a good default for a latency test: optimised but still profileable.
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -g")
 
+# Unoptimised, full debug info: what the *-debug presets build for a gdbserver session on the Pi
+# (see scripts/debug-on-pi.sh). -O0 keeps locals live and statements in source order, which -O2
+# does not; the resulting timing is not representative, so never measure jitter with this.
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -fno-omit-frame-pointer")
+
 add_compile_options(-Wall -Wextra)
 
 # Lint every translation unit as it is compiled: CMAKE_CXX_CLANG_TIDY runs clang-tidy right after

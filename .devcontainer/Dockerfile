@@ -40,6 +40,7 @@ RUN apt-get update \
         lldb \
         llvm \
         gdb \
+        gdb-multiarch \
         crossbuild-essential-arm64 \
     && add-apt-repository -y ppa:ubuntu-toolchain-r/test \
     && apt-get update \

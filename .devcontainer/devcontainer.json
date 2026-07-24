@@ -16,7 +16,8 @@
 				"ms-vscode.cpptools",
 				"ms-vscode.makefile-tools",
 				"ms-vscode.cmake-tools",
-        "ms-python.python"
+        "ms-python.python",
+        "rioj7.command-variable"
       ],
       "settings": {
         "cmake.sourceDirectory": [

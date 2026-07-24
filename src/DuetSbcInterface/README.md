@@ -33,7 +33,7 @@ src/                 duet_sbc(.a/.so)
   Storage/           CRC16/CRC32
 harness/             sbc_jitter_test — standalone latency/jitter test program
 tests/               host-side unit tests (no hardware required)
-Scripts/             fetch-pi-sysroot.sh
+scripts/             fetch-pi-sysroot.sh
 cmake/               cross-compilation toolchain files
 ```
 
