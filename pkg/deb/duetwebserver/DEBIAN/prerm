@@ -1,6 +1,6 @@
 #!/bin/sh
 
 # Stop DWS
-if (systemctl -q is-active duetwebserver); then
-    systemctl -q --no-ask-password stop duetwebserver
+if [ -d /run/systemd/system ] && systemctl -q is-active duetwebserver; then
+    deb-systemd-invoke stop duetwebserver >/dev/null || true
 fi

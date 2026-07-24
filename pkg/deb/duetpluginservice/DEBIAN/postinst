@@ -9,16 +9,19 @@ chmod 744 /opt/dsf/bin/pipInstall2.py 2>/dev/null || true
 # Drop existing per-plugin AppArmor profiles so DPS regenerates them from the current template on its next start
 rm -f /etc/apparmor.d/dsf.*
 
-# Update systemd services
-systemctl -q --no-ask-password daemon-reload
+# Update systemd services, but only when systemd is the running init (skips build chroots/containers)
+if [ -d /run/systemd/system ]; then
+    systemctl -q --no-ask-password daemon-reload
 
-# Start DPS instances again if it is enabled via systemd
-if (systemctl -q is-enabled duetpluginservice); then
-    systemctl -q --no-ask-password start duetpluginservice || true
-fi
+    # Start DPS instances again if they are enabled via systemd. deb-systemd-invoke honours
+    # policy-rc.d so an admin can suppress the start during automated provisioning
+    if systemctl -q is-enabled duetpluginservice; then
+        deb-systemd-invoke start duetpluginservice >/dev/null || true
+    fi
 
-if (systemctl -q is-enabled duetpluginservice-root); then
-    systemctl -q --no-ask-password start duetpluginservice-root || true
+    if systemctl -q is-enabled duetpluginservice-root; then
+        deb-systemd-invoke start duetpluginservice-root >/dev/null || true
+    fi
 fi
 
 # Don't block the configuration of other packages if DPS failed to start

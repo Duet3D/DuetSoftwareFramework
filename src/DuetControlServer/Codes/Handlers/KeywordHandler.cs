@@ -265,7 +265,12 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                 }
 
                 // Assign the variable
+                // TODO save the variable
+#if false
                 object? value = await linkInterface.SetVariableAsync(code.Channel, code.Keyword != KeywordType.Set, fullVarName, expression, cancellationToken);
+#else
+                object? value = null;
+#endif
                 _logger.LogDebug("Set variable {Variable} to {Value}", fullVarName, value);
 
                 // Keep track of it

@@ -28,9 +28,9 @@ public sealed class Executed : PipelineBase
     private readonly Utility.EventLogger _eventLogger;
     private readonly LinkInterface _linkInterface;
     private readonly Model.ObjectModel _model;
-    private readonly ICodeHandler _gCodes;
-    private readonly ICodeHandler _mCodes;
-    private readonly ICodeHandler _tCodes;
+    private readonly GCodeHandler _gCodes;
+    private readonly MCodeHandler _mCodes;
+    private readonly TCodeHandler _tCodes;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly IOptions<Settings> _settings;
     private readonly PipelineStackItem _stackItem;
@@ -62,9 +62,9 @@ public sealed class Executed : PipelineBase
         _eventLogger = eventLogger;
         _linkInterface = linkInterface;
         _model = model;
-        _gCodes = gCodes;
-        _mCodes = mCodes;
-        _tCodes = tCodes;
+        _gCodes = (GCodeHandler)gCodes;
+        _mCodes = (MCodeHandler)mCodes;
+        _tCodes = (TCodeHandler)tCodes;
         _lifetime = lifetime;
         _settings = settings;
 

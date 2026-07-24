@@ -15,10 +15,21 @@
         "editorconfig.editorconfig",
 				"ms-vscode.cpptools",
 				"ms-vscode.makefile-tools",
-				"ms-vscode.cmake-tools"
-      ]
+				"ms-vscode.cmake-tools",
+        "ms-python.python",
+        "rioj7.command-variable"
+      ],
+      "settings": {
+        "cmake.sourceDirectory": [
+          "${workspaceFolder}/src/DuetCANMaster",
+          "${workspaceFolder}/src/DuetSbcInterface"
+        ]
+      }
     }
   },
   "postCreateCommand": "dotnet --info && (cd src && dotnet restore DuetSoftwareFramework.sln) && python3 scripts/create_settings.py",
-  "postStartCommand": "echo 'Ready: run the `Build and Deploy` task or `cd src && dotnet build DuetSoftwareFramework.sln`'"
+  "postStartCommand": "echo 'Ready: run the `Build and Deploy` task or `cd src && dotnet build DuetSoftwareFramework.sln`'",
+	"runArgs": [
+		"--add-host=host.docker.internal:host-gateway"
+	]
 }

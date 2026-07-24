@@ -15,6 +15,7 @@ esac
 arm_gnu_toolchain_archive="arm-gnu-toolchain-${ARM_GNU_TOOLCHAIN_VERSION}-${arm_gnu_toolchain_host_arch}-arm-none-eabi"
 arm_gnu_toolchain_url="https://developer.arm.com/-/media/Files/downloads/gnu/${ARM_GNU_TOOLCHAIN_VERSION}/binrel/${arm_gnu_toolchain_archive}.tar.xz"
 
+echo "Downloading ARM GNU Toolchain from ${arm_gnu_toolchain_url}..."
 curl -L "${arm_gnu_toolchain_url}" -o "/tmp/${arm_gnu_toolchain_archive}.tar.xz"
 tar -xJf "/tmp/${arm_gnu_toolchain_archive}.tar.xz" -C /opt
 ln -s "/opt/${arm_gnu_toolchain_archive}" "${ARM_GNU_TOOLCHAIN_DIR}"

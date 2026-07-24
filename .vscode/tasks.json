@@ -2,6 +2,13 @@
     "version": "2.0.0",
     "inputs": [
         {
+            "id": "canmaster_board",
+            "type": "pickString",
+            "description": "DuetCANMaster board target to build the compile database for",
+            "options": [ "Duet3_MB6HC", "Duet3_MB6XD" ],
+            "default": "Duet3_MB6HC"
+        },
+        {
             "id": "ip_address",
             "type": "promptString",
             "description": "IP address of SBC to deploy to"
@@ -24,6 +31,7 @@
             "options": [
                 "All",
                 "DuetControlServer",
+                "DuetSbcInterface",
                 "DuetPiManagementPlugin",
                 "DuetPluginService",
                 "DuetWebServer",
@@ -34,11 +42,87 @@
                 "CustomHttpEndpoint",
                 "ModelObserver"
             ]
+        },
+        {
+            "id": "canmaster_target",
+            "type": "pickString",
+            "description": "DuetCANMaster board to upload",
+            "options": [
+                {
+                    "label": "Duet3 MB6HC",
+                    "value": "Duet3_MB6HC"
+                },
+                {
+                    "label": "Duet3 MB6XD",
+                    "value": "Duet3_MB6XD"
+                }
+            ]
+        },
+        {
+            // Names must match buildPresets in src/DuetCANMaster/CMakePresets.json.
+            "id": "canmaster_preset",
+            "type": "pickString",
+            "description": "DuetCANMaster CMake build preset",
+            "options": [
+                { "label": "Duet3 MB6HC (Release)", "value": "Duet3_MB6HC" },
+                { "label": "Duet3 MB6HC (Debug)", "value": "Duet3_MB6HC-debug" },
+                { "label": "Duet3 MB6XD (Release)", "value": "Duet3_MB6XD" },
+                { "label": "Duet3 MB6XD (Debug)", "value": "Duet3_MB6XD-debug" },
+                { "label": "All boards (Release)", "value": "release" },
+                { "label": "All boards (Debug)", "value": "debug" }
+            ],
+            "default": "Duet3_MB6HC"
+        },
+        {
+            "id": "expansion_target",
+            "type": "pickString",
+            "description": "Duet3Expansion board to build for",
+            "options": [
+                { "label": "EXP3HC", "value": "EXP3HC" },
+                { "label": "EXP1XD", "value": "EXP1XD" },
+                { "label": "EXP1HCL", "value": "EXP1HCL" },
+                { "label": "TOOL1LC", "value": "TOOL1LC" },
+                { "label": "SAMMYC21", "value": "SAMMYC21" },
+                { "label": "SZP", "value": "SZP" },
+                { "label": "M23CL", "value": "M23CL" },
+                { "label": "F3PTB", "value": "F3PTB" },
+                { "label": "TOOL1RR", "value": "TOOL1RR" },
+                { "label": "TOOLINDX", "value": "TOOLINDX" },
+                { "label": "All", "value": "all" }
+            ]
+        },
+        {
+            "id": "fw_buildType",
+            "type": "pickString",
+            "description": "Firmware build type",
+            "options": [
+                {
+                    "label": "Debug",
+                    "value": "DEBUG=1"
+                },
+                {
+                    "label": "Release",
+                    "value": ""
+                }
+            ]
+        },
+        {
+            "id": "duetHost",
+            "type": "promptString",
+            "description": "Duet host or IP",
+            "default": "duet3.local"
+        },
+        {
+            "id": "duetPassword",
+            "type": "promptString",
+            "description": "Duet HTTP password (leave empty if disabled)",
+            "password": true,
+            "default": ""
         }
     ],
     "tasks": [
         {
-            "label": "Clean Build Directory",
+            "label": "[DSF] Clean Build Directory",
             "command": "rm -rf build",
             "type": "shell",
             "args": [],
@@ -48,7 +132,7 @@
             }
         },
         {
-            "label": "Make Build Directory",
+            "label": "[DSF] Make Build Directory",
             "command": "mkdir -p build",
             "type": "shell",
             "args": [],
@@ -61,7 +145,7 @@
             }
         },
         {
-            "label": "Restore DSF Solution",
+            "label": "[DSF] Restore DSF Solution",
             "type": "shell",
             "command": "dotnet restore ./src/DuetSoftwareFramework.sln -r linux-arm64",
             "args": [],
@@ -73,7 +157,7 @@
             }
         },
         {
-            "label": "Build CodeConsole",
+            "label": "[DSF] Build CodeConsole",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/CodeConsole -o ./build",
             "args": [],
@@ -83,10 +167,10 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
-            "label": "Build CodeLogger",
+            "label": "[DSF] Build CodeLogger",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/CodeLogger -o ./build",
             "args": [],
@@ -96,10 +180,10 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
-            "label": "Build CodeStream",
+            "label": "[DSF] Build CodeStream",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/CodeStream -o ./build",
             "args": [],
@@ -109,10 +193,10 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
-            "label": "Build CustomHttpEndpoint",
+            "label": "[DSF] Build CustomHttpEndpoint",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/CustomHttpEndpoint -o ./build",
             "args": [],
@@ -122,10 +206,10 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
-            "label": "Build DuetControlServer",
+            "label": "[DSF] Build DuetControlServer",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/DuetControlServer -o ./build",
             "args": [],
@@ -135,10 +219,15 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            // DCS P/Invokes into libduet_sbc.so and will not start without it
+            "dependsOn": [
+                "[DSF] Make Build Directory",
+                "[DSF] Build DuetSbcInterface"
+            ],
+            "dependsOrder": "sequence",
         },
         {
-            "label": "Build DuetPiManagementPlugin",
+            "label": "[DSF] Build DuetPiManagementPlugin",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/DuetPiManagementPlugin -o ./build",
             "args": [],
@@ -148,10 +237,10 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
-            "label": "Build DuetPluginService",
+            "label": "[DSF] Build DuetPluginService",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/DuetPluginService -o ./build",
             "args": [],
@@ -161,10 +250,10 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
-            "label": "Build DuetWebServer",
+            "label": "[DSF] Build DuetWebServer",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/DuetWebServer -o ./build",
             "args": [],
@@ -174,10 +263,10 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
-            "label": "Build ModelObserver",
+            "label": "[DSF] Build ModelObserver",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/ModelObserver -o ./build",
             "args": [],
@@ -187,10 +276,10 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
-            "label": "Build PluginManager",
+            "label": "[DSF] Build PluginManager",
             "type": "shell",
             "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/PluginManager -o ./build",
             "args": [],
@@ -200,25 +289,26 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            "dependsOn": "Make Build Directory",
+            "dependsOn": "[DSF] Make Build Directory",
         },
         {
-            "label": "Build All",
+            "label": "[DSF] Build All",
             "type": "shell",
             "command": "echo Build Complete",
             "args": [],
             "problemMatcher": [],
             "dependsOn": [
-                "Build CodeConsole",
-                "Build CodeLogger",
-                "Build CodeStream",
-                "Build CustomHttpEndpoint",
-                "Build DuetControlServer",
-                "Build DuetPiManagementPlugin",
-                "Build DuetPluginService",
-                "Build DuetWebServer",
-                "Build ModelObserver",
-                "Build PluginManager"
+                "[DSF] Build CodeConsole",
+                "[DSF] Build CodeLogger",
+                "[DSF] Build CodeStream",
+                "[DSF] Build CustomHttpEndpoint",
+                "[DSF] Build DuetSbcInterface",
+                "[DSF] Build DuetControlServer",
+                "[DSF] Build DuetPiManagementPlugin",
+                "[DSF] Build DuetPluginService",
+                "[DSF] Build DuetWebServer",
+                "[DSF] Build ModelObserver",
+                "[DSF] Build PluginManager"
             ],
             "runOptions": {
                 "instanceLimit": 1
@@ -226,14 +316,14 @@
             "dependsOrder": "sequence"
         },
         {
-            "label": "Restore & Build All",
+            "label": "[DSF] Restore & Build All",
             "type": "shell",
             "command": "echo Build Complete",
             "args": [],
             "problemMatcher": [],
             "dependsOn": [
-                "Restore DSF Solution",
-                "Build All",
+                "[DSF] Restore DSF Solution",
+                "[DSF] Build All",
             ],
             "runOptions": {
                 "instanceLimit": 1
@@ -241,33 +331,33 @@
             "dependsOrder": "sequence"
         },
         {
-            "label": "Install vsdbg on Remote",
+            "label": "[DSF] Install vsdbg on Remote",
             "type": "shell",
             "command": "ssh -o StrictHostKeyChecking=no ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} 'mkdir -p ~/vsdbg && curl -fsSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l ~/vsdbg && ~/vsdbg/vsdbg --version'",
             "problemMatcher": []
         },
         {
-            "label": "Deploy To",
+            "label": "[DSF] Deploy To",
             "type": "shell",
-            "command": "./scripts/deploy.sh --skip-build --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} ${input:project_name}",
+            "command": "./scripts/build.sh --skip-build --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services ${input:project_name}",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
             }
         },
         {
-            "label": "Deploy Local",
+            "label": "[DSF] Deploy Local",
             "type": "shell",
-            "command": "./scripts/deploy.sh --skip-build --local ${input:project_name}",
+            "command": "./scripts/build.sh --skip-build --local ${input:project_name}",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
             }
         },
         {
-            "label": "Build and Deploy To",
+            "label": "[DSF] Build",
             "type": "shell",
-            "command": "./scripts/deploy.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} ${input:project_name}",
+            "command": "./scripts/build.sh ${input:project_name}",
             "problemMatcher": [
                 "$msCompile"
             ],
@@ -276,9 +366,9 @@
             }
         },
         {
-            "label": "Build and Deploy Local",
+            "label": "[DSF] Build and Deploy To",
             "type": "shell",
-            "command": "./scripts/deploy.sh --local ${input:project_name}",
+            "command": "./scripts/build.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services ${input:project_name}",
             "problemMatcher": [
                 "$msCompile"
             ],
@@ -287,9 +377,9 @@
             }
         },
         {
-            "label": "Build and Deploy DCS to",
+            "label": "[DSF] Build and Deploy Local",
             "type": "shell",
-            "command": "./scripts/deploy.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} DuetControlServer",
+            "command": "./scripts/build.sh --local ${input:project_name}",
             "problemMatcher": [
                 "$msCompile"
             ],
@@ -298,7 +388,116 @@
             }
         },
         {
-            "label": "Stop DSF Services",
+            "label": "[DSF] Build and Deploy DCS to",
+            "type": "shell",
+            "command": "./scripts/build.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services DuetControlServer",
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        },
+        {
+            // Native SPI transfer loop (libduet_sbc.so). Cross-compiled for aarch64; needs a Pi
+            // sysroot to link against the target's glibc, which is fetched automatically the first
+            // time a deploy target is available (see "[DSF] Fetch Pi Sysroot").
+            "label": "[DSF] Build DuetSbcInterface",
+            "type": "shell",
+            "command": "./scripts/build.sh DuetSbcInterface",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        },
+        {
+            "label": "[DSF] Build and Deploy DuetSbcInterface to",
+            "type": "shell",
+            "command": "./scripts/build.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services DuetSbcInterface",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        },
+        {
+            // Refresh the cached sysroot, e.g. after upgrading the Pi's OS or glibc
+            "label": "[DSF] Fetch Pi Sysroot",
+            "type": "shell",
+            "command": "./src/DuetSbcInterface/scripts/fetch-pi-sysroot.sh ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} ./src/DuetSbcInterface/pi-sysroot",
+            "problemMatcher": [],
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        },
+        {
+            // The C# test suite (DCS, DuetAPI, DuetHttpClient). Runs natively for the host.
+            // Note: the HttpClient/Session tests talk to a real printer over HTTP and fail in the
+            // devcontainer unless one is reachable; append
+            //   --filter "FullyQualifiedName!~UnitTests.HttpClient"
+            // to skip them.
+            "label": "[DSF] Run C# Unit Tests",
+            "type": "shell",
+            "command": "dotnet test ./src/UnitTests/UnitTests.csproj --nologo",
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": "test",
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        },
+        {
+            // Host-side unit tests for the native interface (ring buffer framing/concurrency).
+            // Builds natively for the host, so no Pi or sysroot is involved.
+            "label": "[DSF] Run Native Tests",
+            "type": "shell",
+            "command": "cmake --preset native && cmake --build --preset native -j && ctest --test-dir build/native --output-on-failure",
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetSbcInterface"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": "test",
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        },
+        {
+            // Builds and deploys the jitter harness, which measures RequestTransfer -> transfer
+            // latency without the .NET runtime. Statically linked, so it needs no sysroot.
+            "label": "[DSF] Build and Deploy Jitter Harness to",
+            "type": "shell",
+            "command": "cmake --preset arm64 && cmake --build --preset arm64 --target sbc_jitter_test -j && scp build/arm64/harness/sbc_jitter_test ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp}:~/",
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetSbcInterface"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        },
+        {
+            "label": "[DSF] Get DuetControlServer PID",
+            "type": "shell",
+            "command": "${workspaceFolder}/.vscode/scripts/get-remote-dsf-pid.sh",
+            "problemMatcher": [],
+            "options": {
+                "env": {
+                    "DSF_SSH_USER": "${config:dsf.debug.sshUser}",
+                    "DSF_TARGET_IP": "${config:dsf.debug.targetIp}",
+                    "WORKSPACE_FOLDER": "${workspaceFolder}"
+                }
+            }
+        },
+        {
+            "label": "[DSF] Stop DSF Services",
             "type": "shell",
             "command": "ssh root@${config:dsf.debug.targetIp} 'systemctl stop duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
             "problemMatcher": [],
@@ -310,7 +509,7 @@
             }
         },
         {
-            "label": "Restart DSF Services",
+            "label": "[DSF] Restart DSF Services",
             "type": "shell",
             "command": "ssh root@${config:dsf.debug.targetIp} 'systemctl restart duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
             "problemMatcher": [],
@@ -319,7 +518,7 @@
             }
         },
         {
-            "label": "Stop Remote DuetControlServer",
+            "label": "[DSF] Stop Remote DuetControlServer",
             "type": "shell",
             "command": "ssh ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} 'systemctl stop duetcontrolserver'",
             "problemMatcher": [],
@@ -331,7 +530,7 @@
             }
         },
         {
-            "label": "Start Remote DuetControlServer",
+            "label": "[DSF] Start Remote DuetControlServer",
             "type": "shell",
             "command": "ssh ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} 'systemctl start duetcontrolserver'",
             "problemMatcher": [],
@@ -343,7 +542,7 @@
             }
         },
         {
-            "label": "Set Debug Target IP",
+            "label": "[DSF] Set Debug Target IP",
             "type": "shell",
             "command": "python3 scripts/create_settings.py --target-ip ${input:debug_target_ip}",
             "problemMatcher": [],
@@ -354,6 +553,220 @@
                 "reveal": "always",
                 "panel": "shared"
             }
+        },
+
+        // ---------------------------------------------------------------
+        // DuetCANMaster firmware (src/DuetCANMaster). CMake presets live in
+        // src/DuetCANMaster/CMakePresets.json; the "release"/"debug" configure
+        // presets point LIBRARIES_DIR at the shared ./lib checkout themselves,
+        // so nothing needs to be passed on the command line here.
+        // Artefacts land in build/<release|debug>/<target>/<target>.elf|.bin.
+        // ---------------------------------------------------------------
+        {
+            // Configuring is idempotent and cheap, so every build task re-runs it: that way a
+            // fresh clone (or a deleted build/ directory) just works without a separate step.
+            "label": "[CANMaster] Configure - Release",
+            "type": "shell",
+            "command": "cmake --preset release",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "problemMatcher": [],
+            "presentation": { "reveal": "silent" },
+            "runOptions": { "instanceLimit": 1 }
+        },
+        {
+            "label": "[CANMaster] Configure - Debug",
+            "type": "shell",
+            "command": "cmake --preset debug",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "problemMatcher": [],
+            "presentation": { "reveal": "silent" },
+            "runOptions": { "instanceLimit": 1 }
+        },
+        {
+            // The build preset carries the board and the build type; the matching configure
+            // preset is whichever one it inherits, i.e. debug for the "*-debug"/"debug" presets.
+            "label": "[CANMaster] Build Selected Target",
+            "type": "shell",
+            "command": "case '${input:canmaster_preset}' in *debug) cfg=debug;; *) cfg=release;; esac; cmake --preset $cfg && cmake --build --preset ${input:canmaster_preset} -j $(nproc)",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "[CANMaster] Build Duet3_MB6HC - Debug",
+            "type": "shell",
+            "command": "cmake --build --preset Duet3_MB6HC-debug -j $(nproc)",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "dependsOn": "[CANMaster] Configure - Debug",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "[CANMaster] Build Duet3_MB6HC - Release",
+            "type": "shell",
+            "command": "cmake --build --preset Duet3_MB6HC -j $(nproc)",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "dependsOn": "[CANMaster] Configure - Release",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "[CANMaster] Build Duet3_MB6XD - Debug",
+            "type": "shell",
+            "command": "cmake --build --preset Duet3_MB6XD-debug -j $(nproc)",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "dependsOn": "[CANMaster] Configure - Debug",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "[CANMaster] Build Duet3_MB6XD - Release",
+            "type": "shell",
+            "command": "cmake --build --preset Duet3_MB6XD -j $(nproc)",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "dependsOn": "[CANMaster] Configure - Release",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "[CANMaster] Build All Boards - Debug",
+            "type": "shell",
+            "command": "cmake --build --preset debug -j $(nproc)",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "dependsOn": "[CANMaster] Configure - Debug",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "[CANMaster] Build All Boards - Release",
+            "type": "shell",
+            "command": "cmake --build --preset release -j $(nproc)",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "dependsOn": "[CANMaster] Configure - Release",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            // Drops the CMake cache too, so the next build reconfigures from scratch.
+            "label": "[CANMaster] Clean All",
+            "type": "shell",
+            "command": "rm -rf build",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "problemMatcher": [],
+            "group": "build"
+        },
+        {
+            "label": "[CANMaster] Clean - Release",
+            "type": "shell",
+            "command": "cmake --build --preset release --target clean",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "problemMatcher": [],
+            "group": "build"
+        },
+        {
+            "label": "[CANMaster] Clean - Debug",
+            "type": "shell",
+            "command": "cmake --build --preset debug --target clean",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "problemMatcher": [],
+            "group": "build"
+        },
+
+        // ---------------------------------------------------------------
+        // Duet3Expansion firmware (src/Duet3Expansion). These run in the
+        // submodule directory and build against the shared ./lib libraries.
+        // ---------------------------------------------------------------
+        {
+            "label": "[Expansion] Build Selected Target",
+            "type": "shell",
+            "command": "make ${input:fw_buildType} ${input:expansion_target} LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "[Expansion] Build EXP1HCL - Debug",
+            "type": "shell",
+            "command": "make DEBUG=1 EXP1HCL LIBRARIES_DIR=${workspaceFolder}/lib -j",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "[Expansion] Clean All",
+            "type": "shell",
+            "command": "make Duet3Expansion.clean-all LIBRARIES_DIR=${workspaceFolder}/lib",
+            "problemMatcher": [ "$gcc" ],
+            "group": "build"
+        },
+        {
+            "label": "[Style] Format DuetCANMaster",
+            "type": "shell",
+            "command": "clang-format -i --style=file $(find src -name '*.cpp' -o -name '*.h' | grep -vE '^src/(libc|libcpp)/')",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "problemMatcher": [],
+            "group": "build",
+            "detail": "Reformat first-party sources. Skips src/libc and src/libcpp (vendored newlib/GCC runtime)."
+        },
+        {
+            "label": "[Style] Format DuetSbcInterface",
+            "type": "shell",
+            "command": "clang-format -i --style=file $(find src harness tests -name '*.cpp' -o -name '*.h')",
+            "options": { "cwd": "${workspaceFolder}/src/DuetSbcInterface" },
+            "problemMatcher": [],
+            "group": "build",
+            "detail": "Reformat sbc/, harness/ and tests/."
+        },
+        {
+            "label": "[Style] Check Formatting (both projects)",
+            "type": "shell",
+            "command": "cd ${workspaceFolder}/src/DuetCANMaster && clang-format --dry-run --Werror --style=file $(find src -name '*.cpp' -o -name '*.h' | grep -vE '^src/(libc|libcpp)/') && cd ${workspaceFolder}/src/DuetSbcInterface && clang-format --dry-run --Werror --style=file $(find src harness tests -name '*.cpp' -o -name '*.h') && echo 'Formatting OK'",
+            "problemMatcher": [ "$gcc" ],
+            "group": "test",
+            "detail": "Non-mutating check; exits non-zero if anything would be reformatted. Suitable for CI."
+        },
+        {
+            // CMake writes the database at configure time, so this compiles nothing and takes
+            // about a second - unlike the old bear-wrapped Makefile build, which needed a full
+            // clean rebuild to capture every TU. Hence Tidy below just depends on it.
+            "label": "[Style] Generate Compile DB - DuetCANMaster",
+            "type": "shell",
+            "command": "scripts/gen-compile-commands.sh ${input:canmaster_board}",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "problemMatcher": [],
+            "presentation": { "reveal": "silent" },
+            "runOptions": { "instanceLimit": 1 },
+            "group": "build",
+            "detail": "Configure CMake into build/compile-commands, keep the chosen board's firmware TUs, and rewrite them so clang can parse the bare-metal ARM flags. Writes src/DuetCANMaster/compile_commands.json."
+        },
+        {
+            "label": "[Style] Generate Compile DB - DuetSbcInterface",
+            "type": "shell",
+            "command": "cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "options": { "cwd": "${workspaceFolder}/src/DuetSbcInterface" },
+            "problemMatcher": [ "$gcc" ],
+            "group": "build",
+            "detail": "CMake exports compile_commands.json into build/."
+        },
+        {
+            // The database is regenerated first so it always matches the board picked here; it is
+            // a CMake configure, not a build, so this costs about a second.
+            "label": "[Style] Tidy DuetCANMaster",
+            "type": "shell",
+            "dependsOn": "[Style] Generate Compile DB - DuetCANMaster",
+            "command": "run-clang-tidy-18 -p . -j $(nproc) -quiet '^.*/src/DuetCANMaster/src/(?!libc/|libcpp/|Hardware/ExceptionHandlers).*\\.cpp$' 2>&1 | awk -f ${workspaceFolder}/scripts/tidy-report.awk",
+            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "problemMatcher": [ "$gcc" ],
+            "group": "test",
+            "detail": "Regenerates the compile DB for the chosen board, then lints src/ (minus libc, libcpp and ExceptionHandlers). Report only. Do not add -fix: see STYLE.md, per-file fixing corrupts shared headers."
+        },
+        {
+            "label": "[Style] Tidy DuetSbcInterface",
+            "type": "shell",
+            "command": "test -f build/compile_commands.json || { echo 'No build/compile_commands.json - run [Style] Generate Compile DB - DuetSbcInterface first' >&2; exit 1; }; run-clang-tidy-18 -p build -j $(nproc) -quiet '^.*/src/DuetSbcInterface/(src|harness|tests)/.*\\.cpp$' 2>&1 | awk -f ${workspaceFolder}/scripts/tidy-report.awk",
+            "options": { "cwd": "${workspaceFolder}/src/DuetSbcInterface" },
+            "problemMatcher": [ "$gcc" ],
+            "group": "test",
+            "detail": "Report only. Do not add -fix: see STYLE.md, per-file fixing corrupts shared headers."
         }
+
     ]
 }

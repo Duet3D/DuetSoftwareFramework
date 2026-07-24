@@ -21,33 +21,20 @@ public static partial class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Add link adapter to the service collection based on configured communication method
+    /// Add the link transport to the service collection
     /// </summary>
+    /// <remarks>
+    /// The SPI protocol lives in native code (<c>src/DuetSbcInterface</c>, built as
+    /// <c>libduet_sbc.so</c>) so its transfer loop can run on a pinned real-time thread.
+    /// <see cref="Native.NativeLink"/> is the managed side of that boundary
+    /// </remarks>
     /// <param name="services">Service collection</param>
     /// <returns>Service collection</returns>
     public static IServiceCollection AddLinkAdapter(this IServiceCollection services)
     {
-        // Determine which communication method to use
-        var serviceProvider = services.BuildServiceProvider();
-        var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Settings>>().Value;
-
-        if (settings.CommunicationMethod == CommunicationMethod.USB)
-        {
-            return services
-                .AddSingleton<Adapter.USB>()
-                .AddSingleton<Adapter.ILinkAdapter, Adapter.USB>(services => services.GetRequiredService<Adapter.USB>())
-                .AddSingleton<IDiagnostics, Adapter.USB>(services => services.GetRequiredService<Adapter.USB>())
-                .AddSingleton<LinkInterface>()
-                .AddHostedService<LinkService>();
-        }
-        else
-        {
-            return services
-                .AddSingleton<Adapter.SPI>()
-                .AddSingleton<Adapter.ILinkAdapter, Adapter.SPI>(services => services.GetRequiredService<Adapter.SPI>())
-                .AddSingleton<IDiagnostics, Adapter.SPI>(services => services.GetRequiredService<Adapter.SPI>())
-                .AddSingleton<LinkInterface>()
-                .AddHostedService<LinkService>();
-        }
+        return services
+            .AddSingleton<Native.NativeLink>()
+            .AddSingleton<LinkInterface>()
+            .AddHostedService<LinkService>();
     }
 }

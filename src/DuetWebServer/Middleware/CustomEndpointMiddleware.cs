@@ -252,12 +252,15 @@ public class CustomEndpointMiddleware(RequestDelegate next, IConfiguration confi
             body = await reader.ReadToEndAsync();
         }
 
-        // Prepare the HTTP request notification
+        // Prepare the HTTP request notification. The transport peer is taken from the real connection
+        // so endpoints can make origin-based decisions (e.g. actions only allowed from localhost)
         ReceivedHttpRequest receivedHttpRequest = new()
         {
             Body = body,
             ContentType = context.Request.ContentType!,
-            SessionId = sessionId
+            SessionId = sessionId,
+            RemoteIPAddress = context.Connection.RemoteIpAddress?.ToString(),
+            RemotePort = context.Connection.RemotePort
         };
 
         foreach (var item in context.Request.Headers)

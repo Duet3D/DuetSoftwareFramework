@@ -1,0 +1,5 @@
+build/
+pi-sysroot/
+*.o
+*.so
+*.a

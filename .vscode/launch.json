@@ -3,9 +3,19 @@
     // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
+    "compounds": [
+        {
+            // This doesn't work because C# breakpoints trigger the cppdbg to stop
+            "name": "[DSF] Attach Remote DuetControlServer + DuetSbcInterface",
+            "configurations": [
+                "[DSF] Attach Native (lib*.so)",
+                "[DSF] Attach Remote DuetControlServer",
+            ]
+        }
+    ],
     "configurations": [
         {
-            "name": "Launch Remote DuetControlServer",
+            "name": "[DSF] Launch Remote DuetControlServer",
             "type": "coreclr",
             "request": "launch",
             "program": "/opt/dsf/bin/DuetControlServer",
@@ -26,11 +36,11 @@
                 "/workspaces/DuetSoftwareFramework": "${workspaceFolder}"
             },
             "justMyCode": false,
-            "preLaunchTask": "Build and Deploy DCS to",
-            "postDebugTask": "Start Remote DuetControlServer"
+            "preLaunchTask": "[DSF] Stop Remote DuetControlServer",
+            "postDebugTask": "[DSF] Start Remote DuetControlServer"
         },
         {
-            "name": "Attach Remote DuetControlServer",
+            "name": "[DSF] Attach Remote DuetControlServer",
             "type": "coreclr",
             "request": "attach",
             "processName": "DuetControlServer",
@@ -45,6 +55,254 @@
                 "quoteArgs": true
             },
             "justMyCode": false
+        },
+        {
+            "name": "[DSF] Attach Native (lib*.so)",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "/opt/dsf/bin/DuetControlServer",
+            "preLaunchTask": "[DSF] Get DuetControlServer PID",
+            "processId": "${input:dcs_pid}", // Unfortunately we can't use the process name
+            "MIMode": "gdb",
+            "pipeTransport": {
+                "pipeProgram": "ssh",
+                "pipeArgs": [
+                    "-T",
+                    "${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp}"
+                ],
+                "pipeCwd": "${workspaceFolder}",
+                "debuggerPath": "/usr/bin/gdb",
+                "quoteArgs": true
+            },
+            "setupCommands": [
+                {
+                    "description": "Enable pretty printing",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Allow pending breakpoints",
+                    "text": "set breakpoint pending on"
+                },
+                // {
+                //     "description": "Use hardware breakpoints",
+                //     "text": "set breakpoint auto-hw on",
+                //     "ignoreFailures": true
+                // },
+                // {
+                //     "description": "Do not stop on shared library events",
+                //     "text": "set stop-on-solib-events 0",
+                //     "ignoreFailures": true
+                // },
+                // {
+                //     "description": "Enable non-stop mode",
+                //     "text": "set non-stop on",
+                //     "ignoreFailures": true
+                // },
+                {
+                    "description": "Do not stop other threads unnecessarily",
+                    "text": "set scheduler-locking off",
+                    "ignoreFailures": true
+                },
+                // {
+                //     "description": "Ignore runtime debugger signals",
+                //     "text": "handle SIGTRAP nostop noprint pass",
+                //     "ignoreFailures": true
+                // },
+                // {
+                //     "description": "Ignore SIGSTOP",
+                //     "text": "handle SIGSTOP nostop noprint pass",
+                //     "ignoreFailures": true
+                // },
+                // {
+                //     "description": "Ignore SIGCHLD",
+                //     "text": "handle SIGCHLD nostop noprint pass",
+                //     "ignoreFailures": true
+                // },
+                {
+                    "description": "Ignore .NET runtime realtime signal",
+                    "text": "handle SIG34 nostop noprint pass",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        // ---------------------------------------------------------------
+        // DuetCANMaster firmware (src/DuetCANMaster)
+        // ---------------------------------------------------------------
+        {
+            "name": "[DuetCANMaster_MB6HC] Build, Flash & Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/DuetCANMaster/build/debug/Duet3Firmware_MB6HC/Duet3Firmware_MB6HC.elf",
+            "cwd": "${workspaceFolder}/src/DuetCANMaster",
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "miDebuggerServerAddress": "${input:canmaster_gdb_server}",
+            "launchCompleteCommand": "exec-continue",
+            "stopAtEntry": false,
+            "preLaunchTask": "[CANMaster] Build Duet3_MB6HC - Debug",
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "postRemoteConnectCommands": [
+                {
+                    "text": "monitor reset"
+                },
+                {
+                    "text": "monitor halt"
+                },
+                {
+                    "text": "load"
+                },
+                {
+                    "text": "monitor reset"
+                },
+                {
+                    "text": "monitor halt"
+                }
+            ]
+        },
+        {
+            "name": "[DuetCANMaster_MB6HC] Debug Only",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/DuetCANMaster/build/debug/Duet3Firmware_MB6HC/Duet3Firmware_MB6HC.elf",
+            "cwd": "${workspaceFolder}/src/DuetCANMaster",
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "miDebuggerServerAddress": "${input:canmaster_gdb_server}",
+            "launchCompleteCommand": "None",
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "[DuetCANMaster_MB6XD] Build, Flash & Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/DuetCANMaster/build/debug/Duet3Firmware_MB6XD/Duet3Firmware_MB6XD.elf",
+            "cwd": "${workspaceFolder}/src/DuetCANMaster",
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "miDebuggerServerAddress": "${input:canmaster_gdb_server}",
+            "preLaunchTask": "[CANMaster] Build Duet3_MB6XD - Debug",
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "postRemoteConnectCommands": [
+                {
+                    "text": "monitor reset"
+                },
+                {
+                    "text": "monitor halt"
+                },
+                {
+                    "text": "load"
+                },
+                {
+                    "text": "monitor reset"
+                },
+                {
+                    "text": "monitor halt"
+                }
+            ]
+        },
+        {
+            "name": "[DuetCANMaster_MB6XD] Debug Only",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/DuetCANMaster/build/debug/Duet3Firmware_MB6XD/Duet3Firmware_MB6XD.elf",
+            "cwd": "${workspaceFolder}/src/DuetCANMaster",
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "miDebuggerServerAddress": "${input:canmaster_gdb_server}",
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        // ---------------------------------------------------------------
+        // Duet3Expansion firmware (src/Duet3Expansion)
+        // ---------------------------------------------------------------
+        {
+            "name": "[EXP1HCL] Build, Flash & Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Duet3Expansion/EXP1HCL/Duet3Firmware_EXP1HCL.elf",
+            "cwd": "${workspaceFolder}/src/Duet3Expansion",
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "miDebuggerServerAddress": "${input:expansion_gdb_server}",
+            "launchCompleteCommand": "exec-continue",
+            "stopAtEntry": false,
+            "preLaunchTask": "[Expansion] Build EXP1HCL - Debug",
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "postRemoteConnectCommands": [
+                {
+                    "text": "monitor reset"
+                },
+                {
+                    "text": "monitor halt"
+                },
+                {
+                    "text": "load"
+                }
+            ]
+        },
+        {
+            "name": "[EXP1HCL] Debug Only",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Duet3Expansion/EXP1HCL/Duet3Firmware_EXP1HCL.elf",
+            "cwd": "${workspaceFolder}/src/Duet3Expansion",
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "miDebuggerServerAddress": "${input:expansion_gdb_server}",
+            "launchCompleteCommand": "None",
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ],
+    "inputs": [
+        {
+            "id": "canmaster_gdb_server",
+            "type": "promptString",
+            "description": "GDB server host for DuetCANMaster (use \"host.docker.internal:port\" from inside the container)",
+            "default": "host.docker.internal:2331"
+        },
+        {
+            "id": "expansion_gdb_server",
+            "type": "promptString",
+            "description": "GDB server host for Duet3Expansion (use \"host.docker.internal:port\" from inside the container)",
+            "default": "host.docker.internal:2331"
+        },
+        {
+            "id": "dcs_pid",
+            "type": "command",
+            "command": "extension.commandvariable.file.content",
+            "args": {
+                "fileName": "${workspaceFolder}/.vscode/dcs.pid"
+            }
         }
     ]
 }

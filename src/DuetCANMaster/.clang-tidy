@@ -1,0 +1,249 @@
+---
+Checks: >
+  -*,
+  bugprone-*,
+  cppcoreguidelines-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-narrowing-conversions,
+  -cppcoreguidelines-avoid-c-arrays,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-avoid-non-const-global-variables,
+  -cppcoreguidelines-macro-usage,
+  -cppcoreguidelines-narrowing-conversions,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-cstyle-cast,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-type-union-access,
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-avoid-const-or-ref-data-members,
+  -cppcoreguidelines-macro-to-enum,
+  -modernize-macro-to-enum,
+  -misc-confusable-identifiers,
+  -misc-no-recursion,
+  -misc-use-internal-linkage,
+  -modernize-avoid-c-arrays,
+  -modernize-use-designated-initializers,
+  -modernize-use-trailing-return-type,
+  -readability-braces-around-statements,
+  -readability-else-after-return,
+  -readability-function-cognitive-complexity,
+  -readability-function-size,
+  -readability-identifier-length,
+  -readability-implicit-bool-conversion,
+  -readability-magic-numbers,
+  -readability-math-missing-parentheses,
+  -readability-qualified-auto,
+  -readability-uppercase-literal-suffix,
+  -misc-include-cleaner,
+  -misc-use-anonymous-namespace,
+  -misc-non-private-member-variables-in-classes,
+  -cppcoreguidelines-avoid-do-while,
+  -readability-avoid-unconditional-preprocessor-if,
+  -bugprone-unhandled-exception-at-new,
+  -bugprone-macro-parentheses,
+  -readability-redundant-declaration,
+  -bugprone-reserved-identifier,
+  -modernize-use-std-numbers,
+  -modernize-use-default-member-init,
+  -cppcoreguidelines-use-default-member-init,
+  -bugprone-dynamic-static-initializers
+
+# Checks switched off because they conflict with deliberate choices in this codebase rather
+# than flagging defects:
+#   misc-include-cleaner            - demands a direct #include for build-system macros (SAME70),
+#                                     eCv annotations (_ecv_array) and toolchain typedefs; the
+#                                     include chain here is deliberate and order-sensitive
+#   misc-use-anonymous-namespace    - file-scope `static` is the established RepRapFirmware idiom
+#   misc-non-private-member-variables-in-classes - duplicate of the cppcoreguidelines check
+#                                     already disabled above
+#   cppcoreguidelines-avoid-do-while - do/while(0) is the standard multi-statement macro idiom
+#   readability-avoid-unconditional-preprocessor-if - `#if 0` guards debug-only code on purpose
+#   bugprone-unhandled-exception-at-new - the firmware runs without exceptions; allocation
+#                                     failure is handled by the fault path, not a catch
+#   readability-redundant-declaration - the forward declarations of the fault handlers in
+#                                     ExceptionHandlers.cpp are not redundant: they carry
+#                                     __attribute__((naked)) and (noreturn) that the definitions
+#                                     below them do not repeat, and the check deletes the whole
+#                                     declaration. Losing 'naked' makes GCC wrap hand-written
+#                                     assembly that reads MSP/PSP and r0/r1 in a prologue and
+#                                     epilogue. It happens to still work on GCC 15 -- the emitted
+#                                     epilogue is unreachable and no prologue is needed -- but the
+#                                     asm is only correct because of the attribute, and nothing
+#                                     would warn if a future compiler decided to save a register.
+#   modernize-use-default-member-init (and its cppcoreguidelines- alias, which has to be named
+#                                     separately or the wildcard re-enables it) - the diagnostic is
+#                                     sound but its fix-it produces code that does not compile, in
+#                                     two ways, across 9 of the constructors here:
+#                                       * when every initialiser moves to the declaration it deletes
+#                                         them but leaves the dangling ':', e.g. "RepRap() noexcept
+#                                         :\n{". That is a clang-tidy bug, not a property of this
+#                                         codebase.
+#                                       * its replacement ranges span preprocessor directives that
+#                                         are inactive in the configuration being analysed. In
+#                                         DataTransfer's constructor it deleted the whole
+#                                         "#if SAME5x ... #endif" arm -- initialisers for an MCU
+#                                         family this build never compiles -- and orphaned the
+#                                         "#endif" of the SUPPORTS_SBC_OVER_USB block.
+#                                     The second one silently removes code for other targets, so
+#                                     re-enable this only with a per-file review of the fix-it
+#                                     rather than a bulk clang-apply-replacements run.
+#   modernize-use-std-numbers       - it reports these as exact ("differs by 0.00e+00"), but that
+#                                     is measured without -fsingle-precision-constant, which the
+#                                     firmware does build with and scripts/sanitise-compile-
+#                                     commands.py has to drop because clang rejects it. Under the
+#                                     real flags 180.0 / 3.141592653589793 folds in single
+#                                     precision and std::numbers::pi (a double) does not, so
+#                                     RadiansToDegrees moves one ulp: 0x42652ee0 -> 0x42652ee1.
+#                                     The constants in RepRapFirmware.h are all constexpr, so
+#                                     there is no runtime benefit to trade against changing a
+#                                     motion constant.
+#   bugprone-macro-parentheses      - the only hits are the build's own command-line -D flags
+#                                     (-DMQTTC_PAL_FILE=Networking/MQTT/mqtt_pal.h); it fires once
+#                                     per TU with no source location, and parenthesising that
+#                                     value would break the `#include MQTTC_PAL_FILE` that uses it
+#   bugprone-dynamic-static-initializers - the check is inert unless the translation unit is built
+#                                     with -fno-threadsafe-statics, which the firmware passes
+#                                     (cmake/DuetFirmware.cmake), so it is on here purely as a
+#                                     side effect of that flag. It matches the *declaration* in the
+#                                     header and never looks at the definition, so it cannot tell
+#                                     dynamic initialisation from constant or zero initialisation:
+#                                     a plain `static unsigned n;` is reported identically to
+#                                     ExpansionManager's `static ReadWriteLock boardsLock;`, and
+#                                     giving the type a constexpr constructor does not silence it
+#                                     either -- hence the "may be" in the message. Every hit in
+#                                     this tree is a class static data member, which has exactly
+#                                     one definition in one .cpp; the per-TU duplication the check
+#                                     is aimed at cannot arise. That is 230 of the 1745 diagnostics
+#                                     in a full run, none of them actionable without moving the
+#                                     members out of their classes.
+
+# Known residue, left enabled on purpose. Three checks report hits that cannot be fixed or
+# suppressed from this repository, all of them generated by the NamedEnum macro in
+# lib/RRFLibraries/src/General/NamedEnum.h and attributed to its two use sites -- the Module enum in
+# RepRapFirmware.h and BoardState in ExpansionManager.h:
+#   cppcoreguidelines-prefer-member-initializer  ("v = arg" in the generated constructor)
+#   cppcoreguidelines-special-member-functions   (generated copy ctor + copy assignment, no dtor)
+#   misc-unconventional-assign-operator          (generated operator= does not return a reference;
+#                                                 also reported as its alias
+#                                                 cppcoreguidelines-c-copy-assignment-signature)
+# The fix would have to be made in lib/, which Duet3Expansion shares, and a NOLINT at the use site
+# does not help: clang-tidy matches NOLINT against the spelling location inside the macro definition
+# rather than the expansion. All three stay enabled because they do find real cases in first-party
+# code -- between them they produced the CanDriversData, MemoryWatcher, IoPort, OutputBuffer,
+# OutputStack, Platform, RepRap and AutoClearingWatchpoint fixes.
+
+WarningsAsErrors: ''
+
+# Anchored to this project's own first-party sources. Two things are deliberately excluded:
+#   - lib/{CANlib,CoreN2G,FreeRTOS,LibTinyusb,RRFLibraries}/src/, which a bare 'src/.*' would
+#     match. Duet3Expansion compiles those same headers from this checkout, so fixing them here
+#     would silently change a project that is out of scope for this style guide.
+#   - src/libc/ and src/libcpp/, which are vendored newlib and GCC runtime sources (FSF
+#     copyright); they are upstream code and must keep upstream formatting.
+# clang-tidy 18 has no ExcludeHeaderFilterRegex and its regex engine has no negative lookahead,
+# so the first-party directories are enumerated instead.
+#
+# The leading alternation is load-bearing. clang-tidy matches this against the path exactly as it
+# appears in the diagnostic, which for a database generated in this directory is relative --
+# 'src/CAN/CanDriversData.h'. An absolute '/src/DuetCANMaster/src/' prefix therefore matches
+# nothing and silently suppresses every header warning; a bare unanchored 'src/' matches too much
+# (51 headers under lib/*/src/ -- lib/CANlib/src/CanId.h and friends -- satisfy the '[A-Za-z]+\.h'
+# alternative). '^' covers the relative form, '/DuetCANMaster/' the absolute one, and neither can
+# match anything under lib/.
+HeaderFilterRegex: '(^|/DuetCANMaster/)src/((CAN|Config|Hardware|Movement|Platform|SBC|Storage)/.*|[A-Za-z]+\.h)$'
+
+# The firmware is GCC-built; clang hits a handful of constexpr/overload divergences it cannot
+# resolve. Without this it stops at 20 errors and silently leaves the rest of the TU unanalysed.
+ExtraArgs: ['-ferror-limit=0']
+
+FormatStyle: file
+
+CheckOptions:
+  - key: modernize-loop-convert.MinConfidence
+    value: reasonable
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
+  - key: performance-move-const-arg.CheckTriviallyCopyableMove
+    value: 'false'
+  # These classes are singletons (Platform, RepRap), pooled objects (OutputBuffer, OutputStack) or
+  # RAII owners (IoPort, MemoryWatcher, AutoClearingWatchpoint). Deleting the copy operations is the
+  # whole intent -- demanding a move constructor and move assignment on top of that would mean
+  # declaring two more deleted members per class for no benefit.
+  - key: cppcoreguidelines-special-member-functions.AllowMissingMoveFunctionsWhenCopyIsDeleted
+    value: 'true'
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: CamelCase
+  - key: readability-identifier-naming.NamespaceCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.VariableCase
+    value: camelBack
+  - key: readability-identifier-naming.ConstantCase
+    value: camelBack
+  - key: readability-identifier-naming.ParameterCase
+    value: camelBack
+  # Symbols whose spelling is ABI, not style. Renaming these compiles cleanly and then fails
+  # at link time -- or worse, silently changes a vector-table slot:
+  #   VersionText     - CoreN2G's SAME70 Vectors.c stores its address in pfnReserved2_Handler
+  #   exception_table - CoreN2G's DeviceVectors instance
+  #   *_Handler       - CMSIS interrupt vector names, matched by the startup vector table
+  #   _*              - the whole leading-underscore class is reserved for the toolchain, and the
+  #                     linker resolves these by exact spelling against the runtime rather than
+  #                     against anything in this tree: _estack (same70q20b_flash.ld),
+  #                     __cxa_pure_virtual / __cxa_deleted_virtual (emitted by GCC for a call to a
+  #                     pure or deleted virtual) and __cxxabiv1::__terminate_handler (the hook that
+  #                     replaces libstdc++'s default). Renaming any of them still links, because
+  #                     libstdc++ quietly supplies its own -- so the firmware's SoftwareReset
+  #                     diagnostics are bypassed at runtime and __verbose_terminate_handler gets
+  #                     pulled in, which is exactly the bloat ExceptionHandlers.cpp avoids.
+  - key: readability-identifier-naming.GlobalVariableIgnoredRegexp
+    value: '^(_.*|VersionText|exception_table)$'
+  - key: readability-identifier-naming.GlobalConstantIgnoredRegexp
+    value: '^(_.*|VersionText|exception_table|DiagPin|ActLedPin|DiagOnPolarity)$'
+  # DiagPin / ActLedPin / DiagOnPolarity are spelled identically on purpose so that the shared
+  # code in Tasks.cpp and Platform.cpp compiles for both boards, even though the entity behind
+  # the name differs per target:
+  #   MB6XD - global constexpr constants in Pins_Duet3_MB6XD.h
+  #   MB6HC - Platform members (Platform.h, #ifdef DUET3_MB6HC) and locals in AppMain(), because
+  #           the pins depend on the board revision and are only known at runtime
+  # Each board therefore renames these under a different rule (m_ prefix for the member, camelBack
+  # for the local) while leaving the other board's spelling untouched, and the merged result
+  # satisfies neither. The shared spelling is a portability contract, not a style lapse.
+  - key: readability-identifier-naming.PrivateMemberIgnoredRegexp
+    value: '^(DiagPin|ActLedPin|DiagOnPolarity)$'
+  - key: readability-identifier-naming.LocalConstantIgnoredRegexp
+    value: '^(DiagPin|ActLedPin|DiagOnPolarity)$'
+  # *Dispatcher - referenced only from the inline-asm literals in ExceptionHandlers.cpp
+  #               (" handler_hf_address_const: .word hardFaultDispatcher"). clang-tidy renames the
+  #               C++ definition but cannot see inside an asm string, so the reference dangles and
+  #               the link fails with "undefined reference".
+  # debugPrintf - imported by the prebuilt lib/CANlib/SAME70_RTOS/libCANlib.a, which is not built
+  #               from this tree. Its spelling is a link-time contract, not a style choice; it is
+  #               the only one of the 272 renamed identifiers that any prebuilt archive imports.
+  - key: readability-identifier-naming.FunctionIgnoredRegexp
+    value: '^(_.*|.*_Handler|.*Dispatcher|debugPrintf|vAssertCalled|atoi)$'
+  # 'pwm' and 'spi' CamelCase to Pwm/Spi, which are peripheral struct typedefs in the Atmel CMSIS
+  # headers (component/pwm.h, component/spi.h). PinAccess and PinCapability are scoped enums, so
+  # the enumerators cannot actually be confused with those globals -- but GCC's -Wshadow reports
+  # scoped enumerators anyway and the firmware builds with -Werror, so the rename breaks the build.
+  # These two are the only new identifiers out of 272 that collide with a CMSIS global.
+  - key: readability-identifier-naming.EnumConstantIgnoredRegexp
+    value: '^(pwm|spi)$'
+  - key: readability-identifier-naming.PrivateMemberPrefix
+    value: 'm_'
+  - key: readability-identifier-naming.StaticVariablePrefix
+    value: 's_'

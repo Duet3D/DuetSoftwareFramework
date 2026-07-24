@@ -1,0 +1,82 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 24,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "toolchainFile": "${sourceDir}/cmake/arm-none-eabi-toolchain.cmake",
+            "cacheVariables": {
+                "LIBRARIES_DIR": "${sourceDir}/../../lib"
+            }
+        },
+        {
+            "name": "release",
+            "displayName": "Release",
+            "description": "Optimised firmware build for the DuetCANMaster",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "debug",
+            "displayName": "Debug",
+            "description": "Firmware build with debug symbols and reduced optimisation",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "release",
+            "displayName": "All boards (Release)",
+            "configurePreset": "release"
+        },
+        {
+            "name": "Duet3_MB6HC",
+            "displayName": "Duet3 MB6HC (Release)",
+            "configurePreset": "release",
+            "targets": [
+                "Duet3Firmware_MB6HC"
+            ]
+        },
+        {
+            "name": "Duet3_MB6XD",
+            "displayName": "Duet3 MB6XD (Release)",
+            "configurePreset": "release",
+            "targets": [
+                "Duet3Firmware_MB6XD"
+            ]
+        },
+        {
+            "name": "debug",
+            "displayName": "All boards (Debug)",
+            "configurePreset": "debug"
+        },
+        {
+            "name": "Duet3_MB6HC-debug",
+            "displayName": "Duet3 MB6HC (Debug)",
+            "configurePreset": "debug",
+            "targets": [
+                "Duet3Firmware_MB6HC"
+            ]
+        },
+        {
+            "name": "Duet3_MB6XD-debug",
+            "displayName": "Duet3 MB6XD (Debug)",
+            "configurePreset": "debug",
+            "targets": [
+                "Duet3Firmware_MB6XD"
+            ]
+        }
+    ]
+}

@@ -16,7 +16,7 @@ namespace DuetControlServer.Codes.Meta;
 /// <summary>
 /// Service to provide SBC-dependent meta G-code function implementations
 /// </summary>
-public class Functions(Expressions expressions, FilePathResolver filePathResolver, Filter filter, LinkInterface linkInterface) : IHostedService
+public class Functions(Expressions expressions, FilePathResolver filePathResolver, Filter filter) : IHostedService
 {
     /// <summary>
     /// Start the hosted service and register custom functions
@@ -50,7 +50,12 @@ public class Functions(Expressions expressions, FilePathResolver filePathResolve
             {
                 return true;
             }
+            // TODO: evaluate the expression locally
+#if false
             return await linkInterface.EvaluateExpressionAsync(channel, $"exists({stringArgument})");
+#else
+            return false;
+#endif
         }
         throw new ArgumentException("exists requires an argument");
     }

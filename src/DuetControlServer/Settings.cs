@@ -152,11 +152,6 @@ public sealed class Settings
     public string SpiDevice { get; set; } = "/dev/spidev0.0";
 
     /// <summary>
-    /// Communication method to use for connection to RepRapFirmware
-    /// </summary>
-    public CommunicationMethod CommunicationMethod { get; set; } = CommunicationMethod.SPI;
-
-    /// <summary>
     /// Tx and Rx buffer size for SBC protocol transfers.
     /// Only respected in SPI mode and must not exceed the kernel spidev buffer size
     /// </summary>
@@ -171,6 +166,64 @@ public sealed class Settings
     /// Frequency to use for SPI transfers (in Hz)
     /// </summary>
     public int SpiFrequency { get; set; } = 8_000_000;
+
+    /// <summary>
+    /// Whether to isolate the SPI thread on a dedicated CPU core (only relevant on Raspberry Pi)
+    /// </summary>
+    public bool IsolateInterfaceThread { get; set; } = true;
+
+    /// <summary>
+    /// Whether to isolate the motion thread on a dedicated CPU core (only relevant on Raspberry Pi)
+    /// </summary>
+    public bool IsolateMotionThread { get; set; } = true;
+
+    /// <summary>
+    /// The CPU core which has been isolated from the OS scheduler. The SPI interface thread and the GPIO
+    /// monitor threads are pinned here; the motion thread is pinned here too unless <see cref="MotionCoreId"/>
+    /// is set. For best latency this should be a core reserved via the kernel <c>isolcpus</c> boot parameter
+    /// </summary>
+    public int IsolatedCoreId { get; set; } = 3;
+
+    /// <summary>
+    /// CPU core to pin the motion thread to. When negative, the motion thread shares
+    /// <see cref="IsolatedCoreId"/> with the SPI interface thread. Placing motion on its own isolated core
+    /// avoids the two real-time threads competing for the same CPU
+    /// </summary>
+    public int MotionCoreId { get; set; } = -1;
+
+    /// <summary>
+    /// CPU core to pin the GPIO edge-monitor threads (TfrRdy/DataAvailable) to. When negative, they share
+    /// <see cref="IsolatedCoreId"/> with the SPI interface thread so that waking the interface thread is a
+    /// cheap local context switch rather than a cross-core wake-up
+    /// </summary>
+    public int GpioMonitorCoreId { get; set; } = -1;
+
+    /// <summary>
+    /// Whether to run the interface, motion and GPIO monitor threads under the SCHED_FIFO real-time
+    /// scheduling policy (only relevant on Raspberry Pi and requires CAP_SYS_NICE). This is what actually
+    /// bounds scheduling jitter on a PREEMPT_RT kernel; without it these threads run under CFS and can be
+    /// preempted for tens of milliseconds
+    /// </summary>
+    public bool UseRealtimeScheduling { get; set; } = true;
+
+    /// <summary>
+    /// SCHED_FIFO priority for the GPIO edge-monitor threads. This must be the highest of the three because
+    /// the interface thread cannot make progress until a monitor thread has delivered the pin edge that
+    /// unblocks it
+    /// </summary>
+    public int GpioMonitorRtPriority { get; set; } = 60;
+
+    /// <summary>
+    /// SCHED_FIFO priority for the SPI interface thread. Should sit below <see cref="GpioMonitorRtPriority"/>
+    /// and above <see cref="MotionRtPriority"/>
+    /// </summary>
+    public int InterfaceRtPriority { get; set; } = 50;
+
+    /// <summary>
+    /// SCHED_FIFO priority for the motion thread. Should sit below <see cref="InterfaceRtPriority"/> so that
+    /// the SPI transfer is never starved by motion computation when they share a core
+    /// </summary>
+    public int MotionRtPriority { get; set; } = 40;
 
     /// <summary>
     /// Maximum allowed time when waiting for the first transfer (in ms)
@@ -188,9 +241,22 @@ public sealed class Settings
     public int SbcConnectionTimeout { get; set; } = 4000;
 
     /// <summary>
+    /// Maximum time to wait for a reason to initiate a full transfer before performing a keep-alive
+    /// transfer anyway (in ms). When idle a transfer is only started once DSF has data to send or the
+    /// controller raises the data available pin, but a transfer is forced at least this often so that
+    /// disconnects are still detected
+    /// </summary>
+    public int SbcConnectionKeepAliveInterval { get; set; } = 25;
+
+    /// <summary>
     /// Maximum number of sequential transfer retries
     /// </summary>
     public int MaxSbcRetries { get; set; } = 3;
+
+    /// <summary>
+    /// Timeout for CAN requests that expect a reply (in ms).
+    /// </summary>
+    public int CanRequestTimeout { get; set; } = 2000;
 
     /// <summary>
     /// Path to the GPIO chip device node
@@ -202,6 +268,14 @@ public sealed class Settings
     /// </summary>
     public int TransferReadyPin { get; set; } = 25;      // Pin 22 on the RaspPi expansion header
 
+    /// <summary>
+    /// Number of the GPIO pin that is used by DuetCANMaster to flag that it has data to send to the DSF
+    /// </summary>
+    public int DataAvailablePin { get; set; } = 24;      // Pin 18 on the RaspPi expansion header
+
+#if DEBUG
+    public int SbcDataAvailablePin { get; set; } = 23;    // Pin 16 on the RaspPi expansion header
+#endif
     /// <summary>
     /// USB device that is connected to RepRapFirmware (e.g., /dev/ttyACM1)
     /// </summary>
@@ -286,6 +360,10 @@ public sealed class Settings
     /// Interval of object model updates (in ms)
     /// </summary>
     public int ModelUpdateInterval { get; set; } = 100;
+
+    public string FirmwareFilePrefix { get; set; } = "Duet3Firmware_";
+
+    public string BootloaderFilePrefix { get; set; } = "Duet3Bootloader_";
 
     /// <summary>
     /// Maximum lock time of the object model. If this time is exceeded, a deadlock is reported and the application is terminated.

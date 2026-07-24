@@ -1,0 +1,109 @@
+---
+Checks: >
+  -*,
+  bugprone-*,
+  cppcoreguidelines-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-narrowing-conversions,
+  -cppcoreguidelines-avoid-c-arrays,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-avoid-non-const-global-variables,
+  -cppcoreguidelines-macro-usage,
+  -cppcoreguidelines-narrowing-conversions,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-cstyle-cast,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-type-union-access,
+  -cppcoreguidelines-pro-type-vararg,
+  -misc-confusable-identifiers,
+  -misc-no-recursion,
+  -misc-use-internal-linkage,
+  -modernize-avoid-c-arrays,
+  -modernize-use-default-member-init,
+  -modernize-use-designated-initializers,
+  -modernize-use-trailing-return-type,
+  -readability-braces-around-statements,
+  -readability-else-after-return,
+  -readability-function-cognitive-complexity,
+  -readability-function-size,
+  -readability-identifier-length,
+  -readability-implicit-bool-conversion,
+  -readability-magic-numbers,
+  -readability-math-missing-parentheses,
+  -readability-qualified-auto,
+  -readability-uppercase-literal-suffix,
+  -misc-include-cleaner,
+  -misc-use-anonymous-namespace,
+  -misc-non-private-member-variables-in-classes,
+  -cppcoreguidelines-avoid-do-while,
+  -readability-avoid-unconditional-preprocessor-if,
+  -bugprone-unhandled-exception-at-new,
+
+# Checks switched off because they conflict with deliberate choices in this codebase rather
+# than flagging defects:
+#   misc-include-cleaner            - demands a direct #include for build-system macros (SAME70),
+#                                     eCv annotations (_ecv_array) and toolchain typedefs; the
+#                                     include chain here is deliberate and order-sensitive
+#   misc-use-anonymous-namespace    - file-scope `static` is the established RepRapFirmware idiom
+#   misc-non-private-member-variables-in-classes - duplicate of the cppcoreguidelines check
+#                                     already disabled above
+#   cppcoreguidelines-avoid-do-while - do/while(0) is the standard multi-statement macro idiom
+#   readability-avoid-unconditional-preprocessor-if - `#if 0` guards debug-only code on purpose
+#   bugprone-unhandled-exception-at-new - the firmware runs without exceptions; allocation
+#                                     failure is handled by the fault path, not a catch
+
+WarningsAsErrors: ''
+
+# Anchored to this project's own sources. A bare 'src/.*' would also match the shared
+# wire-protocol headers under lib/DuetSpiInterface/, which DuetCANMaster compiles against --
+# fixing headers there would silently change a project that is out of scope.
+HeaderFilterRegex: '/src/DuetSbcInterface/.*'
+
+FormatStyle: file
+
+CheckOptions:
+  # The cleanup/reconnect paths deliberately swallow failures because there is no fallback left
+  # at that point. Each such catch says so and is tagged @intentional; clang-tidy 18 has no
+  # AllowEmptyCatchWithComment, so the keyword list is how an explained catch is accepted.
+  - key: bugprone-empty-catch.IgnoreCatchWithKeywords
+    value: '@TODO;@FIXME;@intentional'
+  - key: modernize-loop-convert.MinConfidence
+    value: reasonable
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
+  - key: performance-move-const-arg.CheckTriviallyCopyableMove
+    value: 'false'
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: CamelCase
+  # The extern "C" ABI in CApi.h is bound by symbol name from
+  # DuetControlServer/Link/Native/NativeMethods.cs. Renaming these would not fail the
+  # build -- it would fail at runtime when P/Invoke cannot resolve the entry point.
+  - key: readability-identifier-naming.FunctionIgnoredRegexp
+    value: '^DuetSbc_.*'
+  - key: readability-identifier-naming.NamespaceCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.VariableCase
+    value: camelBack
+  - key: readability-identifier-naming.ConstantCase
+    value: camelBack
+  - key: readability-identifier-naming.ParameterCase
+    value: camelBack
+  - key: readability-identifier-naming.PrivateMemberPrefix
+    value: 'm_'
+  - key: readability-identifier-naming.StaticVariablePrefix
+    value: 's_'

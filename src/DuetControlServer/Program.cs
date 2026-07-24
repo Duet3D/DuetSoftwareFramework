@@ -5,6 +5,7 @@ using DuetControlServer.Commands;
 using DuetControlServer.Files;
 using DuetControlServer.IPC;
 using DuetControlServer.Link;
+using DuetControlServer.Motion;
 using DuetControlServer.Model;
 using DuetControlServer.Utility;
 using DuetSharedLibrary;
@@ -16,7 +17,10 @@ using Microsoft.Extensions.Options;
 using System;
 using System.CommandLine;
 using System.IO;
+using System.Runtime;
 using System.Text.Json;
+
+GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
 
 string? startErrorFile = Defaults.StartErrorFile;
 
@@ -176,6 +180,7 @@ rootCommand.SetAction(async (parserResult) =>
                     .AddLink()
                     .AddModel()
                     .AddLinkAdapter()
+                    .AddMotion()
                     .AddUtility();
             })
             .Build();

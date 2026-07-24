@@ -56,8 +56,8 @@ fi
 
 %postun
 if [ $1 -eq 1 ] && systemctl -q is-enabled %{name}.service ; then
-# upgrade
-	systemctl start %{name}.service
+# upgrade. Ignore the return code in case no board is connected
+	systemctl start %{name}.service || :
 fi
 
 %files

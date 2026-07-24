@@ -18,16 +18,6 @@ public partial class DSF : ModelObject, IStaticModelObject
     private string _buildDateTime = string.Empty;
 
     /// <summary>
-    /// Communication method used to talk to the firmware
-    /// </summary>
-    public CommunicationMethod CommunicationMethod
-    {
-        get => _communicationMethod;
-        set => SetPropertyValue(ref _communicationMethod, value);
-    }
-    private CommunicationMethod _communicationMethod;
-
-    /// <summary>
     /// List of registered third-party HTTP endpoints
     /// </summary>
     public StaticModelCollection<HttpEndpoint> HttpEndpoints { get; } = [];

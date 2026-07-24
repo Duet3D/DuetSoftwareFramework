@@ -39,7 +39,7 @@ namespace UnitTests.Machine
             IOptions<Settings> settings = Options.Create(new Settings());
             _model = new DcsModel(new TestLifetime(), NullLogger<DcsModel>.Instance, settings);
             _filter = new DcsFilter(_model);
-            _expressions = new Expressions(_filter, _model, null);
+            _expressions = new Expressions(_filter, _model);
 
             // volumes is an SBC-only branch, move is owned by the firmware
             _model.Volumes.Add(new Volume { FreeSpace = 12345 });

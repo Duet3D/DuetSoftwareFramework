@@ -22,7 +22,7 @@ public static partial class ServiceCollectionExtensions
             .AddSingleton<SbcTriggerService>()
             .AddHostedService(provider => provider.GetRequiredService<Observer>())
             .AddHostedService(provider => provider.GetRequiredService<PeriodicUpdateService>())
-            .AddHostedService(provider => provider.GetRequiredService<SbcTriggerService>())
-            .AddHostedService<UpdateService>();
+            .AddHostedService(provider => provider.GetRequiredService<SbcTriggerService>());
+            // .AddHostedService<UpdateService>(); // TODO: remove this if the class is not needed anymore
     }
 }

@@ -1,0 +1,196 @@
+/*
+ * StepTimer.h
+ *
+ *  Created on: 9 Sep 2018
+ *      Author: David
+ */
+
+#ifndef SRC_MOVEMENT_STEPTIMER_H_
+#define SRC_MOVEMENT_STEPTIMER_H_
+
+#include "RepRapFirmware.h"
+
+class CanMessageTimeSync;
+
+// Class to implement a software timer with a few microseconds resolution
+// Important! In systems that use 16-bit timers, callbacks may take place at multiples of 65536 ticks before they are
+// actually due. In order to achieve the maximum step rate possible, the timer code doesn't check for this, because the
+// step generation code checks which drivers are due steps anyway. Any other client that uses the timer MUST do a
+// similar check. The simple way to do this is to use a callback function of the following form: if
+// (timer.ScheduleCallbackFromIsr()) { /* code to execute it the callback really was due */ }
+class StepTimer final
+{
+  public:
+	using Ticks = uint32_t;
+	using TimerCallbackFunction = void (*)(CallbackParameter) noexcept;
+
+	StepTimer() noexcept;
+
+	// Set up the callback function and parameter
+	void SetCallback(TimerCallbackFunction cb, CallbackParameter param) noexcept;
+
+	// Schedule a callback at a particular tick count, returning true if it was not scheduled because it is already due
+	// or imminent
+	bool ScheduleCallback(Ticks when) noexcept SPEED_CRITICAL;
+
+	// As ScheduleCallback but base priority >= NvicPriorityStep when called. Can be called from within a callback.
+	bool ScheduleCallbackFromIsr(Ticks when) noexcept SPEED_CRITICAL;
+
+	// As ScheduleCallback but add the movement delay, and must have base priority >= NvicPriorityStep when called. Can
+	// be called from within a callback.
+	bool ScheduleMovementCallbackFromIsr(Ticks when) noexcept SPEED_CRITICAL;
+
+	// Check whether a callback really is due, schedule it if not. Returns true if it really is due. Can be called from
+	// within a callback.
+	bool ScheduleCallbackFromIsr() noexcept SPEED_CRITICAL;
+
+	// Cancel any scheduled callbacks
+	void CancelCallback() noexcept;
+
+	// As CancelCallback but base priority >= NvicPriorityStep when called
+	void CancelCallbackFromIsr() noexcept SPEED_CRITICAL;
+
+	// Initialise the timer system
+	static void Init() noexcept;
+
+	// Disable the timer interrupt. Called when we shut down the system.
+	static void DisableTimerInterrupt() noexcept;
+
+	// Get the current tick count
+	static Ticks GetTimerTicks() noexcept SPEED_CRITICAL;
+
+	// Get the current tick count when we know that interrupts are disabled
+	static Ticks GetTimerTicksWhenInterruptsDisabled() noexcept SPEED_CRITICAL;
+
+	// Get the current tick count, adjusted for the movement delay
+	static Ticks GetMovementTimerTicks() noexcept SPEED_CRITICAL;
+
+	// Convert local time to movement time
+	static Ticks ConvertLocalToMovementTime(Ticks localTime) noexcept;
+
+	// Get the current tick count when we only need a 16-bit value. Faster than GetTimerTicks() on the SAM4S and SAME70.
+	static uint16_t GetTimerTicks16() noexcept;
+
+	// Get the tick rate (can also access it directly as StepClockRate)
+	static constexpr uint32_t GetTickRate() noexcept { return StepClockRate; }
+
+	// Add more movement delay. Called from our step ISR when we can't keep up.
+	static void IncreaseMovementDelay(uint32_t increase) noexcept;
+
+	// Return the current movement delay
+	static Ticks GetMovementDelay() noexcept { return movementDelay; }
+
+#if SUPPORT_CAN_EXPANSION
+	// Handle a request for movement delay received from an expansion board
+	static void ProcessMovementDelayRequest(uint32_t delayRequested) noexcept;
+
+	// Check whether the movement delay has increased since we last called this. If yes, return the movement delay; else
+	// return zero.
+	static Ticks CheckMovementDelayIncreased() noexcept;
+
+	// Report the amount of movement delay that this board is responsible for
+	static uint32_t GetOwnMovementDelay() noexcept { return ownMovementDelay; }
+#endif
+
+	// ISR called from StepTimer
+	static void Interrupt() noexcept;
+
+	// Append diagnostics to reply string
+	static void Diagnostics(const StringRef& reply) noexcept;
+
+	// Convert a number of step timer ticks to microseconds
+	// Our tick rate is a multiple of 1000 so instead of multiplying n by 1000000 and risking overflow, we multiply by
+	// 1000 and divide by StepClockRate/1000
+	static uint32_t TicksToIntegerMicroseconds(uint32_t n) noexcept { return (n * 1000) / (StepClockRate / 1000); }
+	static float TicksToFloatMicroseconds(uint32_t n) noexcept
+	{
+		return (float)n * (1000000.0f / (float)StepClockRate);
+	}
+
+  private:
+	static bool ScheduleTimerInterrupt(uint32_t tim) noexcept; // Schedule an interrupt at the specified clock count, or
+															   // return true if it has passed already
+
+	static uint32_t movementDelay; // how many timer ticks the move timer is behind the raw timer
+
+#if SUPPORT_CAN_EXPANSION
+	static uint32_t ownMovementDelay;	   // the amount of movement delay requested by this board
+	static bool ownMovementDelayIncreased; // true if have introduced more movement delay and not broadcast it (if in
+										   // master mode) or requested it (if in expansion mode)
+#endif
+
+	StepTimer* _ecv_null m_next;
+	Ticks m_whenDue{};
+	TimerCallbackFunction _ecv_null m_callback;
+	CallbackParameter m_cbParam;
+	volatile bool m_active;
+
+	static StepTimer* volatile _ecv_null pendingList; // list of pending callbacks, soonest first
+};
+
+// Function GetTimerTicks() is very short on SAM4E processors so we inline it
+#if SAM4E
+
+inline __attribute__((always_inline)) StepTimer::Ticks StepTimer::GetTimerTicks() noexcept
+{
+	return STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_CV;
+}
+
+inline __attribute__((always_inline)) StepTimer::Ticks StepTimer::GetTimerTicksWhenInterruptsDisabled() noexcept
+{
+	return STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_CV;
+}
+
+#endif
+
+// Sometimes we only need the lowest 16 bits of the step timer. On some processors this is faster than reading all 32
+// bits.
+inline __attribute__((always_inline)) uint16_t StepTimer::GetTimerTicks16() noexcept
+{
+#if SAME70 || SAM4S
+	return (uint16_t)STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_CV;
+#else
+	return (uint16_t)GetTimerTicks();
+#endif
+}
+
+// Add more movement delay
+inline void StepTimer::IncreaseMovementDelay(uint32_t increase) noexcept
+{
+	movementDelay += increase;
+#if SUPPORT_CAN_EXPANSION
+	ownMovementDelay += increase;
+	ownMovementDelayIncreased = true;
+#endif
+}
+
+// Convert local time to movement time
+inline StepTimer::Ticks StepTimer::ConvertLocalToMovementTime(Ticks localTime) noexcept
+{
+	return localTime - movementDelay;
+}
+
+// Get the current tick count
+inline StepTimer::Ticks StepTimer::GetMovementTimerTicks() noexcept
+{
+	return ConvertLocalToMovementTime(GetTimerTicks());
+}
+
+#if SUPPORT_CAN_EXPANSION
+
+// Check whether the movement delay has increased since we last called this. If yes, return the movement delay; else
+// return zero.
+inline StepTimer::Ticks StepTimer::CheckMovementDelayIncreased() noexcept
+{
+	const AtomicCriticalSectionLocker lock;
+	if (ownMovementDelayIncreased)
+	{
+		ownMovementDelayIncreased = false;
+		return movementDelay;
+	}
+	return 0;
+}
+
+#endif
+
+#endif /* SRC_MOVEMENT_STEPTIMER_H_ */

@@ -107,15 +107,14 @@ public sealed class MacroFile : CodeFile, IDisposable
     /// <param name="codeProcessor">Code processor</param>
     /// <param name="eventLogger">Event logger</param>
     /// <param name="expressions">Expression evaluator</param>
-    /// <param name="linkInterface">Link interface</param>
     /// <param name="model">Object model</param>
     /// <param name="lifetime">Host application lifetime</param>
     /// <param name="loggerFactory">Logger factory</param>
     /// <param name="settings">Settings</param>
     public MacroFile(CodeFilePath filePath, CodeChannel channel, Code startCode, int sourceConnection,
-        CodeFactory codeFactory, CodeProcessor codeProcessor, EventLogger eventLogger, Expressions expressions, LinkInterface linkInterface, Model.ObjectModel model,
+        CodeFactory codeFactory, CodeProcessor codeProcessor, EventLogger eventLogger, Expressions expressions, Model.ObjectModel model,
         IHostApplicationLifetime lifetime, ILoggerFactory loggerFactory, IOptions<Settings> settings)
-        : base(filePath, channel, codeFactory, codeProcessor, expressions, linkInterface, model, loggerFactory, settings)
+        : base(filePath, channel, codeFactory, codeProcessor, expressions, model, loggerFactory, settings)
     {
         SourceConnection = sourceConnection;
 
@@ -145,13 +144,12 @@ public sealed class MacroFile : CodeFile, IDisposable
     /// <param name="codeProcessor">Code processor</param>
     /// <param name="eventLogger">Event logger</param>
     /// <param name="expressions">Expression evaluator</param>
-    /// <param name="linkInterface">Link interface</param>
     /// <param name="model">Object model</param>
     /// <param name="loggerFactory">Logger factory</param>
     /// <param name="settings">Settings</param>
     public MacroFile(CodeFilePath filePath, CodeChannel channel, int sourceConnection,
-        CodeFactory codeFactory, CodeProcessor codeProcessor, EventLogger eventLogger, Expressions expressions, LinkInterface linkInterface, Model.ObjectModel model, IHostApplicationLifetime lifetime, ILoggerFactory loggerFactory, IOptions<Settings> settings)
-        : base(filePath, channel, codeFactory, codeProcessor, expressions, linkInterface, model, loggerFactory, settings)
+        CodeFactory codeFactory, CodeProcessor codeProcessor, EventLogger eventLogger, Expressions expressions, Model.ObjectModel model, IHostApplicationLifetime lifetime, ILoggerFactory loggerFactory, IOptions<Settings> settings)
+        : base(filePath, channel, codeFactory, codeProcessor, expressions, model, loggerFactory, settings)
     {
         SourceConnection = sourceConnection;
 
@@ -180,15 +178,14 @@ public sealed class MacroFile : CodeFile, IDisposable
     /// <param name="codeFactory">Code factory</param>
     /// <param name="codeProcessor">Code processor</param>
     /// <param name="expressions">Expression evaluator</param>
-    /// <param name="linkInterface">Link interface</param>
     /// <param name="model">Object model</param>
     /// <param name="lifetime">Host application lifetime</param>
     /// <param name="loggerFactory">Logger factory</param>
     /// <param name="settings">Settings</param>
     public MacroFile(MacroFile copyFrom, CodeChannel channel,
-        CodeProcessor codeProcessor, CodeFactory codeFactory, Expressions expressions, LinkInterface linkInterface, Model.ObjectModel model,
+        CodeProcessor codeProcessor, CodeFactory codeFactory, Expressions expressions, Model.ObjectModel model,
         IHostApplicationLifetime lifetime, ILoggerFactory loggerFactory, IOptions<Settings> settings)
-        : base(copyFrom, channel, codeFactory, codeProcessor, expressions, linkInterface, model, loggerFactory, settings)
+        : base(copyFrom, channel, codeFactory, codeProcessor, expressions, model, loggerFactory, settings)
     {
         SourceConnection = copyFrom.SourceConnection;
         IsNested = copyFrom.IsNested;

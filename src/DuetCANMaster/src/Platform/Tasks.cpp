@@ -1,0 +1,534 @@
+/*
+ * Startup.cpp
+ *
+ *  Created on: 26 Mar 2018
+ *      Author: David
+ */
+
+#include "Tasks.h"
+
+#include "RepRap.h"
+
+#include "Platform.h"
+#include <Devices.h>
+
+#include <Cache.h>
+#include <Platform/TaskPriorities.h>
+
+#include <Hardware/SoftwareReset.h>
+
+#include <Hardware/NonVolatileMemory.h>
+#include <Storage/CRC32.h>
+
+#include <Movement/StepTimer.h>
+
+#if SAM4E || SAM4S || SAME70
+#  include <efc/efc.h> // for efc_enable_cloe()
+#endif
+
+#if SAME5x
+#  include <hpl_user_area.h>
+#endif
+
+#include <FreeRTOS.h>
+#include <task.h>
+
+#include <freertos_task_additions.h>
+
+#ifdef __ECV__
+
+// mallinfo.h is a nonstandard file so it isn't included in eCv standard include files
+// We put the definitions we need here.
+
+struct mallinfo
+{
+	size_t arena;	 /* total space allocated from system */
+	size_t ordblks;	 /* number of non-inuse chunks */
+	size_t smblks;	 /* unused -- always zero */
+	size_t hblks;	 /* number of mmapped regions */
+	size_t hblkhd;	 /* total space in mmapped regions */
+	size_t usmblks;	 /* unused -- always zero */
+	size_t fsmblks;	 /* unused -- always zero */
+	size_t uordblks; /* total allocated space */
+	size_t fordblks; /* total non-inuse space */
+	size_t keepcost; /* top-most, releasable (via malloc_trim) space */
+};
+
+extern struct mallinfo mallinfo(void);
+
+#else
+#  include <malloc.h> // non-standard include file, defines 'mallinfo'
+#endif
+
+const char memPattern =
+	(char)0xA5; // this must be the same pattern as FreeRTOS because we use common code for checking for stack overflow
+
+// Define replacement standard library functions
+#include <syscalls.h>
+
+// MAIN task data
+// The main task currently runs GCodes, so it needs to be large enough to hold the matrices used for delta auto
+// calibration. The worst case stack usage points are as follows:
+// 1. After running delta auto calibration with Move debugging enabled
+// 2. We create an array of (2 * MaxAxes^2) floats when inverting the movement matrix for Core kinematics.
+#if SAME70
+// On the SAME70 we use matrices of doubles when doing auto calibration, so we need 1800 words of stack even when
+// MaxAxes is only 15 (now 1860 after increasing GCodeReplyLength)
+constexpr unsigned int mainTaskStackWords = max<unsigned int>(1860, (MaxAxes * MaxAxes * 2) + 610);
+#else
+// On other processors we use matrices of floats when doing auto calibration
+// Increase minimum stack words to 1370 for WPA Enterprise support (now 1430 after increasing GCodeReplyLength)
+constexpr unsigned int MainTaskStackWords = max<unsigned int>(1430, (MaxAxes * MaxAxes * 2) + 610);
+#endif
+
+static Task<mainTaskStackWords> mainTask;
+extern "C" [[noreturn]] void MainTask(void* pvParameters) noexcept;
+extern DeviceVectors exception_table;
+
+// Idle task data
+// The timer and idle tasks currently never do I/O, so they don't need much stack.
+constexpr unsigned int idleTaskStackWords =
+	50; // currently we don't use the idle task for anything, so this can be quite small
+static Task<idleTaskStackWords> idleTask;
+
+extern "C" void vApplicationGetIdleTaskMemory(StaticTask_t** ppxIdleTaskTCBBuffer,
+											  StackType_t** ppxIdleTaskStackBuffer,
+											  configSTACK_DEPTH_TYPE* puxIdleTaskStackSize) noexcept
+{
+	*ppxIdleTaskTCBBuffer = (xSTATIC_TCB * _ecv_from) idleTask.GetTaskMemory();
+	*ppxIdleTaskStackBuffer = idleTask.GetStackBase();
+	*puxIdleTaskStackSize = idleTask.GetStackSize();
+}
+
+#if configUSE_TIMERS
+
+// Timer task data
+constexpr unsigned int TimerTaskStackWords = 60;
+static Task<TimerTaskStackWords> timerTask;
+
+extern "C" void vApplicationGetTimerTaskMemory(StaticTask_t** ppxTimerTaskTCBBuffer,
+											   StackType_t** ppxTimerTaskStackBuffer,
+											   uint32_t* pulTimerTaskStackSize) noexcept
+{
+	*ppxTimerTaskTCBBuffer = timerTask.GetTaskMemory();
+	*ppxTimerTaskStackBuffer = timerTask.GetStackBase();
+	*pulTimerTaskStackSize = timerTask.GetStackSize();
+}
+
+#endif
+
+// Mutexes
+static Mutex i2cMutex;
+static Mutex mallocMutex;
+
+// We need to make malloc/free thread safe. We must use a recursive mutex for it.
+extern "C" void GetMallocMutex() noexcept
+{
+	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) // don't take mutex if scheduler not started or suspended
+	{
+		mallocMutex.Take();
+	}
+}
+
+extern "C" void ReleaseMallocMutex() noexcept
+{
+	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) // don't release mutex if scheduler not started or suspended
+	{
+		mallocMutex.Release();
+	}
+}
+
+// Get a 4-byte aligned NonVolatileMemory buffer suitable for the crash handler to use for reading/writing flash memory.
+// We don't want to use a static buffer because that is wasteful of RAM, given that only the crash handler uses it, we
+// have interrupts disabled while we use it, and we reset immediately afterwards. Instead we use either the bottom or
+// top of the main task stack. Parameter 'stk' is the stack we are interested in, which we must not overwrite; or null.
+// If it is not null then the caller is either using the same stack a little lower, or the exception stack.
+void* Tasks::GetNVMBuffer(const uint32_t* _ecv_array _ecv_null stk) noexcept
+{
+	constexpr size_t stackAllowance = 128;
+	static_assert((sizeof(NonVolatileMemory) & 3) == 0);
+	static_assert(mainTaskStackWords * 4 >= 2 * sizeof(NonVolatileMemory) + stackAllowance + 4);
+	const char* const _ecv_array cStack =
+		reinterpret_cast<const char * _ecv_array>((stk == nullptr) ? GetStackPointer() : _ecv_not_null(stk));
+
+	// See if we can use the bottom of the main task stack
+	char* _ecv_array ret = (char* _ecv_array) & mainTask + sizeof(TaskBase);
+	if (cStack > ret + (sizeof(NonVolatileMemory) + stackAllowance +
+						4)) // allow space for the buffer + 128b in case we are on that stack
+	{
+		ret += 4; // the +4 is so that we leave the stack marker alone in case the main task raised the exception
+	}
+	else
+	{
+		ret += (mainTaskStackWords * 4) - sizeof(NonVolatileMemory); // use the top area instead
+	}
+	return ret;
+}
+
+// Application entry point
+[[noreturn]] void AppMain() noexcept
+{
+#if defined(DUET3_MB6HC) // for MB6HC the Status and Activity pins and polarity depend on the board version
+	const BoardType bt = Platform::GetMB6HCBoardType();
+	const Pin DiagPin = (bt >= BoardType::Duet36HcV102) ? DiagPin102 : DiagPinPre102;
+	const Pin ActLedPin = (bt >= BoardType::Duet36HcV102) ? ActLedPin102 : ActLedPinPre102;
+	const bool DiagOnPolarity = (bt >= BoardType::Duet36HcV102) ? DiagOnPolarity102 : DiagOnPolarityPre102;
+	if (bt >= BoardType::Duet36HcV102)
+	{
+		SetPinMode(UsbPowerSwitchPin, OUTPUT_LOW); // turn USB power off
+		SetPinMode(UsbModePin, OUTPUT_LOW);		   // USB mode = device/UFP
+	}
+#endif
+#if defined(DUET3_MB6XD)
+	const BoardType bt = Platform::GetMB6XDBoardType();
+	if (bt >= BoardType::Duet36XdV101)
+	{
+		SetPinMode(UsbPowerSwitchPin, OUTPUT_LOW); // turn USB power off
+		SetPinMode(UsbModePin, OUTPUT_LOW);		   // USB mode = device/UFP
+	}
+#endif
+	SetPinMode(DiagPin, (DiagOnPolarity) ? OUTPUT_LOW : OUTPUT_HIGH); // set up status LED for debugging and turn it off
+#if defined(DUET3MINI) || defined(DUET3_MB6HC) || defined(DUET3_MB6XD)
+	SetPinMode(ActLedPin, (ActOnPolarity) ? OUTPUT_LOW : OUTPUT_HIGH); // set up activity LED and turn it off
+#endif
+
+#ifdef INDX
+	SetPinMode(CanBufferDisablePin, OUTPUT_HIGH); // turn the CAN buffer off, it may interfere with USB on v0.1 boards
+#endif
+
+#if !defined(DEBUG) // don't check the CRC of a debug build because debugger breakpoints mess up the CRC
+	// Check the integrity of the firmware by checking the firmware CRC
+	// If we have embedded files then the CRC is stored after those files, so we need to fetch the CRC address from the
+	// vector table
+	{
+		// NOLINTNEXTLINE(performance-no-int-to-ptr) - VTOR is a hardware register holding an address
+		const char* _ecv_array firmwareStart = reinterpret_cast<const char * _ecv_array>(SCB->VTOR & 0xFFFFFF80u);
+		const char* _ecv_array firmwareCrcAddr = (const char* _ecv_array)exception_table
+#  if SAME5x
+													 .pvReservedM9;
+#  else
+													 .pfnReserved1_Handler;
+#  endif
+		CRC32 crc;
+		crc.Update(firmwareStart, firmwareCrcAddr - firmwareStart);
+		if (crc.Get() != *((const uint32_t*)firmwareCrcAddr))
+		{
+			// CRC failed so flash the diagnostic LED 3 times, pause and repeat. This is the same error code used by the
+			// Duet 3 expansion boards bootloader.
+			for (unsigned int i = 0;; ++i)
+			{
+				const bool on =
+					(i & 1) == 0 &&
+					(i & 15) < 6; // turn LED on if count is 0, 2, 4 or 16, 18, 20 etc. otherwise turn it off
+				digitalWrite(DiagPin, XNor(on, DiagOnPolarity));
+				for (unsigned int j = 0; j < 250; ++j)
+				{
+					delayMicroseconds(
+						1000); // delayMicroseconds only works with low values of delay so do 1ms at a time
+				}
+			}
+		}
+	}
+#endif // !defined(DEBUG)
+
+	// Fill the free memory with a pattern so that we can check for stack usage and memory corruption
+	char* _ecv_array heapend = heapTop;
+	const char* _ecv_array stackPtr = (const char* _ecv_array)GetStackPointer();
+	while (heapend + 16 < stackPtr)
+	{
+		*heapend++ = memPattern;
+	}
+
+#if SAME5x
+	{
+		const uint32_t bootloaderSize = SCB->VTOR & 0xFFFFFF80;
+		if (bootloaderSize == 0x4000)
+		{
+			// Looks like this is release firmware that was loaded by a bootloader in the first 16Kb of flash
+			// Check that the bootloader is protected and EEPROM is configured
+			uint64_t nvmUserRow0 = *reinterpret_cast<const uint64_t*>(
+				NVMCTRL_USER); // we only need values in the first 64 bits of the user area
+			constexpr uint64_t mask =
+				((uint64_t)0x0F << 32) | ((uint64_t)0x07 << 36) |
+				(0x0F << 26); // we just want NVM_BOOT (bits 26-29), SEE.SBLK (bits 32-35) and SEE.PSZ (bits 36:38)
+			constexpr uint64_t reqValue = ((uint64_t)0x01 << 32) | ((uint64_t)0x03 << 36) |
+										  (13 << 26); // 4K SMART EEPROM and 16K bootloader (SBLK=1 PSZ=3 BOOTPROT=13)
+
+			if ((nvmUserRow0 & mask) != reqValue)
+			{
+				nvmUserRow0 = (nvmUserRow0 & ~mask) | reqValue; // set up the required value
+				_user_area_write(reinterpret_cast<void*>(NVMCTRL_USER),
+								 0,
+								 reinterpret_cast<const uint8_t*>(&nvmUserRow0),
+								 sizeof(nvmUserRow0));
+
+				// If we reset immediately then the user area write doesn't complete and the bits get set to all 1s.
+				delayMicroseconds(10000);
+				ResetProcessor();
+			}
+		}
+	}
+#endif
+
+	CoreInit();
+	DeviceInit();
+
+	// Trap integer divide-by-zero.
+	// We could also trap unaligned memory access, if we change the gcc options to not generate code that uses unaligned
+	// memory access.
+	SCB->CCR |= SCB_CCR_DIV_0_TRP_Msk;
+
+#if !SAME5x
+	// When doing a software reset, we disable the NRST input (User reset) to prevent the negative-going pulse that gets
+	// generated on it being held in the capacitor and changing the reset reason from Software to User. So enable it
+	// again here. We hope that the reset signal will have gone away by now.
+#  ifndef RSTC_MR_KEY_PASSWD
+// Definition of RSTC_MR_KEY_PASSWD is missing in the SAM3X ASF files
+#	define RSTC_MR_KEY_PASSWD (0xA5u << 24)
+#  endif
+	RSTC->RSTC_MR = RSTC_MR_KEY_PASSWD | RSTC_MR_URSTEN;
+#endif
+
+	Cache::Init(); // initialise the cache and/or the MPU, if applicable to this processor
+	Cache::Enable();
+
+#if SAM4S
+	efc_enable_cloe(EFC0); // enable code loop optimisation
+#elif SAM4E || SAME70
+	efc_enable_cloe(EFC); // enable code loop optimisation
+#endif
+
+	idleTask.AddToList(); // add the FreeRTOS internal tasks to the task list
+
+#if configUSE_TIMERS
+	timerTask.AddToList();
+#endif
+
+	// Create the mutexes and the startup task
+	mallocMutex.Create("Malloc");
+	i2cMutex.Create("I2C");
+	mainTask.Create(MainTask, "MAIN", nullptr, TaskPriority::SpinPriority);
+
+	StepTimer::Init();	   // initialise the step pulse timer now because we use it for measuring task CPU usage
+	vTaskStartScheduler(); // doesn't return
+	for (;;)
+	{
+	} // keep gcc happy
+}
+
+extern "C" [[noreturn]] void MainTask(void* /*pvParameters*/) noexcept
+{
+	reprap.Init();
+	for (;;)
+	{
+		reprap.Spin();
+	}
+}
+
+// Return the amount of free handler stack space. It may be negative if the stack has overflowed into the area reserved
+// for the heap.
+static ptrdiff_t GetHandlerFreeStack() noexcept
+{
+	const char* const _ecv_array ramend = (const char* _ecv_array) & _estack;
+	const char* _ecv_array stackLwm = sysStackLimit;
+	while (stackLwm < ramend && *stackLwm == memPattern)
+	{
+		++stackLwm;
+	}
+	return stackLwm - sysStackLimit;
+}
+
+ptrdiff_t Tasks::GetNeverUsedRam() noexcept
+{
+	return heapLimit - heapTop;
+}
+
+const char* _ecv_array Tasks::GetHeapTop() noexcept
+{
+	return heapTop;
+}
+
+// Allocate memory permanently. Using this saves about 8 bytes per object. You must not call free() on the returned
+// object. It doesn't try to allocate from the free list maintained by malloc, only from virgin memory.
+void* Tasks::AllocPermanent(size_t sz, std::align_val_t align) noexcept
+{
+	GetMallocMutex();
+	void* const ret = CoreAllocPermanent(sz, align);
+	ReleaseMallocMutex();
+	return ret;
+}
+
+// Function called by FreeRTOS to get the total number of timer ticks since last reset
+// We use a 64-bit value because a 32-bit value wraps after about 95 minutes on Duet 3, a little less on Duet 2.
+// This gets called fairly often, so when the 32-bit tick counter wraps round we assume it has only wrapped once.
+extern "C" uint64_t TaskGetRunTimeTicks() noexcept
+{
+	static uint32_t s_msw = 0;
+	static uint32_t s_ticksAtLastCall = 0;
+
+	const uint32_t ticks = StepTimer::GetTimerTicks();
+	if (ticks < s_ticksAtLastCall)
+	{
+		++s_msw;
+	}
+	s_ticksAtLastCall = ticks;
+	return ((uint64_t)s_msw << 32) | ticks;
+}
+
+// Function called by FreeRTOS and internally to reset the run-time counter and return the number of timer ticks since
+// it was last reset
+extern "C" uint64_t TaskResetRunTimeCounter() noexcept
+{
+	static uint64_t s_whenRunTimeCounterLastReset = 0;
+
+	const uint64_t now = TaskGetRunTimeTicks();
+	const uint64_t ret = now - s_whenRunTimeCounterLastReset;
+	s_whenRunTimeCounterLastReset = now;
+	return ret;
+}
+
+// Populate the reply buffer with task diagnostics
+void Tasks::Diagnostics(const StringRef& reply) noexcept
+{
+	reply.copy("=== RTOS ===");
+	// Print memory stats
+	{
+		const char* const _ecv_array ramstart =
+#if SAME5x
+			reinterpret_cast<const char * _ecv_array>(HSRAM_ADDR);
+#else
+			// NOLINTNEXTLINE(performance-no-int-to-ptr) - IRAM_ADDR is a fixed memory-map constant
+			reinterpret_cast<const char * _ecv_array>(IRAM_ADDR);
+#endif
+		const struct mallinfo mi = mallinfo();
+		reply.lcatf("RAM: static %d, dynamic %d (%d recycled), never used %d, free sys stack %d",
+					(const char* _ecv_array) & _end - ramstart,
+					mi.uordblks,
+					mi.fordblks,
+					GetNeverUsedRam(),
+					GetHandlerFreeStack() / 4);
+	} // end memory stats scope
+
+	const uint64_t timeSinceLastCall = TaskResetRunTimeCounter();
+	float totalCpuPercent = 0.0;
+	reply.lcat("Tasks:");
+	for (TaskBase* _ecv_from _ecv_null t = TaskBase::GetTaskList(); t != nullptr; t = t->GetNext())
+	{
+		ExtendedTaskStatus_t taskDetails;
+		vTaskGetExtendedInfo(t->GetFreeRTOSHandle(), &taskDetails);
+
+		const char* _ecv_array stateText = nullptr;
+		switch (taskDetails.eCurrentState)
+		{
+		case esRunning:
+			stateText = "run";
+			break;
+		case esReady:
+			stateText = "ready";
+			break;
+		case esNotifyWaiting:
+			stateText = "nWait";
+			break;
+		case esResourceWaiting:
+			stateText = "rWait:";
+			break;
+		case esDelaying:
+			stateText = "delay";
+			break;
+		case esSuspended:
+			stateText = "susp";
+			break;
+		case esBlocked:
+			stateText = "blocked";
+			break;
+		default:
+			stateText = "invalid";
+			break;
+		}
+
+		const float cpuPercent = (100 * (float)taskDetails.ulRunTimeCounter) / (float)timeSinceLastCall;
+		totalCpuPercent += cpuPercent;
+		reply.catf(" %s(%u,%s", taskDetails.pcTaskName, (unsigned int)taskDetails.uxCurrentPriority, stateText);
+		switch (taskDetails.eCurrentState)
+		{
+		case esResourceWaiting:
+		{
+			const Mutex* _ecv_null m = Mutex::GetMutexList();
+			while (m != nullptr)
+			{
+				if ((const void*)m == taskDetails.pvResource)
+				{
+					reply.catf(" %s", m->GetName());
+					break;
+				}
+				m = m->GetNext();
+			}
+		}
+		break;
+
+		case esNotifyWaiting:
+			reply.catf(" %" PRIu32, taskDetails.notifyIndex);
+			break;
+
+		default:
+			break;
+		}
+
+		// Print the free stack space in words. The -4 is needed because the FreeRTOS stack overflow check is triggered
+		// if any of the last 4 words is used.
+		reply.catf(",%.1f%%,%u)", (double)cpuPercent, (unsigned int)taskDetails.usStackHighWaterMark - 4);
+	}
+	reply.catf(", total %.1f%%\nMutexes:", (double)totalCpuPercent);
+
+	for (const Mutex* _ecv_null m = Mutex::GetMutexList(); m != nullptr; m = m->GetNext())
+	{
+		// NOLINTNEXTLINE(misc-misplaced-const) - TaskHandle is a pointer typedef; const pins the handle
+		const TaskHandle _ecv_null holder = m->GetHolder();
+		if (holder != nullptr)
+		{
+			reply.catf(" %s(%s)", m->GetName(), pcTaskGetName(holder->GetFreeRTOSHandle()));
+		}
+	}
+}
+
+TaskHandle Tasks::GetMainTask() noexcept
+{
+	return &mainTask;
+}
+
+void Tasks::TerminateMainTask() noexcept
+{
+	mainTask.TerminateAndUnlink();
+}
+
+Mutex* Tasks::GetI2CMutex() noexcept
+{
+	return &i2cMutex;
+}
+
+// This intercepts the 1ms system tick
+extern "C" void vApplicationTickHook() noexcept
+{
+	CoreSysTick();
+	reprap.Tick();
+}
+
+// We don't need the time zone functionality. Declaring these saves 8Kb.
+extern "C" void Tzset() noexcept {}
+extern "C" void TzLock() noexcept {}
+extern "C" void TzUnlock() noexcept {}
+extern "C" void TzsetUnlocked() noexcept {}
+
+#if SUPPORT_CAN_EXPANSION
+
+// Functions called by CanMessageBuffer in CANlib
+void* MessageBufferAlloc(size_t sz, std::align_val_t align) noexcept
+{
+	return Tasks::AllocPermanent(sz, align);
+}
+
+void MessageBufferDelete(void* ptr, std::align_val_t align) noexcept {}
+
+#endif
+
+// End

@@ -22,8 +22,7 @@ namespace DuetControlServer.Codes.Meta;
 /// </summary>
 /// <param name="filter">Object model filter</param>
 /// <param name="model">Object model</param>
-/// <param name="linkInterface">Link interface</param>
-public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, LinkInterface linkInterface)
+public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
 {
     /// <summary>
     /// Delegate for asynchronously resolving custom meta G-code fuctions
@@ -861,7 +860,12 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
+                // TODO: evaluate the expression locally
+#if false
                 return await linkInterface.EvaluateExpressionAsync(code.Channel, subExpression, cancellationToken);
+#else
+                return null;
+#endif
             }
             catch (CodeParserException) when (cancellationToken.IsCancellationRequested)
             {
@@ -1041,7 +1045,12 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
+            // TODO: evaluate the expression locally
+#if false
             return await linkInterface.EvaluateExpressionAsync(code.Channel, expressionContent, cancellationToken);
+#else
+            return null;
+#endif
         }
         catch (CodeParserException) when (cancellationToken.IsCancellationRequested)
         {

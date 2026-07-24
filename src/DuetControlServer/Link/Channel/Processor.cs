@@ -3,7 +3,6 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Codes;
 using DuetControlServer.Files;
-using DuetControlServer.Link.Adapter;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link.Requests;
 
@@ -38,7 +37,7 @@ public sealed class Processor
     private readonly Commands.CommandFactory _commandFactory;
     private readonly CodeProcessor _codeProcessor;
     private readonly FilePathResolver _filePathResolver;
-    private readonly ILinkAdapter _linkAdapter;
+    private readonly Native.NativeLink _nativeLink;
     private readonly LinkInterface _linkInterface;
     private readonly JobProcessor _jobProcessor;
 
@@ -56,7 +55,7 @@ public sealed class Processor
     /// <param name="codeProcessor">Code processor</param>
     /// <param name="eventLogger">Event logger</param>
     /// <param name="filePathResolver">File path resolver</param>
-    /// <param name="linkAdapter">Link adapter</param>
+    /// <param name="nativeLink">Native SPI transfer loop</param>
     /// <param name="linkInterface">Link interface</param>
     /// <param name="jobProcessor">Job processor</param>
     /// <param name="macroFileFactory">Macro file factory</param>
@@ -68,7 +67,7 @@ public sealed class Processor
         Commands.CommandFactory commandFactory,
         CodeProcessor codeProcessor,
         FilePathResolver filePathResolver,
-        ILinkAdapter linkAdapter,
+        Native.NativeLink nativeLink,
         LinkInterface linkInterface,
         JobProcessor jobProcessor,
         FileFactory macroFileFactory,
@@ -82,7 +81,7 @@ public sealed class Processor
         _codeProcessor = codeProcessor;
         _filePathResolver = filePathResolver;
         _jobProcessor = jobProcessor;
-        _linkAdapter = linkAdapter;
+        _nativeLink = nativeLink;
         _linkInterface = linkInterface;
         _macroFileFactory = macroFileFactory;
         _model = model;
@@ -785,7 +784,7 @@ public sealed class Processor
         }
 
         // Cancel pending codes and requests
-        _allFilesAborted = _linkAdapter.ProtocolVersion >= 3;
+        _allFilesAborted = _nativeLink.ProtocolVersion >= 3;
         InvalidateRegular();
 
         // Abort the job files if necessary
@@ -850,127 +849,6 @@ public sealed class Processor
         ResolveCommentCodes();
         ResolvePendingReplies();
 
-        // 2. Lock/Unlock requests
-        if (CurrentState.LockRequests.TryPeek(out LockMovementRequest? lockRequest))
-        {
-            if (lockRequest.IsLockRequest)
-            {
-                if (!lockRequest.IsLockRequested && _linkAdapter.WriteLockAllMovementSystemsAndWaitForStandstill(Channel))
-                {
-                    lockRequest.IsLockRequested = true;
-                }
-                return;
-            }
-
-            if (_linkAdapter.WriteUnlock(Channel))
-            {
-                lockRequest.Resolve(true);
-                CurrentState.LockRequests.Dequeue();
-                // Resources unlocked; carry on
-            }
-            else
-            {
-                return;
-            }
-        }
-
-        // 3. Abort requests
-        if (_allFilesAborted)
-        {
-            _allFilesAborted = !_linkAdapter.WriteInvalidateChannel(Channel);
-            return;
-        }
-
-        // 4. Macro files (must come before any other code unless the stack state is being cloned)
-        if (CurrentState.File is MacroFile || CurrentState.MacroError)
-        {
-            // Tell RRF as quickly as possible about the new macro being started
-            if (CurrentState.File is MacroFile macro && macro.JustStarted)
-            {
-                macro.JustStarted = (_linkAdapter.ProtocolVersion >= 3) && !_linkAdapter.WriteMacroStarted(Channel);
-                return;
-            }
-
-            // Check if the macro file has finished
-            if (CurrentState.File is MacroFile { WasStarted: true, IsExecuting: false } || CurrentState.MacroError)
-            {
-                if (!CurrentState.MacroCompleted && _linkAdapter.WriteMacroCompleted(Channel, CurrentState.MacroError))
-                {
-                    CurrentState.MacroCompleted = true;
-                    if (_linkAdapter.ProtocolVersion >= 3)
-                    {
-                        if (CurrentState.MacroError)
-                        {
-                            // In newer protocol versions we don't expect a response because RRF will be waiting in a semaphore
-                            Code? startCode = CurrentState.StartCode;
-                            if (startCode is not null)
-                            {
-                                BytesBuffered += startCode.BinarySize;
-                                BufferedCodes.Insert(0, startCode);
-                                CurrentState.StartCode = null;
-                                ResolvePendingReplies();
-                            }
-
-                            // Macro has finished, pop the stack
-                            Pop();
-                            if (startCode is not null)
-                            {
-                                _logger.LogDebug("==> Unfinished starting code: {Code}", startCode);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Wait for a response first if an older firmware version is used, then pop the stack
-                        return;
-                    }
-                }
-                else
-                {
-                    // Still waiting for acknowledgement or failed to write macro complete message, try again ASAP
-                    return;
-                }
-            }
-        }
-
-        // 5. Suspended codes being resumed (may include priority and macro codes)
-        while (CurrentState.SuspendedCodes.TryPeek(out Code? suspendedCode))
-        {
-            if (BufferCode(suspendedCode))
-            {
-                _logger.LogDebug("-> Resumed suspended code");
-                CurrentState.SuspendedCodes.Dequeue();
-            }
-            else
-            {
-                return;
-            }
-        }
-
-        // 6. Pending codes
-        while (CurrentState.PendingCodes.Reader.TryPeek(out Code? pendingCode))
-        {
-            if (BufferCode(pendingCode))
-            {
-                CurrentState.PendingCodes.Reader.TryRead(out _);
-            }
-            else
-            {
-                return;
-            }
-        }
-
-        // 7. Flush requests
-        if (BufferedCodes.Count == 0)
-        {
-            if (CurrentState.FlushRequests.TryDequeue(out TaskCompletionSource<bool>? flushRequest))
-            {
-                flushRequest.SetResult(true);
-                return;
-            }
-            CurrentState.SetBusy(false);
-        }
-
         // Log untracked code replies
         while (PendingReplies.TryDequeue(out Tuple<MessageTypeFlags, string>? reply))
         {
@@ -992,49 +870,6 @@ public sealed class Processor
         simpleCode.IsFromFirmware = true;
         simpleCode.ExecuteAsynchronously = true;
         _ = simpleCode.ExecuteAsync();
-    }
-
-    /// <summary>
-    /// Store a pending code for transmission to RepRapFirmware
-    /// </summary>
-    /// <param name="pendingCode">Code to transfer</param>
-    /// <returns>True if the code could be buffered</returns>
-    private bool BufferCode(Code pendingCode)
-    {
-        try
-        {
-            // Figure out how much space this code needs
-            if (pendingCode.Stage != PipelineStage.Firmware)
-            {
-                pendingCode.BinarySize = Consts.BufferedCodeHeaderSize + Protocol.Writer.GetCodeSize(pendingCode, _settings.MaxCodeBufferSize, _linkAdapter.ProtocolVersion);
-
-                pendingCode.Stage = PipelineStage.Firmware;
-            }
-
-            // Don't send cancelled codes to the firmware
-            if (pendingCode.CancellationToken.IsCancellationRequested)
-            {
-                _codeProcessor.CancelCode(pendingCode);
-                return true;
-            }
-
-            // Try to send it to RepRapFirmware
-            if ((BytesBuffered == 0 || BytesBuffered + pendingCode.BinarySize <= _settings.MaxBufferSpacePerChannel) &&
-                _linkInterface.SendCode(pendingCode, pendingCode.BinarySize))
-            {
-                BytesBuffered += pendingCode.BinarySize;
-                BufferedCodes.Add(pendingCode);
-                _logger.LogDebug("Sent {Code}, remaining space {BytesRemaining}, needed {BytesNeeded}", pendingCode, _settings.MaxBufferSpacePerChannel - BytesBuffered, pendingCode.BinarySize);
-                return true;
-            }
-            return false;
-        }
-        catch (Exception e)
-        {
-            _logger.LogDebug(e, "Failed to buffer code {Code}", pendingCode);
-            _codeProcessor.CancelCode(pendingCode, e);
-            return true;
-        }
     }
 
     /// <summary>
@@ -1068,12 +903,12 @@ public sealed class Processor
         // Check for a final empty reply for the current macro file being closed
         if (CurrentState.MacroCompleted)
         {
-            if (_linkAdapter.ProtocolVersion < 3 && string.IsNullOrEmpty(reply))
+            if (_nativeLink.ProtocolVersion < 3 && string.IsNullOrEmpty(reply))
             {
                 MacroFileClosed();
                 return true;
             }
-            else if (_linkAdapter.ProtocolVersion >= 3)
+            else if (_nativeLink.ProtocolVersion >= 3)
             {
                 PendingReplies.Enqueue(new Tuple<MessageTypeFlags, string>(flags, reply));
                 return true;
@@ -1083,12 +918,12 @@ public sealed class Processor
         // Check for message boxes being closed
         if (CurrentState.WaitingForAcknowledgement)
         {
-            if (_linkAdapter.ProtocolVersion < 3 && string.IsNullOrEmpty(reply))
+            if (_nativeLink.ProtocolVersion < 3 && string.IsNullOrEmpty(reply))
             {
                 MessageAcknowledged();
                 return true;
             }
-            else if (_linkAdapter.ProtocolVersion >= 3)
+            else if (_nativeLink.ProtocolVersion >= 3)
             {
                 PendingReplies.Enqueue(new Tuple<MessageTypeFlags, string>(flags, reply));
                 return true;
@@ -1256,72 +1091,6 @@ public sealed class Processor
         else
         {
             _logger.LogError("Tried to acknowledge a message, but no acknowledgement is requested!");
-        }
-    }
-
-    /// <summary>
-    /// Attempt to start a file macro
-    /// </summary>
-    /// <param name="virtualFile">Requested name of the macro file</param>
-    /// <param name="fromCode">Request comes from a real G/M/T-code</param>
-    public void DoMacroFile(string virtualFile, bool fromCode)
-    {
-        // Macro requests are not meant for comment codes, resolve them separately
-        ResolveCommentCodes();
-
-        // Cannot start system macro if something is still busy
-        if (!fromCode && Stack.Count > 1)
-        {
-            _logger.LogWarning("System macro {File} is requested but the stack is not empty. Discarding request.", virtualFile);
-            _linkAdapter.WriteMacroCompleted(Channel, true);
-            return;
-        }
-
-        // Figure out which code started the macro file
-        Code? startCode = null;
-        if (fromCode)
-        {
-            if (CurrentState.MacroCompleted)
-            {
-                _logger.LogInformation("Finished intermediate macro file {File}", CurrentState.File!.FilePath.Virtual);
-                startCode = CurrentState.StartCode;
-                CurrentState.StartCode = null;     // don't add it back to the buffered codes because it's about to be pushed on the stack again
-                Pop();
-            }
-            else if (BufferedCodes.Count > 0)
-            {
-                startCode = BufferedCodes[0];
-                BytesBuffered -= startCode.BinarySize;
-                BufferedCodes.RemoveAt(0);
-            }
-        }
-        else if (Stack.Count > 1)
-        {
-            _logger.LogWarning("System macro {File} is requested but the stack is not empty. Discarding request.", virtualFile);
-            _linkAdapter.WriteMacroCompleted(Channel, true);
-            return;
-        }
-
-        // Try to locate the macro file
-        string physicalFile = _filePathResolver.ToPhysical(virtualFile, FileDirectory.System);
-        MacroFile? macro = _macroFileFactory.CreateMacro(virtualFile, physicalFile, Channel, startCode, startCode?.SourceConnection ?? 0);
-
-        StackState newState = Push(macro);
-        newState.StartCode = startCode;
-        if (macro is not null)
-        {
-            // Start it
-            if (startCode is not null)
-            {
-                startCode.UpdateNextFilePosition();
-                _logger.LogDebug("==> Starting code {Code}", startCode);
-            }
-            macro.Start();
-        }
-        else
-        {
-            // Report back to RRF that the file could not be opened
-            newState.MacroError = true;
         }
     }
 

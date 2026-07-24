@@ -1,0 +1,105 @@
+/*
+ * SoftwareReset.h
+ *
+ *  Created on: 15 Nov 2019
+ *      Author: David
+ */
+
+#ifndef SRC_SOFTWARERESET_H_
+#define SRC_SOFTWARERESET_H_
+
+#include <RepRapFirmware.h>
+
+// Enumeration describing the reasons for a software reset.
+// The spin state gets or'ed into this, so keep the lower 5 bits unused.
+// IMPORTANT! When changing this, also update table SoftwareResetReasonText
+enum class SoftwareResetReason : uint16_t
+{
+	User = 0u,		 // M999 command
+	Erase = 1u << 5, // special M999 command to erase firmware and reset
+	NMI = 2u << 5,
+	HardFault = 3u << 5,   // most exceptions get escalated to a hard fault
+	StuckInSpin = 4u << 5, // we got stuck in a Spin() function in the Main task for too long
+	WdtFault = 5u << 5,	   // secondary watchdog
+	UsageFault = 6u << 5,
+	OtherFault = 7u << 5,
+	StackOverflow = 8u << 5,	// FreeRTOS detected stack overflow
+	AssertCalled = 9u << 5,		// FreeRTOS assertion failure
+	HeaterWatchdog = 10u << 5,	// the Heat task didn't kick the watchdog often enough
+	MemFault = 11u << 5,		// the MPU raised a fault
+	TerminateCalled = 12u << 5, // std::terminate was called
+	PureOrDeletedVirtual = 13u << 5,
+	OutOfMemory = 14u << 5,
+	// unused = 15u << 5,
+
+	MainReasonMask = 0x0F << 5, // mask to pick out the  main reason in a uint16_t
+
+	// Bits that are or'ed in
+	UnusedBit = 0x0200,	  // spare bit
+	Unused2 = 0x0400,	  // spare bit
+	InAuxOutput = 0x0800, // this bit is or'ed in if we were in aux output at the time
+	FromSbc = 0x2000,	  // means the command came from the SBC interface
+	InUsbOutput = 0x4000, // this bit is or'ed in if we were in USB output at the time
+	Deliberate = 0x8000,  // this but it or'ed in if we deliberately caused a fault
+
+	UserFromSbc = User | FromSbc
+};
+
+// Return true if a software reset with this reason has an exception stack frame. Used to skip the FP registers when
+// saving the stack frame.
+inline bool ResetReasonHasExceptionFrame(uint16_t reason) noexcept
+{
+	switch ((SoftwareResetReason)(reason & (uint16_t)SoftwareResetReason::MainReasonMask))
+	{
+	case SoftwareResetReason::NMI:
+	case SoftwareResetReason::HardFault:
+	case SoftwareResetReason::StuckInSpin:
+	case SoftwareResetReason::WdtFault:
+	case SoftwareResetReason::UsageFault:
+	case SoftwareResetReason::OtherFault:
+	case SoftwareResetReason::HeaterWatchdog:
+	case SoftwareResetReason::MemFault:
+		return true;
+	default:
+		return false;
+	}
+}
+
+// These are the structures used to hold our non-volatile data.
+// We store the software reset data in the 512-byte user signature area of the SAM4E, SAM4S and SAME70 processors.
+// It must be a multiple of 4 bytes long.
+struct SoftwareResetData
+{
+	uint16_t magic;				   // the magic number, including the version
+	uint16_t resetReason;		   // this records why we did a software reset, for diagnostic purposes
+	int32_t neverUsedRam;		   // the amount of never used RAM at the last abnormal software reset
+	uint32_t hfsr;				   // hard fault status register
+	uint32_t cfsr;				   // configurable fault status register
+	uint32_t icsr;				   // interrupt control and state register
+	uint32_t bfar;				   // bus fault address register
+	uint32_t sp;				   // stack pointer
+	uint32_t when;				   // value of the RTC when the software reset occurred
+	uint32_t taskName;			   // first 4 bytes of the task name, or 'none'
+	uint32_t stackOffset;		   // how many spare words of stack the running task has
+	uint32_t stackMarkerValid : 1, // true if the stack low marker wasn't overwritten
+		spare : 31;				   // unused at present
+	// The stack length is set to 27 words because that is the most we can print in a single message using our 256-byte
+	// format buffer
+	uint32_t stack[27]; // stack when the exception occurred, with the link register and program counter at the bottom
+
+	[[nodiscard]] bool IsVacant() const noexcept; // return true if this struct can be written without erasing it first
+	[[nodiscard]] bool IsValid() const noexcept { return magic == magicValue; }
+	void Clear() noexcept;
+	void Populate(uint16_t reason, const uint32_t* _ecv_array _ecv_null stk) noexcept;
+	void PrintPart1(unsigned int slot, const StringRef& reply) const noexcept;
+	void PrintPart2(const StringRef& reply) const noexcept;
+
+	static constexpr uint16_t versionValue = 9; // increment this whenever this struct changes
+	static constexpr uint16_t magicValue =
+		0x7D00 | versionValue; // value we use to recognise that all the flash data has been written
+
+	static const char* const _ecv_array ReasonText[];
+	static uint8_t extraDebugInfo; // 3 bits of extra info for debugging can be stored here
+};
+
+#endif /* SRC_SOFTWARERESET_H_ */

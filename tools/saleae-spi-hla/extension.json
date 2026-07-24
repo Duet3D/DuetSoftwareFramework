@@ -1,0 +1,13 @@
+{
+    "version": "0.1.0",
+    "apiVersion": "1.0.0",
+    "author": "DuetSoftwareFramework",
+    "name": "Duet SBC SPI",
+    "description": "Decodes the DuetSoftwareFramework SBC <-> RepRapFirmware SPI link: transfer headers, header/data responses and data packet headers.",
+    "extensions": {
+        "Duet SBC SPI": {
+            "type": "HighLevelAnalyzer",
+            "entryPoint": "HighLevelAnalyzer.Hla"
+        }
+    }
+}

@@ -9,7 +9,8 @@ using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
-using DuetControlServer.Link.Adapter;
+using DuetControlServer.Link.Native;
+using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Utility;
 using Microsoft.Extensions.Logging;
@@ -23,44 +24,63 @@ namespace DuetControlServer.Link;
 /// Main firmware interface
 /// </summary>
 /// <param name="channels">Channel manager</param>
-/// <param name="linkAdapter">Firmware link adapter</param>
+/// <param name="nativeLink">Native SPI transfer loop</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings</param>
 [DiagnosticsPriority(-5)]
 public sealed partial class LinkInterface(
     Channel.Manager channels,
-    ILinkAdapter linkAdapter,
+    NativeLink nativeLink,
     ILogger<LinkInterface> logger,
     IOptions<Settings> settings) : IDiagnostics
 {
     // Information about the code channels
     internal int BytesReserved, BufferSpace;
-    internal readonly Queue<ModelQueryRequest> ModelQueryRequests = new();
-    internal readonly List<string> UpdatedObjectModelKeys = [];
 
-    // Expression evaluation and variable requests
-    internal readonly List<SetLastCodeResultRequest> SetLastCodeResultRequests = [];
-    internal readonly List<EvaluateExpressionRequest> EvaluateExpressionRequests = [];
-    internal readonly List<VariableRequest> VariableRequests = [];
+    // CAN bus requests
 
-    // Firmware updates
+    /// <summary>
+    /// Reserved transmission token used for CAN messages that are not a reply to one of our requests
+    /// </summary>
+    internal const ushort UnsolicitedTxToken = 0xFFFF;
+
+    internal readonly List<CanRequest> CanRequests = [];
+    private ushort _canTxToken;
+
+    // Firmware updates. LinkService watches FirmwareUpdateRequested and performs the flash, because
+    // only it owns the resource invalidation and object model updates an update implies
     internal readonly AsyncLock FirmwareUpdateLock = new();
     internal Stream? IapStream, FirmwareStream;
     internal TaskCompletionSource? FirmwareUpdateRequest;
 
-    // Firmware halt/restart requests
+    /// <summary>
+    /// Raised when a firmware update has been staged for <see cref="LinkService"/> to perform
+    /// </summary>
+    internal readonly SemaphoreSlim FirmwareUpdateRequested = new(0);
+
+    // Serialises firmware halt/restart requests against each other
     internal readonly AsyncLock FirmwareActionLock = new();
-    internal TaskCompletionSource? FirmwareHaltRequest;
-    internal TaskCompletionSource? FirmwareResetRequest;
+
+    /// <summary>
+    /// Invalidate pending codes and code-relevant requests, set by <see cref="LinkService"/>
+    /// </summary>
+    /// <remarks>
+    /// An emergency stop voids everything in flight, and that teardown spans the job processor and
+    /// channel processors which this class does not own. Rather than reach across, it calls back into
+    /// <see cref="LinkService"/>, which owns them
+    /// </remarks>
+    internal Action? InvalidateCodesCallback;
+
+    /// <summary>
+    /// Invalidate every resource, set by <see cref="LinkService"/>
+    /// </summary>
+    internal Action? InvalidateCallback;
 
     // Print handling
     internal readonly AsyncLock PrintStateLock = new();
     internal TaskCompletionSource? SetPrintInfoRequest;
     internal PrintStoppedReason StopPrintReason;
     internal TaskCompletionSource? StopPrintRequest;
-
-    // Miscellaneous requests
-    internal readonly Queue<Tuple<MessageTypeFlags, string>> MessagesToSend = new();
 
     /// <summary>
     /// Print diagnostics of this class
@@ -72,167 +92,152 @@ public sealed partial class LinkInterface(
         builder.AppendLine($"Code buffer space: {BufferSpace}");
     }
 
-    /// <summary>
-    /// Request a specific update of the object model
-    /// </summary>
-    /// <param name="key">Key to request</param>
-    /// <param name="flags">Object model flags</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Deserialized JSON document</returns>
-    public Task<byte[]> RequestObjectModel(string key, string flags, CancellationToken cancellationToken = default)
+    public Task<CanResponse> ConfigCanAsync(byte dstAddress, byte? newAddress, CanTiming timing, CancellationToken cancellationToken = default)
     {
-        if (cancellationToken.IsCancellationRequested)
+        CanMessageSetAddressAndNormalTiming message = new()
         {
-            return Task.FromCanceled<byte[]>(cancellationToken);
-        }
+            oldAddress = dstAddress,
+            newAddress = newAddress ?? dstAddress,
+            newAddressInverted = (byte)~(newAddress ?? dstAddress),
+            doSetTiming = CanMessageSetAddressAndNormalTiming.DoSetTimingYes,
+            normalTiming = timing
+        };
 
-        ModelQueryRequest request = new(key, flags);
-        lock (ModelQueryRequests)
+        return SendCanMessageAsync(dstAddress, in message, cancellationToken: cancellationToken);
+    }
+
+    public Task<CanResponse> ReportCanConfigAsync(byte dstAddress, CancellationToken cancellationToken = default)
+    {
+        CanMessageSetAddressAndNormalTiming message = new()
         {
-            ModelQueryRequests.Enqueue(request);
-        }
-        return request.Tcs.Task.WaitAsync(cancellationToken);
+            oldAddress = dstAddress,
+            doSetTiming = CanMessageSetAddressAndNormalTiming.DoSetTimingNo
+        };
+
+        return SendCanMessageAsync(dstAddress, message, CanMessageType.StandardReply, cancellationToken: cancellationToken);
+    }
+
+    public async Task EnableCanAsync(bool enable, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // The native loop stages this into the next transfer and reports back once it has been written
+        await nativeLink.EnableCanAsync(enable, cancellationToken);
+        logger.LogInformation("Sent CAN enable request: {Enable}", enable);
     }
 
     /// <summary>
-    /// Evaluate an arbitrary expression
+    /// Send a typed CAN message to an expansion board and wait for the (optional) reply
     /// </summary>
-    /// <param name="channel">Where to evaluate the expression</param>
-    /// <param name="expression">Expression to evaluate</param>
+    /// <typeparam name="TReq">Type of the CAN message body</typeparam>
+    /// <param name="dstAddress">CAN destination: 0..126, or 127 for broadcast</param>
+    /// <param name="message">CAN message body to send</param>
+    /// <param name="replyType">Expected reply type (<see cref="CanMessageType.NoReply"/> if none)</param>
+    /// <param name="flags">Flags for the CAN message</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Result of the evaluated expression</returns>
-    /// <exception cref="CodeParserException">Failed to evaluate expression</exception>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    /// <exception cref="NotSupportedException">Incompatible firmware version</exception>
-    /// <exception cref="ArgumentException">Invalid parameter</exception>
-    public Task<object?> EvaluateExpressionAsync(CodeChannel channel, string expression, CancellationToken cancellationToken = default)
+    /// <returns>Reassembled reply (empty if no reply was expected)</returns>
+    public Task<CanResponse> SendCanMessageAsync<TReq>(byte dstAddress, in TReq message, CanMessageType replyType = CanMessageType.NoReply, bool isResponse = false, CancellationToken cancellationToken = default)
+        where TReq : struct, ICanMessage<TReq>
     {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return Task.FromCanceled<object?>(cancellationToken);
-        }
-        if (linkAdapter.ProtocolVersion == 1)
-        {
-            throw new NotSupportedException("Incompatible firmware version");
-        }
-        if (Encoding.UTF8.GetByteCount(expression) >= Consts.MaxExpressionLength)
-        {
-            throw new ArgumentException($"Expression too long (max {Consts.MaxExpressionLength} chars)", nameof(expression));
-        }
+        // Only the leading GetActualDataLength() bytes are transmitted; variable-length messages report fewer
+        // bytes than sizeof(TReq), so writing the whole struct here would overrun a shorter payload buffer.
+        byte[] payload = new byte[message.GetActualDataLength()];
+        CanMessageSerializer.Serialize(in message, payload);
+        return SendCanMessageAsync(TReq.MessageType, replyType, dstAddress, payload, isResponse, cancellationToken);
+    }
 
-        lock (EvaluateExpressionRequests)
+    /// <summary>
+    /// Send a raw CAN message to an expansion board and wait for the (optional) reply
+    /// </summary>
+    /// <param name="messageType">Type of the CAN message</param>
+    /// <param name="replyType">Expected reply type (<see cref="CanMessageType.NoReply"/> if none)</param>
+    /// <param name="dstAddress">CAN destination: 0..126, or 127 for broadcast</param>
+    /// <param name="payload">Serialized CAN message payload</param>
+    /// <param name="flags">Flags for the CAN message</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Reassembled reply (empty if no reply was expected)</returns>
+    private async Task<CanResponse> SendCanMessageAsync(CanMessageType messageType, CanMessageType replyType, byte dstAddress, byte[] payload, bool isResponse, CancellationToken cancellationToken)
+    {
+        CanRequest request;
+        lock (CanRequests)
         {
-            foreach (EvaluateExpressionRequest item in EvaluateExpressionRequests)
+            if (replyType != CanMessageType.NoReply)
             {
-                if (item.Channel == channel && item.Expression == expression)
-                {
-                    // There is no reason to evaluate the same expression twice...
-                    return item.Task.WaitAsync(cancellationToken);
-                }
+                // set the RID (first 12 bits) to 0x7FF to indicate to the HAT that the firmware should allocate the RID for us.
+                payload[0] = 0xFF;
+                payload[1] |= 0x07;
             }
-
-            EvaluateExpressionRequest request = new(channel, expression);
-            EvaluateExpressionRequests.Add(request);
-            logger.LogDebug("Evaluating {Expression} on channel {Channel}", expression, channel);
-            return request.Task.WaitAsync(cancellationToken);
-        }
-    }
-
-    /// <summary>
-    /// Set or delete a global or local variable
-    /// </summary>
-    /// <param name="channel">Where to evaluate the expression</param>
-    /// <param name="createVariable">Whether the variable shall be created</param>
-    /// <param name="varName">Name of the variable</param>
-    /// <param name="expression">Expression to evaluate</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Result of the evaluated expression</returns>
-    /// <exception cref="CodeParserException">Failed to assign or delete variable</exception>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    /// <exception cref="NotSupportedException">Incompatible firmware version</exception>
-    /// <exception cref="ArgumentException">Invalid parameter</exception>
-    public Task<object?> SetVariableAsync(CodeChannel channel, bool createVariable, string varName, string? expression, CancellationToken cancellationToken = default)
-    {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return Task.FromCanceled<object?>(cancellationToken);
-        }
-        if (linkAdapter.ProtocolVersion < 5)
-        {
-            throw new NotSupportedException("Incompatible firmware version");
-        }
-        if (Encoding.UTF8.GetByteCount(varName) >= Consts.MaxVariableLength)
-        {
-            throw new ArgumentException($"Variable too long (max {Consts.MaxVariableLength} chars)");
-        }
-        if (expression is not null && Encoding.UTF8.GetByteCount(expression) >= Consts.MaxExpressionLength)
-        {
-            throw new ArgumentException($"Expression too long (max {Consts.MaxExpressionLength} chars)");
+            request = new(messageType, replyType, NextCanTxToken(), dstAddress, isResponse, payload);
+            CanRequests.Add(request);
+            logger.LogDebug("Queueing CAN message of type {MessageType} to address {DstAddress} expecting reply of type {ReplyType}", messageType, dstAddress, replyType);
         }
 
-        VariableRequest request;
-        lock (VariableRequests)
+        try
         {
-            request = new(channel, createVariable, varName, expression);
-            VariableRequests.Add(request);
-            if (expression is not null)
+            // Hand the message to the native loop, which stages it into the next transfer. The reply
+            // (if any) arrives as a CanResponse event and is matched back to this request by its token
+            nativeLink.QueueCanMessage(request.TxToken, (ushort)request.MessageType, (ushort)request.ReplyType,
+                request.DstAddress, request.IsResponse, request.RequestPayload);
+            request.Sent = true;
+
+            // A request expecting no reply is complete as soon as the native loop has taken it: there
+            // is nothing further to wait for, and no CanResponse event will ever arrive to resolve it.
+            // It must also be dropped from the list here, because only a matching response would
+            // otherwise remove it -- leaving it to accumulate for every fire-and-forget message.
+            if (!request.ExpectsReply)
             {
-                logger.LogDebug("Setting variable {Variable} to {Expression} on channel {Channel}", varName, expression, channel);
+                lock (CanRequests)
+                {
+                    CanRequests.Remove(request);
+                }
+                request.SetResult();
+            }
+        }
+        catch
+        {
+            lock (CanRequests)
+            {
+                CanRequests.Remove(request);
+            }
+            throw;
+        }
+
+        try
+        {
+            if (request.ExpectsReply)
+            {
+                // If no reply is received within the timeout, the request will be canceled and an exception will be thrown
+                await request.Task.WaitAsync(TimeSpan.FromMilliseconds(settings.Value.CanRequestTimeout), cancellationToken);
             }
             else
             {
-                logger.LogDebug("Deleting local variable {Variable} on channel {Channel}", varName, channel);
+                await request.Task.WaitAsync(cancellationToken);
             }
         }
-        return request.Task.WaitAsync(cancellationToken);
-    }
-
-    /// <summary>
-    /// Set the last code result for a specific code channel
-    /// </summary>
-    /// <param name="channel">Code channel</param>
-    /// <param name="result">Code result</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public Task SetLastCodeResultAsync(Code code, CancellationToken cancellationToken = default)
-    {
-        if (code.Result == null)
+        catch
         {
-            // No result to update the code from. Most likely the code was cancelled
-            return Task.CompletedTask;
-        }
-
-        CodeResult result = code.Result.Type switch
-        {
-            MessageType.Success => CodeResult.Ok,
-            MessageType.Warning => CodeResult.Warning,
-            MessageType.Error => CodeResult.Error,
-            _ => throw new ArgumentOutOfRangeException(nameof(code.Result), "Unknown message type"),
-        };
-
-        SetLastCodeResultRequest request;
-        lock (SetLastCodeResultRequests)
-        {
-            request = new(code.Channel, result);
-            SetLastCodeResultRequests.Add(request);
-            logger.LogDebug("Setting last code result to {Result} on channel {Channel}", result, code.Channel);
-        }
-        return request.Task.WaitAsync(cancellationToken);
-    }
-
-    /// <summary>
-    /// Notify that an object model key has changed
-    /// </summary>
-    /// <param name="key">Changed key</param>
-    public void ObjectModelKeyChanged(string key)
-    {
-        lock (UpdatedObjectModelKeys)
-        {
-            if (!UpdatedObjectModelKeys.Contains(key))
+            lock (CanRequests)
             {
-                UpdatedObjectModelKeys.Add(key);
+                CanRequests.Remove(request);
             }
+            throw;
         }
+        return CanResponse.FromRequest(request);
+    }
+
+    /// <summary>
+    /// Allocate the next CAN transmission token, skipping <see cref="UnsolicitedTxToken"/>.
+    /// Must be called while holding the <see cref="CanRequests"/> lock.
+    /// </summary>
+    /// <returns>Token to use for the next request</returns>
+    private ushort NextCanTxToken()
+    {
+        ushort token = _canTxToken++;
+        if (_canTxToken == UnsolicitedTxToken)
+        {
+            _canTxToken = 0;
+        }
+        return token;
     }
 
     /// <summary>
@@ -312,13 +317,14 @@ public sealed partial class LinkInterface(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        Task onFirmwareHalted;
         using (await FirmwareActionLock.LockAsync(cancellationToken))
         {
-            FirmwareHaltRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            onFirmwareHalted = FirmwareHaltRequest.Task;
+            // Everything pending is void the moment the controller halts, so tear it down before the
+            // request goes out rather than racing the halt
+            InvalidateCodesCallback?.Invoke();
+            await nativeLink.EmergencyStopAsync(cancellationToken);
         }
-        await onFirmwareHalted.WaitAsync(cancellationToken);
+        logger.LogWarning("Emergency stop");
     }
 
     /// <summary>
@@ -330,13 +336,13 @@ public sealed partial class LinkInterface(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        Task onFirmwareReset;
         using (await FirmwareActionLock.LockAsync(cancellationToken))
         {
-            FirmwareResetRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            onFirmwareReset = FirmwareResetRequest.Task;
+            // A reset invalidates every resource, not just the code-related ones
+            InvalidateCallback?.Invoke();
+            await nativeLink.ResetAsync(cancellationToken);
         }
-        await onFirmwareReset.WaitAsync(cancellationToken);
+        logger.LogWarning("Resetting controller");
     }
 
     /// <summary>
@@ -495,6 +501,9 @@ public sealed partial class LinkInterface(
             FirmwareStream = firmwareStream;
             FirmwareUpdateRequest = tcs;
         }
+
+        // Hand off to LinkService, which owns the invalidation and object model changes an update implies
+        FirmwareUpdateRequested.Release();
         await tcs.Task.WaitAsync(cancellationToken);
     }
 
@@ -508,7 +517,7 @@ public sealed partial class LinkInterface(
     /// <exception cref="ArgumentException">Invalid parameter</exception>
     public void SendMessage(MessageTypeFlags flags, string message)
     {
-        if (linkAdapter.ProtocolVersion == 1)
+        if (nativeLink.ProtocolVersion == 1)
         {
             throw new NotSupportedException("Incompatible firmware version");
         }
@@ -517,10 +526,7 @@ public sealed partial class LinkInterface(
             throw new ArgumentException($"{nameof(message)} too long");
         }
 
-        lock (MessagesToSend)
-        {
-            MessagesToSend.Enqueue(new Tuple<MessageTypeFlags, string>(flags, message));
-        }
+        nativeLink.QueueMessage(flags, message);
     }
 
     /// <summary>
@@ -536,23 +542,6 @@ public sealed partial class LinkInterface(
         {
             await channels[channel].AbortAllFilesAsync().WaitAsync(cancellationToken);
         }
-    }
-
-    /// <summary>
-    /// Send a pending code to the firmware
-    /// </summary>
-    /// <param name="code">Code to send</param>
-    /// <param name="codeLength">Length of the binary code in bytes</param>
-    /// <returns>Whether the code could be sent</returns>
-    internal bool SendCode(Code code, int codeLength)
-    {
-        if (BufferSpace > codeLength && linkAdapter.WriteCode(code))
-        {
-            BytesReserved += codeLength;
-            BufferSpace -= codeLength;
-            return true;
-        }
-        return false;
     }
 
     /// <summary>
@@ -585,32 +574,14 @@ public sealed partial class LinkInterface(
         }
         BytesReserved = BufferSpace = 0;
 
-        // Resolve pending code result, expression evaluation, and variable requests
-        lock (SetLastCodeResultRequests)
+        // Resolve pending CAN requests
+        lock (CanRequests)
         {
-            foreach (SetLastCodeResultRequest request in SetLastCodeResultRequests)
+            foreach (CanRequest request in CanRequests)
             {
                 request.SetCanceled();
             }
-            SetLastCodeResultRequests.Clear();
-        }
-
-        lock (EvaluateExpressionRequests)
-        {
-            foreach (EvaluateExpressionRequest request in EvaluateExpressionRequests)
-            {
-                request.SetCanceled();
-            }
-            EvaluateExpressionRequests.Clear();
-        }
-
-        lock (VariableRequests)
-        {
-            foreach (VariableRequest request in VariableRequests)
-            {
-                request.SetCanceled();
-            }
-            VariableRequests.Clear();
+            CanRequests.Clear();
         }
     }
 
@@ -619,29 +590,9 @@ public sealed partial class LinkInterface(
     /// </summary>
     internal void Invalidate()
     {
-        // Invalidate codes and code-relevant requests
+        // Invalidate codes and code-relevant requests. Messages no longer need clearing here: they go
+        // straight into the native outbound ring, which the transfer loop discards on a reset
         InvalidateCodes();
-
-        // Resolve pending object model requests
-        lock (ModelQueryRequests)
-        {
-            foreach (ModelQueryRequest request in ModelQueryRequests)
-            {
-                request.Tcs.SetCanceled();
-            }
-            ModelQueryRequests.Clear();
-        }
-
-        lock (UpdatedObjectModelKeys)
-        {
-            UpdatedObjectModelKeys.Clear();
-        }
-
-        // Clear messages to send to the firmware
-        lock (MessagesToSend)
-        {
-            MessagesToSend.Clear();
-        }
     }
 
     /// <summary>
@@ -675,32 +626,14 @@ public sealed partial class LinkInterface(
         }
         BytesReserved = BufferSpace = 0;
 
-        // Resolve pending code result, expression evaluation, and variable requests
-        lock (SetLastCodeResultRequests)
+        // Resolve pending CAN requests
+        lock (CanRequests)
         {
-            foreach (SetLastCodeResultRequest request in SetLastCodeResultRequests)
+            foreach (CanRequest request in CanRequests)
             {
                 request.SetCanceled();
             }
-            SetLastCodeResultRequests.Clear();
-        }
-
-        lock (EvaluateExpressionRequests)
-        {
-            foreach (EvaluateExpressionRequest request in EvaluateExpressionRequests)
-            {
-                request.SetCanceled();
-            }
-            EvaluateExpressionRequests.Clear();
-        }
-
-        lock (VariableRequests)
-        {
-            foreach (VariableRequest request in VariableRequests)
-            {
-                request.SetCanceled();
-            }
-            VariableRequests.Clear();
+            CanRequests.Clear();
         }
     }
 
@@ -710,28 +643,8 @@ public sealed partial class LinkInterface(
     /// <returns>Asynchronous task</returns>
     internal async Task InvalidateAsync(CancellationToken cancellationToken)
     {
-        // Invalidate codes and code-relevant requests
+        // Invalidate codes and code-relevant requests. See Invalidate() on why messages need no
+        // clearing here
         await InvalidateCodesAsync(cancellationToken);
-
-        // Resolve pending object model requests
-        lock (ModelQueryRequests)
-        {
-            foreach (ModelQueryRequest request in ModelQueryRequests)
-            {
-                request.Tcs.SetCanceled(cancellationToken);
-            }
-            ModelQueryRequests.Clear();
-        }
-
-        lock (UpdatedObjectModelKeys)
-        {
-            UpdatedObjectModelKeys.Clear();
-        }
-
-        // Clear messages to send to the firmware
-        lock (MessagesToSend)
-        {
-            MessagesToSend.Clear();
-        }
     }
 }

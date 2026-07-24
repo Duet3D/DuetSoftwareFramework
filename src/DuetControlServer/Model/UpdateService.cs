@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 
 namespace DuetControlServer.Model;
 
+#if false // TODO: remove this class if it is not needed anymore
 /// <summary>
 /// Service to keep the object model up-to-date with the firmware
 /// </summary>
@@ -210,6 +211,7 @@ public class UpdateService : BackgroundService
     /// <returns>Asynchronous task</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+#if false
         do
         {
             try
@@ -341,6 +343,7 @@ public class UpdateService : BackgroundService
             }
         }
         while (!stoppingToken.IsCancellationRequested);
+#endif
     }
 
     /// <summary>
@@ -437,7 +440,7 @@ public class UpdateService : BackgroundService
             float currentHeight = 0F;
             foreach (Axis axis in _model.Move.Axes)
             {
-                if (axis is { Letter: 'Z', UserPosition: {} })
+                if (axis is { Letter: 'Z', UserPosition: { } })
                 {
                     currentHeight = axis.UserPosition.Value;
                     break;
@@ -524,3 +527,4 @@ public class UpdateService : BackgroundService
         }
     }
 }
+#endif

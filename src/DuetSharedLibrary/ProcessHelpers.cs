@@ -63,6 +63,58 @@ public static class ProcessHelpers
     }
 
     /// <summary>
+    /// Pin the calling thread to a specific CPU core using sched_setaffinity.
+    /// </summary>
+    /// <param name="coreId">Zero-based CPU core index to pin to</param>
+    /// <returns>True if the affinity was set successfully</returns>
+    public static bool PinCurrentThreadToCore(int coreId)
+    {
+        ulong mask = 1UL << coreId;
+        return Interop.sched_setaffinity(0, (IntPtr)sizeof(ulong), ref mask) == 0;
+    }
+
+    /// <summary>
+    /// Switch the calling thread to the SCHED_FIFO real-time scheduling policy at the given priority.
+    /// This is what actually gives a thread deterministic, preemptive-over-CFS latency on a PREEMPT_RT
+    /// kernel; plain thread affinity or <see cref="System.Threading.ThreadPriority"/> (which only maps to
+    /// a nice value on Linux) does not. Requires CAP_SYS_NICE or a suitable RLIMIT_RTPRIO
+    /// </summary>
+    /// <param name="priority">Real-time priority (1..99); higher preempts lower</param>
+    /// <returns>True if the scheduling policy was applied successfully</returns>
+    public static bool SetCurrentThreadRealtimePriority(int priority)
+    {
+        int min = Interop.sched_get_priority_min(Interop.SCHED_FIFO);
+        int max = Interop.sched_get_priority_max(Interop.SCHED_FIFO);
+        if (min >= 0 && max >= min)
+        {
+            // Clamp to the range the kernel actually accepts for SCHED_FIFO
+            priority = Math.Clamp(priority, min, max);
+        }
+
+        Interop.sched_param param = new() { sched_priority = priority };
+        return Interop.sched_setscheduler(0, Interop.SCHED_FIFO, ref param) == 0;
+    }
+
+    public static bool IsRaspberryPi()
+    {
+        try
+        {
+            foreach (string line in File.ReadLines("/proc/cpuinfo"))
+            {
+                if (line.StartsWith("Hardware", StringComparison.OrdinalIgnoreCase) && line.Contains("BCM"))
+                    return true;
+                if (line.StartsWith("Model", StringComparison.OrdinalIgnoreCase) && line.Contains("Raspberry Pi"))
+                    return true;
+            }
+        }
+        catch (IOException)
+        {
+            // Not on Linux or /proc/cpuinfo unavailable
+        }
+        return false;
+    }
+
+    /// <summary>
     /// Check whether the process was exec'd with <c>AT_SECURE=1</c>. Parses /proc/{pid}/auxv looking for the AT_SECURE
     /// entry (type 23) set to non-zero. The kernel sets this when the exec crosses a privilege boundary (setuid,
     /// setgid, or file capabilities), causing glibc to ignore LD_PRELOAD and related environment variables. The bit is
