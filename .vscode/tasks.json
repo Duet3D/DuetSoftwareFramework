@@ -762,7 +762,7 @@
             "label": "[Style] Tidy DuetCANMaster",
             "type": "shell",
             "dependsOn": "[Style] Generate Compile DB - DuetCANMaster",
-            "command": "run-clang-tidy-18 -p . -j $(nproc) -quiet '^.*/src/DuetCANMaster/src/(?!libc/|libcpp/|Hardware/ExceptionHandlers).*\\.cpp$' 2>&1 | awk -f ${workspaceFolder}/scripts/tidy-report.awk",
+            "command": "run-clang-tidy -p . -j $(nproc) -quiet '^.*/src/DuetCANMaster/src/(?!libc/|libcpp/|Hardware/ExceptionHandlers).*\\.cpp$' 2>&1 | awk -f ${workspaceFolder}/scripts/tidy-report.awk",
             "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
             "problemMatcher": [ "$gcc" ],
             "group": "test",
@@ -771,7 +771,7 @@
         {
             "label": "[Style] Tidy DuetSbcInterface",
             "type": "shell",
-            "command": "test -f build/compile_commands.json || { echo 'No build/compile_commands.json - run [Style] Generate Compile DB - DuetSbcInterface first' >&2; exit 1; }; run-clang-tidy-18 -p build -j $(nproc) -quiet '^.*/src/DuetSbcInterface/(src|harness|tests)/.*\\.cpp$' 2>&1 | awk -f ${workspaceFolder}/scripts/tidy-report.awk",
+            "command": "test -f build/compile_commands.json || { echo 'No build/compile_commands.json - run [Style] Generate Compile DB - DuetSbcInterface first' >&2; exit 1; }; run-clang-tidy -p build -j $(nproc) -quiet '^.*/src/DuetSbcInterface/(src|harness|tests)/.*\\.cpp$' 2>&1 | awk -f ${workspaceFolder}/scripts/tidy-report.awk",
             "options": { "cwd": "${workspaceFolder}/src/DuetSbcInterface" },
             "problemMatcher": [ "$gcc" ],
             "group": "test",

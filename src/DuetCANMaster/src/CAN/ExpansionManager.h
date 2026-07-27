@@ -19,7 +19,7 @@
 
 #  include <Platform/UniqueId.h>
 
-NamedEnum(BoardState, uint8_t, unknown, flashing, flashFailed, resetting, running, timedOut);
+NamedEnum(BoardState, uint8_t, Unknown, Flashing, FlashFailed, Resetting, Running, TimedOut);
 
 struct ExpansionBoardData
 {
