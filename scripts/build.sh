@@ -3,8 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-DEFAULT_BUILD_DIR="$REPO_ROOT/build/dotnet"
-DEFAULT_AOT_BUILD_DIR="$REPO_ROOT/build/aot"
+DEFAULT_BUILD_DIR="$REPO_ROOT/build/dotnet/"
+DEFAULT_AOT_BUILD_DIR="$REPO_ROOT/build/aot/"
 
 declare -A PROJECT_SRC=(
     [DuetControlServer]="src/DuetControlServer"
@@ -70,7 +70,7 @@ Options:
       --arch           Architecture to build for. Defaults to "$ARCH"
       --build-type     Defaults to "Debug"
   -p, --publish-args   msbuild properties
-  -o, --dest-dir       Defaults to "$DEFAULT_BUILD_DIR unless --aot then "$DEFAULT_AOT_BUILD_DIR/<arch>" 
+  -o, --dest-dir       Defaults to "$DEFAULT_BUILD_DIR unless --aot then "$DEFAULT_AOT_BUILD_DIR/<arch>/" 
   -h, --help           Show this help
 
 Projects (specify one or more, or use --all):
@@ -126,7 +126,7 @@ echo "Arch: $ARCH"
 
 if [[ -z "$BUILD_DIR" ]]; then
     if $AOT; then
-        BUILD_DIR="$DEFAULT_AOT_BUILD_DIR/$ARCH"
+        BUILD_DIR="$DEFAULT_AOT_BUILD_DIR/$ARCH/"
     else
         BUILD_DIR="$DEFAULT_BUILD_DIR"
     fi
@@ -228,6 +228,11 @@ build_sbc_interface() {
 }
 
 # --- Build ---
+publish_args=()
+if [[ -n "$PUBLISH_ARGS" ]]; then
+    publish_args+=("-p:$PUBLISH_ARGS")
+fi
+
 if ! $SKIP_BUILD; then
     mkdir -p "$BUILD_DIR"
     for project in "${SELECTED[@]}"; do
@@ -235,11 +240,13 @@ if ! $SKIP_BUILD; then
             build_sbc_interface
             continue
         fi
-        echo "=== Building $project ==="
+
         if $AOT; then
-            dotnet publish "$REPO_ROOT/${PROJECT_SRC[$project]}" -r "$ARCH" -c "$BUILD_TYPE" -p:AotPublish=true -p:ObjCopyName="$OBJCOPY_NAME" -p:"$PUBLISH_ARGS" -o $BUILD_DIR
+            echo "=== Building $project (Native AOT) ==="
+            dotnet publish "$REPO_ROOT/${PROJECT_SRC[$project]}" -r "$ARCH" -c "$BUILD_TYPE" -p:AotPublish=true -p:ObjCopyName="$OBJCOPY_NAME" "${publish_args[@]}" -o "$BUILD_DIR"
         else
-            dotnet publish -r $ARCH -c "$BUILD_TYPE" --self-contained "$REPO_ROOT/${PROJECT_SRC[$project]}" -p:"$PUBLISH_ARGS" -o "$BUILD_DIR"
+            echo "=== Building $project (dotnet runtime) ==="
+            dotnet publish "$REPO_ROOT/${PROJECT_SRC[$project]}" -r "$ARCH" -c "$BUILD_TYPE" --self-contained "${publish_args[@]}" -o "$BUILD_DIR/"
         fi
     done
 fi
@@ -261,7 +268,7 @@ fi
 
 # --- Sync binaries ---
 # Use --delete only when all projects are selected to avoid wiping unselected binaries
-RSYNC_OPTS="-rav"
+RSYNC_OPTS="-rav --exclude='*.dbg' --exclude='*.pdb' --exclude='*.xml'"
 $ALL && RSYNC_OPTS="$RSYNC_OPTS --delete"
 
 if $LOCAL; then
