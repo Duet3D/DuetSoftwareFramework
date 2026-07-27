@@ -168,6 +168,15 @@ jobs:
             --filter "FullyQualifiedName!~UnitTests.HttpClient" \
             --logger "trx;LogFileName=UnitTests.trx" --results-directory test-results
 
+      # The DuetSbcInterface tests are host-side and only get built when not cross-compiling, so
+      # they run through the native preset rather than the arm64 one the deployable .so uses.
+      - name: Build and run DuetSbcInterface tests
+        working-directory: src/DuetSbcInterface
+        run: |
+          cmake --preset native
+          cmake --build --preset native --target ring_buffer_tests -j"$(nproc)"
+          ctest --test-dir build/native --output-on-failure
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
