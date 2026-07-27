@@ -3,8 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-DEFAULT_BUILD_DIR="$REPO_ROOT/build/dotnet/"
-DEFAULT_AOT_BUILD_DIR="$REPO_ROOT/build/aot/"
+DEFAULT_BUILD_DIR="$REPO_ROOT/build/dotnet"
+DEFAULT_AOT_BUILD_DIR="$REPO_ROOT/build/aot"
 
 declare -A PROJECT_SRC=(
     [DuetControlServer]="src/DuetControlServer"
@@ -77,6 +77,11 @@ Projects (specify one or more, or use --all):
 $(printf '  %s\n' "${ALL_PROJECTS[@]}")
 
 Notes:
+  Projects publish to their own default output directory (bin/<config>/<tfm>/<rid>/publish) and the
+  selected ones are then collated into the build directory. With --all the whole solution is
+  published in one go (MSBuild parallelises it); otherwise the selected projects are published
+  concurrently.
+
   DuetSbcInterface is the native SPI transfer loop (libduet_sbc.so) that DuetControlServer
   P/Invokes into. DCS cannot run without it, so selecting DuetControlServer builds it too.
 
@@ -126,7 +131,7 @@ echo "Arch: $ARCH"
 
 if [[ -z "$BUILD_DIR" ]]; then
     if $AOT; then
-        BUILD_DIR="$DEFAULT_AOT_BUILD_DIR/$ARCH/"
+        BUILD_DIR="$DEFAULT_AOT_BUILD_DIR/$ARCH"
     else
         BUILD_DIR="$DEFAULT_BUILD_DIR"
     fi
@@ -228,27 +233,131 @@ build_sbc_interface() {
 }
 
 # --- Build ---
+# Nothing is published straight into BUILD_DIR: every project publishes to its own default publish
+# directory (bin/<config>/<tfm>/<rid>/publish) and collect_output() copies the selected ones into
+# BUILD_DIR afterwards. That keeps concurrent publishes from writing to a shared output directory.
+SOLUTION="$REPO_ROOT/src/DuetSoftwareFramework.sln"
+
+if $AOT; then
+    BUILD_LABEL="Native AOT"
+else
+    BUILD_LABEL="dotnet runtime"
+fi
+
 publish_args=()
 if [[ -n "$PUBLISH_ARGS" ]]; then
     publish_args+=("-p:$PUBLISH_ARGS")
 fi
 
+# dotnet_publish <project-or-solution path>
+dotnet_publish() {
+    local target="$1"
+    if $AOT; then
+        dotnet publish "$target" -r "$ARCH" -c "$BUILD_TYPE" -p:AotPublish=true -p:ObjCopyName="$OBJCOPY_NAME" "${publish_args[@]}"
+    else
+        dotnet publish "$target" -r "$ARCH" -c "$BUILD_TYPE" --self-contained "${publish_args[@]}"
+    fi
+}
+
+# The target framework is part of the publish path and is not known here, hence the glob
+project_publish_dir() {
+    local project="$1"
+    local matches=("$REPO_ROOT/${PROJECT_SRC[$project]}"/bin/"$BUILD_TYPE"/*/"$ARCH"/publish)
+    if [[ ${#matches[@]} -ne 1 || ! -d "${matches[0]}" ]]; then
+        echo "Error: expected exactly one publish directory for $project, got: ${matches[*]}" >&2
+        return 1
+    fi
+    echo "${matches[0]}"
+}
+
+# write_solution_filter <path>
+# The whole solution cannot be published as-is: the multi-target libraries (DuetAPI,
+# DuetHttpClient) fail with NETSDK1129 unless a target framework is given, and the test and
+# documentation projects are not deployed. A filter narrows the publish to the deployable projects;
+# their project references are still built as dependencies.
+write_solution_filter() {
+    local filter="$1" project first=true
+    {
+        printf '{\n  "solution": {\n    "path": "%s",\n    "projects": [\n' "$SOLUTION"
+        for project in "${DOTNET_PROJECTS[@]}"; do
+            $first || printf ',\n'
+            first=false
+            # Paths in a filter are relative to the solution, which lives in src/
+            printf '      "%s/%s.csproj"' "${PROJECT_SRC[$project]#src/}" "$project"
+        done
+        printf '\n    ]\n  }\n}\n'
+    } > "$filter"
+}
+
+# Merge the per-project publish directories into BUILD_DIR. The projects share most of their
+# dependencies, so the copies overlap; later copies simply overwrite identical files.
+collect_output() {
+    echo "=== Collecting publish output into $BUILD_DIR ==="
+    local project publish_dir
+    for project in "${SELECTED[@]}"; do
+        [[ "$project" == "DuetSbcInterface" ]] && continue
+        publish_dir="$(project_publish_dir "$project")"
+        cp -a "$publish_dir/." "$BUILD_DIR/"
+        echo "    $project <- $publish_dir"
+    done
+}
+
 if ! $SKIP_BUILD; then
     mkdir -p "$BUILD_DIR"
-    for project in "${SELECTED[@]}"; do
-        if [[ "$project" == "DuetSbcInterface" ]]; then
-            build_sbc_interface
-            continue
-        fi
 
-        if $AOT; then
-            echo "=== Building $project (Native AOT) ==="
-            dotnet publish "$REPO_ROOT/${PROJECT_SRC[$project]}" -r "$ARCH" -c "$BUILD_TYPE" -p:AotPublish=true -p:ObjCopyName="$OBJCOPY_NAME" "${publish_args[@]}" -o "$BUILD_DIR"
-        else
-            echo "=== Building $project (dotnet runtime) ==="
-            dotnet publish "$REPO_ROOT/${PROJECT_SRC[$project]}" -r "$ARCH" -c "$BUILD_TYPE" --self-contained "${publish_args[@]}" -o "$BUILD_DIR/"
-        fi
+    if [[ " ${SELECTED[*]} " == *" DuetSbcInterface "* ]]; then
+        build_sbc_interface
+    fi
+
+    DOTNET_PROJECTS=()
+    for project in "${SELECTED[@]}"; do
+        [[ "$project" == "DuetSbcInterface" ]] || DOTNET_PROJECTS+=("$project")
     done
+
+    if $ALL; then
+        # A single publish of the solution; MSBuild builds the projects in parallel itself
+        echo "=== Building solution ($BUILD_LABEL) ==="
+        FILTER_DIR="$(mktemp -d)"
+        write_solution_filter "$FILTER_DIR/DuetSoftwareFramework.slnf"
+        dotnet_publish "$FILTER_DIR/DuetSoftwareFramework.slnf"
+        rm -rf "$FILTER_DIR"
+    elif [[ ${#DOTNET_PROJECTS[@]} -eq 1 ]]; then
+        echo "=== Building ${DOTNET_PROJECTS[0]} ($BUILD_LABEL) ==="
+        dotnet_publish "$REPO_ROOT/${PROJECT_SRC[${DOTNET_PROJECTS[0]}]}"
+    elif [[ ${#DOTNET_PROJECTS[@]} -gt 1 ]]; then
+        # The projects share most of their project references (DuetAPI, DuetAPIClient,
+        # DuetSharedLibrary). Building one of them first brings those up to date so the parallel
+        # publishes below do not race each other building the same dependency.
+        echo "=== Building shared dependencies ==="
+        dotnet build "$REPO_ROOT/${PROJECT_SRC[${DOTNET_PROJECTS[0]}]}" -r "$ARCH" -c "$BUILD_TYPE" "${publish_args[@]}"
+
+        # Each project publishes to its own output directory, so they can run concurrently. Their
+        # logs would interleave, so each is captured and only printed if that publish fails.
+        LOG_DIR="$(mktemp -d)"
+        declare -A BUILD_PIDS=()
+        for project in "${DOTNET_PROJECTS[@]}"; do
+            echo "=== Building $project ($BUILD_LABEL) ==="
+            dotnet_publish "$REPO_ROOT/${PROJECT_SRC[$project]}" > "$LOG_DIR/$project.log" 2>&1 &
+            BUILD_PIDS[$project]=$!
+        done
+
+        build_failed=false
+        for project in "${!BUILD_PIDS[@]}"; do
+            if wait "${BUILD_PIDS[$project]}"; then
+                echo "=== $project built ==="
+            else
+                echo "Error: $project build failed" >&2
+                cat "$LOG_DIR/$project.log" >&2
+                build_failed=true
+            fi
+        done
+        rm -rf "$LOG_DIR"
+        $build_failed && exit 1
+    fi
+
+    if [[ ${#DOTNET_PROJECTS[@]} -gt 0 ]]; then
+        collect_output
+    fi
 fi
 
 if ! $DEPLOY; then
