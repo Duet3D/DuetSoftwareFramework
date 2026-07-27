@@ -90,6 +90,59 @@ jobs:
       - name: Build ${{ matrix.project }}
         run: ./scripts/build.sh --aot --arch "$ARCH" ${{ matrix.project }}
 
+  # Bare-metal DuetCANMaster firmware (arm-none-eabi), built through its CMake presets.
+  # The per-board presets are built here so a break in any single board is visible on its own.
+  firmware:
+    needs: image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.image.outputs.image }}
+      # The image is private to the repository, so the job needs credentials to pull it
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - preset: release
+            configure: release
+          - preset: Duet3_MB6HC
+            configure: release
+          - preset: Duet3_MB6XD
+            configure: release
+          - preset: debug
+            configure: debug
+          - preset: Duet3_MB6HC-debug
+            configure: debug
+          - preset: Duet3_MB6XD-debug
+            configure: debug
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Mark workspace as a safe git directory
+        run: git config --global --add safe.directory '*'
+
+      # LIBRARIES_DIR points at lib/, so the firmware needs those submodules. They are recorded with
+      # git@ URLs; rewriting to https lets the public repos be cloned without a key. Only
+      # LibTinyusb's nested tinyusb is compiled, so the other nested submodules are left alone.
+      - name: Check out firmware libraries
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git submodule update --init --depth 1 lib
+          git -C lib/LibTinyusb submodule update --init --depth 1 src/tinyusb
+
+      - name: Configure (${{ matrix.configure }})
+        working-directory: src/DuetCANMaster
+        run: cmake --preset ${{ matrix.configure }}
+
+      - name: Build ${{ matrix.preset }}
+        working-directory: src/DuetCANMaster
+        run: cmake --build --preset ${{ matrix.preset }} -j"$(nproc)"
+
   test:
     needs: image
     runs-on: ubuntu-24.04
