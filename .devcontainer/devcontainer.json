@@ -13,11 +13,12 @@
         "ms-dotnettools.csharp",
         "ms-dotnettools.csdevkit",
         "editorconfig.editorconfig",
-				"ms-vscode.cpptools",
-				"ms-vscode.makefile-tools",
-				"ms-vscode.cmake-tools",
+        "ms-vscode.cpptools",
+        "ms-vscode.makefile-tools",
+        "ms-vscode.cmake-tools",
         "ms-python.python",
-        "rioj7.command-variable"
+        "rioj7.command-variable",
+        "github.vscode-github-actions"
       ],
       "settings": {
         "cmake.sourceDirectory": [
