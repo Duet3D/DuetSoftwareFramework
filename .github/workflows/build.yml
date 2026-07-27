@@ -8,10 +8,6 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # Architecture passed to scripts/build.sh (--arch)
-  ARCH: linux-arm64
-
 jobs:
   # The devcontainer image carries the cross toolchains, CMake and the .NET SDK the build needs.
   # It is pushed to GHCR under a tag derived from its inputs, so it is only rebuilt when the
@@ -67,8 +63,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Every deployable architecture, each built both ways: Native AOT is what is shipped, the
+        # plain runtime build is kept working as the fallback and for debugging.
+        arch:
+          - linux-arm64
+          - linux-arm
+          - linux-x64
+        mode:
+          - aot
+          - runtime
         # Built one project per job rather than with --all so they run in parallel.
-        # DuetControlServer implicitly pulls in DuetSbcInterface (libduet_sbc.so).
+        # DuetControlServer implicitly pulls in DuetSbcInterface (libduet_sbc.so) for the same arch.
         project:
           - DuetControlServer
           - DuetSbcInterface
@@ -81,14 +86,18 @@ jobs:
           - CustomHttpEndpoint
           - ModelObserver
           - PluginManager
+        exclude:
+          # DuetSbcInterface is native C++ and is built the same way either way, so once per arch
+          - project: DuetSbcInterface
+            mode: aot
     steps:
       - uses: actions/checkout@v6
 
       - name: Mark workspace as a safe git directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Build ${{ matrix.project }}
-        run: ./scripts/build.sh --aot --arch "$ARCH" ${{ matrix.project }}
+      - name: Build ${{ matrix.project }} (${{ matrix.arch }}, ${{ matrix.mode }})
+        run: ./scripts/build.sh ${{ matrix.mode == 'aot' && '--aot' || '' }} --arch ${{ matrix.arch }} ${{ matrix.project }}
 
   # Bare-metal DuetCANMaster firmware (arm-none-eabi), built through its CMake presets.
   # The per-board presets are built here so a break in any single board is visible on its own.

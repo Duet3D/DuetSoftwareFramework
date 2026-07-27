@@ -198,24 +198,36 @@ resolve_sysroot() {
 build_sbc_interface() {
     echo "=== Building DuetSbcInterface (libduet_sbc.so) ==="
 
-    # One of the presets in src/DuetSbcInterface/CMakePresets.json; they all put their build tree
-    # in build/<preset-name>.
-    local preset cmake_args=()
-    if [[ "$(uname -m)" == "aarch64" ]]; then
+    # The .so is loaded by the managed binaries, so it has to be built for --arch as well. Each arch
+    # maps onto a cross-compiling preset in src/DuetSbcInterface/CMakePresets.json, except when the
+    # host already is that architecture, in which case there is nothing to cross-compile.
+    local preset cmake_args=() cross_preset host_arch native=false
+    host_arch="$(uname -m)"
+    case "$ARCH" in
+        linux-arm64) cross_preset=arm64 ; [[ "$host_arch" == "aarch64" ]] && native=true ;;
+        linux-arm)   cross_preset=armhf ; [[ "$host_arch" == "armv7l" || "$host_arch" == "armv6l" ]] && native=true ;;
+        # There is no x86_64 cross toolchain in the container, so linux-x64 is host-only
+        linux-x64)   cross_preset="" ; [[ "$host_arch" == "x86_64" ]] && native=true ;;
+    esac
+
+    if $native; then
         # Already on the target architecture (e.g. building on the Pi itself with --local): build
         # natively. That needs no toolchain and no sysroot, and gets glibc right by construction.
-        echo "    Host is aarch64; building natively"
+        echo "    Host is $host_arch; building natively"
         preset=native
+    elif [[ -z "$cross_preset" ]]; then
+        echo "Error: cannot build $SBC_LIB_NAME for $ARCH on $host_arch; no cross toolchain" >&2
+        exit 1
     else
         resolve_sysroot
         if [[ -n "$SYSROOT" ]]; then
             echo "    Linking against sysroot: $SYSROOT"
-            preset=arm64-sysroot
+            preset="$cross_preset-sysroot"
             # The preset defaults to pi-sysroot/; --sysroot may point somewhere else.
             cmake_args+=("-DDUET_SBC_SYSROOT=$SYSROOT")
         else
-            preset=arm64
-            echo "    Cross-compiling against the container's aarch64 libraries (glibc 2.36)"
+            preset="$cross_preset"
+            echo "    Cross-compiling against the container's $cross_preset libraries (glibc 2.36)"
         fi
     fi
 
