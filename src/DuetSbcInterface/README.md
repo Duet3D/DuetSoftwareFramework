@@ -51,18 +51,19 @@ Requires a C++17 compiler, CMake ≥ 3.21 (for presets) and Linux UAPI headers (
 | Preset | Builds for | glibc it links against |
 | --- | --- | --- |
 | `native` | this machine | this machine's |
-| `arm64` | aarch64 | **this container's (2.39)** — compile/lint test only |
-| `pi-arm64` | aarch64 | the Pi's, from `pi-sysroot/` — deployable |
+| `arm64` | aarch64 | this container's (2.36) — deployable to Bookworm |
+| `arm64-sysroot` | aarch64 | the Pi's, from `pi-sysroot/` — for pre-Bookworm targets |
 
 Each uses its own build tree (`build/<preset>`), and
 `scripts/build.sh` picks between them the same way: `native` when it is already running on aarch64,
-otherwise `pi-arm64` if a sysroot is available and `arm64` if not.
+otherwise `arm64`, or `arm64-sysroot` when a sysroot is explicitly requested.
 
 ### Cross-compile in the devcontainer for a 64-bit Pi (recommended)
 
-The devcontainer ships the `aarch64-linux-gnu` cross toolchain (`crossbuild-essential-arm64`). Both
-aarch64 presets **statically link** the test binary, so it runs on Raspberry Pi OS Bookworm
-regardless of its glibc version (the container's toolchain targets a newer glibc):
+The devcontainer ships the `aarch64-linux-gnu` cross toolchain (`crossbuild-essential-arm64`). It is
+based on Debian Bookworm, so that toolchain targets the same glibc (2.36) as Raspberry Pi OS
+Bookworm and everything it builds is deployable as-is. Both aarch64 presets additionally
+**statically link** the test binary, so it runs on any Pi OS release:
 
 ```sh
 cd src/DuetSbcInterface
@@ -75,19 +76,27 @@ scp build/arm64/harness/sbc_jitter_test pi@raspberrypi:~/
 
 `file build/arm64/harness/sbc_jitter_test` should report `ARM aarch64 ... statically linked`.
 
-`libduet_sbc.so` is the exception — a shared library links glibc dynamically, so one built this way
-fails to load on the Pi with a `GLIBC_2.3x not found` error. Build it with `pi-arm64`, which
-links against a copy of the Pi's own libraries and refuses to configure if that copy is missing:
+`libduet_sbc.so` cannot be statically self-contained, so it links glibc dynamically and its
+requirements have to be satisfiable on the target. Under `arm64` the highest version it asks for is
+`GLIBC_2.17`, comfortably below Bookworm's 2.36, so it loads on the Pi unchanged. Check with:
+
+```sh
+aarch64-linux-gnu-objdump -p build/arm64/src/libduet_sbc.so | grep -o 'GLIBC_[0-9.]*' | sort -uV
+```
+
+#### Targeting an older Pi OS release
+
+`arm64-sysroot` exists for the case where the target's glibc is *older* than the container's. It links
+against a copy of the Pi's own libraries and refuses to configure if that copy is missing:
 
 ```sh
 scripts/fetch-pi-sysroot.sh pi@raspberrypi          # one-off, into pi-sysroot/
-cmake --preset pi-arm64
-cmake --build --preset pi-arm64 -j
+cmake --preset arm64-sysroot
+cmake --build --preset arm64-sysroot -j
 ```
 
-Use `-DDUET_SBC_SYSROOT=<dir>` to point it at a sysroot kept somewhere else. `arm64` is there so
-that the code can still be compiled and linted with no Pi in reach; treat its `.so` as a build
-artifact only.
+Use `-DDUET_SBC_SYSROOT=<dir>` to point it at a sysroot kept somewhere else. `scripts/build.sh`
+never reaches for this on its own — pass `--sysroot <dir>` or `--fetch-sysroot`.
 
 ### Build natively on the Pi
 
@@ -118,14 +127,15 @@ libstdc++ inside the Pi sysroot, where GCC never looks for it).
 - `src/libduet_sbc.a` — static library
 
 > **P/Invoke `.so` note:** a shared library must link glibc dynamically, so the cross-built
-> `libduet_sbc.so` requires the target's glibc. To produce a Bookworm-compatible `.so`, either build
-> it natively on the Pi, or fetch a Pi sysroot and do a glibc-matched dynamic build:
+> `libduet_sbc.so` needs the target's glibc to be no older than what it was linked against. The
+> container and Raspberry Pi OS Bookworm both ship glibc 2.36, so the `arm64` build deploys as-is.
+> Only for an older Pi OS release do you need a sysroot:
 > ```sh
 > scripts/fetch-pi-sysroot.sh pi@raspberrypi
-> cmake --preset pi-arm64 -DDUET_SBC_STATIC=OFF
-> cmake --build --preset pi-arm64
+> cmake --preset arm64-sysroot -DDUET_SBC_STATIC=OFF
+> cmake --build --preset arm64-sysroot
 > ```
-> The standalone jitter test does not need this — it is statically linked.
+> The standalone jitter test never needs this — it is statically linked.
 
 ## Run the jitter test
 
@@ -242,11 +252,11 @@ cd src/DuetControlServer
 make ARCH=arm64 CONFIG=Release publish
 ```
 
-> **glibc:** a `.so` must link glibc dynamically, so a cross-built one needs the *target's* glibc. The
-> devcontainer toolchain targets a newer glibc than Raspberry Pi OS Bookworm, so for release packages
-> either build on the Pi or pass a matching sysroot:
+> **glibc:** a `.so` must link glibc dynamically, so a cross-built one must not need a newer glibc
+> than the target has. The devcontainer is Debian Bookworm and targets the same glibc 2.36 as
+> Raspberry Pi OS Bookworm, so no sysroot is needed. To target an older release, pass one:
 > `make ARCH=arm64 DUET_SBC_SYSROOT=/path/to/pi-sysroot publish`
-> (see `scripts/fetch-pi-sysroot.sh`). A native-`ARCH` build needs no sysroot.
+> (see `scripts/fetch-pi-sysroot.sh`).
 
 ## Sharing with DuetCANMaster
 

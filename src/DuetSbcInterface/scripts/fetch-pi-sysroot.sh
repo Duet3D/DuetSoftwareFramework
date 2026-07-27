@@ -8,8 +8,8 @@
 #   scripts/fetch-pi-sysroot.sh <user@pi-host> [dest-dir]
 #
 # Then configure with the sysroot:
-#   cmake --preset pi-arm64
-#   cmake --build --preset pi-arm64
+#   cmake --preset arm64-sysroot
+#   cmake --build --preset arm64-sysroot
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then

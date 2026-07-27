@@ -31,5 +31,7 @@
   "postStartCommand": "echo 'Ready: run the `Build and Deploy` task or `cd src && dotnet build DuetSoftwareFramework.sln`'",
 	"runArgs": [
 		"--add-host=host.docker.internal:host-gateway"
-	]
+	],
+
+  "remoteUser": "vscode"
 }

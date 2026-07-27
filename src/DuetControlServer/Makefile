@@ -10,14 +10,12 @@ include ../../Makefile.components
 # thread; DuetControlServer P/Invokes into it via Link/Native. The .so therefore has to be built for
 # the same architecture as the managed output and shipped alongside it.
 #
-# NOTE ON GLIBC: a shared library must link glibc dynamically, so a cross-built .so requires the
-# target's glibc at runtime. The devcontainer toolchain targets a newer glibc than Raspberry Pi OS
-# Bookworm, so a cross-built .so will fail to load on the Pi with "GLIBC_2.3x not found". For release
-# packages, either build on the target or pass a matching sysroot:
+# NOTE ON GLIBC: a shared library must link glibc dynamically, so a cross-built .so must not require
+# a newer glibc than the target has. The devcontainer is Debian Bookworm and its cross toolchain
+# targets the same glibc 2.36 as Raspberry Pi OS Bookworm, so a cross-built .so loads on the Pi as-is
+# and no sysroot is involved. To target an older release, pass one:
 #
 #     make DUET_SBC_SYSROOT=/path/to/pi-sysroot   (see src/DuetSbcInterface/scripts/fetch-pi-sysroot.sh)
-#
-# Building natively (ARCH matching the host) needs no sysroot and is what CI/dev use.
 # ---------------------------------------------------------------------------
 
 SBC_SRC_DIR := ../DuetSbcInterface

@@ -3,7 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BUILD_DIR="$REPO_ROOT/build"
+DEFAULT_BUILD_DIR="$REPO_ROOT/build/dotnet"
+DEFAULT_AOT_BUILD_DIR="$REPO_ROOT/build/aot"
 
 declare -A PROJECT_SRC=(
     [DuetControlServer]="src/DuetControlServer"
@@ -43,6 +44,11 @@ SKIP_BUILD=false
 START_SERVICES=false
 SYSROOT=""
 FETCH_SYSROOT=false
+AOT=false
+ARCH=linux-arm64
+BUILD_TYPE=Debug
+BUILD_DIR=
+PUBLISH_ARGS=
 
 usage() {
     cat <<EOF
@@ -57,9 +63,14 @@ Options:
   -l, --local          Deploy locally to /opt/dsf/bin instead of a remote target
       --skip-build     Skip the build step; only sync binaries and run postinst scripts
       --start-services  Start DSF services after deployment
-      --sysroot <dir>  Pi sysroot to cross-link libduet_sbc.so against
-                       (default: $DEFAULT_SYSROOT if it exists)
-      --fetch-sysroot  (Re-)fetch the sysroot from the deploy target before building
+      --sysroot <dir>  Sysroot to cross-link libduet_sbc.so against. Only needed to
+                       target a glibc older than the container's 2.36; off by default
+      --fetch-sysroot  Fetch a sysroot from the deploy target and build against it
+      --aot            Build ahead of time binaries. Defaults to "false"
+      --arch           Architecture to build for. Defaults to "$ARCH"
+      --build-type     Defaults to "Debug"
+  -p, --publish-args   msbuild properties
+  -o, --dest-dir       Defaults to "$DEFAULT_BUILD_DIR unless --aot then "$DEFAULT_AOT_BUILD_DIR/<arch>" 
   -h, --help           Show this help
 
 Projects (specify one or more, or use --all):
@@ -69,11 +80,10 @@ Notes:
   DuetSbcInterface is the native SPI transfer loop (libduet_sbc.so) that DuetControlServer
   P/Invokes into. DCS cannot run without it, so selecting DuetControlServer builds it too.
 
-  Because a shared library links glibc dynamically, the .so must be built against the *target's*
-  glibc. The devcontainer toolchain targets a newer glibc than Raspberry Pi OS Bookworm, so a
-  plain cross-build produces a .so that fails to load on the Pi. This script therefore links
-  against a sysroot copied from the Pi, fetching it automatically on first use when a deploy
-  target is given.
+  Because a shared library links glibc dynamically, the .so must not need a newer glibc than the
+  target has. The devcontainer is Debian Bookworm and so targets the same glibc 2.36 as Raspberry
+  Pi OS Bookworm, meaning a plain cross-build is deployable and no sysroot is involved. To target
+  an older release, pass --sysroot <dir> or --fetch-sysroot to build against the Pi's own libraries.
 
 Examples:
   $(basename "$0") --all --target 192.168.4.27
@@ -95,12 +105,33 @@ while [[ $# -gt 0 ]]; do
         --start-services) START_SERVICES=true; shift ;;
         --sysroot)    SYSROOT="$2";   shift 2 ;;
         --fetch-sysroot) FETCH_SYSROOT=true; shift ;;
+        --aot)        AOT=true;       shift ;;
+        --arch)       ARCH="$2";      shift 2 ;;
+        -o|--dest-dir) BUILD_DIR="$2"; shift 2 ;;
+        -p|--publish-args)    PUBLISH_ARGS="$2"; shift 2 ;;
         -h|--help)    usage; exit 0           ;;
         -*)           echo "Unknown option: $1"; usage; exit 1 ;;
         All)          ALL=true; shift ;;
         *)            SELECTED+=("$1"); shift ;;
     esac
 done
+
+case $ARCH in
+	linux-arm)   OBJCOPY_NAME=arm-linux-gnueabihf-objcopy ; TARGET_ARCH=armhf ;;
+	linux-arm64) OBJCOPY_NAME=aarch64-linux-gnu-objcopy ; TARGET_ARCH=arm64 ;;
+	linux-x64)   OBJCOPY_NAME=objcopy ; TARGET_ARCH=amd64 ;;
+	*) echo "Unsupported arch: $ARCH" ; exit 1 ;;
+esac
+echo "Arch: $ARCH"
+
+if [[ -z "$BUILD_DIR" ]]; then
+    if $AOT; then
+        BUILD_DIR="$DEFAULT_AOT_BUILD_DIR/$ARCH"
+    else
+        BUILD_DIR="$DEFAULT_BUILD_DIR"
+    fi
+fi
+echo "Build directory: $BUILD_DIR"
 
 if $ALL; then
     SELECTED=("${ALL_PROJECTS[@]}")
@@ -134,10 +165,10 @@ if [[ " ${SELECTED[*]} " == *" DuetControlServer "* && " ${SELECTED[*]} " != *" 
 fi
 
 # --- Native SPI interface (libduet_sbc.so) ---
-# Cross-compiled here rather than on the Pi so a deploy needs no toolchain on the target. The catch
-# is glibc: a .so links it dynamically, and the devcontainer toolchain targets a newer glibc than
-# Raspberry Pi OS Bookworm, so linking against the container's libraries yields a .so that fails at
-# dlopen with "GLIBC_2.3x not found". Linking against a sysroot copied from the Pi avoids that.
+# Cross-compiled here rather than on the Pi so a deploy needs no toolchain on the target. The
+# devcontainer is Debian Bookworm, so its cross toolchain targets the same glibc 2.36 as Raspberry
+# Pi OS Bookworm and a plain cross build produces a .so that loads on the Pi. A sysroot is only
+# needed to target something older, and is opt-in via --sysroot / --fetch-sysroot.
 resolve_sysroot() {
     # An explicit --sysroot always wins
     if [[ -n "$SYSROOT" ]]; then
@@ -148,19 +179,13 @@ resolve_sysroot() {
         return
     fi
 
-    if $FETCH_SYSROOT || [[ ! -d "$DEFAULT_SYSROOT" ]]; then
-        if [[ -n "$TARGET" ]]; then
-            if $FETCH_SYSROOT; then
-                echo "=== Fetching sysroot from ${SSH_USER}@${TARGET} (--fetch-sysroot) ==="
-            else
-                echo "=== No sysroot at $DEFAULT_SYSROOT; fetching one from ${SSH_USER}@${TARGET} ==="
-                echo "    (one-off; subsequent builds reuse it. Refresh with --fetch-sysroot)"
-            fi
-            "$SBC_SRC_DIR/scripts/fetch-pi-sysroot.sh" "${SSH_USER}@${TARGET}" "$DEFAULT_SYSROOT"
+    if $FETCH_SYSROOT; then
+        if [[ -z "$TARGET" ]]; then
+            echo "Error: --fetch-sysroot needs a deploy target (-t) to fetch from" >&2
+            exit 1
         fi
-    fi
-
-    if [[ -d "$DEFAULT_SYSROOT" ]]; then
+        echo "=== Fetching sysroot from ${SSH_USER}@${TARGET} (--fetch-sysroot) ==="
+        "$SBC_SRC_DIR/scripts/fetch-pi-sysroot.sh" "${SSH_USER}@${TARGET}" "$DEFAULT_SYSROOT"
         SYSROOT="$DEFAULT_SYSROOT"
     fi
 }
@@ -180,14 +205,12 @@ build_sbc_interface() {
         resolve_sysroot
         if [[ -n "$SYSROOT" ]]; then
             echo "    Linking against sysroot: $SYSROOT"
-            preset=pi-arm64
+            preset=arm64-sysroot
             # The preset defaults to pi-sysroot/; --sysroot may point somewhere else.
             cmake_args+=("-DDUET_SBC_SYSROOT=$SYSROOT")
         else
             preset=arm64
-            echo "WARNING: no Pi sysroot available, linking against the container's aarch64 libraries." >&2
-            echo "         The resulting $SBC_LIB_NAME may fail to load on the Pi with a GLIBC version error." >&2
-            echo "         Re-run with a deploy target (-t) to fetch one, or pass --sysroot <dir>." >&2
+            echo "    Cross-compiling against the container's aarch64 libraries (glibc 2.36)"
         fi
     fi
 
@@ -213,7 +236,11 @@ if ! $SKIP_BUILD; then
             continue
         fi
         echo "=== Building $project ==="
-        dotnet build -r linux-arm64 --self-contained "$REPO_ROOT/${PROJECT_SRC[$project]}" -o "$BUILD_DIR"
+        if $AOT; then
+            dotnet publish "$REPO_ROOT/${PROJECT_SRC[$project]}" -r "$ARCH" -c "$BUILD_TYPE" -p:AotPublish=true -p:ObjCopyName="$OBJCOPY_NAME" -p:"$PUBLISH_ARGS" -o $BUILD_DIR
+        else
+            dotnet publish -r $ARCH -c "$BUILD_TYPE" --self-contained "$REPO_ROOT/${PROJECT_SRC[$project]}" -p:"$PUBLISH_ARGS" -o "$BUILD_DIR"
+        fi
     done
 fi
 

@@ -1,5 +1,5 @@
-FROM mcr.microsoft.com/devcontainers/dotnet:10.0
-# FROM mcr.microsoft.com/devcontainers/cpp:2-ubuntu24.04
+ARG VARIANT=bookworm
+FROM mcr.microsoft.com/devcontainers/base:${VARIANT}
 
 ENV ARM_GNU_TOOLCHAIN_VERSION="15.2.rel1"
 ENV ARM_GNU_TOOLCHAIN_DIR="/opt/arm-gnu-toolchain-${ARM_GNU_TOOLCHAIN_VERSION}"
@@ -35,18 +35,33 @@ RUN apt-get update \
         cppcheck \
         valgrind \
         clang \
-        clang-format-18 \
-        clang-tidy-18 \
+        clang-format-19 \
+        clang-tidy-19 \
         lldb \
         llvm \
         gdb \
         gdb-multiarch \
         crossbuild-essential-arm64 \
-    && add-apt-repository -y ppa:ubuntu-toolchain-r/test \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \
-        gcc-15 \
-        g++-15 \
-    && update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-18 100 \
-    && update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-18 100 \
-    && rm -rf /var/lib/apt/lists/*
+        crossbuild-essential-armhf
+    # && rm -rf /var/lib/apt/lists/*
+
+# The AOT targets ask clang for the armv7-linux-gnueabihf triple, but Debian names its cross tools
+# arm-linux-gnueabihf-*. Without matching names clang silently falls back to the host x86 linker
+RUN ln -s arm-linux-gnueabihf-ld /usr/bin/armv7-linux-gnueabihf-ld \
+	&& ln -s arm-linux-gnueabihf-ld.bfd /usr/bin/armv7-linux-gnueabihf-ld.bfd \
+	&& ln -s arm-linux-gnueabihf-objcopy /usr/bin/armv7-linux-gnueabihf-objcopy
+
+# Debian only ships versioned names for these. DuetSbcInterface's CMakeLists looks for unsuffixed
+# `clang-tidy` (find_program NAMES clang-tidy), so without these the default presets fail to build.
+RUN ln -s clang-tidy-19 /usr/bin/clang-tidy \
+	&& ln -s clang-format-19 /usr/bin/clang-format
+
+RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh \
+	&& bash /tmp/dotnet-install.sh --channel 10.0 --install-dir /usr/share/dotnet \
+	&& ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet \
+	&& rm /tmp/dotnet-install.sh
+
+ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+	DOTNET_NOLOGO=1 \
+	DOTNET_CLI_HOME=/tmp \
+	DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true

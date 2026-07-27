@@ -32,8 +32,8 @@
     },
     {
       "name": "arm64",
-      "displayName": "Cross-compile for aarch64 against this container's libraries (compile test)",
-      "description": "Checks that the code cross-compiles and lints without needing a Pi. libduet_sbc.so from this preset links the container's glibc (2.39) and will NOT load on Raspberry Pi OS Bookworm - use pi-arm64 for anything you intend to run there.",
+      "displayName": "Cross-compile for aarch64 against this container's libraries (deployable)",
+      "description": "The normal way to build for a Pi. The devcontainer is Debian Bookworm, so its cross toolchain targets the same glibc 2.36 as Raspberry Pi OS Bookworm and libduet_sbc.so from this preset loads there as-is. No sysroot and no Pi needed.",
       "inherits": "base",
       "toolchainFile": "${sourceDir}/cmake/aarch64-linux-gnu.cmake",
       "cacheVariables": {
@@ -41,9 +41,9 @@
       }
     },
     {
-      "name": "pi-arm64",
-      "displayName": "Cross-compile for aarch64 against a Pi sysroot (deployable)",
-      "description": "Links against a sysroot copied from the target, so libduet_sbc.so matches the Pi's glibc. Requires pi-sysroot/ to exist: fetch it with scripts/fetch-pi-sysroot.sh <user>@<pi-host>, or override the path with -DDUET_SBC_SYSROOT=...",
+      "name": "arm64-sysroot",
+      "displayName": "Cross-compile for aarch64 against a Pi sysroot (older targets only)",
+      "description": "Only needed to target a glibc older than the container's 2.36 - an earlier Pi OS release, say. For Bookworm use arm64. Links against a sysroot copied from the target, so requires pi-sysroot/ to exist: fetch it with scripts/fetch-pi-sysroot.sh <user>@<pi-host>, or override the path with -DDUET_SBC_SYSROOT=...",
       "inherits": "base",
       "toolchainFile": "${sourceDir}/cmake/aarch64-linux-gnu.cmake",
       "cacheVariables": {
@@ -62,18 +62,18 @@
       "inherits": ["debug", "arm64"]
     },
     {
-      "name": "pi-arm64-debug",
+      "name": "arm64-sysroot-debug",
       "displayName": "Cross-compile for aarch64 against a Pi sysroot, unoptimised with full debug info",
-      "description": "What scripts/debug-on-pi.sh builds for libduet_sbc.so, which must match the Pi's glibc. Requires pi-sysroot/ as pi-arm64 does.",
-      "inherits": ["debug", "pi-arm64"]
+      "description": "As arm64-sysroot, for targeting an older glibc than the container's. Requires pi-sysroot/ as arm64-sysroot does.",
+      "inherits": ["debug", "arm64-sysroot"]
     }
   ],
   "buildPresets": [
     { "name": "native", "configurePreset": "native" },
     { "name": "arm64", "configurePreset": "arm64" },
-    { "name": "pi-arm64", "configurePreset": "pi-arm64" },
+    { "name": "arm64-sysroot", "configurePreset": "arm64-sysroot" },
     { "name": "native-debug", "configurePreset": "native-debug" },
     { "name": "arm64-debug", "configurePreset": "arm64-debug" },
-    { "name": "pi-arm64-debug", "configurePreset": "pi-arm64-debug" }
+    { "name": "arm64-sysroot-debug", "configurePreset": "arm64-sysroot-debug" }
   ]
 }

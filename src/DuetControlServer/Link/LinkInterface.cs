@@ -573,7 +573,7 @@ public sealed partial class LinkInterface(
                 channel.Invalidate();
             }
         }
-        BytesReserved = BufferSpace = MaxReportedBufferSpace = 0;
+        BytesReserved = BufferSpace = 0;
 
         // Resolve pending CAN requests
         lock (CanRequests)
@@ -625,7 +625,7 @@ public sealed partial class LinkInterface(
                 channel.Invalidate();
             }
         }
-        BytesReserved = BufferSpace = MaxReportedBufferSpace = 0;
+        BytesReserved = BufferSpace = 0;
 
         // Resolve pending CAN requests
         lock (CanRequests)

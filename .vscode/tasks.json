@@ -44,6 +44,16 @@
             ]
         },
         {
+            "id": "dotnet_aot",
+            "type": "pickString",
+            "description": "Build DuetControlServer using native AOT compilation",
+            "options": [
+                "Yes",
+                "No"
+            ],
+            "default": "No"
+        },
+        {
             "id": "canmaster_target",
             "type": "pickString",
             "description": "DuetCANMaster board to upload",
@@ -339,7 +349,7 @@
         {
             "label": "[DSF] Deploy To",
             "type": "shell",
-            "command": "./scripts/build.sh --skip-build --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services ${input:project_name}",
+            "command": "./scripts/build.sh $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --skip-build --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services ${input:project_name}",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
@@ -348,7 +358,7 @@
         {
             "label": "[DSF] Deploy Local",
             "type": "shell",
-            "command": "./scripts/build.sh --skip-build --local ${input:project_name}",
+            "command": "./scripts/build.sh $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --skip-build --local ${input:project_name}",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
@@ -357,7 +367,7 @@
         {
             "label": "[DSF] Build",
             "type": "shell",
-            "command": "./scripts/build.sh ${input:project_name}",
+            "command": "./scripts/build.sh $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) ${input:project_name}",
             "problemMatcher": [
                 "$msCompile"
             ],
@@ -368,7 +378,7 @@
         {
             "label": "[DSF] Build and Deploy To",
             "type": "shell",
-            "command": "./scripts/build.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services ${input:project_name}",
+            "command": "./scripts/build.sh $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services ${input:project_name}",
             "problemMatcher": [
                 "$msCompile"
             ],
@@ -379,7 +389,7 @@
         {
             "label": "[DSF] Build and Deploy Local",
             "type": "shell",
-            "command": "./scripts/build.sh --local ${input:project_name}",
+            "command": "./scripts/build.sh $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --local ${input:project_name}",
             "problemMatcher": [
                 "$msCompile"
             ],
@@ -390,7 +400,7 @@
         {
             "label": "[DSF] Build and Deploy DCS to",
             "type": "shell",
-            "command": "./scripts/build.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services DuetControlServer",
+            "command": "./scripts/build.sh $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services DuetControlServer",
             "problemMatcher": [
                 "$msCompile"
             ],
@@ -399,9 +409,8 @@
             }
         },
         {
-            // Native SPI transfer loop (libduet_sbc.so). Cross-compiled for aarch64; needs a Pi
-            // sysroot to link against the target's glibc, which is fetched automatically the first
-            // time a deploy target is available (see "[DSF] Fetch Pi Sysroot").
+            // Native SPI transfer loop (libduet_sbc.so). Cross-compiled for aarch64. The
+            // devcontainer's glibc matches Raspberry Pi OS Bookworm's, so no sysroot is involved.
             "label": "[DSF] Build DuetSbcInterface",
             "type": "shell",
             "command": "./scripts/build.sh DuetSbcInterface",
@@ -424,7 +433,8 @@
             }
         },
         {
-            // Refresh the cached sysroot, e.g. after upgrading the Pi's OS or glibc
+            // Fetch a sysroot from the Pi. Not needed for Bookworm targets; only for cross-building
+            // against a glibc older than the container's 2.36.
             "label": "[DSF] Fetch Pi Sysroot",
             "type": "shell",
             "command": "./src/DuetSbcInterface/scripts/fetch-pi-sysroot.sh ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} ./src/DuetSbcInterface/pi-sysroot",
