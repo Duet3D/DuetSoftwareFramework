@@ -1,0 +1,139 @@
+/*
+ * MotionSystem.h
+ *
+ * What replaces RepRapFirmware's Move class on the SBC.
+ *
+ * Move is the top of the firmware's motion engine: it owns the DDA rings, the per-drive state, the
+ * kinematics, bed compensation, homing, the laser task and the step interrupt. Almost none of that
+ * belongs here. Kinematics, compensation and homing moved to DuetControlServer, which is where the
+ * moves are now built; there is no step interrupt because there are no local drivers.
+ *
+ * What is left is the part the imported DDA and DDARing sources still need: somewhere to ask how
+ * many steps per mm a drive has, which board drives it, how much backlash to take up, and somewhere
+ * to put the segments that Prepare produces. So this class is mostly the machine description
+ * (MotionConfig, pushed down by DCS) plus the array of DriveTrackers.
+ *
+ * It is reached through the `reprap` facade in Compat/Platform/RepRap.h, so that the imported code
+ * keeps its reprap.GetMove() call sites unchanged and stays diffable against upstream.
+ */
+
+#ifndef SRC_MOTION_MOTIONSYSTEM_H_
+#define SRC_MOTION_MOTIONSYSTEM_H_
+
+#include <Motion/DriveTracker.h>
+#include <Motion/MotionConfig.h>
+#include <Motion/MoveProfile.h>
+
+namespace Duet::Sbc::Motion
+{
+	class MotionSystem
+	{
+	public:
+		MotionSystem() noexcept;
+
+		// Reserve the permanent arena and reset every drive. Call once before use.
+		bool Init() noexcept;
+
+		// Replace the machine description. Only safe when no move is in flight - DCS holds movement
+		// locked while it reconfigures, exactly as the firmware requires for M92 and friends.
+		void Configure(const MotionConfig& newConfig) noexcept;
+
+		[[nodiscard]] const MotionConfig& GetConfig() const noexcept { return config; }
+
+		// --- Accessors used by the imported DDA / DDARing sources ------------------------------
+		//
+		// Names match the firmware's Move members so that those files need no edits here.
+
+		[[nodiscard]] float DriveStepsPerMm(size_t drive) const noexcept { return config.driveStepsPerMm[drive]; }
+		[[nodiscard]] uint32_t GetJerkPolicy() const noexcept { return config.jerkPolicy; }
+		[[nodiscard]] float GetMaxInstantDv(size_t drive) const noexcept { return config.instantDvs[drive]; }
+		[[nodiscard]] float GetPrintingInstantDv(size_t drive) const noexcept { return config.printingInstantDvs[drive]; }
+		[[nodiscard]] float GetPressureAdvanceK0ClocksForLogicalDrive(size_t drive) const noexcept
+		{
+			return config.pressureAdvanceClocks[drive];
+		}
+
+		[[nodiscard]] const AxisDriversConfig& GetAxisDriversConfig(size_t axis) const noexcept
+		{
+			return config.axisDrivers[axis];
+		}
+
+		[[nodiscard]] DriverId GetExtruderDriver(size_t extruder) const noexcept
+		{
+			return config.extruderDrivers[extruder];
+		}
+
+		// Kinematics answers that DCS evaluated for us; see MotionConfig.
+		[[nodiscard]] bool IsContinuousRotationAxis(size_t axis) const noexcept
+		{
+			return AxesBitmap(config.continuousRotationAxes).IsBitSet(axis);
+		}
+
+		[[nodiscard]] AxesBitmap GetControllingDrives(size_t axis) const noexcept
+		{
+			return AxesBitmap((axis < MaxAxes) ? config.controllingDrives[axis] : 0);
+		}
+
+		// Extend a reversing move so that the backlash is taken up. Not const: it tracks how much of
+		// the correction has been applied, because spreading it over several moves is the point -
+		// injecting it all at once would show up as a visible jolt.
+		[[nodiscard]] int32_t ApplyBacklashCompensation(size_t drive, int32_t delta) noexcept;
+
+		// No-op: the drivers are on other boards and are enabled over CAN, not from here.
+		void EnableDrivers(size_t drive, bool unconditional) noexcept;
+
+		// How long the boards' input shaper spreads a move over. Zero while shaping is off; see
+		// MotionConfig::shapingTimeClocks for why this is not simply absent.
+		[[nodiscard]] uint32_t GetShapingTimeClocks() const noexcept { return config.shapingTimeClocks; }
+
+		// --- Per-drive motion -----------------------------------------------------------------
+
+		[[nodiscard]] DriveTracker& GetDriveTracker(size_t drive) noexcept { return trackers[drive]; }
+
+		// Hand one drive's share of a prepared move to its tracker. This is what DDA::Prepare calls
+		// in place of the firmware's Move::AddLinearSegments.
+		void AddLinearSegments(size_t drive, uint32_t startTime, const MoveProfile& profile,
+							   motioncalc_t steps, MovementFlags moveFlags) noexcept;
+
+		// Bring every drive's position up to `now`. Called once per pass of the motion loop.
+		void AdvanceTrackers(uint32_t now) noexcept;
+
+		// Motor positions in microsteps, as of the last completed segment. `count` entries.
+		void GetMotorPositions(int32_t *positions, size_t count) const noexcept;
+
+		// Force motor positions, for homing and for resynchronising after a move that was cut short.
+		void SetMotorPositions(LogicalDrivesBitmap drives, const int32_t *positions, size_t count) noexcept;
+
+		// True once every drive named in `drives` has no pending motion. DDA::HasExpired uses this
+		// to decide when a move that checks endstops has finished.
+		[[nodiscard]] bool AreDrivesStopped(LogicalDrivesBitmap drives) const noexcept;
+
+		// Abandon pending motion on every drive, without moving the reported positions. For an
+		// emergency stop, where the boards drop their queued moves too.
+		void CancelStepping() noexcept;
+
+		// Record that preparation could not keep up and everything must slip. Reported to the
+		// controller so it can pass the delay on to the expansion boards.
+		void AddPrepareHiccup() noexcept;
+
+	private:
+		MotionConfig config;
+		DriveTracker trackers[MaxAxesPlusExtruders];
+
+		// Backlash compensation state, as in the firmware's Move. `target` is the correction the
+		// current direction calls for, `current` how much of it has been injected so far; the
+		// difference is spread over subsequent moves.
+		//
+		// The firmware packs the direction flags into a LogicalDrivesBitmap, where saving 124 bytes
+		// is worth it. That is not a trade this side needs to make, and it is worth avoiding:
+		// written as a bitmap, GCC 12.2 miscompiles the `backwards != IsBitSet(drive)` test below at
+		// -O1 and above, dropping the `backwards` term so that the correction is never applied.
+		// Clang compiles the same source correctly and UBSan reports nothing. See the test in
+		// tests/MotionSystemTests.cpp, which catches it.
+		bool lastMoveWasBackwards[MaxAxesPlusExtruders]{};
+		int32_t targetBacklashSteps[MaxAxesPlusExtruders]{};
+		int32_t currentBacklashSteps[MaxAxesPlusExtruders]{};
+	};
+}
+
+#endif /* SRC_MOTION_MOTIONSYSTEM_H_ */

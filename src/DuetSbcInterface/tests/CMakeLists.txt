@@ -20,3 +20,6 @@ target_link_libraries(move_segment_tests PRIVATE duet_motion)
 
 duet_sbc_add_test(drive_tracker_tests DriveTrackerTests.cpp)
 target_link_libraries(drive_tracker_tests PRIVATE duet_motion)
+
+duet_sbc_add_test(motion_system_tests MotionSystemTests.cpp)
+target_link_libraries(motion_system_tests PRIVATE duet_motion)

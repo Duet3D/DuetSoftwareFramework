@@ -29,8 +29,10 @@ endforeach()
 # compiles here only once someone has ported it and said so.
 set(DUET_MOTION_SOURCES
     Compat/Diagnostics.cpp
+    Compat/RepRap.cpp
     Compat/Tasks.cpp
     Motion/DriveTracker.cpp
+    Motion/MotionSystem.cpp
     Motion/SegmentBuilder.cpp
     Movement/MoveSegment.cpp
     Movement/StepTimer.cpp
