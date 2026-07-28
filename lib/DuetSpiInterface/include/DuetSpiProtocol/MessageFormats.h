@@ -150,6 +150,68 @@ struct EnableCanHeader {
     uint16_t padding;
 };
 
+// Bits of ScheduleMoveHeader::flags
+namespace ScheduleMoveFlags {
+// The move was planned expecting the boards to apply late input shaping
+inline constexpr uint8_t UseInputShaping = 1u << 0;
+// At least one extruder in this move wants pressure advance applied
+inline constexpr uint8_t UsePressureAdvance = 1u << 1;
+// The move monitors endstops, so the controller must set up its driver stop list before sending it
+inline constexpr uint8_t CheckEndstops = 1u << 2;
+// The last packet of this move: the controller sends the accumulated CAN messages when it sees this
+inline constexpr uint8_t LastPacket = 1u << 3;
+} // namespace ScheduleMoveFlags
+
+// Schedule a move on the controller (SbcRequest::ScheduleMove).
+//
+// The SBC plans the move and its velocity profile; the controller fans it out to the expansion
+// boards as CanMessageMovementLinearShaped. The fields below are exactly DuetCANMaster's PrepParams
+// (see CanMotion.cpp), in the same units - step clocks and millimetres - so that the controller
+// fills that struct by copying rather than converting. In particular the accelerations are NOT yet
+// scaled to unit distance; CanMotion does that scaling as it always has.
+//
+// A move with more drivers than fit in one packet is split across several packets sharing a moveId,
+// the last of which sets ScheduleMoveFlags::LastPacket. The controller accumulates and only sends
+// once it sees that flag, so a split move still reaches the boards as one CAN message per board.
+// If a packet arrives carrying a different moveId from the one being accumulated, the accumulated
+// packets are discarded: that means the SBC abandoned the earlier move part way through, and half
+// of it must not reach the boards.
+struct ScheduleMoveHeader {
+    uint32_t whenToExecute;     // master step-clock time at which the move starts
+    uint32_t accelClocks;       // duration of the acceleration phase
+    uint32_t steadyClocks;      // duration of the constant-speed phase
+    uint32_t decelClocks;       // duration of the deceleration phase
+    float acceleration;         // always positive, mm/clock^2
+    float deceleration;         // always negative, matching PrepParams' sign convention
+    float totalDistance;        // mm
+    float accelDistance;        // mm travelled when acceleration ends
+    float decelStartDistance;   // mm travelled when deceleration begins
+    float startSpeed;           // mm/clock
+    float topSpeed;             // mm/clock
+    float endSpeed;             // mm/clock
+    uint32_t moveId;            // SBC-chosen id, shared by every packet of a split move
+    uint8_t numDrivers;         // ScheduleMoveDriver records that follow this header
+    uint8_t flags;              // ScheduleMoveFlags
+    uint16_t padding;
+};
+
+// One driver's share of a scheduled move. `steps` applies to axis drivers and `extrusion` to
+// extruders; whichever does not apply is zero, so a receiver that trusts isExtruder and one that
+// checks both agree.
+struct ScheduleMoveDriver {
+    uint8_t boardAddress;  // CAN address of the board carrying this driver
+    uint8_t driverNumber;  // driver number on that board
+    uint8_t isExtruder;    // non-zero if this driver is an extruder
+    uint8_t padding;
+    int32_t steps;         // net microsteps, for an axis driver
+    float extrusion;       // microsteps including fractional parts, for an extruder
+};
+
+// Most drivers one ScheduleMove packet may carry. Chosen so that a full packet is a few hundred
+// bytes and several moves fit in one transfer alongside everything else; more drivers than this
+// simply take another packet.
+inline constexpr size_t MaxScheduleMoveDrivers = 32;
+
 // Bits of SendCanMessageHeader::flags
 namespace SendCanMessageFlags {
 inline constexpr uint8_t IsResponse = 1u << 0;
@@ -217,6 +279,13 @@ static_assert(sizeof(PacketHeader) == 8, "PacketHeader must be 8 bytes");
 static_assert(sizeof(MessageHeader) == 8, "MessageHeader must be 8 bytes");
 static_assert(sizeof(StringHeader) == 4, "StringHeader must be 4 bytes");
 static_assert(sizeof(EnableCanHeader) == 4, "EnableCanHeader must be 4 bytes");
+static_assert(sizeof(ScheduleMoveHeader) == 56, "ScheduleMoveHeader must be 56 bytes");
+static_assert(offsetof(ScheduleMoveHeader, acceleration) == 16, "");
+static_assert(offsetof(ScheduleMoveHeader, moveId) == 48, "");
+static_assert(offsetof(ScheduleMoveHeader, numDrivers) == 52, "");
+static_assert(sizeof(ScheduleMoveDriver) == 12, "ScheduleMoveDriver must be 12 bytes");
+static_assert(offsetof(ScheduleMoveDriver, steps) == 4, "");
+static_assert(offsetof(ScheduleMoveDriver, extrusion) == 8, "");
 static_assert(sizeof(SendCanMessageHeader) == 12, "SendCanMessageHeader must be 12 bytes");
 static_assert(sizeof(FlashVerify) == 8, "FlashVerify must be 8 bytes");
 static_assert(sizeof(CodeBufferUpdateHeader) == 4, "CodeBufferUpdateHeader must be 4 bytes");

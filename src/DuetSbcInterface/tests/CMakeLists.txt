@@ -23,3 +23,9 @@ target_link_libraries(drive_tracker_tests PRIVATE duet_motion)
 
 duet_sbc_add_test(motion_system_tests MotionSystemTests.cpp)
 target_link_libraries(motion_system_tests PRIVATE duet_motion)
+
+duet_sbc_add_test(schedule_move_builder_tests ScheduleMoveBuilderTests.cpp)
+target_link_libraries(schedule_move_builder_tests PRIVATE duet_motion)
+
+duet_sbc_add_test(move_params_layout_tests MoveParamsLayoutTests.cpp)
+target_link_libraries(move_params_layout_tests PRIVATE duet_motion)

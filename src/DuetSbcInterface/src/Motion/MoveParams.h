@@ -1,0 +1,129 @@
+/*
+ * MoveParams.h
+ *
+ * The move as DuetControlServer hands it down: everything DDA::InitStandardMove works out for a
+ * single move on its own, and nothing that depends on the moves either side of it.
+ *
+ * This is the split. DCS interprets the G-code, runs the kinematics, works out where each drive
+ * ends up and how fast the move is allowed to go; that is steps 1-6 of the firmware's
+ * InitStandardMove. It stops there, because step 7 onwards - lookahead, melding one move into the
+ * next, deciding the actual start and end speeds - needs the whole ring, and the ring lives here.
+ *
+ * Units are the firmware's internal ones, not the user's: speed is mm per step clock, acceleration
+ * mm per step clock squared, and the endpoints are microsteps. DCS converts once, on its side,
+ * rather than every consumer converting here.
+ *
+ * The C# mirror is DuetControlServer/Motion/Native/MoveParams.cs and must stay byte-for-byte
+ * identical, exactly as for LinkEvents.h. Sizes are asserted on both sides.
+ */
+
+#ifndef SRC_MOTION_MOVEPARAMS_H_
+#define SRC_MOTION_MOVEPARAMS_H_
+
+#include <RepRapFirmware.h>
+
+namespace Duet::Sbc::Motion
+{
+	// Bits of MoveParamsHeader::flags. These are the subset of the firmware's DDA flags that survive
+	// the split: the ones native still reads during lookahead, preparation or retirement. The rest
+	// (doneIoBits, hadLookaheadUnderrun, ...) are either set here or are DCS's business alone.
+	namespace MoveFlags
+	{
+		// The move may be paused after, i.e. it is not part of an indivisible sequence
+		inline constexpr uint32_t CanPauseAfter = 1u << 0;
+		// The move monitors endstops or a Z probe. Always an isolated move as well
+		inline constexpr uint32_t CheckEndstops = 1u << 1;
+		// The move runs at the standard feed rate, so a feed rate change may be applied while queued
+		inline constexpr uint32_t UsingStandardFeedrate = 1u << 2;
+		// Apply pressure advance to forward extrusion in this move
+		inline constexpr uint32_t UsePressureAdvance = 1u << 3;
+		// Both XY movement and extrusion, i.e. the printing jerk limits apply
+		inline constexpr uint32_t IsPrintingMove = 1u << 4;
+		// Movement along an X or Y axis was asked for, even if it rounds to no steps
+		inline constexpr uint32_t XyMoving = 1u << 5;
+		// An extruder-only move, or one involving reverse extrusion
+		inline constexpr uint32_t IsNonPrintingExtruderMove = 1u << 6;
+		// Continuous rotation axes took the short way round
+		inline constexpr uint32_t ContinuousRotationShortcut = 1u << 7;
+		// Do not meld this move with its neighbours, and let it finish before starting the next
+		inline constexpr uint32_t IsolatedMove = 1u << 8;
+		// Some extruder moves forwards during this move (M571)
+		inline constexpr uint32_t HasForwardExtrusion = 1u << 9;
+	}
+
+#pragma pack(push, 1)
+
+	// Fixed part of a move submission. Two arrays follow it in the same record:
+	//
+	//     int32_t endPoint[numDrives];        machine position each drive ends at, microsteps
+	//     float   directionVector[numDrives]; normalised direction, first three entries Cartesian
+	//
+	// numDrives is the configured MaxAxesPlusExtruders rather than the number of drives that
+	// actually move, because MatchSpeeds, RecalculateMove and Prepare all index densely by logical
+	// drive. That is 288 bytes a move; a sparse encoding would save most of it and cost indexing
+	// complexity everywhere, which is not a trade worth making before anything has been measured.
+	struct MoveParamsHeader
+	{
+		// DCS's correlation id, quoted back in MoveCompleted and MoveFailed. Never zero
+		uint32_t moveId;
+		// LogicalDrivesBitmap of the drives this move is allowed to touch (SUPPORT_ASYNC_MOVES)
+		uint32_t ownedDrives;
+		// MoveFlags
+		uint32_t flags;
+		// Length of the move in hypercuboid space, mm
+		float totalDistance;
+		// Acceleration and deceleration limit, always positive, mm/clock^2. Native may lower this
+		// for an acceleration-only or deceleration-only move, so it is a limit and not a promise
+		float maxAcceleration;
+		// The speed asked for, mm/clock, already limited by DCS to the axis maxima and whatever
+		// Kinematics::LimitSpeedAndAcceleration allows
+		float requestedSpeed;
+		// Which ring to queue this move on: 0 or 1 (SUPPORT_ASYNC_MOVES)
+		uint8_t ringNumber;
+		// Entries in each of the two trailing arrays
+		uint8_t numDrives;
+		uint16_t padding;
+	};
+
+#pragma pack(pop)
+
+	static_assert(sizeof(MoveParamsHeader) == 28, "MoveParamsHeader must be 28 bytes");
+	static_assert(offsetof(MoveParamsHeader, totalDistance) == 12, "");
+	static_assert(offsetof(MoveParamsHeader, ringNumber) == 24, "");
+
+	// Total size of a submission carrying `numDrives` drives.
+	[[nodiscard]] inline constexpr size_t MoveParamsLength(size_t numDrives) noexcept
+	{
+		return sizeof(MoveParamsHeader) + (numDrives * (sizeof(int32_t) + sizeof(float)));
+	}
+
+	// The two trailing arrays. Both are read straight out of the record, so callers must not assume
+	// alignment beyond the 4 bytes the header's size guarantees.
+	[[nodiscard]] inline const int32_t *MoveParamsEndPoints(const MoveParamsHeader& header) noexcept
+	{
+		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
+		return reinterpret_cast<const int32_t *>(reinterpret_cast<const char *>(&header) + sizeof(header));
+	}
+
+	[[nodiscard]] inline const float *MoveParamsDirectionVector(const MoveParamsHeader& header) noexcept
+	{
+		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
+		return reinterpret_cast<const float *>(MoveParamsEndPoints(header) + header.numDrives);
+	}
+
+	// The same two, for filling a record in. numDrives must already be set: it is what says where
+	// the second array begins.
+	[[nodiscard]] inline int32_t *MoveParamsEndPoints(MoveParamsHeader& header) noexcept
+	{
+		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
+		return reinterpret_cast<int32_t *>(reinterpret_cast<char *>(&header) + sizeof(header));
+	}
+
+	[[nodiscard]] inline float *MoveParamsDirectionVector(MoveParamsHeader& header) noexcept
+	{
+		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
+		return reinterpret_cast<float *>(MoveParamsEndPoints(header) + header.numDrives);
+	}
+}
+
+#endif /* SRC_MOTION_MOVEPARAMS_H_ */
