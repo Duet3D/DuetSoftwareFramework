@@ -919,8 +919,7 @@ namespace Duet::Sbc
 	bool SbcTransfer::WriteMessage(uint32_t messageFlags, const std::string& message)
 	{
 		// Don't send a new request if another one is still pending
-		if (std::find(m_packetsBeingResent.begin(), m_packetsBeingResent.end(), proto::SbcRequest::Message) !=
-			m_packetsBeingResent.end())
+		if (std::ranges::find(m_packetsBeingResent, proto::SbcRequest::Message) != m_packetsBeingResent.end())
 		{
 			return false;
 		}
@@ -971,8 +970,7 @@ namespace Duet::Sbc
 				WritePacketHeader(sbcRequestOut, header.length);
 				std::memcpy(GetWriteBuffer(header.length), buffer + offset + headerSize, header.length);
 
-				if (std::find(m_packetsBeingResent.begin(), m_packetsBeingResent.end(), sbcRequestOut) ==
-					m_packetsBeingResent.end())
+				if (std::ranges::find(m_packetsBeingResent, sbcRequestOut) == m_packetsBeingResent.end())
 				{
 					m_packetsBeingResent.push_back(sbcRequestOut);
 				}

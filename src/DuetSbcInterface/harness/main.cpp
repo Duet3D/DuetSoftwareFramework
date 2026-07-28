@@ -332,7 +332,7 @@ int main(int argc, char** argv)
 		const size_t dropF = (dropFirst > 0) ? static_cast<size_t>(dropFirst) : 0;
 		const size_t used = (count > drop + dropF) ? (count - drop - dropF) : 0;
 		std::vector<int64_t> samples(gSamples.begin() + dropF, gSamples.begin() + dropF + used);
-		std::sort(samples.begin(), samples.end());
+		std::ranges::sort(samples);
 
 		std::printf("\n==== Results (%zu request-driven transfers, last %zu dropped) ====\n", used, count - used);
 		if (!samples.empty())
