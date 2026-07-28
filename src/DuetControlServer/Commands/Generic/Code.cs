@@ -38,6 +38,10 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <summary>
     /// Constructor of a new code
     /// </summary>
+    /// <remarks>
+    /// This must remain the only public constructor. CommandFactory instantiates commands through
+    /// ActivatorUtilities.CreateFactory, which rejects any type offering more than one candidate
+    /// </remarks>
     /// <param name="codeProcessor">Code processor</param>
     /// <param name="expressions">Meta G-code expression parser</param>
     /// <param name="gCodes">G-code handler</param>
@@ -58,44 +62,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         LinkInterface linkInterface,
         ILogger<Code> logger,
         IOptions<Settings> settings) : base()
-    {
-        _codeProcessor = codeProcessor;
-        _expressions = expressions;
-        _gCodes = gCodes;
-        _mCodes = mCodes;
-        _tCodes = tCodes;
-        _keywords = keywords;
-        _lifetime = lifetime;
-        _linkInterface = linkInterface;
-        _logger = logger;
-        _settings = settings.Value;
-    }
-
-    /// <summary>
-    /// Constructor of a new code which also parses the given text-based G/M/T-code
-    /// </summary>
-    /// <param name="code">Text-based G/M/T-code</param>
-    /// <param name="codeProcessor">Code processor</param>
-    /// <param name="expressions">Meta G-code expression parser</param>
-    /// <param name="gCodes">G-code handler</param>
-    /// <param name="mCodes">M-code handler</param>
-    /// <param name="tCodes">T-code handler</param>
-    /// <param name="keywords">Keyword handler</param>
-    /// <param name="lifetime">Host application lifetime</param>
-    /// <param name="linkInterface">Link interface</param>
-    /// <param name="logger">Logger instance</param>
-    /// <param name="settings">Settings</param>
-    public Code(string code,
-        Codes.CodeProcessor codeProcessor,
-        Codes.Meta.Expressions expressions,
-        [FromKeyedServices(Keys.GCodes)] ICodeHandler gCodes,
-        [FromKeyedServices(Keys.MCodes)] ICodeHandler mCodes,
-        [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
-        [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
-        IHostApplicationLifetime lifetime,
-        LinkInterface linkInterface,
-        ILogger<Code> logger,
-        IOptions<Settings> settings) : base(code)
     {
         _codeProcessor = codeProcessor;
         _expressions = expressions;
