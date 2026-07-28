@@ -30,6 +30,8 @@ endforeach()
 set(DUET_MOTION_SOURCES
     Compat/Diagnostics.cpp
     Compat/Tasks.cpp
+    Motion/SegmentBuilder.cpp
+    Movement/MoveSegment.cpp
     Movement/StepTimer.cpp
 )
 
@@ -43,7 +45,13 @@ target_compile_options(duet_motion PRIVATE
     # float16_t is __fp16 in RRFLibraries' Portability.h, which does not exist on x86-64. See the
     # header for why this is forced in rather than #included.
     -include "${CMAKE_CURRENT_SOURCE_DIR}/Compat/Float16Compat.h"
+    -Wno-unused-parameter
 )
+# PUBLIC, not PRIVATE: the imported code names parameters it deliberately ignores, most visibly in
+# the no-op operator delete pairs that go with allocation from the permanent arena, and those are in
+# headers - so anything including them sees the same warnings. Renaming them would be churn in files
+# that get re-synced against upstream.
+target_compile_options(duet_motion INTERFACE -Wno-unused-parameter)
 set_target_properties(duet_motion PROPERTIES
     CXX_CLANG_TIDY ""
     POSITION_INDEPENDENT_CODE ON

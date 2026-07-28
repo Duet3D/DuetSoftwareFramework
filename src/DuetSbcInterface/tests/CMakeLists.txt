@@ -14,3 +14,6 @@ target_link_libraries(ring_buffer_tests PRIVATE duet_sbc)
 
 duet_sbc_add_test(step_timer_tests StepTimerTests.cpp)
 target_link_libraries(step_timer_tests PRIVATE duet_motion)
+
+duet_sbc_add_test(move_segment_tests MoveSegmentTests.cpp)
+target_link_libraries(move_segment_tests PRIVATE duet_motion)
