@@ -30,6 +30,7 @@ endforeach()
 set(DUET_MOTION_SOURCES
     Compat/Diagnostics.cpp
     Compat/Tasks.cpp
+    Motion/DriveTracker.cpp
     Motion/SegmentBuilder.cpp
     Movement/MoveSegment.cpp
     Movement/StepTimer.cpp

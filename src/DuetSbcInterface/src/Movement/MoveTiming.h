@@ -19,16 +19,13 @@ namespace MoveTiming
 	// the calculation can just be managed in time at speeds of 15000mm/min (step interval 50us), but not at 20000mm/min (step interval 37.5us).
 	// Therefore, where the step interval falls below 60us, we don't calculate on every step.
 	// Note: the above measurements were taken some time ago, before some firmware optimisations.
-#if SAME70
-	// Use the same defaults as for the SAM4E for now.
-	constexpr uint32_t MinCalcInterval = (40 * StepClockRate)/1000000;				// the smallest sensible interval between calculations (40us) in step timer clocks
-	constexpr uint32_t HiccupTime = (30 * StepClockRate)/1000000;					// how long we hiccup for in step timer clocks
-#elif SAM4E || SAM4S || SAME5x
-	constexpr uint32_t MinCalcInterval = (40 * StepClockRate)/1000000;				// the smallest sensible interval between calculations (40us) in step timer clocks
-	constexpr uint32_t HiccupTime = (30 * StepClockRate)/1000000;					// how long we hiccup for in step timer clocks
-#else
-# error Unsupported processor
-#endif
+	// These two are per-processor in the firmware, where they bound how often the step ISR can
+	// recalculate and how long it backs off for when it cannot keep up. There is no step ISR on the
+	// SBC, so the per-processor distinction is gone; the SAM4E/SAME70 values are kept because
+	// HiccupTime still sets the granularity by which the whole movement timebase slips when some
+	// part of the system falls behind, and that has to stay comparable with the firmware's.
+	constexpr uint32_t MinCalcInterval = (40 * StepClockRate)/1000000;				// 40us in step clocks
+	constexpr uint32_t HiccupTime = (30 * StepClockRate)/1000000;					// 30us in step clocks
 	constexpr uint32_t MinInterruptInterval = (6 * StepClockRate)/1000000;			// Minimum interval between step timer interrupts, in step clocks; about 6us. See StepTimer::ScheduleTimerInterrupt.
 	constexpr uint32_t MaxStepInterruptTime = 10 * MinInterruptInterval;			// the maximum time we spend looping in the ISR, in step clocks
 	constexpr uint32_t HiccupIncrement = HiccupTime/2;								// how much we increase the hiccup time by on each attempt
@@ -38,6 +35,12 @@ namespace MoveTiming
 	constexpr uint32_t MaximumMoveStartAdvanceClocks = StepClockRate/1000;			// 1ms
 
 	constexpr uint32_t StandardMoveWakeupInterval = 500;							// milliseconds
+
+	// Segments shorter than this are folded into the one that follows them. Rounding error in the
+	// profile calculation throws off sub-microsecond segments, and they contribute nothing but a
+	// speed discontinuity in the reported position. In the firmware this constant lives in
+	// DriveMovement; here it belongs with the other timings because DriveTracker is the only user.
+	constexpr uint32_t MinimumExecutingSegmentDuration = (10 * StepClockRate)/1000000;	// 10us in step clocks
 
 #if SUPPORT_CAN_EXPANSION
 	constexpr uint32_t NominalRemoteDriverPositionUpdateInterval = StepClockRate/10;						// how often we aim to generate an interrupt to update the position of remote drivers

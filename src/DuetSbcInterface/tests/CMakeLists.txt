@@ -17,3 +17,6 @@ target_link_libraries(step_timer_tests PRIVATE duet_motion)
 
 duet_sbc_add_test(move_segment_tests MoveSegmentTests.cpp)
 target_link_libraries(move_segment_tests PRIVATE duet_motion)
+
+duet_sbc_add_test(drive_tracker_tests DriveTrackerTests.cpp)
+target_link_libraries(drive_tracker_tests PRIVATE duet_motion)
