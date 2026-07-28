@@ -1,5 +1,7 @@
 // Standalone validation of duet::sbc::RingBuffer: framing, wrap/skip-marker, full-ring rejection,
 // and a threaded producer/consumer soak that checks every record arrives intact and in order.
+#include "TestSupport.h"
+
 #include <Platform/RingBuffer.h>
 
 #include <atomic>
@@ -12,17 +14,6 @@
 #include <vector>
 
 using Duet::Sbc::RingBuffer;
-
-static int failures = 0;
-#define CHECK(cond, msg)                                                                                               \
-	do                                                                                                                 \
-	{                                                                                                                  \
-		if (!(cond))                                                                                                   \
-		{                                                                                                              \
-			std::printf("FAIL: %s (line %d)\n", msg, __LINE__);                                                        \
-			failures++;                                                                                                \
-		}                                                                                                              \
-	} while (0)
 
 static bool ReadOne(RingBuffer& r, std::string& out)
 {
@@ -190,7 +181,7 @@ static void TestThreadedSoak()
 			if (seq != expected)
 			{
 				std::printf("FAIL: soak out of order, got %d expected %d\n", seq, expected);
-				failures++;
+				++TestSupport::failures;
 				r.Consume();
 				break;
 			}
@@ -206,7 +197,7 @@ static void TestThreadedSoak()
 			if (!bodyOk)
 			{
 				std::printf("FAIL: soak payload corrupt at record %d\n", seq);
-				failures++;
+				++TestSupport::failures;
 				r.Consume();
 				break;
 			}
@@ -233,13 +224,5 @@ int main()
 	TestWrapWithBacklog();
 	TestFullRingRejects();
 	TestThreadedSoak();
-	if (failures == 0)
-	{
-		std::printf("All ring buffer tests passed.\n");
-	}
-	else
-	{
-		std::printf("%d check(s) failed.\n", failures);
-	}
-	return failures == 0 ? 0 : 1;
+	return TestSupport::Summarise("ring buffer");
 }

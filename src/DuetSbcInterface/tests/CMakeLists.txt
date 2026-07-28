@@ -1,5 +1,16 @@
 # Host-side unit tests. These need no hardware, so they run in CI/the devcontainer.
-add_executable(ring_buffer_tests RingBufferTests.cpp)
+#
+# The motion tests link duet_motion rather than duet_sbc: the motion engine is deliberately
+# independent of the SPI interface, so it can be exercised entirely offline against a clock and a
+# scheduling sink the test controls.
+function(duet_sbc_add_test name)
+    add_executable(${name} ${ARGN})
+    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME ${name} COMMAND ${name})
+endfunction()
+
+duet_sbc_add_test(ring_buffer_tests RingBufferTests.cpp)
 target_link_libraries(ring_buffer_tests PRIVATE duet_sbc)
 
-add_test(NAME ring_buffer_tests COMMAND ring_buffer_tests)
+duet_sbc_add_test(step_timer_tests StepTimerTests.cpp)
+target_link_libraries(step_timer_tests PRIVATE duet_motion)

@@ -1,601 +1,330 @@
 /*
- * StepTimer.cpp
- *
- *  Created on: 9 Sep 2018
- *      Author: David
+ * StepTimer.cpp - see StepTimer.h for what this models and why.
  */
 
 #include "StepTimer.h"
-#include <RTOSIface/RTOSIface.h>
-#include <Platform/RepRap.h>
-#include <Platform/Platform.h>
-#include <GCodes/GCodes.h>
-#include "MoveTiming.h"
 
-#if SUPPORT_REMOTE_COMMANDS
-# include <CanMessageFormats.h>
-# include <CAN/CanInterface.h>
-#endif
+#include <atomic>
+#include <cinttypes>
+#include <cmath>
+#include <ctime>
 
-#if SAME5x
-# include <CoreIO.h>
-# include <hri_tc_e54.h>
-#else
-# include <tc/tc.h>
-# if SAME70 || SAM4E || SAM4S
-#  include <pmc/pmc.h>
-# endif
-#endif
-
-StepTimer *_ecv_null volatile StepTimer::pendingList = nullptr;
-uint32_t StepTimer::movementDelay = 0;											// how many timer ticks the move timer is behind the raw timer
-
-#if SUPPORT_CAN_EXPANSION
-uint32_t StepTimer::ownMovementDelay = 0;
-bool StepTimer::ownMovementDelayIncreased = false;
-#endif
-
-#if SUPPORT_REMOTE_COMMANDS
-
-volatile uint32_t StepTimer::localTimeOffset = 0;
-volatile uint32_t StepTimer::whenLastSynced;
-uint32_t StepTimer::prevMasterTime;												// the previous master time received
-uint32_t StepTimer::prevLocalTime;												// the previous local time when the master time was received, corrected for receive processing delay
-int32_t StepTimer::peakPosJitter = 0;
-int32_t StepTimer::peakNegJitter = 0;
-int32_t StepTimer::errorAccumulator = 0;
-bool StepTimer::gotJitter = false;
-uint32_t StepTimer::peakReceiveDelay = 0;
-volatile unsigned int StepTimer::syncCount = 0;
-unsigned int StepTimer::numJitterResyncs = 0;
-unsigned int StepTimer::numTimeoutResyncs = 0;
-
-#endif
-
-void StepTimer::Init() noexcept
+namespace
 {
-	// Timer interrupt for stepper motors
-	// The clock rate we use is a compromise. Too fast and the 64-bit square roots take a long time to execute. Too slow and we lose resolution.
-	// On Duet WiFi/Ethernet, Duet Maestro and legacy Duets we use a clock prescaler of 128 which gives
-	// 1.524us resolution on the Duet 085 (84MHz clock)
-	// 1.067us resolution on the Duet WiFi/Ethernet/Maestro (120MHz clock)
-	// On Duet 3 we need a step clock rate that can be programmed on SAME70, SAME5x and SAMC21 processors. We choose 750kHz (1.333us resolution)
+	constexpr double NominalTicksPerNs = (double)StepClockRate / 1.0e9;
 
-#if SAME5x
-	// Step clock runs at 750KHz, same as other Duet 3 boards
-	EnableTcClock(StepTcNumber, GclkNum48MHz);
-	EnableTcClock(StepTcNumber + 1, GclkNum48MHz);
-
-	if (!hri_tc_is_syncing(StepTc, TC_SYNCBUSY_SWRST))
+	// The linear map from local nanoseconds to controller ticks:
+	//     ticks = masterTicks0 + (localNs - localNs0) * ticksPerNs
+	// masterTicks0 is 64-bit; the wrapping 32-bit value callers see is formed on read.
+	struct ClockModel
 	{
-		if (hri_tc_get_CTRLA_reg(StepTc, TC_CTRLA_ENABLE))
-		{
-			hri_tc_clear_CTRLA_ENABLE_bit(StepTc);
-			hri_tc_wait_for_sync(StepTc, TC_SYNCBUSY_ENABLE);
-		}
-		hri_tc_write_CTRLA_reg(StepTc, TC_CTRLA_SWRST);
-	}
-	hri_tc_wait_for_sync(StepTc, TC_SYNCBUSY_SWRST);
+		int64_t localNs0;
+		int64_t masterTicks0;
+		double ticksPerNs;
+	};
 
-	hri_tc_write_CTRLA_reg(StepTc, TC_CTRLA_MODE_COUNT32 | TC_CTRLA_PRESCALER_DIV64);
-	hri_tc_write_DBGCTRL_reg(StepTc, 0);
-	hri_tc_write_EVCTRL_reg(StepTc, 0);
-	hri_tc_write_WAVE_reg(StepTc, TC_WAVE_WAVEGEN_NFRQ);
+	// The published model, behind a seqlock. GetTimerTicks is called from the motion thread on
+	// every pass of the ring, and RecordMasterClockSample from the SPI interface thread once per
+	// transfer; a mutex between them would put the writer in a position to block the reader, which
+	// is the one thing this component must not do. Readers retry instead.
+	std::atomic<uint32_t> modelSeq{0};
+	ClockModel publishedModel{};		// only written between odd/even seq transitions
 
-	hri_tc_set_CTRLA_ENABLE_bit(StepTc);
+	std::atomic<StepTimer::LocalClockSource> localClockSource{nullptr};
 
-	NVIC_SetPriority(StepTcIRQn, NvicPriorityStep);			    // Set the priority for this IRQ
-	NVIC_ClearPendingIRQ(StepTcIRQn);
-	NVIC_EnableIRQ(StepTcIRQn);
-#else
-	pmc_set_writeprotect(false);
-	pmc_enable_periph_clk(STEP_TC_ID);
+	// Movement delay, in step clocks. Written rarely, read on the motion path.
+	std::atomic<uint32_t> movementDelay{0};
+	std::atomic<bool> movementDelayIncreased{false};
 
-# if SAME70 || SAM4S
-	// These processors have 16-bit TCs but we can chain 2 of them together
-	pmc_enable_periph_clk(STEP_TC_ID_UPPER);
+	// --- Fit state. Touched only by RecordMasterClockSample / Init, both on the interface thread.
 
-#  if SAME70
-	// Step clock runs at 48MHz/64 for compatibility with the Tool board
-	constexpr uint32_t divisor = (64ull * (SystemCoreClockFreq/2))/(48000000u);
-	static_assert(divisor <= 256 && divisor >= 100);
-
-	// TC0 channel 0 can use either PCLK6 or PCLK7 depending on the setting in the bus matrix Peripheral Clock Configuration Register. Default is PCLK6.
-	pmc_disable_pck(PMC_PCK_6);
-	pmc_switch_pck_to_mck(PMC_PCK_6, PMC_PCK_PRES(divisor - 1));
-	pmc_enable_pck(PMC_PCK_6);
-
-	// Chain TC0 and TC2 together. TC0 provides the lower 16 bits, TC2 the upper 16 bits. CLOCK1 is PCLK6.
-	tc_init(STEP_TC, STEP_TC_CHAN, TC_CMR_WAVE | TC_CMR_WAVSEL_UP | TC_CMR_TCCLKS_TIMER_CLOCK1 | TC_CMR_ACPA_SET | TC_CMR_ACPC_CLEAR | TC_CMR_EEVT_XC0);	// must set TC_CMR_EEVT nonzero to get RB compare interrupts
-	tc_init(STEP_TC, STEP_TC_CHAN_UPPER, TC_CMR_WAVE | TC_CMR_WAVSEL_UP | TC_CMR_TCCLKS_TIMER_CLOCK1 | TC_CMR_BURST_XC2);
-	tc_set_block_mode(STEP_TC, TC_BMR_TC2XC2S_TIOA0);
-#  elif SAM4S
-	// Chain TC0 and TC2 together. TC0 provides the lower 16 bits, TC2 the upper 16 bits. CLOCK4 is MCLK/128.
-	tc_init(STEP_TC, STEP_TC_CHAN, TC_CMR_WAVE | TC_CMR_WAVSEL_UP | TC_CMR_TCCLKS_TIMER_CLOCK4 | TC_CMR_ACPA_SET | TC_CMR_ACPC_CLEAR | TC_CMR_EEVT_XC0);	// must set TC_CMR_EEVT nonzero to get RB compare interrupts
-	tc_init(STEP_TC, STEP_TC_CHAN_UPPER, TC_CMR_WAVE | TC_CMR_WAVSEL_UP | TC_CMR_TCCLKS_TIMER_CLOCK4 | TC_CMR_BURST_XC2);
-	tc_set_block_mode(STEP_TC, TC_BMR_TC2XC2S_TIOA0);
-#  endif
-
-	// Multiple sources claim there is a bug in both SAM4E and SAME70: the first time that the lower counter wraps round, the upper counter doesn't increment.
-	// Workaround from https://www.at91.com/viewtopic.php?t=24000: set up TC0 to generate an output pulse almost immediately
-	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RA = 0x0001;
-	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RC = 0x0002;
-
-	IrqDisable();
-	tc_start(STEP_TC, STEP_TC_CHAN_UPPER);
-	tc_start(STEP_TC, STEP_TC_CHAN);
-
-	// Wait until first (lost) pulse is generated, then reset compare trip to TC0 wrap
-	while (STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_CV < 0x0002) { }
-
-	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RA = 0xFFFF;
-	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RC = 0;
-	IrqEnable();
-
-# else
-	// Use a single 32-bit timer. CLOCK4 is MCLK/128.
-	tc_init(STEP_TC, STEP_TC_CHAN, TC_CMR_WAVE | TC_CMR_WAVSEL_UP | TC_CMR_TCCLKS_TIMER_CLOCK4 | TC_CMR_EEVT_XC0);	// must set TC_CMR_EEVT nonzero to get RB compare interrupts
-	tc_start(STEP_TC, STEP_TC_CHAN);
-# endif
-
-	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_IDR = ~(uint32_t)0;	// interrupts disabled for now
-	tc_get_status(STEP_TC, STEP_TC_CHAN);						// clear any pending interrupt
-	NVIC_SetPriority(STEP_TC_IRQN, NvicPriorityStep);			// set priority for this IRQ
-	NVIC_EnableIRQ(STEP_TC_IRQN);
-#endif
-}
-
-#if SAM4S || SAME70
-
-// Get the step timer clock count
-/*static*/ uint32_t StepTimer::GetTimerTicks() noexcept
-{
-	AtomicCriticalSectionLocker lock;
-	// The TCs on the SAM4S and SAME70 are only 16 bits wide, so we maintain the upper 16 bits in a chained counter
-	uint16_t highWord = STEP_TC->TC_CHANNEL[STEP_TC_CHAN_UPPER].TC_CV;		// get the timer high word
-	do
+	struct Sample
 	{
-		const uint16_t lowWord = STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_CV;	// get the timer low word
-		const uint16_t highWordAgain = STEP_TC->TC_CHANNEL[STEP_TC_CHAN_UPPER].TC_CV;
-		if (highWordAgain == highWord)
-		{
-			return ((uint32_t)highWord << 16) | lowWord;
-		}
-		highWord = highWordAgain;
-	} while (true);
-}
+		int64_t localNs;
+		int64_t masterTicks;		// unwrapped
+	};
 
-// Get the step timer clock count
-/*static*/ uint32_t StepTimer::GetTimerTicksWhenInterruptsDisabled() noexcept
-{
-	// The TCs on the SAM4S and SAME70 are only 16 bits wide, so we maintain the upper 16 bits in a chained counter
-	uint16_t highWord = STEP_TC->TC_CHANNEL[STEP_TC_CHAN_UPPER].TC_CV;		// get the timer high word
-	do
-	{
-		const uint16_t lowWord = STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_CV;	// get the timer low word
-		const uint16_t highWordAgain = STEP_TC->TC_CHANNEL[STEP_TC_CHAN_UPPER].TC_CV;
-		if (highWordAgain == highWord)
-		{
-			return ((uint32_t)highWord << 16) | lowWord;
-			break;
-		}
-		highWord = highWordAgain;
-	} while (true);
-}
+	Sample samples[StepTimer::MaxSamples];
+	unsigned int numSamples = 0;
+	unsigned int nextSample = 0;			// ring index; the buffer is a sliding window
+	int64_t unwrappedMaster = 0;
+	int64_t lastAcceptedNs = 0;			// local time of the newest sample in the window
+	uint32_t lastRawMaster = 0;
+	bool haveFirstSample = false;
 
-#endif
+	std::atomic<uint32_t> peakResidualNs{0};
+	std::atomic<uint32_t> numBackwardClamps{0};
+	std::atomic<uint32_t> numRejectedSamples{0};
+	std::atomic<double> fittedTicksPerNs{NominalTicksPerNs};
+	std::atomic<uint32_t> publishedSampleCount{0};
 
-#if SAME5x
-
-// Get the step timer clock count
-/*static*/ uint32_t StepTimer::GetTimerTicks() noexcept
-{
-	AtomicCriticalSectionLocker lock;
-	StepTc->CTRLBSET.reg = TC_CTRLBSET_CMD_READSYNC;
-	// On the SAME5x it isn't enough just to wait for SYNCBUSY.COUNT here, nor is it enough just to use a DSB instruction first
-	while (StepTc->CTRLBSET.bit.CMD != 0) { }
-	while (StepTc->SYNCBUSY.bit.COUNT) { }
-	return StepTc->COUNT.reg;
-}
-
-// Get the step timer clock count
-/*static*/ uint32_t StepTimer::GetTimerTicksWhenInterruptsDisabled() noexcept
-{
-	StepTc->CTRLBSET.reg = TC_CTRLBSET_CMD_READSYNC;
-	// On the SAME5x it isn't enough just to wait for SYNCBUSY.COUNT here, nor is it enough just to use a DSB instruction first
-	while (StepTc->CTRLBSET.bit.CMD != 0) { }
-	while (StepTc->SYNCBUSY.bit.COUNT) { }
-	return StepTc->COUNT.reg;
-}
-
-#endif
-
-// Schedule an interrupt at the specified clock count and return false, or return true if that time is imminent or has passed already.
-// On entry, interrupts must be disabled or the base priority must be <= step interrupt priority.
-bool StepTimer::ScheduleTimerInterrupt(uint32_t tim) noexcept
-{
-	// We need to disable all interrupts, because once we read the current step clock we have only 6us to set up the interrupt, or we will miss it
-	AtomicCriticalSectionLocker lock;
-
-	const int32_t diff = (int32_t)(tim - GetTimerTicksWhenInterruptsDisabled());	// see how long we have to go
-	if (diff < (int32_t)MoveTiming::MinInterruptInterval)			// if less than about 6us or already passed
-	{
-		return true;												// tell the caller to simulate an interrupt instead
-	}
-
-#if SAME5x
-	StepTc->CC[0].reg = tim;
-	while (StepTc->SYNCBUSY.reg & TC_SYNCBUSY_CC0) { }
-	StepTc->INTFLAG.reg = TC_INTFLAG_MC0;							// clear any existing compare match
-	StepTc->INTENSET.reg = TC_INTFLAG_MC0;
-#else
-	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RB = tim;					// set up the compare register
-	(void)STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_SR;					// read the status register, which clears the status bits and any pending interrupt
-	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_IER = TC_IER_CPBS;			// enable the interrupt
-#endif
-
-	return false;
-}
-
-// Make sure we get no timer interrupts
-void StepTimer::DisableTimerInterrupt() noexcept
-{
-#if SAME5x
-	StepTc->INTENCLR.reg = TC_INTFLAG_MC0;
-#else
-	STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_IDR = TC_IER_CPBS;
-#endif
-}
-
-#if SUPPORT_REMOTE_COMMANDS
-
-// Check whether we have synced and received a clock sync message recently
-/*static*/ bool StepTimer::CheckSynced() noexcept
-{
-	if (syncCount == MaxSyncCount)
-	{
-		// Check that we received a sync message recently
-		const uint32_t wls = whenLastSynced;						// capture whenLastSynced before we call millis in case we get interrupted
-		if (millis() - wls > MinSyncInterval)
-		{
-			syncCount = 0;
-			++numTimeoutResyncs;
-		}
-	}
-	return syncCount == MaxSyncCount;
-}
-
-// Check whether we have synced
-/*static*/ bool StepTimer::IsSynced() noexcept
-{
-	return syncCount == MaxSyncCount;
-}
-
-// Process a received time sync message. This is only called when we are in expansion mode.
-/*static*/ void StepTimer::ProcessTimeSyncMessage(const CanMessageTimeSync& msg, size_t msgLen, uint16_t timeStamp) noexcept
-{
-	static uint32_t originalOffset = 0;
-
-#if SAME70
-	// On the SAME70 the timestamp counter is the lower 16 bits of the step counter
-	const uint32_t localTimeNow = StepTimer::GetTimerTicks();
-	const uint32_t timeStampDelay = (uint32_t)((localTimeNow - timeStamp) & 0xFFFF);
-#else
-	uint32_t localTimeNow;
-	uint16_t timeStampNow;
-	{
-		AtomicCriticalSectionLocker lock;							// there must be no delay between calling GetTimerTicks and GetTimeStampCounter
-		localTimeNow = StepTimer::GetTimerTicksWhenInterruptsDisabled();
-		timeStampNow = CanInterface::GetTimeStampCounter();
-	}
-
-	// The time stamp counter runs at the CAN normal bit rate, but the step clock runs at 48MHz/64. Calculate the delay to in step clocks.
-	// Datasheet suggests that on the SAMC21 only 15 bits of timestamp counter are readable, but Microchip confirmed this is a documentation error (case 00625843)
-	const uint32_t timeStampDelay = ((uint32_t)((timeStampNow - timeStamp) & 0xFFFF) * CanInterface::GetTimeStampPeriod()) >> 6;	// timestamp counter is 16 bits
-#endif
-
-	// Save the peak timestamp delay for diagnostic purposes
-	if (timeStampDelay > peakReceiveDelay)
-	{
-		peakReceiveDelay = timeStampDelay;
-	}
-
-	const uint32_t oldLocalTime = prevLocalTime;					// save the previous values
-	const uint32_t oldMasterTime = prevMasterTime;
-
-	prevLocalTime = localTimeNow - timeStampDelay;
-	prevMasterTime = msg.timeSent;
-
-	const unsigned int locSyncCount = syncCount;					// capture volatile variable
-	if (locSyncCount == 0)											// we can't sync until we have previous message details
-	{
-		syncCount = 1;
-		errorAccumulator = 0;
-	}
-	else if (msg.lastTimeSent == oldMasterTime && msg.lastTimeAcknowledgeDelay != 0)
-	{
-		// We have the previous message details and now we have the transmit delay for that message
-		const uint32_t correctedMasterTime = oldMasterTime + msg.lastTimeAcknowledgeDelay;
-		const uint32_t newOffset = oldLocalTime - correctedMasterTime;
-
-		const int32_t diff = (int32_t)(newOffset - localTimeOffset);
-		if ((uint32_t)labs(diff) > MaxSyncJitter && locSyncCount > 1)
-		{
-			syncCount = 0;
-			localTimeOffset = newOffset;
-			++numJitterResyncs;
-		}
-		else
-		{
-			whenLastSynced = millis();
-			if (locSyncCount < MaxSyncCount)
-			{
-				localTimeOffset = newOffset;
-				originalOffset = newOffset;
-				syncCount = locSyncCount + 1;
-			}
-			else
-			{
-				errorAccumulator += diff;
-				localTimeOffset += (uint32_t)(errorAccumulator/64 + diff/4);		// this is effectively a PI controller with P=1/4, I=freq/64
-				if (!gotJitter)
-				{
-					peakPosJitter = peakNegJitter = diff;
-					gotJitter = true;
-				}
-				else if (diff > peakPosJitter)
-				{
-					peakPosJitter = diff;
-				}
-				else if (diff < peakNegJitter)
-				{
-					peakNegJitter = diff;
-				}
-				reprap.GetGCodes().SetRemotePrinting(msg.isPrinting);
-				if (msgLen >= CanMessageTimeSync::SizeWithRealTime)					// if real time is included
-				{
-					reprap.GetPlatform().SetDateTime(msg.realTime);
-					if (msgLen >= CanMessageTimeSync::SizeWithRealTimeAndMovementDelay)
-					{
-						AtomicCriticalSectionLocker lock;
-						if (msg.movementDelay >= movementDelay)
-						{
-							movementDelay = msg.movementDelay;
-							ownMovementDelayIncreased = false;
-						}
-					}
-				}
-				if (reprap.Debug(Module::CAN))
-				{
-					debugPrintf("TS RxD,TxD,diff,errac,offs %" PRIu32 ",%u,%" PRIi32 ",%" PRIi32 ",%" PRIi32 "\n",
-								timeStampDelay, (unsigned int)msg.lastTimeAcknowledgeDelay, diff, errorAccumulator, (int32_t)(newOffset - originalOffset));
-				}
-			}
-		}
-	}
-	else
-	{
-		// Looks like we missed a time sync message. Ignore it.
-	}
-}
-
-#endif
-
-// The guts of the ISR
-/*static*/ inline void StepTimer::Interrupt() noexcept
-{
-	StepTimer *_ecv_null tmr = pendingList;
-	if (tmr != nullptr)
+	ClockModel LoadModel() noexcept
 	{
 		for (;;)
 		{
-			StepTimer *_ecv_null const nextTimer = tmr->next;
-			pendingList = nextTimer;								// remove it from the pending list
-
-			tmr->active = false;
-			tmr->callback(tmr->cbParam);							// execute its callback. This may schedule another callback and hence change the pending list.
-
-			tmr = pendingList;
-			if (tmr == nullptr || tmr != nextTimer)
+			const uint32_t before = modelSeq.load(std::memory_order_acquire);
+			if ((before & 1u) == 0)
 			{
-				break;												// no more timers, or another timer has been inserted and an interrupt scheduled
+				const ClockModel model = publishedModel;
+				std::atomic_thread_fence(std::memory_order_acquire);
+				if (modelSeq.load(std::memory_order_relaxed) == before)
+				{
+					return model;
+				}
 			}
-
-			if (!StepTimer::ScheduleTimerInterrupt(tmr->whenDue))
-			{
-				break;												// interrupt isn't due yet and a new one has been scheduled
-			}
+			// A write is in progress, or landed mid-read. Writes happen once per SPI transfer and
+			// take a few dozen nanoseconds, so spinning here costs less than any alternative.
 		}
 	}
-}
 
-// Step pulse timer interrupt
-extern "C" void STEP_TC_HANDLER() noexcept SPEED_CRITICAL;
-
-void STEP_TC_HANDLER() noexcept
-{
-#if SAME5x
-	uint8_t tcsr = StepTc->INTFLAG.reg;								// read the status register, which clears the status bits
-	tcsr &= StepTc->INTENSET.reg;									// select only enabled interrupts
-
-	if (likely((tcsr & TC_INTFLAG_MC0) != 0))						// the step interrupt uses MC0 compare
+	void PublishModel(const ClockModel& model) noexcept
 	{
-		StepTc->INTENCLR.reg = TC_INTFLAG_MC0;						// disable the interrupt (no need to clear it, we do that before we re-enable it)
-#else
-	// ATSAM processor code
-	uint32_t tcsr = STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_SR;		// read the status register, which clears the status bits
-	tcsr &= STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_IMR;				// select only enabled interrupts
-
-	if (likely((tcsr & TC_SR_CPBS) != 0))							// the timer interrupt uses RB compare
-	{
-		STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_IDR = TC_IER_CPBS;		// disable the interrupt
-#endif
-
-#ifdef TIMER_DEBUG
-		++numTimerInterruptsExecuted;
-#endif
-		StepTimer::Interrupt();
-	}
-}
-
-StepTimer::StepTimer() noexcept : next(nullptr), callback(nullptr), active(false)
-{
-}
-
-// Set up the callback function and parameter
-void StepTimer::SetCallback(TimerCallbackFunction cb, CallbackParameter param) noexcept
-{
-	callback = cb;
-	cbParam = param;
-}
-
-// Schedule a callback at a particular tick count, returning true if it was not scheduled because it is already due or imminent.
-bool StepTimer::ScheduleCallbackFromIsr(Ticks when) noexcept
-{
-	whenDue = when;
-	return ScheduleCallbackFromIsr();
-}
-
-// As ScheduleCallback but base priority >= NvicPriorityStep when called. Can be called from within a callback.
-bool StepTimer::ScheduleMovementCallbackFromIsr(Ticks when) noexcept
-{
-#if SUPPORT_REMOTE_COMMANDS
-	whenDue = when + movementDelay + localTimeOffset;
-#else
-	whenDue = when + movementDelay;
-#endif
-	return ScheduleCallbackFromIsr();
-}
-
-bool StepTimer::ScheduleCallbackFromIsr() noexcept
-{
-	if (active)
-	{
-		CancelCallbackFromIsr();
+		const uint32_t seq = modelSeq.load(std::memory_order_relaxed);
+		modelSeq.store(seq + 1, std::memory_order_relaxed);		// odd: write in progress
+		std::atomic_thread_fence(std::memory_order_release);
+		publishedModel = model;
+		std::atomic_thread_fence(std::memory_order_release);
+		modelSeq.store(seq + 2, std::memory_order_release);		// even: readable again
 	}
 
-	// Optimise the common case i.e. no other timer is pending
-	StepTimer *_ecv_null tmr = pendingList;			// capture volatile variable
-	if (tmr == nullptr)
+	int64_t TicksAt(const ClockModel& model, int64_t localNs) noexcept
 	{
-		if (ScheduleTimerInterrupt(whenDue))
+		return model.masterTicks0 + (int64_t)llrint((double)(localNs - model.localNs0) * model.ticksPerNs);
+	}
+
+	// Publish a model, having first made sure it cannot make the reading go backwards.
+	//
+	// DDA::HasExpired and DriveTracker::Advance both compare the current tick count against a stored
+	// one, so a step back would retire a move twice or rewind a tracked position. A new model can
+	// ask for one whenever sampling jitter puts its anchor behind its predecessor's - which is most
+	// likely before the fit has enough samples to average that jitter away, so every publish goes
+	// through here rather than only the fitted ones. Re-anchoring costs an offset error of at most
+	// the jitter, which the next models take back up.
+	void PublishClamped(ClockModel model, int64_t nowNs) noexcept
+	{
+		const int64_t previousReading = TicksAt(LoadModel(), nowNs);
+		const int64_t newReading = TicksAt(model, nowNs);
+		if (newReading < previousReading)
 		{
-			return true;
+			model.masterTicks0 += previousReading - newReading;
+			numBackwardClamps.fetch_add(1, std::memory_order_relaxed);
 		}
-		next = nullptr;
-		pendingList = this;
+		PublishModel(model);
+	}
+
+	int64_t MonotonicNs() noexcept
+	{
+		timespec ts{};
+		clock_gettime(CLOCK_MONOTONIC, &ts);
+		return (int64_t)ts.tv_sec * 1000000000 + ts.tv_nsec;
+	}
+}
+
+int64_t StepTimer::GetLocalTimeNs() noexcept
+{
+	const auto source = localClockSource.load(std::memory_order_acquire);
+	return (source != nullptr) ? source() : MonotonicNs();
+}
+
+void StepTimer::SetLocalClockSource(LocalClockSource source) noexcept
+{
+	localClockSource.store(source, std::memory_order_release);
+}
+
+// --- Reading -----------------------------------------------------------------------------------
+
+void StepTimer::Init() noexcept
+{
+	numSamples = 0;
+	nextSample = 0;
+	unwrappedMaster = 0;
+	lastAcceptedNs = 0;
+	lastRawMaster = 0;
+	haveFirstSample = false;
+
+	peakResidualNs.store(0, std::memory_order_relaxed);
+	numBackwardClamps.store(0, std::memory_order_relaxed);
+	numRejectedSamples.store(0, std::memory_order_relaxed);
+	fittedTicksPerNs.store(NominalTicksPerNs, std::memory_order_relaxed);
+	publishedSampleCount.store(0, std::memory_order_relaxed);
+	movementDelay.store(0, std::memory_order_relaxed);
+	movementDelayIncreased.store(false, std::memory_order_relaxed);
+
+	PublishModel(ClockModel{ GetLocalTimeNs(), 0, NominalTicksPerNs });
+}
+
+StepTimer::Ticks StepTimer::GetTimerTicks() noexcept
+{
+	const ClockModel model = LoadModel();
+	return (Ticks)(uint64_t)TicksAt(model, GetLocalTimeNs());
+}
+
+StepTimer::Ticks StepTimer::ConvertLocalToMovementTime(Ticks localTime) noexcept
+{
+	return localTime - movementDelay.load(std::memory_order_relaxed);
+}
+
+StepTimer::Ticks StepTimer::GetMovementTimerTicks() noexcept
+{
+	return ConvertLocalToMovementTime(GetTimerTicks());
+}
+
+// --- Movement delay ----------------------------------------------------------------------------
+
+void StepTimer::IncreaseMovementDelay(uint32_t increase) noexcept
+{
+	movementDelay.fetch_add(increase, std::memory_order_relaxed);
+	movementDelayIncreased.store(true, std::memory_order_release);
+}
+
+StepTimer::Ticks StepTimer::GetMovementDelay() noexcept
+{
+	return movementDelay.load(std::memory_order_relaxed);
+}
+
+StepTimer::Ticks StepTimer::CheckMovementDelayIncreased() noexcept
+{
+	if (movementDelayIncreased.exchange(false, std::memory_order_acq_rel))
+	{
+		return movementDelay.load(std::memory_order_relaxed);
+	}
+	return 0;
+}
+
+// --- Discipline --------------------------------------------------------------------------------
+
+void StepTimer::RecordMasterClockSample(uint32_t masterTicks, int64_t localNs) noexcept
+{
+	// Unwrap the controller's 32-bit counter. Transfers are milliseconds apart and the counter
+	// wraps every ~95 minutes, so the difference between consecutive samples is always a small
+	// positive number and the wrap falls out of the unsigned subtraction.
+	if (!haveFirstSample)
+	{
+		unwrappedMaster = masterTicks;
+		haveFirstSample = true;
 	}
 	else
 	{
-		// Another timer is already pending
-		const Ticks now = GetTimerTicks();
-		const int32_t howSoon = (int32_t)(whenDue - now);
-		if (howSoon < (int32_t)(tmr->whenDue - now))
+		unwrappedMaster += (int64_t)(uint32_t)(masterTicks - lastRawMaster);
+	}
+	lastRawMaster = masterTicks;
+
+	// Decimate into the fitting window. See MinSampleSpacingNs for why the window has to span
+	// seconds rather than transfers.
+	const bool accepted = (numSamples == 0) || (localNs - lastAcceptedNs >= MinSampleSpacingNs);
+	if (accepted)
+	{
+		samples[nextSample] = Sample{ localNs, unwrappedMaster };
+		nextSample = (nextSample + 1) % MaxSamples;
+		lastAcceptedNs = localNs;
+		if (numSamples < MaxSamples)
 		{
-			// This one is due earlier than the first existing one
-			if (ScheduleTimerInterrupt(whenDue))
-			{
-				return true;
-			}
-			next = tmr;
-			pendingList = this;
-		}
-		else
-		{
-			while (tmr->next != nullptr && (int32_t)(tmr->next->whenDue - now) < howSoon)
-			{
-				tmr = tmr->next;
-			}
-			next = tmr->next;
-			tmr->next = this;
+			++numSamples;
 		}
 	}
 
-	active = true;
-	return false;
-}
-
-bool StepTimer::ScheduleCallback(Ticks when) noexcept
-{
-	BasePriorityBooster booster(NvicPriorityStep);
-	return ScheduleCallbackFromIsr(when);
-}
-
-// Cancel any scheduled callback for this timer. Harmless if there is no callback scheduled.
-void StepTimer::CancelCallbackFromIsr() noexcept
-{
-	for (StepTimer *_ecv_null * ppst = const_cast<StepTimer *_ecv_null *>(&pendingList); *ppst != nullptr; ppst = &((*ppst)->next))
+	if (numSamples < MinSamplesToSync)
 	{
-		if (*ppst == this)
-		{
-			*ppst = this->next;		// unlink this from the pending list
-			this->next = nullptr;
-			break;
-		}
+		// Not enough to fit a rate yet. Track the offset at the nominal rate, on every sample rather
+		// than only the accepted ones, so the reading is usable immediately - the first move is
+		// scheduled long before the window fills.
+		PublishClamped(ClockModel{ localNs, unwrappedMaster, NominalTicksPerNs }, localNs);
+		publishedSampleCount.store(numSamples, std::memory_order_relaxed);
+		return;
 	}
-	active = false;
+
+	if (!accepted)
+	{
+		// Between window samples the published model extrapolates, which is what it is for.
+		// Re-anchoring here on every transfer would feed each sample's quantisation error straight
+		// into the reading.
+		return;
+	}
+
+	// Ordinary least squares of masterTicks against localNs. Both are offset by the oldest sample
+	// before summing: the raw values are ~1e18 and ~1e12, and the sums of squares would lose every
+	// bit that matters in double.
+	const unsigned int oldest = (numSamples < MaxSamples) ? 0 : nextSample;
+	const int64_t refNs = samples[oldest].localNs;
+	const int64_t refTicks = samples[oldest].masterTicks;
+
+	double sumX = 0.0, sumY = 0.0, sumXX = 0.0, sumXY = 0.0;
+	for (unsigned int i = 0; i < numSamples; ++i)
+	{
+		const Sample& s = samples[(oldest + i) % MaxSamples];
+		const double x = (double)(s.localNs - refNs);
+		const double y = (double)(s.masterTicks - refTicks);
+		sumX += x;
+		sumY += y;
+		sumXX += x * x;
+		sumXY += x * y;
+	}
+
+	const double n = (double)numSamples;
+	const double denom = (n * sumXX) - (sumX * sumX);
+	if (denom <= 0.0)
+	{
+		// Every sample carries the same local timestamp, so there is no rate information. Possible
+		// if the clock source is coarse; keep the previous model.
+		numRejectedSamples.fetch_add(1, std::memory_order_relaxed);
+		return;
+	}
+
+	const double slope = ((n * sumXY) - (sumX * sumY)) / denom;
+	const double intercept = (sumY - (slope * sumX)) / n;
+
+	const double ppm = ((slope / NominalTicksPerNs) - 1.0) * 1.0e6;
+	if (!std::isfinite(slope) || std::fabs(ppm) > MaxDriftPpm)
+	{
+		// The fit is implausible - a stalled transfer, or a controller reset that reset its clock.
+		// Drop the window and start again rather than steering the model somewhere wrong.
+		numRejectedSamples.fetch_add(1, std::memory_order_relaxed);
+		numSamples = 0;
+		nextSample = 0;
+		haveFirstSample = false;
+		publishedSampleCount.store(0, std::memory_order_relaxed);
+		return;
+	}
+
+	// Residual of the newest sample, as a health metric.
+	const double predicted = intercept + (slope * (double)(localNs - refNs));
+	const double residualTicks = (double)(unwrappedMaster - refTicks) - predicted;
+	const auto residualNs = (uint32_t)std::fabs(residualTicks / NominalTicksPerNs);
+	if (residualNs > peakResidualNs.load(std::memory_order_relaxed))
+	{
+		peakResidualNs.store(residualNs, std::memory_order_relaxed);
+	}
+
+	const ClockModel model{ refNs, refTicks + (int64_t)llrint(intercept), slope };
+
+	fittedTicksPerNs.store(slope, std::memory_order_relaxed);
+	publishedSampleCount.store(numSamples, std::memory_order_relaxed);
+	PublishClamped(model, GetLocalTimeNs());
 }
 
-void StepTimer::CancelCallback() noexcept
+StepTimer::ClockStats StepTimer::GetClockStats() noexcept
 {
-	BasePriorityBooster booster(NvicPriorityStep);
-	CancelCallbackFromIsr();
+	const uint32_t count = publishedSampleCount.load(std::memory_order_relaxed);
+	return ClockStats{
+		((fittedTicksPerNs.load(std::memory_order_relaxed) / NominalTicksPerNs) - 1.0) * 1.0e6,
+		count,
+		peakResidualNs.load(std::memory_order_relaxed),
+		numBackwardClamps.load(std::memory_order_relaxed),
+		numRejectedSamples.load(std::memory_order_relaxed),
+		count >= MinSamplesToSync
+	};
 }
 
-/*static*/ void StepTimer::Diagnostics(const StringRef& reply) noexcept
+void StepTimer::Diagnostics(const StringRef& reply) noexcept
 {
-#if SUPPORT_REMOTE_COMMANDS
-	if (CanInterface::InExpansionMode())
-	{
-		reply.lcatf("Sync err accum %" PRIi32 ", peak jitter %" PRIi32 "/%" PRIi32 ", peak Rx delay %" PRIu32 ", resyncs %u/%u, ",
-						errorAccumulator, peakNegJitter, peakPosJitter, peakReceiveDelay, numTimeoutResyncs, numJitterResyncs);
-		gotJitter = false;
-		numTimeoutResyncs = numJitterResyncs = 0;
-		peakReceiveDelay = 0;
-	}
-#endif
-	const StepTimer *_ecv_null const pst = pendingList;
-	if (pst == nullptr)
-	{
-		reply.lcat("No step interrupt scheduled");
-	}
-	else
-	{
-		reply.lcatf("Next step interrupt due in %" PRIu32 " ticks, %s",
-					pst->whenDue - GetTimerTicks(),
-# if SAME5x
-					((StepTc->INTENSET.reg & TC_INTFLAG_MC0) == 0)
-# elif SAME70 || SAM4E || SAM4S
-					((STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_IER & TC_IER_CPBS) == 0)
-# endif
-						? "disabled" : "enabled");
-# if SAME5x
-		if (StepTc->CC[0].reg != pst->whenDue)
-# elif SAM4E
-		if (STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RB != pst->whenDue)
-# elif SAME70 || SAM4S
-		if (STEP_TC->TC_CHANNEL[STEP_TC_CHAN].TC_RB != (uint16_t)pst->whenDue)
-# endif
-		{
-			reply.cat(", CC0 mismatch!!");
-		}
-	}
+	const ClockStats stats = GetClockStats();
+	reply.catf("Step clock: %s, %" PRIu32 " samples, drift %.1fppm, peak residual %" PRIu32
+			   "us, %" PRIu32 " clamps, %" PRIu32 " rejected, movement delay %" PRIu32 "us",
+			   (stats.synced) ? "synced" : "free-running",
+			   stats.numSamples,
+			   stats.driftPpm,
+			   stats.peakResidualNs / 1000,
+			   stats.numBackwardClamps,
+			   stats.numRejectedSamples,
+			   TicksToIntegerMicroseconds(GetMovementDelay()));
 }
-
-#if SUPPORT_CAN_EXPANSION
-
-// Handle a request for movement delay received from an expansion board
-void StepTimer::ProcessMovementDelayRequest(uint32_t delayRequested) noexcept
-{
-	AtomicCriticalSectionLocker lock;
-
-	if (delayRequested > movementDelay)
-	{
-		movementDelay = delayRequested;
-	}
-	ownMovementDelayIncreased = true;						// always set this to ensure that we acknowledge the request
-}
-
-#endif
-
-// End

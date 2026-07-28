@@ -30,6 +30,7 @@ endforeach()
 set(DUET_MOTION_SOURCES
     Compat/Diagnostics.cpp
     Compat/Tasks.cpp
+    Movement/StepTimer.cpp
 )
 
 add_library(duet_motion STATIC ${DUET_MOTION_SOURCES})
