@@ -6,8 +6,14 @@
 #
 # CApi.cpp is the one exception: it is the C ABI the shared library exports, and is deliberately kept
 # out of the static library the harness and the tests link.
+#
+# Movement/ is the second exception: it is RepRapFirmware source imported verbatim and still being
+# ported to this project, so it does not compile yet. It gets its own target (duet_motion) with an
+# explicit source list once each file is ported - a recursive glob is exactly what pulled the
+# unported tree into this library and broke the build.
 file(GLOB_RECURSE DUET_SBC_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 list(REMOVE_ITEM DUET_SBC_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/CApi.cpp")
+list(FILTER DUET_SBC_SOURCES EXCLUDE REGEX "/Movement/")
 
 # Static library used by the standalone harness.
 add_library(duet_sbc STATIC ${DUET_SBC_SOURCES})

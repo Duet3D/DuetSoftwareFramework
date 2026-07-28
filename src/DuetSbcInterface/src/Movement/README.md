@@ -1,5 +1,15 @@
 # Movement
 
+> **This document describes the upstream RepRapFirmware motion engine, not what is in this
+> directory.** It was imported verbatim with the source and is kept because it is still the best
+> description of how the pipeline works end to end. Much of what it references no longer exists
+> here: kinematics moved to [../../reference/Kinematics/](../../reference/Kinematics/) (it is being
+> ported to C# in DuetControlServer); `Move`, `RawMove`, `DriveMovement`, `AxisShaper`,
+> `ExtruderShaper`, `BedProbing/`, `HeightControl/`, `StepperDrivers/`, `PhaseStep` and the S-curve
+> planner (`DDA_3rdOrder`, `MovementProfile`) were deleted. This project keeps `DDA`, `DDARing`,
+> `MoveSegment`, `MovementError` and `StepTimer`: DCS builds each `DDA` and sends it down, and this
+> library owns the ring from lookahead through to scheduling the move on the CAN-connected drivers.
+
 `src/Movement/` is the motion engine of RepRapFirmware. It turns parsed moves into timed step output, handling kinematics, look-ahead, shaping, pressure advance, bed compensation, and the split between local drivers and CAN-attached remote drivers.
 
 ## Key Files And Areas

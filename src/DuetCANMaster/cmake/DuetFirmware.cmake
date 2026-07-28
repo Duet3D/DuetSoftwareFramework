@@ -10,13 +10,8 @@
 
 set(_duet_lib_root "${CMAKE_CURRENT_LIST_DIR}/../../../lib")
 
-set(DEFAULT_INTERFACE_ARGS
-    "MCU"       # MCU to compile library for
-)
-set(DEFAULT_LIBRARY_ARGS
-    ${DEFAULT_INTERFACE_ARGS}
-    "ARCH"      # Default interface target for the library (from duet_arch_target)
-)
+# DEFAULT_INTERFACE_ARGS / DEFAULT_LIBRARY_ARGS, which the library modules below parse their
+# arguments against, come from lib/LibraryUtils.cmake (included by each of those modules).
 
 include("${CMAKE_CURRENT_LIST_DIR}/ClangTidy.cmake")
 

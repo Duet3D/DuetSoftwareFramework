@@ -9,11 +9,19 @@
 # duet_arch_flags(<mcu-token> <out-compile-options-var> <out-link-options-var>)
 #   <mcu-token> is the leading component of a library config name, e.g. SAME70, SAME5x, SAME51,
 #   SAM4E, SAMC21, RP2040, STM32H743, STM32H523.
+#
+# HOST is the one non-MCU token: it selects an ordinary hosted build (the SBC - x86-64 natively,
+# aarch64/armhf when cross-compiling for a Pi) and therefore contributes no machine-selection flags
+# at all. The toolchain file already picked the target; the point of the token is that a library
+# built through these modules can be asked for a host variant without every caller having to
+# special-case the ARCH argument.
 
 include_guard(GLOBAL)
 
 function(_duet_mcu_define MCU OUT)
-    if(MCU STREQUAL "SAME70")
+    if(MCU STREQUAL "HOST")
+        set(_part_define "__DUET_HOST__")
+    elseif(MCU STREQUAL "SAME70")
         set(_part_define "__SAME70Q20B__") # FreeRTOS and RRFLibraries used to select `__SAME70Q21__`
     elseif(MCU STREQUAL "SAME51")
         set(_part_define "__SAME51N19A__")
@@ -34,6 +42,18 @@ function(_duet_mcu_define MCU OUT)
 endfunction()
 
 function(_duet_arch_flags MCU OUT_COMPILE_OPTIONS OUT_COMPILE_DEFINITIONS OUT_LINK)
+    if(MCU STREQUAL "HOST")
+        # A hosted build: the toolchain file has already selected the target, and none of the ARM
+        # codegen flags below apply (-mthumb and -mfp16-format are rejected outright on x86-64).
+        # -fno-math-errno is the one flag here that is not machine-specific, and the motion code
+        # relies on it for the same reason the firmware does.
+        _duet_mcu_define(${MCU} _part_define)
+        set(${OUT_COMPILE_OPTIONS} "-fno-math-errno" PARENT_SCOPE)
+        set(${OUT_COMPILE_DEFINITIONS} "${_part_define}" PARENT_SCOPE)
+        set(${OUT_LINK} "" PARENT_SCOPE)
+        return()
+    endif()
+
     if(MCU MATCHES "^(SAME70|STM32H743)$")
         set(_compile_options -mcpu=cortex-m7 -mfpu=fpv5-d16 -mfloat-abi=hard -mno-unaligned-access)
     elseif(MCU MATCHES "^(SAME5x|SAME51|SAM4E)$")
