@@ -1174,8 +1174,16 @@ public class MCodeHandler(
 
                 if (code.GetIntArray('S', [0]).Contains(2))
                 {
-                    // DuetPiManagementPlugin intercepts this code before DCS gets to see it, so reaching
-                    // this point means it is not running and nothing would perform the update
+                    // DuetPiManagementPlugin intercepts this code before DCS gets to see it, so reaching this
+                    // point means it is not running. An upgrade stops the plugin halfway through by design, so
+                    // only report the code as unhandled when no upgrade is in progress
+                    using (await model.AccessReadOnlyAsync(cancellationToken))
+                    {
+                        if (model.IsUpdating)
+                        {
+                            return new Message();
+                        }
+                    }
                     return new Message(MessageType.Error, "Cannot update DSF because DuetPiManagementPlugin is not started");
                 }
                 break;
