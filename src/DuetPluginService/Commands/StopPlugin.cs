@@ -63,8 +63,10 @@ namespace DuetPluginService.Commands
                     }
                     catch (OperationCanceledException)
                     {
-                        // Kill it and any potentially left-over child processes
-                        process.Kill(true);
+                        // Kill it and, unless this is the root service, any potentially left-over child
+                        // processes. A root plugin may have started a package operation that is upgrading
+                        // DSF itself, and killing the process tree would take that down halfway through
+                        process.Kill(!Program.IsRoot);
                         logger.Info("Process killed");
                     }
                 }
