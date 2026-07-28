@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -196,7 +196,7 @@ public class PacketReader
     {
         Span<byte> blob = GetBlob("evaluationResult.bin");
 
-        int bytesRead = Reader.ReadEvaluationResult(blob, out CodeChannel channel, out string expression, out object result);
+        int bytesRead = Reader.ReadEvaluationResult(blob, out CodeChannel channel, out string expression, out object? result);
         Assert.That(bytesRead, Is.EqualTo(32));
 
         // Header

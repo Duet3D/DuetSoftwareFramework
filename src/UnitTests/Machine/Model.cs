@@ -11,7 +11,7 @@ namespace UnitTests.Machine
         static void TestLoadedModel(ObjectModel model)
         {
             // Test all supported data types
-            Assert.That(model.Global["foobar"].Value.GetInt32(), Is.EqualTo(123));
+            Assert.That(model.Global["foobar"]!.Value.GetInt32(), Is.EqualTo(123));
             Assert.That(model.Directories.System, Is.EqualTo("0:/sys/custom"));
             Assert.That(model.Move.Axes[0].Letter, Is.EqualTo('W'));
             Assert.That(model.State.AtxPower, Is.True);
@@ -20,14 +20,14 @@ namespace UnitTests.Machine
 
             // Test nullable ModelObject
             Assert.That(model.State.MessageBox, Is.Not.Null);
-            Assert.That(model.State.MessageBox.Mode, Is.EqualTo(MessageBoxMode.OkOnly));
-            Assert.That(model.State.MessageBox.Message, Is.EqualTo("message"));
-            Assert.That(model.State.MessageBox.Title, Is.EqualTo("title"));
+            Assert.That(model.State.MessageBox!.Mode, Is.EqualTo(MessageBoxMode.OkOnly));
+            Assert.That(model.State.MessageBox!.Message, Is.EqualTo("message"));
+            Assert.That(model.State.MessageBox!.Title, Is.EqualTo("title"));
 
             // Test nullable ModelObject in collection
             Assert.That(model.Heat.Heaters.Count, Is.EqualTo(2));
             Assert.That(model.Heat.Heaters[0], Is.Null);
-            Assert.That(model.Heat.Heaters[1].Current, Is.EqualTo(25.01F));
+            Assert.That(model.Heat.Heaters[1]!.Current, Is.EqualTo(25.01F));
 
             // Test polymorphic ModelObject
             Assert.That(model.Move.Kinematics, Is.TypeOf<CoreKinematics>());
@@ -35,7 +35,7 @@ namespace UnitTests.Machine
 
             // Test polymorphic ModelObject in collection
             Assert.That(model.Sensors.FilamentMonitors[0], Is.TypeOf<RotatingMagnetFilamentMonitor>());
-            Assert.That(model.Sensors.FilamentMonitors[0].Type, Is.EqualTo(FilamentMonitorType.RotatingMagnet));
+            Assert.That(model.Sensors.FilamentMonitors[0]!.Type, Is.EqualTo(FilamentMonitorType.RotatingMagnet));
         }
 
 #if false
@@ -187,13 +187,13 @@ namespace UnitTests.Machine
             using JsonDocument jsonPatch = JsonDocument.Parse(json);
             modelToUpdate.UpdateFromJson(jsonPatch.RootElement, false);
 
-            Assert.That(modelToUpdate.Boards[0].FirmwareName, Is.EqualTo("Yum"));
+            Assert.That(modelToUpdate.Boards[0]!.FirmwareName, Is.EqualTo("Yum"));
             Assert.That(modelToUpdate.Heat.BedHeaterMapping, Is.EquivalentTo(expectedBedHeaterMapping));
-            Assert.That(modelToUpdate.Heat.Heaters[0].Active, Is.EqualTo(90F));
-            Assert.That(modelToUpdate.Heat.Heaters[0].Standby, Is.EqualTo(21F));
-            Assert.That(modelToUpdate.Heat.Heaters[1].Standby, Is.EqualTo(20F));
-            Assert.That(modelToUpdate.Fans[0].ActualValue, Is.EqualTo(0.5F));
-            Assert.That(modelToUpdate.Fans[0].RequestedValue, Is.EqualTo(0.75F));
+            Assert.That(modelToUpdate.Heat.Heaters[0]!.Active, Is.EqualTo(90F));
+            Assert.That(modelToUpdate.Heat.Heaters[0]!.Standby, Is.EqualTo(21F));
+            Assert.That(modelToUpdate.Heat.Heaters[1]!.Standby, Is.EqualTo(20F));
+            Assert.That(modelToUpdate.Fans[0]!.ActualValue, Is.EqualTo(0.5F));
+            Assert.That(modelToUpdate.Fans[0]!.RequestedValue, Is.EqualTo(0.75F));
             Assert.That(modelToUpdate.State.Status, Is.EqualTo(MachineStatus.Pausing));
         }
 

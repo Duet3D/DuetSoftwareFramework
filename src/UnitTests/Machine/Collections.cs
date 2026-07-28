@@ -1,4 +1,4 @@
-using DuetAPI.ObjectModel;
+﻿using DuetAPI.ObjectModel;
 using NUnit.Framework;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -34,7 +34,7 @@ namespace UnitTests.Machine
             Assert.That(model.Fans[0], Is.Not.Null);
             Assert.That(model.Fans[1], Is.Null);
             Assert.That(model.Fans[2], Is.Not.Null);
-            Assert.That(model.Fans[2].ActualValue, Is.EqualTo(0.9F));
+            Assert.That(model.Fans[2]!.ActualValue, Is.EqualTo(0.9F));
         }
 
         [Test]
@@ -109,7 +109,7 @@ namespace UnitTests.Machine
                 model.Global.UpdateFromJson(json.RootElement, false);
             }
             Assert.That(numChangedEvents, Is.EqualTo(1));
-            Assert.That(model.Global["myVar"].Value.GetInt32(), Is.EqualTo(123));
+            Assert.That(model.Global["myVar"]!.Value.GetInt32(), Is.EqualTo(123));
 
             // The same value coming from a different JSON document must not fire another one
             using (JsonDocument json = JsonDocument.Parse("{\"myVar\":123}"))
@@ -124,7 +124,7 @@ namespace UnitTests.Machine
                 model.Global.UpdateFromJson(json.RootElement, false);
             }
             Assert.That(numChangedEvents, Is.EqualTo(2));
-            Assert.That(model.Global["myVar"].Value.GetInt32(), Is.EqualTo(456));
+            Assert.That(model.Global["myVar"]!.Value.GetInt32(), Is.EqualTo(456));
         }
 
         [Test]

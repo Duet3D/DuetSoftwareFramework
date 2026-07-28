@@ -15,7 +15,7 @@ namespace UnitTests.HttpClient;
 [TestFixture]
 public class Session
 {
-    private DuetHttpSession session;
+    private DuetHttpSession session = null!;
 
     [OneTimeSetUp]
     public async Task Connect()

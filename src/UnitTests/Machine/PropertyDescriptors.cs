@@ -1,4 +1,4 @@
-using DuetAPI.ObjectModel;
+﻿using DuetAPI.ObjectModel;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -37,7 +37,7 @@ namespace UnitTests.Machine
             Queue<IModelObjectDescriptor> pending = new();
             pending.Enqueue(ObjectModel.TypeDescriptor);
 
-            while (pending.TryDequeue(out IModelObjectDescriptor descriptor))
+            while (pending.TryDequeue(out IModelObjectDescriptor? descriptor))
             {
                 if (visited.Add(descriptor))
                 {
@@ -58,10 +58,10 @@ namespace UnitTests.Machine
             Type type = accessor.GetType();
             foreach (ModelPropertyDescriptor property in accessor.Descriptor.Properties)
             {
-                PropertyInfo clrProperty = type.GetProperty(property.Name, BindingFlags.Public | BindingFlags.Instance);
+                PropertyInfo? clrProperty = type.GetProperty(property.Name, BindingFlags.Public | BindingFlags.Instance);
                 Assert.That(clrProperty, Is.Not.Null, $"{type.Name} has no CLR property named {property.Name}");
 
-                object expected = clrProperty.GetValue(accessor), actual = accessor.GetPropertyValue(property.Index);
+                object? expected = clrProperty!.GetValue(accessor), actual = accessor.GetPropertyValue(property.Index);
                 if (expected is null || expected.GetType().IsValueType)
                 {
                     Assert.That(actual, Is.EqualTo(expected), $"{type.Name}.{property.Name}");
@@ -161,7 +161,7 @@ namespace UnitTests.Machine
         [Test]
         public void FindPropertyIsCaseSensitiveByDefault()
         {
-            ModelPropertyDescriptor property = ObjectModel.TypeDescriptor.FindProperty("Heat", false);
+            ModelPropertyDescriptor property = ObjectModel.TypeDescriptor.FindProperty("Heat", false)!;
             Assert.That(property, Is.Not.Null);
             Assert.That(property.Name, Is.EqualTo("Heat"));
             Assert.That(property.JsonName, Is.EqualTo("heat"));
@@ -173,7 +173,7 @@ namespace UnitTests.Machine
         [Test]
         public void FindPropertyIgnoringCase()
         {
-            ModelPropertyDescriptor property = ObjectModel.TypeDescriptor.FindProperty("heat", true);
+            ModelPropertyDescriptor property = ObjectModel.TypeDescriptor.FindProperty("heat", true)!;
             Assert.That(property, Is.Not.Null);
             Assert.That(property, Is.SameAs(ObjectModel.TypeDescriptor.FindProperty("Heat", false)));
             Assert.That(ObjectModel.TypeDescriptor.FindProperty("HEAT", true), Is.SameAs(property));
@@ -184,7 +184,7 @@ namespace UnitTests.Machine
         [Test]
         public void FindPropertyByJsonName()
         {
-            ModelPropertyDescriptor property = ObjectModel.TypeDescriptor.FindPropertyByJsonName("ledStrips");
+            ModelPropertyDescriptor property = ObjectModel.TypeDescriptor.FindPropertyByJsonName("ledStrips")!;
             Assert.That(property, Is.Not.Null);
             Assert.That(property.Name, Is.EqualTo("LedStrips"));
 
@@ -196,45 +196,45 @@ namespace UnitTests.Machine
         [Test]
         public void PropertyFlags()
         {
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Messages", false).Flags, Is.EqualTo(ModelPropertyFlags.SbcProperty));
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Limits", false).Flags, Is.EqualTo(ModelPropertyFlags.Verbose));
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("SBC", false).Flags, Is.EqualTo(ModelPropertyFlags.HasSetter | ModelPropertyFlags.SbcProperty));
-            Assert.That(Heat.TypeDescriptor.FindProperty("Heaters", false).Flags, Is.EqualTo(ModelPropertyFlags.Live));
-            Assert.That(Heat.TypeDescriptor.FindProperty("BedHeaters", false).Flags, Is.EqualTo(ModelPropertyFlags.Obsolete));
-            Assert.That(Heat.TypeDescriptor.FindProperty("ColdExtrudeTemperature", false).Flags, Is.EqualTo(ModelPropertyFlags.HasSetter));
-            Assert.That(Network.TypeDescriptor.FindProperty("CorsSite", false).Flags, Is.EqualTo(ModelPropertyFlags.HasSetter | ModelPropertyFlags.SbcProperty));
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Messages", false)!.Flags, Is.EqualTo(ModelPropertyFlags.SbcProperty));
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Limits", false)!.Flags, Is.EqualTo(ModelPropertyFlags.Verbose));
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("SBC", false)!.Flags, Is.EqualTo(ModelPropertyFlags.HasSetter | ModelPropertyFlags.SbcProperty));
+            Assert.That(Heat.TypeDescriptor.FindProperty("Heaters", false)!.Flags, Is.EqualTo(ModelPropertyFlags.Live));
+            Assert.That(Heat.TypeDescriptor.FindProperty("BedHeaters", false)!.Flags, Is.EqualTo(ModelPropertyFlags.Obsolete));
+            Assert.That(Heat.TypeDescriptor.FindProperty("ColdExtrudeTemperature", false)!.Flags, Is.EqualTo(ModelPropertyFlags.HasSetter));
+            Assert.That(Network.TypeDescriptor.FindProperty("CorsSite", false)!.Flags, Is.EqualTo(ModelPropertyFlags.HasSetter | ModelPropertyFlags.SbcProperty));
 
             // Read-only collections and dictionaries have no setter
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Tools", false).Flags & ModelPropertyFlags.HasSetter, Is.EqualTo(ModelPropertyFlags.None));
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Global", false).Flags & ModelPropertyFlags.HasSetter, Is.EqualTo(ModelPropertyFlags.None));
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Tools", false)!.Flags & ModelPropertyFlags.HasSetter, Is.EqualTo(ModelPropertyFlags.None));
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Global", false)!.Flags & ModelPropertyFlags.HasSetter, Is.EqualTo(ModelPropertyFlags.None));
         }
 
         [Test]
         public void PropertyKinds()
         {
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Heat", false).Kind, Is.EqualTo(ModelPropertyKind.ModelObject));
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Tools", false).Kind, Is.EqualTo(ModelPropertyKind.ModelCollection));
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Global", false).Kind, Is.EqualTo(ModelPropertyKind.ModelDictionary));
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Plugins", false).Kind, Is.EqualTo(ModelPropertyKind.ModelDictionary));
-            Assert.That(Heat.TypeDescriptor.FindProperty("BedHeaters", false).Kind, Is.EqualTo(ModelPropertyKind.ObservableCollection));
-            Assert.That(Heat.TypeDescriptor.FindProperty("ColdExtrudeTemperature", false).Kind, Is.EqualTo(ModelPropertyKind.Value));
-            Assert.That(Job.TypeDescriptor.FindProperty("LastFileName", false).Kind, Is.EqualTo(ModelPropertyKind.Value));
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Heat", false)!.Kind, Is.EqualTo(ModelPropertyKind.ModelObject));
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Tools", false)!.Kind, Is.EqualTo(ModelPropertyKind.ModelCollection));
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Global", false)!.Kind, Is.EqualTo(ModelPropertyKind.ModelDictionary));
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Plugins", false)!.Kind, Is.EqualTo(ModelPropertyKind.ModelDictionary));
+            Assert.That(Heat.TypeDescriptor.FindProperty("BedHeaters", false)!.Kind, Is.EqualTo(ModelPropertyKind.ObservableCollection));
+            Assert.That(Heat.TypeDescriptor.FindProperty("ColdExtrudeTemperature", false)!.Kind, Is.EqualTo(ModelPropertyKind.Value));
+            Assert.That(Job.TypeDescriptor.FindProperty("LastFileName", false)!.Kind, Is.EqualTo(ModelPropertyKind.Value));
         }
 
         [Test]
         public void ElementDescriptors()
         {
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Heat", false).ElementDescriptor, Is.SameAs(Heat.TypeDescriptor));
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Tools", false).ElementDescriptor, Is.SameAs(Tool.TypeDescriptor));
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Move", false).ElementDescriptor, Is.SameAs(Move.TypeDescriptor));
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Heat", false)!.ElementDescriptor, Is.SameAs(Heat.TypeDescriptor));
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Tools", false)!.ElementDescriptor, Is.SameAs(Tool.TypeDescriptor));
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Move", false)!.ElementDescriptor, Is.SameAs(Move.TypeDescriptor));
 
             // Inputs derives from StaticModelCollection<InputChannel> instead of using it directly, so the item type
             // has to be resolved through the base class as well
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Inputs", false).ElementDescriptor, Is.SameAs(InputChannel.TypeDescriptor));
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Inputs", false)!.ElementDescriptor, Is.SameAs(InputChannel.TypeDescriptor));
 
             // Scalars have no element type and Message is not a model object
-            Assert.That(Heat.TypeDescriptor.FindProperty("ColdExtrudeTemperature", false).ElementDescriptor, Is.Null);
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Messages", false).ElementDescriptor, Is.Null);
+            Assert.That(Heat.TypeDescriptor.FindProperty("ColdExtrudeTemperature", false)!.ElementDescriptor, Is.Null);
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Messages", false)!.ElementDescriptor, Is.Null);
         }
 
         [Test]

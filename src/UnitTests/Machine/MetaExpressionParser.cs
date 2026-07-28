@@ -13,13 +13,13 @@ namespace UnitTests.Machine
     [TestFixture]
     public class MetaExpressionParserTests
     {
-        private static object Eval(string expression, IExpressionEvaluationContext context = null)
+        private static object Eval(string expression, IExpressionEvaluationContext? context = null)
         {
-            Assert.That(MetaExpressionParser.TryEvaluate(expression, context, out object value), Is.True, "expected the expression to be resolved on the SBC");
-            return value;
+            Assert.That(MetaExpressionParser.TryEvaluate(expression, context, out object? value), Is.True, "expected the expression to be resolved on the SBC");
+            return value!;
         }
 
-        private static void AssertForwards(string expression, IExpressionEvaluationContext context = null)
+        private static void AssertForwards(string expression, IExpressionEvaluationContext? context = null)
         {
             Assert.That(MetaExpressionParser.TryEvaluate(expression, context, out _), Is.False, "expected the expression to be forwarded to the firmware");
         }
@@ -453,7 +453,7 @@ namespace UnitTests.Machine
         [Test]
         public void IterationsOutsideLoopThrows()
         {
-            CodeParserException ex = Assert.Throws<CodeParserException>(() => Eval("iterations"));
+            CodeParserException ex = Assert.Throws<CodeParserException>(() => Eval("iterations"))!;
             Assert.That(ex.Message, Does.Contain("not inside a loop"));
         }
 
@@ -497,7 +497,7 @@ namespace UnitTests.Machine
         public void FunctionResolverReceivesEvaluatedArguments()
         {
             TestContext context = new();
-            context.Functions["max"] = args => Math.Max((int)args[0], (int)args[1]);
+            context.Functions["max"] = args => Math.Max((int)args[0]!, (int)args[1]!);
             Assert.That(Eval("max(3, 7)", context), Is.EqualTo(7));
         }
 
@@ -551,7 +551,7 @@ namespace UnitTests.Machine
         [Test]
         public void ArrayIndexOutOfBoundsThrows()
         {
-            CodeParserException ex = Assert.Throws<CodeParserException>(() => Eval("[1, 2][5]"));
+            CodeParserException ex = Assert.Throws<CodeParserException>(() => Eval("[1, 2][5]"))!;
             Assert.That(ex.Message, Does.Contain("array index out of bounds"));
         }
         #endregion
@@ -564,11 +564,11 @@ namespace UnitTests.Machine
             public int? Iterations { get; set; }
             public int LineNumber { get; set; }
 
-            public Dictionary<string, object> Identifiers { get; } = new();
-            public Dictionary<string, Func<object[], object>> Functions { get; } = new();
+            public Dictionary<string, object?> Identifiers { get; } = new();
+            public Dictionary<string, Func<object?[], object?>> Functions { get; } = new();
             public HashSet<string> ForwardPaths { get; } = new();
 
-            public bool TryResolveIdentifier(string path, bool wantExists, bool wantArrayLength, out object value)
+            public bool TryResolveIdentifier(string path, bool wantExists, bool wantArrayLength, out object? value)
             {
                 value = null;
                 if (ForwardPaths.Contains(path))
@@ -596,11 +596,11 @@ namespace UnitTests.Machine
                 return true;
             }
 
-            public bool TryCallFunction(string name, object[] arguments, bool wantArrayLength, out object value)
+            public bool TryCallFunction(string name, object?[] arguments, bool wantArrayLength, out object? value)
             {
-                if (Functions.TryGetValue(name, out Func<object[], object> fn))
+                if (Functions.TryGetValue(name, out Func<object?[], object?>? fn))
                 {
-                    value = fn(arguments);
+                    value = fn!(arguments);
                     return true;
                 }
                 value = null;

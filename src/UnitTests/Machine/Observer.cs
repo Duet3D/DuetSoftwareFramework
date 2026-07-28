@@ -1,4 +1,4 @@
-using DuetAPI.ObjectModel;
+﻿using DuetAPI.ObjectModel;
 using DuetControlServer;
 using DuetControlServer.Model;
 using Microsoft.Extensions.Hosting;
@@ -27,8 +27,8 @@ namespace UnitTests.Machine
             public void StopApplication() { }
         }
 
-        private DcsModel _model;
-        private readonly List<(object[] Path, PropertyChangeType Type, object Value)> _changes = [];
+        private DcsModel _model = null!;
+        private readonly List<(object[] Path, PropertyChangeType Type, object? Value)> _changes = [];
 
         [SetUp]
         public void Setup()
@@ -43,7 +43,7 @@ namespace UnitTests.Machine
 
         private static string PathToString(object[] path) => string.Join('/', path.Select(item => item.ToString()));
 
-        private void AssertSingleChange(string path, PropertyChangeType changeType, object value)
+        private void AssertSingleChange(string path, PropertyChangeType changeType, object? value)
         {
             Assert.That(_changes, Has.Count.EqualTo(1), $"expected exactly one change for {path}");
             Assert.That(PathToString(_changes[0].Path), Is.EqualTo(path));
@@ -143,7 +143,7 @@ namespace UnitTests.Machine
             Assert.That(_changes, Has.Count.EqualTo(1));
             Assert.That(PathToString(_changes[0].Path), Is.EqualTo("global/foo"));
             Assert.That(_changes[0].Type, Is.EqualTo(PropertyChangeType.Property));
-            Assert.That(((JsonElement)_changes[0].Value).GetInt32(), Is.EqualTo(123));
+            Assert.That(((JsonElement)_changes[0].Value!).GetInt32(), Is.EqualTo(123));
 
             _changes.Clear();
             _model.Global.Clear();
@@ -165,17 +165,17 @@ namespace UnitTests.Machine
         [Test]
         public void UnknownPropertiesAreNotReported()
         {
-            FieldInfo eventField = typeof(ModelObject).GetField("PropertyChanged", BindingFlags.NonPublic | BindingFlags.Instance);
+            FieldInfo? eventField = typeof(ModelObject).GetField("PropertyChanged", BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.That(eventField, Is.Not.Null);
 
-            PropertyChangedEventHandler handler = (PropertyChangedEventHandler)eventField.GetValue(_model.Heat);
+            PropertyChangedEventHandler? handler = (PropertyChangedEventHandler?)eventField!.GetValue(_model.Heat);
             Assert.That(handler, Is.Not.Null, "observer did not subscribe to heat");
 
             // Properties outside the DuetAPI object model must never be reported to clients
-            handler(_model.Heat, new PropertyChangedEventArgs("NotAModelProperty"));
+            handler!(_model.Heat, new PropertyChangedEventArgs("NotAModelProperty"));
             Assert.That(_changes, Is.Empty);
 
-            handler(_model.Heat, new PropertyChangedEventArgs("ColdExtrudeTemperature"));
+            handler!(_model.Heat, new PropertyChangedEventArgs("ColdExtrudeTemperature"));
             AssertSingleChange("heat/coldExtrudeTemperature", PropertyChangeType.Property, 160F);
         }
     }

@@ -29,9 +29,9 @@ namespace UnitTests.Machine
             public void StopApplication() { }
         }
 
-        private DcsModel _model;
-        private DcsFilter _filter;
-        private Expressions _expressions;
+        private DcsModel _model = null!;
+        private DcsFilter _filter = null!;
+        private Expressions _expressions = null!;
 
         [SetUp]
         public void SetUp()
@@ -39,14 +39,14 @@ namespace UnitTests.Machine
             IOptions<Settings> settings = Options.Create(new Settings());
             _model = new DcsModel(new TestLifetime(), NullLogger<DcsModel>.Instance, settings);
             _filter = new DcsFilter(_model);
-            _expressions = new Expressions(_filter, _model, null);
+            _expressions = new Expressions(_filter, _model, null!);
 
             // volumes is an SBC-only branch, move is owned by the firmware
             _model.Volumes.Add(new Volume { FreeSpace = 12345 });
             _model.Move.Axes.Add(new Axis { Letter = 'X', MachinePosition = 42.5f });
         }
 
-        private bool TryEval(string expression, bool evaluateAllFields, out object value)
+        private bool TryEval(string expression, bool evaluateAllFields, out object? value)
         {
             IExpressionEvaluationContext context = new Expressions.ExpressionContext(_expressions, () => null, 0, _filter, evaluateAllFields);
             using (_model.AccessReadOnly())
@@ -58,14 +58,14 @@ namespace UnitTests.Machine
         [Test]
         public void SbcScalarResolvesLocally()
         {
-            Assert.That(TryEval("volumes[0].freeSpace", false, out object value), Is.True);
+            Assert.That(TryEval("volumes[0].freeSpace", false, out object? value), Is.True);
             Assert.That(value, Is.EqualTo(12345L));
         }
 
         [Test]
         public void SbcScalarInComparisonResolvesLocally()
         {
-            Assert.That(TryEval("volumes[0].freeSpace > 1000", false, out object value), Is.True);
+            Assert.That(TryEval("volumes[0].freeSpace > 1000", false, out object? value), Is.True);
             Assert.That(value, Is.EqualTo(true));
         }
 
@@ -78,7 +78,7 @@ namespace UnitTests.Machine
         [Test]
         public void NonSbcScalarResolvesWhenEvaluatingAllFields()
         {
-            Assert.That(TryEval("move.axes[0].machinePosition", true, out object value), Is.True);
+            Assert.That(TryEval("move.axes[0].machinePosition", true, out object? value), Is.True);
             Assert.That(value, Is.EqualTo(42.5f));
         }
 
@@ -92,17 +92,17 @@ namespace UnitTests.Machine
         [Test]
         public void LengthOfSbcCollectionResolvesLocally()
         {
-            Assert.That(TryEval("#volumes", false, out object value), Is.True);
+            Assert.That(TryEval("#volumes", false, out object? value), Is.True);
             Assert.That(value, Is.EqualTo(1));
         }
 
         [Test]
         public void ExistsOnSbcPath()
         {
-            Assert.That(TryEval("exists(volumes[0].freeSpace)", false, out object present), Is.True);
+            Assert.That(TryEval("exists(volumes[0].freeSpace)", false, out object? present), Is.True);
             Assert.That(present, Is.EqualTo(true));
 
-            Assert.That(TryEval("exists(volumes[9])", false, out object missing), Is.True);
+            Assert.That(TryEval("exists(volumes[9])", false, out object? missing), Is.True);
             Assert.That(missing, Is.EqualTo(false));
         }
 
@@ -115,7 +115,7 @@ namespace UnitTests.Machine
         [Test]
         public void ExistsOnNonSbcPathResolvesWhenEvaluatingAllFields()
         {
-            Assert.That(TryEval("exists(move.axes[0])", true, out object value), Is.True);
+            Assert.That(TryEval("exists(move.axes[0])", true, out object? value), Is.True);
             Assert.That(value, Is.EqualTo(true));
         }
 

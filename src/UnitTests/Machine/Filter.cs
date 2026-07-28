@@ -25,11 +25,11 @@ namespace UnitTests.Machine
 
         private static DcsModel CreateModel() => new(new TestLifetime(), NullLogger<DcsModel>.Instance, Options.Create(new Settings()));
 
-        private static Dictionary<string, object> SubDictionary(Dictionary<string, object> parent, string key)
+        private static Dictionary<string, object?> SubDictionary(Dictionary<string, object?> parent, string key)
         {
             Assert.That(parent.ContainsKey(key), Is.True, $"missing key {key}");
-            Assert.That(parent[key], Is.InstanceOf<Dictionary<string, object>>(), $"{key} is not a sub-object");
-            return (Dictionary<string, object>)parent[key];
+            Assert.That(parent[key], Is.InstanceOf<Dictionary<string, object?>>(), $"{key} is not a sub-object");
+            return (Dictionary<string, object?>)parent[key]!;
         }
 
         [Test]
@@ -104,10 +104,10 @@ namespace UnitTests.Machine
             DcsModel model = CreateModel();
             model.Heat.ColdExtrudeTemperature = 145F;
 
-            Dictionary<string, object> result = new DcsFilter(model).GetFiltered("heat/coldExtrudeTemperature");
+            Dictionary<string, object?> result = new DcsFilter(model).GetFiltered("heat/coldExtrudeTemperature");
             Assert.That(result.Keys, Is.EquivalentTo(new[] { "heat" }));
 
-            Dictionary<string, object> heat = SubDictionary(result, "heat");
+            Dictionary<string, object?> heat = SubDictionary(result, "heat");
             Assert.That(heat.Keys, Is.EquivalentTo(new[] { "coldExtrudeTemperature" }));
             Assert.That(heat["coldExtrudeTemperature"], Is.EqualTo(145F));
         }
@@ -120,14 +120,14 @@ namespace UnitTests.Machine
             DcsFilter filter = new(model);
 
             // A single wildcard returns every property of that level
-            Dictionary<string, object> root = filter.GetFiltered("*");
+            Dictionary<string, object?> root = filter.GetFiltered("*");
             Assert.That(root.Keys, Is.EquivalentTo(ApiModel.TypeDescriptor.Properties.Select(property => property.JsonName)));
 
-            Dictionary<string, object> heat = SubDictionary(filter.GetFiltered("heat/*"), "heat");
+            Dictionary<string, object?> heat = SubDictionary(filter.GetFiltered("heat/*"), "heat");
             Assert.That(heat.Keys, Is.EquivalentTo(DuetAPI.ObjectModel.Heat.TypeDescriptor.Properties.Select(property => property.JsonName)));
 
             // Sub-objects are only expanded recursively if query flags are given
-            Dictionary<string, object> recursed = filter.GetFiltered("**", QueryFlags.Parse(null));
+            Dictionary<string, object?> recursed = filter.GetFiltered("**", QueryFlags.Parse(null));
             Assert.That(SubDictionary(recursed, "heat")["coldExtrudeTemperature"], Is.EqualTo(145F));
             Assert.That(SubDictionary(SubDictionary(recursed, "move"), "currentMove"), Is.Not.Empty);
         }
@@ -136,7 +136,7 @@ namespace UnitTests.Machine
         public void GetFilteredKeysAreCamelCased()
         {
             DcsModel model = CreateModel();
-            Dictionary<string, object> state = SubDictionary(new DcsFilter(model).GetFiltered("state/*"), "state");
+            Dictionary<string, object?> state = SubDictionary(new DcsFilter(model).GetFiltered("state/*"), "state");
 
             Assert.That(state.ContainsKey("atxPower"), Is.True);
             Assert.That(state.ContainsKey("displayMessage"), Is.True);
@@ -148,7 +148,7 @@ namespace UnitTests.Machine
         public void GetFilteredLiveOnly()
         {
             DcsModel model = CreateModel();
-            Dictionary<string, object> result = new DcsFilter(model).GetFiltered("*", QueryFlags.Parse("f"));
+            Dictionary<string, object?> result = new DcsFilter(model).GetFiltered("*", QueryFlags.Parse("f"));
 
             IEnumerable<string> liveProperties = ApiModel.TypeDescriptor.Properties
                 .Where(property => (property.Flags & DuetAPI.ObjectModel.ModelPropertyFlags.Live) != 0)
@@ -180,7 +180,7 @@ namespace UnitTests.Machine
 
             Assert.That(SubDictionary(filter.GetFiltered("**", QueryFlags.Parse(null)), "state").ContainsKey("atxPower"), Is.False);
 
-            Dictionary<string, object> state = SubDictionary(filter.GetFiltered("**", QueryFlags.Parse("n")), "state");
+            Dictionary<string, object?> state = SubDictionary(filter.GetFiltered("**", QueryFlags.Parse("n")), "state");
             Assert.That(state.ContainsKey("atxPower"), Is.True);
             Assert.That(state["atxPower"], Is.Null);
         }
@@ -189,7 +189,7 @@ namespace UnitTests.Machine
         public void GetFilteredMaxDepth()
         {
             DcsModel model = CreateModel();
-            Dictionary<string, object> result = new DcsFilter(model).GetFiltered("**", QueryFlags.Parse("d1"));
+            Dictionary<string, object?> result = new DcsFilter(model).GetFiltered("**", QueryFlags.Parse("d1"));
 
             Assert.That(result.ContainsKey("state"), Is.True);
             Assert.That(SubDictionary(result, "state"), Is.Empty);
@@ -204,7 +204,7 @@ namespace UnitTests.Machine
             model.Network.Hostname = "duet3";
             DcsFilter filter = new(model);
 
-            Assert.That(filter.GetSpecific("heat/coldExtrudeTemperature", false, out object result), Is.True);
+            Assert.That(filter.GetSpecific("heat/coldExtrudeTemperature", false, out object? result), Is.True);
             Assert.That(result, Is.EqualTo(145F));
 
             Assert.That(filter.GetSpecific("network/hostname", false, out result), Is.True);
@@ -229,7 +229,7 @@ namespace UnitTests.Machine
             model.State.LogFile = "0:/sys/eventlog.txt";
             DcsFilter filter = new(model);
 
-            Assert.That(filter.GetSpecific("network/corsSite", true, out object result), Is.True);
+            Assert.That(filter.GetSpecific("network/corsSite", true, out object? result), Is.True);
             Assert.That(result, Is.EqualTo("http://localhost"));
 
             Assert.That(filter.GetSpecific("state/logFile", true, out result), Is.True);

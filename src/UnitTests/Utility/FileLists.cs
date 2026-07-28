@@ -1,4 +1,4 @@
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
@@ -8,7 +8,7 @@ namespace UnitTests.Utility;
 [TestFixture]
 public class FileLists
 {
-    private string _testDirectory;
+    private string _testDirectory = null!;
 
     [OneTimeSetUp]
     public void CreateTestDirectory()
@@ -43,7 +43,7 @@ public class FileLists
 
             foreach (JsonElement item in json.RootElement.GetProperty("files").EnumerateArray())
             {
-                Assert.That(seenFiles.Add(item.GetProperty("name").GetString()), Is.True, "every file must be returned exactly once");
+                Assert.That(seenFiles.Add(item.GetProperty("name").GetString()!), Is.True, "every file must be returned exactly once");
             }
 
             int next = json.RootElement.GetProperty("next").GetInt32();
@@ -76,7 +76,7 @@ public class FileLists
 
             foreach (JsonElement item in json.RootElement.GetProperty("files").EnumerateArray())
             {
-                Assert.That(seenFiles.Add(item.GetString()), Is.True, "every file must be returned exactly once");
+                Assert.That(seenFiles.Add(item.GetString()!), Is.True, "every file must be returned exactly once");
             }
 
             int next = json.RootElement.GetProperty("next").GetInt32();
