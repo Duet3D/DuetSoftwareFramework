@@ -1,4 +1,5 @@
 using DuetSharedLibrary;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -53,7 +54,6 @@ public interface IAsyncDiagnostics
 /// Diagnostics provider
 /// </summary>
 /// <param name="logger">Logger</param>
-/// <param name="serviceCollection">Service collection</param>
 /// <param name="serviceProvider">Service provider</param>
 public sealed class DiagnosticsProvider(ILogger<DiagnosticsProvider> logger, IServiceProvider serviceProvider)
 {
@@ -69,43 +69,14 @@ public sealed class DiagnosticsProvider(ILogger<DiagnosticsProvider> logger, ISe
     private IEnumerable<object> GetDiagnosticsProviders()
     {
         Dictionary<object, int> diagnosticProviders = [];
-        foreach (Type type in Assembly.GetExecutingAssembly().GetTypes())
+        foreach (object provider in serviceProvider.GetServices<IDiagnostics>().Cast<object>().Concat(serviceProvider.GetServices<IAsyncDiagnostics>()))
         {
-            if (type != typeof(IDiagnostics) && typeof(IDiagnostics).IsAssignableFrom(type))
+            int? priority = provider.GetType().GetCustomAttribute<DiagnosticsPriorityAttribute>()?.DiagnosticsPriority;
+            if (priority is null)
             {
-                IDiagnostics? serviceWithDiagnostics = (IDiagnostics?)serviceProvider.GetService(type);
-                if (serviceWithDiagnostics != null)
-                {
-                    int? priority = ((DiagnosticsPriorityAttribute)Attribute.GetCustomAttribute(type, typeof(DiagnosticsPriorityAttribute))!)?.DiagnosticsPriority;
-                    if (priority == null)
-                    {
-                        logger.LogWarning("Type {Type} implements IDiagnostics but has no DiagnosticsPriorityAttribute", type);
-                    }
-                    diagnosticProviders.Add(serviceWithDiagnostics, priority ?? 0);
-                }
-                else
-                {
-                    // This is expected when only one link adapter is registered (e.g. USB vs SPI)
-                    logger.LogTrace("Type {Type} implements IDiagnostics but failed to retrieve corresponding service", type);
-                }
+                logger.LogWarning("Type {Type} provides diagnostics but has no DiagnosticsPriorityAttribute", provider.GetType());
             }
-            else if (type != typeof(IAsyncDiagnostics) && typeof(IAsyncDiagnostics).IsAssignableFrom(type))
-            {
-                IAsyncDiagnostics? asyncServiceWithDiagnostics = (IAsyncDiagnostics?)serviceProvider.GetService(type);
-                if (asyncServiceWithDiagnostics != null)
-                {
-                    int? priority = ((DiagnosticsPriorityAttribute)Attribute.GetCustomAttribute(type, typeof(DiagnosticsPriorityAttribute))!)?.DiagnosticsPriority;
-                    if (priority == null)
-                    {
-                        logger.LogWarning("Type {Type} implements IAsyncDiagnostics but has no DiagnosticsPriorityAttribute", type);
-                    }
-                    diagnosticProviders.Add(asyncServiceWithDiagnostics, priority ?? 0);
-                }
-                else
-                {
-                    logger.LogWarning("Type {Type} implements IAsyncDiagnostics but failed to retrieve corresponding service", type);
-                }
-            }
+            diagnosticProviders.Add(provider, priority ?? 0);
         }
         return diagnosticProviders.OrderBy(item => item.Value).Select(item => item.Key);
     }

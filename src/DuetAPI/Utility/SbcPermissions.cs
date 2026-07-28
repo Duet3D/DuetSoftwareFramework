@@ -195,7 +195,11 @@ public class SbcPermissionsConverter : JsonConverter<SbcPermissions>
     public override void Write(Utf8JsonWriter writer, SbcPermissions value, JsonSerializerOptions options)
     {
         writer.WriteStartArray();
+#if NET5_0_OR_GREATER
+        foreach (SbcPermissions permission in Enum.GetValues<SbcPermissions>())
+#else
         foreach (SbcPermissions permission in Enum.GetValues(typeof(SbcPermissions)))
+#endif
         {
             if (permission != SbcPermissions.None && value.HasFlag(permission))
             {

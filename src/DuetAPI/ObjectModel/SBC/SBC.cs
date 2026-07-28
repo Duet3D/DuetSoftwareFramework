@@ -78,6 +78,16 @@ public partial class SBC : ModelObject, IStaticModelObject
     private string? _serial;
 
     /// <summary>
+    /// Details about a software upgrade in progress or null if no upgrade is running
+    /// </summary>
+    public Upgrade? Upgrade
+    {
+        get => _upgrade;
+        set => SetPropertyValue(ref _upgrade, value);
+    }
+    private Upgrade? _upgrade;
+
+    /// <summary>
     /// Uptime of the running system (in s)
     /// </summary>
     public double? Uptime

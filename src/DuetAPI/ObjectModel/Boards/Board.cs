@@ -214,6 +214,16 @@ public partial class Board : ModelObject, IStaticModelObject
     private bool _supportsDirectDisplay;
 
     /// <summary>
+    /// Connection timeout of this board (in s)
+    /// </summary>
+    public int Timeout
+    {
+        get => _timeout;
+        set => SetPropertyValue(ref _timeout, value);
+    }
+    private int _timeout = 10;
+
+    /// <summary>
     /// Unique identifier of the board or null if unknown
     /// </summary>
     public string? UniqueId

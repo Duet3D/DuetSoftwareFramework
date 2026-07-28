@@ -21,7 +21,7 @@ namespace DuetControlServer.Model;
 /// Main object model with extensions for synchronization
 /// </summary>
 [DiagnosticsPriority(-3)]
-public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
+public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
 {
     /// <summary>
     /// Indicates whether multiple motion systems are configured.
@@ -41,9 +41,10 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     private readonly AsyncLock _updateLock = new();
 
     /// <summary>
-    /// Condition variable to trigger when the machine model has been updated
+    /// Completion source that is pulsed whenever the machine model has been updated. Waiters race it against a
+    /// timeout instead of cancelling a condition variable, so poll timeouts do not throw
     /// </summary>
-    private readonly AsyncConditionVariable _updateEvent;
+    private TaskCompletionSource _updateTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     /// <summary>
     /// Condition variable to trigger when the machine model has been fully updated from RepRapFirmware
@@ -63,7 +64,6 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// <param name="settings">Settings</param>
     public ObjectModel(IHostApplicationLifetime lifetime, ILogger<ObjectModel> logger, IOptions<Settings> settings)
     {
-        _updateEvent = new(_updateLock);
         _fullUpdateEvent = new(_updateLock);
 
         _lifetime = lifetime;
@@ -96,13 +96,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// <summary>
     /// Function that is called when the object model has been updated
     /// </summary>
-    private void OnModelUpdated()
-    {
-        using (_updateLock.Lock(_lifetime.ApplicationStopping))
-        {
-            _updateEvent.NotifyAll();
-        }
-    }
+    private void OnModelUpdated() => Interlocked.Exchange(ref _updateTcs, new(TaskCreationOptions.RunContinuationsAsynchronously)).SetResult();
 
     /// <summary>
     /// Current sequence numbers for each object model section as reported by the firmware.
@@ -359,7 +353,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// Access the machine model for read operations only
     /// </summary>
     /// <returns>Disposable lock object to be used with a using directive</returns>
-    public IDisposable AccessReadOnly(CancellationToken cancellationToken)
+    public LockWrapper AccessReadOnly(CancellationToken cancellationToken)
     {
         return new LockWrapper(_readWriteLock.ReaderLock(cancellationToken), false, OnModelUpdated, _lifetime, this, _logger, _settings);
     }
@@ -368,13 +362,13 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// Access the machine model for read operations only
     /// </summary>
     /// <returns>Disposable lock object to be used with a using directive</returns>
-    public IDisposable AccessReadOnly() => AccessReadOnly(_lifetime.ApplicationStopping);
+    public LockWrapper AccessReadOnly() => AccessReadOnly(_lifetime.ApplicationStopping);
 
     /// <summary>
     /// Access the machine model for read/write operations
     /// </summary>
     /// <returns>Disposable lock object to be used with a using directive</returns>
-    public IDisposable AccessReadWrite(CancellationToken cancellationToken)
+    public LockWrapper AccessReadWrite(CancellationToken cancellationToken)
     {
         return new LockWrapper(_readWriteLock.WriterLock(cancellationToken), true, OnModelUpdated, _lifetime, this, _logger, _settings);
     }
@@ -383,13 +377,13 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// Access the machine model for read/write operations
     /// </summary>
     /// <returns>Disposable lock object to be used with a using directive</returns>
-    public IDisposable AccessReadWrite() => AccessReadWrite(_lifetime.ApplicationStopping);
+    public LockWrapper AccessReadWrite() => AccessReadWrite(_lifetime.ApplicationStopping);
 
     /// <summary>
     /// Access the machine model asynchronously for read operations only
     /// </summary>
     /// <returns>Disposable lock object to be used with a using directive</returns>
-    public async Task<IDisposable> AccessReadOnlyAsync(CancellationToken cancellationToken)
+    public async ValueTask<LockWrapper> AccessReadOnlyAsync(CancellationToken cancellationToken)
     {
         return new LockWrapper(await _readWriteLock.ReaderLockAsync(cancellationToken), false, OnModelUpdated, _lifetime, this, _logger, _settings);
     }
@@ -398,13 +392,13 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// Access the machine model asynchronously for read operations only
     /// </summary>
     /// <returns>Disposable lock object to be used with a using directive</returns>
-    public Task<IDisposable> AccessReadOnlyAsync() => AccessReadOnlyAsync(_lifetime.ApplicationStopping);
+    public ValueTask<LockWrapper> AccessReadOnlyAsync() => AccessReadOnlyAsync(_lifetime.ApplicationStopping);
 
     /// <summary>
     /// Access the machine model asynchronously for read/write operations
     /// </summary>
     /// <returns>Disposable lock object to be used with a using directive</returns>
-    public async Task<IDisposable> AccessReadWriteAsync(CancellationToken cancellationToken)
+    public async ValueTask<LockWrapper> AccessReadWriteAsync(CancellationToken cancellationToken)
     {
         return new LockWrapper(await _readWriteLock.WriterLockAsync(cancellationToken), true, OnModelUpdated, _lifetime, this, _logger, _settings);
     }
@@ -413,7 +407,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// Access the machine model asynchronously for read/write operations
     /// </summary>
     /// <returns>Disposable lock object to be used with a using directive</returns>
-    public Task<IDisposable> AccessReadWriteAsync() => AccessReadWriteAsync(_lifetime.ApplicationStopping);
+    public ValueTask<LockWrapper> AccessReadWriteAsync() => AccessReadWriteAsync(_lifetime.ApplicationStopping);
 
     /// <summary>
     /// Check asynchronously if Marlin is being emulated on the given channel
@@ -421,7 +415,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// <param name="channel">Code channel</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if Marlin is being emulated</returns>
-    public async Task<bool> IsEmulatingMarlinAsync(CodeChannel channel, CancellationToken cancellationToken = default)
+    public async ValueTask<bool> IsEmulatingMarlinAsync(CodeChannel channel, CancellationToken cancellationToken = default)
     {
         using (await AccessReadOnlyAsync(cancellationToken))
         {
@@ -434,25 +428,30 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// Wait for an update to occur
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
-    public void WaitForUpdate(CancellationToken cancellationToken)
-    {
-        using (_updateLock.Lock(cancellationToken))
-        {
-            _updateEvent.Wait(cancellationToken);
-        }
-    }
+    public void WaitForUpdate(CancellationToken cancellationToken) => WaitForUpdateAsync(cancellationToken).GetAwaiter().GetResult();
 
     /// <summary>
     /// Wait for an update to occur asynchronously
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public async Task WaitForUpdateAsync(CancellationToken cancellationToken)
+    public Task WaitForUpdateAsync(CancellationToken cancellationToken) => Volatile.Read(ref _updateTcs).Task.WaitAsync(cancellationToken);
+
+    /// <summary>
+    /// Wait for an update to occur asynchronously, giving up after the given timeout
+    /// </summary>
+    /// <param name="timeout">Maximum time to wait in ms</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if an update occurred, false on timeout</returns>
+    public async Task<bool> WaitForUpdateAsync(int timeout, CancellationToken cancellationToken)
     {
-        using (await _updateLock.LockAsync(cancellationToken))
+        Task updateTask = Volatile.Read(ref _updateTcs).Task;
+        if (await Task.WhenAny(updateTask, Task.Delay(timeout, cancellationToken)) != updateTask)
         {
-            await _updateEvent.WaitAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return false;
         }
+        return true;
     }
 
     /// <summary>
@@ -565,6 +564,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel
     /// </summary>
     /// <param name="level">Log level</param>
     /// <param name="message">Message to output</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the message has been written</returns>
     public bool Output(EventLogLevel level, Message message, CancellationToken cancellationToken = default)
     {

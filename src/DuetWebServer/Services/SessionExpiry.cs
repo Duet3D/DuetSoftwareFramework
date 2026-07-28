@@ -1,6 +1,6 @@
 ﻿using DuetWebServer.Singletons;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,15 +10,10 @@ namespace DuetWebServer.Services;
 /// <summary>
 /// Service to automatically remove expired sessions
 /// </summary>
-/// <param name="configuration">App configuration</param>
+/// <param name="settings">Application settings</param>
 /// <param name="sessionStorage">Session storage</param>
-public class SessionExpiry(IConfiguration configuration, ISessionStorage sessionStorage) : BackgroundService
+public class SessionExpiry(IOptionsMonitor<Settings> settings, ISessionStorage sessionStorage) : BackgroundService
 {
-    /// <summary>
-    /// App settings
-    /// </summary>
-    private readonly Settings _settings = configuration.Get<Settings>() ?? new();
-
     /// <summary>
     /// Maintain active HTTP sessions once per second
     /// </summary>
@@ -29,7 +24,8 @@ public class SessionExpiry(IConfiguration configuration, ISessionStorage session
         {
             do
             {
-                sessionStorage.MaintainSessions(TimeSpan.FromMilliseconds(_settings.SessionTimeout), _settings.SocketPath);
+                Settings currentSettings = settings.CurrentValue;
+                sessionStorage.MaintainSessions(TimeSpan.FromMilliseconds(currentSettings.SessionTimeout), currentSettings.SocketPath);
                 await Task.Delay(1000, cancellationToken);
             }
             while (!cancellationToken.IsCancellationRequested);

@@ -5,6 +5,11 @@
 		<AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
 		<ServerGarbageCollection>false</ServerGarbageCollection>
 		<AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
+		<PublishAot Condition="'$(AotPublish)' == 'true'">true</PublishAot>
+		<EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
+		<EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
+		<EnableAotAnalyzer>true</EnableAotAnalyzer>
+		<EnableTrimAnalyzer>true</EnableTrimAnalyzer>
 	</PropertyGroup>
 
 	<ItemGroup>

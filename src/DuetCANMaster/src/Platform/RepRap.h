@@ -164,7 +164,7 @@ class RepRap final
 	uint16_t m_heatTaskIdleTicks;
 	uint32_t m_fastLoop{}, m_slowLoop{};
 
-	DebugFlags m_debugMaps[Module::numModules];
+	DebugFlags m_debugMaps[Module::NumModules];
 
 	unsigned int m_beepFrequency, m_beepDuration;
 	uint32_t m_beepTimer;

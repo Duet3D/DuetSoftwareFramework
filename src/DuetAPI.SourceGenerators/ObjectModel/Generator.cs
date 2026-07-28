@@ -205,12 +205,13 @@ internal static class Generator
 
             SourceText sourceText = SourceText.From($@"using System;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 #nullable enable
 
 namespace DuetAPI.ObjectModel;
 
-public partial class ObjectModel
+public partial class ObjectModel : IModelObjectAccessor
 {{
     /// <summary>
     /// Update the whole or a specific key of this instance from a given JSON element

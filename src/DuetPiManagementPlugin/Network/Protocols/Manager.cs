@@ -1,5 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetSharedLibrary;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
@@ -17,11 +18,22 @@ namespace DuetPiManagementPlugin.Network.Protocols
         private static readonly HashSet<NetworkProtocol> _enabledProtocols = [];
 
         /// <summary>
+        /// Lock guarding <see cref="_enabledProtocols"/>, which is written from concurrent protocol initializations
+        /// </summary>
+        private static readonly object _enabledProtocolsLock = new();
+
+        /// <summary>
         /// Check if the given protocol is enabled
         /// </summary>
         /// <param name="protocol">Network protocol</param>
         /// <returns>True if the protocol is enabled</returns>
-        public static bool IsEnabled(NetworkProtocol protocol) => _enabledProtocols.Contains(protocol);
+        public static bool IsEnabled(NetworkProtocol protocol)
+        {
+            lock (_enabledProtocolsLock)
+            {
+                return _enabledProtocols.Contains(protocol);
+            }
+        }
 
         /// <summary>
         /// Update the status of a network protocol
@@ -33,17 +45,20 @@ namespace DuetPiManagementPlugin.Network.Protocols
         {
             // Update the object model
             using InternalCommandConnection commandConnection = new();
-            await commandConnection.ConnectAsync("/var/run/dsf/dcs.sock", Program.CancellationToken);
+            await commandConnection.ConnectAsync(Program.SocketPath, Program.CancellationToken);
             await commandConnection.SetNetworkProtocolAsync(protocol, enabled);
 
             // Store this internally as well
-            if (enabled)
+            lock (_enabledProtocolsLock)
             {
-                _enabledProtocols.Add(protocol);
-            }
-            else
-            {
-                _enabledProtocols.Remove(protocol);
+                if (enabled)
+                {
+                    _enabledProtocols.Add(protocol);
+                }
+                else
+                {
+                    _enabledProtocols.Remove(protocol);
+                }
             }
         }
 
@@ -53,11 +68,36 @@ namespace DuetPiManagementPlugin.Network.Protocols
         /// <returns></returns>
         public static async Task Init()
         {
-            await FTP.Init();
-            await HTTP.Init();
-            // SFTP depends on SSH
-            await SSH.Init();
-            await Telnet.Init();
+            // Each protocol reads its own configuration, so they are independent of each other.
+            // SFTP has no initialization of its own, it is set up along with SSH
+            await Task.WhenAll(
+                InitProtocol(FTP.Init, "FTP"),
+                InitProtocol(HTTP.Init, "HTTP"),
+                InitProtocol(SSH.Init, "SSH"),
+                InitProtocol(Telnet.Init, "Telnet")
+            );
+        }
+
+        /// <summary>
+        /// Read the settings of a single network protocol
+        /// </summary>
+        /// <param name="init">Initialization function of the protocol</param>
+        /// <param name="protocol">Name of the protocol for diagnostics</param>
+        /// <returns>Asynchronous task</returns>
+        /// <remarks>
+        /// Each protocol is guarded on its own so that one unavailable service neither stops the plugin
+        /// from starting nor keeps the remaining protocols from being read
+        /// </remarks>
+        private static async Task InitProtocol(Func<Task> init, string protocol)
+        {
+            try
+            {
+                await init();
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                Console.WriteLine("[err] Failed to read {0} protocol settings: {1}", protocol, e.Message);
+            }
         }
 
         /// <summary>

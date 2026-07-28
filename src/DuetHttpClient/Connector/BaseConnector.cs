@@ -55,11 +55,11 @@ internal abstract class BaseConnector : IAsyncDisposable
             cts.CancelAfter(timeout);
         }
 
-        HttpResponseMessage response = await HttpClient.SendAsync(request, completionOption, cts.Token);
+        HttpResponseMessage response = await HttpClient.SendAsync(request, completionOption, cts.Token).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
         {
             // Session is no longer valid, attempt to connect again
-            await ReconnectAsync(cancellationToken);
+            await ReconnectAsync(cancellationToken).ConfigureAwait(false);
         }
         return response;
     }

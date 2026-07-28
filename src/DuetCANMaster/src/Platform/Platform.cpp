@@ -67,6 +67,7 @@ static_assert(NumDmaChannelsUsed <= NumDmaChannelsSupported, "Need more DMA chan
 #  include <CanMessageGenericTables.h>
 #endif
 
+#include <algorithm>
 #include <climits>
 
 #if !defined(HAS_LWIP_NETWORKING) || !defined(HAS_WIFI_NETWORKING) || !defined(HAS_CPU_TEMP_SENSOR) ||                 \
@@ -401,14 +402,8 @@ void Platform::Spin() noexcept
 #  endif
 	{
 		const float currentMcuTemperature = GetCpuTemperature();
-		if (currentMcuTemperature > m_highestMcuTemperature)
-		{
-			m_highestMcuTemperature = currentMcuTemperature;
-		}
-		if (currentMcuTemperature < m_lowestMcuTemperature)
-		{
-			m_lowestMcuTemperature = currentMcuTemperature;
-		}
+		m_highestMcuTemperature = std::max(currentMcuTemperature, m_highestMcuTemperature);
+		m_lowestMcuTemperature = std::min(currentMcuTemperature, m_lowestMcuTemperature);
 	}
 #endif
 
@@ -1510,10 +1505,7 @@ void Platform::Tick() noexcept
 #  if HAS_VOLTAGE_MONITOR
 		// Read the power input voltage
 		m_currentVin = AnalogInReadChannel(m_vInMonitorAdcChannel);
-		if (m_currentVin > m_highestVin)
-		{
-			m_highestVin = m_currentVin;
-		}
+		m_highestVin = std::max(m_currentVin, m_highestVin);
 		if (m_currentVin < m_lowestVin ||
 			millis64() < 1000) // don't record the lowest VIN voltage while we are still powering up
 		{
@@ -1523,10 +1515,7 @@ void Platform::Tick() noexcept
 
 #  if HAS_12V_MONITOR
 		m_currentV12 = AnalogInReadChannel(m_v12MonitorAdcChannel);
-		if (m_currentV12 > m_highestV12)
-		{
-			m_highestV12 = m_currentV12;
-		}
+		m_highestV12 = std::max(m_currentV12, m_highestV12);
 		if (m_currentV12 < m_lowestV12 ||
 			millis64() < 1000) // don't record the lowest V12 voltage while we are still powering up
 		{

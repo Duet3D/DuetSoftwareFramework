@@ -3,7 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BUILD_DIR="$REPO_ROOT/build"
+DEFAULT_BUILD_DIR="$REPO_ROOT/build/dotnet"
+DEFAULT_AOT_BUILD_DIR="$REPO_ROOT/build/aot"
 
 declare -A PROJECT_SRC=(
     [DuetControlServer]="src/DuetControlServer"
@@ -43,6 +44,11 @@ SKIP_BUILD=false
 START_SERVICES=false
 SYSROOT=""
 FETCH_SYSROOT=false
+AOT=false
+ARCH=linux-arm64
+BUILD_TYPE=Debug
+BUILD_DIR=
+PUBLISH_ARGS=
 
 usage() {
     cat <<EOF
@@ -57,23 +63,32 @@ Options:
   -l, --local          Deploy locally to /opt/dsf/bin instead of a remote target
       --skip-build     Skip the build step; only sync binaries and run postinst scripts
       --start-services  Start DSF services after deployment
-      --sysroot <dir>  Pi sysroot to cross-link libduet_sbc.so against
-                       (default: $DEFAULT_SYSROOT if it exists)
-      --fetch-sysroot  (Re-)fetch the sysroot from the deploy target before building
+      --sysroot <dir>  Sysroot to cross-link libduet_sbc.so against. Only needed to
+                       target a glibc older than the container's 2.36; off by default
+      --fetch-sysroot  Fetch a sysroot from the deploy target and build against it
+      --aot            Build ahead of time binaries. Defaults to "false"
+      --arch           Architecture to build for. Defaults to "$ARCH"
+      --build-type     Defaults to "Debug"
+  -p, --publish-args   msbuild properties
+  -o, --dest-dir       Defaults to "$DEFAULT_BUILD_DIR unless --aot then "$DEFAULT_AOT_BUILD_DIR/<arch>/" 
   -h, --help           Show this help
 
 Projects (specify one or more, or use --all):
 $(printf '  %s\n' "${ALL_PROJECTS[@]}")
 
 Notes:
+  Projects publish to their own default output directory (bin/<config>/<tfm>/<rid>/publish) and the
+  selected ones are then collated into the build directory. With --all the whole solution is
+  published in one go (MSBuild parallelises it); otherwise the selected projects are published
+  concurrently.
+
   DuetSbcInterface is the native SPI transfer loop (libduet_sbc.so) that DuetControlServer
   P/Invokes into. DCS cannot run without it, so selecting DuetControlServer builds it too.
 
-  Because a shared library links glibc dynamically, the .so must be built against the *target's*
-  glibc. The devcontainer toolchain targets a newer glibc than Raspberry Pi OS Bookworm, so a
-  plain cross-build produces a .so that fails to load on the Pi. This script therefore links
-  against a sysroot copied from the Pi, fetching it automatically on first use when a deploy
-  target is given.
+  Because a shared library links glibc dynamically, the .so must not need a newer glibc than the
+  target has. The devcontainer is Debian Bookworm and so targets the same glibc 2.36 as Raspberry
+  Pi OS Bookworm, meaning a plain cross-build is deployable and no sysroot is involved. To target
+  an older release, pass --sysroot <dir> or --fetch-sysroot to build against the Pi's own libraries.
 
 Examples:
   $(basename "$0") --all --target 192.168.4.27
@@ -95,12 +110,33 @@ while [[ $# -gt 0 ]]; do
         --start-services) START_SERVICES=true; shift ;;
         --sysroot)    SYSROOT="$2";   shift 2 ;;
         --fetch-sysroot) FETCH_SYSROOT=true; shift ;;
+        --aot)        AOT=true;       shift ;;
+        --arch)       ARCH="$2";      shift 2 ;;
+        -o|--dest-dir) BUILD_DIR="$2"; shift 2 ;;
+        -p|--publish-args)    PUBLISH_ARGS="$2"; shift 2 ;;
         -h|--help)    usage; exit 0           ;;
         -*)           echo "Unknown option: $1"; usage; exit 1 ;;
         All)          ALL=true; shift ;;
         *)            SELECTED+=("$1"); shift ;;
     esac
 done
+
+case $ARCH in
+	linux-arm)   OBJCOPY_NAME=arm-linux-gnueabihf-objcopy ; TARGET_ARCH=armhf ;;
+	linux-arm64) OBJCOPY_NAME=aarch64-linux-gnu-objcopy ; TARGET_ARCH=arm64 ;;
+	linux-x64)   OBJCOPY_NAME=objcopy ; TARGET_ARCH=amd64 ;;
+	*) echo "Unsupported arch: $ARCH" ; exit 1 ;;
+esac
+echo "Arch: $ARCH"
+
+if [[ -z "$BUILD_DIR" ]]; then
+    if $AOT; then
+        BUILD_DIR="$DEFAULT_AOT_BUILD_DIR/$ARCH"
+    else
+        BUILD_DIR="$DEFAULT_BUILD_DIR"
+    fi
+fi
+echo "Build directory: $BUILD_DIR"
 
 if $ALL; then
     SELECTED=("${ALL_PROJECTS[@]}")
@@ -134,10 +170,10 @@ if [[ " ${SELECTED[*]} " == *" DuetControlServer "* && " ${SELECTED[*]} " != *" 
 fi
 
 # --- Native SPI interface (libduet_sbc.so) ---
-# Cross-compiled here rather than on the Pi so a deploy needs no toolchain on the target. The catch
-# is glibc: a .so links it dynamically, and the devcontainer toolchain targets a newer glibc than
-# Raspberry Pi OS Bookworm, so linking against the container's libraries yields a .so that fails at
-# dlopen with "GLIBC_2.3x not found". Linking against a sysroot copied from the Pi avoids that.
+# Cross-compiled here rather than on the Pi so a deploy needs no toolchain on the target. The
+# devcontainer is Debian Bookworm, so its cross toolchain targets the same glibc 2.36 as Raspberry
+# Pi OS Bookworm and a plain cross build produces a .so that loads on the Pi. A sysroot is only
+# needed to target something older, and is opt-in via --sysroot / --fetch-sysroot.
 resolve_sysroot() {
     # An explicit --sysroot always wins
     if [[ -n "$SYSROOT" ]]; then
@@ -148,19 +184,13 @@ resolve_sysroot() {
         return
     fi
 
-    if $FETCH_SYSROOT || [[ ! -d "$DEFAULT_SYSROOT" ]]; then
-        if [[ -n "$TARGET" ]]; then
-            if $FETCH_SYSROOT; then
-                echo "=== Fetching sysroot from ${SSH_USER}@${TARGET} (--fetch-sysroot) ==="
-            else
-                echo "=== No sysroot at $DEFAULT_SYSROOT; fetching one from ${SSH_USER}@${TARGET} ==="
-                echo "    (one-off; subsequent builds reuse it. Refresh with --fetch-sysroot)"
-            fi
-            "$SBC_SRC_DIR/scripts/fetch-pi-sysroot.sh" "${SSH_USER}@${TARGET}" "$DEFAULT_SYSROOT"
+    if $FETCH_SYSROOT; then
+        if [[ -z "$TARGET" ]]; then
+            echo "Error: --fetch-sysroot needs a deploy target (-t) to fetch from" >&2
+            exit 1
         fi
-    fi
-
-    if [[ -d "$DEFAULT_SYSROOT" ]]; then
+        echo "=== Fetching sysroot from ${SSH_USER}@${TARGET} (--fetch-sysroot) ==="
+        "$SBC_SRC_DIR/scripts/fetch-pi-sysroot.sh" "${SSH_USER}@${TARGET}" "$DEFAULT_SYSROOT"
         SYSROOT="$DEFAULT_SYSROOT"
     fi
 }
@@ -168,26 +198,36 @@ resolve_sysroot() {
 build_sbc_interface() {
     echo "=== Building DuetSbcInterface (libduet_sbc.so) ==="
 
-    # One of the presets in src/DuetSbcInterface/CMakePresets.json; they all put their build tree
-    # in build/<preset-name>.
-    local preset cmake_args=()
-    if [[ "$(uname -m)" == "aarch64" ]]; then
+    # The .so is loaded by the managed binaries, so it has to be built for --arch as well. Each arch
+    # maps onto a cross-compiling preset in src/DuetSbcInterface/CMakePresets.json, except when the
+    # host already is that architecture, in which case there is nothing to cross-compile.
+    local preset cmake_args=() cross_preset host_arch native=false
+    host_arch="$(uname -m)"
+    case "$ARCH" in
+        linux-arm64) cross_preset=arm64 ; [[ "$host_arch" == "aarch64" ]] && native=true ;;
+        linux-arm)   cross_preset=armhf ; [[ "$host_arch" == "armv7l" || "$host_arch" == "armv6l" ]] && native=true ;;
+        # There is no x86_64 cross toolchain in the container, so linux-x64 is host-only
+        linux-x64)   cross_preset="" ; [[ "$host_arch" == "x86_64" ]] && native=true ;;
+    esac
+
+    if $native; then
         # Already on the target architecture (e.g. building on the Pi itself with --local): build
         # natively. That needs no toolchain and no sysroot, and gets glibc right by construction.
-        echo "    Host is aarch64; building natively"
+        echo "    Host is $host_arch; building natively"
         preset=native
+    elif [[ -z "$cross_preset" ]]; then
+        echo "Error: cannot build $SBC_LIB_NAME for $ARCH on $host_arch; no cross toolchain" >&2
+        exit 1
     else
         resolve_sysroot
         if [[ -n "$SYSROOT" ]]; then
             echo "    Linking against sysroot: $SYSROOT"
-            preset=pi-arm64
+            preset="$cross_preset-sysroot"
             # The preset defaults to pi-sysroot/; --sysroot may point somewhere else.
             cmake_args+=("-DDUET_SBC_SYSROOT=$SYSROOT")
         else
-            preset=arm64
-            echo "WARNING: no Pi sysroot available, linking against the container's aarch64 libraries." >&2
-            echo "         The resulting $SBC_LIB_NAME may fail to load on the Pi with a GLIBC version error." >&2
-            echo "         Re-run with a deploy target (-t) to fetch one, or pass --sysroot <dir>." >&2
+            preset="$cross_preset"
+            echo "    Cross-compiling against the container's $cross_preset libraries (glibc 2.36)"
         fi
     fi
 
@@ -205,16 +245,131 @@ build_sbc_interface() {
 }
 
 # --- Build ---
+# Nothing is published straight into BUILD_DIR: every project publishes to its own default publish
+# directory (bin/<config>/<tfm>/<rid>/publish) and collect_output() copies the selected ones into
+# BUILD_DIR afterwards. That keeps concurrent publishes from writing to a shared output directory.
+SOLUTION="$REPO_ROOT/src/DuetSoftwareFramework.sln"
+
+if $AOT; then
+    BUILD_LABEL="Native AOT"
+else
+    BUILD_LABEL="dotnet runtime"
+fi
+
+publish_args=()
+if [[ -n "$PUBLISH_ARGS" ]]; then
+    publish_args+=("-p:$PUBLISH_ARGS")
+fi
+
+# dotnet_publish <project-or-solution path>
+dotnet_publish() {
+    local target="$1"
+    if $AOT; then
+        dotnet publish "$target" -r "$ARCH" -c "$BUILD_TYPE" -p:AotPublish=true -p:ObjCopyName="$OBJCOPY_NAME" "${publish_args[@]}"
+    else
+        dotnet publish "$target" -r "$ARCH" -c "$BUILD_TYPE" --self-contained "${publish_args[@]}"
+    fi
+}
+
+# The target framework is part of the publish path and is not known here, hence the glob
+project_publish_dir() {
+    local project="$1"
+    local matches=("$REPO_ROOT/${PROJECT_SRC[$project]}"/bin/"$BUILD_TYPE"/*/"$ARCH"/publish)
+    if [[ ${#matches[@]} -ne 1 || ! -d "${matches[0]}" ]]; then
+        echo "Error: expected exactly one publish directory for $project, got: ${matches[*]}" >&2
+        return 1
+    fi
+    echo "${matches[0]}"
+}
+
+# write_solution_filter <path>
+# The whole solution cannot be published as-is: the multi-target libraries (DuetAPI,
+# DuetHttpClient) fail with NETSDK1129 unless a target framework is given, and the test and
+# documentation projects are not deployed. A filter narrows the publish to the deployable projects;
+# their project references are still built as dependencies.
+write_solution_filter() {
+    local filter="$1" project first=true
+    {
+        printf '{\n  "solution": {\n    "path": "%s",\n    "projects": [\n' "$SOLUTION"
+        for project in "${DOTNET_PROJECTS[@]}"; do
+            $first || printf ',\n'
+            first=false
+            # Paths in a filter are relative to the solution, which lives in src/
+            printf '      "%s/%s.csproj"' "${PROJECT_SRC[$project]#src/}" "$project"
+        done
+        printf '\n    ]\n  }\n}\n'
+    } > "$filter"
+}
+
+# Merge the per-project publish directories into BUILD_DIR. The projects share most of their
+# dependencies, so the copies overlap; later copies simply overwrite identical files.
+collect_output() {
+    echo "=== Collecting publish output into $BUILD_DIR ==="
+    local project publish_dir
+    for project in "${SELECTED[@]}"; do
+        [[ "$project" == "DuetSbcInterface" ]] && continue
+        publish_dir="$(project_publish_dir "$project")"
+        cp -a "$publish_dir/." "$BUILD_DIR/"
+        echo "    $project <- $publish_dir"
+    done
+}
+
 if ! $SKIP_BUILD; then
     mkdir -p "$BUILD_DIR"
+
+    if [[ " ${SELECTED[*]} " == *" DuetSbcInterface "* ]]; then
+        build_sbc_interface
+    fi
+
+    DOTNET_PROJECTS=()
     for project in "${SELECTED[@]}"; do
-        if [[ "$project" == "DuetSbcInterface" ]]; then
-            build_sbc_interface
-            continue
-        fi
-        echo "=== Building $project ==="
-        dotnet build -r linux-arm64 --self-contained "$REPO_ROOT/${PROJECT_SRC[$project]}" -o "$BUILD_DIR"
+        [[ "$project" == "DuetSbcInterface" ]] || DOTNET_PROJECTS+=("$project")
     done
+
+    if $ALL; then
+        # A single publish of the solution; MSBuild builds the projects in parallel itself
+        echo "=== Building solution ($BUILD_LABEL) ==="
+        FILTER_DIR="$(mktemp -d)"
+        write_solution_filter "$FILTER_DIR/DuetSoftwareFramework.slnf"
+        dotnet_publish "$FILTER_DIR/DuetSoftwareFramework.slnf"
+        rm -rf "$FILTER_DIR"
+    elif [[ ${#DOTNET_PROJECTS[@]} -eq 1 ]]; then
+        echo "=== Building ${DOTNET_PROJECTS[0]} ($BUILD_LABEL) ==="
+        dotnet_publish "$REPO_ROOT/${PROJECT_SRC[${DOTNET_PROJECTS[0]}]}"
+    elif [[ ${#DOTNET_PROJECTS[@]} -gt 1 ]]; then
+        # The projects share most of their project references (DuetAPI, DuetAPIClient,
+        # DuetSharedLibrary). Building one of them first brings those up to date so the parallel
+        # publishes below do not race each other building the same dependency.
+        echo "=== Building shared dependencies ==="
+        dotnet build "$REPO_ROOT/${PROJECT_SRC[${DOTNET_PROJECTS[0]}]}" -r "$ARCH" -c "$BUILD_TYPE" "${publish_args[@]}"
+
+        # Each project publishes to its own output directory, so they can run concurrently. Their
+        # logs would interleave, so each is captured and only printed if that publish fails.
+        LOG_DIR="$(mktemp -d)"
+        declare -A BUILD_PIDS=()
+        for project in "${DOTNET_PROJECTS[@]}"; do
+            echo "=== Building $project ($BUILD_LABEL) ==="
+            dotnet_publish "$REPO_ROOT/${PROJECT_SRC[$project]}" > "$LOG_DIR/$project.log" 2>&1 &
+            BUILD_PIDS[$project]=$!
+        done
+
+        build_failed=false
+        for project in "${!BUILD_PIDS[@]}"; do
+            if wait "${BUILD_PIDS[$project]}"; then
+                echo "=== $project built ==="
+            else
+                echo "Error: $project build failed" >&2
+                cat "$LOG_DIR/$project.log" >&2
+                build_failed=true
+            fi
+        done
+        rm -rf "$LOG_DIR"
+        $build_failed && exit 1
+    fi
+
+    if [[ ${#DOTNET_PROJECTS[@]} -gt 0 ]]; then
+        collect_output
+    fi
 fi
 
 if ! $DEPLOY; then
@@ -234,7 +389,7 @@ fi
 
 # --- Sync binaries ---
 # Use --delete only when all projects are selected to avoid wiping unselected binaries
-RSYNC_OPTS="-rav"
+RSYNC_OPTS="-rav --exclude='*.dbg' --exclude='*.pdb' --exclude='*.xml'"
 $ALL && RSYNC_OPTS="$RSYNC_OPTS --delete"
 
 if $LOCAL; then

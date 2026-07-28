@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Console;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 
 namespace DuetSharedLibrary;
@@ -124,7 +125,23 @@ public sealed class CommonLogFormatter : ConsoleFormatter
 /// <summary>
 /// Options for the common log formatter
 /// </summary>
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
 public sealed class CommonLogFormatterOptions : ConsoleFormatterOptions
 {
     // No additional options needed currently, but can be extended if needed
+}
+
+/// <summary>
+/// Logging builder extensions for the common log formatter
+/// </summary>
+public static class CommonLogFormatterExtensions
+{
+    /// <summary>
+    /// Register the common console log formatter
+    /// </summary>
+    /// <param name="builder">Logging builder</param>
+    /// <returns>Logging builder</returns>
+    [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "CommonLogFormatterOptions is annotated with DynamicallyAccessedMemberTypes.All so its members survive trimming for configuration binding")]
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "CommonLogFormatterOptions adds no members of its own, so binding it needs no runtime generic instantiation")]
+    public static ILoggingBuilder AddCommonLogFormatter(this ILoggingBuilder builder) => builder.AddConsoleFormatter<CommonLogFormatter, CommonLogFormatterOptions>();
 }

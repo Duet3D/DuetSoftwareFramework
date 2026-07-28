@@ -24,6 +24,8 @@ internal class SourceGeneratorSyntaxReceiver : ISyntaxReceiver
 
     public Dictionary<string, List<PropertyDeclarationSyntax>> ModelCollectionMembers { get; } = [];
 
+    public Dictionary<string, string> ModelCollectionItemTypes { get; } = [];
+
     public void OnVisitSyntaxNode(SyntaxNode syntaxNode)
     {
         if (syntaxNode is ClassDeclarationSyntax cds)
@@ -79,6 +81,9 @@ internal class SourceGeneratorSyntaxReceiver : ISyntaxReceiver
                 {
                     var membersAndMethods = GetClassMembersAndMethods();
                     ModelCollectionMembers.Add(cds.Identifier.ValueText, membersAndMethods.Item1);
+
+                    GenericNameSyntax baseCollection = cds.BaseList.Types.Select(type => type.Type).OfType<GenericNameSyntax>().First(gns => gns.Identifier.ValueText is "DynamicModelCollection" or "StaticModelCollection");
+                    ModelCollectionItemTypes[cds.Identifier.ValueText] = baseCollection.TypeArgumentList.Arguments[0].ToString().TrimEnd('?');
                 }
                 else if (cds.BaseList.Types.Any() && !InheritedClasses.ContainsKey(cds))
                 {
@@ -136,6 +141,10 @@ internal class SourceGeneratorSyntaxReceiver : ISyntaxReceiver
                     {
                         var membersAndMethods = GetClassMembersAndMethods();
                         ModelCollectionMembers.Add(item.Key.Identifier.ValueText, membersAndMethods.Item1);
+                        if (ModelCollectionItemTypes.TryGetValue(item.Value, out string? itemType))
+                        {
+                            ModelCollectionItemTypes[item.Key.Identifier.ValueText] = itemType;
+                        }
                         classesUpdated = true;
                     }
                 }

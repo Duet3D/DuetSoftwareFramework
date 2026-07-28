@@ -27,6 +27,16 @@ public sealed class InstallSystemPackage(ILoggerFactory loggerFactory, IOptions<
     private static readonly byte[] ZipSignature = [0x50, 0x4B, 0x03, 0x04];
 
     /// <summary>
+    /// Overall progress once the package has been unpacked
+    /// </summary>
+    private const float UnpackedProgress = 0.1f;
+
+    /// <summary>
+    /// Overall progress once the packages have been installed and only the update script is left
+    /// </summary>
+    private const float UpdateScriptProgress = 0.9f;
+
+    /// <summary>
     /// Check if the given file is a ZIP file
     /// </summary>
     /// <param name="fileName">File to check</param>
@@ -58,16 +68,19 @@ public sealed class InstallSystemPackage(ILoggerFactory loggerFactory, IOptions<
         }
         ILogger logger = loggerFactory.CreateLogger($"Package {Path.GetFileName(PackageFile)}");
 
+        async Task ReportUpdateStatusAsync(string message, float progress)
+        {
+            using CommandConnection commandConnection = new();
+            await commandConnection.ConnectAsync(_settings.SocketPath, cancellationToken);
+            await commandConnection.SetUpdateStatusAsync(message, progress, cancellationToken);
+        }
+
         string? packageDirectory = null, args;
         if (await IsZipFile(PackageFile, cancellationToken))
         {
             // Go into update mode, this may take longer
             logger.LogInformation("Start of combined ZIP package installation");
-            using (CommandConnection commandConnection = new())
-            {
-                await commandConnection.ConnectAsync(_settings.SocketPath, cancellationToken);
-                await commandConnection.SetUpdateStatusAsync(true, cancellationToken);
-            }
+            await ReportUpdateStatusAsync("Unpacking package", 0f);
 
             // Unpack the ZIP file first
             packageDirectory = Path.Combine(Path.GetTempPath(), Path.GetFileNameWithoutExtension(PackageFile));
@@ -77,6 +90,7 @@ public sealed class InstallSystemPackage(ILoggerFactory loggerFactory, IOptions<
             // Assemble the arguments
             string packageFiles = string.Join(' ', Directory.GetFiles(packageDirectory).Where(file => Path.GetFileName(file) != "update.sh"));
             args = _settings.InstallLocalPackageArguments.Replace("{file}", packageFiles);
+            await ReportUpdateStatusAsync("Installing packages", UnpackedProgress);
         }
         else
         {
@@ -114,6 +128,7 @@ public sealed class InstallSystemPackage(ILoggerFactory loggerFactory, IOptions<
                 string updateScript = Path.Combine(packageDirectory, "update.sh");
                 if (File.Exists(updateScript))
                 {
+                    await ReportUpdateStatusAsync("Running update script", UpdateScriptProgress);
                     File.SetUnixFileMode(updateScript,
                         UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
                         UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute);

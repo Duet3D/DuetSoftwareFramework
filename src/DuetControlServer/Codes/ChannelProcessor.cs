@@ -36,6 +36,7 @@ public sealed class ChannelProcessor
     /// Constructor for the channel processor
     /// </summary>
     /// <param name="channel">Code channel</param>
+    /// <param name="logger">Logger instance</param>
     /// <param name="serviceProvider">Service provider to create pipeline instances</param>
     public ChannelProcessor(CodeChannel channel, ILogger<ChannelProcessor> logger, IServiceProvider serviceProvider)
     {
@@ -158,7 +159,7 @@ public sealed class ChannelProcessor
     /// <param name="flushAll">Whether to flush all states</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
-    public async Task<bool> FlushAsync(bool flushAll, CancellationToken cancellationToken = default)
+    public async ValueTask<bool> FlushAsync(bool flushAll, CancellationToken cancellationToken = default)
     {
         foreach (Pipelines.PipelineBase pipeline in _pipelines.Value)
         {
@@ -179,7 +180,7 @@ public sealed class ChannelProcessor
     /// <param name="file">Code file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
-    public async Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
+    public async ValueTask<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
     {
         foreach (Pipelines.PipelineBase pipeline in _pipelines.Value)
         {
@@ -201,7 +202,7 @@ public sealed class ChannelProcessor
     /// <param name="code">Code waiting for the flush</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
-    public async Task<bool> FlushAsync(Commands.Code code, CancellationToken cancellationToken = default)
+    public async ValueTask<bool> FlushAsync(Commands.Code code, CancellationToken cancellationToken = default)
     {
         foreach (Pipelines.PipelineBase pipeline in _pipelines.Value)
         {

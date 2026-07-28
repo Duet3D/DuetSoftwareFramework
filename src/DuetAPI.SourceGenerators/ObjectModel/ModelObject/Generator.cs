@@ -33,6 +33,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using DuetAPI.Utility;
 
 #nullable enable
@@ -40,7 +41,7 @@ using DuetAPI.Utility;
 
 namespace DuetAPI.ObjectModel;
 
-public partial class {cls}
+public partial class {cls} : IModelObjectAccessor
 {{
     {GenerateMethods(context, receiver, cls)}
 }}", Encoding.UTF8);
@@ -70,6 +71,8 @@ public partial class {cls}
         writer.WriteLine(UpdateFromJson.Generate(context, receiver, cls));
         writer.WriteLine();
         writer.WriteLine(UpdateFromJsonReader.Generate(context, receiver, cls));
+        writer.WriteLine();
+        writer.WriteLine(PropertyAccess.Generate(receiver, cls));
         return stringWriter.ToString().TrimEnd();
     }
 }

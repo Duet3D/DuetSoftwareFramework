@@ -257,7 +257,7 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
             string manifestFilename = Path.Combine(settings.Value.PluginDirectory, $"{plugin.Id}.json");
             await using (FileStream manifestFile = new(manifestFilename, FileMode.Create, FileAccess.Write, FileShare.None))
             {
-                await JsonSerializer.SerializeAsync(manifestFile, plugin, JsonHelper.DefaultJsonOptions);
+                await JsonSerializer.SerializeAsync(manifestFile, plugin, ObjectModelContext.Default.Plugin);
             }
 
             // Install Python packages. Because we're using a venv, this must happen after all other installation steps

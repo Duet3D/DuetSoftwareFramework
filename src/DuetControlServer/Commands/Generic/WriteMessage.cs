@@ -11,6 +11,7 @@ namespace DuetControlServer.Commands;
 /// </summary>
 /// <param name="eventLogger">Internal logger</param>
 /// <param name="model">Object model</param>
+/// <param name="logger">Logger instance</param>
 public sealed class WriteMessage(Utility.EventLogger eventLogger, Model.ObjectModel model, ILogger<WriteMessage> logger) : DuetAPI.Commands.WriteMessage
 {
     /// <summary>

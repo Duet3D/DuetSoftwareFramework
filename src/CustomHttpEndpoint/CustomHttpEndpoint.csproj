@@ -3,6 +3,9 @@
 		<OutputType>Exe</OutputType>
 		<TargetFramework>net10.0</TargetFramework>
 		<PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
+		<PublishAot Condition="'$(AotPublish)' == 'true'">true</PublishAot>
+		<EnableAotAnalyzer>true</EnableAotAnalyzer>
+		<EnableTrimAnalyzer>true</EnableTrimAnalyzer>
 	</PropertyGroup>
 
 	<ItemGroup>

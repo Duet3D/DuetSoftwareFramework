@@ -90,7 +90,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     /// <param name="flushAll">Flush all codes on all stack levels</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
-    public Task<bool> FlushAsync(CodeChannel channel, bool flushAll = false, CancellationToken cancellationToken = default) => Processors.Value[(int)channel].FlushAsync(flushAll, cancellationToken);
+    public ValueTask<bool> FlushAsync(CodeChannel channel, bool flushAll = false, CancellationToken cancellationToken = default) => Processors.Value[(int)channel].FlushAsync(flushAll, cancellationToken);
 
     /// <summary>
     /// Wait for all pending codes of the given file to finish
@@ -98,7 +98,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     /// <param name="file">Code file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
-    public Task<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default) => Processors.Value[(int)file.Channel].FlushAsync(file, cancellationToken);
+    public ValueTask<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default) => Processors.Value[(int)file.Channel].FlushAsync(file, cancellationToken);
 
     /// <summary>
     /// Wait for all pending codes on the same stack level as the given code to finish.
@@ -111,7 +111,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     /// <param name="ifExecuting">Return true only if the corresponding code input is actually active (ignored if syncFileStreams is true)</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
-    public async Task<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true, bool syncFileStreams = false, bool ifExecuting = true, CancellationToken cancellationToken = default)
+    public async ValueTask<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true, bool syncFileStreams = false, bool ifExecuting = true, CancellationToken cancellationToken = default)
     {
         // Wait for the pending codes on this channel to go
         if (!await Processors.Value[(int)code.Channel].FlushAsync(code, cancellationToken))

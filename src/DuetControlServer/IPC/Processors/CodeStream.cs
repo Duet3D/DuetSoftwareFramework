@@ -26,9 +26,9 @@ public sealed class CodeStream : IProcessor, IDisposable
     /// List of supported commands in this mode.
     /// This is not really used because this mode reads lines and no JSON objects
     /// </summary>
-    public static Type[] SupportedCommands { get; } =
+    public static SupportedCommand[] SupportedCommands { get; } =
     [
-        typeof(Code)
+        SupportedCommand.For<Code>()
     ];
 
     /// <summary>
@@ -88,6 +88,7 @@ public sealed class CodeStream : IProcessor, IDisposable
     /// <param name="initMessage">Initialization message from the client</param>
     /// <param name="codeFactory">Code factory to create code instances</param>
     /// <param name="model">Object model</param>
+    /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
     public CodeStream(Connection conn, ClientInitMessage initMessage, Codes.CodeFactory codeFactory, Model.ObjectModel model, ILogger<CodeStream> logger, IOptions<Settings> settings)
     {
@@ -278,7 +279,7 @@ public sealed class CodeStream : IProcessor, IDisposable
                     {
                         _logger.LogError(e, "IPC#{Id}: Failed to execute stream code", Connection.Id);
                     }
-                    await Connection.SendResponseAsync(e);
+                    await Connection.SendExceptionAsync(e);
                 }
             }
             while (!cancellationToken.IsCancellationRequested);

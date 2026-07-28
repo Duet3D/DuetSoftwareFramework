@@ -118,5 +118,42 @@ namespace UnitTests.Machine
             Assert.That(TryEval("exists(move.axes[0])", true, out object value), Is.True);
             Assert.That(value, Is.EqualTo(true));
         }
+
+        [Test]
+        public void SbcPathsAreDetected()
+        {
+            Assert.That(_expressions.IsSbcExpression("volumes", false), Is.True);
+            Assert.That(_expressions.IsSbcExpression("volumes[0].freeSpace", false), Is.True);
+            Assert.That(_expressions.IsSbcExpression("messages", false), Is.True);
+            Assert.That(_expressions.IsSbcExpression("directories.system", false), Is.True);
+
+            // Case-insensitive since the object model is addressed in camelCase
+            Assert.That(_expressions.IsSbcExpression("Directories.Web", false), Is.True);
+
+            // Special variables are always resolved locally
+            Assert.That(_expressions.IsSbcExpression("iterations", false), Is.True);
+            Assert.That(_expressions.IsSbcExpression("line", false), Is.True);
+        }
+
+        [Test]
+        public void NonSbcPathsAreNotDetected()
+        {
+            Assert.That(_expressions.IsSbcExpression("move.axes[0].machinePosition", false), Is.False);
+            Assert.That(_expressions.IsSbcExpression("heat.heaters[0].current", false), Is.False);
+            Assert.That(_expressions.IsSbcExpression("directories.filaments", false), Is.False);
+            Assert.That(_expressions.IsSbcExpression("state", false), Is.False);
+        }
+
+        [Test]
+        public void UnknownPathsAreNotSbcExpressions()
+        {
+            Assert.That(_expressions.IsSbcExpression("foo", false), Is.False);
+            Assert.That(_expressions.IsSbcExpression("move.foo.bar", false), Is.False);
+            Assert.That(_expressions.IsSbcExpression(string.Empty, false), Is.False);
+            Assert.That(_expressions.IsSbcExpression("move..axes", false), Is.False);
+
+            // No custom functions are registered without plugins
+            Assert.That(_expressions.IsSbcExpression("foo", true), Is.False);
+        }
     }
 }

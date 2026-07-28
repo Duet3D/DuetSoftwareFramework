@@ -132,7 +132,7 @@ RepRap::RepRap() noexcept
 	, m_beepFrequency(0)
 	, m_beepDuration(0)
 	, m_beepTimer(0)
-	, m_spinningModule(Module::numModules)
+	, m_spinningModule(Module::NumModules)
 	, m_stopped(false)
 	, m_active(false)
 	, m_processingConfig(true)
@@ -273,7 +273,7 @@ void RepRap::Spin() noexcept
 #endif
 
 	m_ticksInSpinState = 0;
-	m_spinningModule = Module::numModules;
+	m_spinningModule = Module::NumModules;
 
 	RTOSIface::Yield();
 }

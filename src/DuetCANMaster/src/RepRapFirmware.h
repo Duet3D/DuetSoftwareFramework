@@ -390,7 +390,7 @@ NamedEnum(Module,
 		  SbcInterface,
 		  CAN, // uppercase to avoid eCv clash with type Can in Microchip driver file
 		  Expansion,
-		  numModules // this is one greater than the last real module number and also serves as 'none'
+		  NumModules // this is one greater than the last real module number and also serves as 'none'
 );
 
 static_assert(Module::NumValues < 32);

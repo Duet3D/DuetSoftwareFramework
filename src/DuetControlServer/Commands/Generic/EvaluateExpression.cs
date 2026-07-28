@@ -2,6 +2,7 @@
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI.Utility;
 using DuetControlServer.Codes;
 
 namespace DuetControlServer.Commands;
@@ -35,6 +36,8 @@ public sealed class EvaluateExpression(CodeFactory codeFactory, Model.ObjectMode
         dummyCode.Channel = Channel;
 
         object? result = await expressions.EvaluateExpressionToValueAsync(dummyCode, Expression, false, cancellationToken);
-        return JsonSerializer.SerializeToElement(result);
+
+        // An expression can evaluate to anything, so the metadata for the result has to be looked up at runtime
+        return JsonSerializer.SerializeToElement(result, JsonHelper.DefaultJsonOptions.GetTypeInfo(result?.GetType() ?? typeof(object)));
     }
 }

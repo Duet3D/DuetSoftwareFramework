@@ -338,10 +338,7 @@ size_t OutputBuffer::EncodeReply(OutputBuffer* _ecv_null src) noexcept
 		{
 			freeOutputBuffers = buf->m_next;
 			usedOutputBuffers++;
-			if (usedOutputBuffers > maxUsedOutputBuffers)
-			{
-				maxUsedOutputBuffers = usedOutputBuffers;
-			}
+			maxUsedOutputBuffers = std::max<std::atomic<size_t>>(usedOutputBuffers, maxUsedOutputBuffers);
 
 			// Initialise the buffer before we release the lock in case another task uses it immediately
 			buf->m_next = nullptr;

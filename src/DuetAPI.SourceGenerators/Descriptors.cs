@@ -18,7 +18,7 @@ namespace DuetAPI.SourceGenerators
                                                                           isEnabledByDefault: true);
         public static readonly DiagnosticDescriptor IncompleteModelObjectClass = new(id: "DOM003",
                                                                                      title: "Incomplete model class",
-                                                                                     messageFormat: "Model class {0} lacks the IStaticModelObject or IDyanmicModelObject interfaces",
+                                                                                     messageFormat: "Model class {0} lacks the IStaticModelObject or IDynamicModelObject interfaces",
                                                                                      category: "DOM",
                                                                                      DiagnosticSeverity.Error,
                                                                                      isEnabledByDefault: true);

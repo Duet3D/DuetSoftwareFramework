@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Runtime.Versioning;
@@ -276,6 +277,46 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     }
 
     /// <summary>
+    /// Retrieve only the given parts of the object model of the machine
+    /// </summary>
+    /// <param name="filters">Object model key paths to retrieve, e.g. "network.interfaces"</param>
+    /// <returns>Partial machine model holding only the requested parts</returns>
+    /// <exception cref="SocketException">Command could not be processed</exception>
+    /// <seealso cref="SbcPermissions.ObjectModelRead"/>
+    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+    public ObjectModel GetObjectModel(params string[] filters) => PerformCommand<ObjectModel>(new GetObjectModel { Filters = [.. filters] });
+
+    /// <summary>
+    /// Retrieve only the given part of the object model of the machine asynchronously
+    /// </summary>
+    /// <param name="filter">Object model key path to retrieve, e.g. "network.interfaces"</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Partial machine model holding only the requested part</returns>
+    /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+    /// <exception cref="SocketException">Command could not be processed</exception>
+    /// <seealso cref="SbcPermissions.ObjectModelRead"/>
+    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+    public async Task<ObjectModel> GetObjectModelAsync(string filter, CancellationToken cancellationToken = default)
+    {
+        return await PerformCommandAsync<ObjectModel>(new GetObjectModel { Filters = [filter] }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Retrieve only the given parts of the object model of the machine asynchronously
+    /// </summary>
+    /// <param name="filters">Object model key paths to retrieve, e.g. "network.interfaces"</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Partial machine model holding only the requested parts</returns>
+    /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+    /// <exception cref="SocketException">Command could not be processed</exception>
+    /// <seealso cref="SbcPermissions.ObjectModelRead"/>
+    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+    public async Task<ObjectModel> GetObjectModelAsync(IEnumerable<string> filters, CancellationToken cancellationToken = default)
+    {
+        return await PerformCommandAsync<ObjectModel>(new GetObjectModel { Filters = [.. filters] }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Query the object model using a key and flags, returning a response compatible with M409 format
     /// </summary>
     /// <param name="key">Object model key path (e.g. "heat", "move.axes")</param>
@@ -404,62 +445,6 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
         await PerformCommandAsync(new InvalidateChannel { Channel = channel }, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Internal class representing an object model lock
-    /// </summary>
-    /// <param name="connection">Connection that acquired the lock</param>
-    public sealed class ObjectModelLock(BaseCommandConnection connection) : IDisposable, IAsyncDisposable
-    {
-        /// <summary>
-        /// Dispose the lock again
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public void Dispose()
-        {
-            if (connection.IsConnected)
-            {
-                connection.PerformCommand(new UnlockObjectModel());
-            }
-        }
-
-        /// <summary>
-        /// Dispose the lock again asynchronously
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public async ValueTask DisposeAsync()
-        {
-            if (connection.IsConnected)
-            {
-                await connection.PerformCommandAsync(new UnlockObjectModel(), default).ConfigureAwait(false);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Lock the machine model for read/write access
-    /// </summary>
-    /// <returns>Asynchronous object model lock</returns>
-    /// <exception cref="SocketException">Command could not be processed</exception>
-    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public ObjectModelLock LockObjectModel()
-    {
-        PerformCommand(new LockObjectModel());
-        return new ObjectModelLock(this);
-    }
-
-    /// <summary>
-    /// Lock the machine model for read/write access asynchronously
-    /// </summary>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous object model lock</returns>
-    /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
-    /// <exception cref="SocketException">Command could not be processed</exception>
-    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public async Task<ObjectModelLock> LockObjectModelAsync(CancellationToken cancellationToken = default)
-    {
-        await PerformCommandAsync(new LockObjectModel(), cancellationToken).ConfigureAwait(false);
-        return new ObjectModelLock(this);
-    }
 
     /// <summary>
     /// Notify the control server that a plugin has been started
@@ -739,34 +724,6 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     }
 
     /// <summary>
-    /// Set a given property to a certain value. Make sure to lock the object model before calling this
-    /// </summary>
-    /// <param name="path">Path to the property</param>
-    /// <param name="value">New value as string</param>
-    /// <returns>True if the property could be updated</returns>
-    /// <exception cref="SocketException">Command could not be processed</exception>
-    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public bool SetObjectModel(string path, string value)
-    {
-        return PerformCommand<bool>(new SetObjectModel { PropertyPath = path, Value = value });
-    }
-
-    /// <summary>
-    /// Set a given property to a certain value. Make sure to lock the object model before calling this
-    /// </summary>
-    /// <param name="path">Path to the property</param>
-    /// <param name="value">New value as string</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>True if the property could be updated</returns>
-    /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
-    /// <exception cref="SocketException">Command could not be processed</exception>
-    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
-    public async Task<bool> SetObjectModelAsync(string path, string value, CancellationToken cancellationToken = default)
-    {
-        return await PerformCommandAsync<bool>(new SetObjectModel { PropertyPath = path, Value = value }, cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <summary>
     /// Set custom plugin data in the object model
     /// </summary>
     /// <param name="key">Key to set</param>
@@ -827,6 +784,62 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     public async Task SetUpdateStatusAsync(bool isUpdating, CancellationToken cancellationToken = default)
     {
         await PerformCommandAsync(new SetUpdateStatus { Updating = isUpdating }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Override the current machine status and report the progress of the software update in progress
+    /// </summary>
+    /// <param name="message">Description of the current update step</param>
+    /// <param name="progress">Progress of the current update step (0..1) or null if indeterminate</param>
+    /// <remarks>
+    /// The object model must not be locked when this is called
+    /// </remarks>
+    /// <exception cref="SocketException">Command could not be processed</exception>
+    /// <exception cref="UnauthorizedAccessException">Insufficient permissions to modify other plugin data</exception>
+    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+    public void SetUpdateStatus(string message, float? progress = null) => PerformCommand(new SetUpdateStatus { Updating = true, Message = message, Progress = progress });
+
+    /// <summary>
+    /// Override the current machine status and report the progress of the software update in progress asynchronously
+    /// </summary>
+    /// <param name="message">Description of the current update step</param>
+    /// <param name="progress">Progress of the current update step (0..1) or null if indeterminate</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <remarks>
+    /// The object model must not be locked when this is called
+    /// </remarks>
+    /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+    /// <exception cref="SocketException">Command could not be processed</exception>
+    /// <exception cref="UnauthorizedAccessException">Insufficient permissions to modify other plugin data</exception>
+    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+    public async Task SetUpdateStatusAsync(string message, float? progress = null, CancellationToken cancellationToken = default)
+    {
+        await PerformCommandAsync(new SetUpdateStatus { Updating = true, Message = message, Progress = progress }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Set the WiFi country code. This is a global setting on Linux, so it is applied to every WiFi
+    /// interface in the object model
+    /// </summary>
+    /// <param name="countryCode">New WiFi country code, or null to clear it</param>
+    /// <exception cref="SocketException">Command could not be processed</exception>
+    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+    public void SetWifiCountry(string? countryCode) => PerformCommand(new SetWifiCountry { CountryCode = countryCode });
+
+    /// <summary>
+    /// Set the WiFi country code asynchronously. This is a global setting on Linux, so it is applied to every WiFi
+    /// interface in the object model
+    /// </summary>
+    /// <param name="countryCode">New WiFi country code, or null to clear it</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
+    /// <exception cref="SocketException">Command could not be processed</exception>
+    /// <seealso cref="SbcPermissions.ObjectModelReadWrite"/>
+    public async Task SetWifiCountryAsync(string? countryCode, CancellationToken cancellationToken = default)
+    {
+        await PerformCommandAsync(new SetWifiCountry { CountryCode = countryCode }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

@@ -259,8 +259,8 @@ namespace Duet::Sbc
 		double m_maxFullTransferDelay = 0;
 		double m_maxPinWaitDuration = 0;
 		int m_numTfrPinGlitches = 0;
-		int m_maxRxSize = 0;
-		int m_maxTxSize = 0;
+		uint16_t m_maxRxSize = 0;
+		uint16_t m_maxTxSize = 0;
 	};
 
 } // namespace Duet::Sbc

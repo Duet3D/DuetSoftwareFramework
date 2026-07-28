@@ -16,8 +16,13 @@ public partial class Inputs : StaticModelCollection<InputChannel?>
     /// <summary>
     /// Enumeration of valid code channels
     /// </summary>
-    public static readonly CodeChannel[] ValidChannels = Enum.GetValues(typeof(CodeChannel))
+    public static readonly CodeChannel[] ValidChannels =
+#if NET5_0_OR_GREATER
+        Enum.GetValues<CodeChannel>()
+#else
+        Enum.GetValues(typeof(CodeChannel))
         .Cast<CodeChannel>()
+#endif
         .Where(channel => channel != CodeChannel.Unknown)
         .ToArray();
 

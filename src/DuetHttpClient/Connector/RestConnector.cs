@@ -105,15 +105,15 @@ internal class RestConnector : BaseConnector
         using CancellationTokenSource connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _terminateSession.Token);
         connectCts.CancelAfter(Options.Timeout);
 
-        using HttpResponseMessage response = await HttpClient.GetAsync($"machine/connect?password={HttpUtility.UrlEncode(Options.Password)}", connectCts.Token);
+        using HttpResponseMessage response = await HttpClient.GetAsync($"machine/connect?password={HttpUtility.UrlEncode(Options.Password)}", connectCts.Token).ConfigureAwait(false);
         if (response.IsSuccessStatusCode)
         {
 #if NET6_0_OR_GREATER
-            using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 #else
-            using Stream responseStream = await response.Content.ReadAsStreamAsync();
+            using Stream responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
 #endif
-            Responses.RestConnectResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.RestConnectResponse, cancellationToken))!;
+            Responses.RestConnectResponse responseObj = (await JsonSerializer.DeserializeAsync(responseStream, JsonContext.Default.RestConnectResponse, cancellationToken).ConfigureAwait(false))!;
 
             _sessionKey = responseObj.SessionKey;
         }
@@ -360,12 +360,12 @@ internal class RestConnector : BaseConnector
                     // Perform a NOOP request
                     using (HttpRequestMessage request = new(HttpMethod.Get, "machine/noop"))
                     {
-                        using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout);
+                        using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout).ConfigureAwait(false);
                         response.EnsureSuccessStatusCode();
                     }
 
                     // Wait a moment
-                    await Task.Delay(Options.SessionKeepAliveInterval, _terminateSession.Token);
+                    await Task.Delay(Options.SessionKeepAliveInterval, _terminateSession.Token).ConfigureAwait(false);
                 }
                 catch (Exception e) when (e is not OperationCanceledException || !_terminateSession.IsCancellationRequested)
                 {
@@ -375,7 +375,7 @@ internal class RestConnector : BaseConnector
                 if (!_terminateSession.IsCancellationRequested)
                 {
                     // Wait a moment before attempting to reconnect
-                    await Task.Delay(Options.RetryDelay, _terminateSession.Token);
+                    await Task.Delay(Options.RetryDelay, _terminateSession.Token).ConfigureAwait(false);
                 }
             }
             while (!_terminateSession.IsCancellationRequested);
@@ -408,7 +408,7 @@ internal class RestConnector : BaseConnector
 
         // Terminate the session and wait for it
         _terminateSession.Cancel();
-        await _sessionTaskTerminated.Task;
+        await _sessionTaskTerminated.Task.ConfigureAwait(false);
 
         // Disconnect if possible
         if (_sessionKey is not null)
