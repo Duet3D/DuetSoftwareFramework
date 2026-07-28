@@ -5,6 +5,8 @@ Priority: optional
 Architecture: TARGET_ARCH
 Depends: duetcontrolserver (= DSFVER), duetruntime (= DSFVER)
 Conflicts: duettools (<< 1.1.0.0)
+Breaks: duetruntime (<< 3.7.0~beta.2)
+Replaces: duetruntime (<< 3.7.0~beta.2)
 Maintainer: Duet3D Packaging Authority <pkg@duet3d.com>
 Homepage: https://pkg.duet3d.com
 Vcs-Git: https://github.com/Duet3D/DuetSoftwareFramework.git
