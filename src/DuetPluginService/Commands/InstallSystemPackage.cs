@@ -1,4 +1,5 @@
 ﻿using DuetAPIClient;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
@@ -25,6 +26,15 @@ public sealed class InstallSystemPackage(ILoggerFactory loggerFactory, IOptions<
     /// Magic value every ZIP file starts with
     /// </summary>
     private static readonly byte[] ZipSignature = [0x50, 0x4B, 0x03, 0x04];
+
+    /// <summary>
+    /// Transient unit that package installations run in
+    /// </summary>
+    /// <remarks>
+    /// A package may upgrade DuetPluginService itself, and stopping that service takes its whole
+    /// process tree with it, so the installation has to run outside it
+    /// </remarks>
+    private const string PackageUnit = "dsf-package";
 
     /// <summary>
     /// Overall progress once the package has been unpacked
@@ -105,7 +115,7 @@ public sealed class InstallSystemPackage(ILoggerFactory loggerFactory, IOptions<
             if (!string.IsNullOrWhiteSpace(args))
             {
                 // Run the installation process
-                using Process process = Process.Start(_settings.InstallLocalPackageCommand, args);
+                using Process process = TransientUnit.Start(PackageUnit, _settings.InstallLocalPackageCommand, args);
                 try
                 {
                     await process.WaitForExitAsync(cancellationToken);
@@ -135,7 +145,7 @@ public sealed class InstallSystemPackage(ILoggerFactory loggerFactory, IOptions<
 
                     try
                     {
-                        using Process updateScriptProcess = Process.Start(updateScript);
+                        using Process updateScriptProcess = TransientUnit.Start(PackageUnit, updateScript, string.Empty);
                         await updateScriptProcess.WaitForExitAsync(cancellationToken);
                     }
                     catch (OperationCanceledException)

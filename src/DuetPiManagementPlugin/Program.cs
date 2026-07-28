@@ -4,7 +4,9 @@ using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetAPIClient;
 using DuetPiManagementPlugin.Network;
+using DuetSharedLibrary;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -87,6 +89,14 @@ namespace DuetPiManagementPlugin
         /// Fraction of the installation phase spent downloading packages
         /// </summary>
         private const float DownloadShare = 0.4f;
+
+        /// <summary>
+        /// Script that installs a specific DSF version, shipped next to this plugin
+        /// </summary>
+        /// <remarks>
+        /// A transient unit is not started from the plugin directory, so the script cannot be named on its own
+        /// </remarks>
+        private static readonly string InstallScript = Path.Combine(AppContext.BaseDirectory, "install-dsf.sh");
 
         /// <summary>
         /// APT source list holding the Duet3D package feed
@@ -667,7 +677,7 @@ namespace DuetPiManagementPlugin
 
                         // Perform update
                         case 997:
-                            if (code.GetInt('S', 0) == 2)
+                            if (code.GetIntArray('S', [0]).Contains(2))
                             {
                                 // Check if we need to change the package feed
                                 if (code.TryGetString('F', out string? packageFeed))
@@ -707,7 +717,7 @@ namespace DuetPiManagementPlugin
                                     await reporter.BeginPhaseAsync("Updating package lists", 0f, UpdateListsProgress, 1f);
 
                                     // Update package lists
-                                    (int exitCode, string updateOutput) = await Command.ExecuteAptAsync("/usr/bin/apt-get", "-y -o APT::Status-Fd=2 update", reporter);
+                                    (int exitCode, string updateOutput) = await Command.ExecuteAptAsync(UpgradeReporter.UpgradeUnit, "/usr/bin/apt-get", "-y -o APT::Status-Fd=2 update", reporter);
                                     if (exitCode != 0)
                                     {
                                         throw new Exception(string.IsNullOrWhiteSpace(updateOutput) ? $"Update process returned non-zero exit code {exitCode}" : updateOutput);
@@ -719,7 +729,7 @@ namespace DuetPiManagementPlugin
                                         // Install specific DSF/RRF version. The script prints status messages even when it succeeds,
                                         // so the exit code is what decides whether the code failed
                                         await reporter.BeginPhaseAsync($"Installing DSF {version}", UpdateListsProgress, 1f, DownloadShare);
-                                        (int installExitCode, string installOutput) = await Command.ExecuteAptAsync("install-dsf.sh", version, reporter);
+                                        (int installExitCode, string installOutput) = await Command.ExecuteAptAsync(UpgradeReporter.UpgradeUnit, InstallScript, version, reporter);
                                         if (installExitCode != 0)
                                         {
                                             result = installOutput;
@@ -732,12 +742,16 @@ namespace DuetPiManagementPlugin
                                         await reporter.BeginPhaseAsync("Installing available updates", UpdateListsProgress, 1f, 0f);
                                         UpgradeReporter.DeleteUnattendedUpgradeProgress();
 
-                                        ProcessStartInfo upgradeStartInfo = new() { FileName = "/usr/bin/unattended-upgrade" };
-                                        upgradeStartInfo.Environment["LC_ALL"] = "C";
-
-                                        using Process upgradeProcess = Process.Start(upgradeStartInfo)!;
-                                        await reporter.WatchUnattendedUpgradeAsync(() => !upgradeProcess.HasExited);
+                                        using Process upgradeProcess = TransientUnit.Start(UpgradeReporter.UpgradeUnit, "/usr/bin/unattended-upgrade", string.Empty, false, new Dictionary<string, string>
+                                        {
+                                            ["LC_ALL"] = "C"
+                                        });
+                                        await reporter.WatchUnattendedUpgradeAsync(() => Task.FromResult(!upgradeProcess.HasExited));
                                         await upgradeProcess.WaitForExitAsync(CancelSource.Token);
+                                        if (upgradeProcess.ExitCode != 0)
+                                        {
+                                            result = $"Update failed with exit code {upgradeProcess.ExitCode}, see /var/log/unattended-upgrades/unattended-upgrades.log";
+                                        }
                                     }
 
                                     // Done

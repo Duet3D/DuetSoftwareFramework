@@ -1,4 +1,6 @@
-﻿using System;
+﻿using DuetSharedLibrary;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
@@ -43,6 +45,7 @@ namespace DuetPiManagementPlugin
         /// <summary>
         /// Execute an APT process that reports its progress on stderr and wait for it to exit
         /// </summary>
+        /// <param name="unit">Name of the transient unit to run the process in</param>
         /// <param name="fileName">File to execute</param>
         /// <param name="arguments">Command-line arguments</param>
         /// <param name="reporter">Reporter to notify about the progress</param>
@@ -52,23 +55,13 @@ namespace DuetPiManagementPlugin
         /// Since the status descriptor cannot be assigned freely from .NET, stderr is used for it,
         /// so status lines have to be filtered out of the regular error output again
         /// </remarks>
-        public static async Task<(int ExitCode, string Output)> ExecuteAptAsync(string fileName, string arguments, UpgradeReporter reporter)
+        public static async Task<(int ExitCode, string Output)> ExecuteAptAsync(string unit, string fileName, string arguments, UpgradeReporter reporter)
         {
-            ProcessStartInfo startInfo = new()
+            using Process process = TransientUnit.Start(unit, fileName, arguments, true, new Dictionary<string, string>
             {
-                FileName = fileName,
-                Arguments = arguments,
-                RedirectStandardError = true,
-                RedirectStandardOutput = true
-            };
-            startInfo.Environment["LC_ALL"] = "C";
-            startInfo.Environment["DEBIAN_FRONTEND"] = "noninteractive";
-
-            using Process? process = Process.Start(startInfo);
-            if (process is null)
-            {
-                return (-1, string.Empty);
-            }
+                ["LC_ALL"] = "C",
+                ["DEBIAN_FRONTEND"] = "noninteractive"
+            });
 
             StringBuilder output = new();
             Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(Program.CancellationToken);

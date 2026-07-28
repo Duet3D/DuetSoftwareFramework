@@ -7,11 +7,9 @@ StartLimitIntervalSec=0
 [Service]
 ExecStart=/opt/dsf/bin/DuetPluginService
 WorkingDirectory=/opt/dsf/plugins
-KillMode=process
 TimeoutStopSec=15
 Restart=always
 Type=notify
-# Allow child processes to stay alive, required when performing system updates affecting DSF
 
 [Install]
 WantedBy=multi-user.target

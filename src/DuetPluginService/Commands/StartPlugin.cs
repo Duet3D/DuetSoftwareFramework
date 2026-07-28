@@ -187,9 +187,6 @@ public sealed class StartPlugin(PluginStore pluginStore, IHostApplicationLifetim
                             }
                         }
                     }
-
-                    // Kill any leftover child processes
-                    process.Kill(true);
                 }
                 finally
                 {

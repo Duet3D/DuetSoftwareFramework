@@ -1171,6 +1171,13 @@ public class MCodeHandler(
                     }
                     throw new OperationCanceledException();
                 }
+
+                if (code.GetIntArray('S', [0]).Contains(2))
+                {
+                    // DuetPiManagementPlugin intercepts this code before DCS gets to see it, so reaching
+                    // this point means it is not running and nothing would perform the update
+                    return new Message(MessageType.Error, "Cannot update DSF because DuetPiManagementPlugin is not started");
+                }
                 break;
 
             // Request resend of line

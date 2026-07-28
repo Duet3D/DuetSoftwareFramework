@@ -1,8 +1,8 @@
 ﻿using DuetAPIClient;
+using DuetSharedLibrary;
 using System;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -14,6 +14,11 @@ namespace DuetPiManagementPlugin
     /// <param name="connection">Connection to report the progress on</param>
     public sealed partial class UpgradeReporter(BaseCommandConnection connection)
     {
+        /// <summary>
+        /// Transient unit that update operations run in
+        /// </summary>
+        public const string UpgradeUnit = "dsf-update";
+
         /// <summary>
         /// Progress file written by unattended-upgrade
         /// </summary>
@@ -100,39 +105,6 @@ namespace DuetPiManagementPlugin
         }
 
         /// <summary>
-        /// Command lines that indicate a package operation is still in progress
-        /// </summary>
-        /// <remarks>
-        /// dpkg is matched with a trailing space so that dpkg-query, which other maintainer scripts
-        /// invoke all the time, is not mistaken for an ongoing installation
-        /// </remarks>
-        private static readonly string[] UpgradeCommands = ["/usr/bin/unattended-upgrade", "install-dsf.sh", "/usr/bin/dpkg "];
-
-        /// <summary>
-        /// Check if a package operation is currently running
-        /// </summary>
-        /// <returns>Whether an upgrade is in progress</returns>
-        private static bool IsUpgradeRunning()
-        {
-            foreach (string directory in Directory.GetDirectories("/proc"))
-            {
-                try
-                {
-                    string commandLine = File.ReadAllText(Path.Combine(directory, "cmdline")).Replace('\0', ' ');
-                    if (UpgradeCommands.Any(commandLine.Contains))
-                    {
-                        return true;
-                    }
-                }
-                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-                {
-                    // Process exited while its command line was being read
-                }
-            }
-            return false;
-        }
-
-        /// <summary>
         /// Report that an upgrade is in progress without knowing how far along it is
         /// </summary>
         /// <param name="message">Description of the current step</param>
@@ -153,15 +125,15 @@ namespace DuetPiManagementPlugin
         /// <param name="socketPath">Path to the DCS socket</param>
         /// <returns>Asynchronous task</returns>
         /// <remarks>
-        /// An upgrade that installs this plugin stops it halfway through, yet the unattended-upgrade process
-        /// it started keeps running because it is reparented to init. DCS is restarted by the same upgrade and
+        /// An upgrade that installs this plugin stops it halfway through, yet the package operation keeps
+        /// running because it lives in its own transient unit. DCS is restarted by the same upgrade and
         /// forgets that one is in progress, so the remaining progress would go unreported without this
         /// </remarks>
         public static async Task ResumeAsync(string socketPath)
         {
             try
             {
-                if (!IsUpgradeRunning())
+                if (!await TransientUnit.IsActiveAsync(UpgradeUnit, Program.CancellationToken))
                 {
                     return;
                 }
@@ -172,7 +144,7 @@ namespace DuetPiManagementPlugin
                 // Only unattended-upgrade leaves a trail to derive a percentage from, so start out indeterminate
                 UpgradeReporter reporter = new(connection);
                 await reporter.ReportIndeterminateAsync("Finishing pending update");
-                await reporter.WatchUnattendedUpgradeAsync(IsUpgradeRunning);
+                await reporter.WatchUnattendedUpgradeAsync(() => TransientUnit.IsActiveAsync(UpgradeUnit, Program.CancellationToken));
                 await connection.SetUpdateStatusAsync(false, Program.CancellationToken);
             }
             catch (OperationCanceledException)
@@ -212,9 +184,9 @@ namespace DuetPiManagementPlugin
         /// unattended-upgrade does not write machine-readable progress to stdout but it keeps
         /// a single-line status file up-to-date while it is installing packages
         /// </remarks>
-        public async Task WatchUnattendedUpgradeAsync(Func<bool> isRunning)
+        public async Task WatchUnattendedUpgradeAsync(Func<Task<bool>> isRunning)
         {
-            while (isRunning())
+            while (await isRunning())
             {
                 await Task.Delay(ProgressFilePollInterval, Program.CancellationToken);
 
