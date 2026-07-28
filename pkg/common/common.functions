@@ -20,7 +20,7 @@ PKG_DIR=$(readlink -f $COMMON_DIR/..)
 TOP_DIR=$(readlink -f $PKG_DIR/..)
 
 [ "$PACKAGE_TYPE" == "deb" ] && TARGET_ARCH=armhf || TARGET_ARCH=armhfp
-BUILD_TYPE=Debug
+BUILD_TYPE=
 PACKAGES="progs,plugins,sd,dwc,meta"
 
 source $COMMON_DIR/parse_args
@@ -40,7 +40,7 @@ Usage: $0 [ --target-arch=< i386 | i686 | x86_64 | armhf | armhfp | arm64 | aarc
 	[ --packages=[<package>, ... ]
 
 target-arch:   Defaults to "armhf" for deb packages and "armhfp" for rpm packages.
-build-type:    Defaults to "Debug".
+build-type:    Defaults to "Release" for stable versions and "Debug" otherwise.
 aot:           Publishes NativeAOT binaries and drops the duetruntime dependency.
                Requires a cross toolchain for the target, see aot/build.sh.
 dest-dir:      Defaults to "/tmp/duet/<deb|rpm>/<build-type>/<target-arch>".
@@ -72,12 +72,17 @@ for p in $PACKAGES ; do
 	eval BUILD_${p^^}=1
 done
 
-DEST_DIR=${DEST_DIR:-/tmp/duet/${PACKAGE_TYPE}/${BUILD_TYPE}/${TARGET_ARCH}}
-[ $PKGS -eq 0 ] && CLEANUP=0
-
 dsfver=$(xmllint --xpath "string(//Project/PropertyGroup/Version)" $SRC_DIR/Directory.Build.props)
 # We always get the sd version from the deb control file even if we're building an rpm
 sdver=$(cat $PKG_DIR/deb/duetsd/DEBIAN/control | grep Version | cut -d ' ' -f 2)
+
+# Only pre-releases carry a suffix, so anything without one is a stable version and is built for release
+if [ -z "$BUILD_TYPE" ] ; then
+	[[ "$dsfver" == *-* ]] && BUILD_TYPE=Debug || BUILD_TYPE=Release
+fi
+
+DEST_DIR=${DEST_DIR:-/tmp/duet/${PACKAGE_TYPE}/${BUILD_TYPE}/${TARGET_ARCH}}
+[ $PKGS -eq 0 ] && CLEANUP=0
 
 export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true
 

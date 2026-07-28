@@ -17,5 +17,10 @@ fi
 # Install given version
 echo "Installing DSF $VERSION and RRF $RRF_VERSION"
 apt-get install -y --allow-downgrades -o APT::Status-Fd=2 -o Dpkg::Options::="--force-confold" duetsoftwareframework=$VERSION duetcontrolserver=$VERSION duetwebserver=$VERSION duetpluginservice=$VERSION duettools=$VERSION duetruntime=$VERSION duetwebcontrol=$VERSION duetpimanagementplugin=$VERSION reprapfirmware=$RRF_VERSION < /dev/null
+RESULT=$?
+
+# The installation replaces this plugin, so by the time we get here the caller reading our output may
+# be gone. Report what APT did rather than whether the last write to a broken pipe succeeded
 echo "Done!"
+exit $RESULT
 

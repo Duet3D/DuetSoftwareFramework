@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
@@ -28,6 +29,20 @@ internal static class EndpointHelper
             feature.MaxRequestBodySize = null;
         }
     }
+
+    /// <summary>
+    /// Restore path separators that were sent percent-encoded
+    /// </summary>
+    /// <param name="path">Path taken from a catch-all route parameter</param>
+    /// <returns>Path with its separators restored</returns>
+    /// <remarks>
+    /// ASP.NET decodes route parameters but leaves %2F alone so that it cannot be mistaken for a segment
+    /// separator, whereas DWC sends virtual paths with encoded slashes. Only that one escape may be
+    /// resolved here; decoding the whole value again would eat a literal percent sign in a file name and
+    /// turn a plus into a space
+    /// </remarks>
+    [return: NotNullIfNotNull(nameof(path))]
+    public static string? RestorePathSeparators(string? path) => path?.Replace("%2F", "/", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Log an information

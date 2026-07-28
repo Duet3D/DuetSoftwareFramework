@@ -48,7 +48,7 @@ If more than 1 package-type is specified, they will be run in succession.
 If none are specified, all will be run.
 
 target-arch:   Defaults to "armhf" for deb packages and "armhfp" for rpm packages.
-build-type:    Defaults to "Debug".
+build-type:    Defaults to "Release" for stable versions and "Debug" otherwise.
 aot:           Publishes NativeAOT binaries and drops the duetruntime dependency.
                Requires a cross toolchain for the target, see aot/build.sh.
 dest-dir:      Defaults to "/tmp/duet/<deb|rpm>/<build-type>/<target-arch>".

@@ -797,7 +797,8 @@ namespace DuetPiManagementPlugin
                 }
                 catch (Exception e) when (e is MissingParameterException or InvalidParameterTypeException)
                 {
-                    await Connection.ResolveCodeAsync(MessageType.Error, $"{code.ToShortString()}: {e.Message}");
+                    // DCS prefixes the code to error messages it resolves itself
+                    await Connection.ResolveCodeAsync(MessageType.Error, e.Message);
                 }
             } while (!CancellationToken.IsCancellationRequested);
         }

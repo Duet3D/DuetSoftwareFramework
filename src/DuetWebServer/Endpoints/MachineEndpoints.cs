@@ -213,7 +213,7 @@ public class MachineEndpoints
     private static async Task<IResult> DownloadFile(ILogger<MachineEndpoints> logger, IOptionsMonitor<Settings> settingsMonitor, string filename)
     {
         Settings settings = settingsMonitor.CurrentValue;
-        filename = HttpUtility.UrlDecode(filename);
+        filename = EndpointHelper.RestorePathSeparators(filename);
 
         string resolvedPath = "n/a";
         try
@@ -249,7 +249,7 @@ public class MachineEndpoints
     {
         Settings settings = settingsMonitor.CurrentValue;
         EndpointHelper.DisableRequestSizeLimit(context);
-        filename = HttpUtility.UrlDecode(filename);
+        filename = EndpointHelper.RestorePathSeparators(filename);
 
         string resolvedPath = "n/a";
         try
@@ -316,7 +316,7 @@ public class MachineEndpoints
     private static async Task<IResult> GetFileInfo(ILogger<MachineEndpoints> logger, IOptionsMonitor<Settings> settingsMonitor, string filename, bool readThumbnailContent = false)
     {
         Settings settings = settingsMonitor.CurrentValue;
-        filename = HttpUtility.UrlDecode(filename);
+        filename = EndpointHelper.RestorePathSeparators(filename);
 
         string resolvedPath = "n/a";
         try
@@ -354,7 +354,7 @@ public class MachineEndpoints
     private static async Task<IResult> DeleteFileOrDirectory(ILogger<MachineEndpoints> logger, IOptionsMonitor<Settings> settingsMonitor, string filename, bool recursive = false)
     {
         Settings settings = settingsMonitor.CurrentValue;
-        filename = HttpUtility.UrlDecode(filename);
+        filename = EndpointHelper.RestorePathSeparators(filename);
 
         string resolvedPath = "n/a";
         try
@@ -464,7 +464,7 @@ public class MachineEndpoints
     private static async Task<IResult> GetFileList(ILogger<MachineEndpoints> logger, IOptionsMonitor<Settings> settingsMonitor, string? directory)
     {
         Settings settings = settingsMonitor.CurrentValue;
-        directory = HttpUtility.UrlDecode(directory);
+        directory = EndpointHelper.RestorePathSeparators(directory);
 
         string resolvedPath = "n/a";
         try
@@ -494,7 +494,7 @@ public class MachineEndpoints
     private static async Task<IResult> CreateDirectory(ILogger<MachineEndpoints> logger, IOptionsMonitor<Settings> settingsMonitor, string directory)
     {
         Settings settings = settingsMonitor.CurrentValue;
-        directory = HttpUtility.UrlDecode(directory);
+        directory = EndpointHelper.RestorePathSeparators(directory);
 
         string resolvedPath = "n/a";
         try
