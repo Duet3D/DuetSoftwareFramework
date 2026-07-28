@@ -36,7 +36,7 @@ public static class CRC32
 	/// </summary>
 	/// <param name="buffer">Input data</param>
 	/// <returns>CRC32 checksum</returns>
-	public static uint Calculate(Span<byte> buffer)
+	public static uint Calculate(ReadOnlySpan<byte> buffer)
 	{
 		uint crc = 0;
 		int length = buffer.Length, offset = 0;

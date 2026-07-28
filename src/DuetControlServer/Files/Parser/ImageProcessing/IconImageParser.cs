@@ -1,14 +1,12 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Files.ImageProcessing;
 using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
 using System.Text;
-using System.Threading.Tasks;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Formats.Png;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace DuetControlServer.Files.Parser.ImageProcessing;
 
@@ -106,86 +104,56 @@ public static class IconImageParser
             .Replace(" ", string.Empty)
             .Replace("\r\n", string.Empty);
 
-        using MemoryStream ms = new(Convert.FromBase64String(finalString));
-        using MemoryStream bitmapSource = new();
         _logger?.LogDebug("Encoding Image");
         try
         {
-            using Image image = BinaryToImage(ms, out int width, out int height);
-            string? data = null;
-            if (readThumbnailContent)
+            byte[] iconData = Convert.FromBase64String(finalString);
+            if (iconData.Length < 4)
             {
-                using MemoryStream memoryStream = new();
-                image.Save(memoryStream, PngFormat.Instance);
-                memoryStream.TryGetBuffer(out ArraySegment<byte> buffer);
-                data = Convert.ToBase64String(buffer.Array!, 0, (int)memoryStream.Length);
-                _logger?.LogDebug(data);
+                throw new ImageProcessingException();
+            }
+
+            // Icons start with big-endian width and height words followed by RGB565 pixel data
+            int width = iconData[0] << 8 | iconData[1], height = iconData[2] << 8 | iconData[3];
+            if (width == 0 || height == 0 || iconData.Length < 4 + 2L * width * height)
+            {
+                throw new ImageProcessingException();
             }
 
             return new()
             {
-                Data = data,
+                Data = readThumbnailContent ? Convert.ToBase64String(PngWriter.Encode(ConvertPixelData(iconData, width, height), width, height)) : null,
                 Format = ThumbnailInfoFormat.PNG,
                 Height = height,
                 Width = width,
                 Size = finalString.Length
             };
         }
-        catch (Exception ex)
+        catch (Exception e) when (e is not ImageProcessingException)
         {
-            var imageProcessingException = new ImageProcessingException("Error processing Icon image", ex);
+            ImageProcessingException imageProcessingException = new("Error processing Icon image", e);
             _logger?.LogError(imageProcessingException, "Error processing Icon image");
             throw imageProcessingException;
         }
     }
 
     /// <summary>
-    /// Takes a memory stream containing the header icon + the 4 size bytes
+    /// Convert the RGB565 pixel data of an icon to RGB888
     /// </summary>
-    /// <param name="ms">memory stream containing the header icon + 4 size-bytes</param>
-    /// <param name="width">Width of the thumbnail</param>
-    /// <param name="height">Height of the thumbnail</param>
-    /// <returns>Parsed image</returns>
-    public static Image BinaryToImage(MemoryStream ms, out int width, out int height)
+    /// <param name="iconData">Icon data starting with the width and height words</param>
+    /// <param name="width">Image width in pixels</param>
+    /// <param name="height">Image height in pixels</param>
+    /// <returns>Pixel data with three bytes per pixel in RGB order</returns>
+    private static byte[] ConvertPixelData(ReadOnlySpan<byte> iconData, int width, int height)
     {
-        ms.Position = 0;
-        var internalWidth = ms.ReadByte() << 8 | ms.ReadByte(); //Have to use a local for the new anon call to ProcessPixelRows
-        var internalHeight = ms.ReadByte() << 8 | ms.ReadByte();
-
-        var target = new Image<Rgba32>(internalWidth, internalHeight);
-        target.ProcessPixelRows(pixelAccessor => {
-            for (int y = 0; y < internalHeight; y++)
-            {
-                Span<Rgba32> pixelRowSpan = pixelAccessor.GetRowSpan(y);  
-                for (int x = 0; x < internalWidth; x++)
-                {
-                    byte upper = (byte)ms.ReadByte();
-                    byte lower = (byte)ms.ReadByte();
-                    int color = lower | upper << 8;
-                    byte[] rgb = RGB2To3Bytes(color);
-                    pixelRowSpan[x] = new Rgba32(rgb[0], rgb[1], rgb[2]);
-                }
-            }
-        });
-            
-        width = internalWidth;
-        height = internalHeight;
-        return target;
-    }
-
-    /// <summary>
-    /// Convert two bytes compressed RGB to three bytes
-    /// </summary>
-    /// <param name="color"></param>
-    /// <returns>[0]: Red, [1]: Green, [2]: Blue </returns>
-    public static byte[] RGB2To3Bytes(int color)
-    {
-        byte[] result =
-        [
-            (byte)((color & 0xF800) >> 8),  // Red
-            (byte)((color & 0x07E0) >> 3),  // Green
-            (byte)((color & 0x001F) << 3),  // Blue
-        ];
-        return result;
+        byte[] pixels = new byte[3 * width * height];
+        for (int i = 0; i < width * height; i++)
+        {
+            int color = iconData[4 + 2 * i] << 8 | iconData[5 + 2 * i];
+            pixels[3 * i] = (byte)((color & 0xF800) >> 8);
+            pixels[3 * i + 1] = (byte)((color & 0x07E0) >> 3);
+            pixels[3 * i + 2] = (byte)((color & 0x001F) << 3);
+        }
+        return pixels;
     }
 }
