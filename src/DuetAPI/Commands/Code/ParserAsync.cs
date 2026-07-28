@@ -23,9 +23,9 @@ public partial class Code
         async ValueTask FillBufferAsync()
         {
 #if NETSTANDARD2_1_OR_GREATER || NET6_0_OR_GREATER
-            buffer.Size = await stream.ReadAsync(buffer.Content, cancellationToken);
+            buffer.Size = await stream.ReadAsync(buffer.Content, cancellationToken).ConfigureAwait(false);
 #else
-            buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length, cancellationToken);
+            buffer.Size = await stream.ReadAsync(buffer.Content, 0, buffer.Content.Length, cancellationToken).ConfigureAwait(false);
 #endif
             buffer.Pointer = 0;
         }
@@ -33,7 +33,7 @@ public partial class Code
         // Deal with BOM when starting to parse a file. Previously this was done by the used StreamReader instance
         if (buffer.IsFile && stream.Position + buffer.Pointer == 0)
         {
-            await FillBufferAsync();
+            await FillBufferAsync().ConfigureAwait(false);
 
             if (buffer.Size >= 2 && buffer.Content[0] == 0xFF && (buffer.Content[1] & 0xFE) == 0xFE)
             {
@@ -78,7 +78,7 @@ public partial class Code
             // Read the next character
             if (buffer.Pointer >= buffer.Size)
             {
-                await FillBufferAsync();
+                await FillBufferAsync().ConfigureAwait(false);
             }
             c = (buffer.Pointer < buffer.Size) ? (char)buffer.Content[buffer.Pointer] : '\n';
             result.Length++;
@@ -106,7 +106,7 @@ public partial class Code
             // Peek at the next character without consuming it
             if (buffer.Pointer >= buffer.Size)
             {
-                await FillBufferAsync();
+                await FillBufferAsync().ConfigureAwait(false);
             }
             char peek = (buffer.Pointer < buffer.Size) ? (char)buffer.Content[buffer.Pointer] : '\0';
 

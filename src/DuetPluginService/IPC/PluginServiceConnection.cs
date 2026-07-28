@@ -101,7 +101,7 @@ public class PluginServiceConnection(CommandFactory commandFactory, IOptions<Set
     /// <exception cref="SocketException">Message could not be sent</exception>
     public ValueTask<int> SendAsync(object obj, CancellationToken cancellationToken = default)
     {
-        byte[] toSend = (obj is byte[] byteArray) ? byteArray : JsonSerializer.SerializeToUtf8Bytes(obj, obj.GetType(), JsonHelper.DefaultJsonOptions);
+        byte[] toSend = (obj is byte[] byteArray) ? byteArray : JsonSerializer.SerializeToUtf8Bytes(obj, JsonHelper.DefaultJsonOptions.GetTypeInfo(obj.GetType()));
         //Console.WriteLine(() => $"Sending {Encoding.UTF8.GetString(toSend)}");
         return _unixSocket.SendAsync(toSend, SocketFlags.None, cancellationToken);
     }

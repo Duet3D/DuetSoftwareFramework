@@ -1,11 +1,14 @@
 ﻿using System;
+using System.Buffers;
 using System.Linq;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Connection.InitMessages;
 using DuetControlServer.Commands;
+using DuetControlServer.Utility;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace DuetControlServer.IPC.Processors;
 
@@ -17,47 +20,50 @@ public sealed class Command : IProcessor
     /// <summary>
     /// List of supported commands in this mode
     /// </summary>
-    public static Type[] SupportedCommands { get; } =
+    public static SupportedCommand[] SupportedCommands { get; } =
     [
-        typeof(GetFileInfo),
-        typeof(ResolvePath),
-        typeof(Code),
-        typeof(EvaluateExpression),
-        typeof(Flush),
-        typeof(SimpleCode),
-        typeof(WriteMessage),
-        typeof(AddHttpEndpoint),
-        typeof(RemoveHttpEndpoint),
-        typeof(CheckPassword),
-        typeof(GetObjectModel),
-        typeof(QueryObjectModel),
-        typeof(LockObjectModel),
-        typeof(PatchObjectModel),
-        typeof(SetObjectModel),
-        typeof(SetUpdateStatus),
-        typeof(SyncObjectModel),
-        typeof(UnlockObjectModel),
-        typeof(InstallPlugin),
-        typeof(NotifyPluginStarted),
-        typeof(ReloadPlugin),
-        typeof(SetNetworkProtocol),
-        typeof(SetPluginData),
-        typeof(SetPluginProcess),
-        typeof(StartPlugin),
-        typeof(StartPlugins),
-        typeof(StopPlugin),
-        typeof(StopPlugins),
-        typeof(UninstallPlugin),
-        typeof(AddUserSession),
-        typeof(RemoveUserSession),
-        typeof(InstallSystemPackage),
-        typeof(UninstallSystemPackage)
+        SupportedCommand.For<GetFileInfo>(),
+        SupportedCommand.For<ResolvePath>(),
+        SupportedCommand.For<Code>(),
+        SupportedCommand.For<EvaluateExpression>(),
+        SupportedCommand.For<Flush>(),
+        SupportedCommand.For<SimpleCode>(),
+        SupportedCommand.For<WriteMessage>(),
+        SupportedCommand.For<AddHttpEndpoint>(),
+        SupportedCommand.For<RemoveHttpEndpoint>(),
+        SupportedCommand.For<CheckPassword>(),
+        SupportedCommand.For<GetObjectModel>(),
+        SupportedCommand.For<QueryObjectModel>(),
+        SupportedCommand.For<PatchObjectModel>(),
+        SupportedCommand.For<SetWifiCountry>(),
+        SupportedCommand.For<SetUpdateStatus>(),
+        SupportedCommand.For<SyncObjectModel>(),
+        SupportedCommand.For<InstallPlugin>(),
+        SupportedCommand.For<NotifyPluginStarted>(),
+        SupportedCommand.For<ReloadPlugin>(),
+        SupportedCommand.For<SetNetworkProtocol>(),
+        SupportedCommand.For<SetPluginData>(),
+        SupportedCommand.For<SetPluginProcess>(),
+        SupportedCommand.For<StartPlugin>(),
+        SupportedCommand.For<StartPlugins>(),
+        SupportedCommand.For<StopPlugin>(),
+        SupportedCommand.For<StopPlugins>(),
+        SupportedCommand.For<UninstallPlugin>(),
+        SupportedCommand.For<AddUserSession>(),
+        SupportedCommand.For<RemoveUserSession>(),
+        SupportedCommand.For<InstallSystemPackage>(),
+        SupportedCommand.For<UninstallSystemPackage>()
     ];
 
     /// <summary>
     /// Logger instance
     /// </summary>
     private readonly ILogger<Command> _logger;
+
+    /// <summary>
+    /// Application settings
+    /// </summary>
+    private readonly Settings _settings;
 
     /// <summary>
     /// Connection to the IPC client served by this processor
@@ -70,10 +76,12 @@ public sealed class Command : IProcessor
     /// <param name="conn">Connection instance</param>
     /// <param name="initMessage">Initialization message from the client</param>
     /// <param name="logger">Logger instance</param>
-    public Command(Connection conn, ClientInitMessage initMessage, ILogger<Command> logger)
+    /// <param name="settings">Application settings</param>
+    public Command(Connection conn, ClientInitMessage initMessage, ILogger<Command> logger, IOptions<Settings> settings)
     {
         Connection = conn;
         _logger = logger;
+        _settings = settings.Value;
 
         _logger.LogDebug("Command processor added for IPC#{Id}", conn.Id);
     }
@@ -93,18 +101,21 @@ public sealed class Command : IProcessor
             {
                 // Read another command from the IPC connection
                 command = await Connection.ReceiveCommandAsync(SupportedCommands, cancellationToken);
-                Type commandType = command.GetType();
-
-                // Make sure it is actually supported and permitted
-                if (!SupportedCommands.Contains(commandType))
-                {
-                    throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
-                }
-                Connection.CheckPermissions(commandType);
 
                 // Execute it and send back the result
-                object? result = await command.InvokeAsync(cancellationToken);
-                await Connection.SendResponseAsync(result);
+                if (command is IRawJsonCommand rawJsonCommand)
+                {
+                    using PooledBufferWriter responseBuffer = new(_settings.IpcJsonBufferSize);
+                    responseBuffer.Write(Connection.SuccessResponseStart);
+                    await rawJsonCommand.ExecuteRawJsonAsync(responseBuffer, cancellationToken);
+                    responseBuffer.Write(Connection.SuccessResponseEnd);
+                    await Connection.SendRawDataAsync(responseBuffer.WrittenMemory);
+                }
+                else
+                {
+                    object? result = await command.InvokeAsync(cancellationToken);
+                    await Connection.SendResponseAsync(result);
+                }
 
                 // Shut down the socket if this was the last command
                 if (cancellationToken.IsCancellationRequested)

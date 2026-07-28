@@ -1,0 +1,194 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The devcontainer image carries the cross toolchains, CMake and the .NET SDK the build needs.
+  # It is pushed to GHCR under a tag derived from its inputs, so it is only rebuilt when the
+  # Dockerfile or the toolchain install script changes.
+  image:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Compute image reference
+        id: meta
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          tag="${{ hashFiles('.devcontainer/Dockerfile', 'scripts/install-arm-gcc.sh') }}"
+          echo "image=ghcr.io/${repo}/devcontainer:${tag}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push devcontainer image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.image }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build:
+    needs: image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.image.outputs.image }}
+      # The image is private to the repository, so the job needs credentials to pull it
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every deployable architecture, each built both ways: Native AOT is what is shipped, the
+        # plain runtime build is kept working as the fallback and for debugging.
+        arch:
+          - linux-arm64
+          - linux-arm
+          - linux-x64
+        mode:
+          - aot
+          - runtime
+        # Built one project per job rather than with --all so they run in parallel.
+        # DuetControlServer implicitly pulls in DuetSbcInterface (libduet_sbc.so) for the same arch.
+        project:
+          - DuetControlServer
+          - DuetSbcInterface
+          - DuetPiManagementPlugin
+          - DuetPluginService
+          - DuetWebServer
+          - CodeConsole
+          - CodeLogger
+          - CodeStream
+          - CustomHttpEndpoint
+          - ModelObserver
+          - PluginManager
+        exclude:
+          # DuetSbcInterface is native C++ and is built the same way either way, so once per arch
+          - project: DuetSbcInterface
+            mode: aot
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Mark workspace as a safe git directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Build ${{ matrix.project }} (${{ matrix.arch }}, ${{ matrix.mode }})
+        run: ./scripts/build.sh ${{ matrix.mode == 'aot' && '--aot' || '' }} --arch ${{ matrix.arch }} ${{ matrix.project }}
+
+  # Bare-metal DuetCANMaster firmware (arm-none-eabi), built through its CMake presets.
+  # The per-board presets are built here so a break in any single board is visible on its own.
+  firmware:
+    needs: image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.image.outputs.image }}
+      # The image is private to the repository, so the job needs credentials to pull it
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - preset: release
+            configure: release
+          - preset: Duet3_MB6HC
+            configure: release
+          - preset: Duet3_MB6XD
+            configure: release
+          - preset: debug
+            configure: debug
+          - preset: Duet3_MB6HC-debug
+            configure: debug
+          - preset: Duet3_MB6XD-debug
+            configure: debug
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Mark workspace as a safe git directory
+        run: git config --global --add safe.directory '*'
+
+      # LIBRARIES_DIR points at lib/, so the firmware needs those submodules. They are recorded with
+      # git@ URLs; rewriting to https lets the public repos be cloned without a key. Only
+      # LibTinyusb's nested tinyusb is compiled, so the other nested submodules are left alone.
+      - name: Check out firmware libraries
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git submodule update --init --depth 1 lib
+          git -C lib/LibTinyusb submodule update --init --depth 1 src/tinyusb
+
+      - name: Configure (${{ matrix.configure }})
+        working-directory: src/DuetCANMaster
+        run: cmake --preset ${{ matrix.configure }}
+
+      - name: Build ${{ matrix.preset }}
+        working-directory: src/DuetCANMaster
+        run: cmake --build --preset ${{ matrix.preset }} -j"$(nproc)"
+
+  test:
+    needs: image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.image.outputs.image }}
+      # The image is private to the repository, so the job needs credentials to pull it
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Mark workspace as a safe git directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # UnitTests.HttpClient talks to a real Duet/SBC at a hard-coded hostname, so it cannot run here
+      - name: Run unit tests
+        run: |
+          dotnet test src/UnitTests/UnitTests.csproj -c Debug \
+            --filter "FullyQualifiedName!~UnitTests.HttpClient" \
+            --logger "trx;LogFileName=UnitTests.trx" --results-directory test-results
+
+      # The DuetSbcInterface tests are host-side and only get built when not cross-compiling, so
+      # they run through the native preset rather than the arm64 one the deployable .so uses.
+      - name: Build and run DuetSbcInterface tests
+        working-directory: src/DuetSbcInterface
+        run: |
+          cmake --preset native
+          cmake --build --preset native --target ring_buffer_tests -j"$(nproc)"
+          ctest --test-dir build/native --output-on-failure
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: test-results

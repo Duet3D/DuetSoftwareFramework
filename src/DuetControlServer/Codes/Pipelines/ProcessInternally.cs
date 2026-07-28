@@ -19,7 +19,7 @@ public sealed class ProcessInternally(ChannelProcessor channelProcessor, CodePro
     : PipelineBase(PipelineStage.ProcessInternally, channelProcessor, codeProcessor, lifetime, settings)
 {
     /// <inheritdoc />
-    public override async Task ProcessCodeAsync(Commands.Code code)
+    public override async ValueTask ProcessCodeAsync(Commands.Code code)
     {
         if (!code.Flags.HasFlag(CodeFlags.IsInternallyProcessed))
         {

@@ -57,7 +57,7 @@ rootCommand.SetAction((parserResult) =>
             {
                 options.FormatterName = nameof(CommonLogFormatter);
             })
-            .AddConsoleFormatter<CommonLogFormatter, CommonLogFormatterOptions>()
+            .AddCommonLogFormatter()
             .SetMinimumLevel(LogLevel.Trace)
             .AddFilter((_, level) => level >= (capturedSettings?.LogLevel ?? logLevel));
         })

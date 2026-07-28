@@ -85,7 +85,7 @@ public static class Commands
                 Console.WriteLine("Plugin {0}:", item.Id);
                 foreach (var kv in item.Data)
                 {
-                    Console.WriteLine("{0} = {1}", kv.Key, JsonSerializer.Serialize(kv.Value, DuetAPI.Utility.JsonHelper.DefaultJsonOptions));
+                    Console.WriteLine("{0} = {1}", kv.Key, kv.Value?.GetRawText() ?? "null");
                 }
                 Console.WriteLine();
             }

@@ -11,6 +11,7 @@ using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Runtime.Versioning;
 using System.Threading;
@@ -60,6 +61,11 @@ namespace DuetPiManagementPlugin
         public static InterceptConnection Connection { get; } = new();
 
         /// <summary>
+        /// Path to the UNIX socket of DCS
+        /// </summary>
+        public static string SocketPath { get; private set; } = Defaults.FullSocketPath;
+
+        /// <summary>
         /// Global cancellation source that is triggered when the program is supposed to terminate
         /// </summary>
         public static readonly CancellationTokenSource CancelSource = new();
@@ -73,20 +79,81 @@ namespace DuetPiManagementPlugin
         private static partial Regex _pkgFeedVersionRegex();
 
         /// <summary>
+        /// Overall progress of M997 S2 once the package lists have been updated
+        /// </summary>
+        private const float UpdateListsProgress = 0.15f;
+
+        /// <summary>
+        /// Fraction of the installation phase spent downloading packages
+        /// </summary>
+        private const float DownloadShare = 0.4f;
+
+        /// <summary>
+        /// APT source list holding the Duet3D package feed
+        /// </summary>
+        private const string PackageFeedFile = "/etc/apt/sources.list.d/duet3d.list";
+
+        /// <summary>
+        /// Read the configured Duet3D package feed
+        /// </summary>
+        /// <returns>Configured package feed or null if it cannot be determined</returns>
+        private static string? GetPackageFeed()
+        {
+            try
+            {
+                foreach (string line in File.ReadAllLines(PackageFeedFile))
+                {
+                    // Entries are of the form deb <uri> <suite> <component>
+                    string[] fields = line.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    if (fields.Length > 2 && fields[0] == "deb" && fields[1].Contains("pkg.duet3d.com"))
+                    {
+                        return fields[2];
+                    }
+                }
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // Feed remains unknown
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Report the configured package feed via plugin data so DWC can offer the feeds to switch to
+        /// </summary>
+        /// <param name="connection">Connection to report the feed on</param>
+        /// <param name="packageFeed">Configured package feed or null to read it back from <see cref="PackageFeedFile"/></param>
+        /// <returns>Asynchronous task</returns>
+        private static async Task ReportPackageFeedAsync(BaseCommandConnection connection, string? packageFeed = null)
+        {
+            try
+            {
+                packageFeed ??= GetPackageFeed();
+                if (packageFeed is null)
+                {
+                    Console.WriteLine($"Failed to determine package feed from {PackageFeedFile}");
+                }
+                await connection.SetPluginDataAsync("pkgFeed", JsonSerializer.SerializeToElement(packageFeed, JsonContext.Default.String), cancellationToken: CancellationToken);
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                Console.WriteLine(e);
+            }
+        }
+
+        /// <summary>
         /// Entry point of this application
         /// </summary>
         /// <param name="args">Command-line arguments</param>
         static async Task Main(string[] args)
         {
-            string socketPath = Defaults.FullSocketPath;
-
             // Parse command line parameters
             string? lastArg = null;
             foreach (string arg in args)
             {
                 if (lastArg == "-s" || lastArg == "--socket")
                 {
-                    socketPath = arg;
+                    SocketPath = arg;
                 }
                 else
                 {
@@ -95,10 +162,13 @@ namespace DuetPiManagementPlugin
             }
 
             // Create an intercepting connection for codes that are not supported natively by DCS
-            await Connection.ConnectAsync(InterceptionMode.Pre, null, CodesToIntercept, false, socketPath);
+            await Connection.ConnectAsync(InterceptionMode.Pre, null, CodesToIntercept, false, SocketPath);
 
             // Keep the WiFi country up-to-date
-            await CountryCodeUpdater.Init(socketPath);
+            await CountryCodeUpdater.Init(SocketPath);
+
+            // Pick up an upgrade that is still running from a past instance of this plugin
+            _ = UpgradeReporter.ResumeAsync(SocketPath);
 
             // Deal with program termination requests (SIGTERM and Ctrl+C)
             AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
@@ -123,12 +193,15 @@ namespace DuetPiManagementPlugin
             // Tell DSF we're up and running
             using (CommandConnection commandConnection = new())
             {
-                await commandConnection.ConnectAsync(socketPath);
+                await commandConnection.ConnectAsync(SocketPath);
                 await commandConnection.NotifyPluginStartedAsync();
+
+                // Let DWC know which package feed is configured
+                await ReportPackageFeedAsync(commandConnection);
             }
 
             // Serve the close-browser endpoint for the local DWC kiosk in the background
-            _ = Browser.RunAsync(socketPath);
+            _ = Browser.RunAsync(SocketPath);
 
             // Keep intercepting codes until the plugin is stopped
             do
@@ -614,7 +687,8 @@ namespace DuetPiManagementPlugin
                                         }
 
                                         // Rewrite duet3d.list
-                                        await File.WriteAllTextAsync("/etc/apt/sources.list.d/duet3d.list", $"deb https://pkg.duet3d.com/ {packageFeed} armv7");
+                                        await File.WriteAllTextAsync(PackageFeedFile, $"deb https://pkg.duet3d.com/ {packageFeed} armv7");
+                                        await ReportPackageFeedAsync(Connection, packageFeed);
 
                                         // Done
                                         await Connection.ResolveCodeAsync(MessageType.Success, string.Empty);
@@ -626,31 +700,44 @@ namespace DuetPiManagementPlugin
                                     }
                                 }
 
+                                UpgradeReporter reporter = new(Connection);
                                 try
                                 {
                                     // Put DSF into update status
-                                    await Connection.SetUpdateStatusAsync(true);
+                                    await reporter.BeginPhaseAsync("Updating package lists", 0f, UpdateListsProgress, 1f);
 
                                     // Update package lists
-                                    using (Process updateProcess = Process.Start("/usr/bin/apt-get", "-y update"))
+                                    (int exitCode, string updateOutput) = await Command.ExecuteAptAsync("/usr/bin/apt-get", "-y -o APT::Status-Fd=2 update", reporter);
+                                    if (exitCode != 0)
                                     {
-                                        await updateProcess.WaitForExitAsync(CancelSource.Token);
-                                        if (updateProcess.ExitCode != 0)
-                                        {
-                                            throw new Exception("Update process return non-zero exit code");
-                                        }
+                                        throw new Exception(string.IsNullOrWhiteSpace(updateOutput) ? $"Update process returned non-zero exit code {exitCode}" : updateOutput);
                                     }
 
                                     string result = string.Empty;
                                     if (code.TryGetString('V', out string? version))
                                     {
-                                        // Install specific DSF/RRF version
-                                        result = await Command.ExecuteAsync("install-dsf.sh", version);
+                                        // Install specific DSF/RRF version. The script prints status messages even when it succeeds,
+                                        // so the exit code is what decides whether the code failed
+                                        await reporter.BeginPhaseAsync($"Installing DSF {version}", UpdateListsProgress, 1f, DownloadShare);
+                                        (int installExitCode, string installOutput) = await Command.ExecuteAptAsync("install-dsf.sh", version, reporter);
+                                        if (installExitCode != 0)
+                                        {
+                                            result = installOutput;
+                                        }
                                     }
                                     else
                                     {
-                                        // Perform upgrade
-                                        await Command.ExecQueryAsync("/usr/bin/unattended-upgrade", string.Empty);
+                                        // Perform upgrade. unattended-upgrade reports its progress in a status file that is never cleaned up
+                                        // and only while it is installing packages, so the download stage gets no share of the phase
+                                        await reporter.BeginPhaseAsync("Installing available updates", UpdateListsProgress, 1f, 0f);
+                                        UpgradeReporter.DeleteUnattendedUpgradeProgress();
+
+                                        ProcessStartInfo upgradeStartInfo = new() { FileName = "/usr/bin/unattended-upgrade" };
+                                        upgradeStartInfo.Environment["LC_ALL"] = "C";
+
+                                        using Process upgradeProcess = Process.Start(upgradeStartInfo)!;
+                                        await reporter.WatchUnattendedUpgradeAsync(() => !upgradeProcess.HasExited);
+                                        await upgradeProcess.WaitForExitAsync(CancelSource.Token);
                                     }
 
                                     // Done

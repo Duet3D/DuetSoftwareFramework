@@ -33,6 +33,85 @@ Development builds may define the `VERIFY_OBJECT_MODEL` constant
 [object-model](object-model.md#json-serialization) update code and is deliberately left out of release
 packages, where it would only add overhead.
 
+## NativeAOT builds
+
+Ordinary builds and packages are JIT-compiled; NativeAOT is opt-in. Every build path in this repository
+defaults to JIT, and the released packages are built that way.
+
+### AOT versus JIT
+
+AOT compiles to a native executable ahead of time, which removes the JIT and most of the runtime's
+start-up work. Measured on a 32-bit ARM SBC against 3.7.0-beta.1, single samples rather than a
+controlled benchmark:
+
+| | JIT | AOT |
+| --- | --- | --- |
+| DuetControlServer `--version` | 393 ms | 46 ms |
+| DuetControlServer resident memory | 89.4 MiB | 27.9 MiB |
+| DuetWebServer resident memory | 82.5 MiB | 34.4 MiB |
+| DuetPluginService resident memory (both instances) | 97.5 MiB | 40.7 MiB |
+
+That is roughly 166 MiB freed across the three core services on an otherwise idle machine. Garbage
+collection behaves the same either way; the wins are start-up time, the memory floor, and deployment
+size, since each binary carries only the runtime code it actually uses instead of the full shared
+`duetruntime`.
+
+What it costs:
+
+- Building takes minutes per project instead of seconds, plus a one-off container image build.
+- The build host needs a cross toolchain, see below. A plain `dotnet publish` on a developer machine
+  cannot produce an armhf AOT binary.
+- Only projects in this repository can be built through `aot/build.sh`; a third-party plugin in its own
+  repository needs its own toolchain.
+- There is no runtime code generation. Anything reaching reflection-based serialization or dynamically
+  created types throws at runtime instead of falling back. The AOT and trim analyzers catch most of it
+  at build time, but they cannot see through a path that only a specific machine configuration reaches,
+  so a first run on real hardware is part of the test.
+- Debug symbols are split into separate `.dbg` files that stay on the build host. Keep the ones matching
+  a deployed binary if a crash may need symbolizing later.
+
+### Building
+
+Every executable project declares
+
+```xml
+<PublishAot Condition="'$(AotPublish)' == 'true'">true</PublishAot>
+```
+
+so a publish becomes a NativeAOT publish by passing `-p:AotPublish=true`. `PublishAot` itself must not
+be set on the command line: it is a global property, so it also reaches the `netstandard2.0` targets of
+DuetAPI and the source generator, neither of which can be AOT-compiled, and the build fails with
+NETSDK1207. All executables also enable the AOT and trim analyzers, so code that would break under AOT
+shows up as a warning in an ordinary build rather than as a runtime `NotSupportedException`.
+
+AOT links a real ELF executable for the target, so unlike a JIT publish the build host needs a cross
+toolchain: binutils for the target architecture and a sysroot whose glibc is no newer than the
+target's. `aot/` holds a Debian bookworm container that provides both (bookworm matches DuetPi's glibc
+2.36; `aot/Containerfile` documents the traps) and a script that drives it:
+
+```sh
+aot/build.sh --arch=linux-arm64 --build-type=Release
+aot/build.sh --arch=linux-arm DuetControlServer
+```
+
+Each project is published into its own subdirectory of `aot/out/<arch>/`. Without a project list every
+AOT-capable project is built; `linux-arm`, `linux-arm64` and `linux-x64` are supported.
+
+### AOT packages
+
+AOT binaries carry their own runtime, so the shared `duetruntime` package is neither built nor
+depended upon. Pass `--aot` to the packager, either through the container or directly on a build host
+that already has the toolchain:
+
+```sh
+aot/build.sh --arch=linux-arm --deb
+pkg/build.sh --aot --target-arch=armhf deb
+```
+
+The `duetruntime` dependency is stripped from the `duetcontrolserver`, `duettools` and `duetwebserver`
+control files. AOT and JIT packages of the same version carry the same package names and versions, so
+they can only be installed as a complete set. `--aot` is supported for `.deb` packages only.
+
 ## Deploying to an SBC for testing
 
 The typical loop is: build for the target architecture, stop the DSF services, copy the binaries over,
@@ -53,9 +132,8 @@ Deploying over SSH as root requires root SSH login to be enabled on the SBC (set
 permit root login in the SSH daemon configuration). On Windows, `rsync` and `libxxhash` from MSYS2 can
 be dropped into the Git-for-Windows `usr` tree to make the same workflow available there.
 
-> The exact service names, paths, and any packaging steps are environment-specific. The repository
-> `Makefile` and `pkg/` directory hold the canonical packaging recipes used to build the `.deb` /
-> `.rpm` / Arch packages.
+> The exact service names, paths, and any packaging steps are environment-specific. `pkg/build.sh`
+> holds the canonical packaging recipes used to build the `.deb` / `.rpm` / Arch packages.
 
 ## Building the documentation
 

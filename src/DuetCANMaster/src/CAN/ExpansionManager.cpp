@@ -25,7 +25,7 @@ ReadWriteLock ExpansionManager::boardsLock;
 ExpansionBoardData::ExpansionBoardData() noexcept
 	: typeName(nullptr)
 	, whenLastStatusReportReceived(0)
-	, state(BoardState::unknown)
+	, state(BoardState::Unknown)
 {
 }
 
@@ -48,22 +48,22 @@ void ExpansionManager::UpdateBoardState(CanAddress address, const BoardState& ne
 	if (newState != oldState)
 	{
 		board.state = newState;
-		if (oldState == BoardState::unknown)
+		if (oldState == BoardState::Unknown)
 		{
 			++m_numExpansionBoards;
 			m_lastIndexSearched = 0;
 			m_lastAddressFound = 0;
 		}
-		else if (oldState == BoardState::flashing && m_numBoardsFlashing != 0)
+		else if (oldState == BoardState::Flashing && m_numBoardsFlashing != 0)
 		{
 			--m_numBoardsFlashing;
 		}
 
-		if (newState == BoardState::flashing)
+		if (newState == BoardState::Flashing)
 		{
 			++m_numBoardsFlashing;
 		}
-		else if (newState == BoardState::unknown && m_numExpansionBoards != 0)
+		else if (newState == BoardState::Unknown && m_numExpansionBoards != 0)
 		{
 			--m_numExpansionBoards;
 			m_lastIndexSearched = 0;
@@ -83,7 +83,7 @@ void ExpansionManager::ProcessAnnouncement(CanMessageBuffer& buf, bool isNewForm
 			const WriteLocker lock(boardsLock);
 
 			board.whenLastStatusReportReceived = millis();
-			if (board.state == BoardState::running)
+			if (board.state == BoardState::Running)
 			{
 				Event::AddEvent(EventType::expansion_reconnect, 0, src, 0, "");
 			}
@@ -98,7 +98,7 @@ void ExpansionManager::ProcessAnnouncement(CanMessageBuffer& buf, bool isNewForm
 				boardTypeAndFirmwareVersion.copy(buf.msg.announceV0.boardTypeAndFirmwareVersion,
 												 CanMessageAnnounceV0::GetMaxTextLength(buf.dataLength));
 			}
-			UpdateBoardState(src, BoardState::unknown);
+			UpdateBoardState(src, BoardState::Unknown);
 			if (board.typeName == nullptr || strcmp(board.typeName, boardTypeAndFirmwareVersion.c_str()) != 0)
 			{
 				// To save memory, see if we already have another board with the same type name
@@ -129,7 +129,7 @@ void ExpansionManager::ProcessAnnouncement(CanMessageBuffer& buf, bool isNewForm
 					board.uniqueId.Clear();
 				}
 			}
-			UpdateBoardState(src, BoardState::running);
+			UpdateBoardState(src, BoardState::Running);
 		}
 
 		// Tell the sending board that we don't need any more announcements from it
@@ -144,10 +144,10 @@ void ExpansionManager::ProcessBoardStatusReport(const CanMessageBuffer& buf) noe
 	const CanAddress address = buf.id.Src();
 	ExpansionBoardData& board = m_boards[address];
 	board.whenLastStatusReportReceived = millis();
-	if (board.state != BoardState::running && board.state != BoardState::flashing)
+	if (board.state != BoardState::Running && board.state != BoardState::Flashing)
 	{
 		const WriteLocker lock(boardsLock);
-		UpdateBoardState(address, BoardState::running);
+		UpdateBoardState(address, BoardState::Running);
 	}
 
 	if (buf.id.MsgType() == CanMessageType::boardStatusReportV1)
@@ -172,7 +172,7 @@ void ExpansionManager::ProcessBoardStatusReport(const CanMessageBuffer& buf) noe
 // Return a pointer to the expansion board, if it is present
 const ExpansionBoardData* _ecv_null ExpansionManager::GetBoardDetails(uint8_t address) const noexcept
 {
-	return (address < ARRAY_SIZE(m_boards) && m_boards[address].state == BoardState::running) ? &m_boards[address]
+	return (address < ARRAY_SIZE(m_boards) && m_boards[address].state == BoardState::Running) ? &m_boards[address]
 																							  : nullptr;
 }
 
@@ -198,13 +198,13 @@ GCodeResult ExpansionManager::UpdateRemoteFirmware(uint32_t boardAddress,
 void ExpansionManager::UpdateFinished(CanAddress address) noexcept
 {
 	const WriteLocker lock(boardsLock);
-	UpdateBoardState(address, BoardState::resetting);
+	UpdateBoardState(address, BoardState::Resetting);
 }
 
 void ExpansionManager::UpdateFailed(CanAddress address) noexcept
 {
 	const WriteLocker lock(boardsLock);
-	UpdateBoardState(address, BoardState::flashFailed);
+	UpdateBoardState(address, BoardState::FlashFailed);
 }
 
 const ExpansionBoardData& ExpansionManager::FindIndexedBoard(unsigned int index) const noexcept
@@ -243,7 +243,7 @@ const ExpansionBoardData& ExpansionManager::FindIndexedBoard(unsigned int index)
 		{
 			return m_boards[0];
 		}
-		if (m_boards[address].state != BoardState::unknown)
+		if (m_boards[address].state != BoardState::Unknown)
 		{
 			++currentIndex;
 		}
@@ -260,7 +260,7 @@ void ExpansionManager::Spin() noexcept
 	for (CanAddress addr = 1; addr <= CanId::MaxCanAddress; ++addr)
 	{
 		const ExpansionBoardData& board = m_boards[addr];
-		if (board.state == BoardState::running)
+		if (board.state == BoardState::Running)
 		{
 			// We can get interrupted here by the CanReceive task, which may update
 			// 'board.whenLastStatusReportReceived'. So read and save that value before we call millis().
@@ -270,7 +270,7 @@ void ExpansionManager::Spin() noexcept
 			{
 				{
 					const WriteLocker lock(boardsLock);
-					UpdateBoardState(addr, BoardState::timedOut);
+					UpdateBoardState(addr, BoardState::TimedOut);
 				}
 				Event::AddEvent(EventType::expansion_timeout, 0, addr, 0, "");
 			}
@@ -289,7 +289,7 @@ void ExpansionManager::EmergencyStop() noexcept
 	// Send an individual message to each known expansion board to ensure that they all acknowledged
 	for (CanAddress addr = 1; addr <= CanId::MaxCanAddress; ++addr)
 	{
-		if (m_boards[addr].state == BoardState::running)
+		if (m_boards[addr].state == BoardState::Running)
 		{
 			buf.SetupRequestMessageNoRid<CanMessageEmergencyStop>(CanInterface::GetCanAddress(), addr);
 			CanInterface::SendMessageNoReplyNoFree(buf);

@@ -19,6 +19,7 @@ namespace DuetControlServer.Commands;
 /// </summary>
 /// <param name="codeFactory">Code factory</param>
 /// <param name="commandFactory">Command factory</param>
+/// <param name="eventLogger">Event logger</param>
 /// <param name="filePathResolver">File path resolver</param>
 /// <param name="model">Object model</param>
 /// <param name="lifetime">Host application lifetime</param>

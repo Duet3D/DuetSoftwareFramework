@@ -3,9 +3,9 @@ using DuetAPIClient;
 using DuetWebServer.Singletons;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 using Microsoft.Net.Http.Headers;
 using System;
@@ -21,11 +21,11 @@ namespace DuetWebServer.Services;
 /// <summary>
 /// Class used to observe the machine model
 /// </summary>
-/// <param name="configuration">App configuration</param>
+/// <param name="settings">Application settings</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="modelProvider">Model provider singleton</param>
 /// <param name="sessionStorage">Session storage singleton</param>
-public sealed class ModelObserver(IConfiguration configuration, ILogger<ModelObserver> logger, IModelProvider modelProvider, ISessionStorage sessionStorage) : BackgroundService
+public sealed class ModelObserver(IOptionsMonitor<Settings> settings, ILogger<ModelObserver> logger, IModelProvider modelProvider, ISessionStorage sessionStorage) : BackgroundService
 {
     /// <summary>
     /// Configured CORS policy for cross-origin requests
@@ -43,7 +43,7 @@ public sealed class ModelObserver(IConfiguration configuration, ILogger<ModelObs
     /// <summary>
     /// App settings
     /// </summary>
-    private readonly Settings _settings = configuration.Get<Settings>() ?? new();
+    private Settings Settings => settings.CurrentValue;
 
     /// <summary>
     /// Check the origin of an incoming WebSocket request and set the status on error
@@ -97,8 +97,8 @@ public sealed class ModelObserver(IConfiguration configuration, ILogger<ModelObs
                         "messages/**",
                         "network/corsSite",
                         "sbc/dsf/httpEndpoints/**"
-                    ], _settings.SocketPath, cancellationToken);
-                    await commandConnection.ConnectAsync(_settings.SocketPath, cancellationToken);
+                    ], Settings.SocketPath, cancellationToken);
+                    await commandConnection.ConnectAsync(Settings.SocketPath, cancellationToken);
                     logger.LogInformation("Connections to DuetControlServer established");
 
                     // Get the machine model and keep it up-to-date
@@ -187,7 +187,7 @@ public sealed class ModelObserver(IConfiguration configuration, ILogger<ModelObs
                 catch (Exception e) when (e is not OperationCanceledException)
                 {
                     logger.LogWarning(e, "Failed to synchronize machine model");
-                    await Task.Delay(_settings.ModelRetryDelay, cancellationToken);
+                    await Task.Delay(Settings.ModelRetryDelay, cancellationToken);
                 }
             }
             while (!cancellationToken.IsCancellationRequested);

@@ -1,5 +1,5 @@
 ﻿using DuetAPI.ObjectModel;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using System.Collections.Generic;
 
 namespace DuetWebServer.Singletons;
@@ -77,6 +77,6 @@ public class ModelProvider : IModelProvider
     /// <summary>
     /// Constructor of this singleton
     /// </summary>
-    /// <param name="configuration">Configuration provider</param>
-    public ModelProvider(IConfiguration configuration) => WebDirectory = (configuration.Get<Settings>() ?? new()).DefaultWebDirectory;
+    /// <param name="settings">Application settings</param>
+    public ModelProvider(IOptionsMonitor<Settings> settings) => WebDirectory = settings.CurrentValue.DefaultWebDirectory;
 }

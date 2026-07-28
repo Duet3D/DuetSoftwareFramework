@@ -26,7 +26,7 @@ public sealed class Start(Manager channelManager, ChannelProcessor channelProces
     private readonly AsyncCountdownEvent _unbufferedCodesCounter = new(0);
 
     /// <inheritdoc />
-    public override async Task ProcessCodeAsync(Commands.Code code)
+    public override async ValueTask ProcessCodeAsync(Commands.Code code)
     {
         try
         {

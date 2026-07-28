@@ -69,7 +69,7 @@ public sealed class HttpEndpointConnection : IDisposable
     /// <returns>Asynchronous task</returns>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Connection has been closed</exception>
-    public Task SendHttpRequest(ReceivedHttpRequest httpRequest, CancellationToken cancellationToken = default)
+    public ValueTask SendHttpRequest(ReceivedHttpRequest httpRequest, CancellationToken cancellationToken = default)
     {
         return Send(httpRequest, cancellationToken);
     }
@@ -81,9 +81,9 @@ public sealed class HttpEndpointConnection : IDisposable
     /// <returns>HTTP response to send</returns>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Connection has been closed</exception>
-    public Task<SendHttpResponse> GetHttpResponse(CancellationToken cancellationToken = default)
+    public ValueTask<SendHttpResponse> GetHttpResponse(CancellationToken cancellationToken = default)
     {
-        return Receive<SendHttpResponse>(cancellationToken);
+        return Receive(cancellationToken);
     }
 
     /// <summary>
@@ -98,30 +98,29 @@ public sealed class HttpEndpointConnection : IDisposable
     }
 
     /// <summary>
-    /// Receive a deserialized object from the server
+    /// Receive a deserialized HTTP response from the server
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <typeparam name="T">Type of the received object</typeparam>
-    /// <returns>Received object</returns>
+    /// <returns>Received response</returns>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Connection has been closed</exception>
-    private async Task<T> Receive<T>(CancellationToken cancellationToken)
+    private async ValueTask<SendHttpResponse> Receive(CancellationToken cancellationToken)
     {
         await using MemoryStream json = await JsonHelper.ReceiveUtf8JsonAsync(_unixSocket, cancellationToken);
-        return (await JsonSerializer.DeserializeAsync<T>(json, JsonHelper.DefaultJsonOptions, cancellationToken))!;
+        return (await JsonSerializer.DeserializeAsync(json, CommandContext.Default.SendHttpResponse, cancellationToken))!;
     }
 
     /// <summary>
-    /// Serialize an arbitrary object into JSON and send it to the server plus NL
+    /// Serialize an HTTP request into JSON and send it to the server plus NL
     /// </summary>
-    /// <param name="obj">Object to send</param>
+    /// <param name="httpRequest">Request to send</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Connection has been closed</exception>
-    private async Task Send(object obj, CancellationToken cancellationToken)
+    private async ValueTask Send(ReceivedHttpRequest httpRequest, CancellationToken cancellationToken)
     {
-        byte[] jsonToWrite = JsonSerializer.SerializeToUtf8Bytes(obj, obj.GetType(), JsonHelper.DefaultJsonOptions);
+        byte[] jsonToWrite = JsonSerializer.SerializeToUtf8Bytes(httpRequest, CommandContext.Default.ReceivedHttpRequest);
         await _unixSocket.SendAsync(jsonToWrite, SocketFlags.None, cancellationToken);
     }
 }

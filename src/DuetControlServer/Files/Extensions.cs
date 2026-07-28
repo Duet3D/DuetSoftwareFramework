@@ -1,3 +1,4 @@
+using DuetControlServer.Utility;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -24,6 +25,7 @@ public static partial class ServiceCollectionExtensions
             .AddSingleton<Parser.FileInfoParser>()
             .AddSingleton<FilePathResolver>()
             .AddSingleton<JobProcessor>()
+            .AddSingleton<IAsyncDiagnostics, JobProcessor>(services => services.GetRequiredService<JobProcessor>())
             .AddSingleton<FileFactory>()
             .AddHostedService((provider) => provider.GetRequiredService<JobProcessor>());
     }

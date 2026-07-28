@@ -546,10 +546,7 @@ extern "C" [[noreturn]] void CanClockLoop(void* /*unused*/) noexcept
 											  CanInterface::GetTimeStampPeriod()) >>
 											 6;
 #  endif
-			if (timeSyncTxDelay > peakTimeSyncTxDelay)
-			{
-				peakTimeSyncTxDelay = timeSyncTxDelay;
-			}
+			peakTimeSyncTxDelay = std::max(timeSyncTxDelay, peakTimeSyncTxDelay);
 
 			// Occasionally on the SAME70 we get very large delays reported. These delays are not genuine.
 			if (timeSyncTxDelay < maxTimeSyncDelay)

@@ -28,6 +28,8 @@
 #  if SUPPORT_CAN_EXPANSION
 #	include <CAN/CanInterface.h>
 #	include <CanMessageBuffer.h>
+
+#include <algorithm>
 #  endif
 
 // script (same70q20b_flash.ld); the leading underscore is part of that contract
@@ -354,10 +356,7 @@ void SbcInterface::EnqueueCanTextReply(uint16_t txToken, CanRequestId requestId,
 		msg.fragmentNumber = fragment;
 
 		size_t thisLength = textLength - offset;
-		if (thisLength > CanMessageStandardReply::MaxTextLength)
-		{
-			thisLength = CanMessageStandardReply::MaxTextLength;
-		}
+		thisLength = std::min(thisLength, CanMessageStandardReply::MaxTextLength);
 		memcpy(msg.text, text + offset, thisLength);
 		offset += thisLength;
 		msg.moreFollows = (offset < textLength) ? 1 : 0;

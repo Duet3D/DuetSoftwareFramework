@@ -180,10 +180,7 @@ namespace Duet::Sbc
 					if (m_fullTransferTimerRunning)
 					{
 						const double elapsed = ElapsedMs(m_fullTransferStart);
-						if (elapsed > m_maxFullTransferDelay)
-						{
-							m_maxFullTransferDelay = elapsed;
-						}
+						m_maxFullTransferDelay = std::max(elapsed, m_maxFullTransferDelay);
 						m_fullTransferTimerRunning = false;
 					}
 					else
@@ -222,10 +219,8 @@ namespace Duet::Sbc
 				m_connected = true;
 
 				// Transfer OK
-				if (m_maxRxSize < m_rxHeader.dataLength)
-					m_maxRxSize = m_rxHeader.dataLength;
-				if (m_maxTxSize < m_txHeader.dataLength)
-					m_maxTxSize = m_txHeader.dataLength;
+				m_maxRxSize = std::max(m_maxRxSize, m_rxHeader.dataLength);
+				m_maxTxSize = std::max(m_maxTxSize, m_txHeader.dataLength);
 				m_txBufferIndex = (m_txBufferIndex + 1) % kNumTxBuffers;
 				m_rxPointer = m_txPointer = 0;
 				m_packetId = 0;
@@ -445,10 +440,7 @@ namespace Duet::Sbc
 			if (inTransfer)
 			{
 				const double waited = ElapsedMs(start);
-				if (waited > m_maxPinWaitDuration)
-				{
-					m_maxPinWaitDuration = waited;
-				}
+				m_maxPinWaitDuration = std::max(waited, m_maxPinWaitDuration);
 			}
 		}
 

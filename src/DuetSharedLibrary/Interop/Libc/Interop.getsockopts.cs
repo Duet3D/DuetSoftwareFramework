@@ -15,4 +15,3 @@ internal partial class Interop
     internal const int SOL_SOCKET = 1;
     internal const int SO_PEERCRED = 17;
 }
-

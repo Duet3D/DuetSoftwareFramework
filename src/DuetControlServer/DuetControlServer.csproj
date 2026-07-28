@@ -6,6 +6,10 @@
 		<BuildTime>$([System.DateTime]::Now)</BuildTime>
 		<!-- Required by the source-generated P/Invokes into libduet_sbc.so (see Link/Native) -->
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
+		<PublishAot Condition="'$(AotPublish)' == 'true'">true</PublishAot>
+		<EnableAotAnalyzer>true</EnableAotAnalyzer>
+		<EnableTrimAnalyzer>true</EnableTrimAnalyzer>
 	</PropertyGroup>
 
 	<ItemGroup>

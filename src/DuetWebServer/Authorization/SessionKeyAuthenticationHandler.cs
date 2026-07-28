@@ -3,7 +3,6 @@ using DuetAPI.ObjectModel;
 using DuetAPIClient;
 using DuetWebServer.Singletons;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
@@ -26,19 +25,14 @@ public class SessionKeyAuthenticationSchemeOptions : AuthenticationSchemeOptions
 /// <param name="options">Options</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="encoder">URL encoder</param>
-/// <param name="configuration">Launch configuration</param>
+/// <param name="settings">Application settings</param>
 /// <param name="sessionStorage">Session storage singleton</param>
-public class SessionKeyAuthenticationHandler(IOptionsMonitor<SessionKeyAuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, IConfiguration configuration, ISessionStorage sessionStorage) : AuthenticationHandler<SessionKeyAuthenticationSchemeOptions>(options, logger, encoder)
+public class SessionKeyAuthenticationHandler(IOptionsMonitor<SessionKeyAuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, IOptionsMonitor<Settings> settings, ISessionStorage sessionStorage) : AuthenticationHandler<SessionKeyAuthenticationSchemeOptions>(options, logger, encoder)
 {
     /// <summary>
     /// Name of this authentication scheme
     /// </summary>
     public const string SchemeName = "SessionKey";
-
-    /// <summary>
-    /// App settings
-    /// </summary>
-    private readonly Settings _settings = configuration.Get<Settings>() ?? new();
 
     /// <inheritdoc />
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -97,7 +91,7 @@ public class SessionKeyAuthenticationHandler(IOptionsMonitor<SessionKeyAuthentic
     private async Task<CommandConnection> BuildConnection()
     {
         CommandConnection connection = new();
-        await connection.ConnectAsync(_settings.SocketPath);
+        await connection.ConnectAsync(settings.CurrentValue.SocketPath);
         return connection;
     }
 }

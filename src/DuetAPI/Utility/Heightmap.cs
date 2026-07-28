@@ -191,7 +191,7 @@ public sealed class Heightmap
         string[] columns = line.Split(',');
 
         // Read data values
-        line = await reader.ReadLineAsync();
+        line = await reader.ReadLineAsync().ConfigureAwait(false);
         if (line is null)
         {
             throw new IOException("Invalid file format");

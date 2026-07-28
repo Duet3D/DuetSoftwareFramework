@@ -21,6 +21,8 @@
 #  include <tc/tc.h>
 #  if SAME70 || SAM4E || SAM4S
 #	include <pmc/pmc.h>
+
+#include <algorithm>
 #  endif
 #endif
 
@@ -458,10 +460,7 @@ void StepTimer::ProcessMovementDelayRequest(uint32_t delayRequested) noexcept
 {
 	const AtomicCriticalSectionLocker lock;
 
-	if (delayRequested > movementDelay)
-	{
-		movementDelay = delayRequested;
-	}
+	movementDelay = std::max(delayRequested, movementDelay);
 	ownMovementDelayIncreased = true; // always set this to ensure that we acknowledge the request
 }
 

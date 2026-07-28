@@ -1,8 +1,7 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Net.WebSockets;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,24 +9,19 @@ using DuetAPI;
 using DuetAPI.Connection;
 using DuetAPIClient;
 using DuetWebServer.Singletons;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 
-namespace DuetWebServer.Controllers;
+namespace DuetWebServer.Endpoints;
 
 /// <summary>
-/// MVC controller for WebSocket requests
+/// Minimal-API endpoint for WebSocket requests
 /// </summary>
-/// <param name="configuration">Configuration of this application</param>
-/// <param name="logger">Logger instance</param>
-/// <param name="applicationLifetime">Application lifecycle instance</param>
-[ApiController]
-[Route("machine")]
-public class WebSocketController(IConfiguration configuration, ILogger<WebSocketController> logger, IHostApplicationLifetime applicationLifetime) : ControllerBase
+public class WebSocketEndpoint
 {
     /// <summary>
     /// PONG response when a PING is received
@@ -40,84 +34,42 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
     private const string UnsupportedCommandResponse = "Unsupported command. The only supported commands are 'OK' and 'PING'";
 
     /// <summary>
-    /// App settings
+    /// Register the WebSocket endpoint
     /// </summary>
-    private readonly Settings _settings = configuration.Get<Settings>() ?? new();
-
-    #region Logging
-    /// <summary>
-    /// Log an information
-    /// </summary>
-    /// <param name="message">Message</param>
-    /// <param name="memberName">Method calling this method</param>
-    private void LogInformation(string message, [CallerMemberName] string memberName = "")
+    /// <param name="app">Web application</param>
+    public static void Map(WebApplication app)
     {
-        logger.LogInformation("[{method}] {message}", memberName, message);
+        app.MapGet("/machine", Get);
     }
-
-    /// <summary>
-    /// Log a warning
-    /// </summary>
-    /// <param name="message">Message</param>
-    /// <param name="memberName">Method calling this method</param>
-    private void LogWarning(string message, [CallerMemberName] string memberName = "")
-    {
-        logger.LogWarning("[{method}] {message}", memberName, message);
-    }
-
-    /// <summary>
-    /// Log an error
-    /// </summary>
-    /// <param name="message">Message</param>
-    /// <param name="memberName">Method calling this method</param>
-    private void LogError(string message, [CallerMemberName] string memberName = "")
-    {
-        logger.LogError("[{method}] {message}", memberName, message);
-    }
-
-    /// <summary>
-    /// Log an error
-    /// </summary>
-    /// <param name="exception">Exception</param>
-    /// <param name="message">Message</param>
-    /// <param name="memberName">Method calling this method</param>
-    private void LogError(Exception? exception, string message, [CallerMemberName] string memberName = "")
-    {
-        logger.LogError(exception, "[{method}] {message}", memberName, message);
-    }
-    #endregion
 
     /// <summary>
     /// WS /machine?sessionKey=XXX
     /// Provide WebSocket for continuous model updates. This is primarily used to keep DWC up-to-date
     /// </summary>
-    /// <param name="sessionKey">Optional session key for authentication</param>
+    /// <param name="context">HTTP context</param>
+    /// <param name="logger">Logger instance</param>
+    /// <param name="settingsMonitor">Application settings</param>
+    /// <param name="applicationLifetime">Application lifecycle instance</param>
     /// <param name="sessionStorage">Session storage singleton</param>
-    /// <returns>
-    /// HTTP status code:
-    /// (101) WebSocket upgrade
-    /// (400) Bad request
-    /// (403) Forbidden
-    /// (500) Generic error
-    /// (502) Incompatible DCS version
-    /// (503) DCS is not started
-    /// </returns>
-    [HttpGet]
-    public async Task Get(string? sessionKey, [FromServices] ISessionStorage sessionStorage)
+    /// <param name="sessionKey">Optional session key for authentication</param>
+    /// <returns>Asynchronous task</returns>
+    private static async Task Get(HttpContext context, ILogger<WebSocketEndpoint> logger, IOptionsMonitor<Settings> settingsMonitor, IHostApplicationLifetime applicationLifetime, ISessionStorage sessionStorage, string? sessionKey)
     {
-        if (!HttpContext.WebSockets.IsWebSocketRequest)
+        Settings settings = settingsMonitor.CurrentValue;
+
+        if (!context.WebSockets.IsWebSocketRequest)
         {
             // Not a WebSocket request
-            HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-            LogWarning($"{HttpContext.Connection.RemoteIpAddress} did not send a WebSocket request");
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            EndpointHelper.LogWarning(logger, $"{context.Connection.RemoteIpAddress} did not send a WebSocket request");
             return;
         }
 
-        if (!Services.ModelObserver.CheckWebSocketOrigin(HttpContext))
+        if (!Services.ModelObserver.CheckWebSocketOrigin(context))
         {
             // Origin check failed
-            HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
-            LogWarning($"Origin check failed for {HttpContext.Connection.RemoteIpAddress}");
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            EndpointHelper.LogWarning(logger, $"Origin check failed for {context.Connection.RemoteIpAddress}");
             return;
         }
 
@@ -126,12 +78,12 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
             try
             {
                 using CommandConnection connection = new();
-                await connection.ConnectAsync(_settings.SocketPath);
+                await connection.ConnectAsync(settings.SocketPath);
                 if (!await connection.CheckPasswordAsync(Defaults.Password))
                 {
                     // Non-default password set and no sessionKey passed
-                    HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
-                    LogWarning($"Machine password is set but WebSocket request from {HttpContext.Connection.RemoteIpAddress} had no session key");
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    EndpointHelper.LogWarning(logger, $"Machine password is set but WebSocket request from {context.Connection.RemoteIpAddress} had no session key");
                     return;
                 }
             }
@@ -144,17 +96,17 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
                 if (e is IncompatibleVersionException)
                 {
                     // Incompatible DCS version
-                    HttpContext.Response.StatusCode = StatusCodes.Status502BadGateway;
+                    context.Response.StatusCode = StatusCodes.Status502BadGateway;
                 }
                 else if (e is SocketException)
                 {
                     // DCS is not started
-                    HttpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                    context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
                 }
                 else
                 {
                     // Generic error
-                    HttpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
                 }
                 return;
             }
@@ -162,8 +114,8 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
         else if (!sessionStorage.CheckSessionKey(sessionKey, false))
         {
             // Session key passed but it is invalid
-            HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
-            LogWarning($"WebSocket request from {HttpContext.Connection.RemoteIpAddress} passed an invalid session key");
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            EndpointHelper.LogWarning(logger, $"WebSocket request from {context.Connection.RemoteIpAddress} passed an invalid session key");
             return;
         }
 
@@ -174,8 +126,8 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
             {
                 sessionStorage.SetWebSocketState(sessionKey, true);
             }
-            using WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-            await Process(webSocket);
+            using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
+            await Process(context, logger, settings, applicationLifetime, webSocket);
         }
         finally
         {
@@ -193,15 +145,19 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
     /// (1003) Invalid command
     /// (1011) Internal error
     /// </summary>
+    /// <param name="context">HTTP context</param>
+    /// <param name="logger">Logger instance</param>
+    /// <param name="settings">Application settings</param>
+    /// <param name="applicationLifetime">Application lifecycle instance</param>
     /// <param name="webSocket">WebSocket connection</param>
     /// <returns>Asynchronous task</returns>
-    private async Task Process(WebSocket webSocket)
+    private static async Task Process(HttpContext context, ILogger logger, Settings settings, IHostApplicationLifetime applicationLifetime, WebSocket webSocket)
     {
         using SubscribeConnection subscribeConnection = new();
         try
         {
             // Subscribe to object model updates targeting the HTTP code channel
-            await subscribeConnection.ConnectAsync(SubscriptionMode.Patch, CodeChannel.HTTP, [], _settings.SocketPath);
+            await subscribeConnection.ConnectAsync(SubscriptionMode.Patch, CodeChannel.HTTP, [], settings.SocketPath);
         }
         catch (Exception e)
         {
@@ -211,33 +167,33 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
             }
             if (e is IncompatibleVersionException)
             {
-                LogError("Incompatible DCS version");
+                EndpointHelper.LogError(logger, "Incompatible DCS version");
                 await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError, "Incompatible DCS version");
                 return;
             }
             if (e is SocketException)
             {
-                if (System.IO.File.Exists(_settings.StartErrorFile))
+                if (File.Exists(settings.StartErrorFile))
                 {
-                    string startError = await System.IO.File.ReadAllTextAsync(_settings.StartErrorFile);
-                    LogError(startError);
+                    string startError = await File.ReadAllTextAsync(settings.StartErrorFile);
+                    EndpointHelper.LogError(logger, startError);
                     await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, startError);
                     return;
                 }
 
-                LogError("DCS is not started");
+                EndpointHelper.LogError(logger, "DCS is not started");
                 await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, "Failed to connect to Duet, please check your connection (DCS is not started)");
                 return;
             }
-            LogError(e, "Failed to connect to DCS");
+            EndpointHelper.LogError(logger, e, "Failed to connect to DCS");
             await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, e.Message);
             return;
         }
 
         // Log this event
-        string? ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-        int port = HttpContext.Connection.RemotePort;
-        LogInformation($"WebSocket connected from {ipAddress}:{port}");
+        string? ipAddress = context.Connection.RemoteIpAddress?.ToString();
+        int port = context.Connection.RemotePort;
+        EndpointHelper.LogInformation(logger, $"WebSocket connected from {ipAddress}:{port}");
 
         // Register this client and keep it up-to-date
         using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(applicationLifetime.ApplicationStopping);
@@ -254,7 +210,7 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
             // lock because WebSocket forbids concurrent SendAsync calls (e.g. PONG vs model patch)
             AsyncAutoResetEvent dataAcknowledged = new();
             AsyncLock sendLock = new();
-            rxTask = ReadFromClient(webSocket, dataAcknowledged, sendLock, cts.Token);
+            rxTask = ReadFromClient(logger, webSocket, dataAcknowledged, sendLock, cts.Token);
             txTask = WriteToClient(webSocket, subscribeConnection, dataAcknowledged, sendLock, cts.Token);
 
             // Deal with the tasks' lifecycles
@@ -272,7 +228,7 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
             }
             if (e is SocketException)
             {
-                LogError("DCS has been stopped");
+                EndpointHelper.LogError(logger, "DCS has been stopped");
                 await CloseConnection(webSocket, WebSocketCloseStatus.EndpointUnavailable, "DCS has been stopped");
             }
             else if (e is OperationCanceledException)
@@ -281,7 +237,7 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
             }
             else
             {
-                LogError(e, $"Connection from {ipAddress}:{port} terminated with an exception");
+                EndpointHelper.LogError(logger, e, $"Connection from {ipAddress}:{port} terminated with an exception");
                 await CloseConnection(webSocket, WebSocketCloseStatus.InternalServerError, e.Message);
             }
         }
@@ -299,18 +255,20 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
                 // ignored, the connection is being torn down anyway
             }
 
-            LogInformation($"WebSocket disconnected from {ipAddress}:{port}");
+            EndpointHelper.LogInformation(logger, $"WebSocket disconnected from {ipAddress}:{port}");
         }
     }
 
     /// <summary>
     /// Keep reading from the client
     /// </summary>
+    /// <param name="logger">Logger instance</param>
     /// <param name="webSocket">WebSocket to read from</param>
     /// <param name="dataAcknowledged">Event to trigger when the client has acknowledged data</param>
+    /// <param name="sendLock">Lock for writing to the WebSocket</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    private async Task ReadFromClient(WebSocket webSocket, AsyncAutoResetEvent dataAcknowledged, AsyncLock sendLock, CancellationToken cancellationToken)
+    private static async Task ReadFromClient(ILogger logger, WebSocket webSocket, AsyncAutoResetEvent dataAcknowledged, AsyncLock sendLock, CancellationToken cancellationToken)
     {
         byte[] receiveBuffer = new byte[128];
         do
@@ -352,7 +310,7 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
                 }
                 else if (!string.IsNullOrWhiteSpace(line))
                 {
-                    LogWarning($"Received unsupported line from WebSocket: '{line}'");
+                    EndpointHelper.LogWarning(logger, $"Received unsupported line from WebSocket: '{line}'");
                     await CloseConnection(webSocket, WebSocketCloseStatus.InvalidMessageType, UnsupportedCommandResponse);
                     break;
                 }
@@ -367,6 +325,7 @@ public class WebSocketController(IConfiguration configuration, ILogger<WebSocket
     /// <param name="webSocket">WebSocket to write to</param>
     /// <param name="subscribeConnection">IPC connection to supply model updates</param>
     /// <param name="dataAcknowledged">Event that is triggered when the client has acknowledged data</param>
+    /// <param name="sendLock">Lock for writing to the WebSocket</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
     private static async Task WriteToClient(WebSocket webSocket, SubscribeConnection subscribeConnection, AsyncAutoResetEvent dataAcknowledged, AsyncLock sendLock, CancellationToken cancellationToken)
