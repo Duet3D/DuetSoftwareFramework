@@ -18,6 +18,13 @@
 #include <Platform/Platform.h>
 #include <RepRapFirmware.h>
 
+// The imported sources declare locals as `const Move&`. On this side the motion system is what Move
+// became, so the name is kept rather than edited out of every one of those files.
+using Move = Duet::Sbc::Motion::MotionSystem;
+
+// Likewise for the machine description types the imported code names unqualified.
+using AxisDriversConfig = Duet::Sbc::Motion::AxisDriversConfig;
+
 class RepRapShim
 {
 public:

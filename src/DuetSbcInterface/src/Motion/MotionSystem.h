@@ -23,6 +23,7 @@
 #include <Motion/DriveTracker.h>
 #include <Motion/MotionConfig.h>
 #include <Motion/MoveProfile.h>
+#include <Motion/ScheduleMoveBuilder.h>
 
 namespace Duet::Sbc::Motion
 {
@@ -86,6 +87,11 @@ namespace Duet::Sbc::Motion
 		// MotionConfig::shapingTimeClocks for why this is not simply absent.
 		[[nodiscard]] uint32_t GetShapingTimeClocks() const noexcept { return config.shapingTimeClocks; }
 
+		// Where prepared moves go out to the controller. Owned here because it is per-machine state
+		// with the same lifetime as the drive trackers, and because the CanMotion shim in front of
+		// it has to find it from somewhere without a second global.
+		[[nodiscard]] ScheduleMoveBuilder& GetScheduleMoveBuilder() noexcept { return scheduleMoveBuilder; }
+
 		// --- Per-drive motion -----------------------------------------------------------------
 
 		[[nodiscard]] DriveTracker& GetDriveTracker(size_t drive) noexcept { return trackers[drive]; }
@@ -119,6 +125,7 @@ namespace Duet::Sbc::Motion
 	private:
 		MotionConfig config;
 		DriveTracker trackers[MaxAxesPlusExtruders];
+		ScheduleMoveBuilder scheduleMoveBuilder;
 
 		// Backlash compensation state, as in the firmware's Move. `target` is the correction the
 		// current direction calls for, `current` how much of it has been injected so far; the

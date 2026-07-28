@@ -31,11 +31,15 @@ set(DUET_MOTION_SOURCES
     Compat/Diagnostics.cpp
     Compat/RepRap.cpp
     Compat/Tasks.cpp
+    Motion/CanMotionShim.cpp
     Motion/DriveTracker.cpp
     Motion/MotionSystem.cpp
     Motion/ScheduleMoveBuilder.cpp
     Motion/SegmentBuilder.cpp
+    Movement/DDA.cpp
+    Movement/DDARing.cpp
     Movement/MoveSegment.cpp
+    Movement/MovementError.cpp
     Movement/StepTimer.cpp
 )
 

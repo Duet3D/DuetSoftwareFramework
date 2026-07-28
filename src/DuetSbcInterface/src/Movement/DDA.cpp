@@ -6,18 +6,16 @@
  */
 
 #include "DDA.h"
+#include "DDARing.h"
 #include "MoveDebugFlags.h"
 #include <Platform/RepRap.h>
 #include <Platform/Platform.h>
-#include "Move.h"
+#include "MoveTiming.h"
 #include "StepTimer.h"
-#include <Endstops/EndstopsManager.h>
-#include <Tools/Tool.h>
 #include <GCodes/GCodes.h>
 
 #if SUPPORT_CAN_EXPANSION
 # include <CAN/CanMotion.h>
-# include <CAN/CanInterface.h>
 #endif
 
 #include <limits>
@@ -200,8 +198,6 @@ void PrepParams::DebugPrint() const noexcept
 
 DDA::DDA(DDA *_ecv_null n) noexcept : next(n), prev(nullptr)
 {
-	tool = nullptr;						// needed in case we pause before any moves have been done
-
 	// Set the endpoints to zero, because Move will ask for them.
 	// They will be wrong if we are on a delta. We take care of that when we process the M665 command in config.g.
 	for (int32_t& ep : endPoint)
@@ -211,12 +207,7 @@ DDA::DDA(DDA *_ecv_null n) noexcept : next(n), prev(nullptr)
 
 	flags.all = 0;						// in particular we need to set endCoordinatesValid, usePressureAdvance to false, stateBits to empty, also checkEndstops false for the ATE build
 	SetState(empty);					// should alrrady be covered by the above
-	virtualExtruderPosition = 0.0;
-	filePos = noFilePosition;
-
-#if SUPPORT_LASER || SUPPORT_IOBITS
-	laserPwmOrIoBits.Clear();
-#endif
+	moveId = 0;
 }
 
 // Return the number of clocks this DDA still needs to execute.
@@ -267,542 +258,100 @@ void DDA::DebugPrint(const char *_ecv_array tag) const noexcept
 #else
 				"a=%.4e"
 #endif
-				" reqv=%.4e startv=%.4e topv=%.4e endv=%.4e cks=%" PRIu32 " fp=%" PRIu32 " fl=0x%06" PRIx32 "\n",
+				" reqv=%.4e startv=%.4e topv=%.4e endv=%.4e cks=%" PRIu32 " id=%" PRIu32 " fl=0x%06" PRIx32 "\n",
 #if SUPPORT_S_CURVE
 				(double)startAcceleration, (double)maxAcceleration, (double)jerk,
 #else
 				(double)maxAcceleration,
 #endif
-				(double)requestedSpeed, (double)startSpeed, (double)topSpeed, (double)endSpeed, clocksNeeded, (uint32_t)filePos, flags.all);
+				(double)requestedSpeed, (double)startSpeed, (double)topSpeed, (double)endSpeed, clocksNeeded, moveId, flags.all);
 }
 
-// Set up a real move. Return true if it represents real movement, else false.
-// Either way, return the amount of extrusion we didn't do in the extruder coordinates of nextMove
-MovementError DDA::InitStandardMove(DDARing& ring, const RawMove &nextMove, bool doMotorMapping) noexcept
+# if SUPPORT_ASYNC_MOVES
+
+#endif
+
+// Take up a move that DuetControlServer has already worked out the shape of.
+//
+// Upstream this is the tail of InitStandardMove. Steps 1 to 6 - endpoints, direction vector,
+// normalisation, the acceleration and speed limits - happen in DCS now, because they need the
+// kinematics and the machine configuration and they depend on nothing but the move itself. What is
+// left is step 7 onwards, which needs the moves either side of this one and therefore needs the
+// ring. The code below is upstream's, with the parameters read from the message rather than
+// computed.
+MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MoveParamsHeader& params) noexcept
 {
-	const size_t numTotalAxes = reprap.GetGCodes().GetTotalAxes();
-	const size_t numVisibleAxes = reprap.GetGCodes().GetVisibleAxes();
-	const Move& move = reprap.GetMove();
+	using namespace Duet::Sbc::Motion;
 
-	// 1. Compute the new endpoints and the movement vector
-#if SUPPORT_ASYNC_MOVES
-	ownedDrives = nextMove.logicalDrivesOwned;
-#endif
-
+	moveId = params.moveId;
 	flags.all = 0;												// set all flags false
-	bool linearAxesMoving = false;
-	bool rotationalAxesMoving = false;
 
-	// Deal with axis movement
-	if (doMotorMapping)
+#if SUPPORT_ASYNC_MOVES
+	ownedDrives = LogicalDrivesBitmap(params.ownedDrives);
+#endif
+
+	// A drive DCS did not send is one this move does not touch, so it ends where the previous move
+	// left it. Getting this wrong is not a small error: Prepare takes the difference against the
+	// previous DDA's endpoint, so a stale entry moves the drive by the whole difference.
+	const int32_t *const endPoints = MoveParamsEndPoints(params);
+	const float *const directions = MoveParamsDirectionVector(params);
+	for (size_t drive = 0; drive < MaxAxesPlusExtruders; ++drive)
 	{
-		// If there are more total axes than visible axes, then we must ignore any movement data in nextMove for the invisible axes.
-		// The call to CartesianToMotorSteps may adjust the invisible axis endpoints for architectures such as CoreXYU and delta with >3 towers, so set them up here.
-		for (size_t axis = numVisibleAxes; axis < numTotalAxes; ++axis)
+		if (drive < params.numDrives)
 		{
-			endPoint[axis] = prev->DriveCoordinates()[axis];
+			endPoint[drive] = endPoints[drive];
+			directionVector[drive] = directions[drive];
 		}
-
-		const MovementError err = move.CartesianToMotorSteps(nextMove.coords, endPoint, nextMove.isCoordinated);	// transform the axis coordinates to motor endpoints
-		if (err != MovementError::ok)
-		{
-			return err;											// throw away the move if it couldn't be transformed
-		}
-
-		// Note, the following loop iterates over both axes and logical drives
-		for (size_t axisOrDrive = 0; axisOrDrive < numTotalAxes; axisOrDrive++)
-		{
-#if SUPPORT_ASYNC_MOVES
-			if (nextMove.axesAndExtrudersOwned.IsBitSet(axisOrDrive))
-#endif
-			{
-				const float positionDelta = nextMove.coords[axisOrDrive] - ring.GetStartCoordinate(axisOrDrive);
-				ring.SetStartCoordinate(axisOrDrive, nextMove.coords[axisOrDrive]);
-				directionVector[axisOrDrive] = positionDelta;
-				if (positionDelta != 0.0)
-				{
-					if (move.IsAxisRotational(axisOrDrive))
-					{
-						if (nextMove.rotationalAxesMentioned)
-						{
-							rotationalAxesMoving = true;
-						}
-					}
-					else if (nextMove.linearAxesMentioned)
-					{
-						linearAxesMoving = true;
-						if (Tool::GetXAxes(nextMove.movementTool).IsBitSet(axisOrDrive) || Tool::GetYAxes(nextMove.movementTool).IsBitSet(axisOrDrive))
-						{
-							flags.xyMoving = true;				// this move has XY movement in user space, before axis were mapped
-						}
-					}
-				}
-			}
-#if SUPPORT_ASYNC_MOVES
-			else
-			{
-				// This is an axis we don't own, so make sure we don't move it
-				directionVector[axisOrDrive] = 0.0;
-			}
-
-			if (!ownedDrives.IsBitSet(axisOrDrive))
-			{
-				endPoint[axisOrDrive] = prev->endPoint[axisOrDrive];
-			}
-#endif
-		}
-	}
-	else
-	{
-		// Raw motor move
-		for (size_t drive = 0; drive < numVisibleAxes; drive++)
-		{
-#if SUPPORT_ASYNC_MOVES
-			if (ownedDrives.IsBitSet(drive))
-#endif
-			{
-				// Raw motor move on a visible axis
-				const MovementError err = move.MotorMovementToSteps(drive, nextMove.coords[drive], endPoint[drive]);
-				if (err != MovementError::ok)
-				{
-					return err;
-				}
-				const int32_t delta = endPoint[drive] - prev->endPoint[drive];
-				directionVector[drive] = (float)delta/move.DriveStepsPerMm(drive);
-				if (delta != 0)
-				{
-					if (move.IsAxisRotational(drive))
-					{
-						rotationalAxesMoving = true;
-					}
-					else
-					{
-						linearAxesMoving = true;
-					}
-				}
-			}
-#if SUPPORT_ASYNC_MOVES
-			else
-			{
-				// This is an axis we don't own, so make sure we don't move it
-				directionVector[drive] = 0.0;
-				endPoint[drive] = prev->endPoint[drive];
-			}
-#endif
-		}
-
-		// Set any invisible axis endpoints to the same positions as the previous move
-		for (size_t drive = numVisibleAxes; drive < numTotalAxes; ++drive)
+		else
 		{
 			endPoint[drive] = prev->endPoint[drive];
 			directionVector[drive] = 0.0;
 		}
 	}
 
-	// Clear out unused logical drives
-	for (size_t drive = numTotalAxes; drive < MaxAxesPlusExtruders - reprap.GetGCodes().GetNumExtruders(); ++drive)
-	{
-		directionVector[drive] = 0.0;
-		endPoint[drive] = prev->endPoint[drive];
-	}
+	totalDistance = params.totalDistance;
+	maxAcceleration = params.maxAcceleration;
+	requestedSpeed = params.requestedSpeed;
 
-	// Deal with extruder movement
-	float accelerations[MaxAxesPlusExtruders];
-	memcpyf(accelerations, move.Accelerations(nextMove.reduceAcceleration), MaxAxesPlusExtruders);
-	bool extrudersMoving = false;
-	float totalExtrusion = 0.0;
-
-	for (size_t drive = MaxAxesPlusExtruders - reprap.GetGCodes().GetNumExtruders(); drive < MaxAxesPlusExtruders; ++drive)
-	{
-#if SUPPORT_ASYNC_MOVES
-		if (ownedDrives.IsBitSet(drive))
-#endif
-		{
-			// It's an extruder drive. We defer calculating the steps because they may be affected by nonlinear extrusion, which we can't calculate until we
-			// know the speed of the move, and because extruder movement is relative so we need to accumulate fractions of a whole step between moves.
-			const float movement = nextMove.coords[drive];
-			directionVector[drive] = movement;							// for an extruder, endCoordinates is the amount of movement
-			if (movement != 0.0)
-			{
-				totalExtrusion += std::fabs(movement);
-				extrudersMoving = true;
-				if (movement > 0.0)
-				{
-					flags.hasForwardExtrusion = true;
-				}
-				if (flags.xyMoving && nextMove.usePressureAdvance)
-				{
-					const float compensationClocks = move.GetPressureAdvanceK0ClocksForLogicalDrive(drive);
-					if (compensationClocks > 0.0)
-					{
-						// Compensation causes instant velocity changes equal to acceleration * k, so we may need to limit the acceleration
-						accelerations[drive] = min<float>(accelerations[drive], move.GetMaxInstantDv(drive)/compensationClocks);
-					}
-				}
-			}
-		}
-#if SUPPORT_ASYNC_MOVES
-		else
-		{
-			// This is an extruder we don't own, so make sure we don't move it
-			directionVector[drive] = 0.0;
-		}
-#endif
-	}
-
-	// 2. Throw it away if there's no real movement.
-	if (!(linearAxesMoving || rotationalAxesMoving || extrudersMoving))
-	{
-		// Update the end position in the previous move, so that on the next move we don't think there is XY movement when the user didn't ask for any
-		if (doMotorMapping)
-		{
-			for (size_t drive = 0; drive < numTotalAxes; ++drive)
-			{
-				ring.SetStartCoordinate(drive, nextMove.coords[drive]);
-			}
-		}
-		return MovementError::noMovement;
-	}
-
-	// 3. Store some values
-	tool = nextMove.movementTool;
-	filePos = nextMove.filePos;
-	gCommandNumber = nextMove.gCommandNumber;
-	virtualExtruderPosition = nextMove.moveStartVirtualExtruderPosition;
-	proportionDone = nextMove.proportionDone;
-	initialUserC0 = nextMove.initialUserC0;
-	initialUserC1 = nextMove.initialUserC1;
-	originalFeedRate = nextMove.originalFeedRate;
-
-	// These 4 or 5 bits can be copied in one go by the compiler generating a ubfx instruction
-	flags.canPauseAfter = nextMove.canPauseAfter;
-	flags.checkEndstops = nextMove.checkEndstops;
-	flags.usingStandardFeedrate = nextMove.usingStandardFeedrate;
-	flags.usePressureAdvance = nextMove.usePressureAdvance;
-#if SUPPORT_SCANNING_PROBES
-	flags.scanningProbeMove = nextMove.scanningProbeMove;
-#endif
-
-	flags.isolatedMove = nextMove.checkEndstops || nextMove.moveType != 0;
-	flags.isPrintingMove = flags.xyMoving && flags.hasForwardExtrusion;				// require forward extrusion so that wipe-while-retracting doesn't count
-	flags.isNonPrintingExtruderMove = extrudersMoving && !flags.isPrintingMove;		// flag used by filament monitors - we can ignore Z movement
-	flags.controlLaserOrIoBits = nextMove.isCoordinated && !nextMove.checkEndstops;
-
-	// The end coordinates will be valid at the end of this move if it does not involve endstop checks and is not a raw motor move
-	flags.continuousRotationShortcut = (nextMove.moveType == 0);
-
-#if SUPPORT_LASER || SUPPORT_IOBITS
-	if (flags.controlLaserOrIoBits)
-	{
-		laserPwmOrIoBits = nextMove.laserPwmOrIoBits;
-	}
-	else
-	{
-		laserPwmOrIoBits.Clear();
-	}
-#endif
-
-	// 4. Normalise the direction vector and compute the amount of motion.
-	// NIST standard section 2.1.2.5 rule A: if any of XYZ is moving then the feed rate specifies the linear XYZ movement
-	// We treat additional linear axes the same as XYZ
-	const Kinematics &_ecv_from k = move.GetKinematics();
-	if (linearAxesMoving)
-	{
-		// There is some linear axis movement, so normalise the direction vector so that the total linear movement has unit length and 'totalDistance' is the linear distance moved.
-		// This means that the user gets the feed rate that he asked for. It also makes the delta calculations simpler.
-		// First do the bed tilt compensation for deltas.
-		directionVector[Z_AXIS] += (directionVector[X_AXIS] * k.GetTiltCorrection(X_AXIS)) + (directionVector[Y_AXIS] * k.GetTiltCorrection(Y_AXIS));
-		totalDistance = NormaliseLinearMotion(move.GetLinearAxes());
-#if SUPPORT_S_CURVE
-		movementRatio = (extrudersMoving) ? totalExtrusion/totalDistance : 1.0;
-#endif
-	}
-	else if (rotationalAxesMoving)
-	{
-		// Some axes are moving, but not linear axes. Normalise the movement to the vector sum of the axes that are moving.
-		totalDistance = Normalise(directionVector, move.GetRotationalAxes());
-#if SUPPORT_S_CURVE
-		movementRatio = (extrudersMoving) ? totalExtrusion/totalDistance : 1.0;
-#endif
-	}
-	else
-	{
-		// Extruder-only movement. Normalise so that the magnitude is the total absolute movement. This gives the correct feed rate for mixing extruders.
-		totalDistance = totalExtrusion;
-		if (totalDistance > 0.0)		// should always be true
-		{
-			Scale(directionVector, 1.0/totalDistance);
-		}
-#if SUPPORT_S_CURVE
-		movementRatio = 1.0;
-#endif
-	}
-
-	// 5. Compute the maximum acceleration available
-	float normalisedDirectionVector[MaxAxesPlusExtruders];			// used to hold a unit-length vector in the direction of motion
-	memcpyf(normalisedDirectionVector, directionVector, ARRAY_SIZE(normalisedDirectionVector));
-	Absolute(normalisedDirectionVector, MaxAxesPlusExtruders);
-	maxAcceleration = VectorBoxIntersection(normalisedDirectionVector, accelerations);
-	if (flags.xyMoving)												// apply M204 acceleration limits to XY moves
-	{
-		maxAcceleration = min<float>(maxAcceleration, (flags.isPrintingMove) ? nextMove.maxPrintingAcceleration : nextMove.maxTravelAcceleration);
-	}
-
-#if SUPPORT_S_CURVE
-	if (move.IsUsingSCurve())
-	{
-		flags.useScurve = true;
-		jerk = VectorBoxIntersection(normalisedDirectionVector, move.Jerks());
-	}
-	else
-	{
-		jerk = 0.0;													// not used, bit it makes debug output clearer
-	}
-#endif
-
-	// 6. Set the speed to the smaller of the requested and maximum speed.
-	// Also enforce a minimum speed of 0.5mm/sec. We need a minimum speed to avoid overflow in the movement calculations.
-	float reqSpeed = (nextMove.inverseTimeMode) ? totalDistance/nextMove.feedRate : nextMove.feedRate;
-	if (!doMotorMapping)
-	{
-		// Special case of a raw or homing move on a delta printer
-		// We use the Cartesian motion system to implement these moves, so the feed rate will be interpreted in Cartesian coordinates.
-		// This is wrong, we want the feed rate to apply to the drive that is moving the farthest.
-		float maxDistance = 0.0;
-		for (size_t axis = 0; axis < numTotalAxes; ++axis)
-		{
-			if (k.GetKinematicsType() == KinematicsType::linearDelta && normalisedDirectionVector[axis] > maxDistance)
-			{
-				maxDistance = normalisedDirectionVector[axis];
-			}
-		}
-		if (maxDistance != 0.0)				// should be true if we are homing a delta
-		{
-			reqSpeed /= maxDistance;		// because normalisedDirectionVector is unit-normalised
-		}
-	}
-
-	// Don't use the constrain function in the following, because if we have a very small XY movement and a lot of extrusion, we may have to make the
-	// speed lower than the configured minimum movement speed. We must apply the minimum speed first and then limit it if necessary after that.
-	requestedSpeed = min<float>(max<float>(reqSpeed, move.MinMovementSpeed()),
-								VectorBoxIntersection(normalisedDirectionVector, move.MaxFeedrates()));
-
-	// On a Cartesian printer, it is OK to limit the X and Y speeds and accelerations independently, and in consequence to allow greater values
-	// for diagonal moves. On other architectures, this is not OK and any movement in the XY plane should be limited on other ways.
-	if (doMotorMapping)
-	{
-		k.LimitSpeedAndAcceleration(*this, normalisedDirectionVector, numVisibleAxes, flags.continuousRotationShortcut);	// give the kinematics the chance to further restrict the speed and acceleration
-	}
+	flags.canPauseAfter = (params.flags & MoveFlags::CanPauseAfter) != 0;
+	flags.checkEndstops = (params.flags & MoveFlags::CheckEndstops) != 0;
+	flags.usingStandardFeedrate = (params.flags & MoveFlags::UsingStandardFeedrate) != 0;
+	flags.usePressureAdvance = (params.flags & MoveFlags::UsePressureAdvance) != 0;
+	flags.isPrintingMove = (params.flags & MoveFlags::IsPrintingMove) != 0;
+	flags.xyMoving = (params.flags & MoveFlags::XyMoving) != 0;
+	flags.isNonPrintingExtruderMove = (params.flags & MoveFlags::IsNonPrintingExtruderMove) != 0;
+	flags.continuousRotationShortcut = (params.flags & MoveFlags::ContinuousRotationShortcut) != 0;
+	flags.isolatedMove = (params.flags & MoveFlags::IsolatedMove) != 0;
+	flags.hasForwardExtrusion = (params.flags & MoveFlags::HasForwardExtrusion) != 0;
 
 	// 7. Calculate the provisional accelerate and decelerate distances and the top speed
-#if SUPPORT_S_CURVE
-	if (   prev->IsProvisional()													// if previous move is queued but has not started yet
-		&& flags.useScurve == prev->flags.useScurve
-		&& flags.isPrintingMove == prev->flags.isPrintingMove
-		&& flags.xyMoving == prev->flags.xyMoving
-		&& flags.isNonPrintingExtruderMove == prev->flags.isNonPrintingExtruderMove	// this is to prevent extruder-only moves being melded with Z-axis moves (issue 990)
-	   )
-	{
-		// We may be able to meld this move with the previous one
-		if (flags.isPrintingMove)
-		{
-			SetSpeedRatioAndMaxJunctionSpeedForPrintingMoves(move);
-		}
-		else
-		{
-			SetSpeedRatioAndMaxJunctionSpeedForNonPrintingMoves(move);
-		}
-	}
-	else
-	{
-		// This will be the first move after standstill
-		beforePrepare.startSpeedRatio = 1.0;
-		beforePrepare.maxPrevEndSpeed = 0.0;
-	}
-#endif
-
 	endSpeed = 0.0;																	// until we have a following move
 
-	MovementError rslt;																// this will hold the return value
-
-	// See if we can meld this with the end of the previous one (which must currently have the end speed set to zero)
-#if SUPPORT_S_CURVE
-	if (flags.useScurve)
-	{
-		startSpeed = startAcceleration = 0.0;										// in case there is no previous move
-		SetState(created);															// postpone planning this move until preparation
-		// We need to store an estimate of the time needed to execute the move because the Move task uses it when deciding whether to add more moves to the ring
-		clocksNeeded = (uint32_t)(totalDistance/requestedSpeed);
-		rslt = MovementError::ok;
-	}
-	else
-	{
-		if (beforePrepare.maxPrevEndSpeed > 0.0)
-		{
-			// Assuming that this move ends with zero speed, calculate the maximum possible starting speed: u^2 = -2as limited to the requested speed
-			prev->beforePrepare.targetNextSpeed = min<float>(fastSqrtf(maxAcceleration * totalDistance * 2.0), beforePrepare.maxPrevEndSpeed);
-			DoLookahead(ring, prev);
-			startSpeed = prev->endSpeed * beforePrepare.startSpeedRatio;
-		}
-		else
-		{
-			startSpeed = 0.0;
-		}
-#else
-	{
-		if (   prev->IsProvisional()													// if previous move has not started yet
-			&& (   move.GetJerkPolicy() != 0											// and melding is allowed
-				|| (   flags.isPrintingMove == prev->flags.isPrintingMove
-					&& flags.xyMoving == prev->flags.xyMoving
-					&& flags.isNonPrintingExtruderMove == prev->flags.isNonPrintingExtruderMove		// this is to prevent extruder-only move being melded with Z-axis moves (issue 990)
-				   )
+	const Move& move = reprap.GetMove();
+	if (   prev->IsProvisional()													// if previous move has not started yet
+		&& (   move.GetJerkPolicy() != 0											// and melding is allowed
+			|| (   flags.isPrintingMove == prev->flags.isPrintingMove
+				&& flags.xyMoving == prev->flags.xyMoving
+				&& flags.isNonPrintingExtruderMove == prev->flags.isNonPrintingExtruderMove		// this is to prevent extruder-only move being melded with Z-axis moves (issue 990)
 			   )
 		   )
-		{
-			// Try to meld this move to the previous move to avoid stop/start
-			// Assuming that this move ends with zero speed, calculate the maximum possible starting speed: u^2 = -2as limited to the requested speed
-			prev->beforePrepare.targetNextSpeed = min<float>(fastSqrtf(maxAcceleration * totalDistance * 2.0), requestedSpeed);
-			DoLookahead(ring, prev);
-			startSpeed = prev->endSpeed;
-		}
-		else
-		{
-			startSpeed = 0.0;															// there is no previous move that we can adjust, so start at zero speed.
-		}
-#endif
-
-		rslt = RecalculateMove(ring);
-		SetState(planned);
-	}
-	return rslt;
-}
-
-// Set up a leadscrew motor move returning true if the move does anything
-bool DDA::InitLeadscrewMove(DDARing& ring, float feedrate, const float adjustments[MaxDriversPerAxis]) noexcept
-{
-	// 1. Compute the new endpoints and the movement vector
-	bool realMove = false;
-
-	for (size_t drive = 0; drive < MaxAxesPlusExtruders; drive++)
+	   )
 	{
-		endPoint[drive] = prev->endPoint[drive];				// adjusting leadscrews doesn't change the endpoint
-		directionVector[drive] = 0.0;
-	}
-
-	const Move& move = reprap.GetMove();
-	for (size_t driver = 0; driver < MaxDriversPerAxis; ++driver)
-	{
-		directionVector[driver] = adjustments[driver];			// for leadscrew adjustment moves, store the adjustment needed in directionVector
-		const int32_t delta = lrintf(adjustments[driver] * move.DriveStepsPerMm(Z_AXIS));
-		if (delta != 0)
-		{
-			realMove = true;
-		}
-	}
-
-	// 2. Throw it away if there's no real movement.
-	if (!realMove)
-	{
-		return false;
-	}
-
-	// 3. Store some values
-	flags.all = 0;
-	flags.isLeadscrewAdjustmentMove = true;
-	flags.isolatedMove = true;
-	virtualExtruderPosition = prev->virtualExtruderPosition;
-	tool = nullptr;
-	originalFeedRate = 0.0;
-	filePos = prev->filePos;
-	maxAcceleration = move.NormalAcceleration(Z_AXIS);
-
-#if SUPPORT_LASER && SUPPORT_IOBITS
-	if (reprap.GetGCodes().GetMachineType() == MachineType::laser)
-	{
-		laserPwmOrIoBits.Clear();
+		// Try to meld this move to the previous move to avoid stop/start
+		// Assuming that this move ends with zero speed, calculate the maximum possible starting speed: u^2 = -2as limited to the requested speed
+		prev->beforePrepare.targetNextSpeed = min<float>(fastSqrtf(maxAcceleration * totalDistance * 2.0), requestedSpeed);
+		DoLookahead(ring, prev);
+		startSpeed = prev->endSpeed;
 	}
 	else
 	{
-		laserPwmOrIoBits = prev->laserPwmOrIoBits;
+		startSpeed = 0.0;															// there is no previous move that we can adjust, so start at zero speed.
 	}
-#elif SUPPORT_LASER
-	laserPwmOrIoBits.Clear();
-#elif SUPPORT_IOBITS
-	laserPwmOrIoBits = prev->laserPwmOrIoBits;
-#endif
 
-	// 4. Normalise the direction vector and compute the amount of motion.
-	//    Currently we normalise the vector sum of all Z motor movement to unit length.
-	totalDistance = Normalise(directionVector);
-
-	// 6. Set the speed to requested feed rate, which the caller must ensure is no more than the maximum speed for the Z axis.
-	requestedSpeed = feedrate;
-
-	// 7. Calculate the provisional accelerate and decelerate distances and the top speed
-	startSpeed = endSpeed = 0.0;
-
-	RecalculateMove(ring);
+	const MovementError rslt = RecalculateMove(ring);
 	SetState(planned);
-	return true;
+	return rslt;
 }
-
-# if SUPPORT_ASYNC_MOVES
-
-// Set up an async motor move returning true if the move does anything.
-// All async moves are relative and linear.
-bool DDA::InitAsyncMove(DDARing& ring, const AsyncMove& nextMove) noexcept
-{
-	// 1. Compute the new endpoints and the movement vector
-	bool realMove = false;
-
-	const Move& move = reprap.GetMove();
-	for (size_t drive = 0; drive < MaxAxesPlusExtruders; drive++)
-	{
-		// Note, the correspondence between endCoordinates and endPoint will not be exact because of rounding error.
-		// This doesn't matter for the current application because we don't use either of these fields.
-
-		// If it's a delta then we can only do async tower moves in the Z direction and on any additional linear axes
-		const size_t axisToUse = (move.GetKinematics().GetKinematicsType() == KinematicsType::linearDelta && drive <= Z_AXIS) ? Z_AXIS : drive;
-		directionVector[drive] = nextMove.movements[axisToUse];
-		const int32_t delta = lrintf(nextMove.movements[axisToUse] * move.DriveStepsPerMm(drive));
-		endPoint[drive] = prev->endPoint[drive] + delta;
-		if (delta != 0)
-		{
-			realMove = true;
-		}
-	}
-
-	// 2. Throw it away if there's no real movement.
-	if (!realMove)
-	{
-		return false;
-	}
-
-	// 3. Store some values
-	flags.all = 0;
-	virtualExtruderPosition = 0;
-	tool = nullptr;
-	filePos = noFilePosition;
-	originalFeedRate = 0.0;
-
-	startSpeed = nextMove.startSpeed;
-	endSpeed = nextMove.endSpeed;
-	requestedSpeed = nextMove.requestedSpeed;
-	maxAcceleration = nextMove.accelDecel;
-
-# if SUPPORT_LASER || SUPPORT_IOBITS
-	laserPwmOrIoBits.Clear();
-# endif
-
-	// Currently we normalise the vector sum of all motor movements to unit length.
-	totalDistance = Normalise(directionVector);
-
-	RecalculateMove(ring);
-	SetState(planned);
-	return true;
-}
-
-#endif
 
 // Return true if this move is or might have been intended to be a deceleration-only move
 // A move planned as a deceleration-only move may have a short acceleration segment at the start because of rounding error
@@ -951,51 +500,6 @@ LA_DEBUG;
 	}
 }
 
-// Try to push babystepping earlier in the move queue, returning the amount we pushed
-// Caution! Thus is called with scheduling locked, therefore it must make no FreeRTOS calls, or call anything that makes them
-//TODO this won't work for CoreXZ, rotary delta, Kappa, or SCARA with Z crosstalk
-float DDA::AdvanceBabyStepping(DDARing& ring, size_t axis, float amount) noexcept
-{
-	if (axis != Z_AXIS)
-	{
-		return 0.0;				// only Z axis babystepping is supported at present
-	}
-
-	// Find the oldest un-prepared move
-	DDA *cdda = this;
-	while (cdda->prev->IsProvisional())
-	{
-		cdda = _ecv_not_null(cdda->prev);
-	}
-
-	// cdda addresses the earliest un-prepared move, which is the first one we can apply babystepping to
-	// Allow babystepping Z speed up to 10% of the move top speed or up to half the Z jerk rate, whichever is lower
-	float babySteppingDone = 0.0;
-	while (cdda != this)
-	{
-		if (amount != 0.0 && cdda->flags.xyMoving)
-		{
-			// Limit the babystepping Z speed to the lower of 0.1 times the original XYZ speed and 0.5 times the Z jerk
-			Move& move = reprap.GetMove();
-			const float maxBabySteppingAmount = cdda->totalDistance * min<float>(0.1, 0.5 * move.GetMaxInstantDv(Z_AXIS)/cdda->topSpeed);
-			const float babySteppingToDo = constrain<float>(amount, -maxBabySteppingAmount, maxBabySteppingAmount);
-			cdda->directionVector[Z_AXIS] += babySteppingToDo/cdda->totalDistance;
-			cdda->totalDistance *= cdda->NormaliseLinearMotion(move.GetLinearAxes());
-			cdda->RecalculateMove(ring);
-			babySteppingDone += babySteppingToDo;
-			amount -= babySteppingToDo;
-		}
-
-		// Even if there is no babystepping to do this move, we may need to adjust the end coordinates
-		cdda->endPoint[Z_AXIS] += (int32_t)(babySteppingDone * reprap.GetMove().DriveStepsPerMm(Z_AXIS));
-
-		// Now do the next move
-		cdda = _ecv_not_null(cdda->next);
-	}
-
-	return babySteppingDone;
-}
-
 // Recalculate the top speed, acceleration distance and deceleration distance, and whether we can pause after this move
 // This may cause a move that we intended to be a deceleration-only move to have a tiny acceleration segment at the start
 // Check that the move will execute in less than 2^31 step clocks and return MovementError::ok if so
@@ -1140,13 +644,6 @@ void DDA::SetDriveCoordinate(size_t drive, int32_t ep) noexcept
 	endPoint[drive] = ep;
 }
 
-// Get a Cartesian end coordinate from this move
-void DDA::GetEndCoordinates(float returnedCoords[MaxAxes]) noexcept
-{
-	const size_t totalAxes = reprap.GetGCodes().GetTotalAxes();
-	reprap.GetMove().MotorStepsToCartesian(endPoint, reprap.GetGCodes().GetVisibleAxes(), totalAxes, returnedCoords);
-}
-
 // Dispatch this DDA to the move segment queue for execution.
 // This must not be called with interrupts disabled, because it calls Platform::EnableDrive.
 void DDA::Prepare(DDARing& ring,
@@ -1248,7 +745,7 @@ void DDA::Prepare(DDARing& ring,
 		// Don't allow the start of a move without input shaping (e.g. retraction/repriming) to overlap a move with input shaping
 		if (!params.useInputShaping && prev->UsesInputShaping())
 		{
-			prevEndTime += move.GetAxisShaper().GetShapingTime();
+			prevEndTime += move.GetShapingTimeClocks();
 		}
 		if ((int32_t)(prevEndTime - now) >= (int32_t)MoveTiming::AbsoluteMinimumPreparedTime)
 		{
@@ -1274,12 +771,6 @@ void DDA::Prepare(DDARing& ring,
 #if SUPPORT_CAN_EXPANSION
 		CanMotion::StartMovement();
 #endif
-		// Handle all drivers
-		if (flags.isLeadscrewAdjustmentMove)
-		{
-			move.EnableDrivers(Z_AXIS, false);			// ensure all Z motors are enabled
-		}
-
 		float extrusionFraction = 0.0;
 		AxesBitmap additionalAxisMotorsToEnable, axisMotorsEnabled;
 		afterPrepare.drivesMoving.Clear();
@@ -1290,31 +781,6 @@ void DDA::Prepare(DDARing& ring,
 		segFlags.nonPrintingMove = !flags.isPrintingMove;
 		for (size_t drive = 0; drive < MaxAxesPlusExtruders; ++drive)
 		{
-			if (flags.isLeadscrewAdjustmentMove)
-			{
-				// We don't set any bits in drivesMoving because setting the Z bit would be misleading, and setting individual driver bits isn't useful because it doesn't take account of CAN-connected drivers.
-				// For a leadscrew adjustment move, the first N elements of the direction vector are the adjustments to the N Z motors
-				const AxisDriversConfig& config = move.GetAxisDriversConfig(Z_AXIS);
-				if (drive < config.numDrivers)
-				{
-					const int32_t delta = lrintf(directionVector[drive] * totalDistance * move.DriveStepsPerMm(Z_AXIS));
-					const DriverId driver = config.driverNumbers[drive];
-					if (delta != 0)
-					{
-#if SUPPORT_CAN_EXPANSION
-						if (driver.IsRemote())
-						{
-							CanMotion::AddAxisMovement(params, driver, delta);
-						}
-						else		// we don't generate segments for leadscrew adjustment moves to remote drivers
-#endif
-						{
-							move.AddLinearSegments(driver.localDriver + MaxAxesPlusExtruders, afterPrepare.moveStartTime, params, (motioncalc_t)delta, segFlags);
-						}
-					}
-				}
-			}
-			else
 #if SUPPORT_ASYNC_MOVES
 			if (ownedDrives.IsBitSet(drive))
 #endif
@@ -1326,7 +792,7 @@ void DDA::Prepare(DDARing& ring,
 					if (delta != 0)
 					{
 						move.EnableDrivers(drive, false);
-						if (flags.continuousRotationShortcut && move.GetKinematics().IsContinuousRotationAxis(drive))
+						if (flags.continuousRotationShortcut && move.IsContinuousRotationAxis(drive))
 						{
 							// This is a continuous rotation axis, so we may have adjusted the move to cross the 180 degrees position
 							const int32_t stepsPerRotation = lrintf(360.0 * move.DriveStepsPerMm(drive));
@@ -1358,7 +824,7 @@ void DDA::Prepare(DDARing& ring,
 						}
 #endif
 						axisMotorsEnabled.SetBit(drive);
-						additionalAxisMotorsToEnable |= move.GetKinematics().GetControllingDrives(drive, flags.checkEndstops);
+						additionalAxisMotorsToEnable |= move.GetControllingDrives(drive);
 					}
 				}
 				else
@@ -1368,9 +834,9 @@ void DDA::Prepare(DDARing& ring,
 					{
 						const size_t extruder = LogicalDriveToExtruder(drive);
 
-						// Check for cold extrusion/retraction. Do this now because we can't read temperatures from within the step ISR, also this works for CAN-connected extruders.
-						// Don't check if it is a special move (indicated by flags.checkEndstops) because the 'tool' variable isn't valid for those moves
-						if (simMode != SimulationMode::off || flags.checkEndstops || Tool::ExtruderMovementAllowed(tool, directionVector[drive] > 0.0, extruder))
+						// Upstream checks here for cold extrusion, which needs the tool and its
+						// temperatures. DuetControlServer has both and refuses the move before it
+						// gets here, so there is nothing left to check.
 						{
 							move.EnableDrivers(drive, false);
 
@@ -1423,22 +889,12 @@ void DDA::Prepare(DDARing& ring,
 
 		afterPrepare.averageExtrusionSpeed = (extrusionFraction * totalDistance * (float)StepClockRate)/(float)clocksNeeded;
 
-		SetState(committed);															// must do this before we call CheckEndstops
-#if SUPPORT_SCANNING_PROBES
-		if (flags.scanningProbeMove)
-		{
-			move.PrepareScanningProbeDataCollection(*this, params);
-		}
-		else
-#endif
-		if (flags.checkEndstops)
-		{
-			// Before we send movement commands to remote drives, if any endstop switches we are monitoring are already set, make sure we don't start the motors concerned.
-			// This is especially important when using CAN-connected motors or endstops, because we rely on receiving "endstop changed" messages.
-			// Moves that check endstops are always run as isolated moves, so there can be no move in progress and the endstops must already be primed.
-			BasePriorityBooster booster(NvicPriorityStep);								// shut out the step interrupt
-			(void)move.CheckEndstops(false);											// this may modify pending CAN moves
-		}
+		SetState(committed);
+
+		// Upstream re-checks the endstops here, from the step interrupt's priority, so that a switch
+		// that is already triggered stops the motors concerned before they are told to move. Here the
+		// endstops belong to the expansion boards and to DCS: the boards stop their own drivers, and
+		// the ScheduleMove packet's CheckEndstops flag is what tells the controller to arm that.
 
 #if SUPPORT_CAN_EXPANSION
 		const uint32_t canClocksNeeded = CanMotion::FinishMovement(*this, afterPrepare.moveStartTime, simMode != SimulationMode::off);
@@ -1485,146 +941,6 @@ bool DDA::HasExpired() const noexcept
 				: (int32_t)(StepTimer::GetMovementTimerTicks() - GetMoveFinishTime()) >= 0;
 }
 
-// Take a unit positive-hyperquadrant vector, and return the factor needed to obtain
-// length of the vector as projected to touch box[].
-/*static*/ float DDA::VectorBoxIntersection(const float v[], const float box[]) noexcept
-{
-	// Generate a vector length that is guaranteed to exceed the size of the box
-	float magnitude = 0.0;
-	for (size_t d = 0; d < MaxAxesPlusExtruders; d++)
-	{
-		magnitude += box[d];
-	}
-
-	// Now reduce the length until every axis fits
-	for (size_t d = 0; d < MaxAxesPlusExtruders; d++)
-	{
-		if (magnitude * v[d] > box[d])
-		{
-			magnitude = box[d]/v[d];
-		}
-	}
-	return magnitude;
-}
-
-// Get the magnitude measured over all axes and extruders
-/*static*/ float DDA::Magnitude(const float v[]) noexcept
-{
-	float magnitudeSquared = 0.0;
-	for (size_t d = 0; d < MaxAxesPlusExtruders; d++)
-	{
-		magnitudeSquared += fsquare(v[d]);
-	}
-	return fastSqrtf(magnitudeSquared);
-}
-
-// Normalise a vector with dim1 dimensions to unit length over the specified axes, and also return its previous magnitude in dim2 dimensions
-/*static*/ float DDA::Normalise(float v[], AxesBitmap unitLengthAxes) noexcept
-{
-	const float magnitude = Magnitude(v, unitLengthAxes);
-	if (magnitude <= 0.0)
-	{
-		return 0.0;
-	}
-	Scale(v, 1.0/magnitude);
-	return magnitude;
-}
-
-// Normalise a vector to unit length over all axes
-/*static*/ float DDA::Normalise(float v[]) noexcept
-{
-	const float magnitude = Magnitude(v);
-	if (magnitude <= 0.0)
-	{
-		return 0.0;
-	}
-	Scale(v, 1.0/magnitude);
-	return magnitude;
-}
-
-// Make the direction vector unit-normal in the linear axes, taking account of axis mapping, and return the previous magnitude
-float DDA::NormaliseLinearMotion(AxesBitmap linearAxes) noexcept
-{
-	// First calculate the magnitude of the vector. If there is more than one X or Y axis, take an average of their movements (they should normally be equal).
-	float xMagSquared = 0.0, yMagSquared = 0.0, magSquared = 0.0;
-	unsigned int numXaxes = 0, numYaxes = 0;
-	const AxesBitmap xAxes = Tool::GetXAxes(tool);
-	const AxesBitmap yAxes = Tool::GetYAxes(tool);
-	const float *_ecv_array const dv = directionVector;
-	linearAxes.Iterate([&xMagSquared, &yMagSquared, &magSquared, &numXaxes, &numYaxes, xAxes, yAxes, dv](unsigned int axis, unsigned int count) noexcept
-						{
-							const float dv2 = fsquare(dv[axis]);
-							if (xAxes.IsBitSet(axis))
-							{
-								xMagSquared += dv2;
-								++numXaxes;
-							}
-							else if (yAxes.IsBitSet(axis))
-							{
-								yMagSquared += dv2;
-								++numYaxes;
-							}
-							else
-							{
-								magSquared += dv2;
-							}
-						}
-					  );
-	if (numXaxes > 1)
-	{
-		xMagSquared /= numXaxes;
-	}
-	if (numYaxes > 1)
-	{
-		yMagSquared /= numYaxes;
-	}
-	const float magnitude = fastSqrtf(xMagSquared + yMagSquared + magSquared);
-	if (magnitude <= 0.0)
-	{
-		return 0.0;
-	}
-
-	// Now normalise it
-	Scale(directionVector, 1.0/magnitude);
-	return magnitude;
-}
-
-// Return the magnitude of a vector over the specified orthogonal axes
-/*static*/ float DDA::Magnitude(const float v[], AxesBitmap axes) noexcept
-{
-	float magnitude = 0.0;
-	axes.Iterate([&magnitude, v](unsigned int axis, unsigned int count) noexcept { magnitude += fsquare(v[axis]); });
-	return fastSqrtf(magnitude);
-}
-
-// Multiply a vector by a scalar
-/*static*/ void DDA::Scale(float v[], float scale) noexcept
-{
-	for (size_t d = 0; d < MaxAxesPlusExtruders; d++)
-	{
-		v[d] *= scale;
-	}
-}
-
-// Move a vector into the positive hyperquadrant
-/*static*/ void DDA::Absolute(float v[], size_t dimensions) noexcept
-{
-	for (size_t d = 0; d < dimensions; d++)
-	{
-		v[d] = fabsf(v[d]);
-	}
-}
-
-// Return the proportion of the extrusion in the complete multi-segment move that has already been done.
-// The move was either not started or was aborted.
-float DDA::GetProportionDone() const noexcept
-{
-	// Get the proportion of extrusion already done at the start of this segment
-	return (filePos != noFilePosition && filePos == prev->filePos)
-									? prev->proportionDone
-										: 0.0;
-}
-
 // Free up this DDA, returning true if the lookahead underrun flag was set
 bool DDA::Free() noexcept
 {
@@ -1632,76 +948,7 @@ bool DDA::Free() noexcept
 	return flags.hadLookaheadUnderrun;
 }
 
-void DDA::LimitSpeedAndAcceleration(float maxSpeed, float maxAllowedAcceleration) noexcept
-{
-	if (requestedSpeed > maxSpeed)
-	{
-		requestedSpeed = maxSpeed;
-	}
-	if (maxAcceleration > maxAllowedAcceleration)
-	{
-		maxAcceleration = maxAllowedAcceleration;
-	}
-}
-
-float DDA::GetTotalExtrusionRate() const noexcept
-{
-	float fraction = 0.0;
-	for (size_t i = MaxAxesPlusExtruders - reprap.GetGCodes().GetNumExtruders(); i < MaxAxesPlusExtruders; ++i)
-	{
-		fraction += directionVector[i];
-	}
-	return fraction * InverseConvertSpeedToMmPerSec(topSpeed);
-}
-
 #if SUPPORT_LASER
-
-// Manage the laser power. Return the number of ticks until we should be called again, or portMAX_DELAY to be called at the start of the next move.
-uint32_t DDA::ManageLaserPower(Platform& p) const noexcept
-{
-	const uint32_t clocksMoving = StepTimer::GetMovementTimerTicks() - afterPrepare.moveStartTime;
-	if (clocksMoving >= clocksNeeded)			// this also covers the case of now < startTime
-	{
-		// Something has gone wrong with the timing. Set zero laser power, but try again soon.
-		p.SetLaserPwm(0);
-		return LaserPwmIntervalMillis;
-	}
-
-	const uint32_t clocksLeft = clocksNeeded - clocksMoving;
-	if (!flags.controlLaserOrIoBits || laserPwmOrIoBits.laserPwm == 0)
-	{
-		p.SetLaserPwm(0);
-		return (uint32_t)lrintf((float)clocksLeft * StepClocksToMillis);
-	}
-
-	const float accelSpeed = startSpeed + maxAcceleration * clocksMoving;
-	if (accelSpeed < topSpeed)
-	{
-		// Acceleration phase
-		const Pwm_t pwm = (Pwm_t)((accelSpeed/topSpeed) * laserPwmOrIoBits.laserPwm);
-		p.SetLaserPwm(pwm);
-		return LaserPwmIntervalMillis;
-	}
-
-	const float decelSpeed = endSpeed + maxAcceleration * clocksLeft;
-	if (decelSpeed < topSpeed)
-	{
-		// Deceleration phase
-		const Pwm_t pwm = (Pwm_t)((decelSpeed/topSpeed) * laserPwmOrIoBits.laserPwm);
-		p.SetLaserPwm(pwm);
-		return LaserPwmIntervalMillis;
-	}
-
-	// We must be in the constant speed phase
-	p.SetLaserPwm(laserPwmOrIoBits.laserPwm);
-	const uint32_t decelClocks = (uint32_t)((topSpeed - endSpeed)/maxAcceleration);
-	if (clocksLeft <= decelClocks)
-	{
-		return LaserPwmIntervalMillis;
-	}
-	const uint32_t clocksToDecel = clocksLeft - decelClocks;
-	return (uint32_t)lrintf((float)clocksToDecel * StepClocksToMillis) + LaserPwmIntervalMillis;
-}
 
 #endif
 
