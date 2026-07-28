@@ -1,0 +1,6 @@
+// Keep locally modified configuration files when packages are upgraded.
+// Without this unattended-upgrade skips every package whose conffile would prompt, and because the
+// DSF packages depend on each other by exact version, one skipped package holds back all of them.
+Dpkg::Options {
+	"--force-confold";
+};
