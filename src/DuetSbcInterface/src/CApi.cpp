@@ -2,6 +2,7 @@
 
 #include <Config/Configuration.h>
 #include <Movement/StepTimer.h>
+#include <SBC/MotionService.h>
 #include <SBC/SbcInterface.h>
 
 #include <algorithm>
@@ -16,9 +17,11 @@ struct DuetSbcHandle
 {
 	Config config;
 	SbcInterface interface;
+	Duet::Sbc::MotionService motion;
 	explicit DuetSbcHandle(const Config& cfg)
 		: config(cfg)
 		, interface(cfg)
+		, motion(interface)
 	{
 	}
 };
@@ -295,6 +298,90 @@ extern "C"
 	uint64_t DuetSbc_GetDroppedEvents(DuetSbcHandle* h)
 	{
 		return h != nullptr ? h->interface.Inbound().DroppedRecords() : 0;
+	}
+
+	int32_t DuetSbc_MotionConfigure(DuetSbcHandle* h, const void* config, int32_t length)
+	{
+		if (h == nullptr || config == nullptr || length != (int32_t)sizeof(Duet::Sbc::Motion::MotionConfig))
+		{
+			return 0;
+		}
+		Duet::Sbc::Motion::MotionConfig copy{};
+		std::memcpy(&copy, config, sizeof(copy));
+		Duet::Sbc::MotionService::Configure(copy);
+		return 1;
+	}
+
+	int32_t DuetSbc_MotionStart(DuetSbcHandle* h, int32_t rtPriority)
+	{
+		if (h == nullptr || !h->motion.Init())
+		{
+			return 0;
+		}
+		h->motion.Start(rtPriority);
+		return 1;
+	}
+
+	void DuetSbc_MotionStop(DuetSbcHandle* h)
+	{
+		if (h != nullptr)
+		{
+			h->motion.Stop();
+		}
+	}
+
+	int32_t DuetSbc_MotionCanAddMove(DuetSbcHandle* h, int32_t ring)
+	{
+		return (h != nullptr && ring >= 0 && h->motion.CanAddMove((unsigned int)ring)) ? 1 : 0;
+	}
+
+	int32_t DuetSbc_MotionSubmitMove(DuetSbcHandle* h, const void* moveParams, int32_t length)
+	{
+		if (h == nullptr || length <= 0)
+		{
+			return 0;
+		}
+		return h->motion.SubmitMove(moveParams, (size_t)length) ? 1 : 0;
+	}
+
+	int32_t DuetSbc_MotionGetMotorPositions(DuetSbcHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks)
+	{
+		if (h == nullptr || count <= 0)
+		{
+			return 0;
+		}
+		return (int32_t)h->motion.GetMotorPositions(stepsOut, (size_t)count, whenTicks);
+	}
+
+	void DuetSbc_MotionSetMotorPositions(DuetSbcHandle* h, uint32_t driveMask, const int32_t* positions, int32_t count)
+	{
+		if (h != nullptr && positions != nullptr && count > 0)
+		{
+			Duet::Sbc::MotionService::SetMotorPositions(driveMask, positions, (size_t)count);
+		}
+	}
+
+	void DuetSbc_MotionSetRingState(DuetSbcHandle* h, int32_t ring, int32_t shouldStartMove, int32_t waitingForEmpty)
+	{
+		if (h != nullptr && ring >= 0)
+		{
+			h->motion.SetRingState((unsigned int)ring, shouldStartMove != 0, waitingForEmpty != 0);
+		}
+	}
+
+	uint32_t DuetSbc_MotionGetScheduledMoves(DuetSbcHandle* h, int32_t ring)
+	{
+		return (h != nullptr && ring >= 0) ? h->motion.GetScheduledMoves((unsigned int)ring) : 0;
+	}
+
+	uint32_t DuetSbc_MotionGetCompletedMoves(DuetSbcHandle* h, int32_t ring)
+	{
+		return (h != nullptr && ring >= 0) ? h->motion.GetCompletedMoves((unsigned int)ring) : 0;
+	}
+
+	uint32_t DuetSbc_MotionGetSubmissionsDropped(DuetSbcHandle* h)
+	{
+		return (h != nullptr) ? h->motion.GetSubmissionsDropped() : 0;
 	}
 
 	uint32_t DuetSbc_GetStepClockTicks(DuetSbcHandle* h)

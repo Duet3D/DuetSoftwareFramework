@@ -79,6 +79,16 @@ namespace Duet::Sbc
 		// returns false rather than waiting when the ring is full - the caller stops preparing.
 		bool QueueScheduleMove(const uint8_t* packet, size_t length);
 
+		// Post an inbound event from a thread other than the interface thread. The ring serialises
+		// its producers with a mutex held only for the copy, so this does not wait on a transfer -
+		// but it does mean the interface thread can briefly wait on this one, which is why the
+		// motion thread's real-time priority has to stay below the interface thread's.
+		void PostEventFromOtherThread(InboundEventType type,
+									  const void* header,
+									  size_t headerLength,
+									  const void* tail = nullptr,
+									  size_t tailLength = 0);
+
 		// How much of the outbound ring is free, as a fraction. The motion engine stops preparing
 		// moves below a threshold rather than filling the ring and having a move refused halfway.
 		[[nodiscard]] bool OutboundHasHeadroom() const;

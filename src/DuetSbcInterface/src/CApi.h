@@ -121,6 +121,46 @@ extern "C"
 	// Events dropped because the inbound ring was full (i.e. the consumer could not keep up).
 	uint64_t DuetSbc_GetDroppedEvents(DuetSbcHandle* h);
 
+	// --- Motion ---
+	//
+	// The motion engine runs on its own thread inside the library. These calls hand moves to it and
+	// read back what it has done; none of them blocks on that thread, because the caller is a
+	// garbage-collected runtime and the motion thread must not wait on one.
+
+	// Machine description, pushed down from DuetControlServer. Mirrors Motion::MotionConfig; the
+	// managed side builds the bytes and this copies them, so the struct is not repeated here.
+	// Safe only while no move is in flight.
+	int32_t DuetSbc_MotionConfigure(DuetSbcHandle* h, const void* config, int32_t length);
+
+	// Start and stop the motion thread. `rtPriority` is a SCHED_FIFO priority, or 0 for the default
+	// scheduler; it must be below the interface thread's, so that a late transfer never waits on a
+	// move being prepared.
+	int32_t DuetSbc_MotionStart(DuetSbcHandle* h, int32_t rtPriority);
+	void DuetSbc_MotionStop(DuetSbcHandle* h);
+
+	// 1 if the ring has room for another move. Advisory: it may have room again a moment later.
+	int32_t DuetSbc_MotionCanAddMove(DuetSbcHandle* h, int32_t ring);
+
+	// Queue a move. `moveParams` is a MoveParamsHeader followed by its two arrays; see
+	// Motion/MoveParams.h and its C# mirror. Returns 1 if queued, 0 if the caller must retry.
+	int32_t DuetSbc_MotionSubmitMove(DuetSbcHandle* h, const void* moveParams, int32_t length);
+
+	// Motor positions in microsteps and the step-clock time they were taken at. Returns how many
+	// were written. Reads a snapshot rather than the live state, so it never stalls the motion
+	// thread and never tears.
+	int32_t DuetSbc_MotionGetMotorPositions(DuetSbcHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks);
+
+	// Force motor positions, after homing or a move that stopped early.
+	void DuetSbc_MotionSetMotorPositions(DuetSbcHandle* h, uint32_t driveMask, const int32_t* positions, int32_t count);
+
+	// State DCS decides from its own bookkeeping each cycle, stored for the motion thread to read.
+	void DuetSbc_MotionSetRingState(DuetSbcHandle* h, int32_t ring, int32_t shouldStartMove, int32_t waitingForEmpty);
+
+	uint32_t DuetSbc_MotionGetScheduledMoves(DuetSbcHandle* h, int32_t ring);
+	uint32_t DuetSbc_MotionGetCompletedMoves(DuetSbcHandle* h, int32_t ring);
+	// Submissions refused because the queue was full. Non-zero means DCS ignored a retry.
+	uint32_t DuetSbc_MotionGetSubmissionsDropped(DuetSbcHandle* h);
+
 	// --- Step clock ---
 	//
 	// The SBC has no step clock of its own: it models the controller's, from the MasterClock packet

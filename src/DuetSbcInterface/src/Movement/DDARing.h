@@ -61,12 +61,30 @@ public:
 	void SetLastEndpoints(LogicalDrivesBitmap logicalDrives, const int32_t *_ecv_array ep) noexcept;
 	void SetLastEndpoint(size_t drive, int32_t ep) noexcept;
 
+	// Called as each move retires, with the move id DuetControlServer gave it. The ring itself has
+	// no use for that id; this is how whoever queued the move learns it has finished, without
+	// polling, and without the ring knowing there is anyone to tell.
+	using RetirementCallback = void (*)(const DDA& dda, void *context) noexcept;
+	void SetRetirementCallback(RetirementCallback callback, void *context) noexcept
+	{
+		m_retirementCallback = callback;
+		m_retirementContext = context;
+	}
+
 	void RecordLookaheadError() noexcept { ++m_numLookaheadErrors; }						// Record a lookahead error
 	void Diagnostics(const StringRef& reply, unsigned int ringNumber) noexcept;
 
 	bool SetWaitingToEmpty() noexcept;
 
 private:
+	void ReportRetirement(const DDA& dda) const noexcept
+	{
+		if (m_retirementCallback != nullptr)
+		{
+			m_retirementCallback(dda, m_retirementContext);
+		}
+	}
+
 	[[nodiscard]] bool IsTimeToPrepareMove(uint32_t prepareAdvanceTime, uint32_t moveTimeLeft) const noexcept;
 	uint32_t PrepareMoves(DDA *firstUnpreparedMove, uint32_t prepareAdvanceTime, uint32_t moveTimeLeft, SimulationMode simulationMode) noexcept;
 #if SUPPORT_S_CURVE
@@ -83,6 +101,9 @@ private:
 #if SUPPORT_S_CURVE
 	MovementProfile plannedProfile;												// the profile planned for a collection of moves
 #endif
+
+	RetirementCallback m_retirementCallback = nullptr;
+	void *m_retirementContext = nullptr;
 
 	uint32_t m_scheduledMoves = 0;												// Number of moves scheduled in this ring
 	uint32_t m_completedMoves = 0;												// Number of moves completed in this ring

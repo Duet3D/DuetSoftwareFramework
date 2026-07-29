@@ -184,6 +184,12 @@ namespace Duet::Sbc
 		return m_outbound.BytesFree() >= kScheduleMoveHeadroom;
 	}
 
+	void SbcInterface::PostEventFromOtherThread(
+		InboundEventType type, const void* header, size_t headerLength, const void* tail, size_t tailLength)
+	{
+		PostEvent(type, header, headerLength, tail, tailLength);
+	}
+
 	bool SbcInterface::QueueScheduleMove(const uint8_t* packet, size_t length)
 	{
 		OutboundCommandHeader header{};

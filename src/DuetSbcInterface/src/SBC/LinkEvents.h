@@ -50,6 +50,13 @@ namespace Duet::Sbc
 		MalformedPacket = 9,
 		// UTF-8 message tail. Unrecoverable; the managed side terminates the link service
 		FatalError = 10,
+		// MoveCompletedEvent, no tail. A queued move finished executing
+		MoveCompleted = 11,
+		// MoveFailedEvent, no tail. A move was rejected or could not be sent
+		MoveFailed = 12,
+		// MotionEndpointsEvent + int32_t[] tail. Where the drives actually ended up after a move
+		// that could stop early, so DCS can resynchronise the shadow endpoints it plans against
+		MotionEndpoints = 13,
 	};
 
 	// Severity for InboundEventType::Log, mirroring the subset of MessageType DCS logs at.
@@ -144,6 +151,36 @@ namespace Duet::Sbc
 		// Raw packet bytes follow
 	};
 
+	struct MoveCompletedEvent
+	{
+		InboundEventHeader header;
+		uint32_t moveId;
+		uint32_t completedMoves; // the ring's running total, so a missed event is detectable
+		uint8_t ring;
+		uint8_t padding;
+		uint16_t padding2;
+	};
+
+	struct MoveFailedEvent
+	{
+		InboundEventHeader header;
+		uint32_t moveId;
+		uint8_t ring;
+		uint8_t error; // MovementError
+		uint16_t padding;
+	};
+
+	struct MotionEndpointsEvent
+	{
+		InboundEventHeader header;
+		uint32_t moveId;
+		uint32_t driveMask; // LogicalDrivesBitmap of the entries that follow
+		uint8_t ring;
+		uint8_t numDrives;
+		uint16_t padding;
+		// int32_t endPoint[numDrives] follows, in microsteps
+	};
+
 	// ---------------------------------------------------------------------------
 	// Outbound: managed -> native
 	// ---------------------------------------------------------------------------
@@ -225,6 +262,9 @@ namespace Duet::Sbc
 	static_assert(sizeof(RequestCompletedEvent) == 12, "RequestCompletedEvent must be 12 bytes");
 	static_assert(sizeof(LogEvent) == 8, "LogEvent must be 8 bytes");
 	static_assert(sizeof(MalformedPacketEvent) == 12, "MalformedPacketEvent must be 12 bytes");
+	static_assert(sizeof(MoveCompletedEvent) == 16, "MoveCompletedEvent must be 16 bytes");
+	static_assert(sizeof(MoveFailedEvent) == 12, "MoveFailedEvent must be 12 bytes");
+	static_assert(sizeof(MotionEndpointsEvent) == 16, "MotionEndpointsEvent must be 16 bytes");
 
 	static_assert(sizeof(OutboundCommandHeader) == 4, "OutboundCommandHeader must be 4 bytes");
 	static_assert(sizeof(MessageCommand) == 8, "MessageCommand must be 8 bytes");

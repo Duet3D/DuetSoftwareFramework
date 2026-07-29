@@ -141,6 +141,7 @@ uint32_t DDARing::Spin(uint32_t prepareAdvanceTime, SimulationMode simulationMod
 			{
 				m_simulationTime += (float)cdda->GetClocksNeeded() * (1.0 / stepClockRate);
 				++m_completedMoves;
+				ReportRetirement(*cdda);
 				if (cdda->Free())
 				{
 					++m_numLookaheadUnderruns;
@@ -159,6 +160,7 @@ uint32_t DDARing::Spin(uint32_t prepareAdvanceTime, SimulationMode simulationMod
 		while (cdda->IsCommitted() && cdda->HasExpired())
 		{
 			++m_completedMoves;
+			ReportRetirement(*cdda);
 			//debugPrintf("Retiring move: now=%" PRIu32 " start=%" PRIu32 " dur=%" PRIu32 "\n", StepTimer::GetMovementTimerTicks(), cdda->GetMoveStartTime(), cdda->GetClocksNeeded());
 			if (cdda->Free())
 			{
