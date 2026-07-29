@@ -27,7 +27,10 @@ Protocol source of truth:
   src/DuetControlServer/Link/Protocol/Shared/TransferResponse.cs
   src/DuetControlServer/Link/Protocol/Shared/PacketHeader.cs
   src/DuetControlServer/Link/Protocol/Shared/Consts.cs
+  lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h
 """
+
+import struct
 
 from saleae.analyzers import HighLevelAnalyzer, AnalyzerFrame, ChoicesSetting
 
@@ -42,6 +45,11 @@ HEADER_SIZE_V4 = 16            # protocol >= 4 (CRC32)
 HEADER_SIZE_LEGACY = 12       # protocol <  4 (CRC16)
 RESPONSE_SIZE = 4
 PACKET_HEADER_SIZE = 8
+
+# MessageFormats.h - ScheduleMove payload layout
+SCHEDULE_MOVE_HEADER_SIZE = 56
+SCHEDULE_MOVE_DRIVER_SIZE = 12
+MAX_SCHEDULE_MOVE_DRIVERS = 32
 
 # TransferResponse.cs
 RESPONSE_NAMES = {
@@ -91,6 +99,12 @@ MESSAGE_TYPE_FLAGS = [
     (0x40000000, "LogLow"), (0x80000000, "LogHigh"),
 ]
 
+# ScheduleMoveFlags (MessageFormats.h) - bits of ScheduleMoveHeader::flags
+SCHEDULE_MOVE_FLAGS = [
+    (0x01, "InputShaping"), (0x02, "PressureAdvance"),
+    (0x04, "CheckEndstops"), (0x08, "LastPacket"),
+]
+
 # CanStatus.cs - reason a CAN reply was delivered
 CAN_STATUS = {0: "Ok", 1: "Timeout", 2: "BusError", 3: "NoBuffer", 4: "Overflow"}
 
@@ -137,13 +151,22 @@ def _message_flags(value):
     return "|".join(dests) if dests else "NoDestination"
 
 
+def _schedule_move_flags(value):
+    names = [name for bit, name in SCHEDULE_MOVE_FLAGS if value & bit]
+    unknown = value & ~sum(bit for bit, _ in SCHEDULE_MOVE_FLAGS)
+    if unknown:
+        names.append("0x%02X" % unknown)
+    return "|".join(names) if names else "none"
+
+
 # --- Per-request payload header parsers -----------------------------------
 #
 # Each parser reads the payload header that immediately follows an 8-byte
-# packet header and returns (size, type_name, detail_string). `off` points at
-# the first payload byte. Structs are in SbcRequests/, FirmwareRequests/ and
-# Shared/. Requests without a defined payload header (EmergencyStop, Reset,
-# WriteIap, StartIap, ScheduleMove, MotionStopped, ResendPacket) have no parser.
+# packet header and returns (size, type_name, detail_string), or a list of such
+# tuples for consecutive sub-structs. `off` points at the first payload byte.
+# Structs are in SbcRequests/, FirmwareRequests/, Shared/ and MessageFormats.h.
+# Requests without a defined payload header (EmergencyStop, Reset, WriteIap,
+# StartIap, MotionStopped, ResendPacket) have no parser.
 
 def _p_config_can(buf, off):
     return 4, "ConfigCanHeader", "ch=%d fd=%d rateMul=%d" % (
@@ -166,6 +189,33 @@ def _p_can_response(buf, off):
         buf[off + 6], buf[off + 7], CAN_STATUS.get(buf[off + 8], str(buf[off + 8])))
 
 
+def _p_schedule_move(buf, off):
+    """ScheduleMoveHeader (56 bytes) plus the ScheduleMoveDriver records after it."""
+    num_drivers = buf[off + 52]
+    flags = buf[off + 53]
+    out = [(SCHEDULE_MOVE_HEADER_SIZE, "ScheduleMoveHeader",
+            "move=%d drivers=%d flags=%s when=%d clocks=%d/%d/%d "
+            "dist=%.3f(accel %.3f, decel from %.3f) "
+            "v=%.5f/%.5f/%.5f a=%.3e d=%.3e" % (
+                _u32(buf, off + 48), num_drivers, _schedule_move_flags(flags),
+                _u32(buf, off), _u32(buf, off + 4), _u32(buf, off + 8), _u32(buf, off + 12),
+                _f32(buf, off + 24), _f32(buf, off + 28), _f32(buf, off + 32),
+                _f32(buf, off + 36), _f32(buf, off + 40), _f32(buf, off + 44),
+                _f32(buf, off + 16), _f32(buf, off + 20)))]
+
+    driver_off = off + SCHEDULE_MOVE_HEADER_SIZE
+    for _ in range(min(num_drivers, MAX_SCHEDULE_MOVE_DRIVERS)):
+        is_extruder = buf[driver_off + 2]
+        amount = ("extrusion=%.4f" % _f32(buf, driver_off + 8) if is_extruder
+                  else "steps=%d" % _i32(buf, driver_off + 4))
+        out.append((SCHEDULE_MOVE_DRIVER_SIZE, "ScheduleMoveDriver",
+                    "board=%d driver=%d %s%s" % (
+                        buf[driver_off], buf[driver_off + 1], amount,
+                        " (extruder)" if is_extruder else "")))
+        driver_off += SCHEDULE_MOVE_DRIVER_SIZE
+    return out
+
+
 def _p_message(buf, off):
     return 8, "MessageHeader", "type=%s len=%d" % (
         _message_flags(_u32(buf, off)), _u16(buf, off + 4))
@@ -185,6 +235,7 @@ PAYLOAD_PARSERS = {
     # SBC -> controller (MOSI, SbcRequests)
     (True, 2): _p_config_can,       # ConfigCAN
     (True, 3): _p_enable_can,       # EnableCAN
+    (True, 4): _p_schedule_move,    # ScheduleMove
     (True, 5): _p_send_can,         # SendCANMessage
     (True, 8): _p_message,          # Message
     # controller -> SBC (MISO, FirmwareRequests)
@@ -201,6 +252,14 @@ def _u16(buf, off):
 
 def _u32(buf, off):
     return buf[off] | (buf[off + 1] << 8) | (buf[off + 2] << 16) | (buf[off + 3] << 24)
+
+
+def _i32(buf, off):
+    return struct.unpack_from("<i", buf, off)[0]
+
+
+def _f32(buf, off):
+    return struct.unpack_from("<f", buf, off)[0]
 
 
 def _pad4(n):
@@ -413,14 +472,25 @@ class Hla(HighLevelAnalyzer):
             payload_off = offset + PACKET_HEADER_SIZE
             if parser is not None and length > 0:
                 try:
-                    size, name, detail = parser(buf, payload_off)
-                except IndexError:
-                    size = 0
-                if 0 < size <= length and payload_off + size <= data_length:
-                    ann.append((payload_off, payload_off + size, "subheader", {
+                    parsed = parser(buf, payload_off)
+                except (IndexError, struct.error):
+                    parsed = []
+                if isinstance(parsed, tuple):
+                    parsed = [parsed]
+
+                # Sub-structs are laid out back to back; stop at the first one
+                # that would run past the packet payload or the captured data.
+                sub_off = payload_off
+                for (size, name, detail) in parsed:
+                    if not 0 < size <= payload_off + length - sub_off:
+                        break
+                    if sub_off + size > data_length:
+                        break
+                    ann.append((sub_off, sub_off + size, "subheader", {
                         "name": name,
                         "detail": detail,
                     }))
+                    sub_off += size
 
             offset += PACKET_HEADER_SIZE + _pad4(length)
             count += 1

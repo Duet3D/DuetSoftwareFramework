@@ -19,6 +19,7 @@ of every transfer:
   | --------- | ------- | ---------------------- |
   | MOSI | `ConfigCAN` | `ConfigCanHeader` (channel, useFd, rateMul) |
   | MOSI | `EnableCAN` | `EnableCanHeader` (channel, enable) |
+  | MOSI | `ScheduleMove` | `ScheduleMoveHeader` (moveId, driver count, flags, start time, phase durations, distances, speeds, accelerations) plus every `ScheduleMoveDriver` that follows it |
   | MOSI | `SendCANMessage` | `SendCanMessageHeader` (txToken, CAN type, replyType, len, dst, isResponse) |
   | MOSI | `Message` | `MessageHeader` (destination flags, length) |
   | MISO | `CodeBufferUpdate` | `CodeBufferUpdateHeader` (bufferSpace) |
@@ -27,12 +28,15 @@ of every transfer:
   | MISO | `CANResponse` | `CanResponseHeader` (txToken, CAN type, len, src, flags, status) |
 
   CAN message types (`CanMessageType`), message destination flags
-  (`MessageTypeFlags`) and CAN statuses (`CanStatus`) are decoded to their names.
+  (`MessageTypeFlags`), CAN statuses (`CanStatus`) and schedule-move flags
+  (`ScheduleMoveFlags`) are decoded to their names.
 
 The variable data *after* each payload header (CAN payload bytes, message text,
-etc.) is left undecoded, which keeps the annotation readable. Requests without a
-fixed payload header (`EmergencyStop`, `Reset`, `WriteIap`, `StartIap`,
-`ScheduleMove`, `MotionStopped`, `ResendPacket`) show just the packet header.
+etc.) is left undecoded, which keeps the annotation readable. `ScheduleMove` is
+the exception: its `ScheduleMoveDriver` records are a fixed-size array, so each
+one gets its own annotation. Requests without a fixed payload header
+(`EmergencyStop`, `Reset`, `WriteIap`, `StartIap`, `MotionStopped`,
+`ResendPacket`) show just the packet header.
 
 Both directions are decoded from the single full-duplex capture:
 
@@ -106,6 +110,8 @@ header / response / packet is listed.
     `CanResponseHeader`, `CodeBufferUpdateHeader`, `MasterClockHeader`) and
     `Shared/MessageHeader.cs`, plus the `CanMessageType`, `MessageTypeFlags` and
     `CanStatus` enums used to name their fields
+  - `lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h` for
+    `ScheduleMoveHeader`, `ScheduleMoveDriver` and `ScheduleMoveFlags`
 - If a capture starts in the middle of a data phase (no preceding header seen),
   the analyzer walks packet headers until the buffer is consumed instead of using
   the header's `numPackets`/`dataLength`.
