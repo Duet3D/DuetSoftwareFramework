@@ -1,10 +1,11 @@
 using System;
 using System.Runtime.InteropServices;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Motion;
-using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
 using NUnit.Framework;
+using OmDriverId = DuetAPI.Utility.DriverId;
 
 namespace UnitTests.Motion;
 
@@ -22,22 +23,78 @@ public class MoveBuilderTests
     private const int NumDrives = MotionLimits.MaxAxesPlusExtruders;
     private const float StepClockRate = MotionLimits.StepClockRate;
 
-    private static MachineConfig CartesianMachine()
+    /// <summary>
+    /// A three-axis Cartesian machine with one extruder, described the way config.g would
+    /// </summary>
+    /// <remarks>
+    /// Built in the object model, because that is where the configuration lives. Speeds are mm/min
+    /// there and accelerations mm/s^2, which is what the M-codes that set them use
+    /// </remarks>
+    private static Move CartesianMachine(string geometry = "cartesian")
     {
-        MachineConfig config = new();
-        AxisConfig[] axes =
-        [
-            new() { Letter = 'X', StepsPerMm = 80.0f, MaxFeedrateMmPerSec = 300.0f, AccelerationMmPerSecSquared = 1000.0f, Drivers = [new DriverId(0, 0)] },
-            new() { Letter = 'Y', StepsPerMm = 80.0f, MaxFeedrateMmPerSec = 300.0f, AccelerationMmPerSecSquared = 1000.0f, Drivers = [new DriverId(0, 1)] },
-            new() { Letter = 'Z', StepsPerMm = 400.0f, MaxFeedrateMmPerSec = 10.0f, AccelerationMmPerSecSquared = 100.0f, Drivers = [new DriverId(0, 2)] }
-        ];
-        ExtruderConfig[] extruders =
-        [
-            new() { StepsPerMm = 400.0f, MaxFeedrateMmPerSec = 60.0f, AccelerationMmPerSecSquared = 2000.0f, Driver = new DriverId(0, 3) }
-        ];
-        config.Configure(axes, extruders, CoreKinematicsEngine.TryCreate("cartesian")!);
-        return config;
+        Move move = new()
+        {
+            PrintingAcceleration = 10000.0f,
+            TravelAcceleration = 10000.0f,
+            MinimumMovementSpeed = 0.5f
+        };
+
+        AddAxis(move, 'X', stepsPerMm: 80.0f, speedMmPerMin: 300.0f * 60.0f, acceleration: 1000.0f, board: 0, port: 0);
+        AddAxis(move, 'Y', stepsPerMm: 80.0f, speedMmPerMin: 300.0f * 60.0f, acceleration: 1000.0f, board: 0, port: 1);
+        AddAxis(move, 'Z', stepsPerMm: 400.0f, speedMmPerMin: 10.0f * 60.0f, acceleration: 100.0f, board: 0, port: 2);
+
+        Extruder extruder = new()
+        {
+            StepsPerMm = 400.0f,
+            Speed = 60.0f * 60.0f,
+            Acceleration = 2000.0f,
+            Driver = new OmDriverId(0, 3)
+        };
+        move.Extruders.Add(extruder);
+
+        if (geometry != "cartesian")
+        {
+            move.Kinematics = MakeCoreKinematics(geometry);
+        }
+        return move;
     }
+
+    private static void AddAxis(Move move, char letter, float stepsPerMm, float speedMmPerMin, float acceleration, int board, int port)
+    {
+        Axis axis = new()
+        {
+            Letter = letter,
+            StepsPerMm = stepsPerMm,
+            Speed = speedMmPerMin,
+            Acceleration = acceleration,
+            Visible = true
+        };
+        axis.Drivers.Add(new OmDriverId(board, port));
+        move.Axes.Add(axis);
+    }
+
+    /// <summary>
+    /// The object model kinematics for one of the named core geometries
+    /// </summary>
+    private static CoreKinematics MakeCoreKinematics(string name)
+    {
+        float[][] inverse = name switch
+        {
+            "corexy" => [[1, 1, 0], [1, -1, 0], [0, 0, 1]],
+            "corexz" => [[1, 0, 1], [0, 1, 0], [1, 0, -1]],
+            _ => [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+        };
+
+        CoreKinematics kinematics = new();
+        kinematics.InverseMatrix.Clear();
+        foreach (float[] row in inverse)
+        {
+            kinematics.InverseMatrix.Add(row);
+        }
+        return kinematics;
+    }
+
+    private static MoveBuilder NewBuilder(Move move) => new(MotionParameters.FromObjectModel(move));
 
     /// <summary>The submission decoded back into the pieces the native side reads</summary>
     private sealed record Submission(MoveParamsHeader Header, int[] EndPoints, float[] DirectionVector);
@@ -74,7 +131,7 @@ public class MoveBuilderTests
     [Test]
     public void AMoveInXProducesTheExpectedEndpointAndDirection()
     {
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         (MoveBuildResult result, Submission? move) = Build(builder, LinearMove(1, 10.0f, 0.0f, 0.0f));
 
         Assert.That(result.Error, Is.EqualTo(NativeMovementError.Ok));
@@ -93,7 +150,7 @@ public class MoveBuilderTests
         // The endpoints are absolute, and the native planner takes the difference against the
         // previous move. Getting this wrong is not a small error - it moves the machine by the whole
         // distance again
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
 
         Build(builder, LinearMove(1, 10.0f, 0.0f, 0.0f));
         (_, Submission? second) = Build(builder, LinearMove(2, 25.0f, 0.0f, 0.0f));
@@ -108,7 +165,7 @@ public class MoveBuilderTests
     [Test]
     public void ADiagonalMoveHasTheRightLengthAndDirection()
     {
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         (_, Submission? move) = Build(builder, LinearMove(1, 3.0f, 4.0f, 0.0f));
 
         Assert.Multiple(() =>
@@ -122,7 +179,7 @@ public class MoveBuilderTests
     [Test]
     public void AMoveThatGoesNowhereIsReportedAsNoMovement()
     {
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         Build(builder, LinearMove(1, 10.0f, 0.0f, 0.0f));
 
         (MoveBuildResult result, _) = Build(builder, LinearMove(2, 10.0f, 0.0f, 0.0f));
@@ -135,7 +192,7 @@ public class MoveBuilderTests
     {
         // Otherwise the rounding accumulates: a run of moves each too small to make a step would
         // never move the machine even though together they cover millimetres
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
 
         for (int i = 1; i <= 100; i++)
         {
@@ -151,7 +208,7 @@ public class MoveBuilderTests
     [Test]
     public void TheFeedRateIsConvertedIntoStepClocks()
     {
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         (_, Submission? move) = Build(builder, LinearMove(1, 10.0f, 0.0f, 0.0f, feedRateMmPerSec: 50.0f));
 
         Assert.That(move!.Header.RequestedSpeed, Is.EqualTo(50.0f / StepClockRate).Within(1e-9f));
@@ -161,7 +218,7 @@ public class MoveBuilderTests
     public void TheFeedRateIsCappedByTheSlowestAxisInvolved()
     {
         // Z is configured for 10mm/sec, so a Z move cannot run at the 50mm/sec asked for
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         (_, Submission? move) = Build(builder, LinearMove(1, 0.0f, 0.0f, 5.0f, feedRateMmPerSec: 50.0f));
 
         Assert.That(move!.Header.RequestedSpeed, Is.EqualTo(10.0f / StepClockRate).Within(1e-9f));
@@ -172,7 +229,7 @@ public class MoveBuilderTests
     {
         // X and Y are limited independently, so a 45-degree move is allowed to be sqrt(2) times
         // faster than either axis on its own
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         (_, Submission? move) = Build(builder, LinearMove(1, 100.0f, 100.0f, 0.0f, feedRateMmPerSec: 1000.0f));
 
         float expected = 300.0f * MathF.Sqrt(2.0f) / StepClockRate;
@@ -182,10 +239,7 @@ public class MoveBuilderTests
     [Test]
     public void ACoreXyDiagonalMoveIsLimitedByTheSharedMotors()
     {
-        MachineConfig config = CartesianMachine();
-        config.Configure(config.Axes, config.Extruders, CoreKinematicsEngine.TryCreate("corexy")!);
-
-        MoveBuilder builder = new(config);
+        MoveBuilder builder = NewBuilder(CartesianMachine("corexy"));
         (_, Submission? move) = Build(builder, LinearMove(1, 100.0f, 100.0f, 0.0f, feedRateMmPerSec: 1000.0f));
 
         // Moving X and Y together at 45 degrees turns motor A at sqrt(2) times the move speed, so
@@ -197,10 +251,7 @@ public class MoveBuilderTests
     [Test]
     public void CoreXyEndpointsDriveBothMotors()
     {
-        MachineConfig config = CartesianMachine();
-        config.Configure(config.Axes, config.Extruders, CoreKinematicsEngine.TryCreate("corexy")!);
-
-        MoveBuilder builder = new(config);
+        MoveBuilder builder = NewBuilder(CartesianMachine("corexy"));
         (_, Submission? move) = Build(builder, LinearMove(1, 10.0f, 0.0f, 0.0f));
 
         Assert.Multiple(() =>
@@ -214,7 +265,7 @@ public class MoveBuilderTests
     [Test]
     public void AnExtrudingMoveIsFlaggedAsPrinting()
     {
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         RawMove move = LinearMove(1, 10.0f, 0.0f, 0.0f);
         move.Coords[NumDrives - 1] = 0.5f;              // the first extruder
 
@@ -234,7 +285,7 @@ public class MoveBuilderTests
     {
         // Requires forward extrusion, so that wipe-while-retracting does not count as printing and
         // pick up the printing jerk limits
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         RawMove move = LinearMove(1, 10.0f, 0.0f, 0.0f);
         move.Coords[NumDrives - 1] = -0.5f;
 
@@ -252,7 +303,7 @@ public class MoveBuilderTests
     {
         // The feed rate applies to the linear movement, so the extruder must not make the move look
         // longer and be run proportionately slow
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         RawMove move = LinearMove(1, 10.0f, 0.0f, 0.0f);
         move.Coords[NumDrives - 1] = 3.0f;
 
@@ -269,7 +320,7 @@ public class MoveBuilderTests
     [Test]
     public void AnExtruderOnlyMoveUsesTheExtrusionAsItsDistance()
     {
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         RawMove move = new() { MoveId = 1, FeedRateMmPerSec = 10.0f };
         move.Coords[NumDrives - 1] = 2.0f;
 
@@ -287,7 +338,7 @@ public class MoveBuilderTests
     [Test]
     public void TheAccelerationIsCappedByTheSlowestDriveInvolved()
     {
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         (_, Submission? move) = Build(builder, LinearMove(1, 0.0f, 0.0f, 5.0f));
 
         // Z accelerates at 100mm/sec^2
@@ -298,11 +349,11 @@ public class MoveBuilderTests
     [Test]
     public void M204CapsTravelAndPrintingMovesSeparately()
     {
-        MachineConfig config = CartesianMachine();
-        config.MaxTravelAccelerationMmPerSecSquared = 500.0f;
-        config.MaxPrintingAccelerationMmPerSecSquared = 200.0f;
+        Move machine = CartesianMachine();
+        machine.TravelAcceleration = 500.0f;
+        machine.PrintingAcceleration = 200.0f;
 
-        MoveBuilder builder = new(config);
+        MoveBuilder builder = NewBuilder(machine);
         float clockSquared = StepClockRate * StepClockRate;
 
         (_, Submission? travel) = Build(builder, LinearMove(1, 10.0f, 0.0f, 0.0f));
@@ -318,7 +369,7 @@ public class MoveBuilderTests
     public void AnEndstopMoveIsIsolated()
     {
         // It may stop short, so it must not be melded with its neighbours
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         RawMove move = LinearMove(1, 10.0f, 0.0f, 0.0f);
         move.CheckEndstops = true;
 
@@ -336,7 +387,7 @@ public class MoveBuilderTests
     {
         // What happens after an endstop move stops short. The next move is planned as a delta from
         // these endpoints, so continuing from the planned ones would move by the whole discrepancy
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         Build(builder, LinearMove(1, 100.0f, 0.0f, 0.0f));
 
         int[] actual = new int[NumDrives];
@@ -357,7 +408,7 @@ public class MoveBuilderTests
     public void SettingAnAxisPositionDoesNotMoveAnything()
     {
         // G92: the machine has not moved, but the coordinate that describes it has changed
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         Build(builder, LinearMove(1, 10.0f, 0.0f, 0.0f));
 
         builder.SetAxisPosition(0, 0.0f);
@@ -369,7 +420,7 @@ public class MoveBuilderTests
     [Test]
     public void ADriveTheMoveDoesNotOwnIsLeftWhereItWas()
     {
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         Build(builder, LinearMove(1, 10.0f, 5.0f, 0.0f));
 
         RawMove move = LinearMove(2, 20.0f, 15.0f, 0.0f);
@@ -387,7 +438,7 @@ public class MoveBuilderTests
     [Test]
     public void APositionTooFarFromTheOriginIsRejectedWithoutAdvancingAnything()
     {
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         Build(builder, LinearMove(1, 10.0f, 0.0f, 0.0f));
 
         (MoveBuildResult bad, _) = Build(builder, LinearMove(2, 1.0e9f, 0.0f, 0.0f));
@@ -404,7 +455,7 @@ public class MoveBuilderTests
     {
         // The native lookahead and preparation index densely by logical drive, so every drive is
         // present whether or not it moves
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         (MoveBuildResult result, Submission? move) = Build(builder, LinearMove(1, 10.0f, 0.0f, 0.0f));
 
         Assert.Multiple(() =>
@@ -419,7 +470,7 @@ public class MoveBuilderTests
     [Test]
     public void TheMoveIdIsCarriedThrough()
     {
-        MoveBuilder builder = new(CartesianMachine());
+        MoveBuilder builder = NewBuilder(CartesianMachine());
         (_, Submission? move) = Build(builder, LinearMove(4242, 10.0f, 0.0f, 0.0f));
         Assert.That(move!.Header.MoveId, Is.EqualTo(4242u));
     }

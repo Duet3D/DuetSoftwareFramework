@@ -48,7 +48,7 @@ namespace DuetControlServer.Link;
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="logger">Logger</param>
 /// <param name="settings">Settings</param>
-public sealed class LinkService(
+internal sealed class LinkService(
     Channel.Manager channels,
     EventLogger eventLogger,
     JobProcessor jobProcessor,

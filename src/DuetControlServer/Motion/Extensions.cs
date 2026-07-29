@@ -24,6 +24,9 @@ public static partial class ServiceCollectionExtensions
             // Shared between the link dispatcher, which records what the engine reports, and the
             // motion service, which acts on it
             .AddSingleton<MotionTracker>()
+            // Where G-codes become queued moves. Shared with the code handlers, which is the whole
+            // point of it: every move has to be built in the order it was commanded
+            .AddSingleton<MovePlanner>()
             .AddHostedService<MotionService>();
     }
 }

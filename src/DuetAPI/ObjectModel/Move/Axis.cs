@@ -183,7 +183,7 @@ public partial class Axis : ModelObject, IStaticModelObject
     private bool? _phaseStep;
 
     /// <summary>
-    /// Motor jerk during the current print only (in mm/s)
+    /// Motor jerk during the current print only (in mm/min)
     /// </summary>
     public float PrintingJerk
     {
@@ -191,6 +191,31 @@ public partial class Axis : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _printingJerk, value);
     }
     private float _printingJerk = 15;
+
+    /// <summary>
+    /// Whether this axis rotates rather than translates, so its units are degrees
+    /// </summary>
+    /// <remarks>
+    /// A rotational axis takes no part in the linear distance a move covers, so the feed rate does
+    /// not apply to it unless the move is rotational only. Set by the R parameter of M584
+    /// </remarks>
+    public bool Rotational
+    {
+        get => _rotational;
+        set => SetPropertyValue(ref _rotational, value);
+    }
+    private bool _rotational;
+
+    /// <summary>
+    /// Whether this axis wraps at 360 degrees, so a move may take the short way round
+    /// </summary>
+    /// <remarks>Only meaningful when <see cref="Rotational"/> is set</remarks>
+    public bool ContinuousRotation
+    {
+        get => _continuousRotation;
+        set => SetPropertyValue(ref _continuousRotation, value);
+    }
+    private bool _continuousRotation;
 
     /// <summary>
     /// Reduced accelerations used by Z probing and stall homing moves (in mm/s^2)

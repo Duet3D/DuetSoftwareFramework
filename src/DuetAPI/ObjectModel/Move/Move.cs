@@ -64,6 +64,34 @@ public partial class Move : ModelObject, IStaticModelObject
     public MotorsIdleControl Idle { get; } = new MotorsIdleControl();
 
     /// <summary>
+    /// How aggressively moves may be melded into each other (M566 P)
+    /// </summary>
+    /// <remarks>
+    /// 0 allows a junction speed only between moves of the same kind - both printing, or both
+    /// travel; higher values allow melding across those boundaries. Read by the planner's lookahead
+    /// </remarks>
+    public int JerkPolicy
+    {
+        get => _jerkPolicy;
+        set => SetPropertyValue(ref _jerkPolicy, value);
+    }
+    private int _jerkPolicy;
+
+    /// <summary>
+    /// Slowest a move is allowed to run (in mm/s)
+    /// </summary>
+    /// <remarks>
+    /// A floor rather than a preference: the planner's timing arithmetic overflows for a move slow
+    /// enough to take more than about 2^31 step clocks
+    /// </remarks>
+    public float MinimumMovementSpeed
+    {
+        get => _minimumMovementSpeed;
+        set => SetPropertyValue(ref _minimumMovementSpeed, value);
+    }
+    private float _minimumMovementSpeed = 0.5F;
+
+    /// <summary>
     /// List of configured keep-out zones
     /// </summary>
     public StaticModelCollection<KeepoutZone> Keepout { get; } = [];

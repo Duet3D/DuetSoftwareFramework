@@ -1,0 +1,220 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using DuetControlServer.Link;
+using DuetControlServer.Link.Native;
+using DuetControlServer.Motion.Native;
+using Microsoft.Extensions.Logging;
+
+namespace DuetControlServer.Motion;
+
+/// <summary>
+/// How a move submission ended
+/// </summary>
+internal enum MoveSubmitResult
+{
+    /// <summary>Queued for execution</summary>
+    Queued,
+
+    /// <summary>Nothing to do: the move rounds to no movement</summary>
+    NoMovement,
+
+    /// <summary>The engine has no room; the caller should retry</summary>
+    Busy,
+
+    /// <summary>The move could not be built</summary>
+    Rejected
+}
+
+/// <summary>
+/// Where a G-code becomes a queued move
+/// </summary>
+/// <remarks>
+/// <para>
+/// This owns the three things a move needs and the ordering between them: the machine description,
+/// the builder that holds where the last move left the machine, and the user-facing interpreter
+/// state. Moves must be built in the order they were commanded, because each one is planned as a
+/// delta from the one before, so everything here happens under one lock.
+/// </para>
+/// <para>
+/// There is deliberately no queue of built moves. The native side already has one - a lock-free
+/// submission ring sized for a few thousand moves - and adding another here would only mean the same
+/// moves waiting in two places, with this side's copy invisible to the diagnostics that report how
+/// far ahead the engine is running
+/// </para>
+/// </remarks>
+/// <param name="linkInterface">Link interface</param>
+/// <param name="motionTracker">What the engine has reported about submitted moves</param>
+/// <param name="model">Object model, which is where the machine configuration lives</param>
+/// <param name="logger">Logger</param>
+internal sealed class MovePlanner(
+    LinkInterface linkInterface,
+    MotionTracker motionTracker,
+    Model.ObjectModel model,
+    ILogger<MovePlanner> logger)
+{
+    private readonly Lock _lock = new();
+    private readonly byte[] _buffer = new byte[MoveParams.Length(MotionLimits.MaxAxesPlusExtruders)];
+    private readonly int[] _resyncBuffer = new int[MotionLimits.MaxAxesPlusExtruders];
+    private uint _nextMoveId = 1;
+
+    /// <summary>
+    /// The machine being planned for, as last read from the object model
+    /// </summary>
+    /// <remarks>
+    /// A derived snapshot, not a second copy of the configuration: the object model is authoritative
+    /// and <see cref="ReconfigureAsync"/> is what brings this back into step with it
+    /// </remarks>
+    public MotionParameters Parameters { get; private set; } = MotionParameters.CreateDefault();
+
+    /// <summary>Where the last move left the machine, and the state that carries between moves</summary>
+    public MoveBuilder Builder { get; }  = new(MotionParameters.CreateDefault());
+
+    /// <summary>
+    /// Take the lock that orders move building
+    /// </summary>
+    /// <returns>The lock scope</returns>
+    /// <remarks>
+    /// Callers that need to read the state and then build a move from it must hold this across both,
+    /// or another channel's move can be built in between and the delta is measured from the wrong
+    /// place
+    /// </remarks>
+    public Lock.Scope Lock() => _lock.EnterScope();
+
+    /// <summary>
+    /// Re-read the machine description from the object model and push it down to the engine
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if the engine accepted it</returns>
+    /// <remarks>
+    /// Only safe while nothing is in flight: steps per mm changing under a queued move would make the
+    /// endpoints it was planned against mean something different from what the drives will do. The
+    /// caller is responsible for having drained the ring first
+    /// </remarks>
+    public async ValueTask<bool> ReconfigureAsync(CancellationToken cancellationToken = default)
+    {
+        MotionParameters parameters;
+        byte[] configBuffer = new byte[MotionConfig.SerializedLength];
+        int length;
+
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            parameters = MotionParameters.FromObjectModel(model.Move);
+            length = parameters.ToMotionConfig(model.Move).Serialize(configBuffer);
+        }
+
+        using (_lock.EnterScope())
+        {
+            if (!linkInterface.Native.ConfigureMotion(configBuffer.AsSpan(0, length)))
+            {
+                logger.LogError("The motion engine rejected the machine description");
+                return false;
+            }
+
+            Parameters = parameters;
+            Builder.Reconfigure(parameters);
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Build a move and hand it to the engine
+    /// </summary>
+    /// <param name="move">The move to queue</param>
+    /// <returns>What became of it</returns>
+    /// <remarks>
+    /// Busy is not a failure: the engine's ring is full, which is the normal state when moves are
+    /// being executed faster than they can be run. The caller waits and tries the same move again
+    /// </remarks>
+    public MoveSubmitResult QueueMove(RawMove move)
+    {
+        using (_lock.EnterScope())
+        {
+            // Endpoints reported after a move that stopped short have to be applied before the next
+            // move is planned, because that move is a delta from them
+            ApplyPendingResync(move.RingNumber);
+
+            if (!linkInterface.Native.CanAddMove(move.RingNumber))
+            {
+                return MoveSubmitResult.Busy;
+            }
+
+            if (move.MoveId == 0)
+            {
+                move.MoveId = NextMoveId();
+            }
+
+            MoveBuildResult built = Builder.Build(move, _buffer);
+            switch (built.Error)
+            {
+                case NativeMovementError.NoMovement:
+                    return MoveSubmitResult.NoMovement;
+
+                case NativeMovementError.Ok:
+                    break;
+
+                default:
+                    logger.LogError("Move {MoveId} could not be built: {Error}", move.MoveId, built.Error);
+                    return MoveSubmitResult.Rejected;
+            }
+
+            if (!linkInterface.Native.SubmitMove(_buffer.AsSpan(0, built.Length)))
+            {
+                // The builder has already advanced to the end of this move, so the submission cannot
+                // simply be dropped - the machine would be planned from a position it never reached.
+                // CanAddMove above makes this unlikely, but it is advisory, so put the builder back
+                logger.LogWarning("The motion engine refused move {MoveId} after accepting it; resynchronising", move.MoveId);
+                ResyncFromEngine();
+                return MoveSubmitResult.Busy;
+            }
+
+            return MoveSubmitResult.Queued;
+        }
+    }
+
+    /// <summary>
+    /// Apply any endpoints the engine has reported since the last move
+    /// </summary>
+    /// <param name="ring">Ring to check</param>
+    /// <returns>True if a correction was applied</returns>
+    private bool ApplyPendingResync(int ring)
+    {
+        if (!motionTracker.TryTakeEndpoints(ring, _resyncBuffer))
+        {
+            return false;
+        }
+
+        Builder.ResyncEndpoints(_resyncBuffer);
+        logger.LogDebug("Resynchronised the planner from the engine's reported endpoints");
+        return true;
+    }
+
+    /// <summary>
+    /// Take the machine position from the engine's live snapshot
+    /// </summary>
+    /// <remarks>
+    /// The fallback when this side's idea of where the machine is has become untrustworthy. The
+    /// snapshot is what the drives were last told, so it is authoritative
+    /// </remarks>
+    public void ResyncFromEngine()
+    {
+        if (linkInterface.Native.GetMotorPositions(_resyncBuffer, out _) > 0)
+        {
+            Builder.ResyncEndpoints(_resyncBuffer);
+        }
+    }
+
+    /// <summary>
+    /// The next correlation id
+    /// </summary>
+    /// <returns>A move id, never zero</returns>
+    private uint NextMoveId()
+    {
+        uint id = _nextMoveId++;
+        if (_nextMoveId == 0)
+        {
+            _nextMoveId = 1;                // zero means "no id" on the wire
+        }
+        return id;
+    }
+}

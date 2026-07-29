@@ -25,7 +25,7 @@ namespace DuetControlServer.Motion;
 /// </para>
 /// </remarks>
 /// <param name="logger">Logger</param>
-public sealed class MotionTracker(ILogger<MotionTracker> logger)
+internal sealed class MotionTracker(ILogger<MotionTracker> logger)
 {
     /// <summary>
     /// Per-ring state

@@ -79,7 +79,7 @@ public partial class Extruder : ModelObject, IStaticModelObject
     private float _factor = 1F;
 
     /// <summary>
-    /// Motor jerk (in mm/s)
+    /// Motor jerk (in mm/min)
     /// </summary>
     public float Jerk
     {

@@ -35,7 +35,7 @@ internal readonly record struct MoveBuildResult(NativeMovementError Error, int L
 /// stops short - see <see cref="ResyncEndpoints"/>
 /// </para>
 /// </remarks>
-internal sealed class MoveBuilder(MachineConfig config)
+internal sealed class MoveBuilder(MotionParameters parameters)
 {
     private const int NumDrives = MotionLimits.MaxAxesPlusExtruders;
 
@@ -51,8 +51,8 @@ internal sealed class MoveBuilder(MachineConfig config)
     private readonly int[] _newEndPoints = new int[NumDrives];
     private readonly float[] _accelerations = new float[NumDrives];
 
-    /// <summary>The machine being planned for</summary>
-    public MachineConfig Config { get; private set; } = config;
+    /// <summary>The machine being planned for, as derived from the object model</summary>
+    public MotionParameters Parameters { get; private set; } = parameters;
 
     /// <summary>Where the last move left the machine in axis space, mm</summary>
     public ReadOnlySpan<float> StartCoordinates => _startCoordinates;
@@ -63,12 +63,12 @@ internal sealed class MoveBuilder(MachineConfig config)
     /// <summary>
     /// Adopt a new machine configuration
     /// </summary>
-    /// <param name="newConfig">The configuration</param>
+    /// <param name="newParameters">The configuration</param>
     /// <remarks>
     /// Only safe while nothing is in flight. Steps per mm changing under a queued move would make the
     /// endpoints it was planned against mean something different from what the drives will do
     /// </remarks>
-    public void Reconfigure(MachineConfig newConfig) => Config = newConfig;
+    public void Reconfigure(MotionParameters newParameters) => Parameters = newParameters;
 
     /// <summary>
     /// Force the machine position, after homing or a move that was cut short
@@ -83,8 +83,8 @@ internal sealed class MoveBuilder(MachineConfig config)
         int count = Math.Min(endPoints.Length, NumDrives);
         endPoints[..count].CopyTo(_endPoints);
 
-        Config.Geometry.MotorStepsToCartesian(
-            _endPoints, Config.BuildStepsPerMm(), Config.NumAxes, Config.NumAxes, _startCoordinates);
+        Parameters.Geometry.MotorStepsToCartesian(
+            _endPoints, Parameters.StepsPerMm, Parameters.NumAxes, Parameters.NumAxes, _startCoordinates);
     }
 
     /// <summary>
@@ -94,14 +94,14 @@ internal sealed class MoveBuilder(MachineConfig config)
     /// <param name="position">Its new position in mm</param>
     public void SetAxisPosition(int axis, float position)
     {
-        if (axis < 0 || axis >= Config.NumAxes)
+        if (axis < 0 || axis >= Parameters.NumAxes)
         {
             return;
         }
 
         _startCoordinates[axis] = position;
-        Config.Geometry.CartesianToMotorSteps(
-            _startCoordinates, Config.BuildStepsPerMm(), Config.NumAxes, Config.NumAxes, _endPoints);
+        Parameters.Geometry.CartesianToMotorSteps(
+            _startCoordinates, Parameters.StepsPerMm, Parameters.NumAxes, Parameters.NumAxes, _endPoints);
     }
 
     /// <summary>
@@ -118,9 +118,9 @@ internal sealed class MoveBuilder(MachineConfig config)
     /// </remarks>
     public MoveBuildResult Build(RawMove move, Span<byte> destination)
     {
-        float[] stepsPerMm = Config.BuildStepsPerMm();
-        int numAxes = Config.NumAxes;
-        int firstExtruderDrive = Config.FirstExtruderDrive;
+        float[] stepsPerMm = Parameters.StepsPerMm;
+        int numAxes = Parameters.NumAxes;
+        int firstExtruderDrive = Parameters.FirstExtruderDrive;
 
         // --- 1. Compute the new endpoints and the movement vector ---------------------------------
 
@@ -132,7 +132,7 @@ internal sealed class MoveBuilder(MachineConfig config)
 
         if (move.MoveType == 0)
         {
-            NativeMovementError error = Config.Geometry.CartesianToMotorSteps(
+            NativeMovementError error = Parameters.Geometry.CartesianToMotorSteps(
                 move.Coords, stepsPerMm, numAxes, numAxes, _newEndPoints);
             if (error != NativeMovementError.Ok)
             {
@@ -160,7 +160,7 @@ internal sealed class MoveBuilder(MachineConfig config)
                     continue;
                 }
 
-                if ((Config.RotationalAxes & (1u << axis)) != 0)
+                if ((Parameters.RotationalAxes & (1u << axis)) != 0)
                 {
                     if (move.RotationalAxesMentioned)
                     {
@@ -203,7 +203,7 @@ internal sealed class MoveBuilder(MachineConfig config)
 
                 if (delta != 0)
                 {
-                    if ((Config.RotationalAxes & (1u << axis)) != 0)
+                    if ((Parameters.RotationalAxes & (1u << axis)) != 0)
                     {
                         rotationalAxesMoving = true;
                     }
@@ -224,7 +224,9 @@ internal sealed class MoveBuilder(MachineConfig config)
 
         // --- Extruders -----------------------------------------------------------------------------
 
-        Config.BuildAccelerations().CopyTo(_accelerations, 0);
+        // Probing and stall-homing moves use the reduced limits, which is what M201.1 configures
+        float[] configuredAccelerations = move.ReduceAcceleration ? Parameters.ReducedAccelerations : Parameters.Accelerations;
+        configuredAccelerations.CopyTo(_accelerations, 0);
 
         bool extrudersMoving = false, hasForwardExtrusion = false;
         float totalExtrusion = 0.0f;
@@ -255,17 +257,13 @@ internal sealed class MoveBuilder(MachineConfig config)
 
             if (xyMoving && move.UsePressureAdvance)
             {
-                int extruder = NumDrives - 1 - drive;
-                if (extruder >= 0 && extruder < Config.NumExtruders)
+                float compensationClocks = Parameters.PressureAdvanceClocks[drive];
+                float jerk = Parameters.InstantDvs[drive];
+                if (compensationClocks > 0.0f && jerk > 0.0f)
                 {
-                    float compensationClocks = Config.Extruders[extruder].PressureAdvanceSeconds * MotionLimits.StepClockRate;
-                    if (compensationClocks > 0.0f)
-                    {
-                        // Pressure advance adds an instant velocity change of acceleration times k,
-                        // so the acceleration has to be capped for that change to stay within jerk
-                        float jerk = Config.Extruders[extruder].JerkMmPerSec / MotionLimits.StepClockRate;
-                        _accelerations[drive] = MathF.Min(_accelerations[drive], jerk / compensationClocks);
-                    }
+                    // Pressure advance adds an instant velocity change of acceleration times k, so
+                    // the acceleration has to be capped for that change to stay within jerk
+                    _accelerations[drive] = MathF.Min(_accelerations[drive], jerk / compensationClocks);
                 }
             }
         }
@@ -308,18 +306,18 @@ internal sealed class MoveBuilder(MachineConfig config)
         if (linearAxesMoving)
         {
             // NIST section 2.1.2.5 rule A: if any linear axis moves, the feed rate is the linear speed
-            float tiltX = Config.Geometry.GetTiltCorrection(0);
-            float tiltY = Config.Geometry.GetTiltCorrection(1);
+            float tiltX = Parameters.Geometry.GetTiltCorrection(0);
+            float tiltY = Parameters.Geometry.GetTiltCorrection(1);
             if ((tiltX != 0.0f || tiltY != 0.0f) && numAxes > 2)
             {
                 _directionVector[2] += (_directionVector[0] * tiltX) + (_directionVector[1] * tiltY);
             }
 
-            totalDistance = MoveVector.NormaliseLinearMotion(_directionVector, Config.LinearAxes, move.XAxes, move.YAxes);
+            totalDistance = MoveVector.NormaliseLinearMotion(_directionVector, Parameters.LinearAxes, move.XAxes, move.YAxes);
         }
         else if (rotationalAxesMoving)
         {
-            totalDistance = MoveVector.Normalise(_directionVector, Config.RotationalAxes);
+            totalDistance = MoveVector.Normalise(_directionVector, Parameters.RotationalAxes);
         }
         else
         {
@@ -347,10 +345,7 @@ internal sealed class MoveBuilder(MachineConfig config)
         if (xyMoving)
         {
             // M204: a separate ceiling for printing and travel moves
-            float clockSquared = MotionLimits.StepClockRate * MotionLimits.StepClockRate;
-            float limit = (isPrintingMove
-                              ? Config.MaxPrintingAccelerationMmPerSecSquared
-                              : Config.MaxTravelAccelerationMmPerSecSquared) / clockSquared;
+            float limit = isPrintingMove ? Parameters.MaxPrintingAcceleration : Parameters.MaxTravelAcceleration;
             maxAcceleration = MathF.Min(maxAcceleration, limit);
         }
 
@@ -362,15 +357,14 @@ internal sealed class MoveBuilder(MachineConfig config)
         // The minimum comes first and the maximum second, deliberately. A move with a tiny XY
         // component and a lot of extrusion may have to run slower than the configured minimum, and
         // clamping to a range would raise it back up
-        float minSpeed = Config.MinFeedrateMmPerSec / MotionLimits.StepClockRate;
-        requestedSpeed = MathF.Max(requestedSpeed, minSpeed);
-        requestedSpeed = MathF.Min(requestedSpeed, MoveVector.VectorBoxIntersection(_normalisedDirection, Config.BuildMaxFeedrates()));
+        requestedSpeed = MathF.Max(requestedSpeed, Parameters.MinFeedrate);
+        requestedSpeed = MathF.Min(requestedSpeed, MoveVector.VectorBoxIntersection(_normalisedDirection, Parameters.MaxFeedrates));
 
         MoveLimits limits = new() { RequestedSpeed = requestedSpeed, MaxAcceleration = maxAcceleration };
         if (move.MoveType == 0)
         {
-            Config.Geometry.LimitSpeedAndAcceleration(
-                ref limits, _normalisedDirection, numAxes, Config.BuildMaxFeedrates(), _accelerations);
+            Parameters.Geometry.LimitSpeedAndAcceleration(
+                ref limits, _normalisedDirection, numAxes, Parameters.MaxFeedrates, _accelerations);
         }
 
         // --- Write the submission -----------------------------------------------------------------------
