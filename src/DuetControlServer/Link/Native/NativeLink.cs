@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using DuetControlServer.Motion.Native;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -100,6 +101,10 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         Check<RequestCompletedEvent>(12);
         Check<LogEvent>(8);
         Check<MalformedPacketEvent>(12);
+        Check<MoveCompletedEvent>(16);
+        Check<MoveFailedEvent>(12);
+        Check<MotionEndpointsEvent>(16);
+        Check<MoveParamsHeader>(28);
     }
 
     /// <summary>
@@ -539,6 +544,135 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// Number of events dropped because the inbound ring was full
     /// </summary>
     public ulong DroppedEvents => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_GetDroppedEvents(_handle) : 0;
+
+    /// <summary>
+    /// The controller's step clock, as the native side models it
+    /// </summary>
+    /// <remarks>
+    /// The SBC has no step clock of its own. Move start times are in this timebase, so a model that
+    /// has drifted schedules moves that arrive late
+    /// </remarks>
+    public uint StepClockTicks => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_GetStepClockTicks(_handle) : 0;
+
+    /// <summary>
+    /// How well the step-clock model is tracking the controller
+    /// </summary>
+    /// <returns>The statistics, or a zeroed struct if the link is not up</returns>
+    public NativeClockStats GetClockStats()
+    {
+        if (_handle == IntPtr.Zero)
+        {
+            return default;
+        }
+        NativeMethods.DuetSbc_GetClockStats(_handle, out NativeClockStats stats);
+        return stats;
+    }
+
+    /// <summary>
+    /// Push the machine description down to the native motion engine
+    /// </summary>
+    /// <param name="config">Serialised MotionConfig</param>
+    /// <returns>True if it was accepted</returns>
+    /// <remarks>Safe only while no move is in flight</remarks>
+    public bool ConfigureMotion(ReadOnlySpan<byte> config)
+        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionConfigure(_handle, config, config.Length) != 0;
+
+    /// <summary>
+    /// Start the native motion thread
+    /// </summary>
+    /// <param name="rtPriority">SCHED_FIFO priority, or 0 for the default scheduler</param>
+    /// <returns>True if it started</returns>
+    public bool StartMotion(int rtPriority)
+        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionStart(_handle, rtPriority) != 0;
+
+    /// <summary>
+    /// Stop the native motion thread
+    /// </summary>
+    public void StopMotion()
+    {
+        if (_handle != IntPtr.Zero)
+        {
+            NativeMethods.DuetSbc_MotionStop(_handle);
+        }
+    }
+
+    /// <summary>
+    /// Whether the given ring has room for another move
+    /// </summary>
+    /// <param name="ring">Ring number</param>
+    /// <returns>True if there is room</returns>
+    public bool CanAddMove(int ring)
+        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionCanAddMove(_handle, ring) != 0;
+
+    /// <summary>
+    /// Queue a move
+    /// </summary>
+    /// <param name="moveParams">A MoveParamsHeader followed by its two arrays</param>
+    /// <returns>True if queued, false if the caller must retry</returns>
+    public bool SubmitMove(ReadOnlySpan<byte> moveParams)
+        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionSubmitMove(_handle, moveParams, moveParams.Length) != 0;
+
+    /// <summary>
+    /// Read the motor positions the motion engine last published
+    /// </summary>
+    /// <param name="steps">Receives the positions in microsteps</param>
+    /// <param name="whenTicks">Receives the step-clock time the snapshot was taken at</param>
+    /// <returns>Number of positions written</returns>
+    public int GetMotorPositions(Span<int> steps, out uint whenTicks)
+    {
+        if (_handle == IntPtr.Zero)
+        {
+            whenTicks = 0;
+            return 0;
+        }
+        return NativeMethods.DuetSbc_MotionGetMotorPositions(_handle, steps, steps.Length, out whenTicks);
+    }
+
+    /// <summary>
+    /// Force motor positions, after homing or a move that stopped early
+    /// </summary>
+    /// <param name="driveMask">Logical drives to set</param>
+    /// <param name="positions">Positions in microsteps</param>
+    public void SetMotorPositions(uint driveMask, ReadOnlySpan<int> positions)
+    {
+        if (_handle != IntPtr.Zero)
+        {
+            NativeMethods.DuetSbc_MotionSetMotorPositions(_handle, driveMask, positions, positions.Length);
+        }
+    }
+
+    /// <summary>
+    /// Store the ring state decided here for the motion thread to read
+    /// </summary>
+    /// <param name="ring">Ring number</param>
+    /// <param name="shouldStartMove">Whether queued moves should start executing</param>
+    /// <param name="waitingForEmpty">Whether this side is waiting for the ring to drain</param>
+    public void SetRingState(int ring, bool shouldStartMove, bool waitingForEmpty)
+    {
+        if (_handle != IntPtr.Zero)
+        {
+            NativeMethods.DuetSbc_MotionSetRingState(_handle, ring, shouldStartMove ? 1 : 0, waitingForEmpty ? 1 : 0);
+        }
+    }
+
+    /// <summary>
+    /// Number of moves the given ring has been given
+    /// </summary>
+    /// <param name="ring">Ring number</param>
+    /// <returns>Scheduled move count</returns>
+    public uint GetScheduledMoves(int ring) => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_MotionGetScheduledMoves(_handle, ring) : 0;
+
+    /// <summary>
+    /// Number of moves the given ring has finished
+    /// </summary>
+    /// <param name="ring">Ring number</param>
+    /// <returns>Completed move count</returns>
+    public uint GetCompletedMoves(int ring) => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_MotionGetCompletedMoves(_handle, ring) : 0;
+
+    /// <summary>
+    /// Submissions refused because the queue was full. Non-zero means a move was lost
+    /// </summary>
+    public uint SubmissionsDropped => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_MotionGetSubmissionsDropped(_handle) : 0;
     #endregion
 
     /// <summary>

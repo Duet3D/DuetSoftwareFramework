@@ -34,6 +34,11 @@ public sealed partial class LinkInterface(
     ILogger<LinkInterface> logger,
     IOptions<Settings> settings) : IDiagnostics
 {
+    /// <summary>
+    /// The native SPI transfer loop and motion engine
+    /// </summary>
+    public NativeLink Native => nativeLink;
+
     // Information about the code channels
     internal int BytesReserved, BufferSpace;
 

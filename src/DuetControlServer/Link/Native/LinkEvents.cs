@@ -54,7 +54,69 @@ internal enum InboundEventType : ushort
     MalformedPacket = 9,
 
     /// <summary>Unrecoverable error, with a UTF-8 message. Terminates the link service</summary>
-    FatalError = 10
+    FatalError = 10,
+
+    /// <summary>A queued move finished executing: <see cref="MoveCompletedEvent"/></summary>
+    MoveCompleted = 11,
+
+    /// <summary>A move was rejected or could not be sent: <see cref="MoveFailedEvent"/></summary>
+    MoveFailed = 12,
+
+    /// <summary>
+    /// Where the drives actually ended up after a move that could stop early:
+    /// <see cref="MotionEndpointsEvent"/> plus one <c>int</c> per drive
+    /// </summary>
+    MotionEndpoints = 13
+}
+
+/// <summary>
+/// How well the native step-clock model is tracking the controller. Mirrors <c>DuetSbcClockStats</c>
+/// </summary>
+/// <remarks>
+/// Move start times are expressed in the modelled clock, so how well it tracks is how well moves
+/// land. The margin they have to stay inside is the preparation lead time, 25ms
+/// </remarks>
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+public struct NativeClockStats
+{
+    /// <summary>Fitted rate minus nominal, in parts per million</summary>
+    public double DriftPpm;
+
+    /// <summary>Samples in the current fit</summary>
+    public uint NumSamples;
+
+    /// <summary>Largest deviation of a sample from the fit since startup, in nanoseconds</summary>
+    public uint PeakResidualNs;
+
+    /// <summary>Times a new fit would have made the reading go backwards, and was clamped</summary>
+    public uint NumBackwardClamps;
+
+    /// <summary>Samples discarded as implausible</summary>
+    public uint NumRejectedSamples;
+
+    /// <summary>Non-zero once the fit rests on enough samples to be trusted</summary>
+    public int Synced;
+}
+
+/// <summary>
+/// Why a move could not be executed. Mirrors the native <c>MovementError</c>
+/// </summary>
+internal enum NativeMovementError : byte
+{
+    /// <summary>The move is fine</summary>
+    Ok = 0,
+
+    /// <summary>Nothing significant was commanded, so the move was dropped</summary>
+    NoMovement = 1,
+
+    /// <summary>More than about +/- 2^31 microsteps from the zero position</summary>
+    MicrostepPositionTooLarge = 2,
+
+    /// <summary>The kinematics cannot reach the requested position</summary>
+    UnreachablePosition = 3,
+
+    /// <summary>The move would take more than about 2^31 step clocks</summary>
+    MoveDurationTooLong = 4
 }
 
 /// <summary>
@@ -244,4 +306,82 @@ internal struct MalformedPacketEvent
 
     /// <summary>Offset the packet was read from</summary>
     public ushort Offset;
+}
+
+/// <summary>
+/// A queued move finished executing
+/// </summary>
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 16)]
+internal struct MoveCompletedEvent
+{
+    /// <summary>Record header</summary>
+    public InboundEventHeader Header;
+
+    /// <summary>The id this side gave the move when it submitted it</summary>
+    public uint MoveId;
+
+    /// <summary>The ring's running total, so a missed event is detectable rather than silent</summary>
+    public uint CompletedMoves;
+
+    /// <summary>Which ring the move was queued on</summary>
+    public byte Ring;
+
+    /// <summary>Padding</summary>
+    public byte Padding;
+
+    /// <summary>Padding</summary>
+    public ushort Padding2;
+}
+
+/// <summary>
+/// A move was rejected or could not be sent
+/// </summary>
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 12)]
+internal struct MoveFailedEvent
+{
+    /// <summary>The id this side gave the move when it submitted it</summary>
+    public InboundEventHeader Header;
+
+    /// <summary>The id this side gave the move when it submitted it</summary>
+    public uint MoveId;
+
+    /// <summary>Which ring the move was queued on</summary>
+    public byte Ring;
+
+    /// <summary>Why it failed</summary>
+    public NativeMovementError Error;
+
+    /// <summary>Padding</summary>
+    public ushort Padding;
+}
+
+/// <summary>
+/// Where the drives actually ended up after a move that could stop early. One <c>int</c> per drive
+/// follows, in microsteps
+/// </summary>
+/// <remarks>
+/// Moves are planned as a delta from the previous move's endpoints, so this side keeps its own copy
+/// of them. A move that watches endstops can stop short, which makes that copy wrong; this is how it
+/// is put right, and it must be applied before another move is submitted
+/// </remarks>
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 16)]
+internal struct MotionEndpointsEvent
+{
+    /// <summary>Record header</summary>
+    public InboundEventHeader Header;
+
+    /// <summary>The move that produced these endpoints</summary>
+    public uint MoveId;
+
+    /// <summary>Which drives the trailing array describes, as a logical-drive bitmap</summary>
+    public uint DriveMask;
+
+    /// <summary>Which ring the move was queued on</summary>
+    public byte Ring;
+
+    /// <summary>Entries in the trailing array</summary>
+    public byte NumDrives;
+
+    /// <summary>Padding</summary>
+    public ushort Padding;
 }

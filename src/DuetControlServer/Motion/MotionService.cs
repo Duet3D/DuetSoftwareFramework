@@ -9,7 +9,7 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
 using DuetControlServer.Link;
-using DuetControlServer.Link.Protocol.CanMessages;
+using DuetControlServer.Motion.Native;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Utility;
@@ -142,31 +142,105 @@ public sealed class MotionService(
     }
 
     /// <summary>
-    /// Perform communication with the RepRapFirmware controller over SPI
+    /// Number of logical drives the native side indexes by. Must match maxAxesPlusExtruders
     /// </summary>
+    private const int NumLogicalDrives = 32;
+
+    /// <summary>
+    /// The controller's step clock, in Hz. Must match the native stepClockRate
+    /// </summary>
+    private const float StepClockRate = 48000000.0f / 64.0f;
+
+    /// <summary>
+    /// Feed moves to the native motion engine
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Placeholder for the G-code path: until the kinematics are ported to this side there is
+    /// nothing to turn into moves, so this submits a slow square wave on X and Y to exercise the
+    /// whole chain - submission, lookahead, preparation, the ScheduleMove packet, and the CAN send
+    /// on the controller.
+    /// </para>
+    /// <para>
+    /// What it does <em>not</em> do is build CAN movement messages here. That was the previous
+    /// stand-in, and it bypassed everything the native engine exists to do
+    /// </para>
+    /// </remarks>
     /// <param name="stoppingToken">Cancellation token</param>
     private void Execute(CancellationToken stoppingToken)
     {
-        byte seq = 0;
-        do
+        if (!linkInterface.Native.StartMotion(settings.Value.UseRealtimeScheduling ? settings.Value.MotionRtPriority : 0))
         {
-            CanMessageMovementLinearShaped msg = new()
-            {
-                WhenToExecute = 0,
-                AccelerationClocks = 0,
-                SteadyClocks = 1000,
-                DecelerationClocks = 0,
-                ExtruderDrives = 0,
-                NumDrivers = 0,
-                Seq = seq++,
-                UsePressureAdvance = false,
-                UseLateInputShaping = false
-            };
-            byte dstAddress = 2;
-            // linkInterface.SendCanMessageAsync(dstAddress, msg);
-
-            Thread.Sleep(TimeSpan.FromMilliseconds(217));
+            logger.LogWarning("Native motion engine did not start; no moves will be submitted");
+            return;
         }
-        while (!stoppingToken.IsCancellationRequested);
+
+        // A move at a time, alternating between the two axes. The endpoints are absolute, so each
+        // move is planned as a delta from where the last one left the machine
+        const float stepsPerMm = 80.0f;
+        const float lengthMm = 20.0f;
+        const float feedRateMmPerSec = 30.0f;
+        const float accelerationMmPerSecSquared = 500.0f;
+
+        byte[] buffer = new byte[MoveParams.Length(NumLogicalDrives)];
+        int[] endPoints = new int[NumLogicalDrives];
+        float[] directionVector = new float[NumLogicalDrives];
+        uint moveId = 1;
+        int axis = 0;
+        bool forwards = true;
+
+        try
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                if (!linkInterface.Native.CanAddMove(0))
+                {
+                    // The ring is full, which is the normal state when moves are being executed
+                    Thread.Sleep(TimeSpan.FromMilliseconds(5));
+                    continue;
+                }
+
+                Array.Clear(directionVector);
+                endPoints[axis] += (int)MathF.Round((forwards ? lengthMm : -lengthMm) * stepsPerMm);
+                directionVector[axis] = forwards ? 1.0f : -1.0f;
+
+                MoveParamsHeader header = new()
+                {
+                    MoveId = moveId,
+                    OwnedDrives = uint.MaxValue,
+                    Flags = MoveFlags.CanPauseAfter | MoveFlags.XyMoving | MoveFlags.UsingStandardFeedrate,
+                    TotalDistance = lengthMm,
+                    // Both in the firmware's internal units: mm per step clock, and mm per step
+                    // clock squared. Converting once here keeps it out of every consumer natively
+                    MaxAcceleration = accelerationMmPerSecSquared / (StepClockRate * StepClockRate),
+                    RequestedSpeed = feedRateMmPerSec / StepClockRate,
+                    RingNumber = 0,
+                    NumDrives = NumLogicalDrives
+                };
+
+                int length = MoveParams.Write(buffer, header, endPoints, directionVector);
+                if (linkInterface.Native.SubmitMove(buffer.AsSpan(0, length)))
+                {
+                    moveId++;
+                    axis ^= 1;
+                    if (axis == 0)
+                    {
+                        forwards = !forwards;
+                    }
+                }
+                else
+                {
+                    // Refused rather than dropped: undo the endpoint so the retry describes the same
+                    // move. Submitting the next one from the advanced position would silently double
+                    // the distance travelled
+                    endPoints[axis] -= (int)MathF.Round((forwards ? lengthMm : -lengthMm) * stepsPerMm);
+                    Thread.Sleep(TimeSpan.FromMilliseconds(5));
+                }
+            }
+        }
+        finally
+        {
+            linkInterface.Native.StopMotion();
+        }
     }
 }
