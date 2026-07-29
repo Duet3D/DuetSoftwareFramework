@@ -89,7 +89,8 @@ bool ScheduleMoveBuilder::SendPacket(uint32_t moveId, uint32_t moveStartTime, ui
 	const size_t driversBytes = count * sizeof(ScheduleMoveDriver);
 	memcpy(packet + sizeof(ScheduleMoveHeader), &m_drivers[first], driversBytes);
 
-	return m_sink != nullptr && m_sink->Send(packet, sizeof(ScheduleMoveHeader) + driversBytes);
+	return m_sink != nullptr
+		   && m_sink->Send({reinterpret_cast<const uint8_t *>(packet), sizeof(ScheduleMoveHeader) + driversBytes});
 }
 
 uint32_t ScheduleMoveBuilder::FinishMovement(uint32_t moveId, uint32_t moveStartTime, bool simulating,

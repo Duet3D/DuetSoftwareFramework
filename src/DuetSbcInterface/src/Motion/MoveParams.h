@@ -22,6 +22,8 @@
 
 #include <RepRapFirmware.h>
 
+#include <span>
+
 namespace Duet::Sbc::Motion
 {
 	// Bits of MoveParamsHeader::flags. These are the subset of the firmware's DDA flags that survive
@@ -99,30 +101,42 @@ namespace Duet::Sbc::Motion
 
 	// The two trailing arrays. Both are read straight out of the record, so callers must not assume
 	// alignment beyond the 4 bytes the header's size guarantees.
-	[[nodiscard]] inline const int32_t *MoveParamsEndPoints(const MoveParamsHeader& header) noexcept
+	//
+	// These return spans rather than pointers, so numDrives is applied once here instead of at every
+	// call site. That is worth doing precisely because numDrives arrives with the record: it is the
+	// value that decides how far a reader walks, and a reader that re-derives the bound itself is a
+	// reader that can get it wrong. The caller is still responsible for having checked that the
+	// record is long enough to hold what the header claims - see MotionService::SubmitMove.
+	[[nodiscard]] inline std::span<const int32_t> MoveParamsEndPoints(const MoveParamsHeader& header) noexcept
 	{
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
-		return reinterpret_cast<const int32_t *>(reinterpret_cast<const char *>(&header) + sizeof(header));
+		const auto *const first = reinterpret_cast<const int32_t *>(reinterpret_cast<const char *>(&header) + sizeof(header));
+		return {first, header.numDrives};
 	}
 
-	[[nodiscard]] inline const float *MoveParamsDirectionVector(const MoveParamsHeader& header) noexcept
+	[[nodiscard]] inline std::span<const float> MoveParamsDirectionVector(const MoveParamsHeader& header) noexcept
 	{
+		const std::span<const int32_t> endPoints = MoveParamsEndPoints(header);
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
-		return reinterpret_cast<const float *>(MoveParamsEndPoints(header) + header.numDrives);
+		const auto *const first = reinterpret_cast<const float *>(endPoints.data() + endPoints.size());
+		return {first, header.numDrives};
 	}
 
 	// The same two, for filling a record in. numDrives must already be set: it is what says where
-	// the second array begins.
-	[[nodiscard]] inline int32_t *MoveParamsEndPoints(MoveParamsHeader& header) noexcept
+	// the second array begins and how long each span is.
+	[[nodiscard]] inline std::span<int32_t> MoveParamsEndPoints(MoveParamsHeader& header) noexcept
 	{
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
-		return reinterpret_cast<int32_t *>(reinterpret_cast<char *>(&header) + sizeof(header));
+		auto *const first = reinterpret_cast<int32_t *>(reinterpret_cast<char *>(&header) + sizeof(header));
+		return {first, header.numDrives};
 	}
 
-	[[nodiscard]] inline float *MoveParamsDirectionVector(MoveParamsHeader& header) noexcept
+	[[nodiscard]] inline std::span<float> MoveParamsDirectionVector(MoveParamsHeader& header) noexcept
 	{
+		const std::span<int32_t> endPoints = MoveParamsEndPoints(header);
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
-		return reinterpret_cast<float *>(MoveParamsEndPoints(header) + header.numDrives);
+		auto *const first = reinterpret_cast<float *>(endPoints.data() + endPoints.size());
+		return {first, header.numDrives};
 	}
 }
 

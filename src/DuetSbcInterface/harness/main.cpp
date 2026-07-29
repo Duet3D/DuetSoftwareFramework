@@ -363,12 +363,14 @@ int main(int argc, char** argv)
 							header.ringNumber = 0;
 							header.numDrives = (uint8_t)maxAxesPlusExtruders;
 
-							memcpy(Duet::Sbc::Motion::MoveParamsEndPoints(header), endPoints, sizeof(endPoints));
-							memcpy(Duet::Sbc::Motion::MoveParamsDirectionVector(header),
-								   directionVector,
-								   sizeof(directionVector));
+							// Copy into the spans rather than memcpy against a sizeof: the destination
+							// length now comes from the record's own header
+							const auto endPointsOut = Duet::Sbc::Motion::MoveParamsEndPoints(header);
+							const auto directionsOut = Duet::Sbc::Motion::MoveParamsDirectionVector(header);
+							std::copy_n(std::begin(endPoints), endPointsOut.size(), endPointsOut.begin());
+							std::copy_n(std::begin(directionVector), directionsOut.size(), directionsOut.begin());
 
-							if (motion.SubmitMove(moveBuffer, sizeof(moveBuffer)))
+							if (motion.SubmitMove({reinterpret_cast<const uint8_t *>(moveBuffer), sizeof(moveBuffer)}))
 							{
 								++moveId;
 								axis ^= 1;

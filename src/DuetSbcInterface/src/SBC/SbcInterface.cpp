@@ -190,13 +190,13 @@ namespace Duet::Sbc
 		PostEvent(type, header, headerLength, tail, tailLength);
 	}
 
-	bool SbcInterface::QueueScheduleMove(const uint8_t* packet, size_t length)
+	bool SbcInterface::QueueScheduleMove(std::span<const uint8_t> packet)
 	{
 		OutboundCommandHeader header{};
 		header.type = static_cast<uint16_t>(OutboundCommandType::ScheduleMove);
 
-		const void* fragments[2] = {&header, packet};
-		const size_t lengths[2] = {sizeof(header), length};
+		const void* fragments[2] = {&header, packet.data()};
+		const size_t lengths[2] = {sizeof(header), packet.size()};
 		if (!m_outbound.WriteScattered(fragments, lengths, 2))
 		{
 			return false;

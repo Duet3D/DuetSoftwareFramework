@@ -293,11 +293,13 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 	// A drive DCS did not send is one this move does not touch, so it ends where the previous move
 	// left it. Getting this wrong is not a small error: Prepare takes the difference against the
 	// previous DDA's endpoint, so a stale entry moves the drive by the whole difference.
-	const int32_t *const endPoints = MoveParamsEndPoints(params);
-	const float *const directions = MoveParamsDirectionVector(params);
+	const std::span<const int32_t> endPoints = MoveParamsEndPoints(params);
+	const std::span<const float> directions = MoveParamsDirectionVector(params);
 	for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)
 	{
-		if (drive < params.numDrives)
+		// The bound comes from the spans rather than from numDrives again: they were built from it
+		// once, at the point where the record's length was known to cover it.
+		if (drive < endPoints.size())
 		{
 			m_endPoint[drive] = endPoints[drive];
 			m_directionVector[drive] = directions[drive];

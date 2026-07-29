@@ -120,7 +120,7 @@ static void TestReportedPositionExcludesBacklash()
 	MotionSystem& move = FreshSystem(BasicConfig(20, 10));
 
 	int32_t positions[maxAxesPlusExtruders] = {};
-	move.GetMotorPositions(positions, maxAxesPlusExtruders);
+	move.GetMotorPositions(positions);
 	CHECK(positions[xAxis] == 0, "starts at zero");
 
 	// Establish a direction, then reverse so that a correction is injected.
@@ -150,7 +150,7 @@ static void TestReportedPositionExcludesBacklash()
 	CHECK_NEAR(move.GetDriveTracker(xAxis).GetMotorPosition(), -20.0, 1.0,
 			   "the motor really did move by the correction");
 
-	move.GetMotorPositions(positions, maxAxesPlusExtruders);
+	move.GetMotorPositions(positions);
 	CHECK_NEAR(positions[xAxis], 0.0, 1.0, "but the reported axis position is back where it started");
 }
 
@@ -194,7 +194,7 @@ static void TestAreDrivesStopped()
 	CHECK(move.AreDrivesStopped(all), "stopped again once the move has been retired");
 
 	int32_t positions[maxAxesPlusExtruders] = {};
-	move.GetMotorPositions(positions, maxAxesPlusExtruders);
+	move.GetMotorPositions(positions);
 	CHECK(positions[xAxis] == 300, "and the move's steps are in the reported position");
 }
 
@@ -218,12 +218,12 @@ static void TestCancelSteppingAbandonsPendingMotion()
 	move.AdvanceTrackers(1000);					// partway through
 
 	int32_t before[maxAxesPlusExtruders] = {};
-	move.GetMotorPositions(before, maxAxesPlusExtruders);
+	move.GetMotorPositions(before);
 
 	move.CancelStepping();
 
 	int32_t after[maxAxesPlusExtruders] = {};
-	move.GetMotorPositions(after, maxAxesPlusExtruders);
+	move.GetMotorPositions(after);
 	CHECK(move.AreDrivesStopped(LogicalDrivesBitmap::MakeLowestNBits(4)), "nothing is pending afterwards");
 	CHECK(after[xAxis] == before[xAxis], "the position does not jump to where the move would have ended");
 	CHECK(after[xAxis] < 300, "and is short of the commanded travel");

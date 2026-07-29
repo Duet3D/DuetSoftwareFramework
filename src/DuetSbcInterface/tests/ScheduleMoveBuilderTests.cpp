@@ -43,14 +43,14 @@ namespace
 	class RecordingSink final : public ScheduleMoveSink
 	{
 	public:
-		bool Send(const void *packet, size_t length) noexcept override
+		bool Send(std::span<const uint8_t> packet) noexcept override
 		{
 			if (refuseFrom >= 0 && (int)packets.size() >= refuseFrom)
 			{
 				return false;
 			}
-			const auto *const first = static_cast<const char *>(packet);
-			packets.push_back(Packet{std::vector<char>(first, first + length)});
+			const auto *const first = reinterpret_cast<const char *>(packet.data());
+			packets.push_back(Packet{std::vector<char>(first, first + packet.size())});
 			return true;
 		}
 

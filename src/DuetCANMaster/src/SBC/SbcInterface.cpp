@@ -30,7 +30,8 @@
 #	include <CAN/CanMotion.h>
 #	include <CanMessageBuffer.h>
 
-#include <algorithm>
+#	include <algorithm>
+#	include <span>
 #  endif
 
 // script (same70q20b_flash.ld); the leading underscore is part of that contract
@@ -484,7 +485,11 @@ void SbcInterface::ExchangeData() noexcept
 				break;
 			}
 
-			const auto* const drivers = reinterpret_cast<const ScheduleMoveDriver*>(payload + sizeof(ScheduleMoveHeader));
+			// The span is built from the count that has just been checked against the payload, so
+			// the bound travels with the pointer instead of being re-derived from the header at the
+			// far end.
+			const std::span drivers{reinterpret_cast<const ScheduleMoveDriver*>(payload + sizeof(ScheduleMoveHeader)),
+									numDrivers};
 			CanMotion::ScheduleFromSbc(*header, drivers);
 			break;
 		}

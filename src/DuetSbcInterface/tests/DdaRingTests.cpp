@@ -50,10 +50,9 @@ namespace
 	class RecordingSink final : public ScheduleMoveSink
 	{
 	public:
-		bool Send(const void *packet, size_t length) noexcept override
+		bool Send(std::span<const uint8_t> packet) noexcept override
 		{
-			(void)length;
-			headers.push_back(*static_cast<const ScheduleMoveHeader *>(packet));
+			headers.push_back(*reinterpret_cast<const ScheduleMoveHeader *>(packet.data()));
 			return true;
 		}
 
@@ -121,8 +120,8 @@ namespace
 		h.ringNumber = 0;
 		h.numDrives = maxAxesPlusExtruders;
 
-		int32_t *const endPoints = MoveParamsEndPoints(h);
-		float *const directions = MoveParamsDirectionVector(h);
+		const std::span<int32_t> endPoints = MoveParamsEndPoints(h);
+		const std::span<float> directions = MoveParamsDirectionVector(h);
 		for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)
 		{
 			endPoints[drive] = 0;

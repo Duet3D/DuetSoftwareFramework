@@ -33,6 +33,7 @@
 #include <Platform/RingBuffer.h>
 
 #include <atomic>
+#include <span>
 #include <thread>
 
 namespace Duet::Sbc
@@ -70,15 +71,15 @@ namespace Duet::Sbc
 
 		// Queue a move. Copies the record, so the caller's buffer is free on return. False means the
 		// submission ring is full and the caller must retry - never a silent drop.
-		bool SubmitMove(const void *params, size_t length);
+		bool SubmitMove(std::span<const uint8_t> params);
 
 		// The most recent position snapshot: motor positions in microsteps and the step-clock time
 		// they were taken at. Lock-free, so a garbage collection in the caller cannot stall motion.
 		// Returns the number of drives written.
-		size_t GetMotorPositions(int32_t *positions, size_t count, uint32_t *whenTicks) const;
+		size_t GetMotorPositions(std::span<int32_t> positions, uint32_t *whenTicks) const;
 
 		// Force motor positions, after homing or a move that was cut short.
-		static void SetMotorPositions(uint32_t driveMask, const int32_t *positions, size_t count);
+		static void SetMotorPositions(uint32_t driveMask, std::span<const int32_t> positions);
 
 		// What DCS decides from its own state each cycle, stored rather than called: the motion
 		// thread must never wait on the managed side to answer a question.
@@ -104,7 +105,7 @@ namespace Duet::Sbc
 		// True if `record` is long enough for the header and for the two trailing arrays that the
 		// header's numDrives claims. Checked at both ends: on submission so the caller hears about
 		// it, and again on the motion thread so nothing reaches a DDA unvalidated.
-		[[nodiscard]] static bool IsWellFormedSubmission(const void *record, size_t length) noexcept;
+		[[nodiscard]] static bool IsWellFormedSubmission(std::span<const uint8_t> record) noexcept;
 
 		static void OnMoveRetired(const DDA& dda, void *context) noexcept;
 

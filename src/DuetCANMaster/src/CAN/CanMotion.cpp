@@ -407,7 +407,7 @@ namespace CanMotion
 } // namespace CanMotion
 
 void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
-								const SbcProtocol::ScheduleMoveDriver* drivers) noexcept
+								std::span<const SbcProtocol::ScheduleMoveDriver> drivers) noexcept
 {
 	if (!sbcMoveInProgress || header.moveId != sbcMoveId)
 	{
@@ -457,10 +457,12 @@ void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
 	params.decelStartDistance = decelStartDistance;
 #    endif
 
+	// Iterating the span rather than header.numDrivers: the count and the records arrive in the same
+	// packet, so trusting the count to describe the records is trusting the packet to be consistent
+	// with itself. The caller sized the span from what the payload actually carries.
 	const bool usePressureAdvance = (header.flags & ScheduleMoveFlags::UsePressureAdvance) != 0;
-	for (size_t i = 0; i < header.numDrivers; ++i)
+	for (const SbcProtocol::ScheduleMoveDriver& d : drivers)
 	{
-		const SbcProtocol::ScheduleMoveDriver& d = drivers[i];
 		const DriverId driver(d.boardAddress, d.driverNumber);
 		if (d.isExtruder != 0)
 		{

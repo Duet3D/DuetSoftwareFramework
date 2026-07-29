@@ -25,7 +25,7 @@ namespace Duet::Sbc
 
 		// Both are called from the motion thread and neither blocks: the ring is lock-free and a
 		// full ring is reported rather than waited on.
-		bool Send(const void *packet, size_t length) noexcept override;
+		bool Send(std::span<const uint8_t> packet) noexcept override;
 		[[nodiscard]] bool CanAccept() const noexcept override;
 
 	private:

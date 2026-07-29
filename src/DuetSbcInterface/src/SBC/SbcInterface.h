@@ -28,6 +28,7 @@
 #include <cstdint>
 #include <functional>
 #include <mutex>
+#include <span>
 #include <string>
 #include <thread>
 #include <vector>
@@ -77,7 +78,7 @@ namespace Duet::Sbc
 
 		// Queue a prepared move. Called from the motion thread, which must never block, so this
 		// returns false rather than waiting when the ring is full - the caller stops preparing.
-		bool QueueScheduleMove(const uint8_t* packet, size_t length);
+		bool QueueScheduleMove(std::span<const uint8_t> packet);
 
 		// Post an inbound event from a thread other than the interface thread. The ring serialises
 		// its producers with a mutex held only for the copy, so this does not wait on a transfer -

@@ -138,9 +138,9 @@ namespace Duet::Sbc
 		PublishPositions();
 	}
 
-	bool MotionService::IsWellFormedSubmission(const void *record, size_t length) noexcept
+	bool MotionService::IsWellFormedSubmission(std::span<const uint8_t> record) noexcept
 	{
-		if (record == nullptr || length < sizeof(Motion::MoveParamsHeader))
+		if (record.data() == nullptr || record.size() < sizeof(Motion::MoveParamsHeader))
 		{
 			return false;
 		}
@@ -148,9 +148,9 @@ namespace Duet::Sbc
 		// numDrives says where the direction vector starts and how far both trailing arrays run, so
 		// it decides what InitFromParams reads. A record that does not carry the drives it claims
 		// would have it read past the end - checking the header alone is not enough.
-		const auto& params = *reinterpret_cast<const Motion::MoveParamsHeader *>(record);
+		const auto& params = *reinterpret_cast<const Motion::MoveParamsHeader *>(record.data());
 		return params.numDrives <= maxAxesPlusExtruders
-			&& length >= Motion::MoveParamsLength(params.numDrives);
+			&& record.size() >= Motion::MoveParamsLength(params.numDrives);
 	}
 
 	void MotionService::DrainSubmissions()
@@ -159,7 +159,7 @@ namespace Duet::Sbc
 		uint32_t length = 0;
 		while (m_submissions.Peek(record, length))
 		{
-			if (!IsWellFormedSubmission(record, length))
+			if (!IsWellFormedSubmission({record, length}))
 			{
 				m_submissions.Consume();
 				continue;
@@ -200,19 +200,20 @@ namespace Duet::Sbc
 		std::atomic_thread_fence(std::memory_order_release);
 
 		m_snapshot.whenTicks = StepTimer::GetMovementTimerTicks();
-		reprap.GetMove().GetMotorPositions(m_snapshot.positions, maxAxesPlusExtruders);
+		// The span is deduced from the array, so the length cannot drift from the thing it describes
+		reprap.GetMove().GetMotorPositions(m_snapshot.positions);
 
 		std::atomic_thread_fence(std::memory_order_release);
 		m_snapshotSequence.store(sequence + 2, std::memory_order_release);
 	}
 
-	size_t MotionService::GetMotorPositions(int32_t *positions, size_t count, uint32_t *whenTicks) const
+	size_t MotionService::GetMotorPositions(std::span<int32_t> positions, uint32_t *whenTicks) const
 	{
-		if (positions == nullptr || count == 0)
+		if (positions.empty())
 		{
 			return 0;
 		}
-		const size_t toCopy = std::min(count, maxAxesPlusExtruders);
+		const size_t toCopy = std::min(positions.size(), maxAxesPlusExtruders);
 
 		for (;;)
 		{
@@ -224,7 +225,7 @@ namespace Duet::Sbc
 			std::atomic_thread_fence(std::memory_order_acquire);
 
 			const uint32_t when = m_snapshot.whenTicks;
-			std::memcpy(positions, m_snapshot.positions, toCopy * sizeof(int32_t));
+			std::memcpy(positions.data(), m_snapshot.positions, toCopy * sizeof(int32_t));
 
 			std::atomic_thread_fence(std::memory_order_acquire);
 			if (m_snapshotSequence.load(std::memory_order_relaxed) == before)
@@ -238,9 +239,9 @@ namespace Duet::Sbc
 		}
 	}
 
-	void MotionService::SetMotorPositions(uint32_t driveMask, const int32_t *positions, size_t count)
+	void MotionService::SetMotorPositions(uint32_t driveMask, std::span<const int32_t> positions)
 	{
-		reprap.GetMove().SetMotorPositions(LogicalDrivesBitmap(driveMask), positions, count);
+		reprap.GetMove().SetMotorPositions(LogicalDrivesBitmap(driveMask), positions);
 	}
 
 	bool MotionService::CanAddMove(unsigned int ring) const
@@ -248,15 +249,15 @@ namespace Duet::Sbc
 		return ring < numRings && m_rings[ring].CanAddMove();
 	}
 
-	bool MotionService::SubmitMove(const void *params, size_t length)
+	bool MotionService::SubmitMove(std::span<const uint8_t> params)
 	{
 		// Reject a malformed record here rather than dropping it on the motion thread, so the caller
 		// finds out that the move it is waiting on will never happen.
-		if (!IsWellFormedSubmission(params, length))
+		if (!IsWellFormedSubmission(params))
 		{
 			return false;
 		}
-		if (!m_submissions.Write(params, length))
+		if (!m_submissions.Write(params.data(), params.size()))
 		{
 			m_submissionsDropped.fetch_add(1, std::memory_order_relaxed);
 			return false;

@@ -146,9 +146,10 @@ void MotionSystem::AdvanceTrackers(uint32_t now) noexcept
 	}
 }
 
-void MotionSystem::GetMotorPositions(int32_t *positions, size_t count) const noexcept
+void MotionSystem::GetMotorPositions(std::span<int32_t> positions) const noexcept
 {
-	for (size_t drive = 0; drive < count && drive < maxAxesPlusExtruders; ++drive)
+	const size_t count = std::min(positions.size(), maxAxesPlusExtruders);
+	for (size_t drive = 0; drive < count; ++drive)
 	{
 		// Subtract the backlash correction already injected: it moved the motor, but it did not
 		// move the axis, so reporting it would put the machine position out by the backlash.
@@ -156,9 +157,10 @@ void MotionSystem::GetMotorPositions(int32_t *positions, size_t count) const noe
 	}
 }
 
-void MotionSystem::SetMotorPositions(LogicalDrivesBitmap drives, const int32_t *positions, size_t count) noexcept
+void MotionSystem::SetMotorPositions(LogicalDrivesBitmap drives, std::span<const int32_t> positions) noexcept
 {
-	for (size_t drive = 0; drive < count && drive < maxAxesPlusExtruders; ++drive)
+	const size_t count = std::min(positions.size(), maxAxesPlusExtruders);
+	for (size_t drive = 0; drive < count; ++drive)
 	{
 		if (drives.IsBitSet(drive))
 		{

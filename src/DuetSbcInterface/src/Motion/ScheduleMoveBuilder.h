@@ -24,6 +24,8 @@
 #include <DuetSpiProtocol/MessageFormats.h>
 #include <Motion/MoveProfile.h>
 
+#include <span>
+
 namespace Duet::Sbc::Motion
 {
 	// Where finished packets go. Implementations must not block: FinishMovement runs on the motion
@@ -41,7 +43,7 @@ namespace Duet::Sbc::Motion
 		// Take one packet: a ScheduleMoveHeader followed by header.numDrivers ScheduleMoveDriver
 		// records, contiguous. The bytes are only valid for the duration of the call. Returns false
 		// if the packet could not be taken, which is a dropped move and must be reported.
-		virtual bool Send(const void *packet, size_t length) noexcept = 0;
+		virtual bool Send(std::span<const uint8_t> packet) noexcept = 0;
 
 		// False when the sink is too full to take another move. Preparation stops rather than
 		// overruns: a move that is dropped after the previous one was scheduled leaves a gap that

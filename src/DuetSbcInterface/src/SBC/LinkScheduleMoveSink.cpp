@@ -8,9 +8,9 @@
 
 namespace Duet::Sbc
 {
-	bool LinkScheduleMoveSink::Send(const void *packet, size_t length) noexcept
+	bool LinkScheduleMoveSink::Send(std::span<const uint8_t> packet) noexcept
 	{
-		return m_link->QueueScheduleMove(static_cast<const uint8_t *>(packet), length);
+		return m_link->QueueScheduleMove(packet);
 	}
 
 	bool LinkScheduleMoveSink::CanAccept() const noexcept

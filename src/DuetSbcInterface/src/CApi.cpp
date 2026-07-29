@@ -335,29 +335,33 @@ extern "C"
 		return (h != nullptr && ring >= 0 && h->motion.CanAddMove((unsigned int)ring)) ? 1 : 0;
 	}
 
+	// This is a C ABI, so the pointer/length pairs stay as they are. It is also the only place they
+	// exist: each one is turned into a span here, once, and everything inside the library carries
+	// the bound with the pointer from then on.
+
 	int32_t DuetSbc_MotionSubmitMove(DuetSbcHandle* h, const void* moveParams, int32_t length)
 	{
-		if (h == nullptr || length <= 0)
+		if (h == nullptr || moveParams == nullptr || length <= 0)
 		{
 			return 0;
 		}
-		return h->motion.SubmitMove(moveParams, (size_t)length) ? 1 : 0;
+		return h->motion.SubmitMove({static_cast<const uint8_t*>(moveParams), (size_t)length}) ? 1 : 0;
 	}
 
 	int32_t DuetSbc_MotionGetMotorPositions(DuetSbcHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks)
 	{
-		if (h == nullptr || count <= 0)
+		if (h == nullptr || stepsOut == nullptr || count <= 0)
 		{
 			return 0;
 		}
-		return (int32_t)h->motion.GetMotorPositions(stepsOut, (size_t)count, whenTicks);
+		return (int32_t)h->motion.GetMotorPositions({stepsOut, (size_t)count}, whenTicks);
 	}
 
 	void DuetSbc_MotionSetMotorPositions(DuetSbcHandle* h, uint32_t driveMask, const int32_t* positions, int32_t count)
 	{
 		if (h != nullptr && positions != nullptr && count > 0)
 		{
-			Duet::Sbc::MotionService::SetMotorPositions(driveMask, positions, (size_t)count);
+			Duet::Sbc::MotionService::SetMotorPositions(driveMask, {positions, (size_t)count});
 		}
 	}
 

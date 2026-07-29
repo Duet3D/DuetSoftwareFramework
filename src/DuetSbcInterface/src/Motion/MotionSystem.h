@@ -25,6 +25,8 @@
 #include <Motion/MoveProfile.h>
 #include <Motion/ScheduleMoveBuilder.h>
 
+#include <span>
+
 namespace Duet::Sbc::Motion
 {
 	class MotionSystem
@@ -116,11 +118,13 @@ namespace Duet::Sbc::Motion
 		// Bring every drive's position up to `now`. Called once per pass of the motion loop.
 		void AdvanceTrackers(uint32_t now) noexcept;
 
-		// Motor positions in microsteps, as of the last completed segment. `count` entries.
-		void GetMotorPositions(int32_t *positions, size_t count) const noexcept;
+		// Motor positions in microsteps, as of the last completed segment. Fills as much of
+		// `positions` as there are drives to report.
+		void GetMotorPositions(std::span<int32_t> positions) const noexcept;
 
 		// Force motor positions, for homing and for resynchronising after a move that was cut short.
-		void SetMotorPositions(LogicalDrivesBitmap drives, const int32_t *positions, size_t count) noexcept;
+		// Only the drives named in `drives` are taken, and only as far as `positions` reaches.
+		void SetMotorPositions(LogicalDrivesBitmap drives, std::span<const int32_t> positions) noexcept;
 
 		// True once every drive named in `drives` has no pending motion. DDA::HasExpired uses this
 		// to decide when a move that checks endstops has finished.

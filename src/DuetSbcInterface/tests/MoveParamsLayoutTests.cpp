@@ -102,21 +102,23 @@ namespace
 
 		// Fill the tails through the same accessors the reader uses, which is what makes this a
 		// round trip rather than a restatement of the same arithmetic twice.
-		auto *const endPoints = MoveParamsEndPoints(*header);
-		auto *const directions = MoveParamsDirectionVector(*header);
+		const std::span<int32_t> endPoints = MoveParamsEndPoints(*header);
+		const std::span<float> directions = MoveParamsDirectionVector(*header);
+		CHECK(endPoints.size() == numDrives, "the endpoint span covers the drives the header claims");
+		CHECK(directions.size() == numDrives, "the direction span covers the drives the header claims");
 		for (uint8_t i = 0; i < numDrives; ++i)
 		{
 			endPoints[i] = 1000 + i;
 			directions[i] = 0.25F * (float)(i + 1);
 		}
 
-		// A byte past the end would be a buffer overrun in the transfer, so check the last write
-		// landed inside the record.
-		const char *const lastByte = reinterpret_cast<const char *>(&directions[numDrives - 1]) + sizeof(float);
+		// A byte past the end would be a buffer overrun in the transfer, so check the span ends
+		// exactly where the record does.
+		const char *const lastByte = reinterpret_cast<const char *>(directions.data() + directions.size());
 		CHECK(lastByte == record + length, "the direction vector ends exactly at the end of the record");
 
-		const int32_t *const readEndPoints = MoveParamsEndPoints(*header);
-		const float *const readDirections = MoveParamsDirectionVector(*header);
+		const std::span<const int32_t> readEndPoints = MoveParamsEndPoints(*header);
+		const std::span<const float> readDirections = MoveParamsDirectionVector(*header);
 		for (uint8_t i = 0; i < numDrives; ++i)
 		{
 			CHECK(readEndPoints[i] == 1000 + i, "endpoints read back as written");
