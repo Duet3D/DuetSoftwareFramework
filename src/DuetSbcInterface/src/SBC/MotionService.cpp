@@ -52,9 +52,11 @@ namespace Duet::Sbc
 		}
 		reprap.GetMove().GetScheduleMoveBuilder().SetSink(&m_sink);
 
+		const Motion::MotionConfig& config = reprap.GetMove().GetConfig();
 		for (DDARing& ring : m_rings)
 		{
-			ring.Init(reprap.GetMove().GetConfig().numDdasPerRing);
+			ring.Init(config.numDdasPerRing);
+			ring.SetGracePeriod(MillisToStepClocks(config.gracePeriodMs));
 			ring.SetRetirementCallback(&MotionService::OnMoveRetired, this);
 		}
 		m_initialised = true;
@@ -111,14 +113,21 @@ namespace Duet::Sbc
 
 		for (unsigned int i = 0; i < numRings; ++i)
 		{
-			(void)m_rings[i].Spin(MoveTiming::usualMinimumPreparedTime,
-								  SimulationMode::Off,
-								  true,
-								  m_ringState[i].shouldStartMove.load(std::memory_order_relaxed));
 			if (m_ringState[i].waitingForEmpty.load(std::memory_order_relaxed))
 			{
 				(void)m_rings[i].SetWaitingToEmpty();
 			}
+
+			// Both arguments as upstream's Move::Spin computes them. shouldStartMove in particular
+			// is local timing - hold off briefly so lookahead has moves to work with, but not for
+			// ever - and not something DuetControlServer can answer. It may still force the issue,
+			// which is what the flag it sets is for.
+			const bool shouldStartMove =
+				m_rings[i].ShouldStartMove() || m_ringState[i].shouldStartMove.load(std::memory_order_relaxed);
+			const bool signalMoveCompletion = !m_rings[i].CanAddMove();
+
+			(void)m_rings[i].Spin(
+				MoveTiming::usualMinimumPreparedTime, SimulationMode::Off, signalMoveCompletion, shouldStartMove);
 		}
 
 		reprap.GetMove().AdvanceTrackers(StepTimer::GetMovementTimerTicks());

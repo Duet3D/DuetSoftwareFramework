@@ -121,6 +121,7 @@ MovementError DDARing::AddMove(const Duet::Sbc::Motion::MoveParamsHeader& params
 	{
 		m_addPointer = m_addPointer->GetNext();
 		m_scheduledMoves++;
+		m_whenLastMoveAdded = StepTimer::GetTimerTicks();
 	}
 	return err;
 }

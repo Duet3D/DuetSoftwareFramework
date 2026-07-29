@@ -37,9 +37,13 @@ namespace
 
 	int64_t FakeClock() noexcept { return fakeNow; }
 
-	constexpr int64_t nsPerTick = 1000000000 / stepClockRate;
-
-	void AdvanceTicks(uint32_t ticks) noexcept { fakeNow += (int64_t)ticks * nsPerTick; }
+	// Scale first, then divide: a nanoseconds-per-tick constant rounds down (1333 rather than
+	// 1333.33 at 750kHz) and the fake clock then runs 0.025% slow, which is enough to make a wait
+	// measured in whole ticks come up short.
+	void AdvanceTicks(uint32_t ticks) noexcept
+	{
+		fakeNow += ((int64_t)ticks * 1000000000) / stepClockRate;
+	}
 
 	// --- The sink the test reads ------------------------------------------------------------
 
@@ -139,7 +143,7 @@ namespace
 			{
 				return true;
 			}
-			(void)ring.Spin(MoveTiming::usualMinimumPreparedTime, SimulationMode::Off, true, true);
+			(void)ring.Spin(MoveTiming::usualMinimumPreparedTime, SimulationMode::Off, !ring.CanAddMove(), ring.ShouldStartMove());
 			AdvanceTicks(stepClockRate / 1000);
 		}
 		return false;
@@ -157,10 +161,11 @@ namespace
 		CHECK(ring.AddMove(move.Header()) == MovementError::Ok, "the move is accepted");
 		CHECK(ring.GetScheduledMoves() == 1, "the move is counted as scheduled");
 
-		// Spin until it has been prepared and sent.
-		for (int i = 0; i < 10 && sink.headers.empty(); ++i)
+		// Spin until it has been prepared and sent. Long enough to cover the grace period: the ring
+		// deliberately holds the first move back for a moment in case more are coming.
+		for (int i = 0; i < 200 && sink.headers.empty(); ++i)
 		{
-			(void)ring.Spin(MoveTiming::usualMinimumPreparedTime, SimulationMode::Off, true, true);
+			(void)ring.Spin(MoveTiming::usualMinimumPreparedTime, SimulationMode::Off, !ring.CanAddMove(), ring.ShouldStartMove());
 			AdvanceTicks(stepClockRate / 1000);
 		}
 
@@ -189,6 +194,49 @@ namespace
 								  + 2.0 * ((double)h.totalDistance - h.decelStartDistance)
 										/ (double)(h.topSpeed + h.endSpeed);
 		CHECK_NEAR(byPhases, byDistance, byPhases * 0.001, "the phase durations account for the whole distance");
+
+		CHECK(Drain(ring), "the move finishes");
+	}
+
+	// Nothing commits a move except the passage of time, so this is what decides whether the machine
+	// moves at all. The ring holds the first move back briefly in case more are coming - lookahead
+	// with one move in the queue can only plan a stop at the end of it - and then commits it whether
+	// or not more arrived. Getting the second half of that wrong means a queue that fills and never
+	// empties, which is exactly what happened when the decision was left to the caller and no caller
+	// made it.
+	void TestGracePeriodCommitsTheMove(DDARing& ring, RecordingSink& sink) noexcept
+	{
+		sink.headers.clear();
+		CHECK(Drain(ring), "the ring starts empty");
+
+		MoveRecord move = MakeXMove(500, 0.0F, 30.0F);
+		CHECK(ring.AddMove(move.Header()) == MovementError::Ok, "the move is accepted");
+		CHECK(!ring.ShouldStartMove(), "a move just added is held back in case more follow");
+
+		// Spinning is not enough on its own: without the clock moving on, the move stays queued.
+		for (int i = 0; i < 20; ++i)
+		{
+			(void)ring.Spin(MoveTiming::usualMinimumPreparedTime, SimulationMode::Off, !ring.CanAddMove(),
+							ring.ShouldStartMove());
+		}
+		CHECK(sink.headers.empty(), "a move is not committed while the ring is still waiting for company");
+
+		// Once the grace period has passed it goes, with nothing else having been added.
+		AdvanceTicks(ring.GetGracePeriod() + 1);
+		CHECK(ring.ShouldStartMove(), "the wait ends even though no more moves arrived");
+
+		for (int i = 0; i < 200 && sink.headers.empty(); ++i)
+		{
+			(void)ring.Spin(MoveTiming::usualMinimumPreparedTime, SimulationMode::Off, !ring.CanAddMove(),
+							ring.ShouldStartMove());
+			AdvanceTicks(stepClockRate / 1000);
+		}
+		CHECK(!sink.headers.empty(), "the move is committed once the ring stops waiting");
+		if (!sink.headers.empty())
+		{
+			CHECK(sink.headers[0].moveId == 500, "and it is the move that was queued");
+		}
+		CHECK(Drain(ring), "the move finishes");
 	}
 
 	// A run of colinear moves is one motion, not five: lookahead must carry speed across every
@@ -205,7 +253,7 @@ namespace
 
 		for (int i = 0; i < 20000 && sink.headers.size() < numMoves; ++i)
 		{
-			(void)ring.Spin(MoveTiming::usualMinimumPreparedTime, SimulationMode::Off, true, true);
+			(void)ring.Spin(MoveTiming::usualMinimumPreparedTime, SimulationMode::Off, !ring.CanAddMove(), ring.ShouldStartMove());
 			AdvanceTicks(stepClockRate / 1000);
 		}
 
@@ -313,7 +361,7 @@ namespace
 		int spins = 0;
 		while (!ring.IsIdle() && spins < 20000)
 		{
-			(void)ring.Spin(MoveTiming::usualMinimumPreparedTime, SimulationMode::Normal, true, true);
+			(void)ring.Spin(MoveTiming::usualMinimumPreparedTime, SimulationMode::Normal, !ring.CanAddMove(), ring.ShouldStartMove());
 			AdvanceTicks(stepClockRate / 1000);
 			++spins;
 		}
@@ -342,6 +390,7 @@ int main()
 	ring.Init(20);
 
 	TestSingleMove(ring, sink);
+	TestGracePeriodCommitsTheMove(ring, sink);
 	TestColinearRunMelds(ring, sink);
 	TestRetirementInOrder(ring, sink);
 	TestRingSaturates(ring, sink);

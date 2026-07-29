@@ -23,7 +23,9 @@ class DDARing final INHERIT_OBJECT_MODEL
 public:
 	// Until DCS pushes its own value down in MotionConfig::gracePeriodMs. Upstream this lives in
 	// Move.h, which is not ported.
-	static constexpr uint32_t defaultGracePeriod = 10;
+	// How long to let moves accumulate before committing the first one, in step clocks. Upstream
+	// this is 10ms; DuetControlServer overrides it through MotionConfig::gracePeriodMs.
+	static constexpr uint32_t defaultGracePeriod = (stepClockRate / 1000) * 10;
 
 	DDARing() noexcept;
 
@@ -39,6 +41,19 @@ public:
 	uint32_t Spin(uint32_t prepareAdvanceTime, SimulationMode simulationMode, bool signalMoveCompletion, bool shouldStartMove) noexcept SPEED_CRITICAL;	// Try to process moves in the ring
 	[[nodiscard]] bool IsIdle() const noexcept;														// Return true if this DDA ring is idle
 	[[nodiscard]] uint32_t GetGracePeriod() const noexcept { return m_gracePeriod; }					// Return the minimum idle time, before we should start a move. Better to have a few moves in the queue so that we can do lookahead
+	void SetGracePeriod(uint32_t clocks) noexcept { m_gracePeriod = clocks; }
+
+	// Whether it is time to commit the first move rather than keep waiting for more.
+	//
+	// This is the `shouldStartMove` argument of Spin, and it is entirely about local timing: hold
+	// off briefly so that a few moves accumulate and lookahead has something to work with, but do
+	// not hold off for ever if no more are coming. Upstream this lives in Move::Spin, measured in
+	// milliseconds off the Move task's tick; here it is measured against the step clock, which is
+	// this side's own timebase and is what the tests can drive.
+	[[nodiscard]] bool ShouldStartMove() const noexcept
+	{
+		return (StepTimer::GetTimerTicks() - m_whenLastMoveAdded) >= m_gracePeriod;
+	}
 
 	[[nodiscard]] DDA *_ecv_null GetCurrentDDA() const noexcept;										// If a move from this ring should be executing now, fetch its DDA
 
@@ -96,7 +111,8 @@ private:
 	DDA* volatile m_getPointer{};													// Pointer to the oldest committed or provisional move, if not equal to addPointer
 
 	unsigned int m_numDdasInRing{};													// The number of DDAs that this ring contains
-	uint32_t m_gracePeriod = defaultGracePeriod;									// The minimum idle time in milliseconds, before we should start a move. Better to have a few moves in the queue so that we can do lookahead
+	uint32_t m_gracePeriod = defaultGracePeriod;								// The minimum idle time, in step clocks, before we should start a move
+	uint32_t m_whenLastMoveAdded = 0;											// Step clock time at which the most recent move was queued
 
 #if SUPPORT_S_CURVE
 	MovementProfile plannedProfile;												// the profile planned for a collection of moves
