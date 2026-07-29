@@ -101,7 +101,11 @@ public struct NativeClockStats
 /// <summary>
 /// Why a move could not be executed. Mirrors the native <c>MovementError</c>
 /// </summary>
-internal enum NativeMovementError : byte
+/// <remarks>
+/// Public because it crosses out of the link layer: <see cref="Motion.MotionTracker"/> records it for
+/// whoever submitted the move
+/// </remarks>
+public enum NativeMovementError : byte
 {
     /// <summary>The move is fine</summary>
     Ok = 0,

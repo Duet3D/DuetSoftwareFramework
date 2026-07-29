@@ -24,6 +24,7 @@ namespace DuetControlServer.Motion;
 /// </summary>
 /// <param name="eventLogger">Event logger</param>
 /// <param name="linkInterface">Link interface</param>
+/// <param name="motionTracker">What the native motion engine has reported about submitted moves</param>
 /// <param name="model">Object model</param>
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="logger">Logger</param>
@@ -31,6 +32,7 @@ namespace DuetControlServer.Motion;
 public sealed class MotionService(
     // EventLogger eventLogger,
     LinkInterface linkInterface,
+    MotionTracker motionTracker,
     // Model.ObjectModel model,
     // IHostApplicationLifetime lifetime,
     ILogger<MotionService> logger,
@@ -144,12 +146,63 @@ public sealed class MotionService(
     /// <summary>
     /// Number of logical drives the native side indexes by. Must match maxAxesPlusExtruders
     /// </summary>
-    private const int NumLogicalDrives = 32;
+    private const int NumLogicalDrives = MotionLimits.MaxAxesPlusExtruders;
 
     /// <summary>
     /// The controller's step clock, in Hz. Must match the native stepClockRate
     /// </summary>
-    private const float StepClockRate = 48000000.0f / 64.0f;
+    private const float StepClockRate = MotionLimits.StepClockRate;
+
+    /// <summary>
+    /// Microsteps per mm of the axes the placeholder move generator drives
+    /// </summary>
+    private const float PlaceholderStepsPerMm = 80.0f;
+
+    /// <summary>
+    /// Build the machine description to push down to the native motion engine
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Hardcoded for now, matching the placeholder move generator below: a Cartesian machine with
+    /// three axes and no extruders, one driver per axis on board 0. When the configuration path is
+    /// ported this is where M92, M201, M203, M566, M425, M569 and M584 will feed in, along with the
+    /// two kinematics results the native planner needs.
+    /// </para>
+    /// <para>
+    /// The native side must be configured before it is started. Its defaults are all zero, and a
+    /// zeroed configuration is not a conservative one: with no extruders and no steps per mm every
+    /// axis is misclassified and no move can be scheduled
+    /// </para>
+    /// </remarks>
+    /// <returns>The machine description</returns>
+    private static MotionConfig BuildMotionConfig()
+    {
+        MotionConfig config = new()
+        {
+            NumVisibleAxes = 3,
+            NumTotalAxes = 3,
+            NumExtruders = 0,
+            NumRings = 1,
+            NumDdasPerRing = 40,
+            GracePeriodMs = 10
+        };
+
+        for (int axis = 0; axis < config.NumTotalAxes; axis++)
+        {
+            config.DriveStepsPerMm[axis] = PlaceholderStepsPerMm;
+
+            // Instantaneous speed change allowed at a junction, converted from the user-facing
+            // mm/min of M566 to the mm per step clock the native planner works in
+            const float jerkMmPerMin = 900.0f;
+            float jerkMmPerClock = jerkMmPerMin / 60.0f / StepClockRate;
+            config.InstantDvs[axis] = jerkMmPerClock;
+            config.PrintingInstantDvs[axis] = jerkMmPerClock;
+
+            config.AxisDrivers[axis] = AxisDriversConfig.WithDrivers(new DriverId(0, (byte)axis));
+        }
+
+        return config;
+    }
 
     /// <summary>
     /// Feed moves to the native motion engine
@@ -169,6 +222,16 @@ public sealed class MotionService(
     /// <param name="stoppingToken">Cancellation token</param>
     private void Execute(CancellationToken stoppingToken)
     {
+        // Before StartMotion, not after: Init builds the rings from the configured depth and grace
+        // period, so a configuration pushed down later would not be reflected in the rings
+        byte[] configBuffer = new byte[MotionConfig.SerializedLength];
+        int configLength = BuildMotionConfig().Serialize(configBuffer);
+        if (!linkInterface.Native.ConfigureMotion(configBuffer.AsSpan(0, configLength)))
+        {
+            logger.LogError("Native motion engine rejected the machine description; no moves will be submitted");
+            return;
+        }
+
         if (!linkInterface.Native.StartMotion(settings.Value.UseRealtimeScheduling ? settings.Value.MotionRtPriority : 0))
         {
             logger.LogWarning("Native motion engine did not start; no moves will be submitted");
@@ -177,7 +240,7 @@ public sealed class MotionService(
 
         // A move at a time, alternating between the two axes. The endpoints are absolute, so each
         // move is planned as a delta from where the last one left the machine
-        const float stepsPerMm = 80.0f;
+        const float stepsPerMm = PlaceholderStepsPerMm;
         const float lengthMm = 20.0f;
         const float feedRateMmPerSec = 30.0f;
         const float accelerationMmPerSecSquared = 500.0f;
@@ -193,6 +256,15 @@ public sealed class MotionService(
         {
             while (!stoppingToken.IsCancellationRequested)
             {
+                // A move that could stop short reports where the drives really ended up. Applying it
+                // before planning the next one is the whole point of the report: the next move is a
+                // delta from these endpoints, so carrying on from the planned ones would move the
+                // machine by the difference
+                if (motionTracker.TryTakeEndpoints(0, endPoints))
+                {
+                    logger.LogDebug("Resynchronised endpoints from the motion engine");
+                }
+
                 if (!linkInterface.Native.CanAddMove(0))
                 {
                     // The ring is full, which is the normal state when moves are being executed

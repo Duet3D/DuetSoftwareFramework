@@ -44,6 +44,7 @@ namespace DuetControlServer.Link;
 /// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model</param>
 /// <param name="filePathResolver">File path resolver</param>
+/// <param name="motionTracker">Where what the native motion engine reports is recorded</param>
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="logger">Logger</param>
 /// <param name="settings">Settings</param>
@@ -55,6 +56,7 @@ public sealed class LinkService(
     LinkInterface linkInterface,
     Model.ObjectModel model,
     FilePathResolver filePathResolver,
+    Motion.MotionTracker motionTracker,
     IHostApplicationLifetime lifetime,
     ILogger<LinkService> logger,
     IOptions<Settings> settings) : BackgroundService
@@ -232,6 +234,15 @@ public sealed class LinkService(
             case InboundEventType.MalformedPacket:
                 DumpMalformedPacket(record);
                 break;
+            case InboundEventType.MoveCompleted:
+                HandleMoveCompleted(record);
+                break;
+            case InboundEventType.MoveFailed:
+                HandleMoveFailed(record);
+                break;
+            case InboundEventType.MotionEndpoints:
+                HandleMotionEndpoints(record);
+                break;
             case InboundEventType.FatalError:
                 HandleFatalError(record);
                 break;
@@ -331,6 +342,70 @@ public sealed class LinkService(
         logger.LogError("Fatal error in native SPI interface: {Message}", message);
         eventLogger.LogOutput(MessageType.Error, $"Fatal SPI error: {message}");
         lifetime.StopApplication();
+    }
+
+    /// <summary>
+    /// Handle a queued move finishing execution
+    /// </summary>
+    /// <param name="record">Raw event record</param>
+    private void HandleMoveCompleted(ReadOnlySpan<byte> record)
+    {
+        if (record.Length < Marshal.SizeOf<MoveCompletedEvent>())
+        {
+            logger.LogError("Discarding truncated MoveCompleted event ({Length} bytes)", record.Length);
+            return;
+        }
+
+        MoveCompletedEvent moveEvent = MemoryMarshal.Read<MoveCompletedEvent>(record);
+        motionTracker.MoveCompleted(moveEvent.Ring, moveEvent.MoveId, moveEvent.CompletedMoves);
+    }
+
+    /// <summary>
+    /// Handle a move that was rejected or could not be executed
+    /// </summary>
+    /// <param name="record">Raw event record</param>
+    private void HandleMoveFailed(ReadOnlySpan<byte> record)
+    {
+        if (record.Length < Marshal.SizeOf<MoveFailedEvent>())
+        {
+            logger.LogError("Discarding truncated MoveFailed event ({Length} bytes)", record.Length);
+            return;
+        }
+
+        MoveFailedEvent moveEvent = MemoryMarshal.Read<MoveFailedEvent>(record);
+        motionTracker.MoveFailed(moveEvent.Ring, moveEvent.MoveId, moveEvent.Error);
+    }
+
+    /// <summary>
+    /// Handle a report of where the drives actually ended up after a move that could stop early
+    /// </summary>
+    /// <param name="record">Raw event record</param>
+    /// <remarks>
+    /// This has to reach the move generator before it submits another move: moves are planned as a
+    /// delta from the previous endpoints, so continuing from the planned ones after a move stopped
+    /// short would move the machine by the whole difference
+    /// </remarks>
+    private void HandleMotionEndpoints(ReadOnlySpan<byte> record)
+    {
+        int headerSize = Marshal.SizeOf<MotionEndpointsEvent>();
+        if (record.Length < headerSize)
+        {
+            logger.LogError("Discarding truncated MotionEndpoints event ({Length} bytes)", record.Length);
+            return;
+        }
+
+        MotionEndpointsEvent endpointsEvent = MemoryMarshal.Read<MotionEndpointsEvent>(record);
+        ReadOnlySpan<byte> tail = record[headerSize..];
+        if (tail.Length < endpointsEvent.NumDrives * sizeof(int))
+        {
+            logger.LogError(
+                "Discarding MotionEndpoints event claiming {NumDrives} drives but carrying {Length} bytes",
+                endpointsEvent.NumDrives, tail.Length);
+            return;
+        }
+
+        ReadOnlySpan<int> endpoints = MemoryMarshal.Cast<byte, int>(tail[..(endpointsEvent.NumDrives * sizeof(int))]);
+        motionTracker.EndpointsReported(endpointsEvent.Ring, endpointsEvent.MoveId, endpointsEvent.DriveMask, endpoints);
     }
 
     /// <summary>
@@ -798,6 +873,10 @@ public sealed class LinkService(
 
         // Fail anything still waiting on the native loop
         nativeLink.CancelPendingRequests();
+
+        // Forget what the motion engine reported. The moves it refers to are gone with the link, and
+        // a stale endpoint reading applied to a move planned after the reconnect would be a jump
+        motionTracker.Invalidate();
 
         // Close all the files
         foreach (var kv in _openFiles)

@@ -21,6 +21,9 @@ public static partial class ServiceCollectionExtensions
         var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Settings>>().Value;
 
         return services
+            // Shared between the link dispatcher, which records what the engine reports, and the
+            // motion service, which acts on it
+            .AddSingleton<MotionTracker>()
             .AddHostedService<MotionService>();
     }
 }
