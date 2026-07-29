@@ -193,7 +193,7 @@ namespace Duet::Sbc
 		{
 			return 0;
 		}
-		const size_t toCopy = (count < maxAxesPlusExtruders) ? count : maxAxesPlusExtruders;
+		const size_t toCopy = std::min(count, maxAxesPlusExtruders);
 
 		for (;;)
 		{
@@ -264,8 +264,8 @@ namespace Duet::Sbc
 
 	void MotionService::OnMoveRetired(const DDA& dda, void *context) noexcept
 	{
-		auto *const self = static_cast<MotionService *>(context);
-		self->PostMoveCompleted(dda.GetMoveId());
+		auto & self = *static_cast<MotionService *>(context);
+		self.PostMoveCompleted(dda.GetMoveId());
 
 		if (dda.IsCheckingEndstops())
 		{
@@ -281,7 +281,7 @@ namespace Duet::Sbc
 
 			int32_t endPoints[maxAxesPlusExtruders]{};
 			std::memcpy(endPoints, dda.DriveCoordinates(), sizeof(endPoints));
-			self->m_link->PostEventFromOtherThread(
+			self.m_link->PostEventFromOtherThread(
 				InboundEventType::MotionEndpoints, &event, sizeof(event), endPoints, sizeof(endPoints));
 		}
 	}
