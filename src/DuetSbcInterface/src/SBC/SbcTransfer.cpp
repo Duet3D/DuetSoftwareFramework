@@ -916,6 +916,26 @@ namespace Duet::Sbc
 		return true;
 	}
 
+	bool SbcTransfer::WriteScheduleMove(const uint8_t* packet, size_t length)
+	{
+		if (length < sizeof(proto::ScheduleMoveHeader))
+		{
+			throw TransferError("ScheduleMove packet is shorter than its header");
+		}
+		if (!CanWritePacket(proto::AddPadding(length)))
+		{
+			return false;
+		}
+
+		WritePacketHeader(proto::SbcRequest::ScheduleMove, proto::AddPadding(length));
+
+		// Copied verbatim: the motion engine built this in the controller's layout precisely so that
+		// nothing between it and the CAN send has to understand a move.
+		uint8_t* dst = GetWriteBuffer(length);
+		std::memcpy(dst, packet, length);
+		return true;
+	}
+
 	bool SbcTransfer::WriteMessage(uint32_t messageFlags, const std::string& message)
 	{
 		// Don't send a new request if another one is still pending

@@ -216,6 +216,61 @@ static void TestThreadedSoak()
 	CHECK(expected == kRecords, "soak received every record");
 }
 
+// BytesFree drives the motion engine's decision to stop preparing moves, so it has to stay honest
+// after the write position has wrapped past the read position - where the obvious head-minus-tail
+// arithmetic underflows, because these are positions in the buffer rather than counters that only
+// ever increase. Reaching that state takes a backlog: the producer has to wrap while the consumer
+// is still behind, which is exactly the busy-machine case this figure is consulted in.
+void TestBytesFreeSurvivesWrap()
+{
+	constexpr size_t capacity = 256;
+	constexpr size_t payloadSize = 48;
+	Duet::Sbc::RingBuffer r(capacity);
+
+	const size_t whenEmpty = r.BytesFree();
+	CHECK(whenEmpty > 0, "an empty ring reports free space");
+	CHECK(whenEmpty < capacity, "an empty ring keeps back the slack the framing needs");
+
+	const std::vector<uint8_t> payload(payloadSize, 0xA5);
+	const uint8_t *record = nullptr;
+	uint32_t length = 0;
+
+	// Fill most of the buffer, then free just enough at the start for the next write to have to
+	// wrap around to it.
+	for (int i = 0; i < 4; ++i)
+	{
+		CHECK(r.Write(payload.data(), payload.size()), "the ring accepts a record while it has room");
+	}
+	for (int i = 0; i < 2; ++i)
+	{
+		CHECK(r.Peek(record, length), "a queued record is there to read");
+		r.Consume();
+	}
+
+	const size_t freeBeforeWrap = r.BytesFree();
+	CHECK(freeBeforeWrap < whenEmpty, "the records still queued count as used");
+
+	// This one cannot fit at the end, so it wraps: the write position is now behind the read one.
+	CHECK(r.Write(payload.data(), payload.size()), "a record that does not fit at the end wraps");
+
+	const size_t freeAfterWrap = r.BytesFree();
+	CHECK(freeAfterWrap <= capacity, "free space stays within the ring once the write position wraps");
+	CHECK(freeAfterWrap < freeBeforeWrap, "the wrapped record counts as used like any other");
+	// The one that matters: subtracting positions the wrong way round underflows, and the guard
+	// against that turns the underflow into a reported zero. Zero here would stop the motion engine
+	// preparing moves and it would never start again, because the ring is not actually full.
+	CHECK(freeAfterWrap > 0, "a ring with records still in it reports the space that is left");
+
+	// And it all comes back once the backlog is read.
+	while (r.Peek(record, length))
+	{
+		CHECK(length == payloadSize, "records read back at the length they were written");
+		r.Consume();
+	}
+	CHECK(r.IsEmpty(), "the ring drains");
+	CHECK(r.BytesFree() == whenEmpty, "a drained ring reports the same free space as a new one");
+}
+
 int main()
 {
 	TestBasicFraming();
@@ -223,6 +278,7 @@ int main()
 	TestWrapAround();
 	TestWrapWithBacklog();
 	TestFullRingRejects();
+	TestBytesFreeSurvivesWrap();
 	TestThreadedSoak();
 	return TestSupport::Summarise("ring buffer");
 }

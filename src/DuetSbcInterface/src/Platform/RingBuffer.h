@@ -118,6 +118,20 @@ namespace Duet::Sbc
 			return m_tail.load(std::memory_order_relaxed) == m_head.load(std::memory_order_acquire);
 		}
 
+		// Bytes not currently holding records. For deciding whether to offer more work, not whether
+		// a particular write will fit: a record needs a contiguous run, and this counts the space
+		// either side of a wrap together. It is a lower bound on what the reader will free, never an
+		// upper bound on what the writer can use.
+		[[nodiscard]] size_t BytesFree() const
+		{
+			const size_t head = m_head.load(std::memory_order_relaxed);
+			const size_t tail = m_tail.load(std::memory_order_acquire);
+			// head and tail are positions within the buffer rather than ever-increasing counters, so
+			// a plain subtraction is only right while the ring has not wrapped.
+			const size_t used = (head >= tail) ? head - tail : capacity - tail + head;
+			return (used + kHeaderSize >= capacity) ? 0 : capacity - used - kHeaderSize;
+		}
+
 		// Number of records dropped because the ring was full (diagnostics).
 		[[nodiscard]] uint64_t DroppedRecords() const { return m_dropped.load(std::memory_order_relaxed); }
 

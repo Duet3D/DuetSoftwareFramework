@@ -172,6 +172,32 @@ namespace Duet::Sbc
 		return true;
 	}
 
+	bool SbcInterface::OutboundHasHeadroom() const
+	{
+		// Enough room for several full moves. Preparation stops here rather than at the point where
+		// a write is actually refused: a move that is dropped after its predecessor has been
+		// scheduled leaves a gap the boards execute as a stop and a restart.
+		static constexpr size_t kScheduleMoveHeadroom =
+			8 * (sizeof(OutboundCommandHeader) + sizeof(proto::ScheduleMoveHeader)
+				 + (proto::MaxScheduleMoveDrivers * sizeof(proto::ScheduleMoveDriver)));
+		return m_outbound.BytesFree() >= kScheduleMoveHeadroom;
+	}
+
+	bool SbcInterface::QueueScheduleMove(const uint8_t* packet, size_t length)
+	{
+		OutboundCommandHeader header{};
+		header.type = static_cast<uint16_t>(OutboundCommandType::ScheduleMove);
+
+		const void* fragments[2] = {&header, packet};
+		const size_t lengths[2] = {sizeof(header), length};
+		if (!m_outbound.WriteScattered(fragments, lengths, 2))
+		{
+			return false;
+		}
+		RequestTransfer();
+		return true;
+	}
+
 	bool SbcInterface::QueueEnableCan(bool enable, uint32_t requestId)
 	{
 		EnableCanCommand cmd{};
@@ -489,6 +515,11 @@ namespace Duet::Sbc
 													 cmd.isResponse != 0,
 													 payload,
 													 payloadLength);
+				break;
+			}
+			case OutboundCommandType::ScheduleMove:
+			{
+				written = m_transfer.WriteScheduleMove(tail, tailLength);
 				break;
 			}
 			case OutboundCommandType::EnableCan:

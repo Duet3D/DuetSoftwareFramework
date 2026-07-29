@@ -74,6 +74,14 @@ namespace Duet::Sbc
 							 const uint8_t* payload,
 							 size_t payloadLength);
 		bool QueueEnableCan(bool enable, uint32_t requestId = kNoRequestId);
+
+		// Queue a prepared move. Called from the motion thread, which must never block, so this
+		// returns false rather than waiting when the ring is full - the caller stops preparing.
+		bool QueueScheduleMove(const uint8_t* packet, size_t length);
+
+		// How much of the outbound ring is free, as a fraction. The motion engine stops preparing
+		// moves below a threshold rather than filling the ring and having a move refused halfway.
+		[[nodiscard]] bool OutboundHasHeadroom() const;
 		void RequestEmergencyStop(uint32_t requestId = kNoRequestId);
 		void RequestReset(uint32_t requestId = kNoRequestId);
 

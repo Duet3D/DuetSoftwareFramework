@@ -114,6 +114,12 @@ namespace Duet::Sbc
 		bool WriteEmergencyStop();
 		bool WriteReset();
 		bool WriteEnableCan(bool enable);
+		// Stage a prepared move for the controller. `packet` is a whole ScheduleMove payload - the
+		// header and its driver records - which is built by the motion engine and copied through
+		// unaltered. Returns false if it does not fit in this transfer, in which case the caller
+		// keeps it and offers it again.
+		bool WriteScheduleMove(const uint8_t* packet, size_t length);
+
 		bool WriteCanMessage(uint16_t txToken,
 							 uint16_t msgType,
 							 uint16_t replyType,

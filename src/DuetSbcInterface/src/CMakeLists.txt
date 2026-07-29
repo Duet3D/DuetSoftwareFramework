@@ -71,7 +71,9 @@ set_target_properties(duet_motion PROPERTIES
 # Static library used by the standalone harness.
 add_library(duet_sbc STATIC ${DUET_SBC_SOURCES})
 target_include_directories(duet_sbc PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(duet_sbc PUBLIC duet_spi_protocol Threads::Threads)
+# duet_motion for the ScheduleMoveSink interface the link implements, and for the motion engine the
+# CApi exposes. The dependency is one-way: the motion engine never refers back to the link.
+target_link_libraries(duet_sbc PUBLIC duet_spi_protocol duet_motion Threads::Threads)
 set_target_properties(duet_sbc PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Shared library exposing the C ABI, for P/Invoke from DuetControlServer.

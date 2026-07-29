@@ -162,6 +162,11 @@ namespace Duet::Sbc
 		EmergencyStop = 4,
 		// RequestCommand, no tail
 		Reset = 5,
+		// OutboundCommandHeader + one whole ScheduleMove packet as the tail. Unlike the others there
+		// is no fixed body: the packet is duet::spi::protocol::ScheduleMoveHeader followed by its
+		// driver records, already laid out for the wire, so the transfer loop copies it through
+		// rather than rebuilding it. Queued by the motion thread, not by the managed side
+		ScheduleMove = 6,
 	};
 
 	struct OutboundCommandHeader
