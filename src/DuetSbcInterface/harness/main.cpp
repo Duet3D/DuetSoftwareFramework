@@ -8,6 +8,8 @@
 //
 #include <Config/Configuration.h>
 #include <Platform/ProcessHelpers.h>
+#include <Motion/MoveParams.h>
+#include <SBC/MotionService.h>
 #include <SBC/SbcInterface.h>
 
 #include <algorithm>
@@ -73,6 +75,8 @@ namespace
 					"  --if-prio N           interface RT priority (default 50)\n"
 					"  --rate HZ             producer cycle rate (default 1000)\n"
 					"  --msgs-per-cycle N    movement messages queued per cycle (default 4, like MotionService)\n"
+					"  --motion              run the motion engine and submit moves instead of messages,\n"
+					"                        so the jitter figures are measured under real motion load\n"
 					"  --dst N               CAN destination address (default 2)\n"
 					"  --producer-core N     pin the producer thread to this core (default: unpinned)\n"
 					"  --producer-prio N     producer SCHED_FIFO priority when real-time (default 30)\n"
@@ -98,6 +102,7 @@ int main(int argc, char** argv)
 	int producerPrio = 30;
 	int msgType = 8;
 	bool throwOnError = false;
+	bool motionMode = false;
 
 	auto needArg = [&](int& i) -> const char*
 	{
@@ -138,6 +143,8 @@ int main(int argc, char** argv)
 			rateHz = std::stod(needArg(i));
 		else if (a == "--msgs-per-cycle")
 			msgsPerCycle = std::stoi(needArg(i));
+		else if (a == "--motion")
+			motionMode = true;
 		else if (a == "--dst")
 			dstAddress = std::stoi(needArg(i));
 		else if (a == "--producer-core")
@@ -265,6 +272,40 @@ int main(int argc, char** argv)
 				}
 			});
 
+		// The motion engine, when asked for. Constructed either way so the lifetime is simple, but
+		// only started in motion mode: starting it queues ScheduleMove packets, which is the point.
+		MotionService motion(interface);
+		if (motionMode)
+		{
+			// A minimal machine: three axes and one extruder, one remote driver each. Enough for the
+			// engine to plan and prepare real moves, which is what puts load on the transfer loop.
+			Duet::Sbc::Motion::MotionConfig motionConfig;
+			motionConfig.numVisibleAxes = 3;
+			motionConfig.numTotalAxes = 3;
+			motionConfig.numExtruders = 1;
+			for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)
+			{
+				motionConfig.driveStepsPerMm[drive] = 80.0F;
+				motionConfig.instantDvs[drive] = 10.0F / stepClockRate;
+				motionConfig.printingInstantDvs[drive] = 10.0F / stepClockRate;
+			}
+			for (size_t axis = 0; axis < 3; ++axis)
+			{
+				motionConfig.axisDrivers[axis].numDrivers = 1;
+				motionConfig.axisDrivers[axis].driverNumbers[0] = DriverId((uint8_t)dstAddress, (uint8_t)axis);
+			}
+			motionConfig.extruderDrivers[0] = DriverId((uint8_t)dstAddress, 3);
+			MotionService::Configure(motionConfig);
+
+			if (!motion.Init())
+			{
+				std::fprintf(stderr, "Failed to initialise the motion engine\n");
+				return 1;
+			}
+			motion.Start(config.useRealtimeScheduling ? producerPrio : 0);
+			motion.SetRingState(0, true, false);
+		}
+
 		// Producer: queue a batch of CanMessageMovementLinearShaped per cycle, like MotionService.cs.
 		std::thread producer(
 			[&]
@@ -286,8 +327,63 @@ int main(int argc, char** argv)
 				const auto period =
 					std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(1.0 / rateHz));
 				auto next = std::chrono::steady_clock::now();
+				// Motion mode: a square wave on X and Y, submitted as fast as the ring will take it.
+				// Endpoints are absolute and each move is a delta from the last, so a refused
+				// submission must not advance them.
+				int32_t endPoints[maxAxesPlusExtruders]{};
+				float directionVector[maxAxesPlusExtruders]{};
+				uint32_t moveId = 1;
+				size_t axis = 0;
+				bool forwards = true;
+				alignas(uint32_t) char moveBuffer[Duet::Sbc::Motion::MoveParamsLength(maxAxesPlusExtruders)]{};
+
 				while (gRunning.load(std::memory_order_relaxed))
 				{
+					if (motionMode)
+					{
+						if (motion.CanAddMove(0))
+						{
+							constexpr float lengthMm = 20.0F;
+							constexpr float stepsPerMm = 80.0F;
+							const auto delta = (int32_t)lrintf((forwards ? lengthMm : -lengthMm) * stepsPerMm);
+
+							for (float& d : directionVector) { d = 0.0F; }
+							endPoints[axis] += delta;
+							directionVector[axis] = forwards ? 1.0F : -1.0F;
+
+							auto& header = *reinterpret_cast<Duet::Sbc::Motion::MoveParamsHeader *>(moveBuffer);
+							header = {};
+							header.moveId = moveId;
+							header.ownedDrives = 0xFFFFFFFFu;
+							header.flags = Duet::Sbc::Motion::MoveFlags::canPauseAfter
+										   | Duet::Sbc::Motion::MoveFlags::xyMoving;
+							header.totalDistance = lengthMm;
+							header.maxAcceleration = 500.0F / ((float)stepClockRate * stepClockRate);
+							header.requestedSpeed = 30.0F / stepClockRate;
+							header.ringNumber = 0;
+							header.numDrives = (uint8_t)maxAxesPlusExtruders;
+
+							memcpy(Duet::Sbc::Motion::MoveParamsEndPoints(header), endPoints, sizeof(endPoints));
+							memcpy(Duet::Sbc::Motion::MoveParamsDirectionVector(header),
+								   directionVector,
+								   sizeof(directionVector));
+
+							if (motion.SubmitMove(moveBuffer, sizeof(moveBuffer)))
+							{
+								++moveId;
+								axis ^= 1;
+								if (axis == 0) { forwards = !forwards; }
+							}
+							else
+							{
+								endPoints[axis] -= delta;
+							}
+						}
+						next += period;
+						std::this_thread::sleep_until(next);
+						continue;
+					}
+
 					for (int k = 0; k < msgsPerCycle; k++)
 					{
 						switch (msgType)
