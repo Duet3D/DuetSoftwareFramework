@@ -28,13 +28,13 @@
     {
       "name": "native",
       "displayName": "Native (dev box / build on the Pi)",
-      "inherits": "base"
+      "inherits": "release"
     },
     {
       "name": "arm64",
       "displayName": "Cross-compile for aarch64 against this container's libraries (deployable)",
       "description": "The normal way to build for a Pi. The devcontainer is Debian Bookworm, so its cross toolchain targets the same glibc 2.36 as Raspberry Pi OS Bookworm and libduet_sbc.so from this preset loads there as-is. No sysroot and no Pi needed.",
-      "inherits": "base",
+      "inherits": "release",
       "toolchainFile": "${sourceDir}/cmake/aarch64-linux-gnu.cmake",
       "cacheVariables": {
         "DUET_SBC_SYSROOT": ""
@@ -44,7 +44,7 @@
       "name": "arm64-sysroot",
       "displayName": "Cross-compile for aarch64 against a Pi sysroot (older targets only)",
       "description": "Only needed to target a glibc older than the container's 2.36 - an earlier Pi OS release, say. For Bookworm use arm64. Links against a sysroot copied from the target, so requires pi-sysroot/ to exist: fetch it with scripts/fetch-pi-sysroot.sh <user>@<pi-host>, or override the path with -DDUET_SBC_SYSROOT=...",
-      "inherits": "base",
+      "inherits": "release",
       "toolchainFile": "${sourceDir}/cmake/aarch64-linux-gnu.cmake",
       "cacheVariables": {
         "DUET_SBC_SYSROOT": "${sourceDir}/pi-sysroot"
@@ -54,7 +54,7 @@
       "name": "armhf",
       "displayName": "Cross-compile for 32-bit armhf against this container's libraries (deployable)",
       "description": "As arm64, for a 32-bit Raspberry Pi OS install. Same glibc reasoning: the devcontainer is Debian Bookworm, so libduet_sbc.so from this preset loads on a Bookworm Pi as-is.",
-      "inherits": "base",
+      "inherits": "release",
       "toolchainFile": "${sourceDir}/cmake/arm-linux-gnueabihf.cmake",
       "cacheVariables": {
         "DUET_SBC_SYSROOT": ""
@@ -64,7 +64,7 @@
       "name": "armhf-sysroot",
       "displayName": "Cross-compile for 32-bit armhf against a Pi sysroot (older targets only)",
       "description": "As arm64-sysroot, for a 32-bit Raspberry Pi OS install. Requires pi-sysroot/, or override the path with -DDUET_SBC_SYSROOT=...",
-      "inherits": "base",
+      "inherits": "release",
       "toolchainFile": "${sourceDir}/cmake/arm-linux-gnueabihf.cmake",
       "cacheVariables": {
         "DUET_SBC_SYSROOT": "${sourceDir}/pi-sysroot"
