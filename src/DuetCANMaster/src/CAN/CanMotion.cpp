@@ -15,6 +15,10 @@
 #  include "CanInterface.h"
 #  include <Platform/Platform.h>
 
+#  if HAS_SBC_INTERFACE
+#    include <SBC/SbcMessageFormats.h>
+#  endif
+
 #  include <General/FreelistManager.h>
 
 struct PrepParams
@@ -390,6 +394,94 @@ uint32_t CanMotion::FinishMovement(uint32_t moveStartTime, bool simulating, bool
 	}
 	return clocks;
 }
+
+#  if HAS_SBC_INTERFACE
+
+namespace CanMotion
+{
+	// The move being accumulated from ScheduleMove packets, and how many drivers it has so far.
+	// A move split across several packets shares one moveId; anything held when a different id
+	// arrives belonged to a move the SBC abandoned part way through and must not reach the boards.
+	static uint32_t sbcMoveId = 0;
+	static bool sbcMoveInProgress = false;
+} // namespace CanMotion
+
+void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
+								const SbcProtocol::ScheduleMoveDriver* drivers) noexcept
+{
+	if (!sbcMoveInProgress || header.moveId != sbcMoveId)
+	{
+		// Either the first packet of a move, or the first of a new one while an old one is still
+		// held. StartMovement frees whatever was accumulated, which is what makes the second case
+		// safe: half a move must never be sent.
+		StartMovement();
+		sbcMoveId = header.moveId;
+		sbcMoveInProgress = true;
+	}
+
+	// Rebuild PrepParams from the packet. The SBC plans second-order moves - it has no S-curve
+	// support - so when this firmware is built with S-curve on, the profile goes into the seven-phase
+	// form with jerk zero and only the constant-acceleration phases used. That is the same shape
+	// PrepParams::SetFromDDA produces for a second-order move, and GetBuffer already special-cases
+	// jerk == 0, so nothing downstream can tell the difference.
+	PrepParams params{};
+	params.totalDistance = (motioncalc_t)header.totalDistance;
+	params.startSpeed = (motioncalc_t)header.startSpeed;
+	params.topSpeed = (motioncalc_t)header.topSpeed;
+	params.endSpeed = (motioncalc_t)header.endSpeed;
+	params.useInputShaping = (header.flags & ScheduleMoveFlags::UseInputShaping) != 0;
+
+	const auto accelDistance = (motioncalc_t)header.accelDistance;
+	const auto decelStartDistance = (motioncalc_t)header.decelStartDistance;
+
+#    if SUPPORT_S_CURVE
+	params.jerk = (motioncalc_t)0.0;					// signals that this is not an S-curve move
+	params.peakAcceleration = params.initialAcceleration = (motioncalc_t)header.acceleration;
+	params.peakDeceleration = params.initialDeceleration = (motioncalc_t)header.deceleration;
+	params.phaseClocks[0] = params.phaseClocks[2] = params.phaseClocks[4] = params.phaseClocks[6] = 0;
+	params.phaseClocks[1] = header.accelClocks;
+	params.phaseClocks[3] = header.steadyClocks;
+	params.phaseClocks[5] = header.decelClocks;
+	params.distances[0] = params.distances[2] = params.distances[4] = params.distances[6] = (motioncalc_t)0.0;
+	params.distances[1] = accelDistance;
+	params.distances[3] = decelStartDistance - accelDistance;
+	params.distances[5] = params.totalDistance - decelStartDistance;
+	params.speedsCalculated = false;
+#    else
+	params.accelClocks = header.accelClocks;
+	params.steadyClocks = header.steadyClocks;
+	params.decelClocks = header.decelClocks;
+	params.acceleration = (motioncalc_t)header.acceleration;
+	params.deceleration = (motioncalc_t)header.deceleration;
+	params.accelDistance = accelDistance;
+	params.decelStartDistance = decelStartDistance;
+#    endif
+
+	const bool usePressureAdvance = (header.flags & ScheduleMoveFlags::UsePressureAdvance) != 0;
+	for (size_t i = 0; i < header.numDrivers; ++i)
+	{
+		const SbcProtocol::ScheduleMoveDriver& d = drivers[i];
+		const DriverId driver(d.boardAddress, d.driverNumber);
+		if (d.isExtruder != 0)
+		{
+			AddExtruderMovement(params, driver, d.extrusion, usePressureAdvance);
+		}
+		else
+		{
+			AddAxisMovement(params, driver, d.steps);
+		}
+	}
+
+	if ((header.flags & ScheduleMoveFlags::LastPacket) != 0)
+	{
+		sbcMoveInProgress = false;
+		(void)FinishMovement(header.whenToExecute,
+							 false, // the SBC does not send a move it is only simulating
+							 (header.flags & ScheduleMoveFlags::CheckEndstops) != 0);
+	}
+}
+
+#  endif
 
 bool CanMotion::CanPrepareMove() noexcept
 {

@@ -27,6 +27,7 @@
 
 #  if SUPPORT_CAN_EXPANSION
 #	include <CAN/CanInterface.h>
+#	include <CAN/CanMotion.h>
 #	include <CanMessageBuffer.h>
 
 #include <algorithm>
@@ -455,6 +456,17 @@ void SbcInterface::ExchangeData() noexcept
 		{
 			const auto* const header = m_transfer.ReadDataHeader<EnableCANHeader>();
 			CanInterface::EnableCan(header->enable != 0);
+			break;
+		}
+
+		// Schedule a move planned by the SBC. The packet is DDA::Prepare's output, so this hands it
+		// straight to CanMotion; nothing here needs to understand the move.
+		case SbcRequest::ScheduleMove:
+		{
+			const auto* const header = m_transfer.ReadDataHeader<ScheduleMoveHeader>();
+			const auto* const drivers =
+				reinterpret_cast<const ScheduleMoveDriver*>(m_transfer.ReadData(header->numDrivers * sizeof(ScheduleMoveDriver)));
+			CanMotion::ScheduleFromSbc(*header, drivers);
 			break;
 		}
 

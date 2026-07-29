@@ -12,6 +12,12 @@
 
 #if SUPPORT_CAN_EXPANSION
 
+#  if HAS_SBC_INTERFACE
+// The wire format, shared with the SBC. Named in full here rather than through the firmware-side
+// aliases in SbcMessageFormats.h so that this header stands on its own.
+#    include <DuetSpiProtocol/MessageFormats.h>
+#  endif
+
 class CanMessageBuffer;
 class PrepParams;
 
@@ -25,6 +31,18 @@ namespace CanMotion
 							 float extrusion,
 							 bool usePressureAdvance) noexcept;
 	uint32_t FinishMovement(uint32_t moveStartTime, bool simulating, bool checkEndstops) noexcept;
+
+#  if HAS_SBC_INTERFACE
+	// Take one ScheduleMove packet from the SBC, which plans the moves in this configuration.
+	//
+	// The packet's fields are PrepParams, so this fills one and hands it to the same GetBuffer path
+	// that DDA::Prepare uses in standalone mode; nothing below here can tell where the move came
+	// from. A move too large for one packet arrives as several sharing a moveId, and only the one
+	// carrying ScheduleMoveFlags::LastPacket sends what has been accumulated.
+	void ScheduleFromSbc(const duet::spi::protocol::ScheduleMoveHeader& header,
+						 const duet::spi::protocol::ScheduleMoveDriver *drivers) noexcept;
+#  endif
+
 	bool CanPrepareMove() noexcept;
 	CanMessageBuffer* _ecv_null GetUrgentMessage() noexcept;
 

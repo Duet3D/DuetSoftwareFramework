@@ -681,6 +681,7 @@ const T* DataTransfer::ReadDataHeader() noexcept
 // Explicit instantiation so SbcInterface can read these headers (the template is defined in this translation unit)
 template const CANRequestHeader* DataTransfer::ReadDataHeader<CANRequestHeader>() noexcept;
 template const EnableCANHeader* DataTransfer::ReadDataHeader<EnableCANHeader>() noexcept;
+template const ScheduleMoveHeader* DataTransfer::ReadDataHeader<ScheduleMoveHeader>() noexcept;
 
 bool DataTransfer::ReadBoolean() noexcept
 {
