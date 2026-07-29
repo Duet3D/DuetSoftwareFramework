@@ -1,5 +1,6 @@
 #include "SbcInterface.h"
 
+#include <Movement/StepTimer.h>
 #include <Platform/ProcessHelpers.h>
 
 #include <poll.h>
@@ -377,6 +378,10 @@ namespace Duet::Sbc
 				// throws TransferTimeout to unwind on stop.
 				m_transfer.PerformFullTransfer();
 
+				// Timestamp every transfer at the same point, from the same clock the step-time model
+				// is fitted against. The MasterClock packet this transfer may carry is paired with it.
+				m_lastTransferNs = StepTimer::GetLocalTimeNs();
+
 				// Report connection state transitions
 				const bool connected = m_transfer.IsConnected();
 				if (connected != m_wasConnected)
@@ -603,7 +608,20 @@ namespace Duet::Sbc
 		}
 		case proto::FirmwareRequest::MasterClock:
 		{
-			// Informational; DCS does not consume it
+			if (dataLength < sizeof(proto::MasterClockHeader))
+			{
+				break;
+			}
+			proto::MasterClockHeader header{};
+			std::memcpy(&header, data, sizeof(header));
+
+			// Stamped when the transfer completed rather than now: this packet may be preceded by
+			// any number of others, and how long those take to process varies. A constant offset
+			// between the two clocks disappears into the fit; a varying one does not.
+			StepTimer::RecordMasterClockSample(header.masterClock, m_lastTransferNs);
+
+			// The controller reports its movement delay as a total, not a change.
+			StepTimer::RaiseMovementDelayTo(header.hiccupTime);
 			break;
 		}
 		case proto::FirmwareRequest::CANResponse:

@@ -52,6 +52,13 @@ public:
 
 	// Report that some part of the system could not keep up and everything must slip by this much.
 	static void IncreaseMovementDelay(uint32_t increase) noexcept;
+
+	// Adopt the controller's movement delay, which it reports as a total rather than a change. The
+	// delay is shared: whichever side fell behind, every board has to slip by the same amount or
+	// they lose sync with each other. Never reduces it - a delay already applied to moves that are
+	// queued cannot be taken back.
+	static void RaiseMovementDelayTo(Ticks total) noexcept;
+
 	static Ticks GetMovementDelay() noexcept;
 
 	// If the movement delay has grown since the last call, return the new value, else zero. The

@@ -142,6 +142,10 @@ namespace Duet::Sbc
 		RingBuffer m_inbound;
 		RingBuffer m_outbound;
 
+		// When the most recent transfer completed, in the step-time model's local timebase. Written
+		// and read only by the interface thread.
+		int64_t m_lastTransferNs = 0;
+
 		// Emergency stop / reset are latched rather than queued: they are unconditional and must survive a
 		// full transfer buffer, retrying on each iteration until they are written.
 		std::atomic<bool> m_pendingEmergencyStop{false};

@@ -177,6 +177,19 @@ void StepTimer::IncreaseMovementDelay(uint32_t increase) noexcept
 	movementDelayIncreased.store(true, std::memory_order_release);
 }
 
+void StepTimer::RaiseMovementDelayTo(Ticks total) noexcept
+{
+	Ticks current = movementDelay.load(std::memory_order_relaxed);
+	while (total > current)
+	{
+		if (movementDelay.compare_exchange_weak(current, total, std::memory_order_relaxed))
+		{
+			movementDelayIncreased.store(true, std::memory_order_release);
+			return;
+		}
+	}
+}
+
 StepTimer::Ticks StepTimer::GetMovementDelay() noexcept
 {
 	return movementDelay.load(std::memory_order_relaxed);

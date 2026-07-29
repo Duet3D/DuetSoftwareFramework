@@ -1,6 +1,7 @@
 #include "CApi.h"
 
 #include <Config/Configuration.h>
+#include <Movement/StepTimer.h>
 #include <SBC/SbcInterface.h>
 
 #include <algorithm>
@@ -294,6 +295,28 @@ extern "C"
 	uint64_t DuetSbc_GetDroppedEvents(DuetSbcHandle* h)
 	{
 		return h != nullptr ? h->interface.Inbound().DroppedRecords() : 0;
+	}
+
+	uint32_t DuetSbc_GetStepClockTicks(DuetSbcHandle* h)
+	{
+		(void)h;					// the model is process-wide, like the clock it tracks
+		return StepTimer::GetTimerTicks();
+	}
+
+	void DuetSbc_GetClockStats(DuetSbcHandle* h, DuetSbcClockStats* stats)
+	{
+		(void)h;
+		if (stats == nullptr)
+		{
+			return;
+		}
+		const StepTimer::ClockStats source = StepTimer::GetClockStats();
+		stats->driftPpm = source.driftPpm;
+		stats->numSamples = source.numSamples;
+		stats->peakResidualNs = source.peakResidualNs;
+		stats->numBackwardClamps = source.numBackwardClamps;
+		stats->numRejectedSamples = source.numRejectedSamples;
+		stats->synced = source.synced ? 1 : 0;
 	}
 
 	void DuetSbc_Destroy(DuetSbcHandle* h)

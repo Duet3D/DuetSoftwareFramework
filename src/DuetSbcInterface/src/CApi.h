@@ -121,6 +121,31 @@ extern "C"
 	// Events dropped because the inbound ring was full (i.e. the consumer could not keep up).
 	uint64_t DuetSbc_GetDroppedEvents(DuetSbcHandle* h);
 
+	// --- Step clock ---
+	//
+	// The SBC has no step clock of its own: it models the controller's, from the MasterClock packet
+	// the controller sends every transfer. Move start times are in that timebase, so how well the
+	// model tracks is how well moves land - a move scheduled against a model that is out by more
+	// than the preparation margin arrives late.
+
+	// The current step-clock reading, in the controller's ticks.
+	uint32_t DuetSbc_GetStepClockTicks(DuetSbcHandle* h);
+
+	// How the model is tracking. Mirrors StepTimer::ClockStats; see LinkEvents.cs's counterpart for
+	// the managed shape. `synced` is 0 until the fit has enough samples to be trusted, during which
+	// the model still works but is anchored to the last sample at the nominal rate.
+	using DuetSbcClockStats = struct
+	{
+		double driftPpm;			 // fitted rate minus nominal, in parts per million
+		uint32_t numSamples;		 // samples in the current fit
+		uint32_t peakResidualNs;	 // largest deviation of a sample from the fit since startup
+		uint32_t numBackwardClamps;	 // times a new fit would have made the reading go backwards
+		uint32_t numRejectedSamples; // samples discarded as implausible
+		int32_t synced;
+	};
+
+	void DuetSbc_GetClockStats(DuetSbcHandle* h, DuetSbcClockStats* stats);
+
 	// Destroy the instance (stops the loop first).
 	void DuetSbc_Destroy(DuetSbcHandle* h);
 

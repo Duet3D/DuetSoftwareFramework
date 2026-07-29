@@ -220,6 +220,37 @@ static void TestMovementDelay()
 	CHECK((uint32_t)(raw - StepTimer::GetMovementTimerTicks()) >= 1500, "and so does the movement reading");
 }
 
+// The controller reports its movement delay as a total, and both sides have to converge on the
+// larger of the two: a delay already applied to queued moves cannot be taken back, and a board that
+// does not slip with the others loses sync with them.
+static void TestAdoptingTheControllersDelay()
+{
+	ResetClock();
+	CHECK(StepTimer::GetMovementDelay() == 0, "no movement delay initially");
+
+	StepTimer::RaiseMovementDelayTo(800);
+	CHECK(StepTimer::GetMovementDelay() == 800, "the controller's delay is adopted");
+	CHECK(StepTimer::CheckMovementDelayIncreased() == 800, "and reported back once");
+
+	// The controller repeats its total every transfer. Treating that as an increment would run the
+	// delay away, a few hundred microseconds per transfer, until moves were scheduled far too late.
+	StepTimer::RaiseMovementDelayTo(800);
+	CHECK(StepTimer::GetMovementDelay() == 800, "repeating the same total changes nothing");
+	CHECK(StepTimer::CheckMovementDelayIncreased() == 0, "and there is nothing new to report");
+
+	StepTimer::RaiseMovementDelayTo(500);
+	CHECK(StepTimer::GetMovementDelay() == 800, "a smaller total does not undo a delay already applied");
+
+	StepTimer::RaiseMovementDelayTo(1200);
+	CHECK(StepTimer::GetMovementDelay() == 1200, "a larger total is adopted");
+
+	// Our own hiccups and the controller's meet at the larger of the two rather than summing.
+	StepTimer::IncreaseMovementDelay(300);
+	CHECK(StepTimer::GetMovementDelay() == 1500, "a local hiccup still adds to the delay");
+	StepTimer::RaiseMovementDelayTo(1400);
+	CHECK(StepTimer::GetMovementDelay() == 1500, "the controller catching up does not lower ours");
+}
+
 // Unit conversions, which the ring uses to size its wakeups.
 static void TestConversions()
 {
@@ -237,6 +268,7 @@ int main()
 	TestSurvivesCounterWrap();
 	TestRejectsImplausibleSample();
 	TestMovementDelay();
+	TestAdoptingTheControllersDelay();
 	TestConversions();
 
 	StepTimer::SetLocalClockSource(nullptr);
