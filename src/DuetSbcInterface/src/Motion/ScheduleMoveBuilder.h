@@ -34,6 +34,8 @@ namespace Duet::Sbc::Motion
 		ScheduleMoveSink() noexcept = default;
 		ScheduleMoveSink(const ScheduleMoveSink&) = delete;
 		ScheduleMoveSink& operator=(const ScheduleMoveSink&) = delete;
+		ScheduleMoveSink(ScheduleMoveSink&&) = delete;
+		ScheduleMoveSink& operator=(ScheduleMoveSink&&) = delete;
 		virtual ~ScheduleMoveSink() = default;
 
 		// Take one packet: a ScheduleMoveHeader followed by header.numDrivers ScheduleMoveDriver
@@ -50,7 +52,7 @@ namespace Duet::Sbc::Motion
 	class ScheduleMoveBuilder
 	{
 	public:
-		void SetSink(ScheduleMoveSink *sinkToUse) noexcept { sink = sinkToUse; }
+		void SetSink(ScheduleMoveSink *sinkToUse) noexcept { m_sink = sinkToUse; }
 
 		// Begin a move. Discards anything left over from a move that was abandoned part way through.
 		void StartMovement() noexcept;
@@ -73,7 +75,7 @@ namespace Duet::Sbc::Motion
 		[[nodiscard]] bool CanPrepareMove() const noexcept;
 
 		// Packets the sink refused. Non-zero means motion was lost and the machine must be stopped.
-		[[nodiscard]] uint32_t GetDroppedPackets() const noexcept { return droppedPackets; }
+		[[nodiscard]] uint32_t GetDroppedPackets() const noexcept { return m_droppedPackets; }
 
 	private:
 		// Append a driver record and take the move's profile from this call.
@@ -83,23 +85,23 @@ namespace Duet::Sbc::Motion
 		bool SendPacket(uint32_t moveId, uint32_t moveStartTime, uint8_t flags,
 						size_t first, size_t count) noexcept;
 
-		ScheduleMoveSink *sink = nullptr;
+		ScheduleMoveSink *m_sink = nullptr;
 
 		// The profile of the move being built. Shared by every driver in it, so the packet carries
 		// it once rather than per driver
-		MoveProfile profile;
-		bool usePressureAdvance = false;
+		MoveProfile m_profile;
+		bool m_usePressureAdvance = false;
 
 		// Every driver of every axis, plus one per extruder: the most Prepare can possibly add,
-		// because it visits each logical drive once and each axis has at most MaxDriversPerAxis
+		// because it visits each logical drive once and each axis has at most maxDriversPerAxis
 		// motors. Sized from that bound rather than from a guess so that overflow is impossible
 		// rather than merely unlikely, which is what lets Add() have no failure path.
-		static constexpr size_t MaxDriversPerMove = (MaxAxes * MaxDriversPerAxis) + MaxExtruders;
+		static constexpr size_t maxDriversPerMove = (maxAxes * maxDriversPerAxis) + maxExtruders;
 
-		duet::spi::protocol::ScheduleMoveDriver drivers[MaxDriversPerMove]{};
-		size_t numDrivers = 0;
+		duet::spi::protocol::ScheduleMoveDriver m_drivers[maxDriversPerMove]{};
+		size_t m_numDrivers = 0;
 
-		uint32_t droppedPackets = 0;
+		uint32_t m_droppedPackets = 0;
 	};
 }
 

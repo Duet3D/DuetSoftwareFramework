@@ -15,7 +15,7 @@ namespace
 	size_t arenaSize = 0;
 	size_t arenaUsed = 0;
 
-	constexpr size_t DefaultAlignment = alignof(std::max_align_t);
+	constexpr size_t defaultAlignment = alignof(std::max_align_t);
 
 	size_t AlignUp(size_t value, size_t alignment) noexcept
 	{
@@ -68,7 +68,7 @@ bool Tasks::InitPermanentArena(size_t bytes) noexcept
 	{
 		// Needs RLIMIT_MEMLOCK; a developer running the tests unprivileged will not have it. The
 		// arena is still usable, just not pinned, so carry on rather than failing to start.
-		debugPrintf("could not mlock the motion arena (%zu bytes): timing may be affected\n", bytes);
+		DebugPrintf("could not mlock the motion arena (%zu bytes): timing may be affected\n", bytes);
 	}
 
 	arenaBase = static_cast<char *>(mem);
@@ -90,7 +90,7 @@ void Tasks::ReleasePermanentArena() noexcept
 
 void *Tasks::AllocPermanent(size_t count) noexcept
 {
-	return Allocate(count, DefaultAlignment);
+	return Allocate(count, defaultAlignment);
 }
 
 void *Tasks::AllocPermanent(size_t count, std::align_val_t align) noexcept

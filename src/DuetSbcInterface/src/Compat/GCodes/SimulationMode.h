@@ -12,11 +12,11 @@
 
 enum class SimulationMode : uint8_t
 {
-	off = 0,			// not simulating
-	debug,				// simulating step generation
-	normal,				// not generating steps, just timing
-	partial,			// simulating step generation
-	highest = partial
+	Off = 0,			// not simulating
+	Debug = 1,				// simulating step generation
+	Normal = 2,				// not generating steps, just timing
+	Partial = 3,			// simulating step generation
+	Highest = Partial
 };
 
 #endif /* SRC_COMPAT_GCODES_SIMULATIONMODE_H_ */

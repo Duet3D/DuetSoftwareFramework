@@ -5,8 +5,9 @@
  *      Author: David
  *
  * Trimmed for the SBC. This is RepRapFirmware's DDA with everything that belongs on the other side
- * of the split removed, and it is meant to stay diffable against upstream: what is left is upstream
- * source, not a rewrite.
+ * of the split removed. The logic that remains is upstream's rather than a rewrite, but the
+ * identifiers are this project's: the whole tree was renamed to the convention in .clang-tidy, so
+ * re-syncing against a future RRF release is a merge rather than a diff.
  *
  * Gone, because DuetControlServer owns it now: InitStandardMove and everything it needs
  * (kinematics, the acceleration and feedrate tables, the vector helpers, normalisation), together
@@ -46,7 +47,7 @@ class DDARing;
 // executed rather than about its shape.
 struct PrepParams : public Duet::Sbc::Motion::MoveProfile
 {
-	bool useInputShaping;
+	bool useInputShaping{};
 
 	[[nodiscard]] uint32_t SteadyClocks() const noexcept { return steadyClocks; }
 	[[nodiscard]] uint32_t TotalAccelClocks() const noexcept { return accelClocks; }
@@ -68,12 +69,12 @@ public:
 
 	enum DDAState : uint8_t
 	{
-		empty,				// empty or being filled in
+		Empty,				// empty or being filled in
 #if SUPPORT_S_CURVE
 		created,			// filled in but not yet planned
 #endif
-		planned,			// ready, but could be subject to modifications
-		committed			// has been converted into move segments already
+		Planned,			// ready, but could be subject to modifications
+		Committed			// has been converted into move segments already
 	};
 
 	explicit DDA(DDA *_ecv_null n) noexcept;
@@ -87,51 +88,51 @@ public:
 	// moves already in the ring. This is where InitStandardMove's step 7 used to begin.
 	MovementError InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MoveParamsHeader& params) noexcept SPEED_CRITICAL;
 
-	void SetNext(DDA *n) noexcept { next = n; }
-	void SetPrevious(DDA *p) noexcept { prev = p; }
+	void SetNext(DDA *n) noexcept { m_next = n; }
+	void SetPrevious(DDA *p) noexcept { m_prev = p; }
 	bool Free() noexcept;
 	void Prepare(DDARing& ring,
 #if SUPPORT_S_CURVE
 					MovementProfile& plannedProfile,
 #endif
 					uint32_t prepareAdvanceTime, SimulationMode simMode) noexcept SPEED_CRITICAL;	// Calculate all the values and freeze this DDA
-	bool CanPauseAfter() const noexcept;
-	bool IsPrintingMove() const noexcept { return flags.isPrintingMove; }							// Return true if this involves both XY movement and extrusion
-	bool UsingStandardFeedrate() const noexcept { return flags.usingStandardFeedrate; }
-	bool IsCheckingEndstops() const noexcept { return flags.checkEndstops; }
-	bool IsIsolatedMove() const noexcept { return flags.isolatedMove; }
-	bool NoShaping() const noexcept { return flags.isolatedMove; }
-	bool UsesInputShaping() const noexcept;									// return true if this move should use input shaping
+	[[nodiscard]] bool CanPauseAfter() const noexcept;
+	[[nodiscard]] bool IsPrintingMove() const noexcept { return m_flags.isPrintingMove; }							// Return true if this involves both XY movement and extrusion
+	[[nodiscard]] bool UsingStandardFeedrate() const noexcept { return m_flags.usingStandardFeedrate; }
+	[[nodiscard]] bool IsCheckingEndstops() const noexcept { return m_flags.checkEndstops; }
+	[[nodiscard]] bool IsIsolatedMove() const noexcept { return m_flags.isolatedMove; }
+	[[nodiscard]] bool NoShaping() const noexcept { return m_flags.isolatedMove; }
+	[[nodiscard]] bool UsesInputShaping() const noexcept;									// return true if this move should use input shaping
 
-	DDAState GetState() const noexcept { return (DDAState)flags.stateBits; }
-	void SetState(DDAState state) noexcept { flags.stateBits = (uint32_t)state; }
-	bool IsCommitted() const noexcept { return GetState() == DDA::committed; }
-	bool IsProvisional() const noexcept;
-	DDA* GetNext() const noexcept { return _ecv_not_null(next); }
-	DDA* GetPrevious() const noexcept { return _ecv_not_null(prev); }
-	uint32_t GetTimeLeft() const noexcept;
+	[[nodiscard]] DDAState GetState() const noexcept { return (DDAState)m_flags.stateBits; }
+	void SetState(DDAState state) noexcept { m_flags.stateBits = (uint32_t)state; }
+	[[nodiscard]] bool IsCommitted() const noexcept { return GetState() == DDA::Committed; }
+	[[nodiscard]] bool IsProvisional() const noexcept;
+	[[nodiscard]] DDA* GetNext() const noexcept { return _ecv_not_null(m_next); }
+	[[nodiscard]] DDA* GetPrevious() const noexcept { return _ecv_not_null(m_prev); }
+	[[nodiscard]] uint32_t GetTimeLeft() const noexcept;
 
-	const int32_t *_ecv_array DriveCoordinates() const noexcept { return endPoint; }				// Get endpoints of a move in machine coordinates
+	[[nodiscard]] const int32_t *_ecv_array DriveCoordinates() const noexcept { return m_endPoint; }				// Get endpoints of a move in machine coordinates
 	void SetDriveCoordinate(size_t drive, int32_t ep) noexcept;										// Force an end point
-	void SetFeedRate(float rate) noexcept { requestedSpeed = rate; }
+	void SetFeedRate(float rate) noexcept { m_requestedSpeed = rate; }
 
 	// DuetControlServer's correlation id for this move, quoted back when the move completes or fails
-	uint32_t GetMoveId() const noexcept { return moveId; }
+	[[nodiscard]] uint32_t GetMoveId() const noexcept { return m_moveId; }
 
-	float GetRequestedSpeedMmPerClock() const noexcept { return requestedSpeed; }
-	float GetRequestedSpeedMmPerSec() const noexcept { return InverseConvertSpeedToMmPerSec(requestedSpeed); }
-	float GetTopSpeedMmPerSec() const noexcept { return InverseConvertSpeedToMmPerSec(topSpeed); }
-	float GetAccelerationMmPerSecSquared() const noexcept							// Get the (peak) acceleration for reporting in the object model
+	[[nodiscard]] float GetRequestedSpeedMmPerClock() const noexcept { return m_requestedSpeed; }
+	[[nodiscard]] float GetRequestedSpeedMmPerSec() const noexcept { return InverseConvertSpeedToMmPerSec(m_requestedSpeed); }
+	[[nodiscard]] float GetTopSpeedMmPerSec() const noexcept { return InverseConvertSpeedToMmPerSec(m_topSpeed); }
+	[[nodiscard]] float GetAccelerationMmPerSecSquared() const noexcept							// Get the (peak) acceleration for reporting in the object model
 #if SUPPORT_S_CURVE
 		{ return InverseConvertAcceleration(afterPrepare.peakAcceleration); }
 #else
-		{ return InverseConvertAcceleration(maxAcceleration); }
+		{ return InverseConvertAcceleration(m_maxAcceleration); }
 #endif
-	float GetDecelerationMmPerSecSquared() const noexcept							// Get the (peak) acceleration for reporting in the object model
+	[[nodiscard]] float GetDecelerationMmPerSecSquared() const noexcept							// Get the (peak) acceleration for reporting in the object model
 #if SUPPORT_S_CURVE
 		{ return InverseConvertAcceleration(afterPrepare.peakDeceleration); }
 #else
-		{ return InverseConvertAcceleration(maxAcceleration); }
+		{ return InverseConvertAcceleration(m_maxAcceleration); }
 #endif
 #if SUPPORT_S_CURVE
 	bool IsSCurveMove() const noexcept { return flags.useScurve; }
@@ -144,29 +145,29 @@ public:
 	static void PlanMoves(DDA *firstUnpreparedMove, MovementProfile& plannedProfile, bool stopping) noexcept;
 #endif
 
-	float GetTotalDistance() const noexcept { return totalDistance; }
+	[[nodiscard]] float GetTotalDistance() const noexcept { return m_totalDistance; }
 
-	uint32_t GetClocksNeeded() const noexcept { return clocksNeeded; }
-	bool HasExpired() const noexcept pre(IsCommitted());
-	bool IsNonPrintingExtruderMove() const noexcept { return flags.isNonPrintingExtruderMove; }
-	uint32_t GetMoveStartTime() const noexcept { return afterPrepare.moveStartTime; }
-	uint32_t GetMoveFinishTime() const noexcept { return afterPrepare.moveStartTime + clocksNeeded; }
+	[[nodiscard]] uint32_t GetClocksNeeded() const noexcept { return m_clocksNeeded; }
+	[[nodiscard]] bool HasExpired() const noexcept pre(IsCommitted());
+	[[nodiscard]] bool IsNonPrintingExtruderMove() const noexcept { return m_flags.isNonPrintingExtruderMove; }
+	[[nodiscard]] uint32_t GetMoveStartTime() const noexcept { return afterPrepare.moveStartTime; }
+	[[nodiscard]] uint32_t GetMoveFinishTime() const noexcept { return afterPrepare.moveStartTime + m_clocksNeeded; }
 
-	float GetAverageExtrusionSpeed() const noexcept pre(IsCommitted()) { return afterPrepare.averageExtrusionSpeed; }
-	bool HasForwardExtrusion() const noexcept { return flags.hasForwardExtrusion; }
+	[[nodiscard]] float GetAverageExtrusionSpeed() const noexcept pre(IsCommitted()) { return afterPrepare.averageExtrusionSpeed; }
+	[[nodiscard]] bool HasForwardExtrusion() const noexcept { return m_flags.hasForwardExtrusion; }
 
 	void DebugPrint(const char *_ecv_array tag) const noexcept;				// print the DDA only
 
 	static void PrintMoves() noexcept;										// print saved moves for debugging
 
 #if DDA_LOG_PROBE_CHANGES
-	static const size_t MaxLoggedProbePositions = 40;
+	static const size_t maxLoggedProbePositions = 40;
 	static size_t numLoggedProbePositions;
-	static int32_t loggedProbePositions[XYZ_AXES * MaxLoggedProbePositions];
+	static int32_t loggedProbePositions[xyzAxes * maxLoggedProbePositions];
 #endif
 
 private:
-	static constexpr float MinimumAccelOrDecelClocks = 10.0;				// Minimum number of acceleration or deceleration clocks we try to ensure
+	static constexpr float minimumAccelOrDecelClocks = 10.0;				// Minimum number of acceleration or deceleration clocks we try to ensure
 
 	MovementError RecalculateMove(DDARing& ring) noexcept SPEED_CRITICAL;
 	static void DoLookahead(DDARing& ring, DDA *laDDA) noexcept SPEED_CRITICAL;	// Try to smooth out moves in the queue
@@ -177,12 +178,12 @@ private:
 #endif
 
 	void MatchSpeeds() noexcept SPEED_CRITICAL;
-	bool IsDecelerationMove() const noexcept;								// return true if this move is or have been might have been intended to be a deceleration-only move
-	bool IsAccelerationMove() const noexcept;								// return true if this move is or have been might have been intended to be an acceleration-only move
+	[[nodiscard]] bool IsDecelerationMove() const noexcept;								// return true if this move is or have been might have been intended to be a deceleration-only move
+	[[nodiscard]] bool IsAccelerationMove() const noexcept;								// return true if this move is or have been might have been intended to be an acceleration-only move
 	void DebugPrintVector(const char *_ecv_array name, const float *_ecv_array vec, size_t len) const noexcept;
 
-    DDA *_ecv_null next;							// The next one in the ring
-	DDA *_ecv_null prev;							// The previous one in the ring
+    DDA *_ecv_null m_next;							// The next one in the ring
+	DDA *_ecv_null m_prev;							// The previous one in the ring
 
 	union
 	{
@@ -209,32 +210,32 @@ private:
 					 ;
 		};
 		uint32_t all;								// so that we can print all the flags at once for debugging
-	} flags;
+	} m_flags{};
 
 	// DuetControlServer's id for this move. Native never interprets it; it exists so that a
 	// MoveCompleted or MoveFailed report can be matched to the move that caused it.
-	uint32_t moveId;
+	uint32_t m_moveId;
 
-	int32_t endPoint[MaxAxesPlusExtruders];  		// Machine coordinates of the endpoint
-	float directionVector[MaxAxesPlusExtruders];	// The normalised direction vector - first 3 are XYZ Cartesian coordinates even on a delta
-    float totalDistance;							// How long is the move in hypercuboid space
-    float maxAcceleration;							// The maximum acceleration and deceleration to use, always positive
+	int32_t m_endPoint[maxAxesPlusExtruders]{};  		// Machine coordinates of the endpoint
+	float m_directionVector[maxAxesPlusExtruders]{};	// The normalised direction vector - first 3 are XYZ Cartesian coordinates even on a delta
+    float m_totalDistance{};							// How long is the move in hypercuboid space
+    float m_maxAcceleration{};							// The maximum acceleration and deceleration to use, always positive
 #if SUPPORT_S_CURVE
 	float jerk;										// The magnitude of the rate of change of acceleration or deceleration, always positive
 #endif
-    float requestedSpeed;							// The speed that the user asked for
+    float m_requestedSpeed{};							// The speed that the user asked for
 
     // These vary depending on how we connect the move with its predecessor and successor, but remain constant while the move is being executed
-    float startSpeed, topSpeed, endSpeed;
+    float m_startSpeed{}, m_topSpeed{}, m_endSpeed{};
 #if SUPPORT_S_CURVE
     float startAcceleration;
     float movementRatio;							// for moves with extrusion and axis movement this is the ratio of total extrusion to total distance. For non extruding moves it is 1.0.
 #endif
 
-	uint32_t clocksNeeded;
+	uint32_t m_clocksNeeded{};
 
 #if SUPPORT_ASYNC_MOVES
-	LogicalDrivesBitmap ownedDrives;				// logical drives we are allowed to move
+	LogicalDrivesBitmap m_ownedDrives;				// logical drives we are allowed to move
 #endif
 
 	union
@@ -249,7 +250,7 @@ private:
 			float startSpeedRatio;					// the ratio of start speed of this move to the end speed of the previous move needed to maintain the same extrusion speed across the boundary
 			float maxPrevEndSpeed;					// the maximum end speed we can have for the previous move to remain within the instantaneous speed change limits
 #endif
-		} beforePrepare;
+		} beforePrepare{};
 
 		// Values that are not set or accessed before Prepare is called
 		struct
@@ -269,7 +270,7 @@ private:
 
 inline bool DDA::CanPauseAfter() const noexcept
 {
-	return flags.canPauseAfter && !next->IsCommitted();		// we can't easily cancel moves that have already been sent to CAN expansion boards
+	return m_flags.canPauseAfter && !m_next->IsCommitted();		// we can't easily cancel moves that have already been sent to CAN expansion boards
 }
 
 inline bool DDA::IsProvisional() const noexcept
@@ -277,14 +278,14 @@ inline bool DDA::IsProvisional() const noexcept
 #if SUPPORT_S_CURVE
 	return GetState() == created || GetState() == planned;
 #else
-	return GetState() == planned;
+	return GetState() == Planned;
 #endif
 }
 
 // Return true if this move should use input shaping
 inline bool DDA::UsesInputShaping() const noexcept
 {
-	return flags.xyMoving && !flags.isolatedMove;
+	return m_flags.xyMoving && !m_flags.isolatedMove;
 }
 
 #endif /* DDA_H_ */

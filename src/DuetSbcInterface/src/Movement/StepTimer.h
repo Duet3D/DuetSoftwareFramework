@@ -3,7 +3,7 @@
  *
  * The step clock, as seen from the SBC.
  *
- * On a Duet board this is a hardware timer counting at StepClockRate, and StepTimer also schedules
+ * On a Duet board this is a hardware timer counting at stepClockRate, and StepTimer also schedules
  * the interrupts that generate steps. Neither applies here: there is no local driver to step, and
  * no hardware counter running at the controller's rate. What the motion code still needs is the
  * *reading* - the number the controller would report right now - because every move is scheduled by
@@ -48,7 +48,7 @@ public:
 	static Ticks GetMovementTimerTicks() noexcept;
 	static Ticks ConvertLocalToMovementTime(Ticks localTime) noexcept;
 
-	static constexpr uint32_t GetTickRate() noexcept { return StepClockRate; }
+	static constexpr uint32_t GetTickRate() noexcept { return stepClockRate; }
 
 	// Report that some part of the system could not keep up and everything must slip by this much.
 	static void IncreaseMovementDelay(uint32_t increase) noexcept;
@@ -64,16 +64,16 @@ public:
 	// offset between the two disappears into the fit, a varying one does not.
 	static void RecordMasterClockSample(uint32_t masterTicks, int64_t localNs) noexcept;
 
-	// Our tick rate is a multiple of 1000, so multiply by 1000 and divide by StepClockRate/1000
+	// Our tick rate is a multiple of 1000, so multiply by 1000 and divide by stepClockRate/1000
 	// rather than by 1000000, which would overflow.
 	static constexpr uint32_t TicksToIntegerMicroseconds(uint32_t n) noexcept
 	{
-		return (n * 1000) / (StepClockRate / 1000);
+		return (n * 1000) / (stepClockRate / 1000);
 	}
 
 	static constexpr float TicksToFloatMicroseconds(uint32_t n) noexcept
 	{
-		return (float)n * (1000000.0f / (float)StepClockRate);
+		return (float)n * (1000000.0f / (float)stepClockRate);
 	}
 
 	// --- Diagnostics -------------------------------------------------------------------------
@@ -103,8 +103,8 @@ public:
 	static int64_t GetLocalTimeNs() noexcept;
 
 	// Samples needed before the fit is trusted, and the most it keeps. Exposed for the tests.
-	static constexpr unsigned int MinSamplesToSync = 8;
-	static constexpr unsigned int MaxSamples = 64;
+	static constexpr unsigned int minSamplesToSync = 8;
+	static constexpr unsigned int maxSamples = 64;
 
 	// Samples closer together than this are not added to the fit's window.
 	//
@@ -116,12 +116,12 @@ public:
 	// seconds and brings the resolution to a fraction of a ppm.
 	//
 	// The offset does not need this and does not wait for it: until the window has filled to
-	// MinSamplesToSync, every sample re-anchors the model at the nominal rate.
-	static constexpr int64_t MinSampleSpacingNs = 50000000;		// 50ms
+	// minSamplesToSync, every sample re-anchors the model at the nominal rate.
+	static constexpr int64_t minSampleSpacingNs = 50000000;		// 50ms
 
 	// A fitted rate further than this from nominal is a bad fit, not a bad crystal. Duet 3 and Pi
 	// oscillators are specified well inside 100ppm; 2000 leaves room for a hot board.
-	static constexpr double MaxDriftPpm = 2000.0;
+	static constexpr double maxDriftPpm = 2000.0;
 
 	// The model itself - the fitted map from local nanoseconds to controller ticks, the seqlock
 	// that publishes it, and the sample window - is entirely private to StepTimer.cpp. Nothing

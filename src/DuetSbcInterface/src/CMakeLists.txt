@@ -19,8 +19,8 @@ foreach(_dir IN LISTS DUET_MOTION_DIRS)
 endforeach()
 
 # The motion engine: RepRapFirmware's Movement/ sources, the Compat/ headers that let them compile
-# unmodified against this host, and the Motion/ code written here to replace the parts of the
-# firmware that have no counterpart on an SBC.
+# against this host, and the Motion/ code written here to replace the parts of the firmware that
+# have no counterpart on an SBC.
 #
 # It is a separate library from duet_sbc for two reasons. Imported upstream source is linted by its
 # own project rather than by this one, so clang-tidy is off for the whole target - which would be

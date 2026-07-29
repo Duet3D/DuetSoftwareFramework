@@ -13,7 +13,7 @@ MoveSegment *_ecv_null MoveSegment::freeList = nullptr;
 unsigned int MoveSegment::numCreated = 0;
 
 // Allocate a MoveSegment, from the freelist if possible, else create a new one
-MoveSegment *MoveSegment::Allocate(MoveSegment *_ecv_null p_next) noexcept
+MoveSegment *MoveSegment::Allocate(MoveSegment *_ecv_null pNext) noexcept
 {
 	const auto iflags = IrqSave();
 	MoveSegment *_ecv_null ms = freeList;
@@ -21,13 +21,13 @@ MoveSegment *MoveSegment::Allocate(MoveSegment *_ecv_null p_next) noexcept
 	{
 		freeList = ms->next;
 		IrqRestore(iflags);
-		ms->next = p_next;
+		ms->next = pNext;
 	}
 	else
 	{
 		++numCreated;
 		IrqRestore(iflags);
-		ms = new MoveSegment(p_next);
+		ms = new MoveSegment(pNext);
 	}
 	return ms;
 }
@@ -45,7 +45,7 @@ void MoveSegment::ReleaseAll(MoveSegment *_ecv_null item) noexcept
 
 void MoveSegment::DebugPrint() const noexcept
 {
-	debugPrintf("s=%" PRIu32 " t=%" PRIu32 " d=%.4f u=%.4e a=%.4e"
+	DebugPrintf("s=%" PRIu32 " t=%" PRIu32 " d=%.4f u=%.4e a=%.4e"
 #if SUPPORT_S_CURVE
 				" j=%.4e"
 #endif
@@ -76,7 +76,7 @@ void MoveSegment::AppendDetails(const StringRef& str) const noexcept
 {
 	if (segs == nullptr)
 	{
-		debugPrintf("null seg\n");
+		DebugPrintf("null seg\n");
 	}
 	else
 	{

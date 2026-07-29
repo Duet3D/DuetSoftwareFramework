@@ -3,8 +3,8 @@
  *
  * In RepRapFirmware `reprap` is the global object through which every subsystem finds every other.
  * The imported motion sources use it about thirty times - reprap.GetMove(), reprap.GetGCodes(),
- * reprap.Debug() - and this facade exists so that those call sites need no edits, which keeps the
- * files diffable against upstream.
+ * reprap.Debug() - and this facade exists so that those call sites keep working as written, rather
+ * than each of them having to learn where the motion system actually lives here.
  *
  * It is a facade over much less than the name suggests: one MotionSystem, one view onto its config
  * shaped like GCodes, and debug flags that nothing sets.
@@ -30,9 +30,12 @@ class RepRapShim
 public:
 	RepRapShim() noexcept;
 
-	[[nodiscard]] Duet::Sbc::Motion::MotionSystem& GetMove() const noexcept { return move; }
-	[[nodiscard]] const GCodesShim& GetGCodes() const noexcept { return gCodes; }
-	[[nodiscard]] Platform& GetPlatform() const noexcept { return platform; }
+	// Not static, although there is only ever one of each: the imported code reaches them as
+	// `reprap.GetMove()`, and a static accessor called through an instance is a lint error at every
+	// one of those call sites. `reprap` is the singleton; what hangs off it need not be.
+	[[nodiscard]] Duet::Sbc::Motion::MotionSystem& GetMove() noexcept { return m_move; }
+	[[nodiscard]] const GCodesShim& GetGCodes() const noexcept { return m_gCodes; }
+	[[nodiscard]] Platform& GetPlatform() noexcept { return m_platform; }
 
 	// Debug topic selection. The firmware sets these from M111; nothing sets them here, so every
 	// `if (reprap.Debug(Module::Move))` in the imported code folds away. Kept as functions rather
@@ -42,9 +45,9 @@ public:
 	[[nodiscard]] static AxesBitmap GetDebugFlags(Module module) noexcept;
 
 private:
-	static Duet::Sbc::Motion::MotionSystem move;
-	static Platform platform;
-	GCodesShim gCodes;
+	Duet::Sbc::Motion::MotionSystem m_move;
+	Platform m_platform;
+	GCodesShim m_gCodes;
 };
 
 extern RepRapShim reprap;

@@ -19,8 +19,8 @@ void ScheduleMoveBuilder::StartMovement() noexcept
 	// Anything still here belongs to a move that was abandoned between Start and Finish - a
 	// simulated move, or one that turned out to move nothing. Dropping it is the whole of the
 	// cleanup, because nothing has been sent yet.
-	numDrivers = 0;
-	usePressureAdvance = false;
+	m_numDrivers = 0;
+	m_usePressureAdvance = false;
 }
 
 // Start a driver record, and take the profile while we are here. Every driver of a move shares one
@@ -28,11 +28,11 @@ void ScheduleMoveBuilder::StartMovement() noexcept
 // matter, and the packet carries it once rather than per driver.
 ScheduleMoveDriver& ScheduleMoveBuilder::NewDriver(const MoveProfile& profileToUse, DriverId driver) noexcept
 {
-	profile = profileToUse;
-	ScheduleMoveDriver& d = drivers[min<size_t>(numDrivers, MaxDriversPerMove - 1)];
-	if (numDrivers < MaxDriversPerMove)
+	m_profile = profileToUse;
+	ScheduleMoveDriver& d = m_drivers[min<size_t>(m_numDrivers, maxDriversPerMove - 1)];
+	if (m_numDrivers < maxDriversPerMove)
 	{
-		++numDrivers;				// the bound on MaxDriversPerMove says this is always taken
+		++m_numDrivers;				// the bound on maxDriversPerMove says this is always taken
 	}
 	d.boardAddress = driver.boardAddress;
 	d.driverNumber = driver.localDriver;
@@ -58,7 +58,7 @@ void ScheduleMoveBuilder::AddExtruderMovement(const MoveProfile& profileToUse, D
 
 	// Pressure advance is a property of the CAN message rather than of one driver within it, which
 	// is how the firmware carries it too. In practice every extruder in a move agrees.
-	usePressureAdvance = usePressureAdvance || usePressureAdvanceForThisDrive;
+	m_usePressureAdvance = m_usePressureAdvance || usePressureAdvanceForThisDrive;
 }
 
 bool ScheduleMoveBuilder::SendPacket(uint32_t moveId, uint32_t moveStartTime, uint8_t flags,
@@ -70,33 +70,33 @@ bool ScheduleMoveBuilder::SendPacket(uint32_t moveId, uint32_t moveStartTime, ui
 
 	auto *const header = reinterpret_cast<ScheduleMoveHeader *>(packet);
 	header->whenToExecute = moveStartTime;
-	header->accelClocks = profile.accelClocks;
-	header->steadyClocks = profile.steadyClocks;
-	header->decelClocks = profile.decelClocks;
-	header->acceleration = (float)profile.acceleration;
-	header->deceleration = (float)profile.deceleration;
-	header->totalDistance = (float)profile.totalDistance;
-	header->accelDistance = (float)profile.accelDistance;
-	header->decelStartDistance = (float)profile.decelStartDistance;
-	header->startSpeed = (float)profile.startSpeed;
-	header->topSpeed = (float)profile.topSpeed;
-	header->endSpeed = (float)profile.endSpeed;
+	header->accelClocks = m_profile.accelClocks;
+	header->steadyClocks = m_profile.steadyClocks;
+	header->decelClocks = m_profile.decelClocks;
+	header->acceleration = (float)m_profile.acceleration;
+	header->deceleration = (float)m_profile.deceleration;
+	header->totalDistance = (float)m_profile.totalDistance;
+	header->accelDistance = (float)m_profile.accelDistance;
+	header->decelStartDistance = (float)m_profile.decelStartDistance;
+	header->startSpeed = (float)m_profile.startSpeed;
+	header->topSpeed = (float)m_profile.topSpeed;
+	header->endSpeed = (float)m_profile.endSpeed;
 	header->moveId = moveId;
 	header->numDrivers = (uint8_t)count;
 	header->flags = flags;
 	header->padding = 0;
 
 	const size_t driversBytes = count * sizeof(ScheduleMoveDriver);
-	memcpy(packet + sizeof(ScheduleMoveHeader), &drivers[first], driversBytes);
+	memcpy(packet + sizeof(ScheduleMoveHeader), &m_drivers[first], driversBytes);
 
-	return sink != nullptr && sink->Send(packet, sizeof(ScheduleMoveHeader) + driversBytes);
+	return m_sink != nullptr && m_sink->Send(packet, sizeof(ScheduleMoveHeader) + driversBytes);
 }
 
 uint32_t ScheduleMoveBuilder::FinishMovement(uint32_t moveId, uint32_t moveStartTime, bool simulating,
 											 bool checkEndstops, bool useInputShaping) noexcept
 {
-	const size_t total = numDrivers;
-	numDrivers = 0;
+	const size_t total = m_numDrivers;
+	m_numDrivers = 0;
 
 	if (total == 0 || simulating)
 	{
@@ -106,7 +106,7 @@ uint32_t ScheduleMoveBuilder::FinishMovement(uint32_t moveId, uint32_t moveStart
 
 	uint8_t commonFlags = 0;
 	if (useInputShaping) { commonFlags |= ScheduleMoveFlags::UseInputShaping; }
-	if (usePressureAdvance) { commonFlags |= ScheduleMoveFlags::UsePressureAdvance; }
+	if (m_usePressureAdvance) { commonFlags |= ScheduleMoveFlags::UsePressureAdvance; }
 	if (checkEndstops) { commonFlags |= ScheduleMoveFlags::CheckEndstops; }
 
 	for (size_t first = 0; first < total; first += MaxScheduleMoveDrivers)
@@ -119,16 +119,16 @@ uint32_t ScheduleMoveBuilder::FinishMovement(uint32_t moveId, uint32_t moveStart
 			// The move is now lost: the controller may hold the packets that did get through, and it
 			// discards those when it next sees a different moveId. Do not send the rest - a partial
 			// move reaching the boards would move some drives and not others.
-			++droppedPackets;
+			++m_droppedPackets;
 			Platform::MessageF(ErrorMessage, "move %" PRIu32 " dropped: link busy\n", moveId);
 			return 0;
 		}
 	}
 
-	return profile.TotalClocks();
+	return m_profile.TotalClocks();
 }
 
 bool ScheduleMoveBuilder::CanPrepareMove() const noexcept
 {
-	return sink != nullptr && sink->CanAccept();
+	return m_sink != nullptr && m_sink->CanAccept();
 }

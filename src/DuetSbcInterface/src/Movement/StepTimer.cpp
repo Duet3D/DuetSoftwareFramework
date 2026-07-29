@@ -11,7 +11,7 @@
 
 namespace
 {
-	constexpr double NominalTicksPerNs = (double)StepClockRate / 1.0e9;
+	constexpr double nominalTicksPerNs = (double)stepClockRate / 1.0e9;
 
 	// The linear map from local nanoseconds to controller ticks:
 	//     ticks = masterTicks0 + (localNs - localNs0) * ticksPerNs
@@ -44,7 +44,7 @@ namespace
 		int64_t masterTicks;		// unwrapped
 	};
 
-	Sample samples[StepTimer::MaxSamples];
+	Sample samples[StepTimer::maxSamples];
 	unsigned int numSamples = 0;
 	unsigned int nextSample = 0;			// ring index; the buffer is a sliding window
 	int64_t unwrappedMaster = 0;
@@ -55,7 +55,7 @@ namespace
 	std::atomic<uint32_t> peakResidualNs{0};
 	std::atomic<uint32_t> numBackwardClamps{0};
 	std::atomic<uint32_t> numRejectedSamples{0};
-	std::atomic<double> fittedTicksPerNs{NominalTicksPerNs};
+	std::atomic<double> fittedTicksPerNs{nominalTicksPerNs};
 	std::atomic<uint32_t> publishedSampleCount{0};
 
 	ClockModel LoadModel() noexcept
@@ -145,12 +145,12 @@ void StepTimer::Init() noexcept
 	peakResidualNs.store(0, std::memory_order_relaxed);
 	numBackwardClamps.store(0, std::memory_order_relaxed);
 	numRejectedSamples.store(0, std::memory_order_relaxed);
-	fittedTicksPerNs.store(NominalTicksPerNs, std::memory_order_relaxed);
+	fittedTicksPerNs.store(nominalTicksPerNs, std::memory_order_relaxed);
 	publishedSampleCount.store(0, std::memory_order_relaxed);
 	movementDelay.store(0, std::memory_order_relaxed);
 	movementDelayIncreased.store(false, std::memory_order_relaxed);
 
-	PublishModel(ClockModel{ GetLocalTimeNs(), 0, NominalTicksPerNs });
+	PublishModel(ClockModel{ GetLocalTimeNs(), 0, nominalTicksPerNs });
 }
 
 StepTimer::Ticks StepTimer::GetTimerTicks() noexcept
@@ -209,26 +209,26 @@ void StepTimer::RecordMasterClockSample(uint32_t masterTicks, int64_t localNs) n
 	}
 	lastRawMaster = masterTicks;
 
-	// Decimate into the fitting window. See MinSampleSpacingNs for why the window has to span
+	// Decimate into the fitting window. See minSampleSpacingNs for why the window has to span
 	// seconds rather than transfers.
-	const bool accepted = (numSamples == 0) || (localNs - lastAcceptedNs >= MinSampleSpacingNs);
+	const bool accepted = (numSamples == 0) || (localNs - lastAcceptedNs >= minSampleSpacingNs);
 	if (accepted)
 	{
 		samples[nextSample] = Sample{ localNs, unwrappedMaster };
-		nextSample = (nextSample + 1) % MaxSamples;
+		nextSample = (nextSample + 1) % maxSamples;
 		lastAcceptedNs = localNs;
-		if (numSamples < MaxSamples)
+		if (numSamples < maxSamples)
 		{
 			++numSamples;
 		}
 	}
 
-	if (numSamples < MinSamplesToSync)
+	if (numSamples < minSamplesToSync)
 	{
 		// Not enough to fit a rate yet. Track the offset at the nominal rate, on every sample rather
 		// than only the accepted ones, so the reading is usable immediately - the first move is
 		// scheduled long before the window fills.
-		PublishClamped(ClockModel{ localNs, unwrappedMaster, NominalTicksPerNs }, localNs);
+		PublishClamped(ClockModel{ localNs, unwrappedMaster, nominalTicksPerNs }, localNs);
 		publishedSampleCount.store(numSamples, std::memory_order_relaxed);
 		return;
 	}
@@ -244,14 +244,14 @@ void StepTimer::RecordMasterClockSample(uint32_t masterTicks, int64_t localNs) n
 	// Ordinary least squares of masterTicks against localNs. Both are offset by the oldest sample
 	// before summing: the raw values are ~1e18 and ~1e12, and the sums of squares would lose every
 	// bit that matters in double.
-	const unsigned int oldest = (numSamples < MaxSamples) ? 0 : nextSample;
+	const unsigned int oldest = (numSamples < maxSamples) ? 0 : nextSample;
 	const int64_t refNs = samples[oldest].localNs;
 	const int64_t refTicks = samples[oldest].masterTicks;
 
 	double sumX = 0.0, sumY = 0.0, sumXX = 0.0, sumXY = 0.0;
 	for (unsigned int i = 0; i < numSamples; ++i)
 	{
-		const Sample& s = samples[(oldest + i) % MaxSamples];
+		const Sample& s = samples[(oldest + i) % maxSamples];
 		const double x = (double)(s.localNs - refNs);
 		const double y = (double)(s.masterTicks - refTicks);
 		sumX += x;
@@ -273,8 +273,8 @@ void StepTimer::RecordMasterClockSample(uint32_t masterTicks, int64_t localNs) n
 	const double slope = ((n * sumXY) - (sumX * sumY)) / denom;
 	const double intercept = (sumY - (slope * sumX)) / n;
 
-	const double ppm = ((slope / NominalTicksPerNs) - 1.0) * 1.0e6;
-	if (!std::isfinite(slope) || std::fabs(ppm) > MaxDriftPpm)
+	const double ppm = ((slope / nominalTicksPerNs) - 1.0) * 1.0e6;
+	if (!std::isfinite(slope) || std::fabs(ppm) > maxDriftPpm)
 	{
 		// The fit is implausible - a stalled transfer, or a controller reset that reset its clock.
 		// Drop the window and start again rather than steering the model somewhere wrong.
@@ -289,7 +289,7 @@ void StepTimer::RecordMasterClockSample(uint32_t masterTicks, int64_t localNs) n
 	// Residual of the newest sample, as a health metric.
 	const double predicted = intercept + (slope * (double)(localNs - refNs));
 	const double residualTicks = (double)(unwrappedMaster - refTicks) - predicted;
-	const auto residualNs = (uint32_t)std::fabs(residualTicks / NominalTicksPerNs);
+	const auto residualNs = (uint32_t)std::fabs(residualTicks / nominalTicksPerNs);
 	if (residualNs > peakResidualNs.load(std::memory_order_relaxed))
 	{
 		peakResidualNs.store(residualNs, std::memory_order_relaxed);
@@ -306,12 +306,12 @@ StepTimer::ClockStats StepTimer::GetClockStats() noexcept
 {
 	const uint32_t count = publishedSampleCount.load(std::memory_order_relaxed);
 	return ClockStats{
-		((fittedTicksPerNs.load(std::memory_order_relaxed) / NominalTicksPerNs) - 1.0) * 1.0e6,
+		((fittedTicksPerNs.load(std::memory_order_relaxed) / nominalTicksPerNs) - 1.0) * 1.0e6,
 		count,
 		peakResidualNs.load(std::memory_order_relaxed),
 		numBackwardClamps.load(std::memory_order_relaxed),
 		numRejectedSamples.load(std::memory_order_relaxed),
-		count >= MinSamplesToSync
+		count >= minSamplesToSync
 	};
 }
 

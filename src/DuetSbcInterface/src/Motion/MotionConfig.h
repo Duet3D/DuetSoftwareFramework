@@ -32,7 +32,7 @@ namespace Duet::Sbc::Motion
 	struct AxisDriversConfig
 	{
 		uint8_t numDrivers = 0;
-		DriverId driverNumbers[MaxDriversPerAxis];
+		DriverId driverNumbers[maxDriversPerAxis];
 	};
 
 	struct MotionConfig
@@ -50,21 +50,21 @@ namespace Duet::Sbc::Motion
 
 		// --- Per-drive limits ----------------------------------------------------------------
 
-		float driveStepsPerMm[MaxAxesPlusExtruders]{};
+		float driveStepsPerMm[maxAxesPlusExtruders]{};
 
 		// Instantaneous speed change a drive tolerates at a junction between moves, in mm per step
 		// clock. The printing variant applies when both moves are extruding, where a lower limit
 		// avoids visible artefacts.
-		float instantDvs[MaxAxesPlusExtruders]{};
-		float printingInstantDvs[MaxAxesPlusExtruders]{};
+		float instantDvs[maxAxesPlusExtruders]{};
+		float printingInstantDvs[maxAxesPlusExtruders]{};
 
 		// Pressure advance time constant per drive, in step clocks. Zero for anything that is not
 		// an extruder.
-		float pressureAdvanceClocks[MaxAxesPlusExtruders]{};
+		float pressureAdvanceClocks[maxAxesPlusExtruders]{};
 
 		// Backlash to take up when a drive reverses, in microsteps, and the distance over which to
 		// spread it (as a multiple of the backlash itself).
-		int32_t backlashSteps[MaxAxes]{};
+		int32_t backlashSteps[maxAxes]{};
 		uint32_t backlashCorrectionDistanceFactor = 10;
 
 		// --- Junction policy -----------------------------------------------------------------
@@ -75,8 +75,8 @@ namespace Duet::Sbc::Motion
 
 		// --- Driver mapping ------------------------------------------------------------------
 
-		AxisDriversConfig axisDrivers[MaxAxes];
-		DriverId extruderDrivers[MaxExtruders];
+		AxisDriversConfig axisDrivers[maxAxes];
+		DriverId extruderDrivers[maxExtruders];
 
 		// --- Kinematics results, evaluated by DCS ---------------------------------------------
 
@@ -85,7 +85,7 @@ namespace Duet::Sbc::Motion
 
 		// For each axis, the other drives that must be energised to hold it. On a Cartesian machine
 		// this is empty; on CoreXY moving X requires both motors to be enabled.
-		uint32_t controllingDrives[MaxAxes]{};			// AxesBitmap raw
+		uint32_t controllingDrives[maxAxes]{};			// AxesBitmap raw
 
 		// --- Input shaping --------------------------------------------------------------------
 
@@ -102,7 +102,7 @@ namespace Duet::Sbc::Motion
 
 		[[nodiscard]] constexpr size_t FirstExtruderDrive() const noexcept
 		{
-			return MaxAxesPlusExtruders - numExtruders;
+			return maxAxesPlusExtruders - numExtruders;
 		}
 
 		[[nodiscard]] constexpr bool IsExtruder(size_t drive) const noexcept

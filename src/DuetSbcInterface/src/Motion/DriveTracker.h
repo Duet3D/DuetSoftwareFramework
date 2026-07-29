@@ -49,13 +49,13 @@ namespace Duet::Sbc::Motion
 
 		// Position as of the last retired segment, i.e. not interpolated. This is the value that is
 		// exact at a standstill.
-		[[nodiscard]] int32_t GetMotorPosition() const noexcept { return currentMotorPosition; }
+		[[nodiscard]] int32_t GetMotorPosition() const noexcept { return m_currentMotorPosition; }
 
 		// Force the position, discarding any pending motion. For homing, and for resynchronising
 		// after a move that an endstop cut short.
 		void SetMotorPosition(int32_t position) noexcept;
 
-		[[nodiscard]] bool MotionPending() const noexcept { return segments != nullptr; }
+		[[nodiscard]] bool MotionPending() const noexcept { return m_segments != nullptr; }
 
 		// Net steps taken since this was last called. Extruders use it to report how much filament
 		// has actually been moved, which is not recoverable from the position alone once the
@@ -75,20 +75,20 @@ namespace Duet::Sbc::Motion
 		// that it is still readable when diagnosing a position that looks wrong.
 		void RetireSegment(MoveSegment *segment) noexcept;
 
-		MoveSegment *segments = nullptr;			// pending motion, earliest first
-		MoveSegment *retiredSegment = nullptr;		// kept for diagnostics only
+		MoveSegment *m_segments = nullptr;			// pending motion, earliest first
+		MoveSegment *m_retiredSegment = nullptr;		// kept for diagnostics only
 
-		motioncalc_t u = 0;							// initial speed of the current segment, steps/clock
-		motioncalc_t distanceCarriedForwards = 0;	// the fraction of a step left over from the last segment
+		motioncalc_t m_u = 0;							// initial speed of the current segment, steps/clock
+		motioncalc_t m_distanceCarriedForwards = 0;	// the fraction of a step left over from the last segment
 
-		int32_t currentMotorPosition = 0;			// microsteps, as of the last retired segment
-		int32_t positionAtSegmentStart = 0;			// position when the current segment was entered
-		int32_t netStepsThisSegment = 0;			// what the current segment will add to the position
-		int32_t movementAccumulator = 0;
+		int32_t m_currentMotorPosition = 0;			// microsteps, as of the last retired segment
+		int32_t m_positionAtSegmentStart = 0;			// position when the current segment was entered
+		int32_t m_netStepsThisSegment = 0;			// what the current segment will add to the position
+		int32_t m_movementAccumulator = 0;
 
-		MovementFlags segmentFlags{};
-		uint8_t drive = 0;
-		bool enteredCurrentSegment = false;			// whether the head segment's parameters are loaded
+		MovementFlags m_segmentFlags{};
+		uint8_t m_drive = 0;
+		bool m_enteredCurrentSegment = false;			// whether the head segment's parameters are loaded
 	};
 }
 

@@ -26,7 +26,7 @@ namespace
 		return fakeLocalNs;
 	}
 
-	constexpr double nominalTicksPerNs = (double)StepClockRate / 1.0e9;
+	constexpr double nominalTicksPerNs = (double)stepClockRate / 1.0e9;
 	constexpr int64_t oneMsNs = 1000000;
 
 	// What the real link does: a transfer completes every couple of milliseconds. Everything below
@@ -35,10 +35,10 @@ namespace
 	constexpr int64_t transferIntervalNs = 2 * oneMsNs;
 	constexpr unsigned int samplesPerSecond = (unsigned int)(1000000000 / transferIntervalNs);
 
-	// Enough transfers to fill StepTimer::MaxSamples slots at MinSampleSpacingNs apart, plus a
+	// Enough transfers to fill StepTimer::maxSamples slots at minSampleSpacingNs apart, plus a
 	// margin. Below this the fit is working from a shorter window and is correspondingly noisier.
 	constexpr unsigned int samplesToFillWindow =
-		(unsigned int)((StepTimer::MaxSamples + 2) * StepTimer::MinSampleSpacingNs / transferIntervalNs);
+		(unsigned int)((StepTimer::maxSamples + 2) * StepTimer::minSampleSpacingNs / transferIntervalNs);
 
 	void ResetClock()
 	{
@@ -115,7 +115,7 @@ static void TestMonotonicUnderJitter()
 	// ratcheting it would drift arbitrarily far from the controller. Check it still tracks.
 	const auto reading = (int32_t)StepTimer::GetTimerTicks();
 	const auto truth = (int32_t)(uint32_t)llrint((double)(fakeLocalNs - baseNs) * actualTicksPerNs);
-	CHECK_NEAR(reading, truth, 0.002 * StepClockRate, "still within 2ms of the controller after clamping");
+	CHECK_NEAR(reading, truth, 0.002 * stepClockRate, "still within 2ms of the controller after clamping");
 }
 
 // A 100ppm rate error is 6ms per minute uncorrected - far more than the 25ms scheduling margin
@@ -170,7 +170,7 @@ static void TestSurvivesCounterWrap()
 	CHECK(stats.synced, "still synced across the wrap");
 	CHECK_NEAR(stats.driftPpm, 25.0, 1.0, "wrap does not corrupt the fitted rate");
 	CHECK(stats.numRejectedSamples == 0, "wrap is not mistaken for a bad sample");
-	CHECK_NEAR((int32_t)(StepTimer::GetTimerTicks() - endTicks), 0, 0.001 * StepClockRate,
+	CHECK_NEAR((int32_t)(StepTimer::GetTimerTicks() - endTicks), 0, 0.001 * stepClockRate,
 			   "reading follows the controller through the wrap");
 }
 
@@ -184,7 +184,7 @@ static void TestRejectsImplausibleSample()
 	CHECK(before.synced, "synced before the bad sample");
 
 	// One sample claiming the controller advanced by a second while 1ms of local time passed.
-	fakeLocalNs += StepTimer::MinSampleSpacingNs;
+	fakeLocalNs += StepTimer::minSampleSpacingNs;
 	StepTimer::RecordMasterClockSample(0x40000000u, fakeLocalNs);
 
 	const StepTimer::ClockStats after = StepTimer::GetClockStats();
@@ -223,10 +223,10 @@ static void TestMovementDelay()
 // Unit conversions, which the ring uses to size its wakeups.
 static void TestConversions()
 {
-	CHECK(StepTimer::GetTickRate() == StepClockRate, "tick rate is the step clock rate");
-	CHECK(StepTimer::TicksToIntegerMicroseconds(StepClockRate) == 1000000, "one second is 1e6 us");
-	CHECK_NEAR(StepTimer::TicksToFloatMicroseconds(StepClockRate / 1000), 1000.0, 0.001, "one ms is 1000us");
-	CHECK(MillisToStepClocks(1000) == StepClockRate, "one second of step clocks");
+	CHECK(StepTimer::GetTickRate() == stepClockRate, "tick rate is the step clock rate");
+	CHECK(StepTimer::TicksToIntegerMicroseconds(stepClockRate) == 1000000, "one second is 1e6 us");
+	CHECK_NEAR(StepTimer::TicksToFloatMicroseconds(stepClockRate / 1000), 1000.0, 0.001, "one ms is 1000us");
+	CHECK(MillisToStepClocks(1000) == stepClockRate, "one second of step clocks");
 }
 
 int main()

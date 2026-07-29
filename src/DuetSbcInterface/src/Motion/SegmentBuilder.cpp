@@ -18,7 +18,7 @@ namespace
 	// rearranged for u. Segments do not store u because it is recoverable this way.
 	motioncalc_t CalcInitialSpeed(uint32_t duration, motioncalc_t distance, motioncalc_t a) noexcept
 	{
-		return distance / (motioncalc_t)duration - OneHalf * a * (motioncalc_t)duration;
+		return distance / (motioncalc_t)duration - oneHalf * a * (motioncalc_t)duration;
 	}
 }
 
@@ -32,7 +32,7 @@ MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment *list, ui
 		// Every caller checks the phase is non-empty first, so this means the profile itself is
 		// malformed. Report it and drop the segment rather than inserting one that would divide by
 		// zero in CalcInitialSpeed.
-		debugPrintf("Adding zero or negative duration segment: d=%.3e a=%.3e\n", (double)distance, (double)a);
+		DebugPrintf("Adding zero or negative duration segment: d=%.3e a=%.3e\n", (double)distance, (double)a);
 		return list;
 	}
 
@@ -58,7 +58,7 @@ MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment *list, ui
 			const uint32_t firstDuration = (uint32_t)-offset;
 			const auto mFirstDuration = (motioncalc_t)firstDuration;
 			const motioncalc_t firstDistance =
-				(CalcInitialSpeed(duration, distance, a) + OneHalf * a * mFirstDuration) * mFirstDuration;
+				(CalcInitialSpeed(duration, distance, a) + oneHalf * a * mFirstDuration) * mFirstDuration;
 			seg->SetParameters(startTime, firstDuration, firstDistance, a, moveFlags);
 			if (prev == nullptr)
 			{
@@ -99,7 +99,7 @@ MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment *list, ui
 				// The new segment outlasts the existing one: merge as much as overlaps, then loop.
 				const auto segDuration = (motioncalc_t)seg->GetDuration();
 				const motioncalc_t firstDistance =
-					(CalcInitialSpeed(duration, distance, a) + OneHalf * a * segDuration) * segDuration;
+					(CalcInitialSpeed(duration, distance, a) + oneHalf * a * segDuration) * segDuration;
 				seg->Merge(firstDistance, a, moveFlags);
 				distance -= firstDistance;
 				startTime += seg->GetDuration();

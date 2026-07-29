@@ -14,7 +14,7 @@
  * (MotionConfig, pushed down by DCS) plus the array of DriveTrackers.
  *
  * It is reached through the `reprap` facade in Compat/Platform/RepRap.h, so that the imported code
- * keeps its reprap.GetMove() call sites unchanged and stays diffable against upstream.
+ * keeps its reprap.GetMove() call sites as they are written upstream.
  */
 
 #ifndef SRC_MOTION_MOTIONSYSTEM_H_
@@ -39,40 +39,40 @@ namespace Duet::Sbc::Motion
 		// locked while it reconfigures, exactly as the firmware requires for M92 and friends.
 		void Configure(const MotionConfig& newConfig) noexcept;
 
-		[[nodiscard]] const MotionConfig& GetConfig() const noexcept { return config; }
+		[[nodiscard]] const MotionConfig& GetConfig() const noexcept { return m_config; }
 
 		// --- Accessors used by the imported DDA / DDARing sources ------------------------------
 		//
-		// Names match the firmware's Move members so that those files need no edits here.
+		// Names match the firmware's Move members, so those call sites read as they do upstream.
 
-		[[nodiscard]] float DriveStepsPerMm(size_t drive) const noexcept { return config.driveStepsPerMm[drive]; }
-		[[nodiscard]] uint32_t GetJerkPolicy() const noexcept { return config.jerkPolicy; }
-		[[nodiscard]] float GetMaxInstantDv(size_t drive) const noexcept { return config.instantDvs[drive]; }
-		[[nodiscard]] float GetPrintingInstantDv(size_t drive) const noexcept { return config.printingInstantDvs[drive]; }
+		[[nodiscard]] float DriveStepsPerMm(size_t drive) const noexcept { return m_config.driveStepsPerMm[drive]; }
+		[[nodiscard]] uint32_t GetJerkPolicy() const noexcept { return m_config.jerkPolicy; }
+		[[nodiscard]] float GetMaxInstantDv(size_t drive) const noexcept { return m_config.instantDvs[drive]; }
+		[[nodiscard]] float GetPrintingInstantDv(size_t drive) const noexcept { return m_config.printingInstantDvs[drive]; }
 		[[nodiscard]] float GetPressureAdvanceK0ClocksForLogicalDrive(size_t drive) const noexcept
 		{
-			return config.pressureAdvanceClocks[drive];
+			return m_config.pressureAdvanceClocks[drive];
 		}
 
 		[[nodiscard]] const AxisDriversConfig& GetAxisDriversConfig(size_t axis) const noexcept
 		{
-			return config.axisDrivers[axis];
+			return m_config.axisDrivers[axis];
 		}
 
 		[[nodiscard]] DriverId GetExtruderDriver(size_t extruder) const noexcept
 		{
-			return config.extruderDrivers[extruder];
+			return m_config.extruderDrivers[extruder];
 		}
 
 		// Kinematics answers that DCS evaluated for us; see MotionConfig.
 		[[nodiscard]] bool IsContinuousRotationAxis(size_t axis) const noexcept
 		{
-			return AxesBitmap(config.continuousRotationAxes).IsBitSet(axis);
+			return AxesBitmap(m_config.continuousRotationAxes).IsBitSet(axis);
 		}
 
 		[[nodiscard]] AxesBitmap GetControllingDrives(size_t axis) const noexcept
 		{
-			return AxesBitmap((axis < MaxAxes) ? config.controllingDrives[axis] : 0);
+			return AxesBitmap((axis < maxAxes) ? m_config.controllingDrives[axis] : 0);
 		}
 
 		// Extend a reversing move so that the backlash is taken up. Not const: it tracks how much of
@@ -85,16 +85,16 @@ namespace Duet::Sbc::Motion
 
 		// How long the boards' input shaper spreads a move over. Zero while shaping is off; see
 		// MotionConfig::shapingTimeClocks for why this is not simply absent.
-		[[nodiscard]] uint32_t GetShapingTimeClocks() const noexcept { return config.shapingTimeClocks; }
+		[[nodiscard]] uint32_t GetShapingTimeClocks() const noexcept { return m_config.shapingTimeClocks; }
 
 		// Where prepared moves go out to the controller. Owned here because it is per-machine state
 		// with the same lifetime as the drive trackers, and because the CanMotion shim in front of
 		// it has to find it from somewhere without a second global.
-		[[nodiscard]] ScheduleMoveBuilder& GetScheduleMoveBuilder() noexcept { return scheduleMoveBuilder; }
+		[[nodiscard]] ScheduleMoveBuilder& GetScheduleMoveBuilder() noexcept { return m_scheduleMoveBuilder; }
 
 		// --- Per-drive motion -----------------------------------------------------------------
 
-		[[nodiscard]] DriveTracker& GetDriveTracker(size_t drive) noexcept { return trackers[drive]; }
+		[[nodiscard]] DriveTracker& GetDriveTracker(size_t drive) noexcept { return m_trackers[drive]; }
 
 		// Hand one drive's share of a prepared move to its tracker. This is what DDA::Prepare calls
 		// in place of the firmware's Move::AddLinearSegments.
@@ -123,9 +123,9 @@ namespace Duet::Sbc::Motion
 		void AddPrepareHiccup() noexcept;
 
 	private:
-		MotionConfig config;
-		DriveTracker trackers[MaxAxesPlusExtruders];
-		ScheduleMoveBuilder scheduleMoveBuilder;
+		MotionConfig m_config;
+		DriveTracker m_trackers[maxAxesPlusExtruders];
+		ScheduleMoveBuilder m_scheduleMoveBuilder;
 
 		// Backlash compensation state, as in the firmware's Move. `target` is the correction the
 		// current direction calls for, `current` how much of it has been injected so far; the
@@ -137,9 +137,9 @@ namespace Duet::Sbc::Motion
 		// -O1 and above, dropping the `backwards` term so that the correction is never applied.
 		// Clang compiles the same source correctly and UBSan reports nothing. See the test in
 		// tests/MotionSystemTests.cpp, which catches it.
-		bool lastMoveWasBackwards[MaxAxesPlusExtruders]{};
-		int32_t targetBacklashSteps[MaxAxesPlusExtruders]{};
-		int32_t currentBacklashSteps[MaxAxesPlusExtruders]{};
+		bool m_lastMoveWasBackwards[maxAxesPlusExtruders]{};
+		int32_t m_targetBacklashSteps[maxAxesPlusExtruders]{};
+		int32_t m_currentBacklashSteps[maxAxesPlusExtruders]{};
 	};
 }
 

@@ -17,7 +17,7 @@
 // The subset of the firmware's MessageType that reaches this code. The values do not have to match
 // the firmware's: nothing on this side puts them on the wire, and DCS classifies messages itself
 // from the LinkEvents log level.
-enum MessageType : uint32_t
+enum MessageType : uint8_t
 {
 	DebugMessage = 0,
 	GenericMessage,

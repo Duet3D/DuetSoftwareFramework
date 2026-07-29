@@ -20,7 +20,6 @@ using Duet::Sbc::Motion::MoveProfile;
 
 namespace
 {
-	constexpr size_t xAxis = 0;
 
 	// A three-axis, one-extruder Cartesian machine with one driver per axis.
 	MotionConfig BasicConfig(int32_t backlash = 0, uint32_t distanceFactor = 10) noexcept
@@ -41,7 +40,7 @@ namespace
 			c.backlashSteps[axis] = backlash;
 		}
 
-		const size_t extruderDrive = MaxAxesPlusExtruders - 1;
+		const size_t extruderDrive = maxAxesPlusExtruders - 1;
 		c.driveStepsPerMm[extruderDrive] = 400.0f;
 		c.extruderDrivers[0] = DriverId((CanAddress)1, 3);
 		return c;
@@ -120,8 +119,8 @@ static void TestReportedPositionExcludesBacklash()
 {
 	MotionSystem& move = FreshSystem(BasicConfig(20, 10));
 
-	int32_t positions[MaxAxesPlusExtruders] = {};
-	move.GetMotorPositions(positions, MaxAxesPlusExtruders);
+	int32_t positions[maxAxesPlusExtruders] = {};
+	move.GetMotorPositions(positions, maxAxesPlusExtruders);
 	CHECK(positions[xAxis] == 0, "starts at zero");
 
 	// Establish a direction, then reverse so that a correction is injected.
@@ -151,7 +150,7 @@ static void TestReportedPositionExcludesBacklash()
 	CHECK_NEAR(move.GetDriveTracker(xAxis).GetMotorPosition(), -20.0, 1.0,
 			   "the motor really did move by the correction");
 
-	move.GetMotorPositions(positions, MaxAxesPlusExtruders);
+	move.GetMotorPositions(positions, maxAxesPlusExtruders);
 	CHECK_NEAR(positions[xAxis], 0.0, 1.0, "but the reported axis position is back where it started");
 }
 
@@ -162,7 +161,7 @@ static void TestExtrudersAreNotCompensated()
 	const MotionConfig config = BasicConfig(50, 10);
 	MotionSystem& move = FreshSystem(config);
 
-	const size_t extruderDrive = MaxAxesPlusExtruders - 1;
+	const size_t extruderDrive = maxAxesPlusExtruders - 1;
 	CHECK(move.ApplyBacklashCompensation(extruderDrive, 500) == 500, "extruder deltas are untouched");
 	CHECK(move.ApplyBacklashCompensation(extruderDrive, -500) == -500, "in both directions");
 }
@@ -194,8 +193,8 @@ static void TestAreDrivesStopped()
 	move.AdvanceTrackers(profile.TotalClocks());
 	CHECK(move.AreDrivesStopped(all), "stopped again once the move has been retired");
 
-	int32_t positions[MaxAxesPlusExtruders] = {};
-	move.GetMotorPositions(positions, MaxAxesPlusExtruders);
+	int32_t positions[maxAxesPlusExtruders] = {};
+	move.GetMotorPositions(positions, maxAxesPlusExtruders);
 	CHECK(positions[xAxis] == 300, "and the move's steps are in the reported position");
 }
 
@@ -218,13 +217,13 @@ static void TestCancelSteppingAbandonsPendingMotion()
 	move.AddLinearSegments(xAxis, 0, profile, (motioncalc_t)300.0, flags);
 	move.AdvanceTrackers(1000);					// partway through
 
-	int32_t before[MaxAxesPlusExtruders] = {};
-	move.GetMotorPositions(before, MaxAxesPlusExtruders);
+	int32_t before[maxAxesPlusExtruders] = {};
+	move.GetMotorPositions(before, maxAxesPlusExtruders);
 
 	move.CancelStepping();
 
-	int32_t after[MaxAxesPlusExtruders] = {};
-	move.GetMotorPositions(after, MaxAxesPlusExtruders);
+	int32_t after[maxAxesPlusExtruders] = {};
+	move.GetMotorPositions(after, maxAxesPlusExtruders);
 	CHECK(move.AreDrivesStopped(LogicalDrivesBitmap::MakeLowestNBits(4)), "nothing is pending afterwards");
 	CHECK(after[xAxis] == before[xAxis], "the position does not jump to where the move would have ended");
 	CHECK(after[xAxis] < 300, "and is short of the commanded travel");
@@ -237,7 +236,7 @@ static void TestConfigureIsVisibleThroughAccessors()
 	config.jerkPolicy = 1;
 	config.continuousRotationAxes = AxesBitmap::MakeFromBits(2).GetRaw();
 	config.controllingDrives[xAxis] = AxesBitmap::MakeFromBits(0, 1).GetRaw();
-	config.pressureAdvanceClocks[MaxAxesPlusExtruders - 1] = 30.0f;
+	config.pressureAdvanceClocks[maxAxesPlusExtruders - 1] = 30.0f;
 	config.shapingTimeClocks = 750;
 
 	const MotionSystem& move = FreshSystem(config);
@@ -250,7 +249,7 @@ static void TestConfigureIsVisibleThroughAccessors()
 	CHECK(move.IsContinuousRotationAxis(2), "continuous rotation axis, as evaluated by DCS");
 	CHECK(!move.IsContinuousRotationAxis(xAxis), "and one that is not");
 	CHECK(move.GetControllingDrives(xAxis).IsBitSet(1), "controlling drives, as evaluated by DCS");
-	CHECK_NEAR(move.GetPressureAdvanceK0ClocksForLogicalDrive(MaxAxesPlusExtruders - 1), 30.0, 1e-6,
+	CHECK_NEAR(move.GetPressureAdvanceK0ClocksForLogicalDrive(maxAxesPlusExtruders - 1), 30.0, 1e-6,
 			   "pressure advance");
 	CHECK(move.GetShapingTimeClocks() == 750, "shaping time");
 	CHECK(reprap.GetGCodes().GetTotalAxes() == 3, "the GCodes view sees the same config");

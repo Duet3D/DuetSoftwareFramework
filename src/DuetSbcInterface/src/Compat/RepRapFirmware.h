@@ -12,7 +12,7 @@
  * the eCv annotations - comes from RRFLibraries, which is built for this host as RRFLibraries_HOST.
  *
  * Values that differ from the firmware's are called out where they appear. Values that must match
- * it - StepClockRate above all, since move start times are exchanged with the boards in those
+ * it - stepClockRate above all, since move start times are exchanged with the boards in those
  * ticks - are copied verbatim from src/DuetCANMaster/src/RepRapFirmware.h.
  */
 
@@ -98,39 +98,39 @@ using MovementSystemNumber = unsigned int;
 // actual axis and extruder counts arrive at run time in MotionConfig.
 // ---------------------------------------------------------------------------------------------
 
-constexpr size_t MaxAxes = 30;					// maximum number of movement axes
-constexpr size_t MaxExtruders = 20;				// maximum number of extruders
-constexpr size_t MaxAxesPlusExtruders = 32;		// may be <= MaxAxes + MaxExtruders
-constexpr size_t MaxDriversPerAxis = 8;
+constexpr size_t maxAxes = 30;					// maximum number of movement axes
+constexpr size_t maxExtruders = 20;				// maximum number of extruders
+constexpr size_t maxAxesPlusExtruders = 32;		// may be <= maxAxes + maxExtruders
+constexpr size_t maxDriversPerAxis = 8;
 
-constexpr size_t XYZ_AXES = 3;
-constexpr size_t X_AXIS = 0, Y_AXIS = 1, Z_AXIS = 2;
-constexpr size_t NO_AXIS = 0x3F;
+constexpr size_t xyzAxes = 3;
+constexpr size_t xAxis = 0, yAxis = 1, zAxis = 2;
+constexpr size_t noAxis = 0x3F;
 
-static_assert(MaxAxesPlusExtruders <= MaxAxes + MaxExtruders);
+static_assert(maxAxesPlusExtruders <= maxAxes + maxExtruders);
 
 // An axis's logical drive number is its axis number; an extruder's counts down from the top. This
-// is how the firmware packs both into MaxAxesPlusExtruders slots, and the endpoint and direction
+// is how the firmware packs both into maxAxesPlusExtruders slots, and the endpoint and direction
 // vectors sent from DuetControlServer are indexed the same way.
 inline size_t ExtruderToLogicalDrive(size_t extruder) noexcept
 {
-	return MaxAxesPlusExtruders - 1 - extruder;
+	return maxAxesPlusExtruders - 1 - extruder;
 }
 
 inline size_t LogicalDriveToExtruder(size_t drive) noexcept
 {
-	return MaxAxesPlusExtruders - 1 - drive;
+	return maxAxesPlusExtruders - 1 - drive;
 }
 
 using AxesBitmap = Bitmap<uint32_t>;
 using ExtrudersBitmap = Bitmap<uint32_t>;
 using LogicalDrivesBitmap = Bitmap<uint32_t>;
 
-static_assert(MaxAxesPlusExtruders <= AxesBitmap::MaxBits());
-static_assert(MaxAxesPlusExtruders <= LogicalDrivesBitmap::MaxBits());
-static_assert(MaxExtruders <= ExtrudersBitmap::MaxBits());
+static_assert(maxAxesPlusExtruders <= AxesBitmap::MaxBits());
+static_assert(maxAxesPlusExtruders <= LogicalDrivesBitmap::MaxBits());
+static_assert(maxExtruders <= ExtrudersBitmap::MaxBits());
 
-constexpr AxesBitmap XyzAxes = AxesBitmap::MakeLowestNBits(XYZ_AXES);
+constexpr AxesBitmap xyzAxesBitmap = AxesBitmap::MakeLowestNBits(xyzAxes);
 
 // ---------------------------------------------------------------------------------------------
 // Driver identifiers
@@ -140,19 +140,19 @@ constexpr AxesBitmap XyzAxes = AxesBitmap::MakeLowestNBits(XYZ_AXES);
 // ---------------------------------------------------------------------------------------------
 
 using CanAddress = uint8_t;
-constexpr CanAddress NoCanAddress = 0xFF;
+constexpr CanAddress noCanAddress = 0xFF;
 
 struct DriverId
 {
 	uint8_t localDriver = 0;			// driver number on the board named by boardAddress
-	CanAddress boardAddress = NoCanAddress;
+	CanAddress boardAddress = noCanAddress;
 
 	constexpr DriverId() noexcept = default;
 	constexpr DriverId(CanAddress addr, uint8_t drv) noexcept : localDriver(drv), boardAddress(addr) { }
 
 	[[nodiscard]] constexpr CanAddress GetBoardAddress() const noexcept { return boardAddress; }
-	[[nodiscard]] constexpr bool IsLocal() const noexcept { return false; }
-	[[nodiscard]] constexpr bool IsRemote() const noexcept { return boardAddress != NoCanAddress; }
+	[[nodiscard]] static constexpr bool IsLocal() noexcept { return false; }
+	[[nodiscard]] constexpr bool IsRemote() const noexcept { return boardAddress != noCanAddress; }
 
 	constexpr bool operator<(const DriverId other) const noexcept
 	{
@@ -177,55 +177,55 @@ struct DriverId
 // aligned with the controller's.
 // ---------------------------------------------------------------------------------------------
 
-constexpr uint32_t StepClockRate = 48000000 / 64;		// 750kHz, common to all Duet 3 boards
-constexpr uint64_t StepClockRateSquared = (uint64_t)StepClockRate * StepClockRate;
-constexpr float StepClocksToMillis = 1000.0f / (float)StepClockRate;
-constexpr float StepClocksToSeconds = 1.0f / (float)StepClockRate;
+constexpr uint32_t stepClockRate = 48000000 / 64;		// 750kHz, common to all Duet 3 boards
+constexpr uint64_t stepClockRateSquared = (uint64_t)stepClockRate * stepClockRate;
+constexpr float stepClocksToMillis = 1000.0f / (float)stepClockRate;
+constexpr float stepClocksToSeconds = 1.0f / (float)stepClockRate;
 
 constexpr unsigned int iMinutesToSeconds = 60;
 
 static constexpr uint32_t MillisToStepClocks(uint32_t numMillis) noexcept
 {
-	static_assert(StepClockRate % 1000 == 0);
-	return numMillis * (StepClockRate / 1000);
+	static_assert(stepClockRate % 1000 == 0);
+	return numMillis * (stepClockRate / 1000);
 }
 
 // Rounds up without std::ceil, which is not usable in a constant expression under clang.
 static consteval uint32_t MicrosecondsToStepClocks(float us) noexcept
 {
-	const double clocks = StepClockRate * 0.000001 * us;
+	const double clocks = stepClockRate * 0.000001 * us;
 	const auto truncated = (uint32_t)clocks;
 	return truncated + (((double)truncated < clocks) ? 1u : 0u);
 }
 
 static constexpr float ConvertSpeedFromMmPerSec(float speed) noexcept
 {
-	return speed * (1.0f / (float)StepClockRate);
+	return speed * (1.0f / (float)stepClockRate);
 }
 
 static constexpr float ConvertSpeedFromMmPerMin(float speed) noexcept
 {
-	return speed * (1.0f / (float)(StepClockRate * iMinutesToSeconds));
+	return speed * (1.0f / (float)(stepClockRate * iMinutesToSeconds));
 }
 
 static constexpr float InverseConvertSpeedToMmPerSec(float speed) noexcept
 {
-	return speed * (float)StepClockRate;
+	return speed * (float)stepClockRate;
 }
 
 static constexpr float InverseConvertSpeedToMmPerMin(float speed) noexcept
 {
-	return speed * (float)(StepClockRate * iMinutesToSeconds);
+	return speed * (float)(stepClockRate * iMinutesToSeconds);
 }
 
 static constexpr float ConvertAcceleration(float accel) noexcept
 {
-	return accel * (1.0f / (float)StepClockRateSquared);
+	return accel * (1.0f / (float)stepClockRateSquared);
 }
 
 static constexpr float InverseConvertAcceleration(float accel) noexcept
 {
-	return accel * (float)StepClockRateSquared;
+	return accel * (float)stepClockRateSquared;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -234,12 +234,12 @@ static constexpr float InverseConvertAcceleration(float accel) noexcept
 
 // The firmware's versions exploit known alignment on Cortex-M. Here they are memcpy, which the
 // compiler lowers to the same thing.
-inline void memcpyf(float *dst, const float *src, size_t numFloats) noexcept
+inline void Memcpyf(float *dst, const float *src, size_t numFloats) noexcept
 {
 	std::memcpy(dst, src, numFloats * sizeof(float));
 }
 
-inline void memcpyu32(uint32_t *dst, const uint32_t *src, size_t numWords) noexcept
+inline void Memcpyu32(uint32_t *dst, const uint32_t *src, size_t numWords) noexcept
 {
 	std::memcpy(dst, src, numWords * sizeof(uint32_t));
 }
@@ -258,14 +258,14 @@ inline void memcpyu32(uint32_t *dst, const uint32_t *src, size_t numWords) noexc
 // the segment machinery from another thread; the C API reads a snapshot the motion thread publishes.
 using irqflags_t = uint32_t;
 inline irqflags_t IrqSave() noexcept { return 0; }
-inline void IrqRestore(irqflags_t) noexcept { }
+inline void IrqRestore(irqflags_t /*unused*/) noexcept { }
 
 // Milliseconds since start, for the ring's grace-period bookkeeping.
-uint32_t millis() noexcept;
+uint32_t Millis() noexcept;
 
 // Debug output. Routed to the log sink rather than stdout: the motion thread runs SCHED_FIFO, and
 // a write() to a pipe nobody is draining would block it. See Compat/Debug.cpp.
-void debugPrintf(const char *fmt, ...) noexcept __attribute__((format(printf, 1, 2)));
+void DebugPrintf(const char *fmt, ...) noexcept __attribute__((format(printf, 1, 2)));
 
 // Debug topic selection. The firmware reads these from M111; here nothing sets them, so every
 // `if (reprap.Debug(Module::Move))` branch is compiled against a constant false.
@@ -273,7 +273,7 @@ enum class Module : uint8_t
 {
 	Move = 0,
 	DDA,
-	num
+	Num
 };
 
 // ---------------------------------------------------------------------------------------------

@@ -30,25 +30,25 @@ namespace Duet::Sbc::Motion
 	namespace MoveFlags
 	{
 		// The move may be paused after, i.e. it is not part of an indivisible sequence
-		inline constexpr uint32_t CanPauseAfter = 1u << 0;
+		inline constexpr uint32_t canPauseAfter = 1u << 0;
 		// The move monitors endstops or a Z probe. Always an isolated move as well
-		inline constexpr uint32_t CheckEndstops = 1u << 1;
+		inline constexpr uint32_t checkEndstops = 1u << 1;
 		// The move runs at the standard feed rate, so a feed rate change may be applied while queued
-		inline constexpr uint32_t UsingStandardFeedrate = 1u << 2;
+		inline constexpr uint32_t usingStandardFeedrate = 1u << 2;
 		// Apply pressure advance to forward extrusion in this move
-		inline constexpr uint32_t UsePressureAdvance = 1u << 3;
+		inline constexpr uint32_t usePressureAdvance = 1u << 3;
 		// Both XY movement and extrusion, i.e. the printing jerk limits apply
-		inline constexpr uint32_t IsPrintingMove = 1u << 4;
+		inline constexpr uint32_t isPrintingMove = 1u << 4;
 		// Movement along an X or Y axis was asked for, even if it rounds to no steps
-		inline constexpr uint32_t XyMoving = 1u << 5;
+		inline constexpr uint32_t xyMoving = 1u << 5;
 		// An extruder-only move, or one involving reverse extrusion
-		inline constexpr uint32_t IsNonPrintingExtruderMove = 1u << 6;
+		inline constexpr uint32_t isNonPrintingExtruderMove = 1u << 6;
 		// Continuous rotation axes took the short way round
-		inline constexpr uint32_t ContinuousRotationShortcut = 1u << 7;
+		inline constexpr uint32_t continuousRotationShortcut = 1u << 7;
 		// Do not meld this move with its neighbours, and let it finish before starting the next
-		inline constexpr uint32_t IsolatedMove = 1u << 8;
+		inline constexpr uint32_t isolatedMove = 1u << 8;
 		// Some extruder moves forwards during this move (M571)
-		inline constexpr uint32_t HasForwardExtrusion = 1u << 9;
+		inline constexpr uint32_t hasForwardExtrusion = 1u << 9;
 	}
 
 #pragma pack(push, 1)
@@ -58,7 +58,7 @@ namespace Duet::Sbc::Motion
 	//     int32_t endPoint[numDrives];        machine position each drive ends at, microsteps
 	//     float   directionVector[numDrives]; normalised direction, first three entries Cartesian
 	//
-	// numDrives is the configured MaxAxesPlusExtruders rather than the number of drives that
+	// numDrives is the configured maxAxesPlusExtruders rather than the number of drives that
 	// actually move, because MatchSpeeds, RecalculateMove and Prepare all index densely by logical
 	// drive. That is 288 bytes a move; a sparse encoding would save most of it and cost indexing
 	// complexity everywhere, which is not a trade worth making before anything has been measured.
@@ -88,11 +88,11 @@ namespace Duet::Sbc::Motion
 #pragma pack(pop)
 
 	static_assert(sizeof(MoveParamsHeader) == 28, "MoveParamsHeader must be 28 bytes");
-	static_assert(offsetof(MoveParamsHeader, totalDistance) == 12, "");
-	static_assert(offsetof(MoveParamsHeader, ringNumber) == 24, "");
+	static_assert(offsetof(MoveParamsHeader, totalDistance) == 12 );
+	static_assert(offsetof(MoveParamsHeader, ringNumber) == 24 );
 
 	// Total size of a submission carrying `numDrives` drives.
-	[[nodiscard]] inline constexpr size_t MoveParamsLength(size_t numDrives) noexcept
+	[[nodiscard]] constexpr size_t MoveParamsLength(size_t numDrives) noexcept
 	{
 		return sizeof(MoveParamsHeader) + (numDrives * (sizeof(int32_t) + sizeof(float)));
 	}

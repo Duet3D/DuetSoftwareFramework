@@ -14,7 +14,7 @@ namespace
 
 	// Long enough for the widest DDA::DebugPrint line; anything longer is truncated rather than
 	// allocated for, because this runs on the motion thread.
-	constexpr size_t MaxMessageLength = 256;
+	constexpr size_t maxMessageLength = 256;
 }
 
 void Duet::Sbc::Motion::SetLogSink(LogSink sink) noexcept
@@ -22,9 +22,9 @@ void Duet::Sbc::Motion::SetLogSink(LogSink sink) noexcept
 	logSink.store(sink, std::memory_order_release);
 }
 
-void debugPrintf(const char *fmt, ...) noexcept
+void DebugPrintf(const char *fmt, ...) noexcept
 {
-	char buffer[MaxMessageLength];
+	char buffer[maxMessageLength];
 
 	va_list args;
 	va_start(args, fmt);
@@ -47,7 +47,7 @@ void debugPrintf(const char *fmt, ...) noexcept
 	}
 }
 
-uint32_t millis() noexcept
+uint32_t Millis() noexcept
 {
 	// CLOCK_MONOTONIC rather than the step clock: this is only used for the ring's grace period and
 	// for rate-limiting diagnostics, neither of which needs to agree with the controller's clock.

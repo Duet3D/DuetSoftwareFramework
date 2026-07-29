@@ -23,14 +23,14 @@ namespace Duet::Sbc::Motion
 class GCodesShim
 {
 public:
-	explicit GCodesShim(const Duet::Sbc::Motion::MotionSystem& p_move) noexcept : move(p_move) { }
+	explicit GCodesShim(const Duet::Sbc::Motion::MotionSystem& pMove) noexcept : m_move(&pMove) { }
 
 	[[nodiscard]] size_t GetTotalAxes() const noexcept;
 	[[nodiscard]] size_t GetVisibleAxes() const noexcept;
 	[[nodiscard]] size_t GetNumExtruders() const noexcept;
 
 private:
-	const Duet::Sbc::Motion::MotionSystem& move;
+	const Duet::Sbc::Motion::MotionSystem *m_move;
 };
 
 #endif /* SRC_COMPAT_GCODES_GCODES_H_ */

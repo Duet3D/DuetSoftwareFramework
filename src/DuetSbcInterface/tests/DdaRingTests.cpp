@@ -37,7 +37,7 @@ namespace
 
 	int64_t FakeClock() noexcept { return fakeNow; }
 
-	constexpr int64_t nsPerTick = 1000000000 / StepClockRate;
+	constexpr int64_t nsPerTick = 1000000000 / stepClockRate;
 
 	void AdvanceTicks(uint32_t ticks) noexcept { fakeNow += (int64_t)ticks * nsPerTick; }
 
@@ -62,13 +62,13 @@ namespace
 
 	constexpr size_t numAxes = 3;
 	constexpr size_t numExtruders = 1;
-	constexpr size_t extruderDrive = MaxAxesPlusExtruders - 1;
+	constexpr size_t extruderDrive = maxAxesPlusExtruders - 1;
 	constexpr float stepsPerMm = 80.0F;
 
 	// A modest printer: 100 mm/s, 1000 mm/s^2, 10 mm/s of allowed instantaneous speed change.
-	constexpr float feedRate = 100.0F / StepClockRate;
-	constexpr float acceleration = 1000.0F / ((float)StepClockRate * StepClockRate);
-	constexpr float instantDv = 10.0F / StepClockRate;
+	constexpr float feedRate = 100.0F / stepClockRate;
+	constexpr float acceleration = 1000.0F / ((float)stepClockRate * stepClockRate);
+	constexpr float instantDv = 10.0F / stepClockRate;
 
 	void ConfigureMachine() noexcept
 	{
@@ -77,7 +77,7 @@ namespace
 		config.numTotalAxes = numAxes;
 		config.numExtruders = numExtruders;
 		config.jerkPolicy = 0;
-		for (size_t drive = 0; drive < MaxAxesPlusExtruders; ++drive)
+		for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)
 		{
 			config.driveStepsPerMm[drive] = stepsPerMm;
 			config.instantDvs[drive] = instantDv;
@@ -99,7 +99,7 @@ namespace
 	// direction vector, with the speed and acceleration already limited on that side.
 	struct MoveRecord
 	{
-		alignas(uint32_t) char bytes[MoveParamsLength(MaxAxesPlusExtruders)]{};
+		alignas(uint32_t) char bytes[MoveParamsLength(maxAxesPlusExtruders)]{};
 
 		[[nodiscard]] MoveParamsHeader& Header() noexcept { return *reinterpret_cast<MoveParamsHeader *>(bytes); }
 	};
@@ -110,22 +110,22 @@ namespace
 		MoveParamsHeader& h = move.Header();
 		h.moveId = moveId;
 		h.ownedDrives = 0xFFFFFFFFu;
-		h.flags = MoveFlags::CanPauseAfter | MoveFlags::XyMoving | MoveFlags::UsingStandardFeedrate;
+		h.flags = MoveFlags::canPauseAfter | MoveFlags::xyMoving | MoveFlags::usingStandardFeedrate;
 		h.totalDistance = endX - startX;
 		h.maxAcceleration = acceleration;
 		h.requestedSpeed = feedRate;
 		h.ringNumber = 0;
-		h.numDrives = MaxAxesPlusExtruders;
+		h.numDrives = maxAxesPlusExtruders;
 
 		int32_t *const endPoints = MoveParamsEndPoints(h);
 		float *const directions = MoveParamsDirectionVector(h);
-		for (size_t drive = 0; drive < MaxAxesPlusExtruders; ++drive)
+		for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)
 		{
 			endPoints[drive] = 0;
 			directions[drive] = 0.0F;
 		}
-		endPoints[X_AXIS] = lrintf(endX * stepsPerMm);
-		directions[X_AXIS] = 1.0F;
+		endPoints[xAxis] = lrintf(endX * stepsPerMm);
+		directions[xAxis] = 1.0F;
 		return move;
 	}
 
@@ -139,8 +139,8 @@ namespace
 			{
 				return true;
 			}
-			(void)ring.Spin(MoveTiming::UsualMinimumPreparedTime, SimulationMode::off, true, true);
-			AdvanceTicks(StepClockRate / 1000);
+			(void)ring.Spin(MoveTiming::usualMinimumPreparedTime, SimulationMode::Off, true, true);
+			AdvanceTicks(stepClockRate / 1000);
 		}
 		return false;
 	}
@@ -154,14 +154,14 @@ namespace
 		sink.headers.clear();
 		MoveRecord move = MakeXMove(1, 0.0F, 50.0F);
 		CHECK(ring.CanAddMove(), "an empty ring accepts a move");
-		CHECK(ring.AddMove(move.Header()) == MovementError::ok, "the move is accepted");
+		CHECK(ring.AddMove(move.Header()) == MovementError::Ok, "the move is accepted");
 		CHECK(ring.GetScheduledMoves() == 1, "the move is counted as scheduled");
 
 		// Spin until it has been prepared and sent.
 		for (int i = 0; i < 10 && sink.headers.empty(); ++i)
 		{
-			(void)ring.Spin(MoveTiming::UsualMinimumPreparedTime, SimulationMode::off, true, true);
-			AdvanceTicks(StepClockRate / 1000);
+			(void)ring.Spin(MoveTiming::usualMinimumPreparedTime, SimulationMode::Off, true, true);
+			AdvanceTicks(stepClockRate / 1000);
 		}
 
 		CHECK(sink.headers.size() == 1, "the move reaches the sink as one packet");
@@ -200,13 +200,13 @@ namespace
 		for (int i = 0; i < numMoves; ++i)
 		{
 			MoveRecord move = MakeXMove((uint32_t)i + 10, (float)i * 20.0F, (float)(i + 1) * 20.0F);
-			CHECK(ring.AddMove(move.Header()) == MovementError::ok, "each move of the run is accepted");
+			CHECK(ring.AddMove(move.Header()) == MovementError::Ok, "each move of the run is accepted");
 		}
 
 		for (int i = 0; i < 20000 && sink.headers.size() < numMoves; ++i)
 		{
-			(void)ring.Spin(MoveTiming::UsualMinimumPreparedTime, SimulationMode::off, true, true);
-			AdvanceTicks(StepClockRate / 1000);
+			(void)ring.Spin(MoveTiming::usualMinimumPreparedTime, SimulationMode::Off, true, true);
+			AdvanceTicks(stepClockRate / 1000);
 		}
 
 		CHECK(sink.headers.size() == numMoves, "every move of the run is sent");
@@ -239,7 +239,7 @@ namespace
 		for (int i = 0; i < 3; ++i)
 		{
 			MoveRecord move = MakeXMove((uint32_t)i + 100, (float)i * 10.0F, (float)(i + 1) * 10.0F);
-			CHECK(ring.AddMove(move.Header()) == MovementError::ok, "the move is accepted");
+			CHECK(ring.AddMove(move.Header()) == MovementError::Ok, "the move is accepted");
 		}
 
 		CHECK(Drain(ring), "the ring empties once the moves have run");
@@ -262,7 +262,7 @@ namespace
 		while (ring.CanAddMove() && added < 1000)
 		{
 			MoveRecord move = MakeXMove((uint32_t)added + 200, (float)added * 5.0F, (float)(added + 1) * 5.0F);
-			if (ring.AddMove(move.Header()) != MovementError::ok)
+			if (ring.AddMove(move.Header()) != MovementError::Ok)
 			{
 				break;
 			}
@@ -288,7 +288,7 @@ namespace
 		{
 			// 100mm at 100mm/s is a second of movement per move.
 			MoveRecord move = MakeXMove((uint32_t)added + 400, (float)added * 100.0F, (float)(added + 1) * 100.0F);
-			if (ring.AddMove(move.Header()) != MovementError::ok)
+			if (ring.AddMove(move.Header()) != MovementError::Ok)
 			{
 				break;
 			}
@@ -307,14 +307,14 @@ namespace
 		for (int i = 0; i < 3; ++i)
 		{
 			MoveRecord move = MakeXMove((uint32_t)i + 300, (float)i * 10.0F, (float)(i + 1) * 10.0F);
-			CHECK(ring.AddMove(move.Header()) == MovementError::ok, "the move is accepted");
+			CHECK(ring.AddMove(move.Header()) == MovementError::Ok, "the move is accepted");
 		}
 
 		int spins = 0;
 		while (!ring.IsIdle() && spins < 20000)
 		{
-			(void)ring.Spin(MoveTiming::UsualMinimumPreparedTime, SimulationMode::normal, true, true);
-			AdvanceTicks(StepClockRate / 1000);
+			(void)ring.Spin(MoveTiming::usualMinimumPreparedTime, SimulationMode::Normal, true, true);
+			AdvanceTicks(stepClockRate / 1000);
 			++spins;
 		}
 

@@ -11,12 +11,12 @@ const char *_ecv_array GetMovementErrorText(MovementError err) noexcept
 {
 	switch (err)
 	{
-	case MovementError::microstep_position_too_large:	return "microstep position too large";
-	case MovementError::unreachable_position:			return "unreachable position";
-	case MovementError::move_duration_too_long:			return "move duration too long";
+	case MovementError::MicrostepPositionTooLarge:	return "microstep position too large";
+	case MovementError::UnreachablePosition:			return "unreachable position";
+	case MovementError::MoveDurationTooLong:			return "move duration too long";
 
-	case MovementError::ok:
-	case MovementError::noMovement:
+	case MovementError::Ok:
+	case MovementError::NoMovement:
 	default:
 		return "no error";
 	}
