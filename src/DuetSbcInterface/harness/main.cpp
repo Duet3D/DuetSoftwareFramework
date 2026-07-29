@@ -220,13 +220,14 @@ int main(int argc, char** argv)
 				Duet::Sbc::RingBuffer& inbound = interface.Inbound();
 				while (gRunning.load(std::memory_order_relaxed))
 				{
-					const uint8_t* record = nullptr;
-					uint32_t length = 0;
-					if (!inbound.Peek(record, length))
+					const std::optional<Duet::Sbc::ByteSpan> peeked = inbound.Peek();
+					if (!peeked.has_value())
 					{
 						std::this_thread::sleep_for(std::chrono::milliseconds(2));
 						continue;
 					}
+					const uint8_t* const record = peeked->data();
+					const size_t length = peeked->size();
 
 					Duet::Sbc::InboundEventHeader header{};
 					if (length >= sizeof(header))

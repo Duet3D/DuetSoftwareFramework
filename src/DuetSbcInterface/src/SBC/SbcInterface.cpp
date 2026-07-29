@@ -137,9 +137,8 @@ namespace Duet::Sbc
 		cmd.header.type = static_cast<uint16_t>(OutboundCommandType::Message);
 		cmd.flags = messageFlags;
 
-		const void* fragments[2] = {&cmd, message};
-		const size_t lengths[2] = {sizeof(cmd), message != nullptr ? length : 0};
-		if (!m_outbound.WriteScattered(fragments, lengths, 2))
+		const ByteSpan fragments[2] = {AsBytes(cmd), AsBytes(message, length)};
+		if (!m_outbound.WriteScattered(fragments))
 		{
 			return false;
 		}
@@ -163,9 +162,8 @@ namespace Duet::Sbc
 		cmd.dstAddress = dstAddress;
 		cmd.isResponse = isResponse ? 1 : 0;
 
-		const void* fragments[2] = {&cmd, payload};
-		const size_t lengths[2] = {sizeof(cmd), payload != nullptr ? payloadLength : 0};
-		if (!m_outbound.WriteScattered(fragments, lengths, 2))
+		const ByteSpan fragments[2] = {AsBytes(cmd), AsBytes(payload, payloadLength)};
+		if (!m_outbound.WriteScattered(fragments))
 		{
 			return false;
 		}
@@ -195,9 +193,8 @@ namespace Duet::Sbc
 		OutboundCommandHeader header{};
 		header.type = static_cast<uint16_t>(OutboundCommandType::ScheduleMove);
 
-		const void* fragments[2] = {&header, packet.data()};
-		const size_t lengths[2] = {sizeof(header), packet.size()};
-		if (!m_outbound.WriteScattered(fragments, lengths, 2))
+		const ByteSpan fragments[2] = {AsBytes(header), packet};
+		if (!m_outbound.WriteScattered(fragments))
 		{
 			return false;
 		}
@@ -211,7 +208,7 @@ namespace Duet::Sbc
 		cmd.header.type = static_cast<uint16_t>(OutboundCommandType::EnableCan);
 		cmd.requestId = requestId;
 		cmd.enable = enable ? 1 : 0;
-		if (!m_outbound.Write(&cmd, sizeof(cmd)))
+		if (!m_outbound.Write(AsBytes(cmd)))
 		{
 			return false;
 		}
@@ -273,9 +270,8 @@ namespace Duet::Sbc
 	{
 		// The caller has already filled in the type; this just performs the scattered write
 		(void)type;
-		const void* fragments[2] = {header, tail};
-		const size_t lengths[2] = {headerLength, tail != nullptr ? tailLength : 0};
-		m_inbound.WriteScattered(fragments, lengths, 2);
+		const ByteSpan fragments[2] = {AsBytes(header, headerLength), AsBytes(tail, tailLength)};
+		m_inbound.WriteScattered(fragments);
 
 		// Wake a parked consumer. Skipped entirely while the dispatcher is keeping up, so the real-time
 		// thread does not pay for a syscall on the hot path.
@@ -475,11 +471,10 @@ namespace Duet::Sbc
 
 		// Drain queued commands until the transfer buffer is full. A command that does not fit is left in
 		// the ring and retried on the next iteration, so ordering is preserved.
-		const uint8_t* record = nullptr;
-		uint32_t length = 0;
-		while (m_outbound.Peek(record, length))
+		while (const std::optional<ByteSpan> peeked = m_outbound.Peek())
 		{
-			if (length < sizeof(OutboundCommandHeader))
+			const ByteSpan bytes = *peeked;
+			if (bytes.size() < sizeof(OutboundCommandHeader))
 			{
 				// Malformed record; drop it rather than wedging the ring
 				m_outbound.Consume();
@@ -487,9 +482,17 @@ namespace Duet::Sbc
 			}
 
 			OutboundCommandHeader header{};
-			std::memcpy(&header, record, sizeof(header));
-			const uint8_t* tail = record + sizeof(OutboundCommandHeader);
-			const size_t tailLength = length - sizeof(OutboundCommandHeader);
+			std::memcpy(&header, bytes.data(), sizeof(header));
+
+			// The cases below decode fixed-size command headers out of the record, which is pointer
+			// work either way. What the span buys is that these two now provably describe the same
+			// bytes, rather than being a pointer and a length that were filled in separately.
+			const uint8_t* const record = bytes.data();
+			const size_t length = bytes.size();
+
+			const ByteSpan tailSpan = bytes.subspan(sizeof(OutboundCommandHeader));
+			const uint8_t* tail = tailSpan.data();
+			const size_t tailLength = tailSpan.size();
 			bool written = false;
 
 			switch (static_cast<OutboundCommandType>(header.type))

@@ -239,14 +239,13 @@ extern "C"
 	{
 		if (h == nullptr || data == nullptr || length == nullptr)
 			return 0;
-		const uint8_t* record = nullptr;
-		uint32_t recordLength = 0;
-		if (!h->interface.Inbound().Peek(record, recordLength))
+		const std::optional<Duet::Sbc::ByteSpan> record = h->interface.Inbound().Peek();
+		if (!record.has_value())
 		{
 			return 0;
 		}
-		*data = record;
-		*length = static_cast<int32_t>(recordLength);
+		*data = record->data();
+		*length = static_cast<int32_t>(record->size());
 		return 1;
 	}
 

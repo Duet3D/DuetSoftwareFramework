@@ -26,10 +26,38 @@
 #include <cstdint>
 #include <cstring>
 #include <mutex>
+#include <optional>
+#include <span>
+#include <type_traits>
 #include <vector>
 
 namespace Duet::Sbc
 {
+
+	// A run of bytes to write, or one that has been read back. Records are untyped on the way through
+	// - the ring frames bytes and nothing more - so this is the currency of the whole interface.
+	using ByteSpan = std::span<const uint8_t>;
+
+	// View a trivially-copyable object as the bytes it occupies. Almost every record written here is
+	// a packed command or event header followed by a payload, and this is what keeps the `sizeof` next
+	// to the object it belongs to instead of in a parallel array of lengths.
+	template <typename T>
+	[[nodiscard]] ByteSpan AsBytes(const T& value) noexcept
+	{
+		static_assert(std::is_trivially_copyable_v<T>, "only trivially copyable objects can be written as bytes");
+		// NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast) - viewing an object as its bytes
+		return {reinterpret_cast<const uint8_t *>(&value), sizeof(T)};
+	}
+
+	// The same for a pointer and a count that may legitimately be null/zero, which is how the optional
+	// tail of an event arrives from callers that may not have one.
+	[[nodiscard]] inline ByteSpan AsBytes(const void *data, size_t length) noexcept
+	{
+		return (data != nullptr && length > 0)
+				   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast) - the ring is untyped
+				   ? ByteSpan{static_cast<const uint8_t *>(data), length}
+				   : ByteSpan{};
+	}
 
 	class RingBuffer
 	{
@@ -48,34 +76,40 @@ namespace Duet::Sbc
 
 		// Append one record. Returns false if the ring is full, in which case nothing is written and the
 		// caller must decide how to handle the overrun (the interface never blocks on a full ring).
-		bool Write(const void* data, size_t length)
+		bool Write(ByteSpan data)
 		{
-			const void* fragments[1] = {data};
-			const size_t lengths[1] = {length};
+			const ByteSpan fragments[1] = {data};
 			const std::lock_guard<std::mutex> lock(m_producerMutex);
-			return WriteLocked(fragments, lengths, 1);
+			return WriteLocked(fragments);
 		}
 
 		// Append one record assembled from several fragments, without an intermediate copy. This is the
 		// common case: a small fixed-size event header followed by a variable-length payload.
-		bool WriteScattered(const void* const* fragments, const size_t* lengths, size_t count)
+		//
+		// One span per fragment rather than an array of pointers beside an array of lengths: those two
+		// had to be the same length and nothing said so, and each fragment's length had to be written
+		// somewhere other than next to the thing it measured.
+		bool WriteScattered(std::span<const ByteSpan> fragments)
 		{
 			const std::lock_guard<std::mutex> lock(m_producerMutex);
-			return WriteLocked(fragments, lengths, count);
+			return WriteLocked(fragments);
 		}
 
 		// --- Consumer side (single consumer, lock-free) ---
 
-		// Peek at the next record without consuming it. Returns false if the ring is empty. The returned
-		// pointer stays valid until the next Consume() call.
-		bool Peek(const uint8_t*& data, uint32_t& length)
+		// Peek at the next record without consuming it. Empty if the ring is empty. The bytes stay valid
+		// until the next Consume() call.
+		//
+		// std::optional rather than an empty span for "nothing there": a zero-length record is a record,
+		// and the caller that has to tell the two apart is the one draining the ring in a loop.
+		std::optional<ByteSpan> Peek()
 		{
 			size_t tail = m_tail.load(std::memory_order_relaxed);
 			size_t head = m_head.load(std::memory_order_acquire);
 			if (tail == head)
 			{
 				m_pendingConsume = 0;
-				return false;
+				return std::nullopt;
 			}
 
 			uint32_t recordLength = 0;
@@ -90,15 +124,13 @@ namespace Duet::Sbc
 				if (tail == head)
 				{
 					m_pendingConsume = 0;
-					return false;
+					return std::nullopt;
 				}
 				std::memcpy(&recordLength, m_buffer.data() + tail, kHeaderSize);
 			}
 
-			data = m_buffer.data() + tail + kHeaderSize;
-			length = recordLength;
 			m_pendingConsume = kHeaderSize + Align(recordLength);
-			return true;
+			return ByteSpan{m_buffer.data() + tail + kHeaderSize, recordLength};
 		}
 
 		// Consume the record most recently returned by Peek().
@@ -158,12 +190,12 @@ namespace Duet::Sbc
 			return tail - head - kHeaderSize;
 		}
 
-		bool WriteLocked(const void* const* fragments, const size_t* lengths, size_t count)
+		bool WriteLocked(std::span<const ByteSpan> fragments)
 		{
 			size_t payload = 0;
-			for (size_t i = 0; i < count; i++)
+			for (const ByteSpan& fragment : fragments)
 			{
-				payload += lengths[i];
+				payload += fragment.size();
 			}
 			const size_t needed = kHeaderSize + Align(payload);
 			if (needed + kHeaderSize > capacity)
@@ -202,12 +234,12 @@ namespace Duet::Sbc
 			const auto recordLength = static_cast<uint32_t>(payload);
 			std::memcpy(m_buffer.data() + head, &recordLength, kHeaderSize);
 			size_t cursor = head + kHeaderSize;
-			for (size_t i = 0; i < count; i++)
+			for (const ByteSpan& fragment : fragments)
 			{
-				if (lengths[i] > 0)
+				if (!fragment.empty())
 				{
-					std::memcpy(m_buffer.data() + cursor, fragments[i], lengths[i]);
-					cursor += lengths[i];
+					std::memcpy(m_buffer.data() + cursor, fragment.data(), fragment.size());
+					cursor += fragment.size();
 				}
 			}
 

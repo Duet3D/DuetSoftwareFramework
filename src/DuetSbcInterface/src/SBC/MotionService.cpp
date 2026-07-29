@@ -155,17 +155,15 @@ namespace Duet::Sbc
 
 	void MotionService::DrainSubmissions()
 	{
-		const uint8_t *record = nullptr;
-		uint32_t length = 0;
-		while (m_submissions.Peek(record, length))
+		while (const std::optional<ByteSpan> record = m_submissions.Peek())
 		{
-			if (!IsWellFormedSubmission({record, length}))
+			if (!IsWellFormedSubmission(*record))
 			{
 				m_submissions.Consume();
 				continue;
 			}
 
-			const auto& params = *reinterpret_cast<const Motion::MoveParamsHeader *>(record);
+			const auto& params = *reinterpret_cast<const Motion::MoveParamsHeader *>(record->data());
 			const unsigned int ring = (params.ringNumber < numRings) ? params.ringNumber : 0;
 
 			// Stop taking moves once the ring is full, and leave the rest where they are: the ring
@@ -257,7 +255,7 @@ namespace Duet::Sbc
 		{
 			return false;
 		}
-		if (!m_submissions.Write(params.data(), params.size()))
+		if (!m_submissions.Write(params))
 		{
 			m_submissionsDropped.fetch_add(1, std::memory_order_relaxed);
 			return false;
