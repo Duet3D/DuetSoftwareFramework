@@ -348,6 +348,32 @@ namespace
 		CHECK(Drain(ring), "the throttled moves finish");
 	}
 
+	// A move the ring refuses must not take the add slot down with it.
+	//
+	// InitFromParams used to promote the DDA to Planned and only then return the error, which left
+	// the slot permanently non-empty: CanAddMove was false for ever after, and Spin went on to
+	// prepare and commit the very move that had just been rejected.
+	void TestRejectedMoveLeavesTheRingUsable(DDARing& ring, RecordingSink& sink) noexcept
+	{
+		CHECK(Drain(ring), "the ring is idle before the check");
+		sink.headers.clear();
+
+		// Far enough at a low enough speed to need more than the 2^31 step clocks a move may take.
+		MoveRecord bad = MakeXMove(500, 0.0F, 1000.0F);
+		bad.Header().requestedSpeed = 1.0e-9F;
+		bad.Header().maxAcceleration = 1.0e-18F;
+
+		CHECK(ring.AddMove(bad.Header()) == MovementError::MoveDurationTooLong, "an impossibly long move is rejected");
+		CHECK(ring.CanAddMove(), "the rejected move did not consume the add slot");
+
+		// The real test of that: the ring still runs. A slot left provisional would either refuse
+		// this move or execute the rejected one instead of it.
+		MoveRecord good = MakeXMove(501, 0.0F, 10.0F);
+		CHECK(ring.AddMove(good.Header()) == MovementError::Ok, "the ring still accepts moves");
+		CHECK(Drain(ring), "the accepted move runs to completion");
+		CHECK(sink.headers.size() == 1, "only the accepted move reached the sink");
+	}
+
 	// Simulation works out how long a print would take without moving anything.
 	void TestSimulationSendsNothing(DDARing& ring, RecordingSink& sink) noexcept
 	{
@@ -395,6 +421,7 @@ int main()
 	TestRetirementInOrder(ring, sink);
 	TestRingSaturates(ring, sink);
 	TestRingThrottlesOnTime(ring, sink);
+	TestRejectedMoveLeavesTheRingUsable(ring, sink);
 	TestSimulationSendsNothing(ring, sink);
 
 	StepTimer::SetLocalClockSource(nullptr);

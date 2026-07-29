@@ -37,7 +37,15 @@ namespace Duet::Sbc::Motion
 
 		// Replace the machine description. Only safe when no move is in flight - DCS holds movement
 		// locked while it reconfigures, exactly as the firmware requires for M92 and friends.
+		//
+		// The configuration arrives over the CApi from a separate process, so it is validated rather
+		// than trusted: counts are clamped to what the fixed-size arrays below can address. See
+		// SanitiseConfig for what is enforced.
 		void Configure(const MotionConfig& newConfig) noexcept;
+
+		// Clamp a configuration to the limits this build was compiled with. Exposed for testing;
+		// Configure applies it to everything that comes in.
+		static void SanitiseConfig(MotionConfig& config) noexcept;
 
 		[[nodiscard]] const MotionConfig& GetConfig() const noexcept { return m_config; }
 
@@ -56,12 +64,16 @@ namespace Duet::Sbc::Motion
 
 		[[nodiscard]] const AxisDriversConfig& GetAxisDriversConfig(size_t axis) const noexcept
 		{
-			return m_config.axisDrivers[axis];
+			static constexpr AxisDriversConfig noDrivers{};
+			return (axis < maxAxes) ? m_config.axisDrivers[axis] : noDrivers;
 		}
 
+		// An out-of-range extruder answers with a default DriverId, whose board address is
+		// noCanAddress: IsRemote() is false, so the caller drops the movement rather than addressing
+		// it to whichever board the out-of-range read happened to land on.
 		[[nodiscard]] DriverId GetExtruderDriver(size_t extruder) const noexcept
 		{
-			return m_config.extruderDrivers[extruder];
+			return (extruder < maxExtruders) ? m_config.extruderDrivers[extruder] : DriverId{};
 		}
 
 		// Kinematics answers that DCS evaluated for us; see MotionConfig.

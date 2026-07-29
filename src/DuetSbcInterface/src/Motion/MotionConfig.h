@@ -27,6 +27,17 @@
 
 namespace Duet::Sbc::Motion
 {
+	// How many movement systems this build supports, i.e. how many DDA rings MotionService builds.
+	// A second one exists for asynchronous moves whether or not anything uses it.
+	inline constexpr unsigned int maxRings = 2;
+
+	// Bounds on the lookahead depth. The minimum is what makes a ring a ring: CanAddMove refuses the
+	// last free slot and DDA::Prepare reads the previous DDA's endpoints, so anything shorter has
+	// each move planned against the slot it is about to overwrite. The maximum only exists to keep a
+	// nonsense configuration from allocating until the process dies.
+	inline constexpr unsigned int minDdasPerRing = 3;
+	inline constexpr unsigned int maxDdasPerRing = 1000;
+
 	// The drivers that move one axis. An axis with several drivers - a Z axis with three
 	// leadscrews, say - moves all of them together.
 	struct AxisDriversConfig
@@ -45,6 +56,7 @@ namespace Duet::Sbc::Motion
 
 		uint8_t numRings = 1;				// 1, or 2 for a second asynchronous movement system
 		uint16_t numDdasPerRing = 40;		// lookahead depth
+		uint16_t padding = 0;				// explicit, so the layout is the same on both sides
 
 		uint32_t gracePeriodMs = 10;		// how long to let moves accumulate before starting one
 
@@ -77,6 +89,7 @@ namespace Duet::Sbc::Motion
 
 		AxisDriversConfig axisDrivers[maxAxes];
 		DriverId extruderDrivers[maxExtruders];
+		uint16_t padding2 = 0;							// explicit, to realign what follows
 
 		// --- Kinematics results, evaluated by DCS ---------------------------------------------
 
@@ -110,6 +123,30 @@ namespace Duet::Sbc::Motion
 			return drive >= FirstExtruderDrive();
 		}
 	};
+
+	// ---------------------------------------------------------------------------------------------
+	// Layout guarantees.
+	//
+	// DuetSbc_MotionConfigure memcpys the managed side's bytes straight into a MotionConfig, so this
+	// struct is as much an ABI as LinkEvents.h and MoveParams.h are. It is not packed, because
+	// driveStepsPerMm and its neighbours are read on the move-preparation path and misaligned float
+	// arrays are not worth the few bytes saved; instead the padding the compiler would have inserted
+	// is declared, so that the C# mirror can reproduce it rather than having to guess at it.
+	//
+	// The mirror is DuetControlServer/Motion/Native/MotionConfig.cs. Its layout test asserts the same
+	// numbers as these do.
+	// ---------------------------------------------------------------------------------------------
+
+	static_assert(sizeof(DriverId) == 2, "DriverId must be 2 bytes");
+	static_assert(sizeof(AxisDriversConfig) == 1 + (2 * maxDriversPerAxis), "AxisDriversConfig must be tightly packed");
+
+	static_assert(offsetof(MotionConfig, gracePeriodMs) == 8);
+	static_assert(offsetof(MotionConfig, driveStepsPerMm) == 12);
+	static_assert(offsetof(MotionConfig, instantDvs) == 12 + (4 * maxAxesPlusExtruders));
+	static_assert(offsetof(MotionConfig, backlashSteps) == 12 + (16 * maxAxesPlusExtruders));
+	static_assert(offsetof(MotionConfig, axisDrivers) == 20 + (16 * maxAxesPlusExtruders) + (4 * maxAxes));
+	static_assert(offsetof(MotionConfig, continuousRotationAxes) % 4 == 0, "the bitmaps must stay 4-aligned");
+	static_assert(sizeof(MotionConfig) % 4 == 0, "no tail padding beyond what is declared");
 }
 
 #endif /* SRC_MOTION_MOTIONCONFIG_H_ */

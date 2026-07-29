@@ -29,8 +29,12 @@ public:
 
 	DDARing() noexcept;
 
+	// Build the ring. `numDdas` is clamped to Motion::minDdasPerRing..Motion::maxDdasPerRing; the
+	// value actually used is what GetNumDdas reports.
 	void Init(unsigned int numDdas) noexcept;
 	void Exit() noexcept;
+
+	[[nodiscard]] unsigned int GetNumDdas() const noexcept { return m_numDdasInRing; }
 
 	[[nodiscard]] bool CanAddMove() const noexcept;
 

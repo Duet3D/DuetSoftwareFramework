@@ -94,21 +94,36 @@ namespace Duet::Sbc
 	private:
 		// Both rings, in the order they are spun. SUPPORT_ASYNC_MOVES gives a second one for moves
 		// that a second motion system owns; it exists even when nothing uses it.
-		static constexpr unsigned int numRings = 2;
+		static constexpr unsigned int numRings = Motion::maxRings;
 
 		void Run();
 		void SpinOnce();
 		void DrainSubmissions();
 		void PublishPositions();
+
+		// True if `record` is long enough for the header and for the two trailing arrays that the
+		// header's numDrives claims. Checked at both ends: on submission so the caller hears about
+		// it, and again on the motion thread so nothing reaches a DDA unvalidated.
+		[[nodiscard]] static bool IsWellFormedSubmission(const void *record, size_t length) noexcept;
+
 		static void OnMoveRetired(const DDA& dda, void *context) noexcept;
 
-		void PostMoveCompleted(uint32_t moveId);
-		void PostMoveFailed(uint32_t moveId, MovementError error);
+		void PostMoveCompleted(unsigned int ring, uint32_t moveId);
+		void PostMoveFailed(unsigned int ring, uint32_t moveId, MovementError error);
 
 		SbcInterface *m_link;
 		LinkScheduleMoveSink m_sink;
 
 		DDARing m_rings[numRings];
+
+		// What a ring's retirement callback is given. The DDA does not know which ring holds it, so
+		// the index travels in the context rather than being guessed at the far end.
+		struct RetirementContext
+		{
+			MotionService *service = nullptr;
+			unsigned int ring = 0;
+		};
+		RetirementContext m_retirementContext[numRings];
 
 		// Moves waiting to be taken up by the motion thread. A ring rather than a call, so that
 		// SubmitMove never blocks the caller and never blocks the motion thread either.

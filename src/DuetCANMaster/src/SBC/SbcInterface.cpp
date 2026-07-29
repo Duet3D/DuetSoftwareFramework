@@ -463,9 +463,28 @@ void SbcInterface::ExchangeData() noexcept
 		// straight to CanMotion; nothing here needs to understand the move.
 		case SbcRequest::ScheduleMove:
 		{
-			const auto* const header = m_transfer.ReadDataHeader<ScheduleMoveHeader>();
-			const auto* const drivers =
-				reinterpret_cast<const ScheduleMoveDriver*>(m_transfer.ReadData(header->numDrivers * sizeof(ScheduleMoveDriver)));
+			// Take the whole declared payload in one read, so the read pointer lands on the next
+			// packet whether or not this one turns out to be usable. numDrivers is what says how
+			// much follows the header, and it arrives over SPI: sizing the driver array from it
+			// without checking would read past the payload and desynchronise the rest of the
+			// transfer as well.
+			const char* const payload = m_transfer.ReadData(packet->length);
+			if (packet->length < sizeof(ScheduleMoveHeader))
+			{
+				REPORT_INTERNAL_ERROR;
+				break;
+			}
+
+			const auto* const header = reinterpret_cast<const ScheduleMoveHeader*>(payload);
+			const size_t numDrivers = header->numDrivers;
+			if (numDrivers > SbcProtocol::MaxScheduleMoveDrivers ||
+				packet->length < sizeof(ScheduleMoveHeader) + (numDrivers * sizeof(ScheduleMoveDriver)))
+			{
+				REPORT_INTERNAL_ERROR;
+				break;
+			}
+
+			const auto* const drivers = reinterpret_cast<const ScheduleMoveDriver*>(payload + sizeof(ScheduleMoveHeader));
 			CanMotion::ScheduleFromSbc(*header, drivers);
 			break;
 		}

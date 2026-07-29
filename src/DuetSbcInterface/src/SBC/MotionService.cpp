@@ -53,11 +53,15 @@ namespace Duet::Sbc
 		reprap.GetMove().GetScheduleMoveBuilder().SetSink(&m_sink);
 
 		const Motion::MotionConfig& config = reprap.GetMove().GetConfig();
-		for (DDARing& ring : m_rings)
+		for (unsigned int i = 0; i < numRings; ++i)
 		{
-			ring.Init(config.numDdasPerRing);
-			ring.SetGracePeriod(MillisToStepClocks(config.gracePeriodMs));
-			ring.SetRetirementCallback(&MotionService::OnMoveRetired, this);
+			m_rings[i].Init(config.numDdasPerRing);
+			m_rings[i].SetGracePeriod(MillisToStepClocks(config.gracePeriodMs));
+
+			// The callback context carries the ring index as well as `this`. The DDA does not know
+			// which ring it belongs to, and the events it produces have to name one.
+			m_retirementContext[i] = RetirementContext{this, i};
+			m_rings[i].SetRetirementCallback(&MotionService::OnMoveRetired, &m_retirementContext[i]);
 		}
 		m_initialised = true;
 		return true;
@@ -134,13 +138,28 @@ namespace Duet::Sbc
 		PublishPositions();
 	}
 
+	bool MotionService::IsWellFormedSubmission(const void *record, size_t length) noexcept
+	{
+		if (record == nullptr || length < sizeof(Motion::MoveParamsHeader))
+		{
+			return false;
+		}
+
+		// numDrives says where the direction vector starts and how far both trailing arrays run, so
+		// it decides what InitFromParams reads. A record that does not carry the drives it claims
+		// would have it read past the end - checking the header alone is not enough.
+		const auto& params = *reinterpret_cast<const Motion::MoveParamsHeader *>(record);
+		return params.numDrives <= maxAxesPlusExtruders
+			&& length >= Motion::MoveParamsLength(params.numDrives);
+	}
+
 	void MotionService::DrainSubmissions()
 	{
 		const uint8_t *record = nullptr;
 		uint32_t length = 0;
 		while (m_submissions.Peek(record, length))
 		{
-			if (length < sizeof(Motion::MoveParamsHeader))
+			if (!IsWellFormedSubmission(record, length))
 			{
 				m_submissions.Consume();
 				continue;
@@ -159,12 +178,12 @@ namespace Duet::Sbc
 			const MovementError err = m_rings[ring].AddMove(params);
 			if (err != MovementError::Ok && err != MovementError::NoMovement)
 			{
-				PostMoveFailed(params.moveId, err);
+				PostMoveFailed(ring, params.moveId, err);
 			}
 			else if (err == MovementError::NoMovement)
 			{
 				// Nothing to do, but DCS is still waiting to hear that this move is done with.
-				PostMoveCompleted(params.moveId);
+				PostMoveCompleted(ring, params.moveId);
 			}
 			m_submissions.Consume();
 		}
@@ -231,7 +250,9 @@ namespace Duet::Sbc
 
 	bool MotionService::SubmitMove(const void *params, size_t length)
 	{
-		if (params == nullptr || length < sizeof(Motion::MoveParamsHeader))
+		// Reject a malformed record here rather than dropping it on the motion thread, so the caller
+		// finds out that the move it is waiting on will never happen.
+		if (!IsWellFormedSubmission(params, length))
 		{
 			return false;
 		}
@@ -264,8 +285,9 @@ namespace Duet::Sbc
 
 	void MotionService::OnMoveRetired(const DDA& dda, void *context) noexcept
 	{
-		auto & self = *static_cast<MotionService *>(context);
-		self.PostMoveCompleted(dda.GetMoveId());
+		const auto& ctx = *static_cast<const RetirementContext *>(context);
+		MotionService& self = *ctx.service;
+		self.PostMoveCompleted(ctx.ring, dda.GetMoveId());
 
 		if (dda.IsCheckingEndstops())
 		{
@@ -276,7 +298,7 @@ namespace Duet::Sbc
 			event.header.type = static_cast<uint16_t>(InboundEventType::MotionEndpoints);
 			event.moveId = dda.GetMoveId();
 			event.driveMask = 0xFFFFFFFFu;
-			event.ring = 0;
+			event.ring = static_cast<uint8_t>(ctx.ring);
 			event.numDrives = static_cast<uint8_t>(maxAxesPlusExtruders);
 
 			int32_t endPoints[maxAxesPlusExtruders]{};
@@ -286,22 +308,24 @@ namespace Duet::Sbc
 		}
 	}
 
-	void MotionService::PostMoveCompleted(uint32_t moveId)
+	void MotionService::PostMoveCompleted(unsigned int ring, uint32_t moveId)
 	{
 		MoveCompletedEvent event{};
 		event.header.type = static_cast<uint16_t>(InboundEventType::MoveCompleted);
 		event.moveId = moveId;
-		event.completedMoves = m_rings[0].GetCompletedMoves();
-		event.ring = 0;
+		// The running total is per ring, and it is what DCS checks for a missed event: quoting
+		// another ring's total would make that check fire on every move.
+		event.completedMoves = GetCompletedMoves(ring);
+		event.ring = static_cast<uint8_t>(ring);
 		m_link->PostEventFromOtherThread(InboundEventType::MoveCompleted, &event, sizeof(event));
 	}
 
-	void MotionService::PostMoveFailed(uint32_t moveId, MovementError error)
+	void MotionService::PostMoveFailed(unsigned int ring, uint32_t moveId, MovementError error)
 	{
 		MoveFailedEvent event{};
 		event.header.type = static_cast<uint16_t>(InboundEventType::MoveFailed);
 		event.moveId = moveId;
-		event.ring = 0;
+		event.ring = static_cast<uint8_t>(ring);
 		event.error = static_cast<uint8_t>(error);
 		m_link->PostEventFromOtherThread(InboundEventType::MoveFailed, &event, sizeof(event));
 	}

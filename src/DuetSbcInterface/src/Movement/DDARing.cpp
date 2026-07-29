@@ -13,6 +13,9 @@
 #include <Platform/RepRap.h>
 #include <Platform/Tasks.h>
 #include <GCodes/GCodes.h>
+#include <Motion/MotionConfig.h>
+
+#include <algorithm>
 
 #if SUPPORT_CAN_EXPANSION
 # include "CAN/CanMotion.h"
@@ -48,6 +51,10 @@ DDARing::DDARing() noexcept : m_gracePeriod(defaultGracePeriod)
 // This can be called in the constructor for class Move
 void DDARing::Init(unsigned int numDdas) noexcept
 {
+	// The configuration comes down from DuetControlServer, so it is not trusted to be sane. A ring
+	// of 0 or 1 is not a ring at all: every move would take its start endpoints from the DDA it is
+	// about to overwrite, and the drives would be commanded the whole distance again.
+	numDdas = std::clamp(numDdas, Duet::Sbc::Motion::minDdasPerRing, Duet::Sbc::Motion::maxDdasPerRing);
 	m_numDdasInRing = numDdas;
 
 	// Build the DDA ring

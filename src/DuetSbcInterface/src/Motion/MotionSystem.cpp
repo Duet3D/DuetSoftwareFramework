@@ -8,6 +8,7 @@
 #include <Movement/StepTimer.h>
 #include <Platform/Tasks.h>
 
+#include <algorithm>
 #include <cstdlib>
 
 using Duet::Sbc::Motion::MotionSystem;
@@ -47,9 +48,35 @@ bool MotionSystem::Init() noexcept
 	return true;
 }
 
+void MotionSystem::SanitiseConfig(MotionConfig& config) noexcept
+{
+	// Axis and extruder counts. numTotalAxes and numExtruders together decide FirstExtruderDrive,
+	// which is what splits the logical drive space; if their sum exceeds maxAxesPlusExtruders then
+	// a drive is both an axis and an extruder, and LogicalDriveToExtruder returns an index past the
+	// end of extruderDrivers. Extruders are what give way, because the axes are already placed.
+	config.numTotalAxes = static_cast<uint8_t>(std::min<size_t>(config.numTotalAxes, maxAxes));
+	config.numExtruders = static_cast<uint8_t>(std::min<size_t>(config.numExtruders, maxExtruders));
+	config.numExtruders = static_cast<uint8_t>(
+		std::min<size_t>(config.numExtruders, maxAxesPlusExtruders - config.numTotalAxes));
+	config.numVisibleAxes = static_cast<uint8_t>(std::min(config.numVisibleAxes, config.numTotalAxes));
+
+	// Rings. DDARing::Init clamps the depth as well, but doing it here keeps GetConfig() honest
+	// about what was actually built.
+	config.numRings = static_cast<uint8_t>(std::clamp<unsigned int>(config.numRings, 1, maxRings));
+	config.numDdasPerRing = static_cast<uint16_t>(
+		std::clamp<unsigned int>(config.numDdasPerRing, minDdasPerRing, maxDdasPerRing));
+
+	// Driver mapping. numDrivers indexes driverNumbers[maxDriversPerAxis] in DDA::Prepare.
+	for (AxisDriversConfig& axis : config.axisDrivers)
+	{
+		axis.numDrivers = static_cast<uint8_t>(std::min<size_t>(axis.numDrivers, maxDriversPerAxis));
+	}
+}
+
 void MotionSystem::Configure(const MotionConfig& newConfig) noexcept
 {
 	m_config = newConfig;
+	SanitiseConfig(m_config);
 }
 
 int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta) noexcept

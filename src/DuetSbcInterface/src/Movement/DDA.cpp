@@ -328,14 +328,15 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 	m_endSpeed = 0.0;																	// until we have a following move
 
 	const Move& move = reprap.GetMove();
-	if (   m_prev->IsProvisional()													// if previous move has not started yet
+	const bool melded =
+		   m_prev->IsProvisional()													// if previous move has not started yet
 		&& (   move.GetJerkPolicy() != 0											// and melding is allowed
 			|| (   m_flags.isPrintingMove == m_prev->m_flags.isPrintingMove
 				&& m_flags.xyMoving == m_prev->m_flags.xyMoving
 				&& m_flags.isNonPrintingExtruderMove == m_prev->m_flags.isNonPrintingExtruderMove		// this is to prevent extruder-only move being melded with Z-axis moves (issue 990)
 			   )
-		   )
-	   )
+		   );
+	if (melded)
 	{
 		// Try to meld this move to the previous move to avoid stop/start
 		// Assuming that this move ends with zero speed, calculate the maximum possible starting speed: u^2 = -2as limited to the requested speed
@@ -349,6 +350,21 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 	}
 
 	const MovementError rslt = RecalculateMove(ring);
+	if (rslt != MovementError::Ok)
+	{
+		// Leave the DDA empty. Promoting it to Planned would hand the ring's add slot to a move that
+		// was rejected: CanAddMove would stay false for ever and Spin would prepare and commit it.
+		if (melded)
+		{
+			// The lookahead above raised the previous move's end speed so this one could carry on
+			// from it. Nothing is going to, so re-plan the chain to come to rest instead - otherwise
+			// the last move in the ring ends at speed with nothing following it.
+			m_prev->beforePrepare.targetNextSpeed = 0.0;
+			DoLookahead(ring, m_prev);
+		}
+		return rslt;
+	}
+
 	SetState(Planned);
 	return rslt;
 }
