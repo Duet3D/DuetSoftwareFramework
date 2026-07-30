@@ -201,4 +201,24 @@ public class CanGenericWriterTests
         CanGenericWriter writer = new(CanGenericTables.M655Params);
         Assert.Throws<CanGenericParamException>(() => writer.AddString('A', new string('x', 60)));
     }
+
+    /// <summary>
+    /// A parameter must not be marked present in <c>paramMap</c> until its value has actually been written:
+    /// otherwise a rejected value would leave the map claiming a parameter the data area does not contain,
+    /// shifting every later parameter's computed offset for the receiver.
+    /// </summary>
+    [Test]
+    public void LeavesTheParamMapUnsetWhenAValueIsRejected()
+    {
+        CanGenericWriter widthWriter = new(CanGenericTables.M950FanParams);
+        Assert.Throws<CanGenericParamException>(() => widthWriter.AddUInt('F', 0x1_0000), "F is a uint16");
+        Assert.That(widthWriter.Message.ParamMap, Is.Zero, "the rejected value must not be marked present");
+        Assert.That(widthWriter.DataLength, Is.Zero);
+        widthWriter.AddUInt('F', 3);
+        Assert.That(widthWriter.Message.ParamMap, Is.EqualTo(0b1u), "F can still be set correctly afterwards");
+
+        CanGenericWriter overflowWriter = new(CanGenericTables.M655Params);
+        Assert.Throws<CanGenericParamException>(() => overflowWriter.AddString('A', new string('x', 60)));
+        Assert.That(overflowWriter.Message.ParamMap, Is.Zero, "an overflowing write must not be marked present");
+    }
 }

@@ -65,81 +65,81 @@ public sealed class CanGenericWriter(ImmutableArray<CanParamDescriptor> table)
     /// <summary>Add an unsigned parameter, which must be one of the unsigned fixed-size types.</summary>
     public void AddUInt(char letter, uint value)
     {
-        (int position, CanParamDescriptor descriptor) = Reserve(letter);
-        switch (descriptor.Type)
+        CanGenericSlot slot = Reserve(letter);
+        switch (slot.Descriptor.Type)
         {
             case CanParamType.UInt32:
-                Insert(position, Bytes(stackalloc byte[4], value, 4));
+                Insert(slot, Bytes(stackalloc byte[4], value, 4));
                 break;
 
             case CanParamType.UInt16 or CanParamType.PwmFreq:
                 Require(value <= ushort.MaxValue, letter, $"{value} does not fit in 16 bits");
-                Insert(position, Bytes(stackalloc byte[2], value, 2));
+                Insert(slot, Bytes(stackalloc byte[2], value, 2));
                 break;
 
             case CanParamType.UInt8 or CanParamType.LocalDriver:
                 Require(value <= byte.MaxValue, letter, $"{value} does not fit in 8 bits");
-                Insert(position, Bytes(stackalloc byte[1], value, 1));
+                Insert(slot, Bytes(stackalloc byte[1], value, 1));
                 break;
 
             case CanParamType.UInt64:
-                Insert(position, Bytes(stackalloc byte[8], value, 8));
+                Insert(slot, Bytes(stackalloc byte[8], value, 8));
                 break;
 
             default:
-                throw WrongType(letter, descriptor, "an unsigned integer");
+                throw WrongType(letter, slot.Descriptor, "an unsigned integer");
         }
     }
 
     /// <summary>Add a 64-bit unsigned parameter.</summary>
     public void AddUInt64(char letter, ulong value)
     {
-        (int position, CanParamDescriptor descriptor) = Reserve(letter);
-        if (descriptor.Type != CanParamType.UInt64)
+        CanGenericSlot slot = Reserve(letter);
+        if (slot.Descriptor.Type != CanParamType.UInt64)
         {
-            throw WrongType(letter, descriptor, "a 64-bit unsigned integer");
+            throw WrongType(letter, slot.Descriptor, "a 64-bit unsigned integer");
         }
         Span<byte> bytes = stackalloc byte[8];
         BinaryPrimitives.WriteUInt64LittleEndian(bytes, value);
-        Insert(position, bytes);
+        Insert(slot, bytes);
     }
 
     /// <summary>Add a signed parameter, which must be one of the signed fixed-size types.</summary>
     public void AddInt(char letter, int value)
     {
-        (int position, CanParamDescriptor descriptor) = Reserve(letter);
-        switch (descriptor.Type)
+        CanGenericSlot slot = Reserve(letter);
+        switch (slot.Descriptor.Type)
         {
             case CanParamType.Int32:
-                Insert(position, Bytes(stackalloc byte[4], (uint)value, 4));
+                Insert(slot, Bytes(stackalloc byte[4], (uint)value, 4));
                 break;
 
             case CanParamType.Int16:
                 Require(value is >= short.MinValue and <= short.MaxValue, letter, $"{value} does not fit in a signed 16 bits");
-                Insert(position, Bytes(stackalloc byte[2], (uint)value, 2));
+                Insert(slot, Bytes(stackalloc byte[2], (uint)value, 2));
                 break;
 
             case CanParamType.Int8:
                 Require(value is >= sbyte.MinValue and <= sbyte.MaxValue, letter, $"{value} does not fit in a signed 8 bits");
-                Insert(position, Bytes(stackalloc byte[1], (uint)value, 1));
+                Insert(slot, Bytes(stackalloc byte[1], (uint)value, 1));
                 break;
 
             default:
-                throw WrongType(letter, descriptor, "a signed integer");
+                throw WrongType(letter, slot.Descriptor, "a signed integer");
         }
     }
 
     /// <summary>Add a floating-point parameter, as either a float or a half.</summary>
     public void AddFloat(char letter, float value)
     {
-        (int position, CanParamDescriptor descriptor) = Reserve(letter);
-        switch (descriptor.Type)
+        CanGenericSlot slot = Reserve(letter);
+        switch (slot.Descriptor.Type)
         {
             case CanParamType.Float:
             {
                 Span<byte> bytes = stackalloc byte[4];
                 BinaryPrimitives.WriteSingleLittleEndian(bytes, value);
-                Insert(position, bytes);
+                Insert(slot, bytes);
                 break;
             }
 
@@ -147,25 +147,25 @@ public sealed class CanGenericWriter(ImmutableArray<CanParamDescriptor> table)
             {
                 Span<byte> bytes = stackalloc byte[2];
                 BinaryPrimitives.WriteHalfLittleEndian(bytes, (Half)value);
-                Insert(position, bytes);
+                Insert(slot, bytes);
                 break;
             }
 
             default:
-                throw WrongType(letter, descriptor, "a floating-point value");
+                throw WrongType(letter, slot.Descriptor, "a floating-point value");
         }
     }
 
     /// <summary>Add a single-character parameter.</summary>
     public void AddChar(char letter, char value)
     {
-        (int position, CanParamDescriptor descriptor) = Reserve(letter);
-        if (descriptor.Type != CanParamType.Char)
+        CanGenericSlot slot = Reserve(letter);
+        if (slot.Descriptor.Type != CanParamType.Char)
         {
-            throw WrongType(letter, descriptor, "a character");
+            throw WrongType(letter, slot.Descriptor, "a character");
         }
         Require(value <= 0x7F, letter, $"'{value}' is not an ASCII character");
-        Insert(position, [(byte)value]);
+        Insert(slot, [(byte)value]);
     }
 
     /// <summary>
@@ -174,41 +174,41 @@ public sealed class CanGenericWriter(ImmutableArray<CanParamDescriptor> table)
     /// </summary>
     public void AddString(char letter, string value)
     {
-        (int position, CanParamDescriptor descriptor) = Reserve(letter);
-        if (descriptor.Type is not (CanParamType.String or CanParamType.ReducedString))
+        CanGenericSlot slot = Reserve(letter);
+        if (slot.Descriptor.Type is not (CanParamType.String or CanParamType.ReducedString))
         {
-            throw WrongType(letter, descriptor, "a string");
+            throw WrongType(letter, slot.Descriptor, "a string");
         }
 
         int length = Encoding.UTF8.GetByteCount(value);
         Span<byte> bytes = length + 1 <= 64 ? stackalloc byte[length + 1] : new byte[length + 1];
         Encoding.UTF8.GetBytes(value, bytes);
         bytes[length] = 0;
-        Insert(position, bytes);
+        Insert(slot, bytes);
     }
 
     /// <summary>Add a local driver number, which CANlib carries as a single byte.</summary>
     public void AddDriverId(char letter, byte localDriver)
     {
-        (int position, CanParamDescriptor descriptor) = Reserve(letter);
-        if (descriptor.Type != CanParamType.LocalDriver)
+        CanGenericSlot slot = Reserve(letter);
+        if (slot.Descriptor.Type != CanParamType.LocalDriver)
         {
-            throw WrongType(letter, descriptor, "a driver ID");
+            throw WrongType(letter, slot.Descriptor, "a driver ID");
         }
-        Insert(position, [localDriver]);
+        Insert(slot, [localDriver]);
     }
 
     /// <summary>Add an unsigned array parameter of any of the three unsigned array types.</summary>
     public void AddUIntArray(char letter, ReadOnlySpan<uint> values)
     {
-        (int position, CanParamDescriptor descriptor) = Reserve(letter);
-        if (descriptor.Type is not (CanParamType.UInt8Array or CanParamType.UInt16Array or CanParamType.UInt32Array))
+        CanGenericSlot slot = Reserve(letter);
+        if (slot.Descriptor.Type is not (CanParamType.UInt8Array or CanParamType.UInt16Array or CanParamType.UInt32Array))
         {
-            throw WrongType(letter, descriptor, "an unsigned array");
+            throw WrongType(letter, slot.Descriptor, "an unsigned array");
         }
-        RequireArrayLength(letter, descriptor, values.Length);
+        RequireArrayLength(letter, slot.Descriptor, values.Length);
 
-        int itemSize = descriptor.ItemSize;
+        int itemSize = slot.Descriptor.ItemSize;
         Span<byte> bytes = stackalloc byte[1 + (values.Length * itemSize)];
         bytes[0] = (byte)values.Length;
         for (int i = 0; i < values.Length; i++)
@@ -218,18 +218,18 @@ public sealed class CanGenericWriter(ImmutableArray<CanParamDescriptor> table)
             Require(value <= limit, letter, $"element {i} ({value}) does not fit in {8 * itemSize} bits");
             Bytes(bytes.Slice(1 + (i * itemSize), itemSize), value, itemSize);
         }
-        Insert(position, bytes);
+        Insert(slot, bytes);
     }
 
     /// <summary>Add a float array parameter.</summary>
     public void AddFloatArray(char letter, ReadOnlySpan<float> values)
     {
-        (int position, CanParamDescriptor descriptor) = Reserve(letter);
-        if (descriptor.Type != CanParamType.FloatArray)
+        CanGenericSlot slot = Reserve(letter);
+        if (slot.Descriptor.Type != CanParamType.FloatArray)
         {
-            throw WrongType(letter, descriptor, "a float array");
+            throw WrongType(letter, slot.Descriptor, "a float array");
         }
-        RequireArrayLength(letter, descriptor, values.Length);
+        RequireArrayLength(letter, slot.Descriptor, values.Length);
 
         Span<byte> bytes = stackalloc byte[1 + (values.Length * sizeof(float))];
         bytes[0] = (byte)values.Length;
@@ -237,15 +237,17 @@ public sealed class CanGenericWriter(ImmutableArray<CanParamDescriptor> table)
         {
             BinaryPrimitives.WriteSingleLittleEndian(bytes.Slice(1 + (i * sizeof(float)), sizeof(float)), values[i]);
         }
-        Insert(position, bytes);
+        Insert(slot, bytes);
     }
 
     /// <summary>
-    /// Mark the parameter as present and return where its value belongs. The position is the sum of the
-    /// sizes of the parameters that precede it in the table and are already present, because the receiver
-    /// finds a value by walking the table the same way.
+    /// Locate where a parameter's value belongs. The position is the sum of the sizes of the parameters
+    /// that precede it in the table and are already present, because the receiver finds a value by walking
+    /// the table the same way. The parameter is not marked present yet: <see cref="Insert"/> does that once
+    /// the value has actually been written, so a validation failure in between (wrong width, wrong type,
+    /// message overflow) never leaves <c>paramMap</c> claiming a value that was never stored.
     /// </summary>
-    private (int Position, CanParamDescriptor Descriptor) Reserve(char letter)
+    private CanGenericSlot Reserve(char letter)
     {
         if (!CanGenericLayout.TryLocate(_message.Data, _message.ParamMap, Table, letter, out CanGenericSlot slot))
         {
@@ -255,11 +257,10 @@ public sealed class CanGenericWriter(ImmutableArray<CanParamDescriptor> table)
         {
             throw new CanGenericParamException($"parameter '{letter}' has already been set");
         }
-        _message.ParamMap |= 1u << slot.Index;
-        return (slot.Position, slot.Descriptor);
+        return slot;
     }
 
-    private void Insert(int position, ReadOnlySpan<byte> value)
+    private void Insert(CanGenericSlot slot, ReadOnlySpan<byte> value)
     {
         if (_dataLength + value.Length > ByteArray60.Length)
         {
@@ -267,9 +268,10 @@ public sealed class CanGenericWriter(ImmutableArray<CanParamDescriptor> table)
         }
 
         Span<byte> data = _message.Data;
-        data[position.._dataLength].CopyTo(data[(position + value.Length)..]);
-        value.CopyTo(data[position..]);
+        data[slot.Position.._dataLength].CopyTo(data[(slot.Position + value.Length)..]);
+        value.CopyTo(data[slot.Position..]);
         _dataLength += value.Length;
+        _message.ParamMap |= 1u << slot.Index;
     }
 
     /// <summary>Write the low <paramref name="size"/> bytes of a value little-endian.</summary>
