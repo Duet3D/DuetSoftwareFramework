@@ -68,19 +68,42 @@ public class CanGenericBuilderTests
     }
 
     /// <summary>
-    /// A retired table entry still occupies its position, which is what keeps the parameters after it on
-    /// the bits the receiver expects, but it cannot be sent so it gets no builder method.
+    /// An entry outside A..Z still occupies its table position, which is what keeps the parameters after it
+    /// on the bits the receiver expects.
     /// </summary>
     [Test]
-    public void RetiredEntriesStillHoldTheirTablePosition()
+    public void EntriesOutsideAtoZStillHoldTheirTablePosition()
     {
         Assert.That(CanGenericTables.M569Point1Params[7].Letter, Is.EqualTo('h'), "the retired entry");
-        Assert.That(CanGenericTables.M569Point1Params[7].IsRetired, Is.True);
+        Assert.That(CanGenericTables.M569Point1Params[7].CanComeFromGCode, Is.False);
         Assert.That(CanGenericTables.M569Point1Params[8].Letter, Is.EqualTo('S'), "the entry after it");
 
         // S therefore sits at bit 8, not bit 7
         M569Point1Builder builder = new();
         builder.S(200);
         Assert.That(builder.Message.ParamMap, Is.EqualTo(1u << 8));
+    }
+
+    /// <summary>
+    /// M915's 'd' and ConfigureFilamentMonitor's 'd' carry a driver number that RepRapFirmware fills in
+    /// itself; they are outside A..Z only so that a G-code command cannot supply them. They still have to be
+    /// settable, and they are the first entry of their tables, so getting this wrong would put every other
+    /// parameter of those two messages at the wrong offset.
+    /// </summary>
+    [Test]
+    public void ParametersTheCallerSuppliesAreStillSettable()
+    {
+        M915Builder m915 = new();
+        m915.d(0b101).S(-3);
+
+        CanGenericParser parser = new(m915.Message, CanGenericTables.M915Params);
+        Assert.That(parser.GetUInt('d'), Is.EqualTo(0b101u), "the driver bitmap");
+        Assert.That(parser.GetInt('S'), Is.EqualTo(-3));
+
+        ConfigureFilamentMonitorBuilder monitor = new();
+        monitor.d(2).S(1);
+        CanGenericParser monitorParser = new(monitor.Message, CanGenericTables.ConfigureFilamentMonitorParams);
+        Assert.That(monitorParser.GetUInt('d'), Is.EqualTo(2u), "the local driver");
+        Assert.That(monitorParser.GetUInt('S'), Is.EqualTo(1u));
     }
 }

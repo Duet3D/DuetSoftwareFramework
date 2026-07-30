@@ -302,6 +302,11 @@ public sealed class M569Point1Builder
     /// <returns>This builder, so that calls can be chained.</returns>
     public M569Point1Builder D(float value) { _writer.AddFloat('D', value); return this; }
 
+    /// <summary>Set the 'h' parameter: was 'H', no longer used, position retained for backwards compatibility (using lowercase 'h' means it won't be matched)</summary>
+    /// <returns>This builder, so that calls can be chained.</returns>
+    /// <remarks>Outside A..Z, so a G-code command can never supply this parameter; the caller has to.</remarks>
+    public M569Point1Builder h(float value) { _writer.AddFloat('h', value); return this; }
+
     /// <summary>Set the 'S' parameter: steps/rev added for EXP1HCL firmware 3.5 compatibility</summary>
     /// <returns>This builder, so that calls can be chained.</returns>
     public M569Point1Builder S(ushort value) { _writer.AddUInt('S', value); return this; }
@@ -445,6 +450,11 @@ public sealed class M569Point6Params_StatusOnlyBuilder
     /// <summary>Set the 'P' parameter.</summary>
     /// <returns>This builder, so that calls can be chained.</returns>
     public M569Point6Params_StatusOnlyBuilder P(byte localDriver) { _writer.AddDriverId('P', localDriver); return this; }
+
+    /// <summary>Set the 'v' parameter: changed to lowercase so that we don't pick up this parameter from the GCode command</summary>
+    /// <returns>This builder, so that calls can be chained.</returns>
+    /// <remarks>Outside A..Z, so a G-code command can never supply this parameter; the caller has to.</remarks>
+    public M569Point6Params_StatusOnlyBuilder v(byte value) { _writer.AddUInt('v', value); return this; }
 }
 
 /// <summary>
@@ -501,6 +511,11 @@ public sealed class M915Builder
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
+
+    /// <summary>Set the 'd' parameter: this is the bitmap of driver numbers to change the parameters for</summary>
+    /// <returns>This builder, so that calls can be chained.</returns>
+    /// <remarks>Outside A..Z, so a G-code command can never supply this parameter; the caller has to.</remarks>
+    public M915Builder d(ushort value) { _writer.AddUInt('d', value); return this; }
 
     /// <summary>Set the 'S' parameter.</summary>
     /// <returns>This builder, so that calls can be chained.</returns>
@@ -701,6 +716,11 @@ public sealed class ConfigureFilamentMonitorBuilder
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
+
+    /// <summary>Set the 'd' parameter: this is the driver number on the remote board</summary>
+    /// <returns>This builder, so that calls can be chained.</returns>
+    /// <remarks>Outside A..Z, so a G-code command can never supply this parameter; the caller has to.</remarks>
+    public ConfigureFilamentMonitorBuilder d(byte value) { _writer.AddUInt('d', value); return this; }
 
     /// <summary>Set the 'S' parameter.</summary>
     /// <returns>This builder, so that calls can be chained.</returns>

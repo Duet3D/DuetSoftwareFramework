@@ -102,17 +102,19 @@ public sealed class CSharpTablesEmitter(CanSchema schema)
 
             foreach (GenericParamDef param in table.Params)
             {
-                // A retired entry only holds its table position; it can never be sent, so it gets no method
-                if (param.IsRetired)
-                {
-                    continue;
-                }
                 writer.Line();
                 string summary = param.Doc is null
                     ? $"Set the '{param.Letter}' parameter."
                     : $"Set the '{param.Letter}' parameter: {CodeWriter.Escape(param.Doc)}";
                 writer.XmlDocRaw(summary);
                 writer.Line("/// <returns>This builder, so that calls can be chained.</returns>");
+                if (!param.CanComeFromGCode)
+                {
+                    // The method keeps the lowercase name on purpose: the letter is the parameter's identity
+                    // on the wire, and an uppercase alias would suggest it maps to that G-code letter, which
+                    // is the very thing CANlib moved it out of A..Z to prevent
+                    writer.Line("/// <remarks>Outside A..Z, so a G-code command can never supply this parameter; the caller has to.</remarks>");
+                }
                 writer.Line($"public {name} {param.Letter}({Signature(param)}) {{ {Call(param)}; return this; }}");
             }
         }
@@ -202,8 +204,17 @@ public sealed class CSharpTablesEmitter(CanSchema schema)
             writer.XmlDocRaw("True if the value is a length byte followed by that many elements");
             writer.Line("public bool IsArray => ((int)Type & 0x80) != 0;");
             writer.Line();
-            writer.XmlDocRaw("True if this entry only reserves a table position and can never be sent");
-            writer.Line("public bool IsRetired => Letter is < 'A' or > 'Z';");
+            writer.XmlDocRaw("""
+                True if a G-code command may supply this parameter, i.e. its letter is in A..Z.
+
+                CANlib puts a parameter outside A..Z to keep it away from G-code while holding its table
+                position, so that the parameters after it stay on the bits the receiver expects. Some of
+                those are retired entries that are never sent at all (M569.1's <c>h</c>); others carry a
+                value the sender fills in itself, such as the driver number in M915's <c>d</c>. The two
+                cannot be told apart from the table, so the rule is only about where a value may come from:
+                never from a command, always available to a caller that knows what it is doing.
+                """);
+            writer.Line("public bool CanComeFromGCode => Letter is >= 'A' and <= 'Z';");
         }
         writer.Line();
     }

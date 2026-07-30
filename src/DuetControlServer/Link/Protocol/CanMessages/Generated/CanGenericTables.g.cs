@@ -91,8 +91,17 @@ public readonly record struct CanParamDescriptor(char Letter, CanParamType Type,
     /// <summary>True if the value is a length byte followed by that many elements</summary>
     public bool IsArray => ((int)Type & 0x80) != 0;
 
-    /// <summary>True if this entry only reserves a table position and can never be sent</summary>
-    public bool IsRetired => Letter is < 'A' or > 'Z';
+    /// <summary>
+    /// True if a G-code command may supply this parameter, i.e. its letter is in A..Z.
+    ///
+    /// CANlib puts a parameter outside A..Z to keep it away from G-code while holding its table
+    /// position, so that the parameters after it stay on the bits the receiver expects. Some of
+    /// those are retired entries that are never sent at all (M569.1's <c>h</c>); others carry a
+    /// value the sender fills in itself, such as the driver number in M915's <c>d</c>. The two
+    /// cannot be told apart from the table, so the rule is only about where a value may come from:
+    /// never from a command, always available to a caller that knows what it is doing.
+    /// </summary>
+    public bool CanComeFromGCode => Letter is >= 'A' and <= 'Z';
 }
 
 /// <summary>

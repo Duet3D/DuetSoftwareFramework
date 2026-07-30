@@ -255,10 +255,6 @@ public sealed class CanGenericWriter(ImmutableArray<CanParamDescriptor> table)
             bool present = (_message.ParamMap & (1u << index)) != 0;
             if (descriptor.Letter == letter)
             {
-                if (descriptor.IsRetired)
-                {
-                    throw new CanGenericParamException($"parameter '{letter}' is a retired table entry and cannot be sent");
-                }
                 if (present)
                 {
                     throw new CanGenericParamException($"parameter '{letter}' has already been set");

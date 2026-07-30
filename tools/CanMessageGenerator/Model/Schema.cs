@@ -301,11 +301,21 @@ public sealed class GenericParamDef
     public int MaxLength;
 
     /// <summary>
-    /// True for a parameter whose letter is outside A..Z. CANlib uses a lowercase letter to retire a
-    /// table entry without shifting the ones after it: the position still has to be reserved, but the
-    /// parameter can never be matched against a G-code command and is never set programmatically.
+    /// True if a G-code command may supply this parameter, i.e. its letter is in A..Z.
     /// </summary>
-    public bool IsRetired => Letter is < 'A' or > 'Z';
+    /// <remarks>
+    /// CANlib puts a parameter outside A..Z to keep it away from G-code while holding its table position, so
+    /// that the parameters after it stay on the bits the receiver expects. That covers two different cases,
+    /// and only the first is a retired entry:
+    /// <list type="bullet">
+    /// <item><c>M569.1</c>'s <c>h</c> and <c>M569.6</c>'s status-only <c>v</c>, which are never sent at all;</item>
+    /// <item><c>M915</c>'s and <c>ConfigureFilamentMonitor</c>'s <c>d</c>, which carry a driver number that
+    /// the sender fills in itself rather than reading off the command.</item>
+    /// </list>
+    /// Since the two are indistinguishable in the table, the rule is only about where the value may come
+    /// from: never from a command, always available to a caller that knows what it is doing.
+    /// </remarks>
+    public bool CanComeFromGCode => Letter is >= 'A' and <= 'Z';
 }
 
 /// <summary>

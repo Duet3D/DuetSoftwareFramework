@@ -163,17 +163,29 @@ public class CanGenericWriterTests
     }
 
     [Test]
-    public void RejectsUnknownDuplicateAndRetiredParameters()
+    public void RejectsUnknownAndDuplicateParameters()
     {
         CanGenericWriter writer = new(CanGenericTables.M950FanParams);
         Assert.Throws<CanGenericParamException>(() => writer.AddUInt('Z', 1), "not in the table");
 
         writer.AddUInt('F', 1);
         Assert.Throws<CanGenericParamException>(() => writer.AddUInt('F', 2), "already set");
+    }
 
-        // M569Point1Params reserves 'h' for a parameter that is no longer used
-        CanGenericWriter m569p1 = new(CanGenericTables.M569Point1Params);
-        Assert.Throws<CanGenericParamException>(() => m569p1.AddFloat('h', 1.0f), "retired entry");
+    /// <summary>
+    /// A letter outside A..Z is out of reach of a G-code command, not out of reach of the sender: M915's 'd'
+    /// carries a driver bitmap that RepRapFirmware fills in itself. The writer must therefore let it be set,
+    /// and it has to land on bit 0 like any other first table entry.
+    /// </summary>
+    [Test]
+    public void AcceptsAParameterThatOnlyTheSenderCanSupply()
+    {
+        CanGenericWriter writer = new(CanGenericTables.M915Params);
+        writer.AddUInt('d', 0b101);
+        writer.AddInt('S', -3);
+
+        Assert.That(writer.Message.ParamMap, Is.EqualTo(0b11u));
+        Assert.That(writer.GetData(), Is.EqualTo(new byte[] { 0x05, 0x00, 0xFD }));
     }
 
     [Test]
