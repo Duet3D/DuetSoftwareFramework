@@ -31,7 +31,10 @@ public sealed class CSharpExprEmitter(EmitContext context)
         _ => throw new InvalidOperationException($"cannot render {e.GetType().Name} as C#")
     };
 
-    private static string RenderNumber(NumberExpr n) => n.Raw.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? n.Raw : n.Value.ToString();
+    private static string RenderNumber(NumberExpr n) =>
+        n.IsFloat ? n.Raw + "f"
+        : n.Raw.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? n.Raw
+        : n.Value.ToString();
 
     /// <summary>
     /// Inline array indexers take an <c>int</c>. The schema's index expressions are typically unsigned
@@ -80,14 +83,16 @@ public sealed class CSharpExprEmitter(EmitContext context)
             case "elem":
                 return $"{Render(c.Args[0])}[0]";
 
+            // These take the result type as their first argument: C++ needs it to pick the template
+            // instantiation, and C# needs every argument cast to the same type
             case "min":
-                return $"Math.Min({Render(c.Args[0])}, {Render(c.Args[1])})";
+                return $"Math.Min({Typed(c, 1)}, {Typed(c, 2)})";
 
             case "max":
-                return $"Math.Max({Render(c.Args[0])}, {Render(c.Args[1])})";
+                return $"Math.Max({Typed(c, 1)}, {Typed(c, 2)})";
 
             case "clamp":
-                return $"Math.Clamp({Render(c.Args[0])}, {Render(c.Args[1])}, {Render(c.Args[2])})";
+                return $"Math.Clamp({Typed(c, 1)}, {Typed(c, 2)}, {Typed(c, 3)})";
 
             default:
                 if (Types.IsPrimitive(c.Name) && c.Args.Count == 1)
@@ -97,6 +102,10 @@ public sealed class CSharpExprEmitter(EmitContext context)
                 return $"{Naming.Pascal(c.Name)}({string.Join(", ", c.Args.Select(Render))})";
         }
     }
+
+    /// <summary>Render one argument of a typed intrinsic, cast to the type given as its first argument.</summary>
+    private string Typed(CallExpr c, int index) =>
+        Cast(((IdentExpr)c.Args[0]).Name, c.Args[index]);
 
     /// <summary>Render a cast, turning a boolean operand into 0 or 1 because C# has no bool-to-int conversion.</summary>
     public string Cast(string type, Expr operand)

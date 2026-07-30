@@ -118,6 +118,10 @@ public static class ExprParser
         switch (token.Kind)
         {
             case TokenKind.Number:
+                if (token.Text.Contains('.'))
+                {
+                    return new NumberExpr(0, token.Text, IsFloat: true);
+                }
                 long value = token.Text.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
                     ? long.Parse(token.Text[2..], NumberStyles.HexNumber, CultureInfo.InvariantCulture)
                     : long.Parse(token.Text, CultureInfo.InvariantCulture);
@@ -252,7 +256,8 @@ internal sealed class Lexer
             if (char.IsDigit(c))
             {
                 int start = i;
-                if (c == '0' && i + 1 < source.Length && (source[i + 1] is 'x' or 'X'))
+                bool hex = c == '0' && i + 1 < source.Length && (source[i + 1] is 'x' or 'X');
+                if (hex)
                 {
                     i += 2;
                     while (i < source.Length && Uri.IsHexDigit(source[i]))
@@ -266,12 +271,23 @@ internal sealed class Lexer
                     {
                         i++;
                     }
+                    // A '.' is only part of the number when a digit follows it; otherwise it is member access
+                    if (i + 1 < source.Length && source[i] == '.' && char.IsDigit(source[i + 1]))
+                    {
+                        i++;
+                        while (i < source.Length && char.IsDigit(source[i]))
+                        {
+                            i++;
+                        }
+                    }
                 }
-                while (i < source.Length && (source[i] is 'u' or 'U' or 'l' or 'L'))
+                // 'f' and 'F' are only suffixes on a decimal literal; in hex they are digits
+                char[] suffixes = hex ? ['u', 'U', 'l', 'L'] : ['u', 'U', 'l', 'L', 'f', 'F'];
+                while (i < source.Length && Array.IndexOf(suffixes, source[i]) >= 0)
                 {
-                    i++;                                        // tolerate C-style integer suffixes
+                    i++;                                        // tolerate C-style numeric suffixes
                 }
-                _tokens.Add(new Token(TokenKind.Number, source[start..i].TrimEnd('u', 'U', 'l', 'L')));
+                _tokens.Add(new Token(TokenKind.Number, source[start..i].TrimEnd(suffixes)));
                 continue;
             }
 

@@ -7,7 +7,11 @@ namespace CanMessageGenerator.Expressions;
 public abstract record Expr;
 
 /// <summary>An integer literal. <see cref="Raw"/> preserves the original spelling (e.g. hexadecimal).</summary>
-public sealed record NumberExpr(long Value, string Raw) : Expr;
+/// <summary>
+/// A numeric literal. <paramref name="Raw"/> keeps the spelling the schema used, so that hex stays hex and
+/// a float keeps its digits; <paramref name="Value"/> is only meaningful for an integer.
+/// </summary>
+public sealed record NumberExpr(long Value, string Raw, bool IsFloat = false) : Expr;
 
 /// <summary>A boolean literal.</summary>
 public sealed record BoolExpr(bool Value) : Expr;

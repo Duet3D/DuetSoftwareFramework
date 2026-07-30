@@ -56,14 +56,15 @@ public sealed class CppExprEmitter(EmitContext context)
             case "elem":
                 return $"{Render(c.Args[0])}[0]";
 
+            // The first argument names the result type, which is the template argument on this side
             case "min":
-                return $"min<size_t>({Render(c.Args[0])}, {Render(c.Args[1])})";
+                return $"min<{TypeArg(c)}>({Render(c.Args[1])}, {Render(c.Args[2])})";
 
             case "max":
-                return $"max<size_t>({Render(c.Args[0])}, {Render(c.Args[1])})";
+                return $"max<{TypeArg(c)}>({Render(c.Args[1])}, {Render(c.Args[2])})";
 
             case "clamp":
-                return $"constrain<size_t>({Render(c.Args[0])}, {Render(c.Args[1])}, {Render(c.Args[2])})";
+                return $"constrain<{TypeArg(c)}>({Render(c.Args[1])}, {Render(c.Args[2])}, {Render(c.Args[3])})";
 
             default:
                 if (Types.IsPrimitive(c.Name) && c.Args.Count == 1)
@@ -73,6 +74,9 @@ public sealed class CppExprEmitter(EmitContext context)
                 return $"{c.Name}({string.Join(", ", c.Args.Select(Render))})";
         }
     }
+
+    /// <summary>The template argument of a typed intrinsic, named by its first argument.</summary>
+    private string TypeArg(CallExpr c) => Types.Cpp(context.Schema, ((IdentExpr)c.Args[0]).Name);
 
     private string RenderSizeofArg(Expr arg) => arg switch
     {
