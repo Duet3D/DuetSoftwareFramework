@@ -17,6 +17,9 @@
 // For backwards compatibility, any new parameters added to a table must be added at the end of that table.
 // Maximum length of data is 60 bytes.
 
+// Superseded: M42 and M280 are sent as CanMessageWriteGpio, which has a struct of its own.
+// This table is kept so that the generated header stays a drop-in for CANlib's, but no message
+// type would ever carry it, so no C# message or builder is generated.
 constexpr ParamDescriptor M42Params[] =
 {
 	{ 'P', ParamDescriptor::uint16, 0 },
@@ -38,6 +41,9 @@ constexpr ParamDescriptor M150Params[] =
 	{ 0, ParamDescriptor::none, 0 }
 };
 
+// Superseded: M42 and M280 are sent as CanMessageWriteGpio, which has a struct of its own.
+// This table is kept so that the generated header stays a drop-in for CANlib's, but no message
+// type would ever carry it, so no C# message or builder is generated.
 constexpr ParamDescriptor M280Params[] =
 {
 	{ 'P', ParamDescriptor::uint16, 0 },

@@ -64,7 +64,7 @@ public sealed class CSharpTablesEmitter(CanSchema schema)
         writer.Line($"namespace {schema.CSharpNamespace};");
         writer.Line();
 
-        foreach (GenericTableDef table in schema.GenericTables)
+        foreach (GenericTableDef table in schema.GenericTables.Where(t => t.IsGenerated(Language.CSharp)))
         {
             EmitMessage(writer, table);
             EmitBuilder(writer, table);
@@ -85,9 +85,7 @@ public sealed class CSharpTablesEmitter(CanSchema schema)
     {
         string name = MessageName(table);
         string doc = table.Doc is null ? $"The {table.BaseName} generic message." : CodeWriter.Escape(table.Doc);
-        string identity = table.MessageType is not null
-            ? $"Sent as <see cref=\"CanMessageType.{Naming.MessageTypeMember(table.MessageType)}\" />."
-            : "CANlib gives this table no message type of its own, so this cannot identify itself and the caller has to supply the type.";
+        string identity = $"Sent as <see cref=\"CanMessageType.{Naming.MessageTypeMember(table.MessageType!)}\" />.";
         writer.XmlDocRaw($"""
             {doc}
 
@@ -99,8 +97,7 @@ public sealed class CSharpTablesEmitter(CanSchema schema)
         // Deriving the layout from the wrapped message rather than restating it is what keeps this type from
         // ever disagreeing with the format the expansion board reads
         writer.Line("[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]");
-        string contract = table.MessageType is not null ? $"ICanMessage<{name}>" : $"ICanMessageBody<{name}>";
-        using (writer.Block($"public struct {name} : {contract}", "}"))
+        using (writer.Block($"public struct {name} : ICanMessage<{name}>", "}"))
         {
             writer.Outdent();
             writer.Line("{");
@@ -110,12 +107,9 @@ public sealed class CSharpTablesEmitter(CanSchema schema)
             writer.Line("[FieldOffset(0)] public CanMessageGeneric Generic;");
             writer.Line();
 
-            if (table.MessageType is not null)
-            {
-                writer.Line("/// <inheritdoc cref=\"ICanMessage{TSelf}.MessageType\" />");
-                writer.Line($"public static CanMessageType MessageType => CanMessageType.{Naming.MessageTypeMember(table.MessageType)};");
-                writer.Line();
-            }
+            writer.Line("/// <inheritdoc cref=\"ICanMessage{TSelf}.MessageType\" />");
+            writer.Line($"public static CanMessageType MessageType => CanMessageType.{Naming.MessageTypeMember(table.MessageType!)};");
+            writer.Line();
 
             writer.XmlDocRaw($"The parameter table this message is built against");
             writer.Line($"public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.{table.Name};");
@@ -163,12 +157,9 @@ public sealed class CSharpTablesEmitter(CanSchema schema)
             writer.Line($"private readonly CanGenericWriter _writer = new(CanGenericTables.{table.Name});");
             writer.Line();
 
-            if (table.MessageType is not null)
-            {
-                writer.XmlDocRaw("The message type this message is sent under");
-                writer.Line($"public static CanMessageType MessageType => CanMessageType.{Naming.MessageTypeMember(table.MessageType)};");
-                writer.Line();
-            }
+            writer.XmlDocRaw("The message type this message is sent under");
+            writer.Line($"public static CanMessageType MessageType => CanMessageType.{Naming.MessageTypeMember(table.MessageType!)};");
+            writer.Line();
 
             writer.XmlDocRaw($"""
                 The message as built so far, ready to hand to the CAN send path.
@@ -329,7 +320,7 @@ public sealed class CSharpTablesEmitter(CanSchema schema)
             writer.Indent();
 
             bool first = true;
-            foreach (GenericTableDef table in schema.GenericTables)
+            foreach (GenericTableDef table in schema.GenericTables.Where(t => t.IsGenerated(Language.CSharp)))
             {
                 if (!first)
                 {
@@ -339,10 +330,7 @@ public sealed class CSharpTablesEmitter(CanSchema schema)
 
                 // The schema's own prose has to be escaped; the sentence added below is markup on purpose
                 string doc = table.Doc is null ? $"Parameters of {table.BaseName}" : CodeWriter.Escape(table.Doc);
-                if (table.MessageType is not null)
-                {
-                    doc += $"\nSent as <see cref=\"CanMessageType.{Naming.MessageTypeMember(table.MessageType)}\" />.";
-                }
+                doc += $"\nSent as <see cref=\"CanMessageType.{Naming.MessageTypeMember(table.MessageType!)}\" />.";
                 writer.XmlDocRaw(doc);
                 using (writer.Block($"public static ImmutableArray<CanParamDescriptor> {table.Name} {{ get; }} =", "];"))
                 {

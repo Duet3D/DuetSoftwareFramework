@@ -80,12 +80,8 @@ public class CanGenericTableLayout
     [Test]
     public void GenericMessagesHaveTheLayoutOfCanMessageGeneric()
     {
-        Assert.That(Unsafe.SizeOf<CanMessageM42>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM42");
-        Assert.That(Marshal.OffsetOf<CanMessageM42>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM42.Generic");
         Assert.That(Unsafe.SizeOf<CanMessageM150>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM150");
         Assert.That(Marshal.OffsetOf<CanMessageM150>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM150.Generic");
-        Assert.That(Unsafe.SizeOf<CanMessageM280>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM280");
-        Assert.That(Marshal.OffsetOf<CanMessageM280>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM280.Generic");
         Assert.That(Unsafe.SizeOf<CanMessageM308V1>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM308V1");
         Assert.That(Marshal.OffsetOf<CanMessageM308V1>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM308V1.Generic");
         Assert.That(Unsafe.SizeOf<CanMessageM569>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM569");
@@ -167,15 +163,8 @@ public class CanGenericTableLayout
         Assert.That(CanMessageM655.ParamTable, Is.EqualTo(CanGenericTables.M655Params), "parameter table of CanMessageM655");
         Assert.That(CanMessageM111.MessageType, Is.EqualTo(CanMessageType.M111), "message type of CanMessageM111");
         Assert.That(CanMessageM111.ParamTable, Is.EqualTo(CanGenericTables.M111Params), "parameter table of CanMessageM111");
-    }
-
-    [Test]
-    public void M42Params_Entries()
-    {
-        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M42Params;
-        Assert.That(table.Length, Is.EqualTo(2), "number of entries in M42Params");
-        Assert.That(table[0], Is.EqualTo(new CanParamDescriptor('P', CanParamType.UInt16, 0)), "M42Params[0]");
-        Assert.That(table[1], Is.EqualTo(new CanParamDescriptor('S', CanParamType.Float, 0)), "M42Params[1]");
+        Assert.That(CanMessageM959.MessageType, Is.EqualTo(CanMessageType.SetConnectionTimeout), "message type of CanMessageM959");
+        Assert.That(CanMessageM959.ParamTable, Is.EqualTo(CanGenericTables.M959Params), "parameter table of CanMessageM959");
     }
 
     [Test]
@@ -192,15 +181,6 @@ public class CanGenericTableLayout
         Assert.That(table[6], Is.EqualTo(new CanParamDescriptor('P', CanParamType.UInt8, 0)), "M150Params[6]");
         Assert.That(table[7], Is.EqualTo(new CanParamDescriptor('Y', CanParamType.UInt8, 0)), "M150Params[7]");
         Assert.That(table[8], Is.EqualTo(new CanParamDescriptor('F', CanParamType.UInt8, 0)), "M150Params[8]");
-    }
-
-    [Test]
-    public void M280Params_Entries()
-    {
-        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M280Params;
-        Assert.That(table.Length, Is.EqualTo(2), "number of entries in M280Params");
-        Assert.That(table[0], Is.EqualTo(new CanParamDescriptor('P', CanParamType.UInt16, 0)), "M280Params[0]");
-        Assert.That(table[1], Is.EqualTo(new CanParamDescriptor('S', CanParamType.UInt16, 0)), "M280Params[1]");
     }
 
     [Test]

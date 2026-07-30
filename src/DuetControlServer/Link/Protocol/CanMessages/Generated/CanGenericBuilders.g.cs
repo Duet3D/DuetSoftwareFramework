@@ -12,73 +12,6 @@ using DuetControlServer.Link.Protocol.Shared;
 namespace DuetControlServer.Link.Protocol.CanMessages;
 
 /// <summary>
-/// The M42 generic message.
-///
-/// CANlib gives this table no message type of its own, so this cannot identify itself and the caller has to supply the type.
-/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
-/// <see cref="CanGenericTables.M42Params" /> that are being sent, packed in table order, plus a
-/// bitmap saying which those are. Build one with <see cref="M42Builder" />.
-/// </summary>
-[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
-public struct CanMessageM42 : ICanMessageBody<CanMessageM42>
-{
-    /// <summary>The generic message body, in the format the expansion board reads</summary>
-    [FieldOffset(0)] public CanMessageGeneric Generic;
-
-    /// <summary>The parameter table this message is built against</summary>
-    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M42Params;
-
-    /// <summary>
-    /// Number of payload bytes this message occupies: the parameters actually present, plus the
-    /// request ID and parameter map.
-    ///
-    /// The parameter map and the table are enough to work this out, because each present parameter's
-    /// size follows from its table entry and, for the variable-length ones, from the data itself.
-    /// </summary>
-    public readonly uint GetActualDataLength()
-    {
-        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M42Params);
-        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
-    }
-}
-
-/// <summary>
-/// Builds the M42 generic message.
-///
-/// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
-/// message's parameter map. Parameters may be set in any order.
-/// </summary>
-public sealed class M42Builder
-{
-    private readonly CanGenericWriter _writer = new(CanGenericTables.M42Params);
-
-    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
-    public CanMessageM42 Message
-    {
-        get
-        {
-            CanMessageM42 message = default;
-            message.Generic = _writer.Message;
-            return message;
-        }
-    }
-
-    /// <summary>The generic message body on its own, without the type that identifies it</summary>
-    public CanMessageGeneric Body => _writer.Message;
-
-    /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
-    public uint ActualDataLength => _writer.ActualDataLength;
-
-    /// <summary>Set the 'P' parameter.</summary>
-    /// <returns>This builder, so that calls can be chained.</returns>
-    public M42Builder P(ushort value) { _writer.AddUInt('P', value); return this; }
-
-    /// <summary>Set the 'S' parameter.</summary>
-    /// <returns>This builder, so that calls can be chained.</returns>
-    public M42Builder S(float value) { _writer.AddFloat('S', value); return this; }
-}
-
-/// <summary>
 /// The M150 generic message.
 ///
 /// Sent as <see cref="CanMessageType.WriteLedStrip" />.
@@ -177,73 +110,6 @@ public sealed class M150Builder
     /// <summary>Set the 'F' parameter: 'more follows' flag</summary>
     /// <returns>This builder, so that calls can be chained.</returns>
     public M150Builder F(byte value) { _writer.AddUInt('F', value); return this; }
-}
-
-/// <summary>
-/// The M280 generic message.
-///
-/// CANlib gives this table no message type of its own, so this cannot identify itself and the caller has to supply the type.
-/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
-/// <see cref="CanGenericTables.M280Params" /> that are being sent, packed in table order, plus a
-/// bitmap saying which those are. Build one with <see cref="M280Builder" />.
-/// </summary>
-[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
-public struct CanMessageM280 : ICanMessageBody<CanMessageM280>
-{
-    /// <summary>The generic message body, in the format the expansion board reads</summary>
-    [FieldOffset(0)] public CanMessageGeneric Generic;
-
-    /// <summary>The parameter table this message is built against</summary>
-    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M280Params;
-
-    /// <summary>
-    /// Number of payload bytes this message occupies: the parameters actually present, plus the
-    /// request ID and parameter map.
-    ///
-    /// The parameter map and the table are enough to work this out, because each present parameter's
-    /// size follows from its table entry and, for the variable-length ones, from the data itself.
-    /// </summary>
-    public readonly uint GetActualDataLength()
-    {
-        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M280Params);
-        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
-    }
-}
-
-/// <summary>
-/// Builds the M280 generic message.
-///
-/// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
-/// message's parameter map. Parameters may be set in any order.
-/// </summary>
-public sealed class M280Builder
-{
-    private readonly CanGenericWriter _writer = new(CanGenericTables.M280Params);
-
-    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
-    public CanMessageM280 Message
-    {
-        get
-        {
-            CanMessageM280 message = default;
-            message.Generic = _writer.Message;
-            return message;
-        }
-    }
-
-    /// <summary>The generic message body on its own, without the type that identifies it</summary>
-    public CanMessageGeneric Body => _writer.Message;
-
-    /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
-    public uint ActualDataLength => _writer.ActualDataLength;
-
-    /// <summary>Set the 'P' parameter.</summary>
-    /// <returns>This builder, so that calls can be chained.</returns>
-    public M280Builder P(ushort value) { _writer.AddUInt('P', value); return this; }
-
-    /// <summary>Set the 'S' parameter.</summary>
-    /// <returns>This builder, so that calls can be chained.</returns>
-    public M280Builder S(ushort value) { _writer.AddUInt('S', value); return this; }
 }
 
 /// <summary>
@@ -1851,16 +1717,19 @@ public sealed class M111Builder
 /// <summary>
 /// M959 parameters. The B parameter selects the board and is consumed by the main board
 ///
-/// CANlib gives this table no message type of its own, so this cannot identify itself and the caller has to supply the type.
+/// Sent as <see cref="CanMessageType.SetConnectionTimeout" />.
 /// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
 /// <see cref="CanGenericTables.M959Params" /> that are being sent, packed in table order, plus a
 /// bitmap saying which those are. Build one with <see cref="M959Builder" />.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
-public struct CanMessageM959 : ICanMessageBody<CanMessageM959>
+public struct CanMessageM959 : ICanMessage<CanMessageM959>
 {
     /// <summary>The generic message body, in the format the expansion board reads</summary>
     [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.SetConnectionTimeout;
 
     /// <summary>The parameter table this message is built against</summary>
     public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M959Params;
@@ -1888,6 +1757,9 @@ public struct CanMessageM959 : ICanMessageBody<CanMessageM959>
 public sealed class M959Builder
 {
     private readonly CanGenericWriter _writer = new(CanGenericTables.M959Params);
+
+    /// <summary>The message type this message is sent under</summary>
+    public static CanMessageType MessageType => CanMessageType.SetConnectionTimeout;
 
     /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
     public CanMessageM959 Message

@@ -306,7 +306,7 @@ public sealed class ConformanceEmitter(CanSchema schema)
             using (w.Block("public void GenericMessagesHaveTheLayoutOfCanMessageGeneric()", "}"))
             {
                 w.Outdent(); w.Line("{"); w.Indent();
-                foreach (GenericTableDef table in schema.GenericTables)
+                foreach (GenericTableDef table in schema.GenericTables.Where(x => x.IsGenerated(Language.CSharp)))
                 {
                     string name = $"CanMessage{table.BaseName}";
                     w.Line($"Assert.That(Unsafe.SizeOf<{name}>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), \"size of {name}\");");
@@ -319,7 +319,7 @@ public sealed class ConformanceEmitter(CanSchema schema)
             using (w.Block("public void GenericMessagesCarryTheMessageTypeOfTheirTable()", "}"))
             {
                 w.Outdent(); w.Line("{"); w.Indent();
-                foreach (GenericTableDef table in schema.GenericTables.Where(t => t.MessageType is not null))
+                foreach (GenericTableDef table in schema.GenericTables.Where(x => x.IsGenerated(Language.CSharp)))
                 {
                     string name = $"CanMessage{table.BaseName}";
                     w.Line($"Assert.That({name}.MessageType, Is.EqualTo(CanMessageType.{Naming.MessageTypeMember(table.MessageType!)}), \"message type of {name}\");");
@@ -328,7 +328,7 @@ public sealed class ConformanceEmitter(CanSchema schema)
             }
             w.Line();
 
-            foreach (GenericTableDef table in schema.GenericTables)
+            foreach (GenericTableDef table in schema.GenericTables.Where(x => x.IsGenerated(Language.CSharp)))
             {
                 w.Line("[Test]");
                 using (w.Block($"public void {table.Name}_Entries()", "}"))

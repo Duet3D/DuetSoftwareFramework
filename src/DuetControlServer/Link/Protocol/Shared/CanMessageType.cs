@@ -107,6 +107,7 @@ public enum CanMessageType : ushort
 	SetHeaterTemperatureV1 = 6068, // added in RRF 3.7
 	HeaterModelV3 = 6069,		   // added in RRF 3.7
 	SetPressureAdvanceV2 = 6070,
+	SetConnectionTimeout = 6071, // for M959, added in RRF 3.7
 
 	// Responses, broadcasts etc. sent by expansion boards
 	StandardReply = 4510,

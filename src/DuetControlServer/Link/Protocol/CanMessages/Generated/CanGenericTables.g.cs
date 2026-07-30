@@ -113,13 +113,6 @@ public readonly record struct CanParamDescriptor(char Letter, CanParamType Type,
 /// </summary>
 public static class CanGenericTables
 {
-    /// <summary>Parameters of M42</summary>
-    public static ImmutableArray<CanParamDescriptor> M42Params { get; } =
-    [
-        new('P', CanParamType.UInt16, 0),
-        new('S', CanParamType.Float, 0),
-    ];
-
     /// <summary>
     /// Parameters of M150
     /// Sent as <see cref="CanMessageType.WriteLedStrip" />.
@@ -135,13 +128,6 @@ public static class CanGenericTables
         new('P', CanParamType.UInt8, 0),                                 // brightness 0-255
         new('Y', CanParamType.UInt8, 0),                                 // alternative brightness 0-31
         new('F', CanParamType.UInt8, 0),                                 // 'more follows' flag
-    ];
-
-    /// <summary>Parameters of M280</summary>
-    public static ImmutableArray<CanParamDescriptor> M280Params { get; } =
-    [
-        new('P', CanParamType.UInt16, 0),
-        new('S', CanParamType.UInt16, 0),
     ];
 
     /// <summary>
@@ -395,7 +381,10 @@ public static class CanGenericTables
         new('S', CanParamType.UInt8, 0),
     ];
 
-    /// <summary>M959 parameters. The B parameter selects the board and is consumed by the main board</summary>
+    /// <summary>
+    /// M959 parameters. The B parameter selects the board and is consumed by the main board
+    /// Sent as <see cref="CanMessageType.SetConnectionTimeout" />.
+    /// </summary>
     public static ImmutableArray<CanParamDescriptor> M959Params { get; } =
     [
         new('T', CanParamType.UInt16, 0),                                // connection timeout in seconds

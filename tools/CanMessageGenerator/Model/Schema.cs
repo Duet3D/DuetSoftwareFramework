@@ -329,11 +329,21 @@ public sealed class GenericTableDef
     public string? Doc;
     public List<GenericParamDef> Params = [];
 
+    /// <summary>Which languages get this table.</summary>
+    public HashSet<Language> Emit = [Language.Cpp, Language.CSharp];
+
     /// <summary>
-    /// The message type this table is normally sent under, where there is exactly one. Three tables
-    /// (M42, M280, M959) have no message type of their own in this version of CANlib.
+    /// The <c>CanMessageType</c> enumerator that a message built from this table is sent under.
     /// </summary>
+    /// <remarks>
+    /// Required for a table emitted to C#: a generic message that could not name its type would go out under
+    /// <c>UnusedMessageType</c>, so <see cref="CanSchema"/> rejects the omission. It is null only for the
+    /// tables that CANlib still declares but nothing sends, which are emitted for C++ alone so that the
+    /// generated header stays a drop-in.
+    /// </remarks>
     public string? MessageType;
+
+    public bool IsGenerated(Language language) => Emit.Contains(language);
 
     /// <summary>
     /// The table name with CANlib's "Params" dropped, used to name the generated message and builder.
@@ -530,6 +540,19 @@ public sealed class CanSchema
             Doc = Doc(o),
             MessageType = Str(o, "messageType")
         };
+
+        if (o["emit"] is JsonArray emit)
+        {
+            table.Emit = [.. emit.Select(n => ParseLanguage(n!.GetValue<string>()))];
+        }
+
+        // A generic message that cannot name its own type would be sent as UnusedMessageType, which is
+        // indistinguishable from NoReply, so it would go out with a malformed CAN id and nothing to say so
+        if (table.MessageType is null && table.IsGenerated(Language.CSharp))
+        {
+            throw new InvalidDataException(
+                $"generic table {table.Name} has no messageType; give it one, or set \"emit\": [\"cpp\"] if nothing sends it");
+        }
 
         foreach (JsonNode? node in o["params"]?.AsArray() ?? [])
         {
