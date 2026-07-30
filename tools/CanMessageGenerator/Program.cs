@@ -115,11 +115,7 @@ public static class Program
     private static void CheckEveryMessageCanNameItsType(CanSchema schema)
     {
         List<string> offenders = [.. schema.Structs
-            .Where(s => s.IsGenerated(Language.CSharp)
-                        && s.TemplateParam is null
-                        && s.Name.StartsWith("CanMessage", StringComparison.Ordinal)
-                        && s.MessageType is null
-                        && !s.BodyOnly)
+            .Where(s => s.IsGenerated(Language.CSharp) && s.IsMessage && s.MessageType is null && !s.BodyOnly)
             .Select(s => s.Name)];
         if (offenders.Count > 0)
         {

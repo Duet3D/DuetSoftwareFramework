@@ -248,6 +248,13 @@ public sealed class StructDef
 
     public bool IsGenerated(Language language) => Emit.Contains(language);
 
+    /// <summary>
+    /// Whether this struct is a sendable CAN message rather than a plain data type, and so needs an
+    /// <c>ICanMessage&lt;T&gt;</c>/<c>ICanMessageBody&lt;T&gt;</c> base and a declared message type (or
+    /// <see cref="BodyOnly"/>). The template itself is not a message; its instantiations are.
+    /// </summary>
+    public bool IsMessage => Name.StartsWith("CanMessage", StringComparison.Ordinal) && TemplateParam is null;
+
     public IEnumerable<MemberDef> FlatMembers
     {
         get
