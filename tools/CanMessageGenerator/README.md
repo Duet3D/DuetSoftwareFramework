@@ -71,9 +71,10 @@ That computed layout is then asserted in both languages by generated harnesses:
 * **`CanMessageLayout.g.cs`** asserts the same expectations against the generated C# structs as an NUnit
   fixture, so `dotnet test` catches any C#-side drift.
 
-Both harnesses currently make 469 checks over 76 structs and 207 bitfields. The generic message parameter
+Both harnesses currently make 488 checks over 79 structs and 216 bitfields. The generic message parameter
 tables are checked the same way, by `CanMessageGenericTablesProbe.cpp` and `CanGenericTableLayout.g.cs`:
-143 checks over 22 tables and 121 parameters.
+143 checks over 22 tables and 121 parameters. Nothing takes a struct's size on trust — including `CanTiming`,
+whose layout is generated even though its bit-rate helpers stay hand-written in the other half of the partial.
 
 ## Schema
 
@@ -278,12 +279,42 @@ parameters are whatever the user typed rather than known at the call site.
 is the type both ends of the link agree on. Its per-type macros are simply unused once the tables are
 generated.
 
+## Enums, constants and addresses
+
+The layouts are only half of what has to agree with CANlib. A value that disagrees produces a *well-formed*
+message that means something else, which no layout check can see, so these are generated and checked too:
+
+| Schema section | Generated as | Checked against |
+| --- | --- | --- |
+| `enums` | `CanMessageType`, `CodeResult`, `FirmwareFlashErrorCode` | `CanId.h`, `GCodeResult.h`, `Duet3Common.h` |
+| `constantGroups` | `CanId` addresses, masks and shifts | `CanId.h` |
+| struct `constants` | members of the generated structs | every CANlib header |
+
+```jsonc
+"enums": [
+  {
+    "name": "GCodeResult",                  // what CANlib calls it, which is what the check looks for
+    "csharpName": "CodeResult",             // what DCS calls it
+    "cppHeader": "GCodeResult.h",
+    "underlyingType": "byte",
+    "output": "src/DuetControlServer/Link/Protocol/Shared/CodeResult.g.cs",
+    "values": [ { "name": "notFinished", "value": 0, "doc": "..." } ]
+  }
+]
+```
+
+An enum may be `checkOnly` with a `csharpSource`, for one that has to agree with CANlib but is generated
+elsewhere: `TemperatureError` is part of DuetAPI's public object model, so the checker parses that file and
+compares its ordinals rather than relocating a published API.
+
+`compare-enums.py` and `compare-constants.py` do the comparing, both in both directions, and both understand
+the spellings the two sides use for the same thing — CANlib's `enum class` and `NamedEnum` forms, implicit
+enumerator values, integer suffixes, digit separators, casts, and a length written as `sizeof(thatBuffer)`.
+Retired message ids are compared too, so that a number CANlib reuses does not quietly contradict the comment
+recording that it was spent.
+
 ## Known gaps
 
-* `CanTiming` is referenced rather than generated: it lives in CANlib's `CanSettings.h` and already has a
-  hand-written C# counterpart in `Link/Protocol/Shared/CanTiming.cs` whose helper methods (`SetDefaults`,
-  `EnableBrs`, …) are outside what the schema's expression language covers. Its layout is therefore not
-  covered by the conformance harnesses.
 * `DebugPrint` is declaration-only: the C++ header declares it and CANlib's `CanMessageFormats.cpp` defines
   it. There is no C# equivalent.
 * The two `cppPrivate` temperature fields (`CanSensorReport`, `CanHeaterReport`) are excluded from the C++
