@@ -8,4 +8,7 @@
 		<RootNamespace>DuetCanMessage.SourceGenerators</RootNamespace>
 		<InvariantGlobalization>true</InvariantGlobalization>
 	</PropertyGroup>
+	<ItemGroup>
+	  <PackageReference Include="JsonSchema.Net" Version="9.4.0" />
+	</ItemGroup>
 </Project>

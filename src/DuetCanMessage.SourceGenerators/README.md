@@ -38,6 +38,12 @@ DuetControlServer does carry a `ProjectReference` to it, with `ReferenceOutputAs
 change that no longer builds is caught by an ordinary DCS build rather than by the next `make can-messages`.
 Nothing from the tool is referenced by or copied into DCS.
 
+A DCS build also runs `--check` before compiling and fails if the checked-in output no longer matches the
+schema, so an edit to `can-messages.json` cannot quietly leave the generated files behind. It only reports;
+regenerating stays a deliberate `make can-messages`, because a build that rewrote tracked source files would
+do it during every publish and deploy as well. The check is skipped when nothing it depends on has changed,
+and `-p:SkipCanMessageCheck=true` turns it off.
+
 `make can-messages-verify` needs a host C++ compiler and the `CANlib`, `RRFLibraries` and `CoreN2G`
 submodules (`git submodule update --init lib/CANlib lib/RRFLibraries lib/CoreN2G`).
 
@@ -93,6 +99,13 @@ it with `$schema`, so an editor completes and checks the keys as you type. The g
 not recognise, which makes a misspelt one do nothing at all rather than fail; the schema is what turns that
 back into a visible error. It also pins down which numeric-looking values are written as strings — a
 constant's `value`, an array's `length` — since the loader reads those as strings and rejects a number.
+
+The generator validates the document against it on every run, before reading anything, and stops with the
+offending locations if it does not conform, so `make can-messages` and `make can-messages-check` both enforce
+it. Errors are reported as `/structs/11: Some additional properties did not match the required schema:
+["requestIdFeild"]`, naming the path through the document. Where a value has to be one of several forms — a
+statement, an enum entry — only the form it came closest to matching is reported, since the others describe
+what the author did not mean.
 
 ### Structs
 

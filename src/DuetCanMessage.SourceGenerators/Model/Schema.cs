@@ -570,6 +570,7 @@ public sealed class CanSchema
             CommentHandling = JsonCommentHandling.Skip,
             AllowTrailingCommas = true
         }) ?? throw new InvalidDataException($"{path} is empty");
+        SchemaValidator.Validate(path, root);
         return Parse(root.AsObject());
     }
 

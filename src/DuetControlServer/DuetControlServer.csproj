@@ -49,11 +49,84 @@
 		<!-- The generator writes the checked-in CAN message files under Link/Protocol, so building it with
 		     DCS keeps the two in step. Its output is a build-time tool, not something DCS links against:
 		     ReferenceOutputAssembly="false" keeps it off the compile references and Private="false" keeps
-		     its apphost, deps.json and runtimeconfig.json out of the DCS output directory. -->
-		<ProjectReference Include="..\DuetCanMessage.SourceGenerators\DuetCanMessage.SourceGenerators.csproj" ReferenceOutputAssembly="false" Private="false" />
+		     its apphost, deps.json and runtimeconfig.json out of the DCS output directory.
+
+		     GlobalPropertiesToRemove keeps DCS's target from reaching it. A tool that runs during the build
+		     has to be built for the machine doing the building, but `dotnet publish -r linux-arm64` (see
+		     scripts/build.sh) would otherwise cross-build it for the Pi, and CheckCanMessagesUpToDate would
+		     then try to execute an arm64 assembly on the host. The same goes for the AOT and self-contained
+		     switches, which would only slow the tool's build down. -->
+		<ProjectReference Include="..\DuetCanMessage.SourceGenerators\DuetCanMessage.SourceGenerators.csproj"
+		                  ReferenceOutputAssembly="false" Private="false"
+		                  GlobalPropertiesToRemove="$(CanMessageGeneratorHostProperties)" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<InternalsVisibleTo Include="UnitTests" />
 	</ItemGroup>
+
+	<!--
+	  The CAN message files under Link/Protocol are generated from the schema and checked in, so a build does
+	  not rewrite them: editing can-messages.json otherwise leaves them stale, and nothing says so until CI
+	  runs `make can-messages-check`. Running that same check here turns it into a build failure instead,
+	  naming the files and telling you to run `make can-messages`. It deliberately does not regenerate: a
+	  build that rewrites tracked source files would do so during every publish and deploy too, and the point
+	  of checking the output in is that neither this build nor CANlib's needs the generator to have run.
+
+	  Pass -p:SkipCanMessageCheck=true to bypass it.
+	-->
+	<PropertyGroup>
+		<CanMessageGeneratorDir>$(MSBuildThisFileDirectory)..\DuetCanMessage.SourceGenerators\</CanMessageGeneratorDir>
+		<!-- Global properties that must not reach the generator: they describe what DCS is being built for,
+		     and the generator is built to run here. Both the ProjectReference and the GetTargetPath query
+		     below remove the same set, or MSBuild would treat them as two different builds of the project
+		     and the path returned would not be the one that was built. -->
+		<CanMessageGeneratorHostProperties>RuntimeIdentifier;SelfContained;PublishAot;AotPublish;PublishTrimmed;PublishReadyToRun;PublishSingleFile</CanMessageGeneratorHostProperties>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- Anything that can make the checked-in output stale: the schema, the emitters that render it, and
+		     the output itself. -->
+		<CanMessageCheckInput Include="$(CanMessageGeneratorDir)Schema\can-messages.json" />
+		<CanMessageCheckInput Include="$(CanMessageGeneratorDir)**\*.cs"
+		                      Exclude="$(CanMessageGeneratorDir)bin\**\*.cs;$(CanMessageGeneratorDir)obj\**\*.cs" />
+		<CanMessageCheckInput Include="$(MSBuildThisFileDirectory)Link\Protocol\CanMessages\Generated\*.g.cs" />
+		<CanMessageCheckInput Include="$(MSBuildThisFileDirectory)Link\Protocol\Shared\*.g.cs" />
+	</ItemGroup>
+
+	<Target Name="CheckCanMessagesUpToDate"
+	        BeforeTargets="CoreCompile"
+	        DependsOnTargets="ResolveProjectReferences"
+	        Condition="'$(SkipCanMessageCheck)' != 'true' AND '$(DesignTimeBuild)' != 'true'"
+	        Inputs="@(CanMessageCheckInput)"
+	        Outputs="$(IntermediateOutputPath)can-messages.check.stamp">
+		<!-- GetTargetPath only reports where the generator was built; the ProjectReference above is what
+		     builds it, and it has already done so by the time ResolveProjectReferences is done. -->
+		<MSBuild Projects="$(CanMessageGeneratorDir)DuetCanMessage.SourceGenerators.csproj"
+		         Targets="GetTargetPath"
+		         Properties="Configuration=$(Configuration)"
+		         RemoveProperties="$(CanMessageGeneratorHostProperties)">
+			<Output TaskParameter="TargetOutputs" ItemName="CanMessageGeneratorAssembly" />
+		</MSBuild>
+		<!-- dotnet exec, not dotnet run: the assembly is already built by the ProjectReference, and
+		     `dotnet run` would start a second, nested build of the same project inside this one.
+
+		     The exit code is handled below rather than by Exec itself, so that the generator's own output -
+		     which files are stale, or where the schema does not match can-messages.schema.json - is carried
+		     into the error. MSB3073 alone says only that a command failed, and the terminal logger `dotnet
+		     build` uses by default shows nothing else. -->
+		<Exec Command="dotnet exec &quot;%(CanMessageGeneratorAssembly.FullPath)&quot; --check"
+		      ConsoleToMSBuild="true" IgnoreExitCode="true"
+		      StandardOutputImportance="high" StandardErrorImportance="high">
+			<Output TaskParameter="ConsoleOutput" ItemName="CanMessageCheckOutput" />
+			<Output TaskParameter="ExitCode" PropertyName="CanMessageCheckExitCode" />
+		</Exec>
+		<Error Condition="'$(CanMessageCheckExitCode)' != '0'"
+		       Code="CANMSG001"
+		       Text="The checked-in CAN message files no longer match Schema/can-messages.json:%0A@(CanMessageCheckOutput->'  %(Identity)', '%0A')" />
+		<Touch Files="$(IntermediateOutputPath)can-messages.check.stamp" AlwaysCreate="true" />
+		<ItemGroup>
+			<FileWrites Include="$(IntermediateOutputPath)can-messages.check.stamp" />
+		</ItemGroup>
+	</Target>
 </Project>
