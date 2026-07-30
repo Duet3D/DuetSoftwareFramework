@@ -70,10 +70,10 @@ echo "==> Comparing constants"
 python3 "$ROOT/tools/CanMessageGenerator/compare-constants.py" \
 	"$ROOT/tools/CanMessageGenerator/Schema/can-messages.json" "$ROOT/lib/CANlib/src"
 
-# A wrong message type does not corrupt a message, it delivers a well-formed one to the wrong handler, and
-# none of the checks above look at the id at all
-echo "==> Comparing message types"
-python3 "$ROOT/tools/CanMessageGenerator/compare-message-types.py" \
-	"$ROOT/lib/CANlib/src/CanId.h" "$ROOT/tools/CanMessageGenerator/Schema/can-messages.json"
+# A wrong enum value does not corrupt a message, it makes a well-formed one mean something else, and none of
+# the checks above look at any of these values
+echo "==> Comparing enums"
+python3 "$ROOT/tools/CanMessageGenerator/compare-enums.py" \
+	"$ROOT/tools/CanMessageGenerator/Schema/can-messages.json" "$ROOT/lib/CANlib/src"
 
 echo "==> C++ layouts verified"

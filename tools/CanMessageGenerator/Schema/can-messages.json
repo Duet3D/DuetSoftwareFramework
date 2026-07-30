@@ -2173,6 +2173,102 @@
       { "name": "unusedMessageType", "value": "0xFFFF" },
       { "name": "noReply", "value": "unusedMessageType", "emit": ["csharp"], "doc": "Alias used as the ReplyType of a CAN request when no reply is expected" }
     ]
+   },
+   {
+    "name": "GCodeResult",
+    "csharpName": "CodeResult",
+    "cppHeader": "GCodeResult.h",
+    "underlyingType": "byte",
+    "output": "src/DuetControlServer/Link/Protocol/Shared/CodeResult.g.cs",
+    "doc": [
+      "Result of attempting to process a G-code command.",
+      "Mirrors GCodeResult in CANlib's GCodeResult.h. The value travels on the wire as the 4-bit",
+      "resultCode of a standard reply, so it has to keep CANlib's numbering."
+    ],
+    "values": [
+      { "name": "notFinished", "value": 0, "doc": "we haven't finished processing this command" },
+      { "name": "ok", "value": 1, "doc": "we have finished processing this code in the current state, and if the GCodeState is 'normal' then we have finished it completely" },
+      { "name": "warning", "value": 2, "doc": "the command succeeded but a warning was generated" },
+      { "name": "warningNotSupported", "value": 3, "doc": "the command is not supported, but for this command we issue a warning not an error" },
+      { "name": "error", "value": 4, "doc": "general error, the reason will be written to the associated reply buffer" },
+      { "name": "errorNotSupported", "value": 5, "doc": "this command is not supported, and we treat it as an error because it's an important command" },
+      { "name": "notSupportedInCurrentMode", "value": 6, "doc": "this command is supported in a different mode (FDM/Laser/CNC)" },
+      { "name": "stopped", "value": 7, "doc": "we are halted because of an emergency stop" },
+      { "name": "badOrMissingParameter", "value": 8, "doc": "a critical parameter is missing or has a bad value" },
+      { "name": "remoteInternalError", "value": 9, "doc": "only used if CAN expansion is supported - can be sent by expansion boards, so don't change its number!" },
+      { "name": "m291Cancelled", "value": 10 },
+      { "name": "waitingForAckSoIgnored", "value": 11, "doc": "we are waiting for a message box to be acknowledged so the command has been ignored" },
+      { "name": "noCanBuffer", "value": 12, "doc": "only used if CAN expansion is supported - we failed to allocate a CAN buffer to send a message to an expansion board" },
+      { "name": "canResponseTimeout", "value": 13, "doc": "only used if CAN expansion is supported - timed out waiting for a response to a CAN message - the associated reply buffer may contain more info" }
+    ]
+   },
+   {
+    "name": "FirmwareFlashErrorCode",
+    "cppHeader": "Duet3Common.h",
+    "underlyingType": "uint",
+    "output": "src/DuetControlServer/Link/Protocol/Shared/FirmwareFlashErrorCode.g.cs",
+    "doc": [
+      "Why a firmware flash failed, as reported by an expansion board's bootloader.",
+      "Mirrors FirmwareFlashErrorCode in CANlib's Duet3Common.h; the same numbering is used for the",
+      "Err values of a firmware update response."
+    ],
+    "values": [
+      { "name": "ok", "value": 0, "doc": "used as a function return code, not used to flash the LED" },
+      { "name": "invalidFirmware", "value": 2, "doc": "bootloader determined that the installed firmware is invalid" },
+      { "name": "badCRC", "value": 3, "doc": "bootloader determined that the installed firmware fails the CRC check" },
+      { "name": "blockReceiveTimeout", "value": 4, "doc": "bootloader requested a firmware block from the master but didn't receive a reply" },
+      { "name": "noFile", "value": 5, "doc": "bootloader requested firmware but the master responded that it didn't have the requested file" },
+      { "name": "badOffset", "value": 6, "doc": "master reported that the file offset requested by the bootloader is out of range" },
+      { "name": "hostOther", "value": 7, "doc": "master reported it was unable to supply the requested block for some other reason" },
+      { "name": "noMemory", "value": 8, "doc": "bootloader ran out of RAM" },
+      { "name": "flashInitFailed", "value": 9, "doc": "failed to initialise flash memory" },
+      { "name": "unlockFailed", "value": 10, "doc": "failed to unlock flash memory" },
+      { "name": "eraseFailed", "value": 11, "doc": "failed to erase flash memory" },
+      { "name": "writeFailed", "value": 12, "doc": "failed to write flash memory" },
+      { "name": "lockFailed", "value": 13, "doc": "failed to lock flash memory" },
+      { "name": "vinTooLow", "value": 14, "doc": "expansion board was asked to update the bootloader but VIN is too low to do that safely" },
+      { "name": "unknownBoard", "value": 15, "doc": "bootloader failed to identify the board type" },
+      { "name": "vAssertCalled", "value": 16, "doc": "assertion failure in the bootloader" },
+      { "name": "noTimeSyncMessageSeen", "value": 17, "doc": "bootloader didn't hear a clock message at any of the standard speeds (added for new bootloader)" }
+    ]
+   },
+   {
+    "name": "TemperatureError",
+    "cppHeader": "TemperatureError.h",
+    "underlyingType": "byte",
+    "checkOnly": true,
+    "csharpSource": "src/DuetAPI/ObjectModel/Sensors/TemperatureError.cs",
+    "doc": [
+      "Result codes returned by temperature sensor drivers.",
+      "Mirrors TemperatureError in CANlib's TemperatureError.h. The value travels on the wire as the",
+      "errorCode of a sensor report, so the ordinals have to match. DuetAPI already declares this",
+      "enum as part of the public object model, so it is checked here rather than generated."
+    ],
+    "values": [
+      { "name": "ok", "value": 0 },
+      { "name": "shortCircuit", "value": 1 },
+      { "name": "shortToVcc", "value": 2 },
+      { "name": "shortToGround", "value": 3 },
+      { "name": "openCircuit", "value": 4 },
+      { "name": "timeout", "value": 5 },
+      { "name": "ioError", "value": 6 },
+      { "name": "hardwareError", "value": 7 },
+      { "name": "notReady", "value": 8 },
+      { "name": "invalidOutputNumber", "value": 9 },
+      { "name": "busBusy", "value": 10 },
+      { "name": "badResponse", "value": 11 },
+      { "name": "unknownPort", "value": 12 },
+      { "name": "notInitialised", "value": 13 },
+      { "name": "unknownSensor", "value": 14 },
+      { "name": "overOrUnderVoltage", "value": 15 },
+      { "name": "badVref", "value": 16 },
+      { "name": "badVssa", "value": 17 },
+      { "name": "readingTooLow", "value": 18 },
+      { "name": "readingTooHigh", "value": 19 },
+      { "name": "ambientReadingTooLow", "value": 20, "doc": "for composite sensors that need to read ambient temperature to calculate object temperature" },
+      { "name": "ambientReadingTooHigh", "value": 21, "doc": "for composite sensors that need to read ambient temperature to calculate object temperature" },
+      { "name": "unknownError", "value": 22 }
+    ]
    }
   ],
 

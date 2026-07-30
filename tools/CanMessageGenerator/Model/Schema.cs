@@ -444,6 +444,9 @@ public sealed class MessageTypeEnumDef
     /// </summary>
     public bool CheckOnly;
 
+    /// <summary>Where the C# counterpart lives, for an enum that is checked rather than generated.</summary>
+    public string? CSharpSource;
+
     public string? Doc;
     public List<MessageTypeDef> Values = [];
 }
@@ -649,6 +652,7 @@ public sealed class CanSchema
             UnderlyingType = Str(o, "underlyingType") ?? "ushort",
             OutputPath = Str(o, "output"),
             CheckOnly = Bool(o, "checkOnly") ?? false,
+            CSharpSource = Str(o, "csharpSource"),
             Doc = Doc(o)
         };
 
