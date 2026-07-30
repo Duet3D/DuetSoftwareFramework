@@ -270,8 +270,11 @@ public sealed class ConformanceEmitter(CanSchema schema)
         w.Line("// </auto-generated>");
         w.Line();
         w.Line("using System.Collections.Immutable;");
+        w.Line("using System.Runtime.CompilerServices;");
+        w.Line("using System.Runtime.InteropServices;");
         w.Line("using NUnit.Framework;");
         w.Line($"using {schema.CSharpNamespace};");
+        w.Line($"using {schema.CSharpNamespace.Replace("CanMessages", "Shared")};");
         w.Line();
         w.Line($"namespace {testNamespace};");
         w.Line();
@@ -292,6 +295,35 @@ public sealed class ConformanceEmitter(CanSchema schema)
                     w.Line($"Assert.That((byte)CanParamType.{type.CSharpName}, Is.EqualTo(0x{type.Value:X2}), \"value of CanParamType.{type.CSharpName}\");");
                     w.Line($"Assert.That(new CanParamDescriptor('A', CanParamType.{type.CSharpName}, 0).ItemSize, Is.EqualTo({type.ItemSize}), \"item size of CanParamType.{type.CSharpName}\");");
                     w.Line($"Assert.That(new CanParamDescriptor('A', CanParamType.{type.CSharpName}, 0).IsArray, Is.{(type.IsArray ? "True" : "False")}, \"CanParamType.{type.CSharpName} array flag\");");
+                }
+            }
+            w.Line();
+
+            // Each table's message type wraps CanMessageGeneric, so it has to be the same 64 bytes with the
+            // body at offset 0 — anything else and it would serialize into a different shape than the one
+            // the expansion board reads
+            w.Line("[Test]");
+            using (w.Block("public void GenericMessagesHaveTheLayoutOfCanMessageGeneric()", "}"))
+            {
+                w.Outdent(); w.Line("{"); w.Indent();
+                foreach (GenericTableDef table in schema.GenericTables)
+                {
+                    string name = $"CanMessage{table.BaseName}";
+                    w.Line($"Assert.That(Unsafe.SizeOf<{name}>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), \"size of {name}\");");
+                    w.Line($"Assert.That(Marshal.OffsetOf<{name}>(\"Generic\").ToInt32(), Is.Zero, \"offset of {name}.Generic\");");
+                }
+            }
+            w.Line();
+
+            w.Line("[Test]");
+            using (w.Block("public void GenericMessagesCarryTheMessageTypeOfTheirTable()", "}"))
+            {
+                w.Outdent(); w.Line("{"); w.Indent();
+                foreach (GenericTableDef table in schema.GenericTables.Where(t => t.MessageType is not null))
+                {
+                    string name = $"CanMessage{table.BaseName}";
+                    w.Line($"Assert.That({name}.MessageType, Is.EqualTo(CanMessageType.{Naming.MessageTypeMember(table.MessageType!)}), \"message type of {name}\");");
+                    w.Line($"Assert.That({name}.ParamTable, Is.EqualTo(CanGenericTables.{table.Name}), \"parameter table of {name}\");");
                 }
             }
             w.Line();

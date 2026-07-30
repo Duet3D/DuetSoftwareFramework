@@ -223,13 +223,25 @@ Each table produces:
 * an entry in `CanGenericTables`, plus the `CanParamType` and `CanParamDescriptor` that describe it.
   `CanParamType` keeps CANlib's numbering because the low nibble is the element size, which decides how far
   each parameter advances the write cursor;
+* a message type — `CanMessageM950Fan` and so on — which is a `CanMessageGeneric` that knows the
+  `CanMessageType` its table is sent under, so it goes through the ordinary typed send path like any other
+  message. It wraps the body in a single field at offset 0 rather than restating its fields, so the wire
+  format is inherited and cannot drift, and it computes its own `GetActualDataLength()` by walking the table
+  — without that, the interface default would report `sizeof` and pad every message out to the full data area;
 * a typed builder, so that the letters and their types are checked by the compiler:
 
 ```csharp
 M950FanBuilder builder = new();
 builder.F(fanNumber).C(portName).K(pulsesPerRev);
 // builder.K("oops") does not compile, and there is no Z method
+
+await linkInterface.SendCanMessageAsync(address, builder.Message, CanMessageType.StandardReply);
 ```
+
+`builder.Message` is the typed message and is the intended way to send one; `builder.Body` hands back the
+bare `CanMessageGeneric` for the rare caller that wants to supply the message type itself. The three tables
+with no message type of their own (M42, M280, M959) get a message that implements only `ICanMessageBody`, so
+passing one to the typed send path is a build error rather than a malformed CAN id.
 
 The two hand-written pieces are `CanGenericWriter`, which does the packing (and `CanGenericParser`, its
 counterpart, used to read back what it produced), and `CanMessageGenericConstructor`, which builds a message

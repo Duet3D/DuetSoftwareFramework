@@ -54,6 +54,8 @@ public sealed class CSharpTablesEmitter(CanSchema schema)
         writer.Line("#nullable enable");
         writer.Line();
         writer.Line("using System;");
+        writer.Line("using System.Collections.Immutable;");
+        writer.Line("using System.Runtime.InteropServices;");
         foreach (string u in schema.CSharpUsings)
         {
             writer.Line($"using {u};");
@@ -64,10 +66,84 @@ public sealed class CSharpTablesEmitter(CanSchema schema)
 
         foreach (GenericTableDef table in schema.GenericTables)
         {
+            EmitMessage(writer, table);
             EmitBuilder(writer, table);
         }
         return writer.ToString();
     }
+
+    /// <summary>
+    /// Emit the message type for a table: a <c>CanMessageGeneric</c> that knows which message type it is
+    /// sent under, so it can go through the ordinary typed send path like any other message.
+    /// </summary>
+    /// <remarks>
+    /// It wraps <c>CanMessageGeneric</c> in a single field at offset 0 rather than restating its fields, so
+    /// the wire format is inherited and cannot drift — these are the same 64 bytes the expansion board
+    /// already reads, only the C# type differs.
+    /// </remarks>
+    private void EmitMessage(CodeWriter writer, GenericTableDef table)
+    {
+        string name = MessageName(table);
+        string doc = table.Doc is null ? $"The {table.BaseName} generic message." : CodeWriter.Escape(table.Doc);
+        string identity = table.MessageType is not null
+            ? $"Sent as <see cref=\"CanMessageType.{Naming.MessageTypeMember(table.MessageType)}\" />."
+            : "CANlib gives this table no message type of its own, so this cannot identify itself and the caller has to supply the type.";
+        writer.XmlDocRaw($"""
+            {doc}
+
+            {identity}
+            Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+            <see cref="CanGenericTables.{table.Name}" /> that are being sent, packed in table order, plus a
+            bitmap saying which those are. Build one with <see cref="{table.BaseName}Builder" />.
+            """);
+        // Deriving the layout from the wrapped message rather than restating it is what keeps this type from
+        // ever disagreeing with the format the expansion board reads
+        writer.Line("[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]");
+        string contract = table.MessageType is not null ? $"ICanMessage<{name}>" : $"ICanMessageBody<{name}>";
+        using (writer.Block($"public struct {name} : {contract}", "}"))
+        {
+            writer.Outdent();
+            writer.Line("{");
+            writer.Indent();
+
+            writer.XmlDocRaw("The generic message body, in the format the expansion board reads");
+            writer.Line("[FieldOffset(0)] public CanMessageGeneric Generic;");
+            writer.Line();
+
+            if (table.MessageType is not null)
+            {
+                writer.Line("/// <inheritdoc cref=\"ICanMessage{TSelf}.MessageType\" />");
+                writer.Line($"public static CanMessageType MessageType => CanMessageType.{Naming.MessageTypeMember(table.MessageType)};");
+                writer.Line();
+            }
+
+            writer.XmlDocRaw($"The parameter table this message is built against");
+            writer.Line($"public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.{table.Name};");
+            writer.Line();
+
+            // Without this the interface default would report sizeof (64) and every message would go out
+            // padded to the full data area
+            writer.XmlDocRaw("""
+                Number of payload bytes this message occupies: the parameters actually present, plus the
+                request ID and parameter map.
+
+                The parameter map and the table are enough to work this out, because each present parameter's
+                size follows from its table entry and, for the variable-length ones, from the data itself.
+                """);
+            using (writer.Block("public readonly uint GetActualDataLength()", "}"))
+            {
+                writer.Outdent();
+                writer.Line("{");
+                writer.Indent();
+                writer.Line($"int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.{table.Name});");
+                writer.Line("return CanMessageGeneric.GetActualDataLength((uint)dataLength);");
+            }
+        }
+        writer.Line();
+    }
+
+    /// <summary>The name of the generated message type for a table.</summary>
+    private static string MessageName(GenericTableDef table) => $"CanMessage{table.BaseName}";
 
     private void EmitBuilder(CodeWriter writer, GenericTableDef table)
     {
@@ -94,8 +170,26 @@ public sealed class CSharpTablesEmitter(CanSchema schema)
                 writer.Line();
             }
 
-            writer.XmlDocRaw("The message as built so far");
-            writer.Line("public CanMessageGeneric Message => _writer.Message;");
+            writer.XmlDocRaw($"""
+                The message as built so far, ready to hand to the CAN send path.
+                """);
+            using (writer.Block($"public {MessageName(table)} Message", "}"))
+            {
+                writer.Outdent();
+                writer.Line("{");
+                writer.Indent();
+                writer.Line("get");
+                writer.Line("{");
+                writer.Indent();
+                writer.Line($"{MessageName(table)} message = default;");
+                writer.Line("message.Generic = _writer.Message;");
+                writer.Line("return message;");
+                writer.Outdent();
+                writer.Line("}");
+            }
+            writer.Line();
+            writer.XmlDocRaw("The generic message body on its own, without the type that identifies it");
+            writer.Line("public CanMessageGeneric Body => _writer.Message;");
             writer.Line();
             writer.XmlDocRaw("Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map");
             writer.Line("public uint ActualDataLength => _writer.ActualDataLength;");

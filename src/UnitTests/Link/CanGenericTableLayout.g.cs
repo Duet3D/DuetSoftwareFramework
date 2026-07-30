@@ -6,8 +6,11 @@
 // </auto-generated>
 
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using NUnit.Framework;
 using DuetControlServer.Link.Protocol.CanMessages;
+using DuetControlServer.Link.Protocol.Shared;
 
 namespace UnitTests.Link;
 
@@ -72,6 +75,98 @@ public class CanGenericTableLayout
         Assert.That((byte)CanParamType.FloatArray, Is.EqualTo(0xA4), "value of CanParamType.FloatArray");
         Assert.That(new CanParamDescriptor('A', CanParamType.FloatArray, 0).ItemSize, Is.EqualTo(4), "item size of CanParamType.FloatArray");
         Assert.That(new CanParamDescriptor('A', CanParamType.FloatArray, 0).IsArray, Is.True, "CanParamType.FloatArray array flag");
+    }
+
+    [Test]
+    public void GenericMessagesHaveTheLayoutOfCanMessageGeneric()
+    {
+        Assert.That(Unsafe.SizeOf<CanMessageM42>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM42");
+        Assert.That(Marshal.OffsetOf<CanMessageM42>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM42.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM150>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM150");
+        Assert.That(Marshal.OffsetOf<CanMessageM150>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM150.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM280>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM280");
+        Assert.That(Marshal.OffsetOf<CanMessageM280>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM280.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM308V1>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM308V1");
+        Assert.That(Marshal.OffsetOf<CanMessageM308V1>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM308V1.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM569>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM569");
+        Assert.That(Marshal.OffsetOf<CanMessageM569>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM569.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM569Point1>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM569Point1");
+        Assert.That(Marshal.OffsetOf<CanMessageM569Point1>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM569Point1.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM569Point2>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM569Point2");
+        Assert.That(Marshal.OffsetOf<CanMessageM569Point2>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM569Point2.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM569Point4>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM569Point4");
+        Assert.That(Marshal.OffsetOf<CanMessageM569Point4>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM569Point4.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM569Point6>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM569Point6");
+        Assert.That(Marshal.OffsetOf<CanMessageM569Point6>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM569Point6.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM569Point6StatusOnly>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM569Point6StatusOnly");
+        Assert.That(Marshal.OffsetOf<CanMessageM569Point6StatusOnly>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM569Point6StatusOnly.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM569Point7>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM569Point7");
+        Assert.That(Marshal.OffsetOf<CanMessageM569Point7>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM569Point7.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM915>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM915");
+        Assert.That(Marshal.OffsetOf<CanMessageM915>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM915.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM950Heater>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM950Heater");
+        Assert.That(Marshal.OffsetOf<CanMessageM950Heater>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM950Heater.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM950Fan>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM950Fan");
+        Assert.That(Marshal.OffsetOf<CanMessageM950Fan>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM950Fan.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM950Gpio>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM950Gpio");
+        Assert.That(Marshal.OffsetOf<CanMessageM950Gpio>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM950Gpio.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM950Led>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM950Led");
+        Assert.That(Marshal.OffsetOf<CanMessageM950Led>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM950Led.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageConfigureFilamentMonitor>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageConfigureFilamentMonitor");
+        Assert.That(Marshal.OffsetOf<CanMessageConfigureFilamentMonitor>("Generic").ToInt32(), Is.Zero, "offset of CanMessageConfigureFilamentMonitor.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM955>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM955");
+        Assert.That(Marshal.OffsetOf<CanMessageM955>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM955.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM122P1>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM122P1");
+        Assert.That(Marshal.OffsetOf<CanMessageM122P1>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM122P1.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM655>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM655");
+        Assert.That(Marshal.OffsetOf<CanMessageM655>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM655.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM111>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM111");
+        Assert.That(Marshal.OffsetOf<CanMessageM111>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM111.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM959>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM959");
+        Assert.That(Marshal.OffsetOf<CanMessageM959>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM959.Generic");
+    }
+
+    [Test]
+    public void GenericMessagesCarryTheMessageTypeOfTheirTable()
+    {
+        Assert.That(CanMessageM150.MessageType, Is.EqualTo(CanMessageType.WriteLedStrip), "message type of CanMessageM150");
+        Assert.That(CanMessageM150.ParamTable, Is.EqualTo(CanGenericTables.M150Params), "parameter table of CanMessageM150");
+        Assert.That(CanMessageM308V1.MessageType, Is.EqualTo(CanMessageType.M308V1), "message type of CanMessageM308V1");
+        Assert.That(CanMessageM308V1.ParamTable, Is.EqualTo(CanGenericTables.M308V1Params), "parameter table of CanMessageM308V1");
+        Assert.That(CanMessageM569.MessageType, Is.EqualTo(CanMessageType.M569), "message type of CanMessageM569");
+        Assert.That(CanMessageM569.ParamTable, Is.EqualTo(CanGenericTables.M569Params), "parameter table of CanMessageM569");
+        Assert.That(CanMessageM569Point1.MessageType, Is.EqualTo(CanMessageType.M569P1), "message type of CanMessageM569Point1");
+        Assert.That(CanMessageM569Point1.ParamTable, Is.EqualTo(CanGenericTables.M569Point1Params), "parameter table of CanMessageM569Point1");
+        Assert.That(CanMessageM569Point2.MessageType, Is.EqualTo(CanMessageType.M569P2), "message type of CanMessageM569Point2");
+        Assert.That(CanMessageM569Point2.ParamTable, Is.EqualTo(CanGenericTables.M569Point2Params), "parameter table of CanMessageM569Point2");
+        Assert.That(CanMessageM569Point4.MessageType, Is.EqualTo(CanMessageType.M569P4), "message type of CanMessageM569Point4");
+        Assert.That(CanMessageM569Point4.ParamTable, Is.EqualTo(CanGenericTables.M569Point4Params), "parameter table of CanMessageM569Point4");
+        Assert.That(CanMessageM569Point6.MessageType, Is.EqualTo(CanMessageType.M569P6), "message type of CanMessageM569Point6");
+        Assert.That(CanMessageM569Point6.ParamTable, Is.EqualTo(CanGenericTables.M569Point6Params), "parameter table of CanMessageM569Point6");
+        Assert.That(CanMessageM569Point6StatusOnly.MessageType, Is.EqualTo(CanMessageType.M569P6), "message type of CanMessageM569Point6StatusOnly");
+        Assert.That(CanMessageM569Point6StatusOnly.ParamTable, Is.EqualTo(CanGenericTables.M569Point6Params_StatusOnly), "parameter table of CanMessageM569Point6StatusOnly");
+        Assert.That(CanMessageM569Point7.MessageType, Is.EqualTo(CanMessageType.M569P7), "message type of CanMessageM569Point7");
+        Assert.That(CanMessageM569Point7.ParamTable, Is.EqualTo(CanGenericTables.M569Point7Params), "parameter table of CanMessageM569Point7");
+        Assert.That(CanMessageM915.MessageType, Is.EqualTo(CanMessageType.M915), "message type of CanMessageM915");
+        Assert.That(CanMessageM915.ParamTable, Is.EqualTo(CanGenericTables.M915Params), "parameter table of CanMessageM915");
+        Assert.That(CanMessageM950Heater.MessageType, Is.EqualTo(CanMessageType.M950Heater), "message type of CanMessageM950Heater");
+        Assert.That(CanMessageM950Heater.ParamTable, Is.EqualTo(CanGenericTables.M950HeaterParams), "parameter table of CanMessageM950Heater");
+        Assert.That(CanMessageM950Fan.MessageType, Is.EqualTo(CanMessageType.M950Fan), "message type of CanMessageM950Fan");
+        Assert.That(CanMessageM950Fan.ParamTable, Is.EqualTo(CanGenericTables.M950FanParams), "parameter table of CanMessageM950Fan");
+        Assert.That(CanMessageM950Gpio.MessageType, Is.EqualTo(CanMessageType.M950Gpio), "message type of CanMessageM950Gpio");
+        Assert.That(CanMessageM950Gpio.ParamTable, Is.EqualTo(CanGenericTables.M950GpioParams), "parameter table of CanMessageM950Gpio");
+        Assert.That(CanMessageM950Led.MessageType, Is.EqualTo(CanMessageType.M950Led), "message type of CanMessageM950Led");
+        Assert.That(CanMessageM950Led.ParamTable, Is.EqualTo(CanGenericTables.M950LedParams), "parameter table of CanMessageM950Led");
+        Assert.That(CanMessageConfigureFilamentMonitor.MessageType, Is.EqualTo(CanMessageType.ConfigureFilamentMonitor), "message type of CanMessageConfigureFilamentMonitor");
+        Assert.That(CanMessageConfigureFilamentMonitor.ParamTable, Is.EqualTo(CanGenericTables.ConfigureFilamentMonitorParams), "parameter table of CanMessageConfigureFilamentMonitor");
+        Assert.That(CanMessageM955.MessageType, Is.EqualTo(CanMessageType.AccelerometerConfig), "message type of CanMessageM955");
+        Assert.That(CanMessageM955.ParamTable, Is.EqualTo(CanGenericTables.M955Params), "parameter table of CanMessageM955");
+        Assert.That(CanMessageM122P1.MessageType, Is.EqualTo(CanMessageType.TestReport), "message type of CanMessageM122P1");
+        Assert.That(CanMessageM122P1.ParamTable, Is.EqualTo(CanGenericTables.M122P1Params), "parameter table of CanMessageM122P1");
+        Assert.That(CanMessageM655.MessageType, Is.EqualTo(CanMessageType.M655), "message type of CanMessageM655");
+        Assert.That(CanMessageM655.ParamTable, Is.EqualTo(CanGenericTables.M655Params), "parameter table of CanMessageM655");
+        Assert.That(CanMessageM111.MessageType, Is.EqualTo(CanMessageType.M111), "message type of CanMessageM111");
+        Assert.That(CanMessageM111.ParamTable, Is.EqualTo(CanGenericTables.M111Params), "parameter table of CanMessageM111");
     }
 
     [Test]

@@ -335,8 +335,16 @@ public sealed class GenericTableDef
     /// </summary>
     public string? MessageType;
 
-    /// <summary>The table name without CANlib's "Params" suffix, used to name the generated builder.</summary>
-    public string BaseName => Name.EndsWith("Params", StringComparison.Ordinal) ? Name[..^"Params".Length] : Name;
+    /// <summary>
+    /// The table name with CANlib's "Params" dropped, used to name the generated message and builder.
+    /// </summary>
+    /// <remarks>
+    /// "Params" is not always the end of the name: <c>M569Point6Params_StatusOnly</c> qualifies it, which
+    /// would otherwise give a type called <c>M569Point6Params_StatusOnlyBuilder</c>.
+    /// </remarks>
+    public string BaseName => string.Concat(Name.Replace("Params", "", StringComparison.Ordinal)
+        .Split('_', StringSplitOptions.RemoveEmptyEntries)
+        .Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
 }
 
 /// <summary>

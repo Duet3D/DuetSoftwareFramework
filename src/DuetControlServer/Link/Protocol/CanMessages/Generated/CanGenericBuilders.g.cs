@@ -5,9 +5,42 @@
 #nullable enable
 
 using System;
+using System.Collections.Immutable;
+using System.Runtime.InteropServices;
 using DuetControlServer.Link.Protocol.Shared;
 
 namespace DuetControlServer.Link.Protocol.CanMessages;
+
+/// <summary>
+/// The M42 generic message.
+///
+/// CANlib gives this table no message type of its own, so this cannot identify itself and the caller has to supply the type.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M42Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M42Builder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM42 : ICanMessageBody<CanMessageM42>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M42Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M42Params);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
 
 /// <summary>
 /// Builds the M42 generic message.
@@ -19,8 +52,19 @@ public sealed class M42Builder
 {
     private readonly CanGenericWriter _writer = new(CanGenericTables.M42Params);
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM42 Message
+    {
+        get
+        {
+            CanMessageM42 message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -32,6 +76,40 @@ public sealed class M42Builder
     /// <summary>Set the 'S' parameter.</summary>
     /// <returns>This builder, so that calls can be chained.</returns>
     public M42Builder S(float value) { _writer.AddFloat('S', value); return this; }
+}
+
+/// <summary>
+/// The M150 generic message.
+///
+/// Sent as <see cref="CanMessageType.WriteLedStrip" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M150Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M150Builder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM150 : ICanMessage<CanMessageM150>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.WriteLedStrip;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M150Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M150Params);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
 }
 
 /// <summary>
@@ -47,8 +125,19 @@ public sealed class M150Builder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.WriteLedStrip;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM150 Message
+    {
+        get
+        {
+            CanMessageM150 message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -91,6 +180,37 @@ public sealed class M150Builder
 }
 
 /// <summary>
+/// The M280 generic message.
+///
+/// CANlib gives this table no message type of its own, so this cannot identify itself and the caller has to supply the type.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M280Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M280Builder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM280 : ICanMessageBody<CanMessageM280>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M280Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M280Params);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
 /// Builds the M280 generic message.
 ///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
@@ -100,8 +220,19 @@ public sealed class M280Builder
 {
     private readonly CanGenericWriter _writer = new(CanGenericTables.M280Params);
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM280 Message
+    {
+        get
+        {
+            CanMessageM280 message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -113,6 +244,40 @@ public sealed class M280Builder
     /// <summary>Set the 'S' parameter.</summary>
     /// <returns>This builder, so that calls can be chained.</returns>
     public M280Builder S(ushort value) { _writer.AddUInt('S', value); return this; }
+}
+
+/// <summary>
+/// The M308V1 generic message.
+///
+/// Sent as <see cref="CanMessageType.M308V1" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M308V1Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M308V1Builder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM308V1 : ICanMessage<CanMessageM308V1>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M308V1;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M308V1Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M308V1Params);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
 }
 
 /// <summary>
@@ -128,8 +293,19 @@ public sealed class M308V1Builder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.M308V1;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM308V1 Message
+    {
+        get
+        {
+            CanMessageM308V1 message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -192,6 +368,40 @@ public sealed class M308V1Builder
 }
 
 /// <summary>
+/// The M569 generic message.
+///
+/// Sent as <see cref="CanMessageType.M569" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M569Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M569Builder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM569 : ICanMessage<CanMessageM569>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M569;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M569Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M569Params);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
 /// Builds the M569 generic message.
 ///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
@@ -204,8 +414,19 @@ public sealed class M569Builder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.M569;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM569 Message
+    {
+        get
+        {
+            CanMessageM569 message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -258,6 +479,40 @@ public sealed class M569Builder
 /// <summary>
 /// Configure closed loop stepper motor
 ///
+/// Sent as <see cref="CanMessageType.M569P1" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M569Point1Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M569Point1Builder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM569Point1 : ICanMessage<CanMessageM569Point1>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M569P1;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M569Point1Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M569Point1Params);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
+/// Configure closed loop stepper motor
+///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
 /// message's parameter map. Parameters may be set in any order.
 /// </summary>
@@ -268,8 +523,19 @@ public sealed class M569Point1Builder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.M569P1;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM569Point1 Message
+    {
+        get
+        {
+            CanMessageM569Point1 message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -331,6 +597,40 @@ public sealed class M569Point1Builder
 /// <summary>
 /// Read or write stepper driver register
 ///
+/// Sent as <see cref="CanMessageType.M569P2" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M569Point2Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M569Point2Builder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM569Point2 : ICanMessage<CanMessageM569Point2>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M569P2;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M569Point2Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M569Point2Params);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
+/// Read or write stepper driver register
+///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
 /// message's parameter map. Parameters may be set in any order.
 /// </summary>
@@ -341,8 +641,19 @@ public sealed class M569Point2Builder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.M569P2;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM569Point2 Message
+    {
+        get
+        {
+            CanMessageM569Point2 message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -363,6 +674,40 @@ public sealed class M569Point2Builder
 /// <summary>
 /// Set driver torque mode
 ///
+/// Sent as <see cref="CanMessageType.M569P4" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M569Point4Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M569Point4Builder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM569Point4 : ICanMessage<CanMessageM569Point4>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M569P4;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M569Point4Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M569Point4Params);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
+/// Set driver torque mode
+///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
 /// message's parameter map. Parameters may be set in any order.
 /// </summary>
@@ -373,8 +718,19 @@ public sealed class M569Point4Builder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.M569P4;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM569Point4 Message
+    {
+        get
+        {
+            CanMessageM569Point4 message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -395,6 +751,40 @@ public sealed class M569Point4Builder
 /// <summary>
 /// Note: M569Point6Params_StatusOnly must be kept in step with this!
 ///
+/// Sent as <see cref="CanMessageType.M569P6" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M569Point6Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M569Point6Builder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM569Point6 : ICanMessage<CanMessageM569Point6>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M569P6;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M569Point6Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M569Point6Params);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
+/// Note: M569Point6Params_StatusOnly must be kept in step with this!
+///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
 /// message's parameter map. Parameters may be set in any order.
 /// </summary>
@@ -405,8 +795,19 @@ public sealed class M569Point6Builder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.M569P6;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM569Point6 Message
+    {
+        get
+        {
+            CanMessageM569Point6 message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -431,30 +832,109 @@ public sealed class M569Point6Builder
 /// <summary>
 /// This is the same as M569Point6Params except that it doesn't pick up the V parameter from the GCodeBuffer, and we don't need the extra parameters
 ///
+/// Sent as <see cref="CanMessageType.M569P6" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M569Point6Params_StatusOnly" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M569Point6StatusOnlyBuilder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM569Point6StatusOnly : ICanMessage<CanMessageM569Point6StatusOnly>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M569P6;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M569Point6Params_StatusOnly;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M569Point6Params_StatusOnly);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
+/// This is the same as M569Point6Params except that it doesn't pick up the V parameter from the GCodeBuffer, and we don't need the extra parameters
+///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
 /// message's parameter map. Parameters may be set in any order.
 /// </summary>
-public sealed class M569Point6Params_StatusOnlyBuilder
+public sealed class M569Point6StatusOnlyBuilder
 {
     private readonly CanGenericWriter _writer = new(CanGenericTables.M569Point6Params_StatusOnly);
 
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.M569P6;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM569Point6StatusOnly Message
+    {
+        get
+        {
+            CanMessageM569Point6StatusOnly message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
 
     /// <summary>Set the 'P' parameter.</summary>
     /// <returns>This builder, so that calls can be chained.</returns>
-    public M569Point6Params_StatusOnlyBuilder P(byte localDriver) { _writer.AddDriverId('P', localDriver); return this; }
+    public M569Point6StatusOnlyBuilder P(byte localDriver) { _writer.AddDriverId('P', localDriver); return this; }
 
     /// <summary>Set the 'v' parameter: changed to lowercase so that we don't pick up this parameter from the GCode command</summary>
     /// <returns>This builder, so that calls can be chained.</returns>
     /// <remarks>Outside A..Z, so a G-code command can never supply this parameter; the caller has to.</remarks>
-    public M569Point6Params_StatusOnlyBuilder v(byte value) { _writer.AddUInt('v', value); return this; }
+    public M569Point6StatusOnlyBuilder v(byte value) { _writer.AddUInt('v', value); return this; }
+}
+
+/// <summary>
+/// The M569Point7 generic message.
+///
+/// Sent as <see cref="CanMessageType.M569P7" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M569Point7Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M569Point7Builder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM569Point7 : ICanMessage<CanMessageM569Point7>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M569P7;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M569Point7Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M569Point7Params);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
 }
 
 /// <summary>
@@ -470,8 +950,19 @@ public sealed class M569Point7Builder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.M569P7;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM569Point7 Message
+    {
+        get
+        {
+            CanMessageM569Point7 message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -494,6 +985,40 @@ public sealed class M569Point7Builder
 }
 
 /// <summary>
+/// The M915 generic message.
+///
+/// Sent as <see cref="CanMessageType.M915" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M915Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M915Builder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM915 : ICanMessage<CanMessageM915>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M915;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M915Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M915Params);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
 /// Builds the M915 generic message.
 ///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
@@ -506,8 +1031,19 @@ public sealed class M915Builder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.M915;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM915 Message
+    {
+        get
+        {
+            CanMessageM915 message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -539,6 +1075,40 @@ public sealed class M915Builder
 }
 
 /// <summary>
+/// The M950Heater generic message.
+///
+/// Sent as <see cref="CanMessageType.M950Heater" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M950HeaterParams" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M950HeaterBuilder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM950Heater : ICanMessage<CanMessageM950Heater>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M950Heater;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M950HeaterParams;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M950HeaterParams);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
 /// Builds the M950Heater generic message.
 ///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
@@ -551,8 +1121,19 @@ public sealed class M950HeaterBuilder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.M950Heater;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM950Heater Message
+    {
+        get
+        {
+            CanMessageM950Heater message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -579,6 +1160,40 @@ public sealed class M950HeaterBuilder
 }
 
 /// <summary>
+/// The M950Fan generic message.
+///
+/// Sent as <see cref="CanMessageType.M950Fan" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M950FanParams" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M950FanBuilder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM950Fan : ICanMessage<CanMessageM950Fan>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M950Fan;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M950FanParams;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M950FanParams);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
 /// Builds the M950Fan generic message.
 ///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
@@ -591,8 +1206,19 @@ public sealed class M950FanBuilder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.M950Fan;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM950Fan Message
+    {
+        get
+        {
+            CanMessageM950Fan message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -615,6 +1241,40 @@ public sealed class M950FanBuilder
 }
 
 /// <summary>
+/// The M950Gpio generic message.
+///
+/// Sent as <see cref="CanMessageType.M950Gpio" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M950GpioParams" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M950GpioBuilder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM950Gpio : ICanMessage<CanMessageM950Gpio>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M950Gpio;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M950GpioParams;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M950GpioParams);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
 /// Builds the M950Gpio generic message.
 ///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
@@ -627,8 +1287,19 @@ public sealed class M950GpioBuilder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.M950Gpio;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM950Gpio Message
+    {
+        get
+        {
+            CanMessageM950Gpio message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -651,6 +1322,40 @@ public sealed class M950GpioBuilder
 }
 
 /// <summary>
+/// The M950Led generic message.
+///
+/// Sent as <see cref="CanMessageType.M950Led" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M950LedParams" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M950LedBuilder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM950Led : ICanMessage<CanMessageM950Led>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M950Led;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M950LedParams;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M950LedParams);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
 /// Builds the M950Led generic message.
 ///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
@@ -663,8 +1368,19 @@ public sealed class M950LedBuilder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.M950Led;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM950Led Message
+    {
+        get
+        {
+            CanMessageM950Led message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -701,6 +1417,40 @@ public sealed class M950LedBuilder
 /// <summary>
 /// This must cover all parameters used by any supported type of filament monitor, except for the type and extruder number
 ///
+/// Sent as <see cref="CanMessageType.ConfigureFilamentMonitor" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.ConfigureFilamentMonitorParams" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="ConfigureFilamentMonitorBuilder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageConfigureFilamentMonitor : ICanMessage<CanMessageConfigureFilamentMonitor>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.ConfigureFilamentMonitor;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.ConfigureFilamentMonitorParams;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.ConfigureFilamentMonitorParams);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
+/// This must cover all parameters used by any supported type of filament monitor, except for the type and extruder number
+///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
 /// message's parameter map. Parameters may be set in any order.
 /// </summary>
@@ -711,8 +1461,19 @@ public sealed class ConfigureFilamentMonitorBuilder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.ConfigureFilamentMonitor;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageConfigureFilamentMonitor Message
+    {
+        get
+        {
+            CanMessageConfigureFilamentMonitor message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -750,6 +1511,40 @@ public sealed class ConfigureFilamentMonitorBuilder
 /// <summary>
 /// Accelerometer settings
 ///
+/// Sent as <see cref="CanMessageType.AccelerometerConfig" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M955Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M955Builder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM955 : ICanMessage<CanMessageM955>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.AccelerometerConfig;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M955Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M955Params);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
+/// Accelerometer settings
+///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
 /// message's parameter map. Parameters may be set in any order.
 /// </summary>
@@ -760,8 +1555,19 @@ public sealed class M955Builder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.AccelerometerConfig;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM955 Message
+    {
+        get
+        {
+            CanMessageM955 message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -786,6 +1592,40 @@ public sealed class M955Builder
 /// <summary>
 /// M122 P1 parameters
 ///
+/// Sent as <see cref="CanMessageType.TestReport" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M122P1Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M122P1Builder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM122P1 : ICanMessage<CanMessageM122P1>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.TestReport;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M122P1Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M122P1Params);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
+/// M122 P1 parameters
+///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
 /// message's parameter map. Parameters may be set in any order.
 /// </summary>
@@ -796,8 +1636,19 @@ public sealed class M122P1Builder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.TestReport;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM122P1 Message
+    {
+        get
+        {
+            CanMessageM122P1 message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -826,6 +1677,40 @@ public sealed class M122P1Builder
 /// <summary>
 /// M655 parameters
 ///
+/// Sent as <see cref="CanMessageType.M655" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M655Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M655Builder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM655 : ICanMessage<CanMessageM655>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M655;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M655Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M655Params);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
+/// M655 parameters
+///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
 /// message's parameter map. Parameters may be set in any order.
 /// </summary>
@@ -836,8 +1721,19 @@ public sealed class M655Builder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.M655;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM655 Message
+    {
+        get
+        {
+            CanMessageM655 message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -874,6 +1770,40 @@ public sealed class M655Builder
 /// <summary>
 /// M111 parameters
 ///
+/// Sent as <see cref="CanMessageType.M111" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M111Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M111Builder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM111 : ICanMessage<CanMessageM111>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M111;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M111Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M111Params);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
+/// M111 parameters
+///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
 /// message's parameter map. Parameters may be set in any order.
 /// </summary>
@@ -884,8 +1814,19 @@ public sealed class M111Builder
     /// <summary>The message type this message is sent under</summary>
     public static CanMessageType MessageType => CanMessageType.M111;
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM111 Message
+    {
+        get
+        {
+            CanMessageM111 message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
@@ -910,6 +1851,37 @@ public sealed class M111Builder
 /// <summary>
 /// M959 parameters. The B parameter selects the board and is consumed by the main board
 ///
+/// CANlib gives this table no message type of its own, so this cannot identify itself and the caller has to supply the type.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M959Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are. Build one with <see cref="M959Builder" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM959 : ICanMessageBody<CanMessageM959>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <summary>The parameter table this message is built against</summary>
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M959Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength()
+    {
+        int dataLength = CanGenericLayout.DataLength(Generic.Data, Generic.ParamMap, CanGenericTables.M959Params);
+        return CanMessageGeneric.GetActualDataLength((uint)dataLength);
+    }
+}
+
+/// <summary>
+/// M959 parameters. The B parameter selects the board and is consumed by the main board
+///
 /// Every parameter is optional: only the ones set are sent, and the receiver is told which by the
 /// message's parameter map. Parameters may be set in any order.
 /// </summary>
@@ -917,8 +1889,19 @@ public sealed class M959Builder
 {
     private readonly CanGenericWriter _writer = new(CanGenericTables.M959Params);
 
-    /// <summary>The message as built so far</summary>
-    public CanMessageGeneric Message => _writer.Message;
+    /// <summary>The message as built so far, ready to hand to the CAN send path.</summary>
+    public CanMessageM959 Message
+    {
+        get
+        {
+            CanMessageM959 message = default;
+            message.Generic = _writer.Message;
+            return message;
+        }
+    }
+
+    /// <summary>The generic message body on its own, without the type that identifies it</summary>
+    public CanMessageGeneric Body => _writer.Message;
 
     /// <summary>Number of payload bytes to transmit, i.e. the parameters plus the request ID and parameter map</summary>
     public uint ActualDataLength => _writer.ActualDataLength;
