@@ -652,7 +652,26 @@ public sealed class CanSchema
             };
         }
         ValidateGenericTableSizes(schema);
+        ValidateStructCppHeaders(schema);
         return schema;
+    }
+
+    /// <summary>
+    /// A struct's <c>cppHeader</c> must name one of the declared <c>cppHeaders</c>, or <see cref="CppEmitter"/>
+    /// silently emits the struct into none of them: its filter only matches an exact name or a null header
+    /// defaulting to the first file, so a typo'd name matches neither and the struct simply disappears from
+    /// the C++ output, surfacing only later and non-obviously wherever something references the missing type.
+    /// </summary>
+    private static void ValidateStructCppHeaders(CanSchema schema)
+    {
+        HashSet<string> headerNames = [.. schema.CppHeaders.Select(h => h.Name)];
+        foreach (StructDef s in schema.Structs)
+        {
+            if (s.CppHeader is not null && !headerNames.Contains(s.CppHeader))
+            {
+                throw new InvalidDataException($"{s.Name} has cppHeader \"{s.CppHeader}\", which is not one of the declared cppHeaders");
+            }
+        }
     }
 
     /// <summary>
