@@ -70,7 +70,7 @@ public sealed class CppEmitter(CanSchema schema)
         _writer.Doc(s.Doc, "// ");
 
         string keyword = s.IsUnion ? "union" : "struct";
-        string packed = s.Packed && !s.IsUnion ? " __attribute__((packed))" : s.Packed ? " __attribute__((packed))" : "";
+        string packed = s.Packed ? " __attribute__((packed))" : "";
         string final = s.CppFinal ? " final" : "";
         if (s.TemplateParam is not null)
         {
