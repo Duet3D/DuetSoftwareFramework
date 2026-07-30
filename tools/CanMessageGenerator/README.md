@@ -13,6 +13,7 @@ Schema/can-messages.json
         |
         +--> generated/cpp/CanMessageFormats.h                                  (drop-in for CANlib)
         +--> generated/cpp/CanMessageGenericTables.h                            (drop-in for CANlib)
+        +--> generated/cpp/CanSettings.h                                        (drop-in for CANlib)
         +--> src/DuetControlServer/Link/Protocol/CanMessages/Generated/*.cs     (DuetControlServer)
         +--> generated/cpp/CanMessageLayoutProbe.cpp                            (C++ conformance harness)
         +--> generated/cpp/CanMessageGenericTablesProbe.cpp                     (C++ conformance harness)
@@ -71,10 +72,14 @@ That computed layout is then asserted in both languages by generated harnesses:
 * **`CanMessageLayout.g.cs`** asserts the same expectations against the generated C# structs as an NUnit
   fixture, so `dotnet test` catches any C#-side drift.
 
-Both harnesses currently make 488 checks over 79 structs and 216 bitfields. The generic message parameter
+Both harnesses currently make 489 checks over 80 structs and 216 bitfields. The generic message parameter
 tables are checked the same way, by `CanMessageGenericTablesProbe.cpp` and `CanGenericTableLayout.g.cs`:
-143 checks over 22 tables and 121 parameters. Nothing takes a struct's size on trust — including `CanTiming`,
-whose layout is generated even though its bit-rate helpers stay hand-written in the other half of the partial.
+143 checks over 22 tables and 121 parameters. Nothing takes a struct's size on trust.
+
+A struct says which generated header it belongs to with `cppHeader`, because CANlib spreads these types over
+more than one and a generated header only stays a drop-in if it holds exactly what the original did —
+`CanSettings.h` carries `CanUserAreaData` and the flash offsets alongside `CanTiming` for that reason, and
+`verify-cpp-layout.sh` compiles CANlib's `CanSettings.cpp` against it to prove the point.
 
 ## Schema
 
