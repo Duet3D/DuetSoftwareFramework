@@ -57,6 +57,13 @@ That computed layout is then asserted in both languages by generated harnesses:
   generated header, which proves the two are equivalent. `verify-cpp-layout.sh` also compiles CANlib's own
   `.cpp` files against the generated header to confirm it is a genuine drop-in replacement, not merely
   layout-compatible.
+* **`compare-method-surface.py`** diffs the method surfaces of the two headers: same methods on the same
+  structs, with the same arity and qualifiers. Layout checks are blind to methods, and only three of
+  CANlib's translation units are available here, so a method that only RepRapFirmware or Duet3Expansion
+  calls could otherwise disappear unnoticed — which is exactly what happened to
+  `FilamentMonitorDataV2::ClearReservedFields` and to both structs' constructors. The generated header is
+  allowed to add `const` and `constexpr` where CANlib omits them, since those only widen what callers may
+  do; anything else must match.
 * **`CanMessageLayout.g.cs`** asserts the same expectations against the generated C# structs as an NUnit
   fixture, so `dotnet test` catches any C#-side drift.
 

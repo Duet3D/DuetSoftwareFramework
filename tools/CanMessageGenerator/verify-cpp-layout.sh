@@ -11,7 +11,10 @@
 #   2. against the generated header, proving that it is equivalent to the hand-written one.
 #
 # It then compiles CANlib's own translation units against the generated header to confirm that it is a
-# drop-in replacement, not merely layout-compatible.
+# drop-in replacement, not merely layout-compatible, and diffs the two headers' method surfaces. That
+# last step catches what neither the probe nor the compile can see: only three of CANlib's translation
+# units are available here, so a method that only the firmware calls can go missing without any of the
+# other checks noticing.
 #
 # The matching C# side is checked by the generated NUnit fixture in src/UnitTests/Link/CanMessageLayout.g.cs,
 # which asserts the same expectations against the generated C# structs.
@@ -48,5 +51,9 @@ for source in CanMessageFormats CanMessageBuffer CanMessageGenericParser; do
 	"$CXX" "${FLAGS[@]}" -fsyntax-only -I "$GENERATED" "${INCLUDES[@]}" "$ROOT/lib/CANlib/src/$source.cpp"
 	echo "    $source.cpp OK"
 done
+
+echo "==> Comparing method surfaces"
+python3 "$ROOT/tools/CanMessageGenerator/compare-method-surface.py" \
+	"$ROOT/lib/CANlib/src/CanMessageFormats.h" "$GENERATED/CanMessageFormats.h"
 
 echo "==> C++ layouts verified"
