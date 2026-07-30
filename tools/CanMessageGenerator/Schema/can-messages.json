@@ -1758,6 +1758,7 @@
         "Note: the first bitfield group is 31 bits wide, so the second group starts at bit 31 rather than",
         "on a byte boundary. This is deliberate and must be preserved."
       ],
+      "clearReservedFields": true,
       "members": [
         {
           "kind": "bitfield", "storage": "u32",

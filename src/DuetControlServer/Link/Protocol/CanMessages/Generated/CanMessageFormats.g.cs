@@ -3433,6 +3433,13 @@ public struct FilamentMonitorDataV2
         readonly get => CanBitFields.SignExtend(CanBitFields.Get(_bits0, 71, 24), 24);
         set => CanBitFields.Set(_bits0, 71, 24, unchecked((ulong)value));
     }
+
+    /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
+    public void ClearReservedFields()
+    {
+        Zero1 = 0;
+        Zero2 = 0;
+    }
 }
 
 /// <summary>

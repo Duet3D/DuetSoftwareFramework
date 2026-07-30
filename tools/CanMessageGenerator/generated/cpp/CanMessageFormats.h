@@ -1469,6 +1469,13 @@ struct __attribute__((packed)) FilamentMonitorDataV2
 	        avgPercentage : 10,
 	        lastPercentage : 10,		// Declaring this struct packed allows this to straddle word boundaries
 	        calibrationLength : 24;
+
+	// Clear the reserved fields of this message so that it stays compatible with future uses
+	void ClearReservedFields() noexcept
+	{
+		zero1 = 0;
+		zero2 = 0;
+	}
 };
 static_assert(sizeof(FilamentMonitorDataV2) == 12);
 
