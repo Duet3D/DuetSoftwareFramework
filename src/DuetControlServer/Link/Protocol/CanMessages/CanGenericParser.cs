@@ -149,45 +149,10 @@ public sealed class CanGenericParser(CanMessageGeneric message, ImmutableArray<C
     /// </summary>
     private bool TryFind(char letter, out int position, out CanParamDescriptor descriptor)
     {
-        position = 0;
-        descriptor = default;
-
-        ReadOnlySpan<CanParamDescriptor> table = Table.AsSpan();
-        ReadOnlySpan<byte> data = _message.Data;
-        for (int index = 0; index < table.Length; index++)
-        {
-            CanParamDescriptor candidate = table[index];
-            bool present = (_message.ParamMap & (1u << index)) != 0;
-            if (candidate.Letter == letter)
-            {
-                descriptor = candidate;
-                return present;
-            }
-            if (!present)
-            {
-                continue;
-            }
-
-            if (candidate.IsArray)
-            {
-                position += 1 + (data[position] * candidate.ItemSize);
-            }
-            else if (candidate.ItemSize != 0)
-            {
-                position += candidate.ItemSize;
-            }
-            else
-            {
-                // The only zero-size entries are the strings, which run to and include their terminator
-                int end = position;
-                while (data[end] != 0)
-                {
-                    end++;
-                }
-                position = end + 1;
-            }
-        }
-        return false;
+        bool inTable = CanGenericLayout.TryLocate(_message.Data, _message.ParamMap, Table, letter, out CanGenericSlot slot);
+        position = slot.Position;
+        descriptor = slot.Descriptor;
+        return inTable && slot.IsPresent;
     }
 
     private ReadOnlySpan<byte> Data(int position, int size) => ((ReadOnlySpan<byte>)_message.Data).Slice(position, size);

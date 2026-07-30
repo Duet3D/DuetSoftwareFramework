@@ -247,49 +247,16 @@ public sealed class CanGenericWriter(ImmutableArray<CanParamDescriptor> table)
     /// </summary>
     private (int Position, CanParamDescriptor Descriptor) Reserve(char letter)
     {
-        int position = 0;
-        ReadOnlySpan<CanParamDescriptor> table = Table.AsSpan();
-        for (int index = 0; index < table.Length; index++)
+        if (!CanGenericLayout.TryLocate(_message.Data, _message.ParamMap, Table, letter, out CanGenericSlot slot))
         {
-            CanParamDescriptor descriptor = table[index];
-            bool present = (_message.ParamMap & (1u << index)) != 0;
-            if (descriptor.Letter == letter)
-            {
-                if (present)
-                {
-                    throw new CanGenericParamException($"parameter '{letter}' has already been set");
-                }
-                _message.ParamMap |= 1u << index;
-                return (position, descriptor);
-            }
-            if (present)
-            {
-                position += SizeAt(position, descriptor);
-            }
+            throw new CanGenericParamException($"'{letter}' is not a parameter of this message");
         }
-        throw new CanGenericParamException($"'{letter}' is not a parameter of this message");
-    }
-
-    /// <summary>Number of data bytes the already-written parameter at the given position occupies.</summary>
-    private int SizeAt(int position, CanParamDescriptor descriptor)
-    {
-        if (descriptor.IsArray)
+        if (slot.IsPresent)
         {
-            // One length byte, then that many elements
-            return 1 + (_message.Data[position] * descriptor.ItemSize);
+            throw new CanGenericParamException($"parameter '{letter}' has already been set");
         }
-        if (descriptor.ItemSize != 0)
-        {
-            return descriptor.ItemSize;
-        }
-
-        // The only zero-size entries are the strings, which run to and include their null terminator
-        int end = position;
-        while (_message.Data[end] != 0)
-        {
-            end++;
-        }
-        return end - position + 1;
+        _message.ParamMap |= 1u << slot.Index;
+        return (slot.Position, slot.Descriptor);
     }
 
     private void Insert(int position, ReadOnlySpan<byte> value)
