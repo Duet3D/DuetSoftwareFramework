@@ -182,8 +182,11 @@ public sealed class CSharpEmitter(CanSchema schema)
                 }
             }
             writer.Line();
-            writer.XmlDoc("Sign-extend a width-bit two's complement value");
+            writer.XmlDoc("Sign-extend a width-bit two's complement value into an int (width must be 32 or less)");
             writer.Line("public static int SignExtend(ulong raw, int width) => width >= 32 ? (int)raw : (int)((uint)raw << (32 - width)) >> (32 - width);");
+            writer.Line();
+            writer.XmlDoc("Sign-extend a width-bit two's complement value into a long");
+            writer.Line("public static long SignExtend64(ulong raw, int width) => width >= 64 ? (long)raw : (long)(raw << (64 - width)) >> (64 - width);");
         }
         writer.Line();
         return writer.ToString();
@@ -403,6 +406,12 @@ public sealed class CSharpEmitter(CanSchema schema)
         }
     }
 
+    /// <summary>
+    /// The sign-extension helper that matches the property type chosen by <see cref="BitFieldSchemaType"/>:
+    /// fields up to 32 bits wide are exposed as int, wider ones as long.
+    /// </summary>
+    private static string SignExtender(BitFieldDef f) => f.Width <= 32 ? "SignExtend" : "SignExtend64";
+
     private static string Getter(BitSegment segment, BitFieldDef f, string type)
     {
         int shift = f.BitOffset - 8 * segment.Offset;
@@ -410,7 +419,7 @@ public sealed class CSharpEmitter(CanSchema schema)
         {
             string raw = $"CanBitFields.Get(_bits{segment.Index}, {shift}, {f.Width})";
             return f.Bool ? $"{raw} != 0"
-                : f.Signed ? $"CanBitFields.SignExtend({raw}, {f.Width})"
+                : f.Signed ? $"CanBitFields.{SignExtender(f)}({raw}, {f.Width})"
                 : $"({type}){raw}";
         }
 
@@ -424,7 +433,7 @@ public sealed class CSharpEmitter(CanSchema schema)
             return $"({shifted} & 1{suffix}) != 0";
         }
         return f.Signed
-            ? $"CanBitFields.SignExtend({shifted} & {mask}, {f.Width})"
+            ? $"CanBitFields.{SignExtender(f)}({shifted} & {mask}, {f.Width})"
             : $"({type})({shifted} & {mask})";
     }
 

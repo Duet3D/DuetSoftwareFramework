@@ -72,7 +72,10 @@ public static class CanBitFields
         }
     }
 
-    /// <summary>Sign-extend a width-bit two's complement value</summary>
+    /// <summary>Sign-extend a width-bit two's complement value into an int (width must be 32 or less)</summary>
     public static int SignExtend(ulong raw, int width) => width >= 32 ? (int)raw : (int)((uint)raw << (32 - width)) >> (32 - width);
+
+    /// <summary>Sign-extend a width-bit two's complement value into a long</summary>
+    public static long SignExtend64(ulong raw, int width) => width >= 64 ? (long)raw : (long)(raw << (64 - width)) >> (64 - width);
 }
 
