@@ -46,8 +46,9 @@ public static class Program
 
         List<(string Path, string Content)> outputs =
         [
-            (options.GetValueOrDefault("cpp-out") ?? Path.Combine(repoRoot, "tools/CanMessageGenerator/generated/cpp/CanMessageFormats.h"),
-             cpp.Emit()),
+            .. schema.CppHeaders.Select((h, index) =>
+                (Path.Combine(repoRoot, index == 0 ? options.GetValueOrDefault("cpp-out") ?? h.OutputPath : h.OutputPath),
+                 new CppEmitter(schema).Emit(h, index == 0))),
             (options.GetValueOrDefault("cpp-tables-out") ?? Path.Combine(repoRoot, "tools/CanMessageGenerator/generated/cpp/CanMessageGenericTables.h"),
              cppTables.Emit()),
             (Path.Combine(csharpDir, "CanMessageFormats.g.cs"), csharp.EmitStructs()),

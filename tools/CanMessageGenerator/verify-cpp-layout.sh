@@ -54,8 +54,8 @@ echo "==> Probing the generated CanMessageGenericTables.h"
 "$CXX" "${FLAGS[@]}" -I "$GENERATED" "${INCLUDES[@]}" -o "$WORK/tables-generated" "$GENERATED/CanMessageGenericTablesProbe.cpp"
 "$WORK/tables-generated"
 
-echo "==> Compiling CANlib's own sources against the generated header"
-for source in CanMessageFormats CanMessageBuffer CanMessageGenericParser; do
+echo "==> Compiling CANlib's own sources against the generated headers"
+for source in CanMessageFormats CanMessageBuffer CanMessageGenericParser CanSettings; do
 	"$CXX" "${FLAGS[@]}" -fsyntax-only -I "$GENERATED" "${INCLUDES[@]}" "$ROOT/lib/CANlib/src/$source.cpp"
 	echo "    $source.cpp OK"
 done
@@ -63,6 +63,8 @@ done
 echo "==> Comparing method surfaces"
 python3 "$ROOT/tools/CanMessageGenerator/compare-method-surface.py" \
 	"$ROOT/lib/CANlib/src/CanMessageFormats.h" "$GENERATED/CanMessageFormats.h"
+python3 "$ROOT/tools/CanMessageGenerator/compare-method-surface.py" \
+	"$ROOT/lib/CANlib/src/CanSettings.h" "$GENERATED/CanSettings.h"
 
 # The layout probe proves where every field sits and is blind to what any of them is worth, so the protocol
 # magic numbers are checked separately

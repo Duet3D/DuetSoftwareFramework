@@ -178,19 +178,22 @@ public struct ShortPressureAdvanceParameters
 
 /// <summary>
 /// CAN bit timing parameters, declared in CANlib's CanSettings.h.
-/// Only the C# side is generated; the layout is still checked against CANlib's by the probe. The
-/// helpers that derive a bit rate from a sample point need floating-point maths that the schema's
-/// expression language does not cover, so they are hand-written in the other half of the partial.
 ///
-/// Mirrors CanTiming in CANlib's CanSettings.h. This layout is 10 bytes.
+/// Mirrors CanTiming in CANlib's CanMessageFormats.h. This layout is 10 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 10)]
-public partial struct CanTiming
+public struct CanTiming
 {
     /// <summary>CAN clock used by all Duet 3 boards</summary>
     public const uint ClockFrequency = unchecked((uint)(48000000));
 
     public const uint DefaultCanBitRate = unchecked((uint)(1000000));
+
+    /// <summary>how far we sample into the bit during the arbitration and CRC phases</summary>
+    public const float DefaultNormalSamplePoint = unchecked((float)(0.78f));
+
+    /// <summary>how far we sample into the bit during the data phase when BRS is used</summary>
+    public const float DefaultDataSamplePoint = unchecked((float)(0.78f));
 
     /// <summary>Number of time quanta in 1 bit time, or 0xFFFF if this and the following fields have not been set</summary>
     [FieldOffset(0)] public ushort Period;
@@ -252,6 +255,72 @@ public partial struct CanTiming
     {
         readonly get => (byte)((((uint)_bits1) >> 8) & 0xFFU);
         set => _bits1 = (ushort)((((uint)_bits1) & ~(0xFFU << 8)) | ((unchecked((uint)value) & 0xFFU) << 8));
+    }
+
+    /// <summary>True if the arbitration phase timings are self-consistent</summary>
+    public readonly bool IsValid() => Period >= 24 && Period <= 4800 && NTseg1 != 0 && NTseg1 <= Period - 2 && NTseg1 + NJumpWidth + 1 <= Period;
+
+    /// <summary>True if bit rate switching is in use</summary>
+    public readonly bool IsUsingBrs() => DataRateMultiplier != 0 && DataRateMultiplier != 0x0F;
+
+    /// <summary>
+    /// Set the bit rate to the requested value, set the sample point and jump width to default values,
+    /// and disable BRS. This is called by the bootloader, so it must not use any run-time floating point
+    /// maths in order to keep the SAMC21 bootloader small.
+    /// </summary>
+    public void SetDefaults(uint bitRate)
+    {
+        uint DefaultNormalSamplePointTimes1024 = (uint)((uint)(DefaultNormalSamplePoint * 1024));
+        Period = (ushort)((ushort)((ClockFrequency + (bitRate / 2)) / bitRate));
+        NTseg1 = (ushort)((ushort)((Period * DefaultNormalSamplePointTimes1024) / 1024) - 1);
+        NJumpWidth = (ushort)(Period - (NTseg1 + 1));
+        DataRateMultiplier = 0x0F;
+    }
+
+    /// <summary>Set the arbitration phase sample point and set maximum jump width. The period must be set first.</summary>
+    public void SetNormalSamplePoint(float samplePoint)
+    {
+        NTseg1 = (ushort)((ushort)(Period * samplePoint) - 1);
+        NJumpWidth = (ushort)(Period - (NTseg1 + 1));
+    }
+
+    /// <summary>Set the arbitration phase jump width. The bit rate and sample point must be set first.</summary>
+    public void SetNormalJumpWidth(float jw)
+    {
+        NJumpWidth = (ushort)(Math.Clamp((ushort)((ushort)(Period * jw)), (ushort)(1), (ushort)(Period - (NTseg1 + 1))));
+    }
+
+    /// <summary>Enable bit rate switching and set the default data phase sample point and jump width</summary>
+    public void EnableBrs(byte bitRateMultiplier)
+    {
+        uint DefaultDataSamplePointTimes1024 = (uint)((uint)(DefaultDataSamplePoint * 1024));
+        ushort dataBitPeriod = (ushort)(Period / bitRateMultiplier);
+        DataRateMultiplier = (byte)(bitRateMultiplier - 1);
+        DTseg1 = (byte)((ushort)((dataBitPeriod * DefaultDataSamplePointTimes1024) / 1024) - 1);
+        DJumpWidth = (byte)(dataBitPeriod - (DTseg1 + 1));
+    }
+
+    /// <summary>Set the data phase sample point and set maximum jump width. The period must be set first.</summary>
+    public void SetDataSamplePoint(float samplePoint)
+    {
+        ushort dataBitPeriod = (ushort)(Period / (DataRateMultiplier + 1));
+        DTseg1 = (byte)((ushort)(dataBitPeriod * samplePoint) - 1);
+        DJumpWidth = (byte)(dataBitPeriod - (DTseg1 + 1));
+    }
+
+    /// <summary>Set the data phase sample point directly and set maximum jump width</summary>
+    public void SetDataSamplePointDirect(ushort samplePoint)
+    {
+        ushort dataBitPeriod = (ushort)(Period / (DataRateMultiplier + 1));
+        DTseg1 = (byte)(samplePoint);
+        DJumpWidth = (byte)(dataBitPeriod - (DTseg1 + 1));
+    }
+
+    /// <summary>Set the data phase jump width. The bit rate and sample point must be set first.</summary>
+    public void SetDataJumpWidth(float jw)
+    {
+        ushort dataBitPeriod = (ushort)(Period / (DataRateMultiplier + 1));
+        DJumpWidth = (byte)(Math.Clamp((ushort)((ushort)(dataBitPeriod * jw)), (ushort)(1), (ushort)(dataBitPeriod - (DTseg1 + 1))));
     }
 }
 

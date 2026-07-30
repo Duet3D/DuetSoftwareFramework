@@ -113,6 +113,9 @@ int main()
 	CHECK_BITFIELD(CanTiming, "CanTiming", dJumpWidth, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x00);
 	CHECK_BITFIELD(CanTiming, "CanTiming", spare2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff);
 
+	// CanUserAreaData
+	CheckSize("CanUserAreaData", sizeof(CanUserAreaData), 16);
+
 	// CanMessageTimeSync
 	CheckSize("CanMessageTimeSync", sizeof(CanMessageTimeSync), 20);
 	CheckOffset("CanMessageTimeSync", "timeSent", offsetof(CanMessageTimeSync, timeSent), 0);

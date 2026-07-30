@@ -138,6 +138,9 @@ public sealed class MethodDef
     /// <summary>Whether a single-argument constructor is declared <c>explicit</c>.</summary>
     public bool Explicit;
 
+    /// <summary>Whether the C++ method is declared <c>constexpr</c>. Static methods always are.</summary>
+    public bool Constexpr;
+
     /// <summary>Member initialiser list of a constructor.</summary>
     public List<InitDef> Init = [];
 }
@@ -225,6 +228,12 @@ public sealed class StructDef
     /// language cannot express. The generated half still owns the layout, which is what the probe checks.
     /// </summary>
     public bool CSharpPartial;
+
+    /// <summary>Which generated C++ header this belongs in; the first one when unset.</summary>
+    public string? CppHeader;
+
+    /// <summary>Emit as a <c>class</c> rather than a <c>struct</c>.</summary>
+    public bool CppClass;
 
     /// <summary>
     /// Set for a message body that is never sent under its own name, and so has no message type of its own.
@@ -414,6 +423,28 @@ public sealed class MessageTypeDef
 }
 
 /// <summary>
+/// One generated C++ header. CANlib spreads these types over more than one header, and a generated header
+/// only stays a drop-in if it holds exactly what the original did.
+/// </summary>
+public sealed class CppHeaderDef
+{
+    /// <summary>File name, which is also what a struct's <c>cppHeader</c> refers to.</summary>
+    public string Name = "";
+
+    public string Guard = "";
+    public List<string> Includes = [];
+
+    /// <summary>Where the generated header is written, relative to the repository root.</summary>
+    public string OutputPath = "";
+
+    /// <summary>Lines emitted after the includes, such as the forward declarations CANlib has there.</summary>
+    public List<string> Preamble = [];
+
+    /// <summary>Lines emitted after the types, for anything that has to be sized from one of them.</summary>
+    public List<string> Postamble = [];
+}
+
+/// <summary>
 /// A group of related constants that CANlib declares, such as the CAN addresses.
 /// </summary>
 public sealed class ConstantGroupDef
@@ -511,6 +542,7 @@ public sealed class CanSchema
     public List<GenericTableDef> GenericTables = [];
     public List<MessageTypeEnumDef> Enums = [];
     public List<ConstantGroupDef> ConstantGroups = [];
+    public List<CppHeaderDef> CppHeaders = [];
     public UnionDef? MessageUnion;
 
     private Dictionary<string, StructDef>? _byName;
@@ -557,6 +589,20 @@ public sealed class CanSchema
         foreach (JsonNode? node in o["enums"]?.AsArray() ?? [])
         {
             schema.Enums.Add(ParseEnum(node!.AsObject()));
+        }
+
+        foreach (JsonNode? node in o["cppHeaders"]?.AsArray() ?? [])
+        {
+            JsonObject h = node!.AsObject();
+            schema.CppHeaders.Add(new CppHeaderDef
+            {
+                Name = Str(h, "name") ?? throw new InvalidDataException("C++ header without a name"),
+                Guard = Str(h, "guard") ?? "",
+                Includes = StrList(h, "includes"),
+                OutputPath = Str(h, "output") ?? "",
+                Preamble = StrList(h, "preamble"),
+                Postamble = StrList(h, "postamble")
+            });
         }
 
         foreach (JsonNode? node in o["constantGroups"]?.AsArray() ?? [])
@@ -627,6 +673,8 @@ public sealed class CanSchema
             ForceClearReservedFields = Bool(o, "clearReservedFields") ?? false,
             BodyOnly = Bool(o, "bodyOnly") ?? false,
             CSharpPartial = Bool(o, "csharpPartial") ?? false,
+            CppHeader = Str(o, "cppHeader"),
+            CppClass = Bool(o, "cppClass") ?? false,
             Size = Int(o, "size") ?? 0
         };
 
@@ -860,6 +908,7 @@ public sealed class CanSchema
             Doc = Doc(o),
             Body = o["body"]?.AsArray(),
             DeclarationOnly = Bool(o, "declarationOnly") ?? false,
+            Constexpr = Bool(o, "constexpr") ?? false,
             CppSignature = Str(o, "cppSignature")
         };
         if (o["emit"] is JsonArray emit)

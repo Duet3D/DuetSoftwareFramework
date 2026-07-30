@@ -15,20 +15,40 @@
     "Field order therefore matters and must not be changed without bumping the message type."
   ],
 
-  "cppHeaderGuard": "SRC_CAN_CANMESSAGEFORMATS_H_",
-  "cppIncludes": [
-    "\"CanId.h\"",
-    "\"RRF3Common.h\"",
-    "\"Duet3Common.h\"",
-    "\"CanSettings.h\"",
-    "\"RemoteInputHandle.h\"",
-    "\"HeaterModel.h\"",
-    "<General/Bitmap.h>",
-    "<General/Strnlen.h>",
-    "<General/Portability.h>",
-    "<climits>",
-    "<ctime>",
-    "<cstring>"
+  "cppHeaders": [
+    {
+      "name": "CanMessageFormats.h",
+      "guard": "SRC_CAN_CANMESSAGEFORMATS_H_",
+      "output": "tools/CanMessageGenerator/generated/cpp/CanMessageFormats.h",
+      "includes": [
+        "\"CanId.h\"", "\"RRF3Common.h\"", "\"Duet3Common.h\"", "\"CanSettings.h\"",
+        "\"RemoteInputHandle.h\"", "\"HeaterModel.h\"", "<General/Bitmap.h>", "<General/Strnlen.h>",
+        "<General/Portability.h>", "<climits>", "<ctime>", "<cstring>"
+      ],
+      "preamble": [
+        "size_t CanAdjustedLength(size_t rawLength) noexcept;",
+        "",
+        "// CAN message formats",
+        "// Some messages end in strings. For such messages, it is safe to compute the message length without allowing for a null terminator,",
+        "// because when our sending functions round the message length up to a supported CAN size the additional data is set to zeros.",
+        "// All fields named 'zero' are spare and must be set to 0 for compatibility with future uses.",
+        "// Message formats that take a request ID have a SetRequestId method that sets the request ID and clears the zero fields.",
+        "// Message formats that don't take a request ID have a ClearReservedFields method that clears the zero fields.",
+        "",
+        "struct ParamDescriptor;"
+      ]
+    },
+    {
+      "name": "CanSettings.h",
+      "guard": "SRC_CANTIMINGDATA_H_",
+      "output": "tools/CanMessageGenerator/generated/cpp/CanSettings.h",
+      "includes": [ "<ecv_duet3d.h>", "\"CanId.h\"", "<General/SimpleMath.h>" ],
+      "postamble": [
+        "// Where we store the CAN data",
+        "constexpr uint32_t CanUserAreaDataOffset_SAME5x = 512 - sizeof(CanUserAreaData);",
+        "constexpr uint32_t CanUserAreaDataOffset_SAMC21 = 256 - sizeof(CanUserAreaData);"
+      ]
+    }
   ],
   "csharpNamespace": "DuetControlServer.Link.Protocol.CanMessages",
   "csharpSharedNamespace": "DuetControlServer.Link.Protocol.Shared",
@@ -150,20 +170,15 @@
 
     {
       "name": "CanTiming",
+      "cppHeader": "CanSettings.h",
       "doc": [
-        "CAN bit timing parameters, declared in CANlib's CanSettings.h.",
-        "Only the C# side is generated; the layout is still checked against CANlib's by the probe. The",
-        "helpers that derive a bit rate from a sample point need floating-point maths that the schema's",
-        "expression language does not cover, so they are hand-written in the other half of the partial."
+        "CAN bit timing parameters, declared in CANlib's CanSettings.h."
       ],
-      "emit": ["csharp"],
-      "csharpPartial": true,
-      "existing": {
-        "cpp": { "header": "CanSettings.h" }
-      },
       "constants": [
         { "name": "ClockFrequency", "type": "u32", "value": "48000000", "doc": "CAN clock used by all Duet 3 boards" },
-        { "name": "DefaultCanBitRate", "type": "u32", "value": "1000000" }
+        { "name": "DefaultCanBitRate", "type": "u32", "value": "1000000" },
+        { "name": "DefaultNormalSamplePoint", "type": "f32", "value": "0.78", "doc": "how far we sample into the bit during the arbitration and CRC phases" },
+        { "name": "DefaultDataSamplePoint", "type": "f32", "value": "0.78", "doc": "how far we sample into the bit during the data phase when BRS is used" }
       ],
       "members": [
         { "kind": "field", "name": "period", "type": "u16", "doc": "Number of time quanta in 1 bit time, or 0xFFFF if this and the following fields have not been set" },
@@ -184,6 +199,128 @@
             { "name": "spare2", "width": 8, "reserved": true, "doc": "Makes the struct up to 10 bytes for future expansion" }
           ]
         }
+      ],
+      "methods": [
+        {
+          "name": "IsValid", "returnType": "bool", "constexpr": true,
+          "doc": "True if the arbitration phase timings are self-consistent",
+          "body": [ { "return": "period >= 24 && period <= 4800 && nTseg1 != 0 && nTseg1 <= period - 2 && nTseg1 + nJumpWidth + 1 <= period" } ]
+        },
+        {
+          "name": "IsUsingBrs", "returnType": "bool", "constexpr": true,
+          "doc": "True if bit rate switching is in use",
+          "body": [ { "return": "dataRateMultiplier != 0 && dataRateMultiplier != 0x0F" } ]
+        },
+        {
+          "name": "SetDefaults", "returnType": "void", "const": false, "constexpr": true,
+          "doc": [
+            "Set the bit rate to the requested value, set the sample point and jump width to default values,",
+            "and disable BRS. This is called by the bootloader, so it must not use any run-time floating point",
+            "maths in order to keep the SAMC21 bootloader small."
+          ],
+          "params": [ { "name": "bitRate", "type": "u32" } ],
+          "body": [
+            { "let": "DefaultNormalSamplePointTimes1024", "type": "u32", "value": "u32(DefaultNormalSamplePoint * 1024)" },
+            { "set": "period", "to": "u16((ClockFrequency + (bitRate / 2)) / bitRate)" },
+            { "set": "nTseg1", "to": "u16((period * DefaultNormalSamplePointTimes1024) / 1024) - 1" },
+            { "set": "nJumpWidth", "to": "period - (nTseg1 + 1)" },
+            { "set": "dataRateMultiplier", "to": "0x0F" }
+          ]
+        },
+        {
+          "name": "SetNormalSamplePoint", "returnType": "void", "const": false, "constexpr": true,
+          "doc": "Set the arbitration phase sample point and set maximum jump width. The period must be set first.",
+          "params": [ { "name": "samplePoint", "type": "f32" } ],
+          "body": [
+            { "set": "nTseg1", "to": "u16(period * samplePoint) - 1" },
+            { "set": "nJumpWidth", "to": "period - (nTseg1 + 1)" }
+          ]
+        },
+        {
+          "name": "SetNormalJumpWidth", "returnType": "void", "const": false, "constexpr": true,
+          "doc": "Set the arbitration phase jump width. The bit rate and sample point must be set first.",
+          "params": [ { "name": "jw", "type": "f32" } ],
+          "body": [ { "set": "nJumpWidth", "to": "clamp(u16, u16(period * jw), 1, period - (nTseg1 + 1))" } ]
+        },
+        {
+          "name": "EnableBrs", "returnType": "void", "const": false, "constexpr": true,
+          "doc": "Enable bit rate switching and set the default data phase sample point and jump width",
+          "params": [ { "name": "bitRateMultiplier", "type": "u8" } ],
+          "body": [
+            { "let": "DefaultDataSamplePointTimes1024", "type": "u32", "value": "u32(DefaultDataSamplePoint * 1024)" },
+            { "let": "dataBitPeriod", "type": "u16", "value": "period / bitRateMultiplier" },
+            { "set": "dataRateMultiplier", "to": "bitRateMultiplier - 1" },
+            { "set": "dTseg1", "to": "u16((dataBitPeriod * DefaultDataSamplePointTimes1024) / 1024) - 1" },
+            { "set": "dJumpWidth", "to": "dataBitPeriod - (dTseg1 + 1)" }
+          ]
+        },
+        {
+          "name": "SetDataSamplePoint", "returnType": "void", "const": false, "constexpr": true,
+          "doc": "Set the data phase sample point and set maximum jump width. The period must be set first.",
+          "params": [ { "name": "samplePoint", "type": "f32" } ],
+          "body": [
+            { "let": "dataBitPeriod", "type": "u16", "value": "period / (dataRateMultiplier + 1)" },
+            { "set": "dTseg1", "to": "u16(dataBitPeriod * samplePoint) - 1" },
+            { "set": "dJumpWidth", "to": "dataBitPeriod - (dTseg1 + 1)" }
+          ]
+        },
+        {
+          "name": "SetDataSamplePointDirect", "returnType": "void", "const": false, "constexpr": true,
+          "doc": "Set the data phase sample point directly and set maximum jump width",
+          "params": [ { "name": "samplePoint", "type": "u16" } ],
+          "body": [
+            { "let": "dataBitPeriod", "type": "u16", "value": "period / (dataRateMultiplier + 1)" },
+            { "set": "dTseg1", "to": "samplePoint" },
+            { "set": "dJumpWidth", "to": "dataBitPeriod - (dTseg1 + 1)" }
+          ]
+        },
+        {
+          "name": "SetDataJumpWidth", "returnType": "void", "const": false, "constexpr": true,
+          "doc": "Set the data phase jump width. The bit rate and sample point must be set first.",
+          "params": [ { "name": "jw", "type": "f32" } ],
+          "body": [
+            { "let": "dataBitPeriod", "type": "u16", "value": "period / (dataRateMultiplier + 1)" },
+            { "set": "dJumpWidth", "to": "clamp(u16, u16(dataBitPeriod * jw), 1, dataBitPeriod - (dTseg1 + 1))" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanUserAreaData",
+      "cppHeader": "CanSettings.h",
+      "cppClass": true,
+      "packed": false,
+      "emit": ["cpp"],
+      "doc": "This is read from the user area flash, so all values default to all bits set",
+      "constants": [
+        { "name": "magic", "type": "u16", "value": "0x4321", "doc": "the expected XOR of all eight 16-bit words" }
+      ],
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16", "cppPrivate": true,
+          "fields": [
+            { "name": "canIdV1NotSet", "width": 1, "doc": "set if canAddress does not contain the CAN address to use" },
+            { "name": "timingV1NotSet", "width": 1, "doc": "set if timing has not been set" },
+            { "name": "fastParametersNotSet", "width": 1, "doc": "set if BRS parameters have not been set" },
+            { "name": "spare", "width": 13, "doc": "spare bits, must be set to 1 for future compatibility" }
+          ]
+        },
+        { "kind": "field", "name": "canAddress", "type": "u8", "cppPrivate": true, "doc": "the CAN address of this board, or 0xFF if it has not been set" },
+        { "kind": "field", "name": "invertedCanAddress", "type": "u8", "cppPrivate": true, "doc": "the inverted CAN address of this board, or 0xFF if it has not been set" },
+        { "kind": "field", "name": "timing", "type": "CanTiming", "cppPrivate": true },
+        { "kind": "field", "name": "checksum", "type": "u16", "cppPrivate": true, "doc": "checksum word to make the XOR of all eight 16-bit words the magic value" }
+      ],
+      "methods": [
+        { "name": "Clear", "returnType": "void", "const": false, "declarationOnly": true, "emit": ["cpp"] },
+        { "name": "IsValid", "returnType": "bool", "declarationOnly": true, "emit": ["cpp"] },
+        { "name": "SetCanAddress", "returnType": "void", "const": false, "declarationOnly": true, "emit": ["cpp"], "params": [ { "name": "address", "type": "CanAddress" } ] },
+        { "name": "AddressValid", "returnType": "bool", "declarationOnly": true, "emit": ["cpp"] },
+        { "name": "GetCanAddress", "returnType": "CanAddress", "declarationOnly": true, "emit": ["cpp"], "params": [ { "name": "defaultAddress", "type": "CanAddress" } ] },
+        { "name": "SetTiming", "returnType": "void", "const": false, "declarationOnly": true, "emit": ["cpp"], "cppSignature": "void SetTiming(const CanTiming& data) noexcept" },
+        { "name": "GetTiming", "returnType": "void", "declarationOnly": true, "emit": ["cpp"], "cppSignature": "void GetTiming(CanTiming& data) const noexcept" },
+        { "name": "GetChecksum", "returnType": "u16", "declarationOnly": true, "emit": ["cpp"] },
+        { "name": "UpdateChecksum", "returnType": "void", "const": false, "declarationOnly": true, "emit": ["cpp"] }
       ]
     },
 

@@ -55,7 +55,9 @@ public sealed class ConformanceEmitter(CanSchema schema)
                 .Select(m => (CppPath(m.CppAccessPath, m.Name), m.Offset))];
 
             List<(string, int, bool, bool, byte[])> patterns = [];
-            foreach (BitFieldDef f in s.AllBitFields)
+            // A bitfield in a private member is out of reach of the probe, exactly as a private plain member
+            // is; the struct size and the members around it still pin where it sits
+            foreach (BitFieldDef f in s.FlatMembers.Where(m => m.Kind == MemberKind.Bitfield && !m.CppPrivate).SelectMany(m => m.Fields))
             {
                 byte[] pattern = new byte[Math.Max(s.Size, 1)];
                 for (int bit = f.BitOffset; bit < f.BitOffset + f.Width; bit++)
