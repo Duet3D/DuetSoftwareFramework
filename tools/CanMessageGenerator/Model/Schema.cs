@@ -221,6 +221,12 @@ public sealed class StructDef
     public bool ForceClearReservedFields;
 
     /// <summary>
+    /// Emit the C# struct as <c>partial</c>, so that hand-written code can add what the schema's expression
+    /// language cannot express. The generated half still owns the layout, which is what the probe checks.
+    /// </summary>
+    public bool CSharpPartial;
+
+    /// <summary>
     /// Set for a message body that is never sent under its own name, and so has no message type of its own.
     /// </summary>
     /// <remarks>
@@ -546,6 +552,7 @@ public sealed class CanSchema
             CppStaticAsserts = StrList(o, "cppStaticAsserts"),
             ForceClearReservedFields = Bool(o, "clearReservedFields") ?? false,
             BodyOnly = Bool(o, "bodyOnly") ?? false,
+            CSharpPartial = Bool(o, "csharpPartial") ?? false,
             Size = Int(o, "size") ?? 0
         };
 

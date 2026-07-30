@@ -91,6 +91,40 @@ public class CanMessageLayout
     }
 
     [Test]
+    public void CanTiming_Layout()
+    {
+        Assert.That(Unsafe.SizeOf<CanTiming>(), Is.EqualTo(10), "size of CanTiming");
+        Assert.That(Marshal.OffsetOf<CanTiming>("Period").ToInt32(), Is.EqualTo(0), "offset of CanTiming.Period");
+        Assert.That(Marshal.OffsetOf<CanTiming>("NTseg1").ToInt32(), Is.EqualTo(2), "offset of CanTiming.NTseg1");
+        Assert.That(Marshal.OffsetOf<CanTiming>("NJumpWidth").ToInt32(), Is.EqualTo(4), "offset of CanTiming.NJumpWidth");
+        {
+            CanTiming probe = default;
+            probe.DataRateMultiplier = (byte)0xF;
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x00, 0x00, 0x00 }), "bit layout of CanTiming.DataRateMultiplier");
+        }
+        {
+            CanTiming probe = default;
+            probe.DTseg1 = (byte)0xFF;
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF0, 0x0F, 0x00, 0x00 }), "bit layout of CanTiming.DTseg1");
+        }
+        {
+            CanTiming probe = default;
+            probe.Spare1 = (byte)0xF;
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF0, 0x00, 0x00 }), "bit layout of CanTiming.Spare1");
+        }
+        {
+            CanTiming probe = default;
+            probe.DJumpWidth = (byte)0xFF;
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00 }), "bit layout of CanTiming.DJumpWidth");
+        }
+        {
+            CanTiming probe = default;
+            probe.Spare2 = (byte)0xFF;
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF }), "bit layout of CanTiming.Spare2");
+        }
+    }
+
+    [Test]
     public void CanMessageTimeSync_Layout()
     {
         Assert.That(Unsafe.SizeOf<CanMessageTimeSync>(), Is.EqualTo(20), "size of CanMessageTimeSync");

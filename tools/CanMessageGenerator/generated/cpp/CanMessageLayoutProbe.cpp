@@ -102,6 +102,17 @@ int main()
 	CheckOffset("ShortPressureAdvanceParameters", "k", offsetof(ShortPressureAdvanceParameters, k), 0);
 	CheckOffset("ShortPressureAdvanceParameters", "dk", offsetof(ShortPressureAdvanceParameters, dk), 4);
 
+	// CanTiming
+	CheckSize("CanTiming", sizeof(CanTiming), 10);
+	CheckOffset("CanTiming", "period", offsetof(CanTiming, period), 0);
+	CheckOffset("CanTiming", "nTseg1", offsetof(CanTiming, nTseg1), 2);
+	CheckOffset("CanTiming", "nJumpWidth", offsetof(CanTiming, nJumpWidth), 4);
+	CHECK_BITFIELD(CanTiming, "CanTiming", dataRateMultiplier, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00);
+	CHECK_BITFIELD(CanTiming, "CanTiming", dTseg1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x0f, 0x00, 0x00);
+	CHECK_BITFIELD(CanTiming, "CanTiming", spare1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x00, 0x00);
+	CHECK_BITFIELD(CanTiming, "CanTiming", dJumpWidth, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x00);
+	CHECK_BITFIELD(CanTiming, "CanTiming", spare2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff);
+
 	// CanMessageTimeSync
 	CheckSize("CanMessageTimeSync", sizeof(CanMessageTimeSync), 20);
 	CheckOffset("CanMessageTimeSync", "timeSent", offsetof(CanMessageTimeSync, timeSent), 0);

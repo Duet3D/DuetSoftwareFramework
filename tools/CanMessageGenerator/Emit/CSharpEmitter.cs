@@ -256,7 +256,8 @@ public sealed class CSharpEmitter(CanSchema schema)
             ? s.MessageType is not null ? $" : ICanMessage<{s.Name}>" : $" : ICanMessageBody<{s.Name}>"
             : "";
         writer.Line($"[StructLayout(LayoutKind.Explicit, Pack = 1, Size = {Math.Max(s.Size, 1)})]");
-        using (writer.Block($"public struct {s.Name}{bases}", "}"))
+        string partial = s.CSharpPartial ? "partial " : "";
+        using (writer.Block($"public {partial}struct {s.Name}{bases}", "}"))
         {
             writer.Outdent();
             writer.Line("{");

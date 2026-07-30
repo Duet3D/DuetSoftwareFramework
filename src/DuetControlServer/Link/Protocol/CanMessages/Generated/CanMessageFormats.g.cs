@@ -177,6 +177,85 @@ public struct ShortPressureAdvanceParameters
 }
 
 /// <summary>
+/// CAN bit timing parameters, declared in CANlib's CanSettings.h.
+/// Only the C# side is generated; the layout is still checked against CANlib's by the probe. The
+/// helpers that derive a bit rate from a sample point need floating-point maths that the schema's
+/// expression language does not cover, so they are hand-written in the other half of the partial.
+///
+/// Mirrors CanTiming in CANlib's CanSettings.h. This layout is 10 bytes.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 10)]
+public partial struct CanTiming
+{
+    /// <summary>CAN clock used by all Duet 3 boards</summary>
+    public const uint ClockFrequency = unchecked((uint)(48000000));
+
+    public const uint DefaultCanBitRate = unchecked((uint)(1000000));
+
+    /// <summary>Number of time quanta in 1 bit time, or 0xFFFF if this and the following fields have not been set</summary>
+    [FieldOffset(0)] public ushort Period;
+
+    /// <summary>How far into the bit period the sample point is (minimum 1, maximum period-2) less 1</summary>
+    [FieldOffset(2)] public ushort NTseg1;
+
+    /// <summary>The (re)synchronisation jump width during the arbitration and CRC phases</summary>
+    [FieldOffset(4)] public ushort NJumpWidth;
+
+    /// <summary>Backing storage for the bitfields dataRateMultiplier:4, dTseg1:8, spare1:4</summary>
+    [FieldOffset(6)] private ushort _bits0;
+
+    /// <summary>Backing storage for the bitfields dJumpWidth:8, spare2:8</summary>
+    [FieldOffset(8)] private ushort _bits1;
+
+    /// <summary>
+    /// How many times faster the data bit rate is (must be 1, 2, 3, 4, 6 or 8) minus 1. 0 or 0x0F mean do not use BRS.
+    /// (4-bit field, bits 48-51 of the message)
+    /// </summary>
+    public byte DataRateMultiplier
+    {
+        readonly get => (byte)(((uint)_bits0) & 0xFU);
+        set => _bits0 = (ushort)((((uint)_bits0) & ~0xFU) | (unchecked((uint)value) & 0xFU));
+    }
+
+    /// <summary>
+    /// Number of time quanta before the data phase sample point, less 1
+    /// (8-bit field, bits 52-59 of the message)
+    /// </summary>
+    public byte DTseg1
+    {
+        readonly get => (byte)((((uint)_bits0) >> 4) & 0xFFU);
+        set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFFU << 4)) | ((unchecked((uint)value) & 0xFFU) << 4));
+    }
+
+    /// <summary>Spare1 (4-bit field, bits 60-63 of the message)</summary>
+    public byte Spare1
+    {
+        readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
+        set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
+    }
+
+    /// <summary>
+    /// The jump width during the data phase
+    /// (8-bit field, bits 64-71 of the message)
+    /// </summary>
+    public byte DJumpWidth
+    {
+        readonly get => (byte)(((uint)_bits1) & 0xFFU);
+        set => _bits1 = (ushort)((((uint)_bits1) & ~0xFFU) | (unchecked((uint)value) & 0xFFU));
+    }
+
+    /// <summary>
+    /// Makes the struct up to 10 bytes for future expansion
+    /// (8-bit field, bits 72-79 of the message)
+    /// </summary>
+    public byte Spare2
+    {
+        readonly get => (byte)((((uint)_bits1) >> 8) & 0xFFU);
+        set => _bits1 = (ushort)((((uint)_bits1) & ~(0xFFU << 8)) | ((unchecked((uint)value) & 0xFFU) << 8));
+    }
+}
+
+/// <summary>
 /// Time sync message. The realTime field was added at RRF 3.2 so it is not transmitted by main boards running 3.1.1 and earlier.
 /// Time sync messages are always transmitted without using BRS.
 ///

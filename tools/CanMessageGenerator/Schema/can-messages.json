@@ -150,13 +150,41 @@
 
     {
       "name": "CanTiming",
-      "doc": "CAN bit timing parameters. Declared in CANlib's CanSettings.h and hand-written on the C# side, so only referenced here.",
-      "emit": [],
+      "doc": [
+        "CAN bit timing parameters, declared in CANlib's CanSettings.h.",
+        "Only the C# side is generated; the layout is still checked against CANlib's by the probe. The",
+        "helpers that derive a bit rate from a sample point need floating-point maths that the schema's",
+        "expression language does not cover, so they are hand-written in the other half of the partial."
+      ],
+      "emit": ["csharp"],
+      "csharpPartial": true,
       "existing": {
-        "cpp": { "header": "CanSettings.h" },
-        "csharp": { "namespace": "DuetControlServer.Link.Protocol.Shared" }
+        "cpp": { "header": "CanSettings.h" }
       },
-      "size": 10
+      "constants": [
+        { "name": "ClockFrequency", "type": "u32", "value": "48000000", "doc": "CAN clock used by all Duet 3 boards" },
+        { "name": "DefaultCanBitRate", "type": "u32", "value": "1000000" }
+      ],
+      "members": [
+        { "kind": "field", "name": "period", "type": "u16", "doc": "Number of time quanta in 1 bit time, or 0xFFFF if this and the following fields have not been set" },
+        { "kind": "field", "name": "nTseg1", "type": "u16", "doc": "How far into the bit period the sample point is (minimum 1, maximum period-2) less 1" },
+        { "kind": "field", "name": "nJumpWidth", "type": "u16", "doc": "The (re)synchronisation jump width during the arbitration and CRC phases" },
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "dataRateMultiplier", "width": 4, "doc": "How many times faster the data bit rate is (must be 1, 2, 3, 4, 6 or 8) minus 1. 0 or 0x0F mean do not use BRS." },
+            { "name": "dTseg1", "width": 8, "doc": "Number of time quanta before the data phase sample point, less 1" },
+            { "name": "spare1", "width": 4, "reserved": true }
+          ]
+        },
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "dJumpWidth", "width": 8, "doc": "The jump width during the data phase" },
+            { "name": "spare2", "width": 8, "reserved": true, "doc": "Makes the struct up to 10 bytes for future expansion" }
+          ]
+        }
+      ]
     },
 
     {
