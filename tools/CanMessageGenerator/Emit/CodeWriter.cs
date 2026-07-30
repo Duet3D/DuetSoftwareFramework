@@ -50,27 +50,40 @@ public sealed class CodeWriter(string indentUnit = "\t")
     }
 
     /// <summary>Write an XML documentation comment for C#.</summary>
-    public void XmlDoc(string? doc)
+    /// <summary>
+    /// Write a documentation comment for text taken from the schema, which is prose and may contain
+    /// characters that XML would choke on.
+    /// </summary>
+    public void XmlDoc(string? doc) => WriteXmlDoc(doc, escape: true);
+
+    /// <summary>
+    /// Write a documentation comment the generator composed itself, so it may contain XML markup such as
+    /// <c>&lt;see cref="..." /&gt;</c>. Anything originating in the schema has to be run through
+    /// <see cref="Escape"/> before being included.
+    /// </summary>
+    public void XmlDocRaw(string? doc) => WriteXmlDoc(doc, escape: false);
+
+    private void WriteXmlDoc(string? doc, bool escape)
     {
         if (string.IsNullOrWhiteSpace(doc))
         {
             return;
         }
-        string[] lines = doc.Split('\n');
+        string[] lines = [.. doc.Split('\n').Select(l => escape ? Escape(l) : l)];
         if (lines.Length == 1)
         {
-            Line($"/// <summary>{Escape(lines[0])}</summary>");
+            Line($"/// <summary>{lines[0]}</summary>");
             return;
         }
         Line("/// <summary>");
         foreach (string line in lines)
         {
-            Line($"/// {Escape(line)}");
+            Line(line.Length == 0 ? "///" : $"/// {line}");
         }
         Line("/// </summary>");
     }
 
-    private static string Escape(string s) => s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+    public static string Escape(string s) => s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
 
     public override string ToString() => _builder.ToString();
 

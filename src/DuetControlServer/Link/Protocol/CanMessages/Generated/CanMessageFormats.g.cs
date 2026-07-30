@@ -14,7 +14,7 @@ namespace DuetControlServer.Link.Protocol.CanMessages;
 
 /// <summary>
 /// Handle to a remote input. Declared in CANlib's RemoteInputHandle.h, so only the C# mirror is generated.
-/// 
+///
 /// Mirrors RemoteInputHandle in CANlib's RemoteInputHandle.h. This layout is 2 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 2)]
@@ -82,7 +82,7 @@ public struct RemoteInputHandle
 
 /// <summary>
 /// Heater model used by RRF. Declared in CANlib's HeaterModel.h, so only the C# mirror is generated.
-/// 
+///
 /// Mirrors HeaterModel in CANlib's HeaterModel.h. This layout is 40 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 40)]
@@ -135,7 +135,7 @@ public struct HeaterModel
 
 /// <summary>
 /// Minimum, current and maximum values of a floating point quantity. Declared in CANlib's RRF3Common.h.
-/// 
+///
 /// Mirrors MinCurMax in CANlib's RRF3Common.h. This layout is 12 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 12)]
@@ -150,7 +150,7 @@ public struct MinCurMax
 
 /// <summary>
 /// Version of MinCurMax that uses float16 for more compact CAN messages. Declared in CANlib's RRF3Common.h.
-/// 
+///
 /// Mirrors ShortMinCurMax in CANlib's RRF3Common.h. This layout is 6 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 6)]
@@ -165,7 +165,7 @@ public struct ShortMinCurMax
 
 /// <summary>
 /// Compact pressure advance parameters for passing over CAN. Declared in CANlib's RRF3Common.h.
-/// 
+///
 /// Mirrors ShortPressureAdvanceParameters in CANlib's RRF3Common.h. This layout is 6 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 6)]
@@ -179,7 +179,7 @@ public struct ShortPressureAdvanceParameters
 /// <summary>
 /// Time sync message. The realTime field was added at RRF 3.2 so it is not transmitted by main boards running 3.1.1 and earlier.
 /// Time sync messages are always transmitted without using BRS.
-/// 
+///
 /// Mirrors CanMessageTimeSync in CANlib's CanMessageFormats.h. This layout is 20 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 20)]
@@ -268,7 +268,7 @@ public struct CanMessageTimeSync : ICanMessage<CanMessageTimeSync>
 
 /// <summary>
 /// Emergency stop message
-/// 
+///
 /// Mirrors CanMessageEmergencyStop in CANlib's CanMessageFormats.h. This layout is 1 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 1)]
@@ -283,7 +283,7 @@ public struct CanMessageEmergencyStop : ICanMessage<CanMessageEmergencyStop>
 
 /// <summary>
 /// Enter test mode message, used to force a main board to behave like a CAN expansion board
-/// 
+///
 /// Mirrors CanMessageEnterTestMode in CANlib's CanMessageFormats.h. This layout is 8 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 8)]
@@ -346,7 +346,7 @@ public struct CanMessageEnterTestMode : ICanMessage<CanMessageEnterTestMode>
 
 /// <summary>
 /// Announce acknowledgement message
-/// 
+///
 /// Mirrors CanMessageAcknowledgeAnnounce in CANlib's CanMessageFormats.h. This layout is 1 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 1)]
@@ -361,7 +361,7 @@ public struct CanMessageAcknowledgeAnnounce : ICanMessage<CanMessageAcknowledgeA
 
 /// <summary>
 /// Reset message
-/// 
+///
 /// Mirrors CanMessageReset in CANlib's CanMessageFormats.h. This layout is 2 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 2)]
@@ -397,7 +397,7 @@ public struct CanMessageReset : ICanMessage<CanMessageReset>
 
 /// <summary>
 /// Stop movement on specific drivers
-/// 
+///
 /// Mirrors CanMessageStopMovement in CANlib's CanMessageFormats.h. This layout is 2 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 2)]
@@ -415,7 +415,7 @@ public struct CanMessageStopMovement : ICanMessage<CanMessageStopMovement>
 
 /// <summary>
 /// Revert position on specific drivers
-/// 
+///
 /// Mirrors CanMessageRevertPosition in CANlib's CanMessageFormats.h. This layout is 40 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 40)]
@@ -461,7 +461,7 @@ public struct CanMessageRevertPosition : ICanMessage<CanMessageRevertPosition>
 
 /// <summary>
 /// Per-drive value carried by a movement message: net steps for non-extruders, or extrusion (including fractional parts) for extruders
-/// 
+///
 /// Mirrors PerDriveValues in CANlib's CanMessageFormats.h. This layout is 4 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 4)]
@@ -481,7 +481,7 @@ public struct PerDriveValues
 
 /// <summary>
 /// Linear movement message with input shaping applied by the receiving board
-/// 
+///
 /// Mirrors CanMessageMovementLinearShaped in CANlib's CanMessageFormats.h. This layout is 60 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 60)]
@@ -607,7 +607,7 @@ public struct CanMessageMovementLinearShaped : ICanMessage<CanMessageMovementLin
 
 /// <summary>
 /// Change CAN address and normal timing message
-/// 
+///
 /// Mirrors CanMessageSetAddressAndNormalTiming in CANlib's CanMessageFormats.h. This layout is 16 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 16)]
@@ -658,7 +658,7 @@ public struct CanMessageSetAddressAndNormalTiming : ICanMessage<CanMessageSetAdd
 
 /// <summary>
 /// Steps/mm and microstepping data sent in a CanMessageMultipleDrivesRequest
-/// 
+///
 /// Mirrors StepsPerUnitAndMicrostepping in CANlib's CanMessageFormats.h. This layout is 6 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 6)]
@@ -684,7 +684,7 @@ public struct StepsPerUnitAndMicrostepping
 ///  - if the mode is driverIdle then the top 8 bits are the idle current percent, to match the earlier version of this struct;
 ///  - if the mode is driverDisabled then all 12 bits are the delay in milliseconds between re-engaging the brake and disabling the motor;
 ///  - if the mode is driverEnabled then all 12 bits are the delay in milliseconds between enabling the motor and disengaging the brake.
-/// 
+///
 /// Mirrors DriverStateControl in CANlib's CanMessageFormats.h. This layout is 2 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 2)]
@@ -733,7 +733,7 @@ public struct DriverStateControl
 
 /// <summary>
 /// Request board information
-/// 
+///
 /// Mirrors CanMessageReturnInfo in CANlib's CanMessageFormats.h. This layout is 3 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 3)]
@@ -789,7 +789,7 @@ public struct CanMessageReturnInfo : ICanMessage<CanMessageReturnInfo>
 
 /// <summary>
 /// Run a diagnostic test (M122 P parameter)
-/// 
+///
 /// Mirrors CanMessageDiagnosticTest in CANlib's CanMessageFormats.h. This layout is 20 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 20)]
@@ -837,7 +837,7 @@ public struct CanMessageDiagnosticTest : ICanMessage<CanMessageDiagnosticTest>
 
 /// <summary>
 /// Set the target temperature of a heater
-/// 
+///
 /// Mirrors CanMessageSetHeaterTemperatureV1 in CANlib's CanMessageFormats.h. This layout is 9 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 9)]
@@ -933,7 +933,7 @@ public struct CanMessageSetHeaterTemperatureV1 : ICanMessage<CanMessageSetHeater
 
 /// <summary>
 /// M303 auto-tune request. This message has no message type of its own; it is sent as a generic message.
-/// 
+///
 /// Mirrors CanMessageM303 in CANlib's CanMessageFormats.h. This layout is 8 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 8)]
@@ -970,7 +970,7 @@ public struct CanMessageM303 : ICanMessageBody<CanMessageM303>
 
 /// <summary>
 /// Send a heater model to an expansion board
-/// 
+///
 /// Mirrors CanMessageHeaterModelV3 in CANlib's CanMessageFormats.h. This layout is 60 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 60)]
@@ -1064,7 +1064,7 @@ public struct CanMessageHeaterModelV3 : ICanMessage<CanMessageHeaterModelV3>
 /// M570 parameters.
 /// IMPORTANT! Field maxBadTemperatureCount was added at version 3.5. Boards receiving this message
 /// must not use maxBadTemperatureCount unless the version35 bit is set.
-/// 
+///
 /// Mirrors CanMessageSetHeaterFaultDetectionParameters in CANlib's CanMessageFormats.h. This layout is 16 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 16)]
@@ -1117,7 +1117,7 @@ public struct CanMessageSetHeaterFaultDetectionParameters : ICanMessage<CanMessa
 
 /// <summary>
 /// One heater monitor within a CanMessageSetHeaterMonitors
-/// 
+///
 /// Mirrors CanHeaterMonitor in CANlib's CanMessageFormats.h. This layout is 8 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 8)]
@@ -1136,7 +1136,7 @@ public struct CanHeaterMonitor
 
 /// <summary>
 /// Configure the monitors of a heater
-/// 
+///
 /// Mirrors CanMessageSetHeaterMonitors in CANlib's CanMessageFormats.h. This layout is 60 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 60)]
@@ -1177,7 +1177,7 @@ public struct CanMessageSetHeaterMonitors : ICanMessage<CanMessageSetHeaterMonit
 
 /// <summary>
 /// Tell an expansion board to update its firmware
-/// 
+///
 /// Mirrors CanMessageUpdateYourFirmware in CANlib's CanMessageFormats.h. This layout is 4 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 4)]
@@ -1227,7 +1227,7 @@ public struct CanMessageUpdateYourFirmware : ICanMessage<CanMessageUpdateYourFir
 
 /// <summary>
 /// Configure a fan
-/// 
+///
 /// Mirrors CanMessageFanParameters in CANlib's CanMessageFormats.h. This layout is 34 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 34)]
@@ -1278,7 +1278,7 @@ public struct CanMessageFanParameters : ICanMessage<CanMessageFanParameters>
 
 /// <summary>
 /// Set the speed of a fan
-/// 
+///
 /// Mirrors CanMessageSetFanSpeed in CANlib's CanMessageFormats.h. This layout is 8 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 8)]
@@ -1318,7 +1318,7 @@ public struct CanMessageSetFanSpeed : ICanMessage<CanMessageSetFanSpeed>
 
 /// <summary>
 /// Request to create an input monitor
-/// 
+///
 /// Mirrors CanMessageCreateInputMonitorV1 in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
@@ -1378,7 +1378,7 @@ public struct CanMessageCreateInputMonitorV1 : ICanMessage<CanMessageCreateInput
 
 /// <summary>
 /// Request to reconfigure an input monitor
-/// 
+///
 /// Mirrors CanMessageChangeInputMonitorV1 in CANlib's CanMessageFormats.h. This layout is 9 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 9)]
@@ -1456,7 +1456,7 @@ public struct CanMessageChangeInputMonitorV1 : ICanMessage<CanMessageChangeInput
 
 /// <summary>
 /// An analog handle and the reading from it. Allocated in arrays starting on a 2- or 4-byte boundary, so 'handle' is aligned but 'reading' is not.
-/// 
+///
 /// Mirrors AnalogHandleDataV0 in CANlib's CanMessageFormats.h. This layout is 6 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 6)]
@@ -1470,7 +1470,7 @@ public struct AnalogHandleDataV0
 
 /// <summary>
 /// An analog handle and the reading from it. Allocated in arrays starting on a 4-byte boundary, so all fields are correctly aligned.
-/// 
+///
 /// Mirrors AnalogHandleDataV1 in CANlib's CanMessageFormats.h. This layout is 8 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 8)]
@@ -1487,7 +1487,7 @@ public struct AnalogHandleDataV1
 
 /// <summary>
 /// Request to read inputs, including analog inputs
-/// 
+///
 /// Mirrors CanMessageReadInputsRequest in CANlib's CanMessageFormats.h. This layout is 8 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 8)]
@@ -1532,7 +1532,7 @@ public struct CanMessageReadInputsRequest : ICanMessage<CanMessageReadInputsRequ
 
 /// <summary>
 /// Request to start sending accelerometer data
-/// 
+///
 /// Mirrors CanMessageStartAccelerometer in CANlib's CanMessageFormats.h. This layout is 12 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 12)]
@@ -1607,7 +1607,7 @@ public struct CanMessageStartAccelerometer : ICanMessage<CanMessageStartAccelero
 
 /// <summary>
 /// Request to start sending closed loop data
-/// 
+///
 /// Mirrors CanMessageStartClosedLoopDataCollection in CANlib's CanMessageFormats.h. This layout is 11 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 11)]
@@ -1661,7 +1661,7 @@ public struct CanMessageStartClosedLoopDataCollection : ICanMessage<CanMessageSt
 
 /// <summary>
 /// M42 or M280
-/// 
+///
 /// Mirrors CanMessageWriteGpio in CANlib's CanMessageFormats.h. This layout is 7 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 7)]
@@ -1708,7 +1708,7 @@ public struct CanMessageWriteGpio : ICanMessage<CanMessageWriteGpio>
 
 /// <summary>
 /// Create a filament monitor (M591). A separate message is used to configure it.
-/// 
+///
 /// Mirrors CanMessageCreateFilamentMonitor in CANlib's CanMessageFormats.h. This layout is 5 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 5)]
@@ -1769,7 +1769,7 @@ public struct CanMessageCreateFilamentMonitor : ICanMessage<CanMessageCreateFila
 
 /// <summary>
 /// Delete a filament monitor (M591)
-/// 
+///
 /// Mirrors CanMessageDeleteFilamentMonitor in CANlib's CanMessageFormats.h. This layout is 5 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 5)]
@@ -1826,7 +1826,7 @@ public struct CanMessageDeleteFilamentMonitor : ICanMessage<CanMessageDeleteFila
 /// If just the 'on' bit is set, we are asking for heater tuning to start.
 /// If 'on' and 'calibrate' are both set, we are asking for calibration to start.
 /// If just 'calibrate' is set, we are asking whether calibration has completed.
-/// 
+///
 /// Mirrors CanMessageHeaterTuningCommand in CANlib's CanMessageFormats.h. This layout is 22 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 22)]
@@ -1905,7 +1905,7 @@ public struct CanMessageHeaterTuningCommand : ICanMessage<CanMessageHeaterTuning
 
 /// <summary>
 /// Set heater feedforward. The receiving board does not reply to this message.
-/// 
+///
 /// Mirrors CanMessageHeaterFeedForwardV1 in CANlib's CanMessageFormats.h. This layout is 16 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 16)]
@@ -1949,7 +1949,7 @@ public struct CanMessageHeaterFeedForwardV1 : ICanMessage<CanMessageHeaterFeedFo
 
 /// <summary>
 /// The coefficient and duration of one input shaping impulse
-/// 
+///
 /// Mirrors ShapingPair in CANlib's CanMessageFormats.h. This layout is 8 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 8)]
@@ -1962,7 +1962,7 @@ public struct ShapingPair
 
 /// <summary>
 /// Configure input shaping
-/// 
+///
 /// Mirrors CanMessageSetInputShapingV1 in CANlib's CanMessageFormats.h. This layout is 60 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 60)]
@@ -2006,7 +2006,7 @@ public struct CanMessageSetInputShapingV1 : ICanMessage<CanMessageSetInputShapin
 
 /// <summary>
 /// Enable a stall endstop, or clear all stall endstops
-/// 
+///
 /// Mirrors CanMessageEnableStallEndstop in CANlib's CanMessageFormats.h. This layout is 8 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 8)]
@@ -2051,7 +2051,7 @@ public struct CanMessageEnableStallEndstop : ICanMessage<CanMessageEnableStallEn
 
 /// <summary>
 /// Request to set and return the default model for a heater
-/// 
+///
 /// Mirrors CanMessageSetDefaultHeaterModel in CANlib's CanMessageFormats.h. This layout is 5 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 5)]
@@ -2112,7 +2112,7 @@ public struct CanMessageSetDefaultHeaterModel : ICanMessage<CanMessageSetDefault
 
 /// <summary>
 /// Reply to CanMessageSetDefaultHeaterModel
-/// 
+///
 /// Mirrors CanMessageHeaterModelReport in CANlib's CanMessageFormats.h. This layout is 44 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 44)]
@@ -2174,7 +2174,7 @@ public struct CanMessageHeaterModelReport : ICanMessage<CanMessageHeaterModelRep
 
 /// <summary>
 /// Request to send a chunk of a firmware or bootloader file
-/// 
+///
 /// Mirrors CanMessageFirmwareUpdateRequest in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
@@ -2274,7 +2274,7 @@ public struct CanMessageFirmwareUpdateRequest : ICanMessage<CanMessageFirmwareUp
 
 /// <summary>
 /// Firmware update response
-/// 
+///
 /// Mirrors CanMessageFirmwareUpdateResponse in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
@@ -2360,7 +2360,7 @@ public struct CanMessageFirmwareUpdateResponse : ICanMessage<CanMessageFirmwareU
 /// The standard reply used by many calls. It carries a GCodeResult, some text, and in some cases 8 bits of
 /// additional information. It can be split into multiple fragments so that the text is not constrained to 60 characters.
 /// The layout of requestId and resultCode is common to more than one reply type.
-/// 
+///
 /// Mirrors CanMessageStandardReply in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
@@ -2447,7 +2447,7 @@ public struct CanMessageStandardReply : ICanMessage<CanMessageStandardReply>
 
 /// <summary>
 /// Response to a CanMessageReadInputsRequest. The requestId and resultCode must be in the same place as for a standard reply.
-/// 
+///
 /// Mirrors CanMessageReadInputsReplyV0 in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
@@ -2510,7 +2510,7 @@ public struct CanMessageReadInputsReplyV0 : ICanMessage<CanMessageReadInputsRepl
 
 /// <summary>
 /// Response to a CanMessageReadInputsRequest. The requestId and resultCode must be in the same place as for a standard reply.
-/// 
+///
 /// Mirrors CanMessageReadInputsReplyV1 in CANlib's CanMessageFormats.h. This layout is 60 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 60)]
@@ -2575,7 +2575,7 @@ public struct CanMessageReadInputsReplyV1 : ICanMessage<CanMessageReadInputsRepl
 /// Generic message. These are always used in conjunction with a ParamTable that is known to both sender and receiver.
 /// The table lists the parameters, each one defined by the parameter letter and the type of parameter.
 /// The paramMap bitmap indicates which parameters are present in the data. They are provided in the same order as in the ParamTable.
-/// 
+///
 /// Mirrors CanMessageGeneric in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
@@ -2611,7 +2611,7 @@ public struct CanMessageGeneric : ICanMessageBody<CanMessageGeneric>
 
 /// <summary>
 /// One sensor reading within a CanMessageSensorTemperatures
-/// 
+///
 /// Mirrors CanSensorReport in CANlib's CanMessageFormats.h. This layout is 5 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 5)]
@@ -2633,7 +2633,7 @@ public struct CanSensorReport
 
 /// <summary>
 /// Message broadcast by expansion boards and the main board to provide sensor temperatures
-/// 
+///
 /// Mirrors CanMessageSensorTemperatures in CANlib's CanMessageFormats.h. This layout is 63 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 63)]
@@ -2656,7 +2656,7 @@ public struct CanMessageSensorTemperatures : ICanMessage<CanMessageSensorTempera
 
 /// <summary>
 /// One heater status within a CanMessageHeatersStatus
-/// 
+///
 /// Mirrors CanHeaterReport in CANlib's CanMessageFormats.h. This layout is 6 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 6)]
@@ -2681,7 +2681,7 @@ public struct CanHeaterReport
 
 /// <summary>
 /// Message broadcast by expansion boards to send heater status to the main board
-/// 
+///
 /// Mirrors CanMessageHeatersStatus in CANlib's CanMessageFormats.h. This layout is 62 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 62)]
@@ -2704,7 +2704,7 @@ public struct CanMessageHeatersStatus : ICanMessage<CanMessageHeatersStatus>
 
 /// <summary>
 /// Message used by expansion boards running firmware 3.4.0beta4 and earlier to announce their presence on the CAN bus
-/// 
+///
 /// Mirrors CanMessageAnnounceV0 in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
@@ -2762,7 +2762,7 @@ public struct CanMessageAnnounceV0 : ICanMessage<CanMessageAnnounceV0>
 
 /// <summary>
 /// Message used by expansion boards running firmware 3.4.0beta5 and later to announce their presence on the CAN bus
-/// 
+///
 /// Mirrors CanMessageAnnounceV1 in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
@@ -2853,7 +2853,7 @@ public struct CanMessageAnnounceV1 : ICanMessage<CanMessageAnnounceV1>
 
 /// <summary>
 /// One fan's status within a CanMessageFansReport
-/// 
+///
 /// Mirrors FanReport in CANlib's CanMessageFormats.h. This layout is 4 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 4)]
@@ -2868,7 +2868,7 @@ public struct FanReport
 
 /// <summary>
 /// Message used to broadcast the status of fans
-/// 
+///
 /// Mirrors CanMessageFansReport in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
@@ -2891,7 +2891,7 @@ public struct CanMessageFansReport : ICanMessage<CanMessageFansReport>
 
 /// <summary>
 /// Message sent by an expansion board when one of its monitored inputs has changed state
-/// 
+///
 /// Mirrors CanMessageInputChangedV1 in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
@@ -2943,7 +2943,7 @@ public struct CanMessageInputChangedV1 : ICanMessage<CanMessageInputChangedV1>
 
 /// <summary>
 /// Message sent by an expansion board when one of its monitored inputs has changed state
-/// 
+///
 /// Mirrors CanMessageInputChangedV2 in CANlib's CanMessageFormats.h. This layout is 60 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 60)]
@@ -2998,7 +2998,7 @@ public struct CanMessageInputChangedV2 : ICanMessage<CanMessageInputChangedV2>
 
 /// <summary>
 /// Message sent by expansion boards to report their general health
-/// 
+///
 /// Mirrors CanMessageBoardStatusV0 in CANlib's CanMessageFormats.h. This layout is 44 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 44)]
@@ -3124,7 +3124,7 @@ public struct CanMessageBoardStatusV0 : ICanMessage<CanMessageBoardStatusV0>
 
 /// <summary>
 /// Message sent by expansion boards to report their general health
-/// 
+///
 /// Mirrors CanMessageBoardStatusV1 in CANlib's CanMessageFormats.h. This layout is 26 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 26)]
@@ -3250,7 +3250,7 @@ public struct CanMessageBoardStatusV1 : ICanMessage<CanMessageBoardStatusV1>
 
 /// <summary>
 /// Driver status. If this is changed then CanMessageDriversStatus must be replaced by a new version.
-/// 
+///
 /// Mirrors OpenLoopStatus in CANlib's CanMessageFormats.h. This layout is 4 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 4)]
@@ -3261,7 +3261,7 @@ public struct OpenLoopStatus
 
 /// <summary>
 /// Driver status including closed loop data. If this is changed then CanMessageDriversStatus must be replaced by a new version.
-/// 
+///
 /// Mirrors ClosedLoopStatus in CANlib's CanMessageFormats.h. This layout is 12 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 12)]
@@ -3280,7 +3280,7 @@ public struct ClosedLoopStatus
 
 /// <summary>
 /// Message sent by expansion boards to report the status of their drivers
-/// 
+///
 /// Mirrors CanMessageDriversStatus in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
@@ -3343,7 +3343,7 @@ public struct CanMessageDriversStatus : ICanMessage<CanMessageDriversStatus>
 /// having to include CanMessageFormats.h in FilamentMonitor.h.
 /// Note: the first bitfield group is 31 bits wide, so the second group starts at bit 31 rather than
 /// on a byte boundary. This is deliberate and must be preserved.
-/// 
+///
 /// Mirrors FilamentMonitorDataV2 in CANlib's CanMessageFormats.h. This layout is 12 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 12)]
@@ -3444,7 +3444,7 @@ public struct FilamentMonitorDataV2
 
 /// <summary>
 /// Message sent by expansion boards to report the status of their filament monitors
-/// 
+///
 /// Mirrors CanMessageFilamentMonitorsStatusV2 in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
@@ -3491,7 +3491,7 @@ public struct CanMessageFilamentMonitorsStatusV2 : ICanMessage<CanMessageFilamen
 
 /// <summary>
 /// Message used by expansion boards to report the results of one heater tuning cycle
-/// 
+///
 /// Mirrors CanMessageHeaterTuningReport in CANlib's CanMessageFormats.h. This layout is 32 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 32)]
@@ -3552,7 +3552,7 @@ public struct CanMessageHeaterTuningReport : ICanMessage<CanMessageHeaterTuningR
 
 /// <summary>
 /// Message used to send accelerometer data from an expansion board to the main board
-/// 
+///
 /// Mirrors CanMessageAccelerometerData in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
@@ -3661,7 +3661,7 @@ public struct CanMessageAccelerometerData : ICanMessage<CanMessageAccelerometerD
 
 /// <summary>
 /// Message used to send closed loop data from an expansion board to the main board
-/// 
+///
 /// Mirrors CanMessageClosedLoopData in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
@@ -3767,7 +3767,7 @@ public struct CanMessageClosedLoopData : ICanMessage<CanMessageClosedLoopData>
 
 /// <summary>
 /// Message sent by an expansion board to the main board to indicate an event
-/// 
+///
 /// Mirrors CanMessageEvent in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
@@ -3837,7 +3837,7 @@ public struct CanMessageEvent : ICanMessage<CanMessageEvent>
 
 /// <summary>
 /// Debug text message, sent by an expansion board to the main board
-/// 
+///
 /// Mirrors CanMessageDebugText in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
@@ -3873,7 +3873,7 @@ public struct CanMessageDebugText : ICanMessage<CanMessageDebugText>
 ///  - microstepping: microstepping (bits 0-8) and interpolation enable (bit 15);
 ///  - standstill current percentages: the percentages;
 ///  - driver states: 0 = disabled, 1 = idle, 2 = active.
-/// 
+///
 /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;uint16_t&amp;gt;. This layout is 20 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 20)]
@@ -3918,7 +3918,7 @@ public struct CanMessageMultipleDrivesRequestUint16 : ICanMessageBody<CanMessage
 ///  - microstepping: microstepping (bits 0-8) and interpolation enable (bit 15);
 ///  - standstill current percentages: the percentages;
 ///  - driver states: 0 = disabled, 1 = idle, 2 = active.
-/// 
+///
 /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;float&amp;gt;. This layout is 36 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 36)]
@@ -3963,7 +3963,7 @@ public struct CanMessageMultipleDrivesRequestFloat : ICanMessageBody<CanMessageM
 ///  - microstepping: microstepping (bits 0-8) and interpolation enable (bit 15);
 ///  - standstill current percentages: the percentages;
 ///  - driver states: 0 = disabled, 1 = idle, 2 = active.
-/// 
+///
 /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;StepsPerUnitAndMicrostepping&amp;gt;. This layout is 52 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 52)]
@@ -4008,7 +4008,7 @@ public struct CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping : ICan
 ///  - microstepping: microstepping (bits 0-8) and interpolation enable (bit 15);
 ///  - standstill current percentages: the percentages;
 ///  - driver states: 0 = disabled, 1 = idle, 2 = active.
-/// 
+///
 /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;DriverStateControl&amp;gt;. This layout is 20 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 20)]
@@ -4053,7 +4053,7 @@ public struct CanMessageMultipleDrivesRequestDriverStateControl : ICanMessageBod
 ///  - microstepping: microstepping (bits 0-8) and interpolation enable (bit 15);
 ///  - standstill current percentages: the percentages;
 ///  - driver states: 0 = disabled, 1 = idle, 2 = active.
-/// 
+///
 /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;ShortPressureAdvanceParameters&amp;gt;. This layout is 52 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 52)]

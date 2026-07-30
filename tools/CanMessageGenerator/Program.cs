@@ -33,6 +33,7 @@ public static class Program
         CppEmitter cpp = new(schema);
         CppTablesEmitter cppTables = new(schema);
         CSharpEmitter csharp = new(schema);
+        CSharpTablesEmitter csharpTables = new(schema);
         ConformanceEmitter conformance = new(schema);
         List<LayoutFacts> facts = conformance.Collect();
 
@@ -51,11 +52,13 @@ public static class Program
             (Path.Combine(csharpDir, "CanMessageUnion.g.cs"), csharp.EmitUnion()),
             (Path.Combine(csharpDir, "CanMessageBuffers.g.cs"), csharp.EmitBuffers()),
             (Path.Combine(csharpDir, "CanMessageSupport.g.cs"), csharp.EmitSupport()),
+            (Path.Combine(csharpDir, "CanGenericTables.g.cs"), csharpTables.Emit()),
             (options.GetValueOrDefault("probe-out") ?? Path.Combine(repoRoot, "tools/CanMessageGenerator/generated/cpp/CanMessageLayoutProbe.cpp"),
              conformance.EmitCppProbe(facts)),
             (options.GetValueOrDefault("tables-probe-out") ?? Path.Combine(repoRoot, "tools/CanMessageGenerator/generated/cpp/CanMessageGenericTablesProbe.cpp"),
              conformance.EmitCppTablesProbe()),
-            (Path.Combine(testDir, "CanMessageLayout.g.cs"), conformance.EmitCSharpTests(facts, "UnitTests.Link"))
+            (Path.Combine(testDir, "CanMessageLayout.g.cs"), conformance.EmitCSharpTests(facts, "UnitTests.Link")),
+            (Path.Combine(testDir, "CanGenericTableLayout.g.cs"), conformance.EmitCSharpTablesTests("UnitTests.Link"))
         ];
 
         int stale = 0;
