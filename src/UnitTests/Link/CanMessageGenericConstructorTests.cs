@@ -105,6 +105,26 @@ public class CanMessageGenericConstructorTests
     }
 
     /// <summary>
+    /// RepRapFirmware's G-code parser reads an unsigned value with <c>strtoul</c>, which wraps a negative
+    /// literal around to a huge unsigned value rather than rejecting it; a uint8/uint16 field then clamps
+    /// that the same way it clamps an oversized positive value.
+    /// </summary>
+    [Test]
+    public void WrapsNegativeValuesForUnsignedFieldsInsteadOfThrowing()
+    {
+        Code code = new("M915 F-1 H-1");
+        CanGenericWriter writer = CanMessageGenericConstructor.FromCode(CanGenericTables.M915Params, code);
+        CanGenericParser parser = new(writer.Message, CanGenericTables.M915Params);
+        Assert.That(parser.GetUInt('F'), Is.EqualTo(255u), "F is a uint8, clamped after wrapping");
+        Assert.That(parser.GetUInt('H'), Is.EqualTo(65535u), "H is a uint16, clamped after wrapping");
+
+        Code uint32Code = new("M950 E0 U10 Q-1");
+        CanGenericWriter uint32Writer = CanMessageGenericConstructor.FromCode(CanGenericTables.M950LedParams, uint32Code);
+        CanGenericParser uint32Parser = new(uint32Writer.Message, CanGenericTables.M950LedParams);
+        Assert.That(uint32Parser.GetUInt('Q'), Is.EqualTo(uint.MaxValue), "Q is a uint32 with no field-width clamp");
+    }
+
+    /// <summary>
     /// A retired entry has a lowercase letter precisely so that it can never be matched against a command,
     /// even if the user types the uppercase one.
     /// </summary>

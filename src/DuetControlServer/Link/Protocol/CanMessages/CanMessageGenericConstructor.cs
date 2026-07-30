@@ -69,15 +69,15 @@ public static class CanMessageGenericConstructor
                 break;
 
             case CanParamType.UInt32:
-                writer.AddUInt(letter, (uint)parameter);
+                writer.AddUInt(letter, ToUInt(parameter));
                 break;
 
             case CanParamType.UInt16 or CanParamType.PwmFreq:
-                writer.AddUInt(letter, Math.Min((uint)parameter, ushort.MaxValue));
+                writer.AddUInt(letter, Math.Min(ToUInt(parameter), ushort.MaxValue));
                 break;
 
             case CanParamType.UInt8:
-                writer.AddUInt(letter, Math.Min((uint)parameter, byte.MaxValue));
+                writer.AddUInt(letter, Math.Min(ToUInt(parameter), byte.MaxValue));
                 break;
 
             case CanParamType.Int32:
@@ -135,6 +135,16 @@ public static class CanMessageGenericConstructor
                 throw new CanGenericParamException($"parameter '{letter}' has unsupported type {descriptor.Type}");
         }
     }
+
+    /// <summary>
+    /// Convert a G-code integer parameter to <see cref="uint"/> the way RepRapFirmware's <c>strtoul</c>-based
+    /// parser does: a negative literal wraps around rather than being rejected (<c>(uint)parameter</c> would
+    /// throw <see cref="OverflowException"/> instead, since a negative value is stored as a signed
+    /// <see cref="int"/>). Callers then clamp the result to the field width, matching the firmware's
+    /// <c>min&lt;uint32_t&gt;(gb.GetUIValue(), ...)</c>.
+    /// </summary>
+    private static uint ToUInt(CodeParameter parameter) =>
+        parameter.Type == typeof(int) ? unchecked((uint)(int)parameter) : (uint)parameter;
 
     private static string Text(char letter, CodeParameter parameter) =>
         (string?)parameter ?? throw new CanGenericParamException($"parameter '{letter}' expects a string");
