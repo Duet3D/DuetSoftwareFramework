@@ -274,21 +274,27 @@ public sealed class CanGenericWriter(ImmutableArray<CanParamDescriptor> table)
         _message.ParamMap |= 1u << slot.Index;
     }
 
-    /// <summary>Write the low <paramref name="size"/> bytes of a value little-endian.</summary>
+    /// <summary>
+    /// Write the low <paramref name="size"/> bytes of a value little-endian, via the same
+    /// <see cref="BinaryPrimitives"/> helpers <see cref="AddUInt64"/> and <see cref="AddFloat"/> use, so an
+    /// endianness fix to one write path can't miss the others.
+    /// </summary>
     private static Span<byte> Bytes(Span<byte> destination, uint value, int size)
     {
-        for (int i = 0; i < size; i++)
+        switch (size)
         {
-            destination[i] = (byte)(value >> (8 * i));
-        }
-        return destination;
-    }
-
-    private static Span<byte> Bytes(Span<byte> destination, ulong value, int size)
-    {
-        for (int i = 0; i < size; i++)
-        {
-            destination[i] = (byte)(value >> (8 * i));
+            case 1:
+                destination[0] = (byte)value;
+                break;
+            case 2:
+                BinaryPrimitives.WriteUInt16LittleEndian(destination, (ushort)value);
+                break;
+            case 4:
+                BinaryPrimitives.WriteUInt32LittleEndian(destination, value);
+                break;
+            default:
+                BinaryPrimitives.WriteUInt64LittleEndian(destination, value);
+                break;
         }
         return destination;
     }
