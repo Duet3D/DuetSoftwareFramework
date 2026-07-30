@@ -64,6 +64,12 @@ echo "==> Comparing method surfaces"
 python3 "$ROOT/tools/CanMessageGenerator/compare-method-surface.py" \
 	"$ROOT/lib/CANlib/src/CanMessageFormats.h" "$GENERATED/CanMessageFormats.h"
 
+# The layout probe proves where every field sits and is blind to what any of them is worth, so the protocol
+# magic numbers are checked separately
+echo "==> Comparing constants"
+python3 "$ROOT/tools/CanMessageGenerator/compare-constants.py" \
+	"$ROOT/tools/CanMessageGenerator/Schema/can-messages.json" "$ROOT/lib/CANlib/src"
+
 # A wrong message type does not corrupt a message, it delivers a well-formed one to the wrong handler, and
 # none of the checks above look at the id at all
 echo "==> Comparing message types"
