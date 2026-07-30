@@ -22,6 +22,7 @@ public static class Program
         {
             schema = CanSchema.Load(schemaPath);
             ExpandTemplates(schema);
+            CheckEveryMessageCanNameItsType(schema);
             LayoutEngine.ComputeAll(schema);
         }
         catch (Exception e) when (e is InvalidDataException or InvalidOperationException)
@@ -103,6 +104,29 @@ public static class Program
     }
 
     /// <summary>
+    /// Every message the C# side can send has to be able to name its own message type. Without one it would
+    /// go out as UnusedMessageType, which is the same value as NoReply, so the board would see a malformed
+    /// CAN id and nothing would report it. A body that is genuinely never sent has to say so with
+    /// <c>bodyOnly</c>, rather than being told apart from a mistake by the absence of a message type.
+    /// </summary>
+    private static void CheckEveryMessageCanNameItsType(CanSchema schema)
+    {
+        List<string> offenders = [.. schema.Structs
+            .Where(s => s.IsGenerated(Language.CSharp)
+                        && s.TemplateParam is null
+                        && s.Name.StartsWith("CanMessage", StringComparison.Ordinal)
+                        && s.MessageType is null
+                        && !s.BodyOnly)
+            .Select(s => s.Name)];
+        if (offenders.Count > 0)
+        {
+            throw new InvalidDataException(
+                $"these messages have no messageType: {string.Join(", ", offenders)}. "
+                + "Give each one the CanMessageType it is sent under, or mark it \"bodyOnly\": true if it is never sent");
+        }
+    }
+
+    /// <summary>
     /// Replace each template struct with the concrete instantiations that the C# side needs. C++ keeps
     /// the template itself, so the template's own definition stays in the C++ output only.
     /// </summary>
@@ -116,10 +140,12 @@ public static class Program
                 StructDef concrete = new()
                 {
                     Name = template.Name + instantiation.Suffix,
-                    Doc = template.Doc,
                     Packed = template.Packed,
                     IsUnion = template.IsUnion,
-                    MessageType = template.MessageType,
+                    // A payload sent under several message types has one expansion per type
+                    MessageType = instantiation.MessageType ?? template.MessageType,
+                    BodyOnly = instantiation.BodyOnly || template.BodyOnly,
+                    Doc = instantiation.Doc ?? template.Doc,
                     Emit = [Language.CSharp],
                     Constants = template.Constants,
                     Members = [.. template.Members.Select(CloneMember)],

@@ -385,11 +385,14 @@
       ],
       "templateParam": "T",
       "instantiations": [
-        { "suffix": "Uint16", "arg": "u16" },
-        { "suffix": "Float", "arg": "f32" },
-        { "suffix": "StepsPerUnitAndMicrostepping", "arg": "StepsPerUnitAndMicrostepping" },
-        { "suffix": "DriverStateControl", "arg": "DriverStateControl" },
-        { "suffix": "ShortPressureAdvanceParameters", "arg": "ShortPressureAdvanceParameters" }
+        { "suffix": "Uint16", "arg": "u16", "bodyOnly": true,
+          "doc": "Legacy: the uint16 forms of microstepping and standstill current were retired (see unused_was_setMicrostepping and unused_was_setStandstillCurrentFactor). CANlib still declares this arm of the union, so the type is kept, but nothing sends it." },
+        { "suffix": "MotorCurrents", "arg": "f32", "messageType": "setMotorCurrents" },
+        { "suffix": "StandstillCurrentFactor", "arg": "f32", "messageType": "setStandstillCurrentFactor" },
+        { "suffix": "PressureAdvanceV1", "arg": "f32", "messageType": "setPressureAdvanceV1" },
+        { "suffix": "StepsPerUnitAndMicrostepping", "arg": "StepsPerUnitAndMicrostepping", "messageType": "setStepsPerMmAndMicrostepping" },
+        { "suffix": "DriverStateControl", "arg": "DriverStateControl", "messageType": "setDriverStates" },
+        { "suffix": "ShortPressureAdvanceParameters", "arg": "ShortPressureAdvanceParameters", "messageType": "setPressureAdvanceV2" }
       ],
       "requestIdField": "requestId",
       "members": [
@@ -596,7 +599,12 @@
 
     {
       "name": "CanMessageM303",
-      "doc": "M303 auto-tune request. This message has no message type of its own; it is sent as a generic message.",
+      "doc": [
+        "Superseded: CanMessageHeaterTuningCommand carries heater tuning now, and this struct appears",
+        "neither in CANlib's message union nor anywhere in RepRapFirmware. It is kept so that the",
+        "generated header stays a drop-in for CANlib's, but there is no message type that would carry it."
+      ],
+      "emit": ["cpp"],
       "requestIdField": "requestId",
       "members": [
         {
@@ -1303,6 +1311,7 @@
 
     {
       "name": "CanMessageGeneric",
+      "bodyOnly": true,
       "doc": [
         "Generic message. These are always used in conjunction with a ParamTable that is known to both sender and receiver.",
         "The table lists the parameters, each one defined by the parameter letter and the type of parameter.",
@@ -2434,7 +2443,7 @@
       { "name": "heatersStatusBroadcast", "type": "CanMessageHeatersStatus" },
       { "name": "heaterModelV3", "type": "CanMessageHeaterModelV3" },
       { "name": "multipleDrivesRequestUint16", "type": "CanMessageMultipleDrivesRequest<uint16_t>", "csharpType": "CanMessageMultipleDrivesRequestUint16" },
-      { "name": "multipleDrivesRequestFloat", "type": "CanMessageMultipleDrivesRequest<float>", "csharpType": "CanMessageMultipleDrivesRequestFloat" },
+      { "name": "multipleDrivesRequestFloat", "type": "CanMessageMultipleDrivesRequest<float>", "csharpType": "CanMessageMultipleDrivesRequestMotorCurrents" },
       { "name": "multipleDrivesStepsPerUnitAndMicrostepping", "type": "CanMessageMultipleDrivesRequest<StepsPerUnitAndMicrostepping>", "csharpType": "CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping" },
       { "name": "multipleDrivesRequestDriverState", "type": "CanMessageMultipleDrivesRequest<DriverStateControl>", "csharpType": "CanMessageMultipleDrivesRequestDriverStateControl" },
       { "name": "multipleDrivesRequestPressureAdvance", "type": "CanMessageMultipleDrivesRequest<ShortPressureAdvanceParameters>", "csharpType": "CanMessageMultipleDrivesRequestShortPressureAdvanceParameters" },

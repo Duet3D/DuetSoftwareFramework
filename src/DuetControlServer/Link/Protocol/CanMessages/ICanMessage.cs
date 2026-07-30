@@ -18,10 +18,12 @@ namespace DuetControlServer.Link.Protocol.CanMessages;
 /// <see cref="System.Runtime.CompilerServices.InlineArrayAttribute"/> buffers so they can be
 /// (de)serialized with <c>MemoryMarshal</c>.
 /// <para>
-/// A few message bodies carry no message type of their own because they are sent under several different
-/// types: the <c>CanMessageMultipleDrivesRequest</c> family, <c>CanMessageGeneric</c> and
-/// <c>CanMessageM303</c>. CANlib gives those no <c>messageType</c> member either, so they implement this
-/// interface rather than <see cref="ICanMessage{TSelf}"/> and the caller supplies the type.
+/// Almost every message names the type it is sent under and so implements <see cref="ICanMessage{TSelf}"/>.
+/// This interface is for the two bodies that are never sent under a name of their own:
+/// <c>CanMessageGeneric</c>, whose type belongs to the parameter table of whichever generic message wraps
+/// it, and <c>CanMessageMultipleDrivesRequestUint16</c>, a retired form that survives only as an arm of
+/// CANlib's message union. Both are marked <c>bodyOnly</c> in the schema, which is what lets the generator
+/// tell them apart from a message whose type was simply forgotten.
 /// </para>
 /// </remarks>
 public interface ICanMessageBody<TSelf> where TSelf : struct, ICanMessageBody<TSelf>

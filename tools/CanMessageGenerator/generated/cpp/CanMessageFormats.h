@@ -402,7 +402,9 @@ struct __attribute__((packed)) CanMessageSetHeaterTemperatureV1
 };
 static_assert(sizeof(CanMessageSetHeaterTemperatureV1) == 9);
 
-// M303 auto-tune request. This message has no message type of its own; it is sent as a generic message.
+// Superseded: CanMessageHeaterTuningCommand carries heater tuning now, and this struct appears
+// neither in CANlib's message union nor anywhere in RepRapFirmware. It is kept so that the
+// generated header stays a drop-in for CANlib's, but there is no message type that would carry it.
 struct __attribute__((packed)) CanMessageM303
 {
 	uint16_t requestId : 12,
@@ -1615,6 +1617,8 @@ static_assert(sizeof(CanMessageDebugText) == 64);
 // Template instantiations are asserted here rather than next to the template itself,
 // because their argument types are declared further down the file.
 static_assert(sizeof(CanMessageMultipleDrivesRequest<uint16_t>) == 20);
+static_assert(sizeof(CanMessageMultipleDrivesRequest<float>) == 36);
+static_assert(sizeof(CanMessageMultipleDrivesRequest<float>) == 36);
 static_assert(sizeof(CanMessageMultipleDrivesRequest<float>) == 36);
 static_assert(sizeof(CanMessageMultipleDrivesRequest<StepsPerUnitAndMicrostepping>) == 52);
 static_assert(sizeof(CanMessageMultipleDrivesRequest<DriverStateControl>) == 20);

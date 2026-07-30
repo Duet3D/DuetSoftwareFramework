@@ -932,43 +932,6 @@ public struct CanMessageSetHeaterTemperatureV1 : ICanMessage<CanMessageSetHeater
 }
 
 /// <summary>
-/// M303 auto-tune request. This message has no message type of its own; it is sent as a generic message.
-///
-/// Mirrors CanMessageM303 in CANlib's CanMessageFormats.h. This layout is 8 bytes.
-/// </summary>
-[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 8)]
-public struct CanMessageM303 : ICanMessageBody<CanMessageM303>
-{
-    /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
-    [FieldOffset(0)] private ushort _bits0;
-
-    [FieldOffset(2)] public ushort HeaterNumber;
-
-    [FieldOffset(4)] public float TargetTemperature;
-
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
-    public ushort RequestId
-    {
-        readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
-        set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
-    }
-
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
-    public byte Zero
-    {
-        readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
-        set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
-    }
-
-    /// <summary>Set the request ID of this message and clear its reserved fields</summary>
-    public void SetRequestId(ushort rid)
-    {
-        RequestId = (ushort)(rid);
-        Zero = 0;
-    }
-}
-
-/// <summary>
 /// Send a heater model to an expansion board
 ///
 /// Mirrors CanMessageHeaterModelV3 in CANlib's CanMessageFormats.h. This layout is 60 bytes.
@@ -3868,11 +3831,7 @@ public struct CanMessageDebugText : ICanMessage<CanMessageDebugText>
 }
 
 /// <summary>
-/// Set a per-driver parameter for multiple drivers. The meaning of the values depends on the message type:
-///  - motor currents: currents in mA;
-///  - microstepping: microstepping (bits 0-8) and interpolation enable (bit 15);
-///  - standstill current percentages: the percentages;
-///  - driver states: 0 = disabled, 1 = idle, 2 = active.
+/// Legacy: the uint16 forms of microstepping and standstill current were retired (see unused_was_setMicrostepping and unused_was_setStandstillCurrentFactor). CANlib still declares this arm of the union, so the type is kept, but nothing sends it.
 ///
 /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;uint16_t&amp;gt;. This layout is 20 bytes.
 /// </summary>
@@ -3922,8 +3881,107 @@ public struct CanMessageMultipleDrivesRequestUint16 : ICanMessageBody<CanMessage
 /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;float&amp;gt;. This layout is 36 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 36)]
-public struct CanMessageMultipleDrivesRequestFloat : ICanMessageBody<CanMessageMultipleDrivesRequestFloat>
+public struct CanMessageMultipleDrivesRequestMotorCurrents : ICanMessage<CanMessageMultipleDrivesRequestMotorCurrents>
 {
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.SetMotorCurrents;
+
+    /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
+    [FieldOffset(0)] private ushort _bits0;
+
+    [FieldOffset(2)] public ushort DriversToUpdate;
+
+    [FieldOffset(4)] public FloatArray8 Values;
+
+    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    public ushort RequestId
+    {
+        readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
+        set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
+    }
+
+    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    public byte Zero
+    {
+        readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
+        set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
+    }
+
+    public static uint GetActualDataLength(uint numDrivers) => (uint)(2 * 2 + numDrivers * 4);
+
+    public static uint MaxDrivesPerMessage() => (uint)((64 - 2 * 2) / 4);
+
+    /// <summary>Set the request ID of this message and clear its reserved fields</summary>
+    public void SetRequestId(ushort rid)
+    {
+        RequestId = (ushort)(rid);
+        Zero = 0;
+    }
+}
+
+/// <summary>
+/// Set a per-driver parameter for multiple drivers. The meaning of the values depends on the message type:
+///  - motor currents: currents in mA;
+///  - microstepping: microstepping (bits 0-8) and interpolation enable (bit 15);
+///  - standstill current percentages: the percentages;
+///  - driver states: 0 = disabled, 1 = idle, 2 = active.
+///
+/// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;float&amp;gt;. This layout is 36 bytes.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 36)]
+public struct CanMessageMultipleDrivesRequestStandstillCurrentFactor : ICanMessage<CanMessageMultipleDrivesRequestStandstillCurrentFactor>
+{
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.SetStandstillCurrentFactor;
+
+    /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
+    [FieldOffset(0)] private ushort _bits0;
+
+    [FieldOffset(2)] public ushort DriversToUpdate;
+
+    [FieldOffset(4)] public FloatArray8 Values;
+
+    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    public ushort RequestId
+    {
+        readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
+        set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
+    }
+
+    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    public byte Zero
+    {
+        readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
+        set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
+    }
+
+    public static uint GetActualDataLength(uint numDrivers) => (uint)(2 * 2 + numDrivers * 4);
+
+    public static uint MaxDrivesPerMessage() => (uint)((64 - 2 * 2) / 4);
+
+    /// <summary>Set the request ID of this message and clear its reserved fields</summary>
+    public void SetRequestId(ushort rid)
+    {
+        RequestId = (ushort)(rid);
+        Zero = 0;
+    }
+}
+
+/// <summary>
+/// Set a per-driver parameter for multiple drivers. The meaning of the values depends on the message type:
+///  - motor currents: currents in mA;
+///  - microstepping: microstepping (bits 0-8) and interpolation enable (bit 15);
+///  - standstill current percentages: the percentages;
+///  - driver states: 0 = disabled, 1 = idle, 2 = active.
+///
+/// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;float&amp;gt;. This layout is 36 bytes.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 36)]
+public struct CanMessageMultipleDrivesRequestPressureAdvanceV1 : ICanMessage<CanMessageMultipleDrivesRequestPressureAdvanceV1>
+{
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.SetPressureAdvanceV1;
+
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
@@ -3967,8 +4025,11 @@ public struct CanMessageMultipleDrivesRequestFloat : ICanMessageBody<CanMessageM
 /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;StepsPerUnitAndMicrostepping&amp;gt;. This layout is 52 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 52)]
-public struct CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping : ICanMessageBody<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>
+public struct CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping : ICanMessage<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>
 {
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.SetStepsPerMmAndMicrostepping;
+
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
@@ -4012,8 +4073,11 @@ public struct CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping : ICan
 /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;DriverStateControl&amp;gt;. This layout is 20 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 20)]
-public struct CanMessageMultipleDrivesRequestDriverStateControl : ICanMessageBody<CanMessageMultipleDrivesRequestDriverStateControl>
+public struct CanMessageMultipleDrivesRequestDriverStateControl : ICanMessage<CanMessageMultipleDrivesRequestDriverStateControl>
 {
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.SetDriverStates;
+
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
@@ -4057,8 +4121,11 @@ public struct CanMessageMultipleDrivesRequestDriverStateControl : ICanMessageBod
 /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;ShortPressureAdvanceParameters&amp;gt;. This layout is 52 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 52)]
-public struct CanMessageMultipleDrivesRequestShortPressureAdvanceParameters : ICanMessageBody<CanMessageMultipleDrivesRequestShortPressureAdvanceParameters>
+public struct CanMessageMultipleDrivesRequestShortPressureAdvanceParameters : ICanMessage<CanMessageMultipleDrivesRequestShortPressureAdvanceParameters>
 {
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.SetPressureAdvanceV2;
+
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 

@@ -379,24 +379,6 @@ public class CanMessageLayout
     }
 
     [Test]
-    public void CanMessageM303_Layout()
-    {
-        Assert.That(Unsafe.SizeOf<CanMessageM303>(), Is.EqualTo(8), "size of CanMessageM303");
-        Assert.That(Marshal.OffsetOf<CanMessageM303>("HeaterNumber").ToInt32(), Is.EqualTo(2), "offset of CanMessageM303.HeaterNumber");
-        Assert.That(Marshal.OffsetOf<CanMessageM303>("TargetTemperature").ToInt32(), Is.EqualTo(4), "offset of CanMessageM303.TargetTemperature");
-        {
-            CanMessageM303 probe = default;
-            probe.RequestId = (ushort)0xFFF;
-            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0xFF, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }), "bit layout of CanMessageM303.RequestId");
-        }
-        {
-            CanMessageM303 probe = default;
-            probe.Zero = (byte)0xF;
-            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0x00, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }), "bit layout of CanMessageM303.Zero");
-        }
-    }
-
-    [Test]
     public void CanMessageHeaterModelV3_Layout()
     {
         Assert.That(Unsafe.SizeOf<CanMessageHeaterModelV3>(), Is.EqualTo(60), "size of CanMessageHeaterModelV3");
@@ -1623,20 +1605,56 @@ public class CanMessageLayout
     }
 
     [Test]
-    public void CanMessageMultipleDrivesRequestFloat_Layout()
+    public void CanMessageMultipleDrivesRequestMotorCurrents_Layout()
     {
-        Assert.That(Unsafe.SizeOf<CanMessageMultipleDrivesRequestFloat>(), Is.EqualTo(36), "size of CanMessageMultipleDrivesRequestFloat");
-        Assert.That(Marshal.OffsetOf<CanMessageMultipleDrivesRequestFloat>("DriversToUpdate").ToInt32(), Is.EqualTo(2), "offset of CanMessageMultipleDrivesRequestFloat.DriversToUpdate");
-        Assert.That(Marshal.OffsetOf<CanMessageMultipleDrivesRequestFloat>("Values").ToInt32(), Is.EqualTo(4), "offset of CanMessageMultipleDrivesRequestFloat.Values");
+        Assert.That(Unsafe.SizeOf<CanMessageMultipleDrivesRequestMotorCurrents>(), Is.EqualTo(36), "size of CanMessageMultipleDrivesRequestMotorCurrents");
+        Assert.That(Marshal.OffsetOf<CanMessageMultipleDrivesRequestMotorCurrents>("DriversToUpdate").ToInt32(), Is.EqualTo(2), "offset of CanMessageMultipleDrivesRequestMotorCurrents.DriversToUpdate");
+        Assert.That(Marshal.OffsetOf<CanMessageMultipleDrivesRequestMotorCurrents>("Values").ToInt32(), Is.EqualTo(4), "offset of CanMessageMultipleDrivesRequestMotorCurrents.Values");
         {
-            CanMessageMultipleDrivesRequestFloat probe = default;
+            CanMessageMultipleDrivesRequestMotorCurrents probe = default;
             probe.RequestId = (ushort)0xFFF;
-            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0xFF, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }), "bit layout of CanMessageMultipleDrivesRequestFloat.RequestId");
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0xFF, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }), "bit layout of CanMessageMultipleDrivesRequestMotorCurrents.RequestId");
         }
         {
-            CanMessageMultipleDrivesRequestFloat probe = default;
+            CanMessageMultipleDrivesRequestMotorCurrents probe = default;
             probe.Zero = (byte)0xF;
-            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0x00, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }), "bit layout of CanMessageMultipleDrivesRequestFloat.Zero");
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0x00, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }), "bit layout of CanMessageMultipleDrivesRequestMotorCurrents.Zero");
+        }
+    }
+
+    [Test]
+    public void CanMessageMultipleDrivesRequestStandstillCurrentFactor_Layout()
+    {
+        Assert.That(Unsafe.SizeOf<CanMessageMultipleDrivesRequestStandstillCurrentFactor>(), Is.EqualTo(36), "size of CanMessageMultipleDrivesRequestStandstillCurrentFactor");
+        Assert.That(Marshal.OffsetOf<CanMessageMultipleDrivesRequestStandstillCurrentFactor>("DriversToUpdate").ToInt32(), Is.EqualTo(2), "offset of CanMessageMultipleDrivesRequestStandstillCurrentFactor.DriversToUpdate");
+        Assert.That(Marshal.OffsetOf<CanMessageMultipleDrivesRequestStandstillCurrentFactor>("Values").ToInt32(), Is.EqualTo(4), "offset of CanMessageMultipleDrivesRequestStandstillCurrentFactor.Values");
+        {
+            CanMessageMultipleDrivesRequestStandstillCurrentFactor probe = default;
+            probe.RequestId = (ushort)0xFFF;
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0xFF, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }), "bit layout of CanMessageMultipleDrivesRequestStandstillCurrentFactor.RequestId");
+        }
+        {
+            CanMessageMultipleDrivesRequestStandstillCurrentFactor probe = default;
+            probe.Zero = (byte)0xF;
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0x00, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }), "bit layout of CanMessageMultipleDrivesRequestStandstillCurrentFactor.Zero");
+        }
+    }
+
+    [Test]
+    public void CanMessageMultipleDrivesRequestPressureAdvanceV1_Layout()
+    {
+        Assert.That(Unsafe.SizeOf<CanMessageMultipleDrivesRequestPressureAdvanceV1>(), Is.EqualTo(36), "size of CanMessageMultipleDrivesRequestPressureAdvanceV1");
+        Assert.That(Marshal.OffsetOf<CanMessageMultipleDrivesRequestPressureAdvanceV1>("DriversToUpdate").ToInt32(), Is.EqualTo(2), "offset of CanMessageMultipleDrivesRequestPressureAdvanceV1.DriversToUpdate");
+        Assert.That(Marshal.OffsetOf<CanMessageMultipleDrivesRequestPressureAdvanceV1>("Values").ToInt32(), Is.EqualTo(4), "offset of CanMessageMultipleDrivesRequestPressureAdvanceV1.Values");
+        {
+            CanMessageMultipleDrivesRequestPressureAdvanceV1 probe = default;
+            probe.RequestId = (ushort)0xFFF;
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0xFF, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }), "bit layout of CanMessageMultipleDrivesRequestPressureAdvanceV1.RequestId");
+        }
+        {
+            CanMessageMultipleDrivesRequestPressureAdvanceV1 probe = default;
+            probe.Zero = (byte)0xF;
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0x00, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }), "bit layout of CanMessageMultipleDrivesRequestPressureAdvanceV1.Zero");
         }
     }
 

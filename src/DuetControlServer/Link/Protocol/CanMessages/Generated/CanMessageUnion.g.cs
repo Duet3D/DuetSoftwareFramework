@@ -32,7 +32,7 @@ public struct CanMessage
     [FieldOffset(0)] public CanMessageHeatersStatus HeatersStatusBroadcast;
     [FieldOffset(0)] public CanMessageHeaterModelV3 HeaterModelV3;
     [FieldOffset(0)] public CanMessageMultipleDrivesRequestUint16 MultipleDrivesRequestUint16;
-    [FieldOffset(0)] public CanMessageMultipleDrivesRequestFloat MultipleDrivesRequestFloat;
+    [FieldOffset(0)] public CanMessageMultipleDrivesRequestMotorCurrents MultipleDrivesRequestFloat;
     [FieldOffset(0)] public CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping MultipleDrivesStepsPerUnitAndMicrostepping;
     [FieldOffset(0)] public CanMessageMultipleDrivesRequestDriverStateControl MultipleDrivesRequestDriverState;
     [FieldOffset(0)] public CanMessageMultipleDrivesRequestShortPressureAdvanceParameters MultipleDrivesRequestPressureAdvance;

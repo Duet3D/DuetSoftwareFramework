@@ -149,6 +149,16 @@ public sealed class InstantiationDef
 {
     public string Suffix = "";
     public string Arg = "";
+    public string? Doc;
+
+    /// <summary>
+    /// The message type this expansion is sent under. A payload sent under more than one type gets one
+    /// expansion per type, because a struct can only name one.
+    /// </summary>
+    public string? MessageType;
+
+    /// <summary>Set for an expansion that is never sent; see <see cref="StructDef.BodyOnly"/>.</summary>
+    public bool BodyOnly;
 }
 
 /// <summary>
@@ -209,6 +219,17 @@ public sealed class StructDef
 
     /// <summary>Set for the few non-message structs that nevertheless declare ClearReservedFields.</summary>
     public bool ForceClearReservedFields;
+
+    /// <summary>
+    /// Set for a message body that is never sent under its own name, and so has no message type of its own.
+    /// </summary>
+    /// <remarks>
+    /// It has to be stated rather than inferred from a missing message type, because that is exactly the
+    /// mistake worth catching: a message that cannot name its type would go out as UnusedMessageType. There
+    /// are two, both wrapped or superseded rather than sent — CanMessageGeneric, whose type comes from the
+    /// parameter table of whichever generic message wraps it, and the legacy uint16 CanMessageMultipleDrivesRequest.
+    /// </remarks>
+    public bool BodyOnly;
 
     public bool IsGenerated(Language language) => Emit.Contains(language);
 
@@ -524,6 +545,7 @@ public sealed class CanSchema
             ClearAlsoClears = StrList(o, "clearAlsoClears"),
             CppStaticAsserts = StrList(o, "cppStaticAsserts"),
             ForceClearReservedFields = Bool(o, "clearReservedFields") ?? false,
+            BodyOnly = Bool(o, "bodyOnly") ?? false,
             Size = Int(o, "size") ?? 0
         };
 
@@ -548,7 +570,10 @@ public sealed class CanSchema
             s.Instantiations.Add(new InstantiationDef
             {
                 Suffix = Str(node!.AsObject(), "suffix") ?? "",
-                Arg = Str(node.AsObject(), "arg") ?? ""
+                Arg = Str(node.AsObject(), "arg") ?? "",
+                Doc = Doc(node.AsObject()),
+                MessageType = Str(node.AsObject(), "messageType"),
+                BodyOnly = Bool(node.AsObject(), "bodyOnly") ?? false
             });
         }
 
