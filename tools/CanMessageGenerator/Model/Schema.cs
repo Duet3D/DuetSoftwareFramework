@@ -107,11 +107,22 @@ public sealed class InitDef
     public string Value = "";
 }
 
+/// <summary>A schema element that is not necessarily emitted for every language.</summary>
+public interface IEmittable
+{
+    HashSet<Language> Emit { get; }
+}
+
+public static class EmittableExtensions
+{
+    public static bool IsGenerated(this IEmittable emittable, Language language) => emittable.Emit.Contains(language);
+}
+
 /// <summary>
 /// A method declared on a struct. The body is written in the neutral statement/expression language
 /// (see <see cref="Expressions"/>) so that it can be rendered into either target language.
 /// </summary>
-public sealed class MethodDef
+public sealed class MethodDef : IEmittable
 {
     public string Name = "";
     public string ReturnType = "void";
@@ -120,7 +131,7 @@ public sealed class MethodDef
     public string? Doc;
     public List<ParamDef> Params = [];
     public JsonArray? Body;
-    public HashSet<Language> Emit = [Language.Cpp, Language.CSharp];
+    public HashSet<Language> Emit { get; set; } = [Language.Cpp, Language.CSharp];
 
     /// <summary>Only a declaration is emitted; the definition lives in hand-written code (e.g. CanMessageFormats.cpp).</summary>
     public bool DeclarationOnly;
@@ -178,7 +189,7 @@ public sealed class ExistingDef
 /// <summary>
 /// A struct (or union) definition.
 /// </summary>
-public sealed class StructDef
+public sealed class StructDef : IEmittable
 {
     public string Name = "";
     public string? Doc;
@@ -189,7 +200,7 @@ public sealed class StructDef
     public string? NestedIn;
     public string? TemplateParam;
     public List<InstantiationDef> Instantiations = [];
-    public HashSet<Language> Emit = [Language.Cpp, Language.CSharp];
+    public HashSet<Language> Emit { get; set; } = [Language.Cpp, Language.CSharp];
     public ExistingDef? Existing;
     public List<ConstantDef> Constants = [];
     public List<MemberDef> Members = [];
@@ -245,8 +256,6 @@ public sealed class StructDef
     /// parameter table of whichever generic message wraps it, and the legacy uint16 CanMessageMultipleDrivesRequest.
     /// </remarks>
     public bool BodyOnly;
-
-    public bool IsGenerated(Language language) => Emit.Contains(language);
 
     /// <summary>
     /// Whether this struct is a sendable CAN message rather than a plain data type, and so needs an
@@ -366,14 +375,14 @@ public sealed class GenericParamDef
 /// sender packs the present parameters in table order and sets the matching bit in the message's
 /// paramMap, and the receiver walks the same table to find them again.
 /// </summary>
-public sealed class GenericTableDef
+public sealed class GenericTableDef : IEmittable
 {
     public string Name = "";
     public string? Doc;
     public List<GenericParamDef> Params = [];
 
     /// <summary>Which languages get this table.</summary>
-    public HashSet<Language> Emit = [Language.Cpp, Language.CSharp];
+    public HashSet<Language> Emit { get; set; } = [Language.Cpp, Language.CSharp];
 
     /// <summary>
     /// The <c>CanMessageType</c> enumerator that a message built from this table is sent under.
@@ -385,8 +394,6 @@ public sealed class GenericTableDef
     /// generated header stays a drop-in.
     /// </remarks>
     public string? MessageType;
-
-    public bool IsGenerated(Language language) => Emit.Contains(language);
 
     /// <summary>
     /// The table name with CANlib's "Params" dropped, used to name the generated message and builder.
@@ -403,7 +410,7 @@ public sealed class GenericTableDef
 /// <summary>
 /// One entry of the CanMessageType enum: an enumerator, a retired id, or a section heading.
 /// </summary>
-public sealed class MessageTypeDef
+public sealed class MessageTypeDef : IEmittable
 {
     /// <summary>Section heading, for an entry that only groups the ones after it.</summary>
     public string? Section;
@@ -421,9 +428,7 @@ public sealed class MessageTypeDef
     /// </summary>
     public bool Retired;
 
-    public HashSet<Language> Emit = [Language.Cpp, Language.CSharp];
-
-    public bool IsGenerated(Language language) => Emit.Contains(language);
+    public HashSet<Language> Emit { get; set; } = [Language.Cpp, Language.CSharp];
 
     /// <summary>True if <see cref="Value"/> names another enumerator rather than giving a number.</summary>
     public bool IsAlias => !char.IsAsciiDigit(Value[0]);

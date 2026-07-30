@@ -237,7 +237,7 @@ public sealed class CppEmitter(CanSchema schema)
 
     private void EmitMethods(StructDef s)
     {
-        List<MethodDef> methods = [.. s.Methods.Where(x => x.Emit.Contains(Language.Cpp))];
+        List<MethodDef> methods = [.. s.Methods.Where(x => x.IsGenerated(Language.Cpp))];
         MethodDef? synthesised = Synthesise.RequestIdOrClear(schema, s);
         if (synthesised is not null)
         {

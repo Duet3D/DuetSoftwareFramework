@@ -470,7 +470,7 @@ public sealed class CSharpEmitter(CanSchema schema)
 
     private void EmitMethods(CodeWriter writer, StructDef s, ref bool needsBlank)
     {
-        List<MethodDef> methods = [.. s.Methods.Where(m => m.Emit.Contains(Language.CSharp) && !m.DeclarationOnly)];
+        List<MethodDef> methods = [.. s.Methods.Where(m => m.IsGenerated(Language.CSharp) && !m.DeclarationOnly)];
         MethodDef? synthesised = Synthesise.RequestIdOrClear(schema, s);
         if (synthesised is not null)
         {
