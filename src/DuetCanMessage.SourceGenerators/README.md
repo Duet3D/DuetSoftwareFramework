@@ -88,6 +88,12 @@ more than one and a generated header only stays a drop-in if it holds exactly wh
 
 ## Schema
 
+`Schema/can-messages.schema.json` describes the whole file as JSON Schema, and `can-messages.json` points at
+it with `$schema`, so an editor completes and checks the keys as you type. The generator ignores keys it does
+not recognise, which makes a misspelt one do nothing at all rather than fail; the schema is what turns that
+back into a visible error. It also pins down which numeric-looking values are written as strings — a
+constant's `value`, an array's `length` — since the loader reads those as strings and rejects a number.
+
 ### Structs
 
 ```jsonc
