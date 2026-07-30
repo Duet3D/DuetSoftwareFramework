@@ -414,11 +414,36 @@ public sealed class MessageTypeDef
 }
 
 /// <summary>
-/// The CanMessageType enum, i.e. what identifies a message in the CAN id.
+/// An enum that CANlib declares and the C# side has to agree with.
 /// </summary>
+/// <remarks>
+/// These carry values that travel on the wire — a message type in the CAN id, a result code in a reply, a
+/// sensor error in a report — so a value that disagrees with CANlib is not caught by any layout check. It
+/// produces a well-formed message that means something else.
+/// </remarks>
 public sealed class MessageTypeEnumDef
 {
+    /// <summary>Name of the enum in CANlib, which is what the drift check looks for.</summary>
     public string Name = "CanMessageType";
+
+    /// <summary>Name of the generated C# enum, where DCS calls it something else.</summary>
+    public string CSharpName = "";
+
+    /// <summary>CANlib header the enum is declared in, relative to its src directory.</summary>
+    public string CppHeader = "";
+
+    /// <summary>Underlying C# integer type.</summary>
+    public string UnderlyingType = "ushort";
+
+    /// <summary>File the generated enum is written to, relative to the repository root.</summary>
+    public string? OutputPath;
+
+    /// <summary>
+    /// Set for an enum that is checked against CANlib but generated elsewhere, such as one that is part of
+    /// DuetAPI's public object model.
+    /// </summary>
+    public bool CheckOnly;
+
     public string? Doc;
     public List<MessageTypeDef> Values = [];
 }
@@ -461,7 +486,7 @@ public sealed class CanSchema
     public Dictionary<string, int> Constants = [];
     public List<StructDef> Structs = [];
     public List<GenericTableDef> GenericTables = [];
-    public MessageTypeEnumDef? MessageTypes;
+    public List<MessageTypeEnumDef> Enums = [];
     public UnionDef? MessageUnion;
 
     private Dictionary<string, StructDef>? _byName;
@@ -505,9 +530,9 @@ public sealed class CanSchema
             schema.Structs.Add(ParseStruct(node!.AsObject()));
         }
 
-        if (o["messageTypes"] is JsonObject messageTypes)
+        foreach (JsonNode? node in o["enums"]?.AsArray() ?? [])
         {
-            schema.MessageTypes = ParseMessageTypes(messageTypes);
+            schema.Enums.Add(ParseEnum(node!.AsObject()));
         }
 
         foreach (JsonNode? node in o["genericTables"]?.AsArray() ?? [])
@@ -613,11 +638,17 @@ public sealed class CanSchema
         return s;
     }
 
-    private static MessageTypeEnumDef ParseMessageTypes(JsonObject o)
+    private static MessageTypeEnumDef ParseEnum(JsonObject o)
     {
+        string name = Str(o, "name") ?? throw new InvalidDataException("enum without a name");
         MessageTypeEnumDef definition = new()
         {
-            Name = Str(o, "name") ?? "CanMessageType",
+            Name = name,
+            CSharpName = Str(o, "csharpName") ?? name,
+            CppHeader = Str(o, "cppHeader") ?? "",
+            UnderlyingType = Str(o, "underlyingType") ?? "ushort",
+            OutputPath = Str(o, "output"),
+            CheckOnly = Bool(o, "checkOnly") ?? false,
             Doc = Doc(o)
         };
 

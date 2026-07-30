@@ -49,7 +49,8 @@ def parse_canlib(path):
 
 
 def parse_schema(path):
-    values = json.load(open(path, encoding="utf-8"))["messageTypes"]["values"]
+    schema = json.load(open(path, encoding="utf-8"))
+    values = next(e for e in schema["enums"] if e["name"] == "CanMessageType")["values"]
     live, retired, pending, cpp_only = {}, {}, {}, set()
     for entry in values:
         if "section" in entry:

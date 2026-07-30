@@ -2039,7 +2039,12 @@
     }
   ],
 
-  "messageTypes": {
+  "enums": [
+   {
+    "name": "CanMessageType",
+    "cppHeader": "CanId.h",
+    "underlyingType": "ushort",
+    "output": "src/DuetControlServer/Link/Protocol/Shared/CanMessageType.g.cs",
     "doc": [
       "Type of a CAN message, which identifies it in the CAN id.",
       "Mirrors the CanMessageType enum in CANlib's CanId.h. A retired id is kept as a comment so that",
@@ -2168,7 +2173,8 @@
       { "name": "unusedMessageType", "value": "0xFFFF" },
       { "name": "noReply", "value": "unusedMessageType", "emit": ["csharp"], "doc": "Alias used as the ReplyType of a CAN request when no reply is expected" }
     ]
-  },
+   }
+  ],
 
   "genericTables": [
     {
