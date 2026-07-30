@@ -136,6 +136,27 @@ Statements are `return`, `set`/`to`, `orWith`/`value`, `storeLE`/`to`, `incr`, `
 `SetRequestId` and `ClearReservedFields` are **not** written in the schema. They are derived from which
 fields are marked `reserved`, so the two languages can never disagree about what gets zeroed.
 
+### Constructors
+
+Two of CANlib's payload structs are built through constructors rather than setters, and
+`DriverStateControl`'s parameterless one is what zeroes its reserved bits. A `constructors` array
+reproduces them:
+
+```jsonc
+"constructors": [
+  { "init": [ { "name": "mode", "value": "0" } ] },                    // DriverStateControl() noexcept : mode(0) { }
+  { "explicit": true,
+    "params": [ { "name": "m", "type": "u16" },
+                { "name": "idlePc", "type": "u16", "default": "0" } ],
+    "init": [ { "name": "mode", "value": "m" } ] },
+  { "params": [ ... ], "body": [ ... ] }                               // an ordinary body instead of an init list
+]
+```
+
+Constructors are emitted for C++ only: a C# struct cannot reproduce a zero-initialising parameterless
+constructor, because `default` and array allocation bypass it. Where C# needs the same functionality the
+schema declares an ordinary `Set` method with `"emit": ["csharp"]`.
+
 ## Generated C# conventions
 
 * `[StructLayout(LayoutKind.Explicit, Pack = 1, Size = N)]` with a generator-computed `[FieldOffset]` on

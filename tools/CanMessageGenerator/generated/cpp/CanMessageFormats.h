@@ -291,11 +291,12 @@ struct __attribute__((packed)) StepsPerUnitAndMicrostepping
 
 	float GetStepsPerUnit() const noexcept { return LoadLEF32(&stepsPerUnit); }
 	uint16_t GetMicrostepping() const noexcept { return microstepping; }
-	void Set(float spu, uint16_t ms) noexcept
+	StepsPerUnitAndMicrostepping(float spu, uint16_t ms) noexcept
 	{
 		StoreLEF32(&stepsPerUnit, spu);
 		microstepping = ms;
 	}
+	StepsPerUnitAndMicrostepping() noexcept { }
 };
 static_assert(sizeof(StepsPerUnitAndMicrostepping) == 6);
 
@@ -313,12 +314,8 @@ struct __attribute__((packed)) DriverStateControl
 	static constexpr uint16_t driverIdle = 1;
 	static constexpr uint16_t driverActive = 2;
 
-	void Set(uint16_t m, uint16_t idlePc) noexcept
-	{
-		mode = m;
-		zero = 0;
-		idlePercent = idlePc;
-	}
+	DriverStateControl() noexcept : mode(0), zero(0), idlePercent(0) { }
+	explicit DriverStateControl(uint16_t m, uint16_t idlePc = 0) noexcept : mode(m), zero(0), idlePercent(idlePc) { }
 };
 static_assert(sizeof(DriverStateControl) == 2);
 

@@ -242,10 +242,17 @@ public sealed class CppEmitter(CanSchema schema)
             }
 
             string returnType = m.ReturnType == "void" ? "void" : Types.Cpp(schema, m.ReturnType);
-            string parameters = string.Join(", ", m.Params.Select(p => $"{Types.Cpp(schema, p.Type)} {p.Name}"));
+            string parameters = string.Join(", ", m.Params.Select(p =>
+                $"{Types.Cpp(schema, p.Type)} {p.Name}{(p.Default is null ? "" : $" = {p.Default}")}"));
             // CANlib marks every one of these noexcept, static ones included
             string qualifiers = m.Const && !m.Static ? " const noexcept" : " noexcept";
             string prefix = m.Static ? "static constexpr " : "";
+
+            if (m.Constructor)
+            {
+                EmitConstructor(s, m, parameters, qualifiers);
+                continue;
+            }
 
             if (m.DeclarationOnly)
             {
@@ -270,6 +277,36 @@ public sealed class CppEmitter(CanSchema schema)
                 _writer.Indent();
                 new CppStatementEmitter(context).Write(_writer, body);
             }
+        }
+    }
+
+    /// <summary>
+    /// Emit a constructor. CANlib relies on these both to build a value in a single expression and — for
+    /// the parameterless ones — to zero the reserved bits, so that a default-constructed value never puts
+    /// uninitialised bits on the bus.
+    /// </summary>
+    private void EmitConstructor(StructDef s, MethodDef m, string parameters, string qualifiers)
+    {
+        EmitContext context = new(schema, s, Language.Cpp, [.. m.Params.Select(p => p.Name)]);
+        CppExprEmitter expressions = new(context);
+        string prefix = m.Explicit ? "explicit " : "";
+        string initialisers = m.Init.Count == 0
+            ? ""
+            : " : " + string.Join(", ", m.Init.Select(i => $"{i.Name}({expressions.Render(ExprParser.Parse(i.Value))})"));
+
+        List<Stmt> body = ExprParser.ParseBody(m.Body);
+        if (body.Count == 0)
+        {
+            _writer.Line($"{prefix}{m.Name}({parameters}){qualifiers}{initialisers} {{ }}");
+            return;
+        }
+
+        using (_writer.Block($"{prefix}{m.Name}({parameters}){qualifiers}{initialisers}", "}"))
+        {
+            _writer.Outdent();
+            _writer.Line("{");
+            _writer.Indent();
+            new CppStatementEmitter(context).Write(_writer, body);
         }
     }
 

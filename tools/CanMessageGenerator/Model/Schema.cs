@@ -93,6 +93,18 @@ public sealed class ParamDef
 {
     public string Name = "";
     public string Type = "";
+
+    /// <summary>Default argument, C++ only (C# structs in this schema never need one).</summary>
+    public string? Default;
+}
+
+/// <summary>
+/// One entry of a C++ constructor's member initialiser list.
+/// </summary>
+public sealed class InitDef
+{
+    public string Name = "";
+    public string Value = "";
 }
 
 /// <summary>
@@ -115,6 +127,19 @@ public sealed class MethodDef
 
     /// <summary>Verbatim C++ declaration, for the few signatures that the neutral language cannot express.</summary>
     public string? CppSignature;
+
+    /// <summary>
+    /// True for a constructor: it has no return type, is named after its struct and may carry a member
+    /// initialiser list. C# structs cannot reproduce a zero-initialising parameterless constructor
+    /// (<c>default</c> and array allocation bypass it), so constructors are emitted for C++ only.
+    /// </summary>
+    public bool Constructor;
+
+    /// <summary>Whether a single-argument constructor is declared <c>explicit</c>.</summary>
+    public bool Explicit;
+
+    /// <summary>Member initialiser list of a constructor.</summary>
+    public List<InitDef> Init = [];
 }
 
 /// <summary>
@@ -370,6 +395,11 @@ public sealed class CanSchema
         {
             s.Methods.Add(ParseMethod(node!.AsObject()));
         }
+
+        foreach (JsonNode? node in o["constructors"]?.AsArray() ?? [])
+        {
+            s.Methods.Add(ParseConstructor(node!.AsObject(), s.Name));
+        }
         return s;
     }
 
@@ -437,15 +467,50 @@ public sealed class CanSchema
         {
             m.Emit = [.. emit.Select(n => ParseLanguage(n!.GetValue<string>()))];
         }
+        ParseParams(o, m);
+        return m;
+    }
+
+    /// <summary>
+    /// Parse a constructor. Constructors exist only to keep the generated C++ header a source-level
+    /// drop-in for CANlib's, so they are never emitted for C#.
+    /// </summary>
+    private static MethodDef ParseConstructor(JsonObject o, string structName)
+    {
+        MethodDef m = new()
+        {
+            Name = structName,
+            ReturnType = "void",
+            Const = false,
+            Constructor = true,
+            Explicit = Bool(o, "explicit") ?? false,
+            Doc = Doc(o),
+            Body = o["body"]?.AsArray(),
+            Emit = [Language.Cpp]
+        };
+        foreach (JsonNode? node in o["init"]?.AsArray() ?? [])
+        {
+            m.Init.Add(new InitDef
+            {
+                Name = Str(node!.AsObject(), "name") ?? "",
+                Value = Str(node.AsObject(), "value") ?? "0"
+            });
+        }
+        ParseParams(o, m);
+        return m;
+    }
+
+    private static void ParseParams(JsonObject o, MethodDef m)
+    {
         foreach (JsonNode? node in o["params"]?.AsArray() ?? [])
         {
             m.Params.Add(new ParamDef
             {
                 Name = Str(node!.AsObject(), "name") ?? "",
-                Type = Str(node.AsObject(), "type") ?? ""
+                Type = Str(node.AsObject(), "type") ?? "",
+                Default = Str(node.AsObject(), "default")
             });
         }
-        return m;
     }
 
     private static Language ParseLanguage(string s) => s switch

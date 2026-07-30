@@ -432,13 +432,23 @@
           "body": [ { "return": "microstepping" } ]
         },
         {
-          "name": "Set", "returnType": "void", "const": false,
+          "name": "Set", "returnType": "void", "const": false, "emit": ["csharp"],
           "params": [ { "name": "spu", "type": "f32" }, { "name": "ms", "type": "u16" } ],
           "body": [
             { "storeLE": "stepsPerUnit", "to": "spu" },
             { "set": "microstepping", "to": "ms" }
           ]
         }
+      ],
+      "constructors": [
+        {
+          "params": [ { "name": "spu", "type": "f32" }, { "name": "ms", "type": "u16" } ],
+          "body": [
+            { "storeLE": "stepsPerUnit", "to": "spu" },
+            { "set": "microstepping", "to": "ms" }
+          ]
+        },
+        {}
       ]
     },
 
@@ -467,12 +477,30 @@
       ],
       "methods": [
         {
-          "name": "Set", "returnType": "void", "const": false,
+          "name": "Set", "returnType": "void", "const": false, "emit": ["csharp"],
           "params": [ { "name": "m", "type": "u16" }, { "name": "idlePc", "type": "u16" } ],
           "body": [
             { "set": "mode", "to": "m" },
             { "set": "zero", "to": "0" },
             { "set": "idlePercent", "to": "idlePc" }
+          ]
+        }
+      ],
+      "constructors": [
+        {
+          "init": [
+            { "name": "mode", "value": "0" },
+            { "name": "zero", "value": "0" },
+            { "name": "idlePercent", "value": "0" }
+          ]
+        },
+        {
+          "explicit": true,
+          "params": [ { "name": "m", "type": "u16" }, { "name": "idlePc", "type": "u16", "default": "0" } ],
+          "init": [
+            { "name": "mode", "value": "m" },
+            { "name": "zero", "value": "0" },
+            { "name": "idlePercent", "value": "idlePc" }
           ]
         }
       ]
