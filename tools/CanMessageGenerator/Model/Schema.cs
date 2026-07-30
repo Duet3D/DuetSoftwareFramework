@@ -358,6 +358,45 @@ public sealed class GenericTableDef
 }
 
 /// <summary>
+/// One entry of the CanMessageType enum: an enumerator, a retired id, or a section heading.
+/// </summary>
+public sealed class MessageTypeDef
+{
+    /// <summary>Section heading, for an entry that only groups the ones after it.</summary>
+    public string? Section;
+
+    public string Name = "";
+
+    /// <summary>The id, or the name of another enumerator this one aliases, as written in the schema.</summary>
+    public string Value = "";
+
+    public string? Doc;
+
+    /// <summary>
+    /// An id that is no longer used. It is emitted as a comment rather than dropped, so that it is never
+    /// reused: an expansion board on older firmware would still act on it.
+    /// </summary>
+    public bool Retired;
+
+    public HashSet<Language> Emit = [Language.Cpp, Language.CSharp];
+
+    public bool IsGenerated(Language language) => Emit.Contains(language);
+
+    /// <summary>True if <see cref="Value"/> names another enumerator rather than giving a number.</summary>
+    public bool IsAlias => !char.IsAsciiDigit(Value[0]);
+}
+
+/// <summary>
+/// The CanMessageType enum, i.e. what identifies a message in the CAN id.
+/// </summary>
+public sealed class MessageTypeEnumDef
+{
+    public string Name = "CanMessageType";
+    public string? Doc;
+    public List<MessageTypeDef> Values = [];
+}
+
+/// <summary>
 /// One arm of the all-messages union.
 /// </summary>
 public sealed class UnionMemberDef
@@ -388,10 +427,14 @@ public sealed class CanSchema
     public string CppTablesHeaderGuard = "SRC_CANMESSAGEGENERICTABLES_H_";
     public List<string> CppIncludes = [];
     public string CSharpNamespace = "";
+
+    /// <summary>Namespace of the types shared by the messages, such as the CanMessageType enum.</summary>
+    public string CSharpSharedNamespace = "";
     public List<string> CSharpUsings = [];
     public Dictionary<string, int> Constants = [];
     public List<StructDef> Structs = [];
     public List<GenericTableDef> GenericTables = [];
+    public MessageTypeEnumDef? MessageTypes;
     public UnionDef? MessageUnion;
 
     private Dictionary<string, StructDef>? _byName;
@@ -418,6 +461,7 @@ public sealed class CanSchema
             CppTablesHeaderGuard = Str(o, "cppTablesHeaderGuard") ?? "SRC_CANMESSAGEGENERICTABLES_H_",
             CppIncludes = StrList(o, "cppIncludes"),
             CSharpNamespace = Str(o, "csharpNamespace") ?? "",
+            CSharpSharedNamespace = Str(o, "csharpSharedNamespace") ?? "",
             CSharpUsings = StrList(o, "csharpUsings")
         };
 
@@ -432,6 +476,11 @@ public sealed class CanSchema
         foreach (JsonNode? node in o["structs"]?.AsArray() ?? [])
         {
             schema.Structs.Add(ParseStruct(node!.AsObject()));
+        }
+
+        if (o["messageTypes"] is JsonObject messageTypes)
+        {
+            schema.MessageTypes = ParseMessageTypes(messageTypes);
         }
 
         foreach (JsonNode? node in o["genericTables"]?.AsArray() ?? [])
@@ -530,6 +579,54 @@ public sealed class CanSchema
             s.Methods.Add(ParseConstructor(node!.AsObject(), s.Name));
         }
         return s;
+    }
+
+    private static MessageTypeEnumDef ParseMessageTypes(JsonObject o)
+    {
+        MessageTypeEnumDef definition = new()
+        {
+            Name = Str(o, "name") ?? "CanMessageType",
+            Doc = Doc(o)
+        };
+
+        foreach (JsonNode? node in o["values"]?.AsArray() ?? [])
+        {
+            JsonObject v = node!.AsObject();
+            if (Str(v, "section") is { } section)
+            {
+                definition.Values.Add(new MessageTypeDef { Section = section });
+                continue;
+            }
+
+            MessageTypeDef entry = new()
+            {
+                Name = Str(v, "name") ?? throw new InvalidDataException("message type without a name"),
+                Value = v["value"] switch
+                {
+                    JsonValue value when value.TryGetValue(out int number) => number.ToString(),
+                    JsonValue value => value.GetValue<string>(),
+                    _ => throw new InvalidDataException($"message type {Str(v, "name")} has no value")
+                },
+                Doc = Doc(v),
+                Retired = Bool(v, "retired") ?? false
+            };
+            if (v["emit"] is JsonArray emit)
+            {
+                entry.Emit = [.. emit.Select(n => ParseLanguage(n!.GetValue<string>()))];
+            }
+            definition.Values.Add(entry);
+        }
+
+        // An alias has to resolve, or the generated enum would not compile
+        HashSet<string> declared = [.. definition.Values.Where(v => v.Section is null).Select(v => v.Name)];
+        foreach (MessageTypeDef alias in definition.Values.Where(v => v.Section is null && v.IsAlias))
+        {
+            if (!declared.Contains(alias.Value))
+            {
+                throw new InvalidDataException($"message type {alias.Name} aliases '{alias.Value}', which is not declared");
+            }
+        }
+        return definition;
     }
 
     private static GenericTableDef ParseGenericTable(JsonObject o)

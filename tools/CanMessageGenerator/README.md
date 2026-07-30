@@ -18,6 +18,7 @@ Schema/can-messages.json
         +--> generated/cpp/CanMessageGenericTablesProbe.cpp                     (C++ conformance harness)
         +--> src/UnitTests/Link/CanMessageLayout.g.cs                           (C# conformance harness)
         +--> src/UnitTests/Link/CanGenericTableLayout.g.cs                      (C# conformance harness)
+        +--> src/DuetControlServer/Link/Protocol/Shared/CanMessageType.g.cs     (DuetControlServer)
 ```
 
 ## Usage
@@ -184,6 +185,31 @@ schema declares an ordinary `Set` method with `"emit": ["csharp"]`.
   case alone — `CanMessageEnterTestMode`'s `Passwd` constant and `passwd` field — the constant takes a
   `Value` suffix (`PasswdValue`).
 
+## Message types
+
+`CanMessageType` is the id a message travels under, so a value that disagrees with CANlib does not produce a
+malformed message — it produces a well-formed one that the board hands to the wrong handler, which none of the
+layout or table checks would notice. It is generated from the schema too:
+
+```jsonc
+"messageTypes": {
+  "values": [
+    { "section": "High-priority requests sent by the main board" },
+    { "name": "emergencyStop", "value": 0 },
+    { "name": "unused_was_movement", "value": 50, "retired": true },
+    { "name": "noReply", "value": "unusedMessageType", "emit": ["csharp"] }
+  ]
+}
+```
+
+A `retired` id is emitted as a comment rather than dropped: the comment is the record that the number is
+spent, and reusing one would have an expansion board on older firmware act on a message that now means
+something else. `value` may name another enumerator to alias it, and `emit` narrows an entry to one language —
+`noReply` is how DCS spells "expecting no reply" and has no counterpart in `CanId.h`.
+
+`compare-message-types.py` checks the schema against `CanId.h` in both directions, ids and names, retired
+entries included, so an id CANlib adds is reported as well as one the schema gets wrong.
+
 ## Generic messages
 
 Around twenty of the messages do not have a struct of their own. They share `CanMessageGeneric`, whose
@@ -258,8 +284,6 @@ generated.
   hand-written C# counterpart in `Link/Protocol/Shared/CanTiming.cs` whose helper methods (`SetDefaults`,
   `EnableBrs`, …) are outside what the schema's expression language covers. Its layout is therefore not
   covered by the conformance harnesses.
-* `CanMessageType` itself is still declared separately in `CanId.h` and `Link/Protocol/Shared/CanMessageType.cs`.
-  Generating it from the schema would be a natural follow-up.
 * `DebugPrint` is declaration-only: the C++ header declares it and CANlib's `CanMessageFormats.cpp` defines
   it. There is no C# equivalent.
 * The two `cppPrivate` temperature fields (`CanSensorReport`, `CanHeaterReport`) are excluded from the C++

@@ -34,6 +34,7 @@ public static class Program
         CppTablesEmitter cppTables = new(schema);
         CSharpEmitter csharp = new(schema);
         CSharpTablesEmitter csharpTables = new(schema);
+        CSharpEnumEmitter csharpEnum = new(schema);
         ConformanceEmitter conformance = new(schema);
         List<LayoutFacts> facts = conformance.Collect();
 
@@ -53,6 +54,8 @@ public static class Program
             (Path.Combine(csharpDir, "CanMessageBuffers.g.cs"), csharp.EmitBuffers()),
             (Path.Combine(csharpDir, "CanMessageSupport.g.cs"), csharp.EmitSupport()),
             (Path.Combine(csharpDir, "CanGenericTables.g.cs"), csharpTables.Emit()),
+            (options.GetValueOrDefault("shared-out") ?? Path.Combine(repoRoot, "src/DuetControlServer/Link/Protocol/Shared/CanMessageType.g.cs"),
+             csharpEnum.Emit()),
             (Path.Combine(csharpDir, "CanGenericBuilders.g.cs"), csharpTables.EmitBuilders()),
             (options.GetValueOrDefault("probe-out") ?? Path.Combine(repoRoot, "tools/CanMessageGenerator/generated/cpp/CanMessageLayoutProbe.cpp"),
              conformance.EmitCppProbe(facts)),

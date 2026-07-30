@@ -64,4 +64,10 @@ echo "==> Comparing method surfaces"
 python3 "$ROOT/tools/CanMessageGenerator/compare-method-surface.py" \
 	"$ROOT/lib/CANlib/src/CanMessageFormats.h" "$GENERATED/CanMessageFormats.h"
 
+# A wrong message type does not corrupt a message, it delivers a well-formed one to the wrong handler, and
+# none of the checks above look at the id at all
+echo "==> Comparing message types"
+python3 "$ROOT/tools/CanMessageGenerator/compare-message-types.py" \
+	"$ROOT/lib/CANlib/src/CanId.h" "$ROOT/tools/CanMessageGenerator/Schema/can-messages.json"
+
 echo "==> C++ layouts verified"
