@@ -162,7 +162,7 @@ struct __attribute__((packed)) CanMessageRevertPosition
 	// Net number of steps of the last move that were required
 	int32_t finalStepCounts[MaxLinearDriversPerCanSlave];
 
-	static constexpr size_t GetActualDataLength(size_t numReverting) { return (2 * sizeof(uint32_t)) + (numReverting * sizeof(int32_t)); }
+	static constexpr size_t GetActualDataLength(size_t numReverting) noexcept { return (2 * sizeof(uint32_t)) + (numReverting * sizeof(int32_t)); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept { zero = 0; }
 };
@@ -273,8 +273,8 @@ template<class T> struct __attribute__((packed)) CanMessageMultipleDrivesRequest
 	uint16_t driversToUpdate;
 	T values[MaxLinearDriversPerCanSlave];
 
-	static constexpr size_t GetActualDataLength(size_t numDrivers) { return sizeof(uint16_t) * 2 + numDrivers * sizeof(T); }
-	static constexpr size_t MaxDrivesPerMessage() { return (64 - 2 * sizeof(uint16_t)) / sizeof(T); }
+	static constexpr size_t GetActualDataLength(size_t numDrivers) noexcept { return sizeof(uint16_t) * 2 + numDrivers * sizeof(T); }
+	static constexpr size_t MaxDrivesPerMessage() noexcept { return (64 - 2 * sizeof(uint16_t)) / sizeof(T); }
 	// Set the request ID of this message and clear its reserved fields
 	void SetRequestId(CanRequestId rid) noexcept
 	{
@@ -1070,7 +1070,7 @@ struct __attribute__((packed)) CanMessageGeneric
 	         paramMap : 20;
 	uint8_t data[60];
 
-	static constexpr size_t GetActualDataLength(size_t paramLength) { return paramLength + sizeof(uint32_t); }
+	static constexpr size_t GetActualDataLength(size_t paramLength) noexcept { return paramLength + sizeof(uint32_t); }
 	void DebugPrint(const ParamDescriptor *_ecv_array _ecv_null pt = nullptr) const noexcept;
 	// Set the request ID of this message and clear its reserved fields
 	void SetRequestId(CanRequestId rid) noexcept { requestId = rid; }
@@ -1164,7 +1164,7 @@ struct __attribute__((packed)) CanMessageAnnounceV0
 	char boardTypeAndFirmwareVersion[56];
 
 	size_t GetActualDataLength() const noexcept { return (2 * sizeof(uint32_t)) + Strnlen(boardTypeAndFirmwareVersion, ARRAY_SIZE(boardTypeAndFirmwareVersion)); }
-	static constexpr size_t GetMaxTextLength(size_t dataLength) { return dataLength - (2 * sizeof(uint32_t)); }
+	static constexpr size_t GetMaxTextLength(size_t dataLength) noexcept { return dataLength - (2 * sizeof(uint32_t)); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept { zero = 0; }
 };
@@ -1188,7 +1188,7 @@ struct __attribute__((packed)) CanMessageAnnounceV1
 	char boardTypeAndFirmwareVersion[43];
 
 	size_t GetActualDataLength() const noexcept { return sizeof(timeSinceStarted) + sizeof(uniqueId) + sizeof(uint8_t) + Strnlen(boardTypeAndFirmwareVersion, ARRAY_SIZE(boardTypeAndFirmwareVersion)); }
-	static constexpr size_t GetMaxTextLength(size_t dataLength) { return dataLength - (sizeof(uint32_t) + 16 + sizeof(uint8_t)); }
+	static constexpr size_t GetMaxTextLength(size_t dataLength) noexcept { return dataLength - (sizeof(uint32_t) + 16 + sizeof(uint8_t)); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept { zero = 0; }
 };
@@ -1562,7 +1562,7 @@ struct __attribute__((packed)) CanMessageClosedLoopData
 
 	size_t GetActualDataLength(size_t numDataBytes) const noexcept { return 2 * sizeof(uint32_t) + numDataBytes; }
 	// Get the number of data bytes in a message, given the message length (which will have been rounded up to the next CAN-FD value)
-	static constexpr size_t GetNumDataBytes(size_t msglen) { return msglen - 2 * sizeof(uint32_t); }
+	static constexpr size_t GetNumDataBytes(size_t msglen) noexcept { return msglen - 2 * sizeof(uint32_t); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept
 	{

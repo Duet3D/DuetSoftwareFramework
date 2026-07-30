@@ -243,7 +243,8 @@ public sealed class CppEmitter(CanSchema schema)
 
             string returnType = m.ReturnType == "void" ? "void" : Types.Cpp(schema, m.ReturnType);
             string parameters = string.Join(", ", m.Params.Select(p => $"{Types.Cpp(schema, p.Type)} {p.Name}"));
-            string qualifiers = m.Static ? "" : m.Const ? " const noexcept" : " noexcept";
+            // CANlib marks every one of these noexcept, static ones included
+            string qualifiers = m.Const && !m.Static ? " const noexcept" : " noexcept";
             string prefix = m.Static ? "static constexpr " : "";
 
             if (m.DeclarationOnly)
