@@ -53,6 +53,7 @@ public static class Program
             (Path.Combine(csharpDir, "CanMessageBuffers.g.cs"), csharp.EmitBuffers()),
             (Path.Combine(csharpDir, "CanMessageSupport.g.cs"), csharp.EmitSupport()),
             (Path.Combine(csharpDir, "CanGenericTables.g.cs"), csharpTables.Emit()),
+            (Path.Combine(csharpDir, "CanGenericBuilders.g.cs"), csharpTables.EmitBuilders()),
             (options.GetValueOrDefault("probe-out") ?? Path.Combine(repoRoot, "tools/CanMessageGenerator/generated/cpp/CanMessageLayoutProbe.cpp"),
              conformance.EmitCppProbe(facts)),
             (options.GetValueOrDefault("tables-probe-out") ?? Path.Combine(repoRoot, "tools/CanMessageGenerator/generated/cpp/CanMessageGenericTablesProbe.cpp"),
