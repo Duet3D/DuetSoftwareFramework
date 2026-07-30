@@ -49,6 +49,7 @@ public sealed class CSharpEmitter(CanSchema schema)
 
     public string EmitBuffers()
     {
+        CollectBuffers();
         CodeWriter writer = new("    ");
         Header(writer);
         writer.Line("using System;");
@@ -531,6 +532,31 @@ public sealed class CSharpEmitter(CanSchema schema)
         bool collides = s.ScalarNames.Any(n => Naming.Pascal(n) == name)
                         || s.FlatMembers.Any(m => Naming.Pascal(m.Name) == name);
         return collides ? name + "Value" : name;
+    }
+
+    /// <summary>
+    /// Register every inline array type the generated C# needs, straight from the schema. Emitting the
+    /// structs and the union also registers them as a side effect, but deriving the set here means the
+    /// buffer file no longer depends on those having been emitted first.
+    /// </summary>
+    private void CollectBuffers()
+    {
+        foreach (StructDef s in schema.Structs.Where(s => s.IsGenerated(Language.CSharp)))
+        {
+            foreach (MemberDef m in s.FlatMembers.Where(m => m.Kind == MemberKind.Array))
+            {
+                BufferName(m.Type == "char" ? "char" : Types.CSharpIn(schema, s, m.Type), m.ResolvedLength);
+            }
+            foreach (BitSegment segment in LayoutEngine.SegmentsOf(s).Where(x => x.NeedsByteBuffer))
+            {
+                BufferName("byte", segment.ByteCount);
+            }
+        }
+
+        foreach (UnionMemberDef m in schema.MessageUnion?.Members.Where(m => m.Length is not null) ?? [])
+        {
+            BufferName(Types.CSharp(schema, m.Type), int.Parse(m.Length!));
+        }
     }
 
     /// <summary>Register and name the inline array type used to represent a fixed-length C array.</summary>

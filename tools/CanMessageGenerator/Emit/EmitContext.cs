@@ -31,6 +31,30 @@ public sealed class EmitContext(CanSchema schema, StructDef? owner, Language lan
 
     public bool IsIntLocal(string name) => _intLocals.Contains(name);
 
+    /// <summary>
+    /// Introduce a local for the duration of a block, so that a loop variable does not stay visible to
+    /// the statements that follow the loop and shadow a member of the same name.
+    /// </summary>
+    public IDisposable Scope(string name, bool isInt = false)
+    {
+        Locals.Add(name);
+        if (isInt)
+        {
+            MarkIntLocal(name);
+        }
+        return new LocalScope(this, name);
+    }
+
+    private sealed class LocalScope(EmitContext context, string name) : IDisposable
+    {
+        public void Dispose()
+        {
+            context.Locals.Remove(name);
+            context._intLocals.Remove(name);
+            context._boolLocals.Remove(name);
+        }
+    }
+
     public SymbolKind Classify(string name)
     {
         if (Locals.Contains(name))

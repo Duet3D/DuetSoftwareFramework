@@ -194,9 +194,10 @@ public sealed class CSharpStatementEmitter(EmitContext context, string returnTyp
                     writer.Outdent();
                     writer.Line("{");
                     writer.Indent();
-                    context.Locals.Add(f.Var);
-                    context.MarkIntLocal(f.Var);
-                    Write(writer, f.Body);
+                    using (context.Scope(f.Var, isInt: true))
+                    {
+                        Write(writer, f.Body);
+                    }
                 }
                 break;
 

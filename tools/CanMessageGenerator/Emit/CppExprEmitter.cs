@@ -152,7 +152,10 @@ public sealed class CppStatementEmitter(EmitContext context)
                     writer.Outdent();
                     writer.Line("{");
                     writer.Indent();
-                    Write(writer, f.Body);
+                    using (context.Scope(var))
+                    {
+                        Write(writer, f.Body);
+                    }
                 }
                 break;
             }
