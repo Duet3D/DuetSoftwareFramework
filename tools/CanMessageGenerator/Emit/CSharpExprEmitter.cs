@@ -263,10 +263,22 @@ public sealed class CSharpStatementEmitter(EmitContext context, string returnTyp
     }
 
     /// <summary>The schema type of an assignment target, used to pick the cast.</summary>
-    private string TargetType(Expr target)
+    private string TargetType(Expr target) => TypeOf(target) ?? "void";
+
+    /// <summary>
+    /// Resolve the schema type of an lvalue by walking the access path outwards from the enclosing struct,
+    /// so that a member reached through a sub-struct is looked up in the struct that actually declares it.
+    /// Resolving by bare name across the whole schema would be ambiguous: several member names (zero, data,
+    /// numSamples, current, minimum, maximum) occur with different types in different structs, and picking
+    /// the wrong one silently emits a cast of the wrong width.
+    /// </summary>
+    private string? TypeOf(Expr e)
     {
-        switch (target)
+        switch (e)
         {
+            case ParenExpr p:
+                return TypeOf(p.Inner);
+
             case IdentExpr i:
             {
                 BitFieldDef? bits = context.BitField(i.Name);
@@ -275,30 +287,31 @@ public sealed class CSharpStatementEmitter(EmitContext context, string returnTyp
                     return bits.Bool ? "bool" : CSharpEmitter.BitFieldSchemaType(bits);
                 }
                 MemberDef? member = context.Member(i.Name);
-                return member is not null ? context.ResolveType(member.Type) : "void";
+                return member is not null ? context.ResolveType(member.Type) : null;
             }
+
+            // A member's declared type is its element type, so indexing an array yields the same type
+            case IndexExpr x:
+                return TypeOf(x.Target);
 
             case MemberExpr m:
             {
-                // Find the field in whichever struct declares it; the schema has no duplicate field names
-                // within a struct, and cross-struct name reuse is resolved by matching the member name.
-                MemberDef? member = context.Schema.Structs.SelectMany(x => x.FlatMembers).FirstOrDefault(x => x.Name == m.Name);
-                BitFieldDef? bits = context.Schema.Structs.SelectMany(x => x.AllBitFields).FirstOrDefault(x => x.Name == m.Name);
-                if (member is not null)
+                string? targetType = TypeOf(m.Target);
+                StructDef? declaring = targetType is null ? null : context.Schema.Find(targetType);
+                if (declaring is null)
                 {
-                    return member.Type;
+                    return null;
                 }
-                return bits is not null ? (bits.Bool ? "bool" : CSharpEmitter.BitFieldSchemaType(bits)) : "void";
-            }
-
-            case IndexExpr x:
-            {
-                MemberDef? member = target is IndexExpr { Target: IdentExpr id } ? context.Member(id.Name) : null;
-                return member is not null ? context.ResolveType(member.Type) : "void";
+                BitFieldDef? bits = declaring.AllBitFields.FirstOrDefault(f => f.Name == m.Name);
+                if (bits is not null)
+                {
+                    return bits.Bool ? "bool" : CSharpEmitter.BitFieldSchemaType(bits);
+                }
+                return declaring.FlatMembers.FirstOrDefault(x => x.Name == m.Name)?.Type;
             }
 
             default:
-                return "void";
+                return null;
         }
     }
 }
