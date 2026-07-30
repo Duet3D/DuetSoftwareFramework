@@ -46,6 +46,14 @@ echo "==> Probing the generated CanMessageFormats.h"
 "$CXX" "${FLAGS[@]}" -I "$GENERATED" "${INCLUDES[@]}" -o "$WORK/probe-generated" "$GENERATED/CanMessageLayoutProbe.cpp"
 "$WORK/probe-generated"
 
+echo "==> Probing CANlib's hand-written CanMessageGenericTables.h"
+"$CXX" "${FLAGS[@]}" "${INCLUDES[@]}" -o "$WORK/tables-canlib" "$GENERATED/CanMessageGenericTablesProbe.cpp"
+"$WORK/tables-canlib"
+
+echo "==> Probing the generated CanMessageGenericTables.h"
+"$CXX" "${FLAGS[@]}" -I "$GENERATED" "${INCLUDES[@]}" -o "$WORK/tables-generated" "$GENERATED/CanMessageGenericTablesProbe.cpp"
+"$WORK/tables-generated"
+
 echo "==> Compiling CANlib's own sources against the generated header"
 for source in CanMessageFormats CanMessageBuffer CanMessageGenericParser; do
 	"$CXX" "${FLAGS[@]}" -fsyntax-only -I "$GENERATED" "${INCLUDES[@]}" "$ROOT/lib/CANlib/src/$source.cpp"
