@@ -37,21 +37,39 @@ public sealed class EmitContext(CanSchema schema, StructDef? owner, Language lan
     /// </summary>
     public IDisposable Scope(string name, bool isInt = false)
     {
+        LocalScope restore = new(this, name, Locals.Contains(name), _intLocals.Contains(name), _boolLocals.Contains(name));
         Locals.Add(name);
         if (isInt)
         {
             MarkIntLocal(name);
         }
-        return new LocalScope(this, name);
+        return restore;
     }
 
-    private sealed class LocalScope(EmitContext context, string name) : IDisposable
+    /// <summary>
+    /// Restores whatever binding <paramref name="name"/> had before the scope began, rather than clearing it
+    /// outright — an outer loop reusing the same variable name as an inner one must still see it as a local
+    /// (and, if applicable, an int local) once the inner scope closes.
+    /// </summary>
+    private sealed class LocalScope(EmitContext context, string name, bool wasLocal, bool wasIntLocal, bool wasBoolLocal) : IDisposable
     {
         public void Dispose()
         {
-            context.Locals.Remove(name);
-            context._intLocals.Remove(name);
-            context._boolLocals.Remove(name);
+            Restore(context.Locals, wasLocal);
+            Restore(context._intLocals, wasIntLocal);
+            Restore(context._boolLocals, wasBoolLocal);
+        }
+
+        private void Restore(HashSet<string> set, bool wasPresent)
+        {
+            if (wasPresent)
+            {
+                set.Add(name);
+            }
+            else
+            {
+                set.Remove(name);
+            }
         }
     }
 
