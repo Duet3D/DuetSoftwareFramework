@@ -58,6 +58,7 @@ public static class Program
             .. schema.Enums.Where(e => !e.CheckOnly).Select(e =>
                 (Path.Combine(repoRoot, e.OutputPath ?? throw new InvalidDataException($"enum {e.Name} has no output path")),
                  csharpEnum.Emit(e))),
+            .. schema.ConstantGroups.Select(g => (Path.Combine(repoRoot, g.OutputPath), csharpEnum.Emit(g))),
             (Path.Combine(csharpDir, "CanGenericBuilders.g.cs"), csharpTables.EmitBuilders()),
             (options.GetValueOrDefault("probe-out") ?? Path.Combine(repoRoot, "tools/CanMessageGenerator/generated/cpp/CanMessageLayoutProbe.cpp"),
              conformance.EmitCppProbe(facts)),

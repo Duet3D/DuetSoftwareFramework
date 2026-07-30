@@ -116,6 +116,15 @@ def main():
         elif normalise(want, canlib, arrays) != normalise(canlib[name], canlib, arrays):
             problems.append(f"FAIL {name}: schema says {want}, CANlib says {canlib[name]}")
 
+    for group in schema.get("constantGroups", []):
+        for constant in group["values"]:
+            checks += 1
+            name, want = constant["name"], constant["value"]
+            if name not in canlib:
+                problems.append(f"FAIL {group['name']}.{name} = {want} is not declared by CANlib")
+            elif normalise(want, canlib, arrays) != normalise(canlib[name], canlib, arrays):
+                problems.append(f"FAIL {group['name']}.{name}: schema says {want}, CANlib says {canlib[name]}")
+
     for problem in problems:
         print(problem)
     print(f"{checks} constant checks, {len(problems)} failures")

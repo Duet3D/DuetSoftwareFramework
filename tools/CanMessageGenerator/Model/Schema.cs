@@ -414,6 +414,26 @@ public sealed class MessageTypeDef
 }
 
 /// <summary>
+/// A group of related constants that CANlib declares, such as the CAN addresses.
+/// </summary>
+public sealed class ConstantGroupDef
+{
+    public string Name = "";
+
+    /// <summary>CANlib header the constants are declared in, relative to its src directory.</summary>
+    public string CppHeader = "";
+
+    /// <summary>Class the constants sit inside in CANlib, where they are not at file scope.</summary>
+    public string? CppScope;
+
+    /// <summary>File the generated class is written to, relative to the repository root.</summary>
+    public string OutputPath = "";
+
+    public string? Doc;
+    public List<ConstantDef> Values = [];
+}
+
+/// <summary>
 /// An enum that CANlib declares and the C# side has to agree with.
 /// </summary>
 /// <remarks>
@@ -490,6 +510,7 @@ public sealed class CanSchema
     public List<StructDef> Structs = [];
     public List<GenericTableDef> GenericTables = [];
     public List<MessageTypeEnumDef> Enums = [];
+    public List<ConstantGroupDef> ConstantGroups = [];
     public UnionDef? MessageUnion;
 
     private Dictionary<string, StructDef>? _byName;
@@ -536,6 +557,31 @@ public sealed class CanSchema
         foreach (JsonNode? node in o["enums"]?.AsArray() ?? [])
         {
             schema.Enums.Add(ParseEnum(node!.AsObject()));
+        }
+
+        foreach (JsonNode? node in o["constantGroups"]?.AsArray() ?? [])
+        {
+            JsonObject g = node!.AsObject();
+            ConstantGroupDef group = new()
+            {
+                Name = Str(g, "name") ?? throw new InvalidDataException("constant group without a name"),
+                CppHeader = Str(g, "cppHeader") ?? "",
+                CppScope = Str(g, "cppScope"),
+                OutputPath = Str(g, "output") ?? throw new InvalidDataException($"constant group {Str(g, "name")} has no output path"),
+                Doc = Doc(g)
+            };
+            foreach (JsonNode? value in g["values"]?.AsArray() ?? [])
+            {
+                JsonObject v = value!.AsObject();
+                group.Values.Add(new ConstantDef
+                {
+                    Name = Str(v, "name") ?? "",
+                    Type = Str(v, "type") ?? "u32",
+                    Value = Str(v, "value") ?? "0",
+                    Doc = Doc(v)
+                });
+            }
+            schema.ConstantGroups.Add(group);
         }
 
         foreach (JsonNode? node in o["genericTables"]?.AsArray() ?? [])

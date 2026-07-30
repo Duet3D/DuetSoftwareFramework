@@ -135,7 +135,7 @@ public sealed partial class LinkInterface(
     /// Send a typed CAN message to an expansion board and wait for the (optional) reply
     /// </summary>
     /// <typeparam name="TReq">Type of the CAN message body</typeparam>
-    /// <param name="dstAddress">CAN destination: 0..126, or 127 for broadcast</param>
+    /// <param name="dstAddress">CAN destination: up to <see cref="CanId.MaxCanAddress" />, or <see cref="CanId.BroadcastAddress" /></param>
     /// <param name="message">CAN message body to send</param>
     /// <param name="replyType">Expected reply type (<see cref="CanMessageType.NoReply"/> if none)</param>
     /// <param name="flags">Flags for the CAN message</param>
@@ -156,7 +156,7 @@ public sealed partial class LinkInterface(
     /// </summary>
     /// <param name="messageType">Type of the CAN message</param>
     /// <param name="replyType">Expected reply type (<see cref="CanMessageType.NoReply"/> if none)</param>
-    /// <param name="dstAddress">CAN destination: 0..126, or 127 for broadcast</param>
+    /// <param name="dstAddress">CAN destination: up to <see cref="CanId.MaxCanAddress" />, or <see cref="CanId.BroadcastAddress" /></param>
     /// <param name="payload">Serialized CAN message payload</param>
     /// <param name="flags">Flags for the CAN message</param>
     /// <param name="cancellationToken">Optional cancellation token</param>

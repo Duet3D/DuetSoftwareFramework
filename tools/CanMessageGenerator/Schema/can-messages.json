@@ -2272,6 +2272,43 @@
    }
   ],
 
+  "constantGroups": [
+   {
+    "name": "CanId",
+    "cppHeader": "CanId.h",
+    "cppScope": "CanId",
+    "output": "src/DuetControlServer/Link/Protocol/Shared/CanId.g.cs",
+    "doc": [
+      "CAN addresses and the layout of a CAN id, mirroring the CanId class in CANlib's CanId.h.",
+      "DCS builds no CAN ids itself — the native link does — but the addresses decide who a message",
+      "is for, and they were previously only written down in a doc comment."
+    ],
+    "values": [
+      { "name": "MasterAddress", "type": "u8", "value": "0", "doc": "main boards (except ATE main boards) have address 0" },
+      { "name": "ATECMBoardFirstAddress", "type": "u8", "value": "90" },
+      { "name": "ATEIOBoardFirstAddress", "type": "u8", "value": "95" },
+      { "name": "ATECMBoardDefaultAddress", "type": "u8", "value": "118" },
+      { "name": "ATEIOBoardDefaultAddress", "type": "u8", "value": "119" },
+      { "name": "SZPDefaultAddress", "type": "u8", "value": "120" },
+      { "name": "ToolBoardDefaultAddress", "type": "u8", "value": "121", "doc": "default address for tool boards" },
+      { "name": "Exp1XDBoardDefaultAddress", "type": "u8", "value": "122" },
+      { "name": "Exp1HCLBoardDefaultAddress", "type": "u8", "value": "123" },
+      { "name": "SammyC21DefaultAddress", "type": "u8", "value": "124" },
+      { "name": "ATEMasterAddress", "type": "u8", "value": "125", "doc": "the address of the ATE main board" },
+      { "name": "Exp3HCFirmwareUpdateAddress", "type": "u8", "value": "126", "doc": "special address we use for backup firmware update system (board ID switches set to zero on 3HC)" },
+      { "name": "MaxCanAddress", "type": "u8", "value": "126", "doc": "maximum CAN address including the firmware update address" },
+      { "name": "BroadcastAddress", "type": "u8", "value": "127" },
+      { "name": "NoAddress", "type": "u8", "value": "255" },
+      { "name": "BoardAddressMask", "type": "u32", "value": "0x7F" },
+      { "name": "DstAddressShift", "type": "u32", "value": "0" },
+      { "name": "SrcAddressShift", "type": "u32", "value": "8" },
+      { "name": "ResponseBit", "type": "u32", "value": "1ul << 15" },
+      { "name": "MessageTypeShift", "type": "u32", "value": "16" },
+      { "name": "MessageTypeMask", "type": "u32", "value": "0x1FFF" }
+    ]
+   }
+  ],
+
   "genericTables": [
     {
       "name": "M42Params",
