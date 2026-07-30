@@ -237,6 +237,99 @@ public sealed class StructDef
 }
 
 /// <summary>
+/// The type of a parameter in a generic message's parameter table.
+/// </summary>
+/// <remarks>
+/// These mirror <c>ParamDescriptor::ParamType</c> in CANlib's <c>CanMessageGenericTableFormat.h</c>. The
+/// numeric value is not on the wire, but its low nibble is the element size in bytes, which is what
+/// decides how much space the parameter takes in the packed data, so the values have to agree with
+/// CANlib's for the two sides to pack identically.
+/// </remarks>
+public sealed record ParamType(string Id, string CppEnumerator, string CSharpName, int Value, bool IsArray)
+{
+    /// <summary>Element size in bytes, or 0 for the two string types, which are null-terminated.</summary>
+    public int ItemSize => Value & 0x0F;
+}
+
+/// <summary>
+/// The parameter types understood by the generic message tables.
+/// </summary>
+public static class ParamTypes
+{
+    private const int Length1 = 0x01, Length2 = 0x02, Length4 = 0x04, Length8 = 0x08, IsArray = 0x80;
+
+    private static readonly ParamType[] All =
+    [
+        new("uint64",        "uint64",        "UInt64",        0x00 | Length8, false),
+        new("uint32",        "uint32",        "UInt32",        0x00 | Length4, false),
+        new("uint16",        "uint16",        "UInt16",        0x00 | Length2, false),
+        new("uint8",         "uint8",         "UInt8",         0x00 | Length1, false),
+        new("int32",         "int32",         "Int32",         0x10 | Length4, false),
+        new("int16",         "int16",         "Int16",         0x10 | Length2, false),
+        new("int8",          "int8",          "Int8",          0x10 | Length1, false),
+        new("string",        "string",        "String",        0x10,           false),
+        new("float",         "float_p",       "Float",         0x20 | Length4, false),
+        new("pwmFreq",       "pwmFreq",       "PwmFreq",       0x20 | Length2, false),
+        new("char",          "char_p",        "Char",          0x20 | Length1, false),
+        new("reducedString", "reducedString", "ReducedString", 0x20,           false),
+        new("localDriver",   "localDriver",   "LocalDriver",   0x40 | Length1, false),
+        new("float16",       "float16_p",     "Float16",       0x40 | Length2, false),
+        new("uint32Array",   "uint32_array",  "UInt32Array",   0x00 | Length4 | IsArray, true),
+        new("uint16Array",   "uint16_array",  "UInt16Array",   0x00 | Length2 | IsArray, true),
+        new("uint8Array",    "uint8_array",   "UInt8Array",    0x00 | Length1 | IsArray, true),
+        new("floatArray",    "float_array",   "FloatArray",    0x20 | Length4 | IsArray, true)
+    ];
+
+    private static readonly Dictionary<string, ParamType> ById = All.ToDictionary(t => t.Id);
+
+    public static IReadOnlyList<ParamType> Ordered => All;
+
+    public static ParamType Find(string id) =>
+        ById.TryGetValue(id, out ParamType? t) ? t : throw new InvalidDataException($"unknown generic parameter type '{id}'");
+}
+
+/// <summary>
+/// One parameter of a generic message, identified in the message by its G-code letter.
+/// </summary>
+public sealed class GenericParamDef
+{
+    public char Letter;
+    public ParamType Type = null!;
+    public string? Doc;
+
+    /// <summary>Number of elements, for the array types only.</summary>
+    public int MaxLength;
+
+    /// <summary>
+    /// True for a parameter whose letter is outside A..Z. CANlib uses a lowercase letter to retire a
+    /// table entry without shifting the ones after it: the position still has to be reserved, but the
+    /// parameter can never be matched against a G-code command and is never set programmatically.
+    /// </summary>
+    public bool IsRetired => Letter is < 'A' or > 'Z';
+}
+
+/// <summary>
+/// A parameter table for one generic message. The table is the contract between the two ends: the
+/// sender packs the present parameters in table order and sets the matching bit in the message's
+/// paramMap, and the receiver walks the same table to find them again.
+/// </summary>
+public sealed class GenericTableDef
+{
+    public string Name = "";
+    public string? Doc;
+    public List<GenericParamDef> Params = [];
+
+    /// <summary>
+    /// The message type this table is normally sent under, where there is exactly one. Three tables
+    /// (M42, M280, M959) have no message type of their own in this version of CANlib.
+    /// </summary>
+    public string? MessageType;
+
+    /// <summary>The table name without CANlib's "Params" suffix, used to name the generated builder.</summary>
+    public string BaseName => Name.EndsWith("Params", StringComparison.Ordinal) ? Name[..^"Params".Length] : Name;
+}
+
+/// <summary>
 /// One arm of the all-messages union.
 /// </summary>
 public sealed class UnionMemberDef
@@ -264,11 +357,13 @@ public sealed class UnionDef
 public sealed class CanSchema
 {
     public string CppHeaderGuard = "SRC_CAN_CANMESSAGEFORMATS_H_";
+    public string CppTablesHeaderGuard = "SRC_CANMESSAGEGENERICTABLES_H_";
     public List<string> CppIncludes = [];
     public string CSharpNamespace = "";
     public List<string> CSharpUsings = [];
     public Dictionary<string, int> Constants = [];
     public List<StructDef> Structs = [];
+    public List<GenericTableDef> GenericTables = [];
     public UnionDef? MessageUnion;
 
     private Dictionary<string, StructDef>? _byName;
@@ -292,6 +387,7 @@ public sealed class CanSchema
         CanSchema schema = new()
         {
             CppHeaderGuard = Str(o, "cppHeaderGuard") ?? "SRC_CAN_CANMESSAGEFORMATS_H_",
+            CppTablesHeaderGuard = Str(o, "cppTablesHeaderGuard") ?? "SRC_CANMESSAGEGENERICTABLES_H_",
             CppIncludes = StrList(o, "cppIncludes"),
             CSharpNamespace = Str(o, "csharpNamespace") ?? "",
             CSharpUsings = StrList(o, "csharpUsings")
@@ -308,6 +404,11 @@ public sealed class CanSchema
         foreach (JsonNode? node in o["structs"]?.AsArray() ?? [])
         {
             schema.Structs.Add(ParseStruct(node!.AsObject()));
+        }
+
+        foreach (JsonNode? node in o["genericTables"]?.AsArray() ?? [])
+        {
+            schema.GenericTables.Add(ParseGenericTable(node!.AsObject()));
         }
 
         if (o["messageUnion"] is JsonObject union)
@@ -401,6 +502,53 @@ public sealed class CanSchema
             s.Methods.Add(ParseConstructor(node!.AsObject(), s.Name));
         }
         return s;
+    }
+
+    private static GenericTableDef ParseGenericTable(JsonObject o)
+    {
+        GenericTableDef table = new()
+        {
+            Name = Str(o, "name") ?? throw new InvalidDataException("generic table without a name"),
+            Doc = Doc(o),
+            MessageType = Str(o, "messageType")
+        };
+
+        foreach (JsonNode? node in o["params"]?.AsArray() ?? [])
+        {
+            JsonObject p = node!.AsObject();
+            string letter = Str(p, "letter") ?? throw new InvalidDataException($"{table.Name} has a parameter without a letter");
+            if (letter.Length != 1)
+            {
+                throw new InvalidDataException($"{table.Name} parameter '{letter}' must be a single letter");
+            }
+            ParamType type = ParamTypes.Find(Str(p, "type") ?? throw new InvalidDataException($"{table.Name}.{letter} has no type"));
+            int maxLength = Int(p, "maxLength") ?? 0;
+            if (type.IsArray == (maxLength == 0))
+            {
+                throw new InvalidDataException(type.IsArray
+                    ? $"{table.Name}.{letter} is an array and needs a maxLength"
+                    : $"{table.Name}.{letter} is not an array and must not have a maxLength");
+            }
+            table.Params.Add(new GenericParamDef
+            {
+                Letter = letter[0],
+                Type = type,
+                MaxLength = maxLength,
+                Doc = Doc(p)
+            });
+        }
+
+        // A letter identifies a parameter within its table, so a repeat would make one of them
+        // unreachable. Letters that differ only by case would collide in the generated C# builder.
+        foreach (IGrouping<char, GenericParamDef> group in table.Params.GroupBy(p => char.ToUpperInvariant(p.Letter)))
+        {
+            if (group.Count() > 1)
+            {
+                throw new InvalidDataException(
+                    $"{table.Name} declares {string.Join(" and ", group.Select(p => $"'{p.Letter}'"))}, which cannot be told apart");
+            }
+        }
+        return table;
     }
 
     private static MemberDef ParseMember(JsonObject o)

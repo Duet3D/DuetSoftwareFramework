@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace CanMessageGenerator.Emit;
 
@@ -86,7 +87,7 @@ public sealed class CodeWriter(string indentUnit = "\t")
 /// <summary>
 /// Naming conventions shared by the emitters.
 /// </summary>
-public static class Naming
+public static partial class Naming
 {
     /// <summary>Convert a schema name (camelCase, possibly with underscores) to a C# PascalCase name.</summary>
     public static string Pascal(string name)
@@ -97,6 +98,14 @@ public static class Naming
         return result.Length == 0 ? name : result;
     }
 
-    /// <summary>Convert a C++ CanMessageType enumerator (camelCase) to its C# PascalCase counterpart.</summary>
-    public static string MessageTypeMember(string cppName) => char.ToUpperInvariant(cppName[0]) + cppName[1..];
+    /// <summary>
+    /// The C# spelling of a <c>CanMessageType</c> enumerator. Capitalising the first letter covers almost
+    /// all of them; the exception is the G-code subcommand types, where CANlib writes <c>m569p1</c> and the
+    /// C# enum has <c>M569P1</c>.
+    /// </summary>
+    public static string MessageTypeMember(string cppName) =>
+        SubcommandLetter().Replace(char.ToUpperInvariant(cppName[0]) + cppName[1..], m => m.Value.ToUpperInvariant());
+
+    [GeneratedRegex(@"(?<=[0-9])p(?=[0-9])")]
+    private static partial Regex SubcommandLetter();
 }

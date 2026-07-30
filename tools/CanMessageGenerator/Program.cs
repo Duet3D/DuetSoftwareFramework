@@ -31,6 +31,7 @@ public static class Program
         }
 
         CppEmitter cpp = new(schema);
+        CppTablesEmitter cppTables = new(schema);
         CSharpEmitter csharp = new(schema);
         ConformanceEmitter conformance = new(schema);
         List<LayoutFacts> facts = conformance.Collect();
@@ -44,6 +45,8 @@ public static class Program
         [
             (options.GetValueOrDefault("cpp-out") ?? Path.Combine(repoRoot, "tools/CanMessageGenerator/generated/cpp/CanMessageFormats.h"),
              cpp.Emit()),
+            (options.GetValueOrDefault("cpp-tables-out") ?? Path.Combine(repoRoot, "tools/CanMessageGenerator/generated/cpp/CanMessageGenericTables.h"),
+             cppTables.Emit()),
             (Path.Combine(csharpDir, "CanMessageFormats.g.cs"), csharp.EmitStructs()),
             (Path.Combine(csharpDir, "CanMessageUnion.g.cs"), csharp.EmitUnion()),
             (Path.Combine(csharpDir, "CanMessageBuffers.g.cs"), csharp.EmitBuffers()),

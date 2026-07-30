@@ -2001,6 +2001,270 @@
     }
   ],
 
+  "genericTables": [
+    {
+      "name": "M42Params",
+      "params": [
+        { "letter": "P", "type": "uint16" },
+        { "letter": "S", "type": "float" }
+      ]
+    },
+    {
+      "name": "M150Params",
+      "messageType": "writeLedStrip",
+      "params": [
+        { "letter": "E", "type": "uint16", "doc": "strip number" },
+        { "letter": "S", "type": "uint16", "doc": "number of LEDs to set" },
+        { "letter": "R", "type": "uint8", "doc": "red intensity" },
+        { "letter": "U", "type": "uint8", "doc": "green intensity" },
+        { "letter": "B", "type": "uint8", "doc": "blue intensity" },
+        { "letter": "W", "type": "uint8", "doc": "white intensity" },
+        { "letter": "P", "type": "uint8", "doc": "brightness 0-255" },
+        { "letter": "Y", "type": "uint8", "doc": "alternative brightness 0-31" },
+        { "letter": "F", "type": "uint8", "doc": "'more follows' flag" }
+      ]
+    },
+    {
+      "name": "M280Params",
+      "params": [
+        { "letter": "P", "type": "uint16" },
+        { "letter": "S", "type": "uint16" }
+      ]
+    },
+    {
+      "name": "M308V1Params",
+      "messageType": "m308V1",
+      "params": [
+        { "letter": "T", "type": "float" },
+        { "letter": "B", "type": "float" },
+        { "letter": "C", "type": "float" },
+        { "letter": "R", "type": "float" },
+        { "letter": "L", "type": "int16" },
+        { "letter": "H", "type": "int16" },
+        { "letter": "F", "type": "uint8" },
+        { "letter": "S", "type": "uint8" },
+        { "letter": "W", "type": "uint8" },
+        { "letter": "K", "type": "char" },
+        { "letter": "Y", "type": "reducedString" },
+        { "letter": "P", "type": "reducedString" },
+        { "letter": "U", "type": "float16" },
+        { "letter": "V", "type": "float16" }
+      ]
+    },
+    {
+      "name": "M569Params",
+      "messageType": "m569",
+      "params": [
+        { "letter": "P", "type": "localDriver" },
+        { "letter": "S", "type": "uint8" },
+        { "letter": "R", "type": "int8" },
+        { "letter": "D", "type": "uint8" },
+        { "letter": "F", "type": "uint8" },
+        { "letter": "B", "type": "uint8" },
+        { "letter": "H", "type": "uint16" },
+        { "letter": "V", "type": "uint16" },
+        { "letter": "Y", "type": "uint8Array", "maxLength": 3 },
+        { "letter": "T", "type": "floatArray", "maxLength": 4 },
+        { "letter": "U", "type": "int8" }
+      ]
+    },
+    {
+      "name": "M569Point1Params",
+      "doc": "Configure closed loop stepper motor",
+      "messageType": "m569p1",
+      "params": [
+        { "letter": "P", "type": "localDriver" },
+        { "letter": "T", "type": "uint8" },
+        { "letter": "E", "type": "floatArray", "maxLength": 2 },
+        { "letter": "C", "type": "float" },
+        { "letter": "R", "type": "float" },
+        { "letter": "I", "type": "float" },
+        { "letter": "D", "type": "float" },
+        { "letter": "h", "type": "float", "doc": "was 'H', no longer used, position retained for backwards compatibility (using lowercase 'h' means it won't be matched)" },
+        { "letter": "S", "type": "uint16", "doc": "steps/rev added for EXP1HCL firmware 3.5 compatibility" },
+        { "letter": "V", "type": "float", "doc": "velocity feedforward term added in 3.5beta2" },
+        { "letter": "A", "type": "float", "doc": "acceleration feedforward term added in 3.5beta4" },
+        { "letter": "Q", "type": "float", "doc": "torque constant in Nm per A added in 3.5 post beta4" },
+        { "letter": "Y", "type": "reducedString", "doc": "magnetic encoder type, added at 3.6.2" }
+      ]
+    },
+    {
+      "name": "M569Point2Params",
+      "doc": "Read or write stepper driver register",
+      "messageType": "m569p2",
+      "params": [
+        { "letter": "P", "type": "localDriver" },
+        { "letter": "R", "type": "uint8" },
+        { "letter": "V", "type": "uint32" }
+      ]
+    },
+    {
+      "name": "M569Point4Params",
+      "doc": "Set driver torque mode",
+      "messageType": "m569p4",
+      "params": [
+        { "letter": "P", "type": "localDriver", "doc": "driver" },
+        { "letter": "T", "type": "float", "doc": "requested torque in Nm" },
+        { "letter": "V", "type": "float", "doc": "maximum speed to move at" }
+      ]
+    },
+    {
+      "name": "M569Point6Params",
+      "doc": "Note: M569Point6Params_StatusOnly must be kept in step with this!",
+      "messageType": "m569p6",
+      "params": [
+        { "letter": "P", "type": "localDriver" },
+        { "letter": "V", "type": "uint8" },
+        { "letter": "S", "type": "float", "doc": "speed parameter (in full steps/sec) for step tuning move (can't use V because it is taken already)" },
+        { "letter": "A", "type": "float", "doc": "acceleration parameter (in full steps/sec^2) for step tuning move" }
+      ]
+    },
+    {
+      "name": "M569Point6Params_StatusOnly",
+      "doc": "This is the same as M569Point6Params except that it doesn't pick up the V parameter from the GCodeBuffer, and we don't need the extra parameters",
+      "messageType": "m569p6",
+      "params": [
+        { "letter": "P", "type": "localDriver" },
+        { "letter": "v", "type": "uint8", "doc": "changed to lowercase so that we don't pick up this parameter from the GCode command" }
+      ]
+    },
+    {
+      "name": "M569Point7Params",
+      "messageType": "m569p7",
+      "params": [
+        { "letter": "P", "type": "localDriver", "doc": "drive number" },
+        { "letter": "C", "type": "reducedString", "doc": "port name" },
+        { "letter": "V", "type": "float", "doc": "brake voltage added at 3.5beta2" },
+        { "letter": "S", "type": "uint16", "doc": "brake off delay added at 3.6beta1" }
+      ]
+    },
+    {
+      "name": "M915Params",
+      "messageType": "m915",
+      "params": [
+        { "letter": "d", "type": "uint16", "doc": "this is the bitmap of driver numbers to change the parameters for" },
+        { "letter": "S", "type": "int8" },
+        { "letter": "F", "type": "uint8" },
+        { "letter": "H", "type": "uint16" },
+        { "letter": "T", "type": "uint16" },
+        { "letter": "R", "type": "uint8" }
+      ]
+    },
+    {
+      "name": "M950HeaterParams",
+      "messageType": "m950Heater",
+      "params": [
+        { "letter": "H", "type": "uint16" },
+        { "letter": "Q", "type": "pwmFreq" },
+        { "letter": "T", "type": "uint16" },
+        { "letter": "C", "type": "reducedString" },
+        { "letter": "B", "type": "int16", "doc": "ambient temperature sensor number, added at 3.7.0-beta.2" }
+      ]
+    },
+    {
+      "name": "M950FanParams",
+      "messageType": "m950Fan",
+      "params": [
+        { "letter": "F", "type": "uint16" },
+        { "letter": "Q", "type": "pwmFreq" },
+        { "letter": "C", "type": "reducedString" },
+        { "letter": "K", "type": "float", "doc": "tacho pulses/rev added at 3.5" }
+      ]
+    },
+    {
+      "name": "M950GpioParams",
+      "messageType": "m950Gpio",
+      "params": [
+        { "letter": "P", "type": "uint16" },
+        { "letter": "Q", "type": "pwmFreq" },
+        { "letter": "S", "type": "uint8", "doc": "1 if servo, 0 if GPIO" },
+        { "letter": "C", "type": "reducedString" }
+      ]
+    },
+    {
+      "name": "M950LedParams",
+      "messageType": "m950Led",
+      "params": [
+        { "letter": "E", "type": "uint16", "doc": "Strip number" },
+        { "letter": "U", "type": "uint16", "doc": "Maximum number of LEDs" },
+        { "letter": "Q", "type": "uint32", "doc": "SPI frequency (DotStar) or cycle frequency (Neopixel)" },
+        { "letter": "T", "type": "uint8", "doc": "Type (0 = DotStar, 1 = RGB Neopixel, 2 = RGBW Neopixel)" },
+        { "letter": "C", "type": "reducedString", "doc": "Port name" },
+        { "letter": "L", "type": "uint16Array", "maxLength": 4, "doc": "Timing parameters, used by STM implementation only, implies bit-banged if present" },
+        { "letter": "K", "type": "uint8" }
+      ]
+    },
+    {
+      "name": "ConfigureFilamentMonitorParams",
+      "doc": "This must cover all parameters used by any supported type of filament monitor, except for the type and extruder number",
+      "messageType": "configureFilamentMonitor",
+      "params": [
+        { "letter": "d", "type": "uint8", "doc": "this is the driver number on the remote board" },
+        { "letter": "S", "type": "uint8" },
+        { "letter": "A", "type": "uint8" },
+        { "letter": "L", "type": "float" },
+        { "letter": "E", "type": "float" },
+        { "letter": "R", "type": "uint16Array", "maxLength": 2 },
+        { "letter": "C", "type": "reducedString" }
+      ]
+    },
+    {
+      "name": "M955Params",
+      "doc": "Accelerometer settings",
+      "messageType": "accelerometerConfig",
+      "params": [
+        { "letter": "P", "type": "localDriver", "doc": "accelerometer number" },
+        { "letter": "I", "type": "uint8", "doc": "orientation" },
+        { "letter": "R", "type": "uint8", "doc": "resolution (bits)" },
+        { "letter": "S", "type": "uint16", "doc": "sampling rate" }
+      ]
+    },
+    {
+      "name": "M122P1Params",
+      "doc": "M122 P1 parameters",
+      "messageType": "testReport",
+      "params": [
+        { "letter": "T", "type": "floatArray", "maxLength": 2, "doc": "MCU temperature limits" },
+        { "letter": "V", "type": "floatArray", "maxLength": 2, "doc": "VIN voltage limits" },
+        { "letter": "W", "type": "floatArray", "maxLength": 2, "doc": "V12 voltage limits" },
+        { "letter": "U", "type": "floatArray", "maxLength": 2, "doc": "thermistor temperature reading limits" },
+        { "letter": "F", "type": "floatArray", "maxLength": 2, "doc": "inductive sensor frequency limits" }
+      ]
+    },
+    {
+      "name": "M655Params",
+      "doc": "M655 parameters",
+      "messageType": "m655",
+      "params": [
+        { "letter": "E", "type": "float" },
+        { "letter": "F", "type": "float" },
+        { "letter": "R", "type": "int32" },
+        { "letter": "S", "type": "int32" },
+        { "letter": "P", "type": "uint16" },
+        { "letter": "C", "type": "reducedString" },
+        { "letter": "A", "type": "string" }
+      ]
+    },
+    {
+      "name": "M111Params",
+      "doc": "M111 parameters",
+      "messageType": "m111",
+      "params": [
+        { "letter": "D", "type": "uint32" },
+        { "letter": "F", "type": "uint16", "doc": "probably not needed but include it in case" },
+        { "letter": "P", "type": "uint8" },
+        { "letter": "S", "type": "uint8" }
+      ]
+    },
+    {
+      "name": "M959Params",
+      "doc": "M959 parameters. The B parameter selects the board and is consumed by the main board",
+      "params": [
+        { "letter": "T", "type": "uint16", "doc": "connection timeout in seconds" }
+      ]
+    }
+  ],
+
   "messageUnion": {
     "name": "CanMessage",
     "doc": "A union of all message types to allow the correct message format to be extracted from a message buffer",
