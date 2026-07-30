@@ -12,9 +12,12 @@ This tool removes the duplication. Both representations are generated from one n
 Schema/can-messages.json
         |
         +--> generated/cpp/CanMessageFormats.h                                  (drop-in for CANlib)
+        +--> generated/cpp/CanMessageGenericTables.h                            (drop-in for CANlib)
         +--> src/DuetControlServer/Link/Protocol/CanMessages/Generated/*.cs     (DuetControlServer)
         +--> generated/cpp/CanMessageLayoutProbe.cpp                            (C++ conformance harness)
+        +--> generated/cpp/CanMessageGenericTablesProbe.cpp                     (C++ conformance harness)
         +--> src/UnitTests/Link/CanMessageLayout.g.cs                           (C# conformance harness)
+        +--> src/UnitTests/Link/CanGenericTableLayout.g.cs                      (C# conformance harness)
 ```
 
 ## Usage
@@ -67,7 +70,9 @@ That computed layout is then asserted in both languages by generated harnesses:
 * **`CanMessageLayout.g.cs`** asserts the same expectations against the generated C# structs as an NUnit
   fixture, so `dotnet test` catches any C#-side drift.
 
-Both harnesses currently make 469 checks over 76 structs and 207 bitfields.
+Both harnesses currently make 469 checks over 76 structs and 207 bitfields. The generic message parameter
+tables are checked the same way, by `CanMessageGenericTablesProbe.cpp` and `CanGenericTableLayout.g.cs`:
+143 checks over 22 tables and 121 parameters.
 
 ## Schema
 
@@ -178,6 +183,62 @@ schema declares an ordinary `Set` method with `"emit": ["csharp"]`.
 * Names are PascalCased. Where PascalCasing would collide a constant with a field that C++ distinguishes by
   case alone — `CanMessageEnterTestMode`'s `Passwd` constant and `passwd` field — the constant takes a
   `Value` suffix (`PasswdValue`).
+
+## Generic messages
+
+Around twenty of the messages do not have a struct of their own. They share `CanMessageGeneric`, whose
+payload is a `paramMap` bitmap plus the values of whichever G-code parameters are being sent, and a
+**parameter table** tells both ends what those parameters are:
+
+```jsonc
+{
+  "name": "M950FanParams",
+  "messageType": "m950Fan",                 // where exactly one message type uses this table
+  "params": [
+    { "letter": "F", "type": "uint16" },
+    { "letter": "Q", "type": "pwmFreq" },
+    { "letter": "C", "type": "reducedString" },
+    { "letter": "K", "type": "float", "doc": "tacho pulses/rev added at 3.5" },
+    { "letter": "L", "type": "uint16Array", "maxLength": 4 }
+  ]
+}
+```
+
+Types are the `ParamDescriptor::ParamType` enumerators under schema names: `uint8`…`uint64`, `int8`…`int32`,
+`float`, `float16`, `pwmFreq`, `char`, `string`, `reducedString`, `localDriver`, and the array types
+`uint8Array`, `uint16Array`, `uint32Array` and `floatArray`, which need a `maxLength`.
+
+The sender packs the parameters it is sending in table order with no padding of any kind — a fixed-size
+parameter takes its element size, a string its bytes plus a null terminator, an array a length byte followed
+by its elements — and sets bit *i* of `paramMap` for entry *i*. **A new parameter must therefore be added at
+the end of its table**, or the paramMap bits and offsets of every existing one shift.
+
+A letter outside `A..Z` cannot be supplied by a G-code command. CANlib uses that both to retire an entry
+while keeping its position (`M569.1`'s `h`) and to reserve a parameter that the sender fills in itself
+(`M915`'s `d`, a driver bitmap), so the generated code still lets a caller set one.
+
+Each table produces:
+
+* an entry in the C++ `CanMessageGenericTables.h`, with CANlib's per-entry macros expanded;
+* an entry in `CanGenericTables`, plus the `CanParamType` and `CanParamDescriptor` that describe it.
+  `CanParamType` keeps CANlib's numbering because the low nibble is the element size, which decides how far
+  each parameter advances the write cursor;
+* a typed builder, so that the letters and their types are checked by the compiler:
+
+```csharp
+M950FanBuilder builder = new();
+builder.F(fanNumber).C(portName).K(pulsesPerRev);
+// builder.K("oops") does not compile, and there is no Z method
+```
+
+The two hand-written pieces are `CanGenericWriter`, which does the packing (and `CanGenericParser`, its
+counterpart, used to read back what it produced), and `CanMessageGenericConstructor`, which builds a message
+from a `Code` — the equivalent of RepRapFirmware's `PopulateFromCommand`, and the path to use when the
+parameters are whatever the user typed rather than known at the call site.
+
+`ParamDescriptor` itself is not generated: it comes from CANlib's `CanMessageGenericTableFormat.h`, since it
+is the type both ends of the link agree on. Its per-type macros are simply unused once the tables are
+generated.
 
 ## Known gaps
 
