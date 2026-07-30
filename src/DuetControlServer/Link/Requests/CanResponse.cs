@@ -34,7 +34,7 @@ public readonly record struct CanResponse(CanStatus Status, CanMessageType Respo
     /// </summary>
     /// <typeparam name="T">CAN message body type.</typeparam>
     /// <returns>Deserialized message body.</returns>
-    public readonly T AsCanMessage<T>() where T : struct, ICanMessage<T> => CanMessageSerializer.Deserialize<T>(Payload);
+    public readonly T AsCanMessage<T>() where T : struct, ICanMessageBody<T> => CanMessageSerializer.Deserialize<T>(Payload);
 
     public string PayloadString => Encoding.ASCII.GetString(Payload);
 }

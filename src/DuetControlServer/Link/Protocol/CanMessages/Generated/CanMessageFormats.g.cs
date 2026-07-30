@@ -937,7 +937,7 @@ public struct CanMessageSetHeaterTemperatureV1 : ICanMessage<CanMessageSetHeater
 /// Mirrors CanMessageM303 in CANlib's CanMessageFormats.h. This layout is 8 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 8)]
-public struct CanMessageM303 : ICanMessage<CanMessageM303>
+public struct CanMessageM303 : ICanMessageBody<CanMessageM303>
 {
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
@@ -2579,7 +2579,7 @@ public struct CanMessageReadInputsReplyV1 : ICanMessage<CanMessageReadInputsRepl
 /// Mirrors CanMessageGeneric in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
-public struct CanMessageGeneric : ICanMessage<CanMessageGeneric>
+public struct CanMessageGeneric : ICanMessageBody<CanMessageGeneric>
 {
     /// <summary>Backing storage for the bitfields requestId:12, paramMap:20</summary>
     [FieldOffset(0)] private uint _bits0;
@@ -3877,7 +3877,7 @@ public struct CanMessageDebugText : ICanMessage<CanMessageDebugText>
 /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;uint16_t&amp;gt;. This layout is 20 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 20)]
-public struct CanMessageMultipleDrivesRequestUint16 : ICanMessage<CanMessageMultipleDrivesRequestUint16>
+public struct CanMessageMultipleDrivesRequestUint16 : ICanMessageBody<CanMessageMultipleDrivesRequestUint16>
 {
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
@@ -3922,7 +3922,7 @@ public struct CanMessageMultipleDrivesRequestUint16 : ICanMessage<CanMessageMult
 /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;float&amp;gt;. This layout is 36 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 36)]
-public struct CanMessageMultipleDrivesRequestFloat : ICanMessage<CanMessageMultipleDrivesRequestFloat>
+public struct CanMessageMultipleDrivesRequestFloat : ICanMessageBody<CanMessageMultipleDrivesRequestFloat>
 {
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
@@ -3967,7 +3967,7 @@ public struct CanMessageMultipleDrivesRequestFloat : ICanMessage<CanMessageMulti
 /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;StepsPerUnitAndMicrostepping&amp;gt;. This layout is 52 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 52)]
-public struct CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping : ICanMessage<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>
+public struct CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping : ICanMessageBody<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>
 {
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
@@ -4012,7 +4012,7 @@ public struct CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping : ICan
 /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;DriverStateControl&amp;gt;. This layout is 20 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 20)]
-public struct CanMessageMultipleDrivesRequestDriverStateControl : ICanMessage<CanMessageMultipleDrivesRequestDriverStateControl>
+public struct CanMessageMultipleDrivesRequestDriverStateControl : ICanMessageBody<CanMessageMultipleDrivesRequestDriverStateControl>
 {
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
@@ -4057,7 +4057,7 @@ public struct CanMessageMultipleDrivesRequestDriverStateControl : ICanMessage<Ca
 /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;ShortPressureAdvanceParameters&amp;gt;. This layout is 52 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 52)]
-public struct CanMessageMultipleDrivesRequestShortPressureAdvanceParameters : ICanMessage<CanMessageMultipleDrivesRequestShortPressureAdvanceParameters>
+public struct CanMessageMultipleDrivesRequestShortPressureAdvanceParameters : ICanMessageBody<CanMessageMultipleDrivesRequestShortPressureAdvanceParameters>
 {
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;

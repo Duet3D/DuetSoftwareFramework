@@ -247,8 +247,13 @@ public sealed class CSharpEmitter(CanSchema schema)
     {
         writer.XmlDoc(Describe(s));
 
+        // A body that CANlib declares no messageType for cannot identify itself, so it implements only
+        // ICanMessageBody and the send path refuses it at compile time rather than putting an
+        // UnusedMessageType on the bus
         bool isMessage = s.Name.StartsWith("CanMessage", StringComparison.Ordinal) && s.TemplateParam is null;
-        string bases = isMessage ? $" : ICanMessage<{s.Name}>" : "";
+        string bases = isMessage
+            ? s.MessageType is not null ? $" : ICanMessage<{s.Name}>" : $" : ICanMessageBody<{s.Name}>"
+            : "";
         writer.Line($"[StructLayout(LayoutKind.Explicit, Pack = 1, Size = {Math.Max(s.Size, 1)})]");
         using (writer.Block($"public struct {s.Name}{bases}", "}"))
         {

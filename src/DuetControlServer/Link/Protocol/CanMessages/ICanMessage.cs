@@ -17,22 +17,34 @@ namespace DuetControlServer.Link.Protocol.CanMessages;
 /// and fixed C arrays represented as blittable
 /// <see cref="System.Runtime.CompilerServices.InlineArrayAttribute"/> buffers so they can be
 /// (de)serialized with <c>MemoryMarshal</c>.
+/// <para>
+/// A few message bodies carry no message type of their own because they are sent under several different
+/// types: the <c>CanMessageMultipleDrivesRequest</c> family, <c>CanMessageGeneric</c> and
+/// <c>CanMessageM303</c>. CANlib gives those no <c>messageType</c> member either, so they implement this
+/// interface rather than <see cref="ICanMessage{TSelf}"/> and the caller supplies the type.
+/// </para>
 /// </remarks>
-public interface ICanMessage<TSelf> where TSelf : struct, ICanMessage<TSelf>
+public interface ICanMessageBody<TSelf> where TSelf : struct, ICanMessageBody<TSelf>
 {
-    /// <summary>
-    /// CAN message type identifying this message (placed in the CAN id)
-    /// </summary>
-    /// <remarks>
-    /// A few message bodies carry no message type of their own because they are sent under several
-    /// different types: the <c>CanMessageMultipleDrivesRequest</c> family, <c>CanMessageGeneric</c> and
-    /// <c>CanMessageM303</c>. CANlib gives those no <c>messageType</c> member either, so they inherit
-    /// this default and the caller supplies the type instead.
-    /// </remarks>
-    static virtual CanMessageType MessageType => CanMessageType.UnusedMessageType;
-
     /// <summary>
     /// Number of payload bytes this message actually occupies. Variable-length messages override this.
     /// </summary>
     virtual uint GetActualDataLength() => (uint)Unsafe.SizeOf<TSelf>();
+}
+
+/// <summary>
+/// A CAN message body that identifies itself, i.e. one that CANlib declares a <c>messageType</c> for.
+/// </summary>
+/// <remarks>
+/// The message type is <c>static abstract</c> on purpose. Supplying a default here would let a body whose
+/// schema entry is missing its <c>messageType</c> compile and then go out on the bus under
+/// <see cref="CanMessageType.UnusedMessageType"/>, which is indistinguishable from
+/// <see cref="CanMessageType.NoReply"/> — a silently malformed CAN id rather than a build error.
+/// </remarks>
+public interface ICanMessage<TSelf> : ICanMessageBody<TSelf> where TSelf : struct, ICanMessage<TSelf>
+{
+    /// <summary>
+    /// CAN message type identifying this message (placed in the CAN id)
+    /// </summary>
+    static abstract CanMessageType MessageType { get; }
 }
