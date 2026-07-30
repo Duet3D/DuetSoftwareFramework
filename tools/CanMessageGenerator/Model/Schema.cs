@@ -651,7 +651,36 @@ public sealed class CanSchema
                 })]
             };
         }
+        ValidateGenericTableSizes(schema);
         return schema;
+    }
+
+    /// <summary>
+    /// A parameter's presence is one bit of <c>CanMessageGeneric.paramMap</c>, so no table may declare more
+    /// parameters than that bitfield is wide. Past the limit, a parameter's presence bit would be silently
+    /// masked away by the generated property's setter while its bytes are still written to the data area,
+    /// corrupting every parameter that follows it for the receiver.
+    /// </summary>
+    private static void ValidateGenericTableSizes(CanSchema schema)
+    {
+        // Not schema.Find/ByName: that dictionary is cached lazily, and caching it here - before
+        // Program.ExpandTemplates adds its instantiations to schema.Structs - would leave every
+        // later lookup blind to template-instantiated structs for the rest of the run.
+        StructDef generic = schema.Structs.FirstOrDefault(s => s.Name == "CanMessageGeneric")
+            ?? throw new InvalidDataException("schema has no CanMessageGeneric struct to size paramMap against");
+        BitFieldDef paramMap = generic.Members
+            .SelectMany(m => m.Fields)
+            .FirstOrDefault(f => f.Name == "paramMap")
+            ?? throw new InvalidDataException("CanMessageGeneric has no paramMap bitfield to size generic tables against");
+
+        foreach (GenericTableDef table in schema.GenericTables)
+        {
+            if (table.Params.Count > paramMap.Width)
+            {
+                throw new InvalidDataException(
+                    $"{table.Name} has {table.Params.Count} parameters, more than the {paramMap.Width}-bit paramMap can address");
+            }
+        }
     }
 
     private static StructDef ParseStruct(JsonObject o)
