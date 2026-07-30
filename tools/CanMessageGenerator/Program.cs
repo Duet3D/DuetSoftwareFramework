@@ -156,10 +156,19 @@ public static class Program
                     RequestIdField = template.RequestIdField,
                     SetRequestIdAlsoClears = template.SetRequestIdAlsoClears,
                     ClearAlsoClears = template.ClearAlsoClears,
+                    // The rest of StructDef (CppFinal, NestedIn, Existing, CppStaticAsserts, CppHeader,
+                    // CppClass) is C++-only and irrelevant here, since an instantiation is always C#-only.
+                    CSharpPartial = template.CSharpPartial,
                     TemplateArg = instantiation.Arg,
                     TemplateParamName = template.TemplateParam,
                     TemplateOf = template.Name
                 };
+                int substituted = concrete.Members.Count(m => m.Type == template.TemplateParam);
+                if (substituted == 0)
+                {
+                    throw new InvalidDataException(
+                        $"{template.Name}{instantiation.Suffix} substitutes '{template.TemplateParam}' but no member has that type");
+                }
                 foreach (MemberDef m in concrete.Members.Where(m => m.Type == template.TemplateParam))
                 {
                     m.Type = instantiation.Arg;
