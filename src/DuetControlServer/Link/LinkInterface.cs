@@ -101,11 +101,11 @@ public sealed partial class LinkInterface(
     {
         CanMessageSetAddressAndNormalTiming message = new()
         {
-            oldAddress = dstAddress,
-            newAddress = newAddress ?? dstAddress,
-            newAddressInverted = (byte)~(newAddress ?? dstAddress),
-            doSetTiming = CanMessageSetAddressAndNormalTiming.DoSetTimingYes,
-            normalTiming = timing
+            OldAddress = dstAddress,
+            NewAddress = newAddress ?? dstAddress,
+            NewAddressInverted = (byte)~(newAddress ?? dstAddress),
+            DoSetTiming = CanMessageSetAddressAndNormalTiming.DoSetTimingYes,
+            NormalTiming = timing
         };
 
         return SendCanMessageAsync(dstAddress, in message, cancellationToken: cancellationToken);
@@ -115,8 +115,8 @@ public sealed partial class LinkInterface(
     {
         CanMessageSetAddressAndNormalTiming message = new()
         {
-            oldAddress = dstAddress,
-            doSetTiming = CanMessageSetAddressAndNormalTiming.DoSetTimingNo
+            OldAddress = dstAddress,
+            DoSetTiming = CanMessageSetAddressAndNormalTiming.DoSetTimingNo
         };
 
         return SendCanMessageAsync(dstAddress, message, CanMessageType.StandardReply, cancellationToken: cancellationToken);

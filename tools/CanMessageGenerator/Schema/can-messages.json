@@ -1,0 +1,2043 @@
+{
+  "$schema": "./can-messages.schema.json",
+  "$comment": [
+    "Neutral description of the Duet 3 CAN message formats. This file is the single source of truth;",
+    "both lib/CANlib/src/CanMessageFormats.h (C++) and DuetControlServer's Link/Protocol/CanMessages",
+    "(C#) are generated from it by tools/CanMessageGenerator.",
+    "",
+    "Layout rules (verified against g++ __attribute__((packed)) on little-endian targets):",
+    " - a bit cursor runs through the struct; a bitfield is placed at the cursor and advances it by its",
+    "   width, with no padding and no regard for the declared storage type (bitfields may straddle both",
+    "   byte and storage-unit boundaries, and consecutive groups of different storage types pack together);",
+    " - a non-bitfield member rounds the cursor up to the next byte boundary before being placed;",
+    " - the struct size is the cursor rounded up to a whole number of bytes.",
+    "",
+    "Field order therefore matters and must not be changed without bumping the message type."
+  ],
+
+  "cppHeaderGuard": "SRC_CAN_CANMESSAGEFORMATS_H_",
+  "cppIncludes": [
+    "\"CanId.h\"",
+    "\"RRF3Common.h\"",
+    "\"Duet3Common.h\"",
+    "\"CanSettings.h\"",
+    "\"RemoteInputHandle.h\"",
+    "\"HeaterModel.h\"",
+    "<General/Bitmap.h>",
+    "<General/Strnlen.h>",
+    "<General/Portability.h>",
+    "<climits>",
+    "<ctime>",
+    "<cstring>"
+  ],
+  "csharpNamespace": "DuetControlServer.Link.Protocol.CanMessages",
+  "csharpUsings": [
+    "DuetControlServer.Link.Protocol.Shared"
+  ],
+
+  "constants": {
+    "MaxLinearDriversPerCanSlave": 8,
+    "MaxHeatersPerCanSlave": 6
+  },
+
+  "structs": [
+    {
+      "name": "RemoteInputHandle",
+      "doc": "Handle to a remote input. Declared in CANlib's RemoteInputHandle.h, so only the C# mirror is generated.",
+      "emit": ["csharp"],
+      "isUnion": true,
+      "existing": { "cpp": { "header": "RemoteInputHandle.h" } },
+      "constants": [
+        { "name": "TypeUnset", "type": "u16", "value": "0" },
+        { "name": "TypeEndstop", "type": "u16", "value": "1" },
+        { "name": "TypeGpIn", "type": "u16", "value": "2" },
+        { "name": "TypeZprobe", "type": "u16", "value": "3" },
+        { "name": "TypeAte", "type": "u16", "value": "4" },
+        { "name": "TypeStallEndstop", "type": "u16", "value": "5" },
+        { "name": "LowestBadType", "type": "u16", "value": "6" }
+      ],
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16", "cppAccessPath": "parts",
+          "fields": [
+            { "name": "minor", "width": 6, "doc": "Endstop switch number within the axis (for endstops)" },
+            { "name": "major", "width": 6, "doc": "Axis number (for endstops), or GPIn number, or Z probe number" },
+            { "name": "type", "width": 4, "doc": "What the handle is used for; see the Type... constants" }
+          ]
+        },
+        { "kind": "field", "name": "all", "type": "u16", "doc": "The whole handle as a single 16-bit value" }
+      ],
+      "methods": [
+        {
+          "name": "IsValid", "returnType": "bool",
+          "body": [ { "return": "type > TypeUnset && type < LowestBadType" } ]
+        },
+        {
+          "name": "Set", "returnType": "void", "const": false,
+          "params": [ { "name": "p_type", "type": "u8" }, { "name": "p_major", "type": "u8" }, { "name": "p_minor", "type": "u8" } ],
+          "body": [
+            { "set": "type", "to": "p_type" },
+            { "set": "major", "to": "p_major" },
+            { "set": "minor", "to": "p_minor" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "HeaterModel",
+      "doc": "Heater model used by RRF. Declared in CANlib's HeaterModel.h, so only the C# mirror is generated.",
+      "emit": ["csharp"],
+      "packed": false,
+      "existing": { "cpp": { "header": "HeaterModel.h" } },
+      "members": [
+        { "kind": "field", "name": "heatingRate", "type": "f32", "doc": "Rate at which the heater heats up at 25C and full PWM with no cooling" },
+        { "kind": "field", "name": "basicCoolingRate", "type": "f32", "doc": "Rate at which the heater cools when 100C above ambient with the print cooling fan off" },
+        { "kind": "field", "name": "fanCoolingRate", "type": "f32", "doc": "Additional cooling rate at 100C above ambient with the print cooling fan at full PWM" },
+        { "kind": "field", "name": "coolingRateExponent", "type": "f32", "doc": "How the basic cooling rate varies with temperature difference" },
+        { "kind": "field", "name": "deadTime", "type": "f32", "doc": "How long between the heating power changing and the temperature sensor noticing" },
+        { "kind": "field", "name": "temperatureCoefficient", "type": "f32", "doc": "How much the heating power increases per degC above 25C; negative for PTC heaters" },
+        { "kind": "field", "name": "typicalTemperature", "type": "f32", "doc": "Temperature at which the PID parameters are calculated" },
+        { "kind": "field", "name": "standardVoltage", "type": "f32", "doc": "Power voltage reading at which tuning was done, or 0 if unknown" },
+        { "kind": "field", "name": "fzero", "type": "f32", "reserved": true, "doc": "Reserved for expansion, e.g. cooling rate due to extrusion" },
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "usePid", "width": 1, "bool": true },
+            { "name": "zero", "width": 31, "reserved": true }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "MinCurMax",
+      "doc": "Minimum, current and maximum values of a floating point quantity. Declared in CANlib's RRF3Common.h.",
+      "emit": ["csharp"],
+      "packed": false,
+      "existing": { "cpp": { "header": "RRF3Common.h" } },
+      "members": [
+        { "kind": "field", "name": "minimum", "type": "f32" },
+        { "kind": "field", "name": "current", "type": "f32" },
+        { "kind": "field", "name": "maximum", "type": "f32" }
+      ]
+    },
+
+    {
+      "name": "ShortMinCurMax",
+      "doc": "Version of MinCurMax that uses float16 for more compact CAN messages. Declared in CANlib's RRF3Common.h.",
+      "emit": ["csharp"],
+      "packed": false,
+      "existing": { "cpp": { "header": "RRF3Common.h" } },
+      "members": [
+        { "kind": "field", "name": "minimum", "type": "f16" },
+        { "kind": "field", "name": "current", "type": "f16" },
+        { "kind": "field", "name": "maximum", "type": "f16" }
+      ]
+    },
+
+    {
+      "name": "ShortPressureAdvanceParameters",
+      "doc": "Compact pressure advance parameters for passing over CAN. Declared in CANlib's RRF3Common.h.",
+      "emit": ["csharp"],
+      "existing": { "cpp": { "header": "RRF3Common.h" } },
+      "members": [
+        { "kind": "array", "name": "k", "type": "f16", "length": "2" },
+        { "kind": "field", "name": "dk", "type": "f16" }
+      ]
+    },
+
+    {
+      "name": "CanTiming",
+      "doc": "CAN bit timing parameters. Declared in CANlib's CanSettings.h and hand-written on the C# side, so only referenced here.",
+      "emit": [],
+      "existing": {
+        "cpp": { "header": "CanSettings.h" },
+        "csharp": { "namespace": "DuetControlServer.Link.Protocol.Shared" }
+      },
+      "size": 10
+    },
+
+    {
+      "name": "CanMessageTimeSync",
+      "doc": [
+        "Time sync message. The realTime field was added at RRF 3.2 so it is not transmitted by main boards running 3.1.1 and earlier.",
+        "Time sync messages are always transmitted without using BRS."
+      ],
+      "messageType": "timeSync",
+      "constants": [
+        { "name": "SizeWithoutRealTime", "type": "usize", "value": "12", "doc": "Length of a message that does not include the real time" },
+        { "name": "SizeWithRealTime", "type": "usize", "value": "16", "doc": "Minimum length of a message that includes the real time" },
+        { "name": "SizeWithRealTimeAndMovementDelay", "type": "usize", "value": "20", "doc": "Length of a message that includes the real time and the movement delay" }
+      ],
+      "members": [
+        { "kind": "field", "name": "timeSent", "type": "u32", "doc": "When this message was sent" },
+        { "kind": "field", "name": "lastTimeSent", "type": "u32", "doc": "When we tried to send the previous message" },
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "lastTimeAcknowledgeDelay", "width": 16, "doc": "Delay from that time before the previous message was acknowledged" },
+            { "name": "isPrinting", "width": 1, "bool": true, "doc": "Set if we are printing and the filament monitor should collect data" },
+            { "name": "fastDataRate", "width": 3, "doc": "CAN-FD data bit rate divided by nominal bit rate, minus 1. 0 (multiplier 1) means do not use bit rate switching" },
+            { "name": "tseg1Minus1", "width": 8, "doc": "The tseg1 value for the data phase, minus 1" },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "realTime", "type": "u32", "doc": "Seconds since 00:00:00 UTC on 1 January 1970, unsigned to avoid the year 2038 problem. Not always present." },
+        { "kind": "field", "name": "movementDelay", "type": "u32", "doc": "Cumulative hiccup time. Not always present." }
+      ]
+    },
+
+    {
+      "name": "CanMessageEmergencyStop",
+      "doc": "Emergency stop message",
+      "messageType": "emergencyStop",
+      "members": []
+    },
+
+    {
+      "name": "CanMessageEnterTestMode",
+      "doc": "Enter test mode message, used to force a main board to behave like a CAN expansion board",
+      "messageType": "enterTestMode",
+      "requestIdField": "requestId",
+      "constants": [
+        { "name": "Passwd", "type": "u32", "value": "0x57a82fd1", "doc": "Value that the password field must match" }
+      ],
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero1", "width": 4, "reserved": true }
+          ]
+        },
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "address", "width": 7, "doc": "CAN address to use" },
+            { "name": "zero2", "width": 9, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "passwd", "type": "u32", "doc": "Integrity check" }
+      ]
+    },
+
+    {
+      "name": "CanMessageAcknowledgeAnnounce",
+      "doc": "Announce acknowledgement message",
+      "messageType": "acknowledgeAnnounce",
+      "members": []
+    },
+
+    {
+      "name": "CanMessageReset",
+      "doc": "Reset message",
+      "messageType": "reset",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageStopMovement",
+      "doc": "Stop movement on specific drivers",
+      "messageType": "stopMovement",
+      "members": [
+        { "kind": "field", "name": "whichDrives", "type": "u16", "doc": "0xFFFF if all drives on the board are to be stopped" }
+      ]
+    },
+
+    {
+      "name": "CanMessageRevertPosition",
+      "doc": "Revert position on specific drivers",
+      "messageType": "revertPosition",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "whichDrives", "width": 16, "doc": "Bitmap of driver numbers whose required step counts are included in the message" },
+            { "name": "zero", "width": 16, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "clocksAllowed", "type": "u32", "doc": "How many step clocks we allow for the move" },
+        { "kind": "array", "name": "finalStepCounts", "type": "i32", "length": "MaxLinearDriversPerCanSlave", "doc": "Net number of steps of the last move that were required" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize", "static": true,
+          "params": [ { "name": "numReverting", "type": "usize" } ],
+          "body": [ { "return": "(2 * sizeof(u32)) + (numReverting * sizeof(i32))" } ]
+        }
+      ],
+      "cppStaticAsserts": [ "CanMessageRevertPosition::GetActualDataLength(MaxLinearDriversPerCanSlave) == sizeof(CanMessageRevertPosition)" ]
+    },
+
+    {
+      "name": "PerDriveValues",
+      "doc": "Per-drive value carried by a movement message: net steps for non-extruders, or extrusion (including fractional parts) for extruders",
+      "isUnion": true,
+      "nestedIn": "CanMessageMovementLinearShaped",
+      "members": [
+        { "kind": "field", "name": "steps", "type": "i32", "doc": "Net steps moved by this drive (for non-extruders)" },
+        { "kind": "field", "name": "extrusion", "type": "f32", "doc": "How many steps of extrusion to do (for extruders), including fractional parts" }
+      ],
+      "methods": [
+        {
+          "name": "Init", "returnType": "void", "const": false,
+          "body": [ { "set": "steps", "to": "0" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageMovementLinearShaped",
+      "doc": "Linear movement message with input shaping applied by the receiving board",
+      "messageType": "movementLinearShaped",
+      "cppFinal": true,
+      "clearAlsoClears": ["extruderDrives", "usePressureAdvance", "useLateInputShaping"],
+      "constants": [
+        { "name": "SeqMask", "type": "u8", "value": "0x0f" }
+      ],
+      "members": [
+        { "kind": "field", "name": "whenToExecute", "type": "u32", "doc": "The master clock time at which this move should start" },
+        { "kind": "field", "name": "accelerationClocks", "type": "u32", "doc": "How many clocks the acceleration phase should last" },
+        { "kind": "field", "name": "steadyClocks", "type": "u32", "doc": "How many clocks the steady speed phase should last" },
+        { "kind": "field", "name": "decelClocks", "type": "u32", "doc": "How many clocks the deceleration phase should last" },
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "extruderDrives", "width": 8, "doc": "Which drivers are for extruders" },
+            { "name": "numDrivers", "width": 4, "doc": "How many drivers we included (maximum is 8)" },
+            { "name": "seq", "width": 4, "doc": "Sequence number" },
+            { "name": "zero1", "width": 8, "reserved": true, "doc": "Was used to hold the input shaping plan for this move" },
+            { "name": "usePressureAdvance", "width": 1, "bool": true, "doc": "True to apply pressure advance to the extruders and accumulate partial steps" },
+            { "name": "useLateInputShaping", "width": 1, "bool": true },
+            { "name": "zero2", "width": 6, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "acceleration", "type": "f32", "doc": "Base acceleration during the acceleration segment when the total distance is normalised to 1.0. Always positive or zero." },
+        { "kind": "field", "name": "deceleration", "type": "f32", "doc": "Negative of the base deceleration during the deceleration segment when the total distance is normalised to 1.0. Always positive or zero." },
+        { "kind": "array", "name": "perDrive", "type": "PerDriveValues", "length": "MaxLinearDriversPerCanSlave" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "(sizeof(self) - sizeof(perDrive)) + (numDrivers * sizeof(elem(perDrive)))" } ]
+        },
+        {
+          "name": "HasMotion", "returnType": "bool",
+          "doc": "Return true if any of the included drives actually moves. Relies on a floating point zero also being an all-bits-zero integer.",
+          "body": [
+            {
+              "forRange": { "var": "drive", "from": "0", "to": "numDrivers" },
+              "body": [
+                { "if": "perDrive[drive].steps != 0", "then": [ { "return": "true" } ] }
+              ]
+            },
+            { "return": "false" }
+          ]
+        },
+        { "name": "DebugPrint", "returnType": "void", "emit": ["cpp"], "declarationOnly": true }
+      ]
+    },
+
+    {
+      "name": "CanMessageSetAddressAndNormalTiming",
+      "doc": "Change CAN address and normal timing message",
+      "messageType": "setAddressAndNormalTiming",
+      "requestIdField": "requestId",
+      "constants": [
+        { "name": "DoSetTimingYes", "type": "u8", "value": "0xB6", "doc": "Magic byte indicating that we do want to write the timing data" },
+        { "name": "DoSetTimingNo", "type": "u8", "value": "0" }
+      ],
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "oldAddress", "type": "u8" },
+        { "kind": "field", "name": "newAddress", "type": "u8" },
+        { "kind": "field", "name": "newAddressInverted", "type": "u8" },
+        { "kind": "field", "name": "doSetTiming", "type": "u8" },
+        { "kind": "field", "name": "normalTiming", "type": "CanTiming" }
+      ]
+    },
+
+    {
+      "name": "CanMessageMultipleDrivesRequest",
+      "doc": [
+        "Set a per-driver parameter for multiple drivers. The meaning of the values depends on the message type:",
+        " - motor currents: currents in mA;",
+        " - microstepping: microstepping (bits 0-8) and interpolation enable (bit 15);",
+        " - standstill current percentages: the percentages;",
+        " - driver states: 0 = disabled, 1 = idle, 2 = active."
+      ],
+      "templateParam": "T",
+      "instantiations": [
+        { "suffix": "Uint16", "arg": "u16" },
+        { "suffix": "Float", "arg": "f32" },
+        { "suffix": "StepsPerUnitAndMicrostepping", "arg": "StepsPerUnitAndMicrostepping" },
+        { "suffix": "DriverStateControl", "arg": "DriverStateControl" },
+        { "suffix": "ShortPressureAdvanceParameters", "arg": "ShortPressureAdvanceParameters" }
+      ],
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "driversToUpdate", "type": "u16" },
+        { "kind": "array", "name": "values", "type": "T", "length": "MaxLinearDriversPerCanSlave" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize", "static": true,
+          "params": [ { "name": "numDrivers", "type": "usize" } ],
+          "body": [ { "return": "sizeof(u16) * 2 + numDrivers * sizeof(T)" } ]
+        },
+        {
+          "name": "MaxDrivesPerMessage", "returnType": "usize", "static": true,
+          "body": [ { "return": "(64 - 2 * sizeof(u16)) / sizeof(T)" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "StepsPerUnitAndMicrostepping",
+      "doc": "Steps/mm and microstepping data sent in a CanMessageMultipleDrivesRequest",
+      "members": [
+        { "kind": "field", "name": "stepsPerUnit", "type": "f32", "unaligned": true },
+        { "kind": "field", "name": "microstepping", "type": "u16" }
+      ],
+      "methods": [
+        {
+          "name": "GetStepsPerUnit", "returnType": "f32",
+          "body": [ { "return": "loadLE(stepsPerUnit)" } ]
+        },
+        {
+          "name": "GetMicrostepping", "returnType": "u16",
+          "body": [ { "return": "microstepping" } ]
+        },
+        {
+          "name": "Set", "returnType": "void", "const": false,
+          "params": [ { "name": "spu", "type": "f32" }, { "name": "ms", "type": "u16" } ],
+          "body": [
+            { "storeLE": "stepsPerUnit", "to": "spu" },
+            { "set": "microstepping", "to": "ms" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "DriverStateControl",
+      "doc": [
+        "Driver state sent in a CanMessageMultipleDrivesRequest. The meaning of idlePercent is:",
+        " - if the mode is driverIdle then the top 8 bits are the idle current percent, to match the earlier version of this struct;",
+        " - if the mode is driverDisabled then all 12 bits are the delay in milliseconds between re-engaging the brake and disabling the motor;",
+        " - if the mode is driverEnabled then all 12 bits are the delay in milliseconds between enabling the motor and disengaging the brake."
+      ],
+      "constants": [
+        { "name": "driverDisabled", "type": "u16", "value": "0" },
+        { "name": "driverIdle", "type": "u16", "value": "1" },
+        { "name": "driverActive", "type": "u16", "value": "2" }
+      ],
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "mode", "width": 2, "doc": "See the driver... constants" },
+            { "name": "zero", "width": 6, "reserved": true },
+            { "name": "idlePercent", "width": 8 }
+          ]
+        }
+      ],
+      "methods": [
+        {
+          "name": "Set", "returnType": "void", "const": false,
+          "params": [ { "name": "m", "type": "u16" }, { "name": "idlePc", "type": "u16" } ],
+          "body": [
+            { "set": "mode", "to": "m" },
+            { "set": "zero", "to": "0" },
+            { "set": "idlePercent", "to": "idlePc" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageReturnInfo",
+      "doc": "Request board information",
+      "messageType": "returnInfo",
+      "requestIdField": "requestId",
+      "constants": [
+        { "name": "typeFirmwareVersion", "type": "u8", "value": "0" },
+        { "name": "typeBoardName", "type": "u8", "value": "1" },
+        { "name": "unused_was_typePressureAdvance", "type": "u8", "value": "2" },
+        { "name": "unused_was_typeM408", "type": "u8", "value": "3" },
+        { "name": "typeBootloaderName", "type": "u8", "value": "4" },
+        { "name": "typeBoardUniqueId", "type": "u8", "value": "5" },
+        { "name": "typeDiagnosticsPart0", "type": "u8", "value": "100", "doc": "Other parts of the diagnostics reply use 101, 102 etc. so keep those free" }
+      ],
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "param", "width": 4, "doc": "M122 P parameter" }
+          ]
+        },
+        { "kind": "field", "name": "type", "type": "u8", "doc": "Type of info requested" }
+      ]
+    },
+
+    {
+      "name": "CanMessageDiagnosticTest",
+      "doc": "Run a diagnostic test (M122 P parameter)",
+      "messageType": "diagnosticTest",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "testType", "type": "u16", "doc": "The M122 P parameter" },
+        { "kind": "field", "name": "invertedTestType", "type": "u16", "doc": "The complement of the M122 P parameter" },
+        { "kind": "field", "name": "param16", "type": "u16", "doc": "Possible 16-bit parameter" },
+        { "kind": "array", "name": "param32", "type": "u32", "length": "3", "doc": "Possible 32-bit parameters" }
+      ]
+    },
+
+    {
+      "name": "CanMessageSetHeaterTemperatureV1",
+      "doc": "Set the target temperature of a heater",
+      "messageType": "setHeaterTemperatureV1",
+      "requestIdField": "requestId",
+      "constants": [
+        { "name": "commandNone", "type": "u8", "value": "0" },
+        { "name": "commandOff", "type": "u8", "value": "1" },
+        { "name": "commandOn", "type": "u8", "value": "2" },
+        { "name": "commandResetFault", "type": "u8", "value": "3" },
+        { "name": "commandSuspend", "type": "u8", "value": "4" },
+        { "name": "commandUnsuspend", "type": "u8", "value": "5" },
+        { "name": "commandReset", "type": "u8", "value": "6", "doc": "Reset the heater after a failed model update" }
+      ],
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "heaterNumber", "width": 8 },
+            { "name": "zero2", "width": 5, "reserved": true },
+            { "name": "function", "width": 3 }
+          ]
+        },
+        { "kind": "field", "name": "setPoint", "type": "f32" },
+        {
+          "kind": "bitfield", "storage": "u8",
+          "fields": [
+            { "name": "command", "width": 4 },
+            { "name": "zero3", "width": 4, "reserved": true }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageM303",
+      "doc": "M303 auto-tune request. This message has no message type of its own; it is sent as a generic message.",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "heaterNumber", "type": "u16" },
+        { "kind": "field", "name": "targetTemperature", "type": "f32" }
+      ]
+    },
+
+    {
+      "name": "CanMessageHeaterModelV3",
+      "doc": "Send a heater model to an expansion board",
+      "messageType": "heaterModelV3",
+      "requestIdField": "requestId",
+      "setRequestIdAlsoClears": ["_obsolete_was_pidParametersOverridden"],
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "heater", "width": 8 },
+            { "name": "enabled", "width": 1, "bool": true },
+            { "name": "inverted", "width": 1, "bool": true },
+            { "name": "_obsolete_was_pidParametersOverridden", "width": 1, "bool": true, "doc": "Unused because we no longer support overriding PID parameters" },
+            { "name": "zero2", "width": 5, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "basicModel", "type": "HeaterModel" },
+        { "kind": "field", "name": "maxPwm", "type": "f32" },
+        { "kind": "field", "name": "_obsolete_was_kP", "type": "f32", "doc": "Controller (not model) gain; obsolete" },
+        { "kind": "field", "name": "_obsolete_was_recipTi", "type": "f32", "doc": "Reciprocal of the controller integral time; obsolete" },
+        { "kind": "field", "name": "_obsolete_was_tD", "type": "f32", "doc": "Controller differential time; obsolete" }
+      ]
+    },
+
+    {
+      "name": "CanMessageSetHeaterFaultDetectionParameters",
+      "doc": [
+        "M570 parameters.",
+        "IMPORTANT! Field maxBadTemperatureCount was added at version 3.5. Boards receiving this message",
+        "must not use maxBadTemperatureCount unless the version35 bit is set."
+      ],
+      "messageType": "setHeaterFaultDetection",
+      "requestIdField": "requestId",
+      "setRequestIdAlsoClears": ["version35"],
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "version35", "width": 1, "bool": true },
+            { "name": "zero", "width": 3, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "heater", "type": "u16" },
+        { "kind": "field", "name": "maxTempExcursion", "type": "f32" },
+        { "kind": "field", "name": "maxFaultTime", "type": "f32" },
+        { "kind": "field", "name": "maxBadTemperatureCount", "type": "u32", "doc": "Added at version 3.5; only present if the version35 flag is set" }
+      ]
+    },
+
+    {
+      "name": "CanHeaterMonitor",
+      "doc": "One heater monitor within a CanMessageSetHeaterMonitors",
+      "nestedIn": "CanMessageSetHeaterMonitors",
+      "members": [
+        { "kind": "field", "name": "limit", "type": "f32" },
+        { "kind": "field", "name": "sensor", "type": "i8" },
+        { "kind": "field", "name": "action", "type": "u8" },
+        { "kind": "field", "name": "trigger", "type": "i8" },
+        { "kind": "field", "name": "zero", "type": "u8", "reserved": true }
+      ]
+    },
+
+    {
+      "name": "CanMessageSetHeaterMonitors",
+      "doc": "Configure the monitors of a heater",
+      "messageType": "setHeaterMonitors",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "numMonitors", "width": 4 }
+          ]
+        },
+        { "kind": "field", "name": "heater", "type": "u16" },
+        { "kind": "array", "name": "monitors", "type": "CanHeaterMonitor", "length": "7" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDatalength", "returnType": "usize",
+          "body": [ { "return": "(2 * sizeof(u16)) + (numMonitors * sizeof(CanHeaterMonitor))" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageUpdateYourFirmware",
+      "doc": "Tell an expansion board to update its firmware",
+      "messageType": "updateFirmware",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "module", "width": 2, "doc": "0 = main firmware, 1 = bootloader, 2 and 3 reserved" },
+            { "name": "zero", "width": 2, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "boardId", "type": "u8" },
+        { "kind": "field", "name": "invertedBoardId", "type": "u8" }
+      ]
+    },
+
+    {
+      "name": "CanMessageFanParameters",
+      "doc": "Configure a fan",
+      "messageType": "fanParameters",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "fanNumber", "type": "u16" },
+        { "kind": "field", "name": "blipTime", "type": "u16", "doc": "In milliseconds" },
+        { "kind": "field", "name": "val", "type": "f32" },
+        { "kind": "field", "name": "minVal", "type": "f32" },
+        { "kind": "field", "name": "maxVal", "type": "f32" },
+        { "kind": "array", "name": "triggerTemperatures", "type": "f32", "length": "2" },
+        { "kind": "field", "name": "sensorsMonitored", "type": "u64" }
+      ]
+    },
+
+    {
+      "name": "CanMessageSetFanSpeed",
+      "doc": "Set the speed of a fan",
+      "messageType": "setFanSpeed",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "fanNumber", "type": "u16" },
+        { "kind": "field", "name": "pwm", "type": "f32" }
+      ]
+    },
+
+    {
+      "name": "CanMessageCreateInputMonitorV1",
+      "doc": "Request to create an input monitor",
+      "messageType": "createInputMonitorV1",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "handle", "type": "RemoteInputHandle" },
+        { "kind": "field", "name": "threshold", "type": "i32", "doc": "Analog threshold, or zero if digital" },
+        { "kind": "field", "name": "minInterval", "type": "u16" },
+        { "kind": "array", "name": "pinName", "type": "char", "length": "54", "doc": "Null terminated" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "2 * sizeof(u16) + sizeof(u32) + sizeof(RemoteInputHandle) + strnlen(pinName)" } ]
+        },
+        {
+          "name": "GetMaxPinNameLength", "returnType": "usize",
+          "params": [ { "name": "dataLength", "type": "usize" } ],
+          "body": [ { "return": "dataLength - (2 * sizeof(u16) + sizeof(u32) + sizeof(RemoteInputHandle))" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageChangeInputMonitorV1",
+      "doc": "Request to reconfigure an input monitor",
+      "messageType": "changeInputMonitorV1",
+      "requestIdField": "requestId",
+      "constants": [
+        { "name": "actionDontMonitor", "type": "u8", "value": "0", "doc": "Stop sending status change messages" },
+        { "name": "actionDoMonitor", "type": "u8", "value": "1", "doc": "Send status change messages" },
+        { "name": "actionDelete", "type": "u8", "value": "2", "doc": "Delete this handle" },
+        { "name": "actionChangeThreshold", "type": "u8", "value": "3", "doc": "Change the threshold to param and set standard mode" },
+        { "name": "actionChangeMinInterval", "type": "u8", "value": "4", "doc": "Change the minimum interval to param and set standard mode" },
+        { "name": "actionReturnPinName", "type": "u8", "value": "5", "doc": "Return the pin name" },
+        { "name": "actionSetDriveLevel", "type": "u8", "value": "6", "doc": "Set the drive level to param, only for scanning Z probes" },
+        { "name": "actionSelectTouchMode", "type": "u8", "value": "7", "doc": "Select touch mode and set the sensitivity to param, only for scanning Z probes" },
+        { "name": "paramAutoCalibrateDriveLevelAndReport", "type": "u32", "value": "0xFFFFFFFF" },
+        { "name": "paramReportDriveLevel", "type": "u32", "value": "0xFFFFFFFE" },
+        { "name": "paramDriveLevelMask", "type": "u32", "value": "0x1F", "doc": "Bottom 5 bits are the drive level" },
+        { "name": "paramOffsetShift", "type": "u32", "value": "5", "doc": "The remaining bits are the offset" },
+        { "name": "maxParamOffset", "type": "u32", "value": "(1 << (32 - paramOffsetShift)) - 1" }
+      ],
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "handle", "type": "RemoteInputHandle" },
+        { "kind": "field", "name": "param", "type": "u32" },
+        { "kind": "field", "name": "action", "type": "u8" }
+      ]
+    },
+
+    {
+      "name": "AnalogHandleDataV0",
+      "doc": "An analog handle and the reading from it. Allocated in arrays starting on a 2- or 4-byte boundary, so 'handle' is aligned but 'reading' is not.",
+      "members": [
+        { "kind": "field", "name": "handle", "type": "RemoteInputHandle" },
+        { "kind": "field", "name": "reading", "type": "i32", "unaligned": true, "doc": "Note, this will not be aligned!" }
+      ]
+    },
+
+    {
+      "name": "AnalogHandleDataV1",
+      "doc": "An analog handle and the reading from it. Allocated in arrays starting on a 4-byte boundary, so all fields are correctly aligned.",
+      "members": [
+        { "kind": "field", "name": "handle", "type": "RemoteInputHandle" },
+        { "kind": "field", "name": "when", "type": "u16", "doc": "Lower 16 bits of the system step tick count when the new value was recorded" },
+        { "kind": "field", "name": "reading", "type": "i32", "doc": "The handle value" }
+      ]
+    },
+
+    {
+      "name": "CanMessageReadInputsRequest",
+      "doc": "Request to read inputs, including analog inputs",
+      "messageType": "readInputsRequest",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "requestId", "width": 12, "doc": "The request ID of the message we are replying to" },
+            { "name": "zero", "width": 20, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "mask", "type": "RemoteInputHandle", "doc": "The mask we use when matching handles" },
+        { "kind": "field", "name": "pattern", "type": "RemoteInputHandle", "doc": "The handle pattern to match" }
+      ]
+    },
+
+    {
+      "name": "CanMessageStartAccelerometer",
+      "doc": "Request to start sending accelerometer data",
+      "messageType": "startAccelerometer",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero1", "width": 4, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "deviceNumber", "type": "u8" },
+        {
+          "kind": "bitfield", "storage": "u8",
+          "fields": [
+            { "name": "axes", "width": 3, "doc": "Bitmap of axes to collect" },
+            { "name": "delayedStart", "width": 1, "bool": true, "doc": "True to delay starting until startTime" },
+            { "name": "zero2", "width": 4, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "numSamples", "type": "u32", "doc": "How many samples to collect" },
+        { "kind": "field", "name": "startTime", "type": "u32", "doc": "Step timer ticks at which to start collecting, if delayedStart is set" }
+      ]
+    },
+
+    {
+      "name": "CanMessageStartClosedLoopDataCollection",
+      "doc": "Request to start sending closed loop data",
+      "messageType": "startClosedLoopDataCollection",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero1", "width": 4, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "rate", "type": "u16", "doc": "The sample rate at which to collect" },
+        { "kind": "field", "name": "filter", "type": "u16", "doc": "What variables to collect" },
+        { "kind": "field", "name": "deviceNumber", "type": "u8", "doc": "The device to collect data for" },
+        { "kind": "field", "name": "mode", "type": "u8", "doc": "The mode to collect in" },
+        { "kind": "field", "name": "numSamples", "type": "u16", "doc": "How many samples to collect" },
+        { "kind": "field", "name": "movement", "type": "u8", "doc": "Which (if any) movement was requested" }
+      ]
+    },
+
+    {
+      "name": "CanMessageWriteGpio",
+      "doc": "M42 or M280",
+      "messageType": "writeGpio",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "isServo", "width": 1, "bool": true },
+            { "name": "zero", "width": 3, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "pwm", "type": "f32" },
+        { "kind": "field", "name": "portNumber", "type": "u8" }
+      ]
+    },
+
+    {
+      "name": "CanMessageCreateFilamentMonitor",
+      "doc": "Create a filament monitor (M591). A separate message is used to configure it.",
+      "messageType": "createFilamentMonitor",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "driver", "width": 8 },
+            { "name": "zero2", "width": 4, "reserved": true },
+            { "name": "type", "width": 8 }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageDeleteFilamentMonitor",
+      "doc": "Delete a filament monitor (M591)",
+      "messageType": "deleteFilamentMonitor",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "driver", "width": 8 },
+            { "name": "zero2", "width": 12, "reserved": true }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageHeaterTuningCommand",
+      "doc": [
+        "Enter tuning mode (used by M303). This causes the heater to cycle between two temperatures, reporting data at the end of each cycle.",
+        "If just the 'on' bit is set, we are asking for heater tuning to start.",
+        "If 'on' and 'calibrate' are both set, we are asking for calibration to start.",
+        "If just 'calibrate' is set, we are asking whether calibration has completed."
+      ],
+      "messageType": "heaterTuningCommand",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "heaterNumber", "width": 8 },
+            { "name": "on", "width": 1, "bool": true },
+            { "name": "calibrate", "width": 1, "bool": true, "doc": "Added for 3.7.0-beta.2" },
+            { "name": "zero2", "width": 22, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "pwm", "type": "f32" },
+        { "kind": "field", "name": "lowTemp", "type": "f32" },
+        { "kind": "field", "name": "highTemp", "type": "f32" },
+        { "kind": "field", "name": "peakTempDrop", "type": "f32" }
+      ]
+    },
+
+    {
+      "name": "CanMessageHeaterFeedForwardV1",
+      "doc": "Set heater feedforward. The receiving board does not reply to this message.",
+      "messageType": "heaterFeedForwardV1",
+      "members": [
+        { "kind": "field", "name": "zero", "type": "u16", "reserved": true },
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "heaterNumber", "width": 8 },
+            { "name": "zero2", "width": 8, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "fanPwmFraction", "type": "f32" },
+        { "kind": "field", "name": "extrusionPwmBoost", "type": "f32" },
+        { "kind": "field", "name": "extrusionTemperatureBoost", "type": "f32" }
+      ]
+    },
+
+    {
+      "name": "ShapingPair",
+      "doc": "The coefficient and duration of one input shaping impulse",
+      "nestedIn": "CanMessageSetInputShapingV1",
+      "packed": false,
+      "members": [
+        { "kind": "field", "name": "coefficient", "type": "f32" },
+        { "kind": "field", "name": "impulseDelay", "type": "u32" }
+      ]
+    },
+
+    {
+      "name": "CanMessageSetInputShapingV1",
+      "doc": "Configure input shaping",
+      "messageType": "setInputShapingV1",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "numImpulses", "type": "u16", "doc": "The total number of impulses" },
+        { "kind": "array", "name": "impulses", "type": "ShapingPair", "length": "7", "doc": "The coefficients and durations of the impulses" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "(2 * sizeof(u16)) + (numImpulses * sizeof(ShapingPair))" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageEnableStallEndstop",
+      "doc": "Enable a stall endstop, or clear all stall endstops",
+      "messageType": "enableStallEndstop",
+      "requestIdField": "requestId",
+      "constants": [
+        { "name": "disableAll", "type": "u16", "value": "0xFFFF", "doc": "If driverNumber is this then we disable all stall endstops on this board" }
+      ],
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "driverNumber", "type": "u16", "doc": "The number of the driver we want to enable a stall endstop for" },
+        { "kind": "field", "name": "speed", "type": "f32", "doc": "The speed we will use for the homing move; not relevant if driverNumber == disableAll" }
+      ]
+    },
+
+    {
+      "name": "CanMessageSetDefaultHeaterModel",
+      "doc": "Request to set and return the default model for a heater",
+      "messageType": "setDefaultHeaterModel",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "zero", "width": 4, "reserved": true }
+          ]
+        },
+        {
+          "kind": "bitfield", "storage": "u16",
+          "$comment": "This group is 17 bits wide, which makes the message 5 bytes long. That is how CANlib declares it and must not be 'fixed' without a new message type.",
+          "fields": [
+            { "name": "heater", "width": 6 },
+            { "name": "heaterFunction", "width": 3 },
+            { "name": "zero2", "width": 8, "reserved": true }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageHeaterModelReport",
+      "doc": "Reply to CanMessageSetDefaultHeaterModel",
+      "messageType": "heaterModelReport",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "requestId", "width": 12, "doc": "The request ID of the message we are replying to; must be in the same place as in a standard reply" },
+            { "name": "resultCode", "width": 4, "doc": "Normally a GCodeResult; must be in the same place as in a standard reply" },
+            { "name": "heaterNumber", "width": 6, "doc": "Number of the heater reported" },
+            { "name": "zero", "width": 10, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "model", "type": "HeaterModel", "doc": "The returned model" }
+      ]
+    },
+
+    {
+      "name": "CanMessageFirmwareUpdateRequest",
+      "doc": "Request to send a chunk of a firmware or bootloader file",
+      "messageType": "firmwareBlockRequest",
+      "constants": [
+        { "name": "BootloaderVersion0", "type": "u32", "value": "0" }
+      ],
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "fileOffset", "width": 24, "doc": "The offset in the file of the data we need" },
+            { "name": "bootloaderVersion", "width": 5, "doc": "The protocol version of the bootloader or firmware making this request, currently 0" },
+            { "name": "uf2Format", "width": 1, "bool": true, "doc": "Set if we want UF2 format, otherwise we want binary" },
+            { "name": "fileWanted", "width": 2, "doc": "0 = want firmware file, 1 and 2 reserved, 3 = want bootloader" }
+          ]
+        },
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "lengthRequested", "width": 24, "doc": "How much data we want" },
+            { "name": "boardVersion", "width": 8, "doc": "The hardware version of this board, currently always 0 for production boards" }
+          ]
+        },
+        { "kind": "array", "name": "boardType", "type": "char", "length": "56", "doc": "Null-terminated board type name (firmware request) or bootloader class name (bootloader request)" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "2 * sizeof(u32) + strnlen(boardType)" } ]
+        },
+        {
+          "name": "GetBoardTypeLength", "returnType": "usize",
+          "params": [ { "name": "dataLength", "type": "usize" } ],
+          "body": [ { "return": "dataLength - 2 * sizeof(u32)" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageFirmwareUpdateResponse",
+      "doc": "Firmware update response",
+      "messageType": "firmwareBlockResponse",
+      "constants": [
+        { "name": "ErrNone", "type": "u32", "value": "0" },
+        { "name": "ErrNoFile", "type": "u32", "value": "1" },
+        { "name": "ErrBadOffset", "type": "u32", "value": "2" },
+        { "name": "ErrOther", "type": "u32", "value": "3" }
+      ],
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "fileOffset", "width": 24, "doc": "The offset in the file where this block starts" },
+            { "name": "dataLength", "width": 6, "doc": "The number of bytes of data that follow" },
+            { "name": "err", "width": 2, "doc": "The error code" }
+          ]
+        },
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "fileLength", "width": 24, "doc": "The total size of the firmware file" },
+            { "name": "zero", "width": 8, "reserved": true }
+          ]
+        },
+        { "kind": "array", "name": "data", "type": "u8", "length": "56", "doc": "Up to 56 bytes of data" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "dataLength + 2 * sizeof(u32)" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageStandardReply",
+      "doc": [
+        "The standard reply used by many calls. It carries a GCodeResult, some text, and in some cases 8 bits of",
+        "additional information. It can be split into multiple fragments so that the text is not constrained to 60 characters.",
+        "The layout of requestId and resultCode is common to more than one reply type."
+      ],
+      "messageType": "standardReply",
+      "requestIdField": "requestId",
+      "setRequestIdAlsoClears": ["extra"],
+      "constants": [
+        { "name": "MaxTextLength", "type": "usize", "value": "60" }
+      ],
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "requestId", "width": 12, "doc": "The request ID of the message we are replying to" },
+            { "name": "resultCode", "width": 4, "doc": "Normally a GCodeResult" },
+            { "name": "fragmentNumber", "width": 7, "doc": "The fragment number of this message" },
+            { "name": "moreFollows", "width": 1, "bool": true, "doc": "Set if this is not the last fragment of the reply" },
+            { "name": "extra", "width": 8, "doc": "Normally unused, but occasionally carries extra data" }
+          ]
+        },
+        { "kind": "array", "name": "text", "type": "char", "length": "60" }
+      ],
+      "methods": [
+        {
+          "name": "GetTextLength", "returnType": "usize",
+          "params": [ { "name": "dataLength", "type": "usize" } ],
+          "body": [ { "return": "strnlen(text, (dataLength < sizeof(u32) + sizeof(text)) ? dataLength - sizeof(u32) : sizeof(text))" } ]
+        },
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "params": [ { "name": "textLength", "type": "usize" } ],
+          "body": [ { "return": "textLength + sizeof(u32)" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageReadInputsReplyV0",
+      "doc": "Response to a CanMessageReadInputsRequest. The requestId and resultCode must be in the same place as for a standard reply.",
+      "messageType": "readInputsReplyV0",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "requestId", "width": 12, "doc": "The request ID of the message we are replying to" },
+            { "name": "resultCode", "width": 4, "doc": "Normally a GCodeResult" },
+            { "name": "numReported", "width": 4, "doc": "Number of input handles reported" },
+            { "name": "zero", "width": 12, "reserved": true }
+          ]
+        },
+        { "kind": "array", "name": "results", "type": "AnalogHandleDataV0", "length": "10" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "sizeof(u32) + numReported * sizeof(elem(results))" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageReadInputsReplyV1",
+      "doc": "Response to a CanMessageReadInputsRequest. The requestId and resultCode must be in the same place as for a standard reply.",
+      "messageType": "readInputsReplyV1",
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "requestId", "width": 12, "doc": "The request ID of the message we are replying to" },
+            { "name": "resultCode", "width": 4, "doc": "Normally a GCodeResult" },
+            { "name": "numReported", "width": 4, "doc": "Number of input handles reported" },
+            { "name": "zero", "width": 12, "reserved": true }
+          ]
+        },
+        { "kind": "array", "name": "results", "type": "AnalogHandleDataV1", "length": "7" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "sizeof(u32) + numReported * sizeof(elem(results))" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageGeneric",
+      "doc": [
+        "Generic message. These are always used in conjunction with a ParamTable that is known to both sender and receiver.",
+        "The table lists the parameters, each one defined by the parameter letter and the type of parameter.",
+        "The paramMap bitmap indicates which parameters are present in the data. They are provided in the same order as in the ParamTable."
+      ],
+      "requestIdField": "requestId",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "requestId", "width": 12 },
+            { "name": "paramMap", "width": 20 }
+          ]
+        },
+        { "kind": "array", "name": "data", "type": "u8", "length": "60" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize", "static": true,
+          "params": [ { "name": "paramLength", "type": "usize" } ],
+          "body": [ { "return": "paramLength + sizeof(u32)" } ]
+        },
+        {
+          "name": "DebugPrint", "returnType": "void", "emit": ["cpp"], "declarationOnly": true,
+          "cppSignature": "void DebugPrint(const ParamDescriptor *_ecv_array _ecv_null pt = nullptr) const noexcept"
+        }
+      ]
+    },
+
+    {
+      "name": "CanSensorReport",
+      "doc": "One sensor reading within a CanMessageSensorTemperatures",
+      "members": [
+        { "kind": "field", "name": "errorCode", "type": "u8", "doc": "This holds a TemperatureError" },
+        { "kind": "field", "name": "temperature", "type": "f32", "unaligned": true, "cppPrivate": true, "doc": "The last temperature we read" }
+      ],
+      "methods": [
+        {
+          "name": "GetTemperature", "returnType": "f32",
+          "body": [ { "return": "loadLE(temperature)" } ]
+        },
+        {
+          "name": "SetTemperature", "returnType": "void", "const": false,
+          "params": [ { "name": "t", "type": "f32" } ],
+          "body": [ { "storeLE": "temperature", "to": "t" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageSensorTemperatures",
+      "doc": "Message broadcast by expansion boards and the main board to provide sensor temperatures",
+      "messageType": "sensorTemperaturesReport",
+      "members": [
+        { "kind": "field", "name": "whichSensors", "type": "u64", "doc": "Which sensor numbers we have" },
+        { "kind": "array", "name": "temperatureReports", "type": "CanSensorReport", "length": "11", "doc": "The error codes and temperatures of the ones we have, lowest sensor number first" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "params": [ { "name": "numSensors", "type": "u32" } ],
+          "body": [ { "return": "numSensors * sizeof(CanSensorReport) + sizeof(u64)" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanHeaterReport",
+      "doc": "One heater status within a CanMessageHeatersStatus",
+      "members": [
+        { "kind": "field", "name": "mode", "type": "u8", "doc": "A HeaterMode value" },
+        { "kind": "field", "name": "averagePwm", "type": "u8", "doc": "Scaled to 0-255 to save space" },
+        { "kind": "field", "name": "temperature", "type": "f32", "unaligned": true, "cppPrivate": true, "doc": "The last temperature we read" }
+      ],
+      "methods": [
+        {
+          "name": "GetTemperature", "returnType": "f32",
+          "body": [ { "return": "loadLE(temperature)" } ]
+        },
+        {
+          "name": "SetTemperature", "returnType": "void", "const": false,
+          "params": [ { "name": "t", "type": "f32" } ],
+          "body": [ { "storeLE": "temperature", "to": "t" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageHeatersStatus",
+      "doc": "Message broadcast by expansion boards to send heater status to the main board",
+      "messageType": "heatersStatusReport",
+      "members": [
+        { "kind": "field", "name": "whichHeaters", "type": "u64", "doc": "Which heater numbers we have" },
+        { "kind": "array", "name": "reports", "type": "CanHeaterReport", "length": "9", "doc": "The status and temperatures of the ones we have, lowest heater number first" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "params": [ { "name": "numHeaters", "type": "u32" } ],
+          "body": [ { "return": "numHeaters * sizeof(CanHeaterReport) + sizeof(u64)" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageAnnounceV0",
+      "doc": "Message used by expansion boards running firmware 3.4.0beta4 and earlier to announce their presence on the CAN bus",
+      "messageType": "announceV0",
+      "members": [
+        { "kind": "field", "name": "timeSinceStarted", "type": "u32", "doc": "How long since we started up" },
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "numDrivers", "width": 8, "doc": "The number of motor drivers on this board" },
+            { "name": "zero", "width": 24, "reserved": true }
+          ]
+        },
+        { "kind": "array", "name": "boardTypeAndFirmwareVersion", "type": "char", "length": "56", "doc": "The short type name of this board followed by '|' and the firmware version" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "(2 * sizeof(u32)) + strnlen(boardTypeAndFirmwareVersion)" } ]
+        },
+        {
+          "name": "GetMaxTextLength", "returnType": "usize", "static": true,
+          "params": [ { "name": "dataLength", "type": "usize" } ],
+          "body": [ { "return": "dataLength - (2 * sizeof(u32))" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageAnnounceV1",
+      "doc": "Message used by expansion boards running firmware 3.4.0beta5 and later to announce their presence on the CAN bus",
+      "messageType": "announceV1",
+      "members": [
+        { "kind": "field", "name": "timeSinceStarted", "type": "u32", "doc": "How long since we started up" },
+        { "kind": "array", "name": "uniqueId", "type": "u8", "length": "16", "doc": "The unique ID of this board" },
+        {
+          "kind": "bitfield", "storage": "u8",
+          "fields": [
+            { "name": "numDrivers", "width": 4, "doc": "The number of motor drivers on this board" },
+            { "name": "usesUf2Binary", "width": 1, "bool": true, "doc": "Set if this board takes a main firmware binary in .uf2 format" },
+            { "name": "isReconnect", "width": 1, "bool": true, "doc": "Set if this board did not reset but is re-announcing after losing and regaining time sync" },
+            { "name": "wasShutDown", "width": 1, "bool": true, "doc": "Set if this board switched its heaters off because time sync was lost for longer than the connection timeout" },
+            { "name": "zero", "width": 1, "reserved": true }
+          ]
+        },
+        { "kind": "array", "name": "boardTypeAndFirmwareVersion", "type": "char", "length": "43", "doc": "The short type name of this board followed by '|' and the firmware version" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "sizeof(timeSinceStarted) + sizeof(uniqueId) + sizeof(u8) + strnlen(boardTypeAndFirmwareVersion)" } ]
+        },
+        {
+          "name": "GetMaxTextLength", "returnType": "usize", "static": true,
+          "params": [ { "name": "dataLength", "type": "usize" } ],
+          "body": [ { "return": "dataLength - (sizeof(u32) + 16 + sizeof(u8))" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "FanReport",
+      "doc": "One fan's status within a CanMessageFansReport",
+      "members": [
+        { "kind": "field", "name": "actualPwm", "type": "u16", "doc": "Actual PWM value, 0-65535" },
+        { "kind": "field", "name": "rpm", "type": "i16", "doc": "Tacho reading, or -1 if no tacho is configured" }
+      ]
+    },
+
+    {
+      "name": "CanMessageFansReport",
+      "doc": "Message used to broadcast the status of fans",
+      "messageType": "fansReport",
+      "members": [
+        { "kind": "field", "name": "whichFans", "type": "u64", "doc": "Which fan numbers we are reporting" },
+        { "kind": "array", "name": "fanReports", "type": "FanReport", "length": "14", "doc": "The actual PWM and RPM readings of the fans" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "params": [ { "name": "numReported", "type": "u32" } ],
+          "body": [ { "return": "numReported * sizeof(elem(fanReports)) + sizeof(u64)" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageInputChangedV1",
+      "doc": "Message sent by an expansion board when one of its monitored inputs has changed state",
+      "messageType": "inputStateChangedV1",
+      "members": [
+        { "kind": "field", "name": "states", "type": "u16", "doc": "1 bit per reported handle" },
+        { "kind": "field", "name": "numHandles", "type": "u8" },
+        { "kind": "field", "name": "zero", "type": "u8", "reserved": true },
+        { "kind": "array", "name": "results", "type": "AnalogHandleDataV0", "length": "10" }
+      ],
+      "methods": [
+        {
+          "name": "AddEntry", "returnType": "bool", "const": false,
+          "doc": "Add an entry. 'states' and 'numHandles' must be cleared to zero before adding the first one. Returns true if successful, false if the message is full.",
+          "params": [ { "name": "h", "type": "u16" }, { "name": "val", "type": "i32" }, { "name": "state", "type": "bool" } ],
+          "body": [
+            {
+              "if": "numHandles < countof(results)",
+              "then": [
+                { "if": "state", "then": [ { "orWith": "states", "value": "1 << numHandles" } ] },
+                { "set": "results[numHandles].handle.all", "to": "h" },
+                { "storeLE": "results[numHandles].reading", "to": "val" },
+                { "incr": "numHandles" },
+                { "return": "true" }
+              ]
+            },
+            { "return": "false" }
+          ]
+        },
+        {
+          "name": "GetEntryHandle", "returnType": "RemoteInputHandle",
+          "doc": "Get the handle from one of the result values. 'results' is 4-byte allocated and each entry is 6 bytes long, so the 2-byte handle is always 2-byte aligned.",
+          "params": [ { "name": "index", "type": "usize" } ],
+          "body": [ { "return": "results[index].handle" } ]
+        },
+        {
+          "name": "GetEntryReading", "returnType": "i32",
+          "doc": "Get the reading from one of the result values. 'results' is 4-byte allocated and each entry is 6 bytes long, so the 4-byte reading is not always 4-byte aligned.",
+          "params": [ { "name": "index", "type": "usize" } ],
+          "body": [ { "return": "loadLE(results[index].reading)" } ]
+        },
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "sizeof(states) + sizeof(numHandles) + sizeof(zero) + (numHandles * sizeof(elem(results)))" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageInputChangedV2",
+      "doc": "Message sent by an expansion board when one of its monitored inputs has changed state",
+      "messageType": "inputStateChangedV2",
+      "members": [
+        { "kind": "field", "name": "states", "type": "u16", "doc": "1 bit per reported handle" },
+        { "kind": "field", "name": "numHandles", "type": "u8" },
+        { "kind": "field", "name": "zero", "type": "u8", "reserved": true },
+        { "kind": "array", "name": "results", "type": "AnalogHandleDataV1", "length": "7", "doc": "This is on a 4-byte boundary" }
+      ],
+      "methods": [
+        {
+          "name": "AddEntry", "returnType": "bool", "const": false,
+          "doc": "Add an entry. 'states' and 'numHandles' must be cleared to zero before adding the first one. Returns true if successful, false if the message is full.",
+          "params": [
+            { "name": "h", "type": "u16" },
+            { "name": "whenStateChanged", "type": "u32" },
+            { "name": "val", "type": "i32" },
+            { "name": "state", "type": "bool" }
+          ],
+          "body": [
+            {
+              "if": "numHandles < countof(results)",
+              "then": [
+                { "if": "state", "then": [ { "orWith": "states", "value": "1 << numHandles" } ] },
+                { "set": "results[numHandles].handle.all", "to": "h" },
+                { "set": "results[numHandles].reading", "to": "val" },
+                { "set": "results[numHandles].when", "to": "u16(whenStateChanged)" },
+                { "incr": "numHandles" },
+                { "return": "true" }
+              ]
+            },
+            { "return": "false" }
+          ]
+        },
+        {
+          "name": "GetEntryHandle", "returnType": "RemoteInputHandle",
+          "params": [ { "name": "index", "type": "usize" } ],
+          "body": [ { "return": "results[index].handle" } ]
+        },
+        {
+          "name": "GetEntryReading", "returnType": "i32",
+          "params": [ { "name": "index", "type": "usize" } ],
+          "body": [ { "return": "results[index].reading" } ]
+        },
+        {
+          "name": "GetWhen", "returnType": "u16",
+          "doc": "Get the change time stamp for one of the result values",
+          "params": [ { "name": "index", "type": "usize" } ],
+          "body": [ { "return": "results[index].when" } ]
+        },
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "sizeof(states) + sizeof(numHandles) + sizeof(zero) + (numHandles * sizeof(elem(results)))" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageBoardStatusV0",
+      "doc": "Message sent by expansion boards to report their general health",
+      "messageType": "boardStatusReportV0",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "hasVin", "width": 1, "bool": true },
+            { "name": "hasV12", "width": 1, "bool": true },
+            { "name": "hasMcuTemp", "width": 1, "bool": true },
+            { "name": "hasAccelerometer", "width": 1, "bool": true },
+            { "name": "hasClosedLoop", "width": 1, "bool": true },
+            { "name": "hasInductiveSensor", "width": 1, "bool": true },
+            { "name": "zero", "width": 10, "reserved": true },
+            { "name": "hasMovementDelay", "width": 1, "bool": true },
+            { "name": "numAnalogHandles", "width": 3, "doc": "How many instances of AnalogHandleDataV0 we append" },
+            { "name": "zero2", "width": 12, "reserved": true }
+          ]
+        },
+        {
+          "kind": "union", "anonymous": true,
+          "alternatives": [
+            { "kind": "field", "name": "neverUsedRam", "type": "i32", "doc": "This field is present if hasMovementDelay is false" },
+            { "kind": "field", "name": "movementDelay", "type": "u32", "doc": "This field is present if hasMovementDelay is true" }
+          ]
+        },
+        { "kind": "array", "name": "values", "type": "MinCurMax", "length": "3", "doc": "Values of none, some or all of Vin, V12 and CPU temperature. The data for some analog handles follows the last present value (max 4 if all of Vin/V12/mcuTemp are supported)." }
+      ],
+      "methods": [
+        {
+          "name": "Clear", "returnType": "void", "const": false,
+          "body": [
+            { "set": "hasVin", "to": "false" },
+            { "set": "hasV12", "to": "false" },
+            { "set": "hasMcuTemp", "to": "false" },
+            { "set": "hasMovementDelay", "to": "false" },
+            { "set": "hasAccelerometer", "to": "false" },
+            { "set": "hasClosedLoop", "to": "false" },
+            { "set": "hasInductiveSensor", "to": "false" },
+            { "set": "numAnalogHandles", "to": "0" }
+          ]
+        },
+        {
+          "name": "GetAnalogHandlesOffset", "returnType": "usize",
+          "body": [
+            { "let": "numMinCurMaxValues", "type": "u32", "value": "u32(hasVin) + u32(hasV12) + u32(hasMcuTemp)" },
+            { "return": "2 * sizeof(u32) + numMinCurMaxValues * sizeof(elem(values))" }
+          ]
+        },
+        {
+          "name": "GetMaxAnalogHandleSpace", "returnType": "usize",
+          "body": [ { "return": "64 - GetAnalogHandlesOffset()" } ]
+        },
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "GetAnalogHandlesOffset() + numAnalogHandles * sizeof(AnalogHandleDataV0)" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageBoardStatusV1",
+      "doc": "Message sent by expansion boards to report their general health",
+      "messageType": "boardStatusReportV1",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "hasVin", "width": 1, "bool": true },
+            { "name": "hasV12", "width": 1, "bool": true },
+            { "name": "hasMcuTemp", "width": 1, "bool": true },
+            { "name": "hasAccelerometer", "width": 1, "bool": true },
+            { "name": "hasClosedLoop", "width": 1, "bool": true },
+            { "name": "hasInductiveSensor", "width": 1, "bool": true },
+            { "name": "zero", "width": 10, "reserved": true },
+            { "name": "hasMovementDelay", "width": 1, "bool": true },
+            { "name": "numAnalogHandles", "width": 3, "doc": "How many instances of AnalogHandleDataV1 we append" },
+            { "name": "zero2", "width": 12, "reserved": true }
+          ]
+        },
+        {
+          "kind": "union", "anonymous": true,
+          "alternatives": [
+            { "kind": "field", "name": "neverUsedRam", "type": "i32", "doc": "This field is present if hasMovementDelay is false" },
+            { "kind": "field", "name": "movementDelay", "type": "u32", "doc": "This field is present if hasMovementDelay is true" }
+          ]
+        },
+        { "kind": "array", "name": "shortValues", "type": "ShortMinCurMax", "length": "3", "doc": "Values of none, some or all of Vin, V12 and CPU temperature. The data for some analog handles follows the last present value (max 5 if all of Vin/V12/mcuTemp are supported)." }
+      ],
+      "methods": [
+        {
+          "name": "Clear", "returnType": "void", "const": false,
+          "body": [
+            { "set": "hasVin", "to": "false" },
+            { "set": "hasV12", "to": "false" },
+            { "set": "hasMcuTemp", "to": "false" },
+            { "set": "hasMovementDelay", "to": "false" },
+            { "set": "hasAccelerometer", "to": "false" },
+            { "set": "hasClosedLoop", "to": "false" },
+            { "set": "hasInductiveSensor", "to": "false" },
+            { "set": "numAnalogHandles", "to": "0" }
+          ]
+        },
+        {
+          "name": "GetAnalogHandlesOffset", "returnType": "usize",
+          "body": [
+            { "let": "numMinCurMaxValues", "type": "u32", "value": "u32(hasVin) + u32(hasV12) + u32(hasMcuTemp)" },
+            { "return": "2 * sizeof(u32) + numMinCurMaxValues * sizeof(elem(shortValues))" }
+          ]
+        },
+        {
+          "name": "GetMaxAnalogHandleSpace", "returnType": "usize",
+          "body": [ { "return": "64 - GetAnalogHandlesOffset()" } ]
+        },
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "GetAnalogHandlesOffset() + numAnalogHandles * sizeof(AnalogHandleDataV1)" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "OpenLoopStatus",
+      "doc": "Driver status. If this is changed then CanMessageDriversStatus must be replaced by a new version.",
+      "members": [
+        { "kind": "field", "name": "status", "type": "u32" }
+      ]
+    },
+
+    {
+      "name": "ClosedLoopStatus",
+      "doc": "Driver status including closed loop data. If this is changed then CanMessageDriversStatus must be replaced by a new version.",
+      "members": [
+        { "kind": "field", "name": "status", "type": "u32" },
+        { "kind": "field", "name": "averageCurrentFraction", "type": "f16" },
+        { "kind": "field", "name": "maxCurrentFraction", "type": "f16" },
+        { "kind": "field", "name": "rmsPositionError", "type": "f16" },
+        { "kind": "field", "name": "maxAbsPositionError", "type": "f16" }
+      ]
+    },
+
+    {
+      "name": "CanMessageDriversStatus",
+      "doc": "Message sent by expansion boards to report the status of their drivers",
+      "messageType": "driversStatusReport",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u16",
+          "fields": [
+            { "name": "numDriversReported", "width": 4 },
+            { "name": "hasClosedLoopData", "width": 1, "bool": true },
+            { "name": "zero", "width": 11, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "zero2", "type": "u16", "reserved": true, "doc": "For alignment" },
+        {
+          "kind": "union", "anonymous": true,
+          "alternatives": [
+            { "kind": "array", "name": "openLoopData", "type": "OpenLoopStatus", "length": "15", "doc": "Status of each driver if not closed loop" },
+            { "kind": "array", "name": "closedLoopData", "type": "ClosedLoopStatus", "length": "5", "doc": "Status of each driver if closed loop" }
+          ]
+        }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "2 * sizeof(u16) + numDriversReported * (hasClosedLoopData ? sizeof(elem(closedLoopData)) : sizeof(elem(openLoopData)))" } ]
+        },
+        {
+          "name": "SetStandardFields", "returnType": "void", "const": false,
+          "params": [ { "name": "numReported", "type": "u32" }, { "name": "closedLoop", "type": "bool" } ],
+          "body": [
+            { "set": "numDriversReported", "to": "numReported" },
+            { "set": "hasClosedLoopData", "to": "closedLoop" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "FilamentMonitorDataV2",
+      "doc": [
+        "Status of one filament monitor. Declared outside CanMessageFilamentMonitorsStatusV2 to avoid",
+        "having to include CanMessageFormats.h in FilamentMonitor.h.",
+        "Note: the first bitfield group is 31 bits wide, so the second group starts at bit 31 rather than",
+        "on a byte boundary. This is deliberate and must be preserved."
+      ],
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "position", "width": 12, "doc": "Raw position from the sensor" },
+            { "name": "zero1", "width": 12, "reserved": true },
+            { "name": "status", "width": 4, "doc": "Standard filament status" },
+            { "name": "zero2", "width": 2, "reserved": true },
+            { "name": "hasLiveData", "width": 1, "bool": true, "doc": "True if the following fields are meaningful for this sensor" }
+          ]
+        },
+        {
+          "kind": "bitfield", "storage": "i32",
+          "fields": [
+            { "name": "minPercentage", "width": 10, "signed": true },
+            { "name": "maxPercentage", "width": 10, "signed": true },
+            { "name": "avgPercentage", "width": 10, "signed": true },
+            { "name": "lastPercentage", "width": 10, "signed": true, "doc": "Declaring this struct packed allows this to straddle word boundaries" },
+            { "name": "calibrationLength", "width": 24, "signed": true }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageFilamentMonitorsStatusV2",
+      "doc": "Message sent by expansion boards to report the status of their filament monitors",
+      "messageType": "filamentMonitorsStatusReportV2",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "driversReported", "width": 8, "doc": "Bitmap of driver numbers with associated filament monitors reported in this message" },
+            { "name": "zero", "width": 24, "reserved": true }
+          ]
+        },
+        { "kind": "array", "name": "data", "type": "FilamentMonitorDataV2", "length": "5" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "sizeof(u32) + (popcount(driversReported) * sizeof(elem(data)))" } ]
+        },
+        {
+          "name": "SetStandardFields", "returnType": "void", "const": false,
+          "params": [ { "name": "drivers", "type": "u32" } ],
+          "body": [ { "set": "driversReported", "to": "drivers" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageHeaterTuningReport",
+      "doc": "Message used by expansion boards to report the results of one heater tuning cycle",
+      "messageType": "heaterTuningReport",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "heater", "width": 8 },
+            { "name": "zero", "width": 8, "reserved": true },
+            { "name": "cyclesDone", "width": 16 }
+          ]
+        },
+        { "kind": "field", "name": "ton", "type": "u32" },
+        { "kind": "field", "name": "toff", "type": "u32" },
+        { "kind": "field", "name": "dlow", "type": "u32" },
+        { "kind": "field", "name": "dhigh", "type": "u32" },
+        { "kind": "field", "name": "heatingRate", "type": "f32" },
+        { "kind": "field", "name": "coolingRate", "type": "f32" },
+        { "kind": "field", "name": "voltage", "type": "f32" }
+      ],
+      "methods": [
+        {
+          "name": "SetStandardFields", "returnType": "void", "const": false,
+          "params": [ { "name": "heaterNumber", "type": "u32" } ],
+          "body": [ { "set": "heater", "to": "heaterNumber" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageAccelerometerData",
+      "doc": "Message used to send accelerometer data from an expansion board to the main board",
+      "messageType": "accelerometerData",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "actualSampleRate", "width": 14, "doc": "Measured sample rate, or zero if not measured yet" },
+            { "name": "numSamples", "width": 6, "doc": "Number of samples in this buffer; each sample has data for each requested axis" },
+            { "name": "overflowed", "width": 1, "bool": true, "doc": "True if the accelerometer detected overflow" },
+            { "name": "axes", "width": 3, "doc": "Which axes are returned in this data" },
+            { "name": "bitsPerSampleMinusOne", "width": 4, "doc": "How many bits each sample takes up, minus one" },
+            { "name": "lastPacket", "width": 1, "bool": true, "doc": "Set if this is the last packet" },
+            { "name": "zero", "width": 3, "reserved": true }
+          ]
+        },
+        { "kind": "field", "name": "firstSampleNumber", "type": "u16", "doc": "The number of the first sample" },
+        { "kind": "array", "name": "data", "type": "u16", "length": "29" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "doc": "Get the actual amount of data. SetAxesAndResolution must have been called first to set up bitsPerSampleMinusOne.",
+          "body": [
+            { "let": "numAxes", "type": "u32", "value": "(axes & 1) + ((axes >> 1) & 1) + ((axes >> 2) & 1)" },
+            { "return": "sizeof(u32) + sizeof(u16) + ((numSamples * (bitsPerSampleMinusOne + 1) * numAxes + 15) / 16) * sizeof(u16)" }
+          ]
+        },
+        {
+          "name": "SetAxesAndResolution", "returnType": "usize", "const": false,
+          "doc": "Set the resolution and axes bits, and return the maximum number of samples that one message can accommodate",
+          "params": [ { "name": "p_axes", "type": "u8" }, { "name": "bitsPerSample", "type": "u8" } ],
+          "body": [
+            { "set": "bitsPerSampleMinusOne", "to": "bitsPerSample - 1" },
+            { "set": "axes", "to": "p_axes & 0x07" },
+            { "let": "numAxes", "type": "u32", "value": "(axes & 1) + ((axes >> 1) & 1) + ((axes >> 2) & 1)" },
+            { "return": "(numAxes * bitsPerSample == 0) ? 0xFFFF : (sizeof(data) * 8) / (numAxes * bitsPerSample)" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageClosedLoopData",
+      "doc": "Message used to send closed loop data from an expansion board to the main board",
+      "messageType": "closedLoopData",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "numSamples", "width": 5, "doc": "Number of samples in this data packet" },
+            { "name": "lastPacket", "width": 1, "bool": true, "doc": "Set if this is the last packet" },
+            { "name": "filter", "width": 16, "doc": "Which variables are present in the data packet" },
+            { "name": "overflowed", "width": 1, "bool": true, "doc": "True if there was buffer overflow" },
+            { "name": "badSample", "width": 1, "bool": true, "doc": "True if we had a bad sample (should not happen)" },
+            { "name": "zero", "width": 8, "reserved": true }
+          ]
+        },
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "firstSampleNumber", "width": 20, "doc": "The number of the first sample" },
+            { "name": "zero2", "width": 12, "reserved": true }
+          ]
+        },
+        { "kind": "array", "name": "data", "type": "u8", "length": "56" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "params": [ { "name": "numDataBytes", "type": "usize" } ],
+          "body": [ { "return": "2 * sizeof(u32) + numDataBytes" } ]
+        },
+        {
+          "name": "GetNumDataBytes", "returnType": "usize", "static": true,
+          "doc": "Get the number of data bytes in a message, given the message length (which will have been rounded up to the next CAN-FD value)",
+          "params": [ { "name": "msglen", "type": "usize" } ],
+          "body": [ { "return": "msglen - 2 * sizeof(u32)" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageEvent",
+      "doc": "Message sent by an expansion board to the main board to indicate an event",
+      "messageType": "event",
+      "members": [
+        {
+          "kind": "bitfield", "storage": "u32",
+          "fields": [
+            { "name": "eventType", "width": 8, "doc": "The event type (what happened)" },
+            { "name": "deviceNumber", "width": 8, "doc": "The device number that it happened to" },
+            { "name": "eventParam", "width": 16, "doc": "More info about the event" }
+          ]
+        },
+        { "kind": "field", "name": "zero", "type": "u32", "reserved": true },
+        { "kind": "array", "name": "text", "type": "char", "length": "56", "doc": "Other information about the event, to display to the user" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "2 * sizeof(u32) + strnlen(text)" } ]
+        },
+        {
+          "name": "GetMaxTextLength", "returnType": "usize",
+          "params": [ { "name": "msgLen", "type": "usize" } ],
+          "body": [ { "return": "msgLen - 2 * sizeof(u32)" } ]
+        }
+      ]
+    },
+
+    {
+      "name": "CanMessageDebugText",
+      "doc": "Debug text message, sent by an expansion board to the main board",
+      "messageType": "debugText",
+      "members": [
+        { "kind": "array", "name": "text", "type": "char", "length": "64", "doc": "Text to display to the user" }
+      ],
+      "methods": [
+        {
+          "name": "GetActualDataLength", "returnType": "usize",
+          "body": [ { "return": "strnlen(text)" } ]
+        },
+        {
+          "name": "GetMaxTextLength", "returnType": "usize",
+          "params": [ { "name": "msgLen", "type": "usize" } ],
+          "body": [ { "return": "msgLen" } ]
+        }
+      ]
+    }
+  ],
+
+  "messageUnion": {
+    "name": "CanMessage",
+    "doc": "A union of all message types to allow the correct message format to be extracted from a message buffer",
+    "maxSize": 64,
+    "members": [
+      { "name": "raw", "type": "u8", "length": "64" },
+      { "name": "raw32", "type": "u32", "length": "16" },
+      { "name": "generic", "type": "CanMessageGeneric" },
+      { "name": "sync", "type": "CanMessageTimeSync" },
+      { "name": "eStop", "type": "CanMessageEmergencyStop" },
+      { "name": "enterTestMode", "type": "CanMessageEnterTestMode" },
+      { "name": "stopMovement", "type": "CanMessageStopMovement" },
+      { "name": "revertPosition", "type": "CanMessageRevertPosition" },
+      { "name": "reset", "type": "CanMessageReset" },
+      { "name": "moveLinearShaped", "type": "CanMessageMovementLinearShaped" },
+      { "name": "getInfo", "type": "CanMessageReturnInfo" },
+      { "name": "setTemp", "type": "CanMessageSetHeaterTemperatureV1" },
+      { "name": "standardReply", "type": "CanMessageStandardReply" },
+      { "name": "firmwareUpdateRequest", "type": "CanMessageFirmwareUpdateRequest" },
+      { "name": "firmwareUpdateResponse", "type": "CanMessageFirmwareUpdateResponse" },
+      { "name": "sensorTemperaturesBroadcast", "type": "CanMessageSensorTemperatures" },
+      { "name": "heatersStatusBroadcast", "type": "CanMessageHeatersStatus" },
+      { "name": "heaterModelV3", "type": "CanMessageHeaterModelV3" },
+      { "name": "multipleDrivesRequestUint16", "type": "CanMessageMultipleDrivesRequest<uint16_t>", "csharpType": "CanMessageMultipleDrivesRequestUint16" },
+      { "name": "multipleDrivesRequestFloat", "type": "CanMessageMultipleDrivesRequest<float>", "csharpType": "CanMessageMultipleDrivesRequestFloat" },
+      { "name": "multipleDrivesStepsPerUnitAndMicrostepping", "type": "CanMessageMultipleDrivesRequest<StepsPerUnitAndMicrostepping>", "csharpType": "CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping" },
+      { "name": "multipleDrivesRequestDriverState", "type": "CanMessageMultipleDrivesRequest<DriverStateControl>", "csharpType": "CanMessageMultipleDrivesRequestDriverStateControl" },
+      { "name": "multipleDrivesRequestPressureAdvance", "type": "CanMessageMultipleDrivesRequest<ShortPressureAdvanceParameters>", "csharpType": "CanMessageMultipleDrivesRequestShortPressureAdvanceParameters" },
+      { "name": "updateYourFirmware", "type": "CanMessageUpdateYourFirmware" },
+      { "name": "fanParameters", "type": "CanMessageFanParameters" },
+      { "name": "setFanSpeed", "type": "CanMessageSetFanSpeed" },
+      { "name": "setHeaterFaultDetection", "type": "CanMessageSetHeaterFaultDetectionParameters" },
+      { "name": "setHeaterMonitors", "type": "CanMessageSetHeaterMonitors" },
+      { "name": "setInputShapingV1", "type": "CanMessageSetInputShapingV1" },
+      { "name": "createInputMonitorV1", "type": "CanMessageCreateInputMonitorV1" },
+      { "name": "changeInputMonitorV1", "type": "CanMessageChangeInputMonitorV1" },
+      { "name": "inputChangedV1", "type": "CanMessageInputChangedV1" },
+      { "name": "inputChangedV2", "type": "CanMessageInputChangedV2" },
+      { "name": "fansReport", "type": "CanMessageFansReport" },
+      { "name": "writeGpio", "type": "CanMessageWriteGpio" },
+      { "name": "setAddressAndNormalTiming", "type": "CanMessageSetAddressAndNormalTiming" },
+      { "name": "announceV0", "type": "CanMessageAnnounceV0" },
+      { "name": "announceV1", "type": "CanMessageAnnounceV1" },
+      { "name": "acknowledgeAnnounce", "type": "CanMessageAcknowledgeAnnounce" },
+      { "name": "diagnosticTest", "type": "CanMessageDiagnosticTest" },
+      { "name": "readInputsRequest", "type": "CanMessageReadInputsRequest" },
+      { "name": "readInputsReplyV0", "type": "CanMessageReadInputsReplyV0" },
+      { "name": "readInputsReplyV1", "type": "CanMessageReadInputsReplyV1" },
+      { "name": "boardStatusV0", "type": "CanMessageBoardStatusV0" },
+      { "name": "boardStatusV1", "type": "CanMessageBoardStatusV1" },
+      { "name": "driversStatus", "type": "CanMessageDriversStatus" },
+      { "name": "filamentMonitorsStatusV2", "type": "CanMessageFilamentMonitorsStatusV2" },
+      { "name": "createFilamentMonitor", "type": "CanMessageCreateFilamentMonitor" },
+      { "name": "deleteFilamentMonitor", "type": "CanMessageDeleteFilamentMonitor" },
+      { "name": "heaterTuningCommand", "type": "CanMessageHeaterTuningCommand" },
+      { "name": "heaterTuningReport", "type": "CanMessageHeaterTuningReport" },
+      { "name": "heaterFeedForwardV1", "type": "CanMessageHeaterFeedForwardV1" },
+      { "name": "startAccelerometer", "type": "CanMessageStartAccelerometer" },
+      { "name": "accelerometerData", "type": "CanMessageAccelerometerData" },
+      { "name": "startClosedLoopDataCollection", "type": "CanMessageStartClosedLoopDataCollection" },
+      { "name": "closedLoopData", "type": "CanMessageClosedLoopData" },
+      { "name": "event", "type": "CanMessageEvent" },
+      { "name": "debugText", "type": "CanMessageDebugText" },
+      { "name": "enableStallEndstop", "type": "CanMessageEnableStallEndstop" },
+      { "name": "setDefaultHeaterModel", "type": "CanMessageSetDefaultHeaterModel" },
+      { "name": "heaterModelReport", "type": "CanMessageHeaterModelReport" }
+    ]
+  }
+}
