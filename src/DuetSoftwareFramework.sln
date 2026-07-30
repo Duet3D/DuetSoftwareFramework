@@ -44,7 +44,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetHttpClient", "DuetHttpC
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetAPI.SourceGenerators", "DuetAPI.SourceGenerators\DuetAPI.SourceGenerators.csproj", "{3F5FBCF1-D22D-4DBD-877C-F5A4BA7890AB}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CanMessageGenerator", "..\tools\CanMessageGenerator\CanMessageGenerator.csproj", "{29A1E30C-B89B-4958-BD79-E6B933347313}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DuetCanMessage.SourceGenerators", "DuetCanMessage.SourceGenerators\DuetCanMessage.SourceGenerators.csproj", "{29A1E30C-B89B-4958-BD79-E6B933347313}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

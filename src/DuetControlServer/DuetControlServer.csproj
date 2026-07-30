@@ -46,6 +46,11 @@
 		<ProjectReference Include="..\DuetAPIClient\DuetAPIClient.csproj" />
 		<ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
 		<ProjectReference Include="..\DuetSharedLibrary\DuetSharedLibrary.csproj" />
+		<!-- The generator writes the checked-in CAN message files under Link/Protocol, so building it with
+		     DCS keeps the two in step. Its output is a build-time tool, not something DCS links against:
+		     ReferenceOutputAssembly="false" keeps it off the compile references and Private="false" keeps
+		     its apphost, deps.json and runtimeconfig.json out of the DCS output directory. -->
+		<ProjectReference Include="..\DuetCanMessage.SourceGenerators\DuetCanMessage.SourceGenerators.csproj" ReferenceOutputAssembly="false" Private="false" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -24,7 +24,7 @@ Targets:
     rpms:       $(RPMS)
 
     can-messages:        Regenerates the C++ and C# CAN message formats from
-                         tools/CanMessageGenerator/Schema/can-messages.json
+                         src/DuetCanMessage.SourceGenerators/Schema/can-messages.json
     can-messages-check:  Fails if the generated CAN message files are stale
     can-messages-verify: Checks the generated C++ layouts against CANlib's
                          hand-written CanMessageFormats.h
@@ -206,7 +206,7 @@ build: $(DIRS_BUILD) DuetWebControl.build
 # The CAN message formats are generated for both C++ (CANlib) and C# (DuetControlServer) from a single
 # neutral schema, so that the two can never drift apart. The generated files are checked in; re-run
 # `make can-messages` after editing the schema.
-CANMSG_GEN := tools/CanMessageGenerator
+CANMSG_GEN := src/DuetCanMessage.SourceGenerators
 
 can-messages:
 	$(ECHO_PREFIX)echo " [GENERATE ] CAN message formats"
