@@ -195,16 +195,31 @@ struct ScheduleMoveHeader {
     uint16_t padding;
 };
 
+// Value of ScheduleMoveDriver::stopOnBoard meaning "this driver watches no endstop".
+inline constexpr uint8_t NoEndstopBoard = 0xFF;
+
 // One driver's share of a scheduled move. `steps` applies to axis drivers and `extrusion` to
 // extruders; whichever does not apply is zero, so a receiver that trusts isExtruder and one that
 // checks both agree.
+//
+// stopOnBoard and stopOnHandle are how an endstop move says what stops this driver. They are the
+// CAN address and RemoteInputHandle of the input to watch, which is exactly what arrives in
+// CanMessageInputChangedV2, so the controller matches an incoming change against them directly
+// rather than looking anything up. Carrying it per driver rather than per move is what lets one
+// move home several axes at once, each stopping on its own endstop.
+//
+// The controller does the stopping because it is the only place close enough to the bus for the
+// latency to be acceptable: by the time an input change reached the SBC and a stop came back, the
+// axis would have travelled past the endstop.
 struct ScheduleMoveDriver {
     uint8_t boardAddress;  // CAN address of the board carrying this driver
     uint8_t driverNumber;  // driver number on that board
     uint8_t isExtruder;    // non-zero if this driver is an extruder
-    uint8_t padding;
+    uint8_t stopOnBoard;   // CAN address of the board carrying the endstop, or NoEndstopBoard
     int32_t steps;         // net microsteps, for an axis driver
     float extrusion;       // microsteps including fractional parts, for an extruder
+    uint16_t stopOnHandle; // RemoteInputHandle of the endstop to stop on, if stopOnBoard is set
+    uint16_t padding;
 };
 
 // Most drivers one ScheduleMove packet may carry. Chosen so that a full packet is a few hundred
@@ -283,9 +298,11 @@ static_assert(sizeof(ScheduleMoveHeader) == 56, "ScheduleMoveHeader must be 56 b
 static_assert(offsetof(ScheduleMoveHeader, acceleration) == 16, "");
 static_assert(offsetof(ScheduleMoveHeader, moveId) == 48, "");
 static_assert(offsetof(ScheduleMoveHeader, numDrivers) == 52, "");
-static_assert(sizeof(ScheduleMoveDriver) == 12, "ScheduleMoveDriver must be 12 bytes");
+static_assert(sizeof(ScheduleMoveDriver) == 16, "ScheduleMoveDriver must be 16 bytes");
+static_assert(offsetof(ScheduleMoveDriver, stopOnBoard) == 3, "");
 static_assert(offsetof(ScheduleMoveDriver, steps) == 4, "");
 static_assert(offsetof(ScheduleMoveDriver, extrusion) == 8, "");
+static_assert(offsetof(ScheduleMoveDriver, stopOnHandle) == 12, "");
 static_assert(sizeof(SendCanMessageHeader) == 12, "SendCanMessageHeader must be 12 bytes");
 static_assert(sizeof(FlashVerify) == 8, "FlashVerify must be 8 bytes");
 static_assert(sizeof(CodeBufferUpdateHeader) == 4, "CodeBufferUpdateHeader must be 4 bytes");

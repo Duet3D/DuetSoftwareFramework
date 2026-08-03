@@ -154,6 +154,51 @@ static void HandleFirmwareBlockRequest(CanMessageBuffer& buf) noexcept
 
 // Forward a received CAN message to the SBC. If it is a response to a request we sent on behalf of the SBC, map the
 // request ID back to the SBC's txToken and collate multi-fragment standard replies into a single response.
+// Stop whatever the move said this input stops. The two message versions differ in the size of their
+// per-handle entries, so each is read as itself; reading one as the other shifts every handle.
+static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) noexcept
+{
+#if HAS_SBC_INTERFACE
+	const CanAddress src = buf.id.Src();
+	bool stoppedAnything = false;
+
+	if (id == CanMessageType::inputStateChangedV2)
+	{
+		const CanMessageInputChangedV2& msg = buf.msg.inputChangedV2;
+		for (unsigned int i = 0; i < msg.numHandles && i < ARRAY_SIZE(msg.results); ++i)
+		{
+			// Bit i of states is the level of the i'th handle. Only a handle that went active stops
+			// anything; a release is just as much a change, and stopping on one would end the move
+			// the moment the axis backed off the endstop
+			if ((msg.states & (1u << i)) != 0 && CanMotion::StopDriversWatchingInput(src, msg.results[i].handle.asU16()))
+			{
+				stoppedAnything = true;
+			}
+		}
+	}
+	else
+	{
+		const CanMessageInputChangedV1& msg = buf.msg.inputChangedV1;
+		for (unsigned int i = 0; i < msg.numHandles && i < ARRAY_SIZE(msg.results); ++i)
+		{
+			if ((msg.states & (1u << i)) != 0 && CanMotion::StopDriversWatchingInput(src, msg.results[i].handle.asU16()))
+			{
+				stoppedAnything = true;
+			}
+		}
+	}
+
+	if (stoppedAnything)
+	{
+		// The stop messages are built but not sent from this task; the async sender does that
+		CanInterface::WakeAsyncSender();
+	}
+#else
+	(void)buf;
+	(void)id;
+#endif
+}
+
 void CommandProcessor::ForwardMessageToSbc(CanMessageBuffer& buf) noexcept
 {
 #  if HAS_SBC_INTERFACE
@@ -225,8 +270,13 @@ void CommandProcessor::ProcessReceivedMessage(CanMessageBuffer& buf) noexcept
 			{
 			case CanMessageType::inputStateChangedV1:
 			case CanMessageType::inputStateChangedV2:
-				// TODO: Latency-sensitive (these arrive via the high-priority CAN receiver task) can we forward these
-				// to the SBC any quicker?
+				// An endstop move told us which input stops which driver, so the stop is decided here
+				// rather than at the SBC. That is the whole point of doing it in this task: the round
+				// trip to the SBC and back would let the axis overrun the endstop.
+				//
+				// The message is still forwarded below, because the object model has to see the input
+				// change whether or not anything was moving
+				HandleInputStateChanged(buf, id);
 				break;
 
 			case CanMessageType::firmwareBlockRequest:

@@ -1,3 +1,4 @@
+using System;
 using DuetControlServer.Motion.Native;
 
 namespace DuetControlServer.Motion;
@@ -41,6 +42,35 @@ internal sealed class RawMove
 
     /// <summary>Whether the move watches endstops or a Z probe, so it may stop short</summary>
     public bool CheckEndstops { get; set; }
+
+    /// <summary>
+    /// Which input stops each drive during this move, by logical drive
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Each entry is the CAN address and remote input handle of an endstop packed by
+    /// <see cref="Native.MoveParams.MakeStopInput"/>, or <see cref="Native.MoveParams.NoStopInput"/>
+    /// for a drive that watches nothing. Only meaningful when <see cref="CheckEndstops"/> is set.
+    /// </para>
+    /// <para>
+    /// It is per drive rather than per move so that one move can home several axes at once, each
+    /// stopping on its own endstop. The entries are passed down unchanged to the controller, which is
+    /// what watches for the input change: an endstop that had to reach here before the axis stopped
+    /// would already have been overrun
+    /// </para>
+    /// </remarks>
+    public uint[] StopOnInput { get; } = CreateStopInputs();
+
+    /// <summary>
+    /// A stop input array with nothing being watched
+    /// </summary>
+    /// <returns>The array</returns>
+    private static uint[] CreateStopInputs()
+    {
+        uint[] inputs = new uint[MotionLimits.MaxAxesPlusExtruders];
+        Array.Fill(inputs, Native.MoveParams.NoStopInput);
+        return inputs;
+    }
 
     /// <summary>Whether the move runs at the standard feed rate, so a later change may apply to it</summary>
     public bool UsingStandardFeedrate { get; set; } = true;

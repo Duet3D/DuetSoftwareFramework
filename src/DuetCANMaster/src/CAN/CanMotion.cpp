@@ -404,6 +404,18 @@ namespace CanMotion
 	// arrives belonged to a move the SBC abandoned part way through and must not reach the boards.
 	static uint32_t sbcMoveId = 0;
 	static bool sbcMoveInProgress = false;
+
+	// Which input stops which driver, for the move being accumulated or executed. One entry per
+	// driver that watches something, which is at most the drivers a move can carry.
+	struct EndstopWatch
+	{
+		DriverId driver;
+		uint8_t inputBoard;
+		uint16_t inputHandle;
+	};
+
+	static EndstopWatch endstopWatches[SbcProtocol::MaxScheduleMoveDrivers];
+	static size_t numEndstopWatches = 0;
 } // namespace CanMotion
 
 void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
@@ -417,6 +429,7 @@ void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
 		StartMovement();
 		sbcMoveId = header.moveId;
 		sbcMoveInProgress = true;
+		numEndstopWatches = 0;			// the watches belong to the move being abandoned, not the new one
 	}
 
 	// Rebuild PrepParams from the packet. The SBC plans second-order moves - it has no S-curve
@@ -471,6 +484,15 @@ void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
 		else
 		{
 			AddAxisMovement(params, driver, d.steps);
+		}
+
+		// Record what stops this driver, if anything. Only an endstop move carries these
+		if (d.stopOnBoard != SbcProtocol::NoEndstopBoard && numEndstopWatches < ARRAY_SIZE(endstopWatches))
+		{
+			endstopWatches[numEndstopWatches].driver = driver;
+			endstopWatches[numEndstopWatches].inputBoard = d.stopOnBoard;
+			endstopWatches[numEndstopWatches].inputHandle = d.stopOnHandle;
+			++numEndstopWatches;
 		}
 	}
 
@@ -580,6 +602,42 @@ void CanMotion::StopDriverWhenProvisional(DriverId driver) noexcept
 		buf = buf->next;
 	}
 }
+
+#  if HAS_SBC_INTERFACE
+
+bool CanMotion::StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle) noexcept
+{
+	bool stoppedAnything = false;
+	for (size_t i = 0; i < numEndstopWatches; ++i)
+	{
+		const EndstopWatch& watch = endstopWatches[i];
+		if (watch.inputBoard != inputBoard || watch.inputHandle != inputHandle)
+		{
+			continue;
+		}
+
+		if (sbcMoveInProgress)
+		{
+			// The move has not gone out yet, so the driver can simply be given no steps. This is the
+			// case RepRapFirmware calls an endstop already triggered at the start of the move
+			StopDriverWhenProvisional(watch.driver);
+			stoppedAnything = true;
+		}
+		else
+		{
+			// The move is running on the boards. Zero net steps means "stop where you are": the
+			// controller never generated the steps, so it does not know how far this driver got, and
+			// the accurate position comes back through the revert mechanism instead
+			if (StopDriverWhenExecuting(watch.driver, 0))
+			{
+				stoppedAnything = true;
+			}
+		}
+	}
+	return stoppedAnything;
+}
+
+#  endif
 
 // Tell a CAN-connected driver to stop moving after we have sent the movement message.
 // Return true if we found it, we hadn't already requested a stop, and now we have.

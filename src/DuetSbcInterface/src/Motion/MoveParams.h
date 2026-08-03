@@ -93,10 +93,29 @@ namespace Duet::Sbc::Motion
 	static_assert(offsetof(MoveParamsHeader, totalDistance) == 12 );
 	static_assert(offsetof(MoveParamsHeader, ringNumber) == 24 );
 
+	// Value of a stopOnInput entry meaning "this drive watches no endstop during this move".
+	inline constexpr uint32_t NoStopInput = 0xFFFFFFFF;
+
+	// Pack the CAN address and RemoteInputHandle of an endstop into a stopOnInput entry.
+	[[nodiscard]] constexpr uint32_t MakeStopInput(uint8_t boardAddress, uint16_t inputHandle) noexcept
+	{
+		return (static_cast<uint32_t>(boardAddress) << 16) | inputHandle;
+	}
+
+	[[nodiscard]] constexpr uint8_t StopInputBoard(uint32_t stopOnInput) noexcept
+	{
+		return static_cast<uint8_t>(stopOnInput >> 16);
+	}
+
+	[[nodiscard]] constexpr uint16_t StopInputHandle(uint32_t stopOnInput) noexcept
+	{
+		return static_cast<uint16_t>(stopOnInput);
+	}
+
 	// Total size of a submission carrying `numDrives` drives.
 	[[nodiscard]] constexpr size_t MoveParamsLength(size_t numDrives) noexcept
 	{
-		return sizeof(MoveParamsHeader) + (numDrives * (sizeof(int32_t) + sizeof(float)));
+		return sizeof(MoveParamsHeader) + (numDrives * (sizeof(int32_t) + sizeof(float) + sizeof(uint32_t)));
 	}
 
 	// The two trailing arrays. Both are read straight out of the record, so callers must not assume
@@ -122,8 +141,23 @@ namespace Duet::Sbc::Motion
 		return {first, header.numDrives};
 	}
 
-	// The same two, for filling a record in. numDrives must already be set: it is what says where
-	// the second array begins and how long each span is.
+	// Which input, if any, stops each drive during this move. Only meaningful when the move carries
+	// MoveFlags::checkEndstops; every entry is NoStopInput otherwise.
+	//
+	// It is per drive rather than per move so that one move can home several axes at once, each
+	// stopping on its own endstop. The entries travel all the way down to the controller, which is
+	// what actually watches for the input change: it is the only place close enough to the CAN bus
+	// for the axis not to overrun before the stop takes effect.
+	[[nodiscard]] inline std::span<const uint32_t> MoveParamsStopInputs(const MoveParamsHeader& header) noexcept
+	{
+		const std::span<const float> directionVector = MoveParamsDirectionVector(header);
+		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
+		const auto *const first = reinterpret_cast<const uint32_t *>(directionVector.data() + directionVector.size());
+		return {first, header.numDrives};
+	}
+
+	// The same three, for filling a record in. numDrives must already be set: it is what says where
+	// each array begins and how long each span is.
 	[[nodiscard]] inline std::span<int32_t> MoveParamsEndPoints(MoveParamsHeader& header) noexcept
 	{
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
@@ -136,6 +170,14 @@ namespace Duet::Sbc::Motion
 		const std::span<int32_t> endPoints = MoveParamsEndPoints(header);
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
 		auto *const first = reinterpret_cast<float *>(endPoints.data() + endPoints.size());
+		return {first, header.numDrives};
+	}
+
+	[[nodiscard]] inline std::span<uint32_t> MoveParamsStopInputs(MoveParamsHeader& header) noexcept
+	{
+		const std::span<float> directionVector = MoveParamsDirectionVector(header);
+		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
+		auto *const first = reinterpret_cast<uint32_t *>(directionVector.data() + directionVector.size());
 		return {first, header.numDrives};
 	}
 }

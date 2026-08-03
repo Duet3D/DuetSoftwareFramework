@@ -405,7 +405,7 @@ internal sealed class MoveBuilder(MotionParameters parameters)
             NumDrives = NumDrives
         };
 
-        int length = MoveParams.Write(destination, header, _newEndPoints, _directionVector);
+        int length = MoveParams.Write(destination, header, _newEndPoints, _directionVector, move.StopOnInput);
 
         // The machine is now where this move leaves it, so a move that is built must be submitted
         _newEndPoints.CopyTo(_endPoints, 0);

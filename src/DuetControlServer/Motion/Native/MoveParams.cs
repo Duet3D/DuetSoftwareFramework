@@ -106,21 +106,36 @@ internal static class MoveFlags
 }
 
 /// <summary>
-/// Builds the byte layout of a move submission: the header followed by its two arrays
+/// Builds the byte layout of a move submission: the header followed by its three arrays
 /// </summary>
 /// <remarks>
-/// The two arrays are <c>int endPoint[NumDrives]</c> then <c>float directionVector[NumDrives]</c>.
-/// <c>NumDrives</c> is the configured number of logical drives rather than the number that actually
-/// move, because the native lookahead and preparation index densely by logical drive
+/// The arrays are <c>int endPoint[NumDrives]</c>, <c>float directionVector[NumDrives]</c> and
+/// <c>uint stopOnInput[NumDrives]</c>. <c>NumDrives</c> is the configured number of logical drives
+/// rather than the number that actually move, because the native lookahead and preparation index
+/// densely by logical drive
 /// </remarks>
 internal static class MoveParams
 {
+    /// <summary>
+    /// Value of a stop input entry meaning the drive watches no endstop during this move
+    /// </summary>
+    public const uint NoStopInput = 0xFFFFFFFF;
+
+    /// <summary>
+    /// Pack the CAN address and input handle of an endstop into a stop input entry
+    /// </summary>
+    /// <param name="boardAddress">CAN address of the board carrying the input</param>
+    /// <param name="inputHandle">Remote input handle of the endstop</param>
+    /// <returns>The packed entry</returns>
+    public static uint MakeStopInput(byte boardAddress, ushort inputHandle) => ((uint)boardAddress << 16) | inputHandle;
+
     /// <summary>
     /// Total size of a submission carrying the given number of drives
     /// </summary>
     /// <param name="numDrives">Number of logical drives</param>
     /// <returns>Size in bytes</returns>
-    public static int Length(int numDrives) => Marshal.SizeOf<MoveParamsHeader>() + (numDrives * (sizeof(int) + sizeof(float)));
+    public static int Length(int numDrives)
+        => Marshal.SizeOf<MoveParamsHeader>() + (numDrives * (sizeof(int) + sizeof(float) + sizeof(uint)));
 
     /// <summary>
     /// Write a move submission into <paramref name="destination"/>
@@ -129,14 +144,16 @@ internal static class MoveParams
     /// <param name="header">Fixed part of the submission; its NumDrives must match the arrays</param>
     /// <param name="endPoints">Machine position each drive ends at, in microsteps</param>
     /// <param name="directionVector">Normalised direction, first three entries Cartesian</param>
+    /// <param name="stopOnInput">Which input stops each drive, or <see cref="NoStopInput"/></param>
     /// <returns>Number of bytes written</returns>
     /// <exception cref="ArgumentException">The buffer is too small, or the arrays disagree with the header</exception>
-    public static int Write(Span<byte> destination, MoveParamsHeader header, ReadOnlySpan<int> endPoints, ReadOnlySpan<float> directionVector)
+    public static int Write(Span<byte> destination, MoveParamsHeader header, ReadOnlySpan<int> endPoints,
+                            ReadOnlySpan<float> directionVector, ReadOnlySpan<uint> stopOnInput)
     {
         int numDrives = header.NumDrives;
-        if (endPoints.Length != numDrives || directionVector.Length != numDrives)
+        if (endPoints.Length != numDrives || directionVector.Length != numDrives || stopOnInput.Length != numDrives)
         {
-            throw new ArgumentException($"Expected {numDrives} entries in each array, got {endPoints.Length} and {directionVector.Length}");
+            throw new ArgumentException($"Expected {numDrives} entries in each array, got {endPoints.Length}, {directionVector.Length} and {stopOnInput.Length}");
         }
 
         int total = Length(numDrives);
@@ -149,6 +166,7 @@ internal static class MoveParams
         MemoryMarshal.Write(destination, in header);
         MemoryMarshal.AsBytes(endPoints).CopyTo(destination[headerSize..]);
         MemoryMarshal.AsBytes(directionVector).CopyTo(destination[(headerSize + (numDrives * sizeof(int)))..]);
+        MemoryMarshal.AsBytes(stopOnInput).CopyTo(destination[(headerSize + (numDrives * (sizeof(int) + sizeof(float))))..]);
         return total;
     }
 }

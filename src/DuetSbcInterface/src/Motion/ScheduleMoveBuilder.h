@@ -60,7 +60,7 @@ namespace Duet::Sbc::Motion
 		void StartMovement() noexcept;
 
 		// Add one axis driver's share of the move, in net microsteps.
-		void AddAxisMovement(const MoveProfile& profile, DriverId driver, int32_t steps) noexcept;
+		void AddAxisMovement(const MoveProfile& profile, DriverId driver, int32_t steps, uint32_t stopOnInput) noexcept;
 
 		// Add one extruder driver's share, in microsteps including fractional parts. The board adds
 		// pressure advance and carries the fraction forward, which is why this is not rounded here.

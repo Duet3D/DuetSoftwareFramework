@@ -23,9 +23,9 @@ void CanMotion::StartMovement() noexcept
 	Builder().StartMovement();
 }
 
-void CanMotion::AddAxisMovement(const PrepParams& params, DriverId canDriver, int32_t steps) noexcept
+void CanMotion::AddAxisMovement(const PrepParams& params, DriverId canDriver, int32_t steps, uint32_t stopOnInput) noexcept
 {
-	Builder().AddAxisMovement(params, canDriver, steps);
+	Builder().AddAxisMovement(params, canDriver, steps, stopOnInput);
 }
 
 void CanMotion::AddExtruderMovement(const PrepParams& params, DriverId canDriver, float extrusion,

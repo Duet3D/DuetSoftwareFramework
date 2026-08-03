@@ -52,6 +52,19 @@ namespace CanMotion
 	bool CanPrepareMove() noexcept;
 	CanMessageBuffer* _ecv_null GetUrgentMessage() noexcept;
 
+#  if HAS_SBC_INTERFACE
+	// Stop every driver of the move in progress that was told to watch this input.
+	//
+	// This is why the controller and not the SBC watches endstops: an input change that had to reach
+	// the SBC and come back as a stop would take long enough for the axis to overrun. The move says
+	// which input stops which driver (ScheduleMoveDriver::stopOnBoard and stopOnHandle), so matching
+	// an incoming change against it needs no lookup and no knowledge of what an endstop means.
+	//
+	// Returns true if anything was stopped, in which case the caller should wake the async sender.
+	// Called from the CAN receiver task
+	bool StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle) noexcept;
+#  endif
+
 	// The next 4 functions may be called from the step ISR, so they can't send CAN messages directly
 	void StopDriverWhenProvisional(DriverId driver) noexcept pre(driver.IsRemote());
 	bool StopDriverWhenExecuting(DriverId driver, int32_t netStepsTaken) noexcept pre(driver.IsRemote());

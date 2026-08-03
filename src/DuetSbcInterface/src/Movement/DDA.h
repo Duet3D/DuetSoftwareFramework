@@ -218,6 +218,10 @@ private:
 
 	int32_t m_endPoint[maxAxesPlusExtruders]{};  		// Machine coordinates of the endpoint
 	float m_directionVector[maxAxesPlusExtruders]{};	// The normalised direction vector - first 3 are XYZ Cartesian coordinates even on a delta
+	// Which input stops each drive, packed by Motion::MakeStopInput, or Motion::NoStopInput. Only
+	// meaningful when checkEndstops is set. Carried per drive so one move can home several axes at
+	// once, each stopping on its own endstop
+	uint32_t m_stopOnInput[maxAxesPlusExtruders]{};
     float m_totalDistance{};							// How long is the move in hypercuboid space
     float m_maxAcceleration{};							// The maximum acceleration and deceleration to use, always positive
 #if SUPPORT_S_CURVE

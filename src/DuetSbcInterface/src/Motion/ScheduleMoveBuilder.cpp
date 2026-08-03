@@ -4,6 +4,8 @@
 
 #include "ScheduleMoveBuilder.h"
 
+#include "MoveParams.h"
+
 #include <Platform/Platform.h>
 
 #include <cstring>
@@ -36,16 +38,27 @@ ScheduleMoveDriver& ScheduleMoveBuilder::NewDriver(const MoveProfile& profileToU
 	}
 	d.boardAddress = driver.boardAddress;
 	d.driverNumber = driver.localDriver;
+	d.stopOnBoard = duet::spi::protocol::NoEndstopBoard;
+	d.stopOnHandle = 0;
 	d.padding = 0;
 	return d;
 }
 
-void ScheduleMoveBuilder::AddAxisMovement(const MoveProfile& profileToUse, DriverId driver, int32_t steps) noexcept
+void ScheduleMoveBuilder::AddAxisMovement(const MoveProfile& profileToUse, DriverId driver, int32_t steps,
+										  uint32_t stopOnInput) noexcept
 {
 	ScheduleMoveDriver& d = NewDriver(profileToUse, driver);
 	d.isExtruder = 0;
 	d.steps = steps;
 	d.extrusion = 0.0F;
+
+	// The controller watches for this input and stops this driver itself. Only an endstop move
+	// carries one; every other move leaves the sentinel NewDriver already wrote
+	if (stopOnInput != Duet::Sbc::Motion::NoStopInput)
+	{
+		d.stopOnBoard = Duet::Sbc::Motion::StopInputBoard(stopOnInput);
+		d.stopOnHandle = Duet::Sbc::Motion::StopInputHandle(stopOnInput);
+	}
 }
 
 void ScheduleMoveBuilder::AddExtruderMovement(const MoveProfile& profileToUse, DriverId driver, float extrusion,
