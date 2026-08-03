@@ -208,7 +208,8 @@ public class KinematicsTests
         direction[1] = MathF.Sqrt(0.5f);
 
         MoveLimits limits = new() { RequestedSpeed = 100.0f, MaxAcceleration = 1000.0f };
-        engine.LimitSpeedAndAcceleration(ref limits, direction, numVisibleAxes: 3, maxFeedrates, accelerations);
+        PlannedMove move = new() { NormalisedDirectionVector = direction, NumVisibleAxes = 3 };
+        engine.LimitSpeedAndAcceleration(ref limits, move, maxFeedrates, accelerations);
 
         // Motor A moves (X+Y)/sqrt(2) = sqrt(2) times as far as the move itself, so the move is
         // limited to 1/sqrt(2) of what the motor can do
@@ -235,7 +236,8 @@ public class KinematicsTests
         direction[1] = MathF.Sqrt(0.5f);
 
         MoveLimits limits = new() { RequestedSpeed = 100.0f, MaxAcceleration = 1000.0f };
-        engine.LimitSpeedAndAcceleration(ref limits, direction, numVisibleAxes: 3, maxFeedrates, accelerations);
+        PlannedMove move = new() { NormalisedDirectionVector = direction, NumVisibleAxes = 3 };
+        engine.LimitSpeedAndAcceleration(ref limits, move, maxFeedrates, accelerations);
 
         Assert.Multiple(() =>
         {

@@ -128,8 +128,11 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
         ReadOnlySpan<float> stepsPerMm,
         int numVisibleAxes,
         int numTotalAxes,
-        Span<int> motorPos)
+        Span<int> motorPos,
+        bool isCoordinated = false)
     {
+        // A linear combination has exactly one solution, so there is no pose to choose and
+        // isCoordinated makes no difference here
         NativeMovementError result = NativeMovementError.Ok;
         int motorLimit = Math.Min(numTotalAxes, Math.Min(MatrixSize, Math.Min(motorPos.Length, stepsPerMm.Length)));
 
@@ -197,17 +200,20 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     /// <inheritdoc />
     public override void LimitSpeedAndAcceleration(
         ref MoveLimits limits,
-        ReadOnlySpan<float> normalisedDirectionVector,
-        int numVisibleAxes,
+        in PlannedMove move,
         ReadOnlySpan<float> maxFeedrates,
         ReadOnlySpan<float> accelerations)
     {
+        // Deliberately not the base implementation: on a Cartesian machine X and Y really are limited
+        // independently, so a diagonal move may go faster than either axis alone
+        ReadOnlySpan<float> normalisedDirectionVector = move.NormalisedDirectionVector;
+
         // How much of the move each shared motor contributes. A motor that only one axis drives has
         // already been limited by the per-axis pass, so only the shared ones are of interest here
         Span<float> motorMovements = stackalloc float[MatrixSize];
         motorMovements.Clear();
 
-        int axisLimit = Math.Min(numVisibleAxes, Math.Min(MatrixSize, normalisedDirectionVector.Length));
+        int axisLimit = Math.Min(move.NumVisibleAxes, Math.Min(MatrixSize, normalisedDirectionVector.Length));
         for (int axis = 0; axis < axisLimit; axis++)
         {
             if (!_hasSharedMotor[axis])

@@ -133,10 +133,37 @@ Update these counts as boxes are ticked.
 | **No Tool subsystem in DCS** | §5.7, M116, M568 | Tool selection, offsets, mix ratios, standby/active temperatures. [TCodeHandler.cs](src/DuetControlServer/Codes/Handlers/TCodeHandler.cs) is a 27-line stub |
 | **No Spindle subsystem in DCS** | §5.8 | |
 | **No endstop/probe abstraction in DCS** | M119, M558, M574, M577, M585, M401, M402, M851 | Needs the input-monitor CAN messages (`CanMessageCreateInputMonitorV1`, `CanMessageChangeInputMonitorV1`, `CanMessageInputChangedV2`) wired to `sensors.endstops[]` / `sensors.probes[]` |
-| **Non-Cartesian kinematics not ported** | M665, M666, M667, part of M669 | `MotionParameters.BuildGeometry` falls back to Cartesian for delta, SCARA, polar and hangprinter. Only `CoreKinematicsEngine` exists |
 
 Because of these, **§5.1-§5.4 (motion) is the tractable scope on this branch**; the rest is gated on
 subsystems that do not exist yet.
+
+### Kinematics engines
+
+Every geometry RepRapFirmware supports now has an engine under
+[Motion/Kinematics/](src/DuetControlServer/Motion/Kinematics/), and
+`MotionParameters.BuildGeometry` picks between them from `move.kinematics`. What is left is the
+M-codes that configure them (M665, M666, M667 and the non-core half of M669), not the geometry itself.
+
+| Engine | Ported from | Notes |
+|---|---|---|
+| `CoreKinematicsEngine` | `CoreKinematics` | Cartesian, CoreXY, CoreXZ, CoreXYU, CoreXYUV, MarkForged |
+| `LinearDeltaKinematicsEngine` | `LinearDeltaKinematics` | Up to six towers, bed tilt correction |
+| `RotaryDeltaKinematicsEngine` | `RotaryDeltaKinematics` | Nothing in the object model configures it — built with RRF's defaults |
+| `ScaraKinematicsEngine` | `ScaraKinematics` | Arm mode is engine state, as in RRF |
+| `FiveBarScaraKinematicsEngine` | `FiveBarScaraKinematics` | Nothing in the object model configures it — built with the M669 documentation's defaults |
+| `PolarKinematicsEngine` | `PolarKinematics` | Turntable speed and acceleration limits are converted to step clocks at build time |
+| `HangprinterKinematicsEngine` | `HangprinterKinematics` | Constant spool radius only; see below |
+
+Two of RepRapFirmware's hangprinter refinements are deliberately not ported, because nothing in the
+object model can express them and so nothing could configure them: **line buildup compensation**,
+which varies steps per mm with how much line is on the spool, and **flex compensation**, which needs
+the mover's weight and the lines' spring constants. The engine uses the constant-radius model, which
+is the branch RepRapFirmware itself takes when the buildup factor is zero. Both need
+`move.kinematics` to grow the fields M669 sets before they can be brought across.
+
+Position limiting (`LimitPosition`), homing, auto-calibration and bed levelling are not part of
+`KinematicsEngine` yet; the reachability predicates each engine exposes (`IsReachable`) are the piece
+of that work which the transforms already needed.
 
 ---
 
@@ -183,10 +210,10 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M425 | 3223 | Backlash compensation | `move.axes[].backlash`, `move.backlashFactor` | yes | ⬜ |
 | M556 | 3653 | Axis skew compensation | `move.compensation.skew` | no | ⬜ |
 | M579 | 3925 | Scale Cartesian axes | needs new field — §6 | no | ⬜ |
-| M665 | 4052 | Delta configuration | `move.kinematics` (`DeltaKinematics`) | yes | ⬜ blocked |
-| M666 | 4082 | Delta endstop adjustments | `move.kinematics` (`DeltaKinematics`) | yes | ⬜ blocked |
+| M665 | 4052 | Delta configuration | `move.kinematics` (`DeltaKinematics`) | yes | ⬜ engine ported, M-code not |
+| M666 | 4082 | Delta endstop adjustments | `move.kinematics` (`DeltaKinematics`) | yes | ⬜ engine ported, M-code not |
 | M667 | 4099 | CoreXY mode (legacy, superseded by M669) | `move.kinematics` (`CoreKinematics`) | yes | ⬜ |
-| M669 | 4104 | Kinematics selection and parameters | `move.kinematics` | yes | ⬜ only `CoreKinematics` has an engine |
+| M669 | 4104 | Kinematics selection and parameters | `move.kinematics` | yes | ⬜ every geometry has an engine now |
 | M671 | 4152 | Z leadscrew positions | `move.kinematics.tiltCorrection` | no | ⬜ |
 | M673 | 4168 | Align plane on rotary axis | `move.rotation` | yes | ⬜ |
 | M674 | 4275 | Set Z to centre point | — | yes | ⬜ |
@@ -420,8 +447,9 @@ Each phase leaves the tree in a state where the machine is more usable than befo
    **Done** — see §8.
 3. **Phase 3 — interpreter state and reporting.** M82, M83, M114, M120, M121, M220, M221, M290, M425,
    M556, M564.
-4. **Phase 4 — geometry.** M667, M669 (Cartesian and CoreXY first), M671, M673-M675; then the delta
-   kinematics engine and M665/M666.
+4. **Phase 4 — geometry.** M667, M669 (Cartesian and CoreXY first), M671, M673-M675, then M665/M666.
+   The engines all exist (§4), so this phase is the M-codes that set their parameters and the object
+   model fields some of those parameters still have nowhere to live.
 5. **Phase 5 — endstops and probing.** Needs the input-monitor plumbing first: M119, M574, M558, M401,
    M402, M577, M585, M851, then the height map codes M374-M376, M557, M561.
 6. **Phase 6 — queue and multi-system.** M595, M596, M597, M598, M599.

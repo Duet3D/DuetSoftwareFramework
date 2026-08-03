@@ -210,6 +210,35 @@ public class MotionParametersTests
     }
 
     [Test]
+    public void TheGeometryAddsItsOwnContinuousRotationAxes()
+    {
+        // A polar bed goes round whether or not anything in the object model says so, and the native
+        // planner needs to know that or it will take the long way round on every angular move
+        Move move = MachineWithOneOfEach();
+        move.Axes.Add(new Axis { Letter = 'Z', StepsPerMm = 400.0f });
+        move.Kinematics = new PolarKinematics { RadiusMax = 150.0f };
+
+        MotionConfig config = MotionParameters.FromObjectModel(move).ToMotionConfig(move);
+
+        // Bit 1 is the turntable, which the polar geometry contributes; the C axis at bit 1 declares
+        // it as well, so this is really a check that neither source is lost
+        Assert.That(config.ContinuousRotationAxes & 0b010u, Is.EqualTo(0b010u));
+    }
+
+    [Test]
+    public void ContinuousRotationIsNotClaimedForAxesTheMachineDoesNotHave()
+    {
+        // A five-bar SCARA calls both its actuators continuous, but a machine configured with one
+        // axis has no second axis for that to be true of
+        Move move = new();
+        move.Axes.Add(new Axis { Letter = 'X', StepsPerMm = 80.0f });
+        move.Kinematics = new PolarKinematics { RadiusMax = 150.0f };
+
+        MotionConfig config = MotionParameters.FromObjectModel(move).ToMotionConfig(move);
+        Assert.That(config.ContinuousRotationAxes, Is.EqualTo(0u));
+    }
+
+    [Test]
     public void DriversAreCarriedThroughWithTheirBoardAddress()
     {
         Move move = MachineWithOneOfEach();
@@ -278,6 +307,111 @@ public class MotionParametersTests
 
         // CoreXY: holding X still needs both motors
         Assert.That(parameters.Geometry.GetControllingDrives(0), Is.EqualTo(0b011u));
+    }
+
+    [Test]
+    public void ADeltaInTheObjectModelBuildsADeltaEngine()
+    {
+        Move move = MachineWithOneOfEach();
+        DeltaKinematics kinematics = new() { DeltaRadius = 105.6f, HomedHeight = 240.0f, PrintRadius = 80.0f };
+        for (int tower = 0; tower < 3; tower++)
+        {
+            kinematics.Towers.Add(new DeltaTower { Diagonal = 215.0f });
+        }
+        move.Kinematics = kinematics;
+
+        MotionParameters parameters = MotionParameters.FromObjectModel(move);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(parameters.Geometry.Name, Is.EqualTo("delta"));
+
+            // The giveaway that this is not a Cartesian machine: all three towers move together
+            Assert.That(parameters.Geometry.GetControllingDrives(0), Is.EqualTo(0b111u));
+        });
+    }
+
+    [Test]
+    public void ADeltaWithNothingConfiguredStillGetsAUsableGeometry()
+    {
+        // Before M665 has run the object model has zeroes in it. A delta radius of zero would put all
+        // three towers on top of each other, which is not a machine - so the defaults stand in
+        Move move = MachineWithOneOfEach();
+        move.Kinematics = new DeltaKinematics();
+
+        MotionParameters parameters = MotionParameters.FromObjectModel(move);
+        float[] machinePos = new float[NumDrives];
+        int[] motorPos = new int[NumDrives];
+
+        Assert.That(parameters.Geometry.CartesianToMotorSteps(machinePos, parameters.StepsPerMm, 3, 3, motorPos),
+                    Is.EqualTo(DuetControlServer.Link.Native.NativeMovementError.Ok));
+    }
+
+    [Test]
+    public void AScaraInTheObjectModelBuildsAScaraEngine()
+    {
+        Move move = MachineWithOneOfEach();
+        ScaraKinematics kinematics = new() { ProximalLength = 100.0f, DistalLength = 100.0f };
+        kinematics.ThetaLimits[0] = -90.0f;
+        kinematics.ThetaLimits[1] = 90.0f;
+        kinematics.PsiLimits[0] = -135.0f;
+        kinematics.PsiLimits[1] = 135.0f;
+        move.Kinematics = kinematics;
+
+        MotionParameters parameters = MotionParameters.FromObjectModel(move);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(parameters.Geometry.Name, Is.EqualTo("Scara"));
+            Assert.That(parameters.Geometry.GetControllingDrives(0), Is.EqualTo(0b011u), "both arm motors");
+        });
+    }
+
+    [Test]
+    public void APolarInTheObjectModelCarriesItsTurntableLimitsInStepClocks()
+    {
+        Move move = MachineWithOneOfEach();
+        move.Kinematics = new PolarKinematics { RadiusMin = 20.0f, RadiusMax = 150.0f, TTSpeedMax = 30.0f, TTAccMax = 60.0f };
+
+        MotionParameters parameters = MotionParameters.FromObjectModel(move);
+        float clockSquared = StepClockRate * StepClockRate;
+
+        Assert.That(parameters.Geometry, Is.InstanceOf<DuetControlServer.Motion.Kinematics.PolarKinematicsEngine>());
+
+        var polar = (DuetControlServer.Motion.Kinematics.PolarKinematicsEngine)parameters.Geometry;
+        Assert.Multiple(() =>
+        {
+            Assert.That(polar.MaxTurntableSpeed, Is.EqualTo(30.0f / StepClockRate).Within(1e-10f));
+            Assert.That(polar.MaxTurntableAcceleration, Is.EqualTo(60.0f / clockSquared).Within(1e-16f));
+            Assert.That(polar.ContinuousRotationAxes, Is.EqualTo(0b010u));
+        });
+    }
+
+    [Test]
+    public void AHangprinterInTheObjectModelCarriesItsAnchors()
+    {
+        Move move = MachineWithOneOfEach();
+        move.Kinematics = new HangprinterKinematics();
+
+        MotionParameters parameters = MotionParameters.FromObjectModel(move);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(parameters.Geometry.Name, Is.EqualTo("Hangprinter"));
+            Assert.That(parameters.Geometry.GetControllingDrives(0), Is.EqualTo(0b1111u), "all four lines");
+        });
+    }
+
+    [Test]
+    public void AGeometryWithNoEngineStillPlansAsCartesian()
+    {
+        // Refusing to plan at all would be worse than planning for a machine we can describe, and the
+        // fallback is the geometry that maps one motor to one axis
+        Move move = MachineWithOneOfEach();
+        move.Kinematics = new Kinematics();
+
+        MotionParameters parameters = MotionParameters.FromObjectModel(move);
+        Assert.That(parameters.Geometry.GetControllingDrives(0), Is.EqualTo(0b001u));
     }
 
     [Test]
