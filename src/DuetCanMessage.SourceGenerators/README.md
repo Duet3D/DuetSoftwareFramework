@@ -280,29 +280,37 @@ Each table produces:
   `CanParamType` keeps CANlib's numbering because the low nibble is the element size, which decides how far
   each parameter advances the write cursor;
 * a message type — `CanMessageM950Fan` and so on — which is a `CanMessageGeneric` that knows the
-  `CanMessageType` its table is sent under, so it goes through the ordinary typed send path like any other
-  message. It wraps the body in a single field at offset 0 rather than restating its fields, so the wire
+  `CanMessageType` its table is sent under and the parameters it can carry, so it is built and sent like any
+  other message. It wraps the body in a single field at offset 0 rather than restating its fields, so the wire
   format is inherited and cannot drift, and it computes its own `GetActualDataLength()` by walking the table
-  — without that, the interface default would report `sizeof` and pad every message out to the full data area;
-* a typed builder, so that the letters and their types are checked by the compiler:
+  — without that, the interface default would report `sizeof` and pad every message out to the full data area.
+
+Every parameter is a nullable property, because a generic message says which parameters it carries rather
+than giving every one of them a value: a property reads back null when the message is not carrying it, and
+assigning null takes it back out. The letters and their types are therefore checked by the compiler, and the
+parameter table and message type never appear at the call site:
 
 ```csharp
-M950FanBuilder builder = new();
-builder.F(fanNumber).C(portName).K(pulsesPerRev);
-// builder.K("oops") does not compile, and there is no Z method
+CanMessageM950Fan message = new();
+message.FromCode(code);          // whatever the command supplied, converted per the table
+message.F = fanNumber;           // and whatever the main board fills in itself
+// message.K = "oops" does not compile, and there is no Z
 
-await linkInterface.SendCanMessageAsync(address, builder.Message, CanMessageType.StandardReply);
+await linkInterface.SendCanMessageAsync(address, message, CanMessageType.StandardReply);
 ```
 
-`builder.Message` is the typed message and is the intended way to send one; `builder.Body` hands back the
-bare `CanMessageGeneric` for the rare caller that wants to supply the message type itself. The three tables
-with no message type of their own (M42, M280, M959) get a message that implements only `ICanMessageBody`, so
-passing one to the typed send path is a build error rather than a malformed CAN id.
+`FromCode` is the equivalent of RepRapFirmware's `PopulateFromCommand`. It sets the parameters the command
+mentions and leaves the rest alone, so it composes with setting one explicitly in either order; `Clear()`
+starts again from an empty message. Keeping the message a struct is what lets it stay an `ICanMessage`: the
+send path serializes the value itself, exactly as it does for the messages CANlib defines with a struct of
+their own. The two tables with no message type of their own (M42 and M280, both superseded by
+`CanMessageWriteGpio`) are emitted for C++ only, so there is no C# message that could go out under a
+malformed CAN id.
 
-The two hand-written pieces are `CanGenericWriter`, which does the packing (and `CanGenericParser`, its
-counterpart, used to read back what it produced), and `CanMessageGenericConstructor`, which builds a message
-from a `Code` — the equivalent of RepRapFirmware's `PopulateFromCommand`, and the path to use when the
-parameters are whatever the user typed rather than known at the call site.
+Underneath are the two hand-written, letter-keyed pieces the properties call into: `CanGenericWriter`, which
+does the packing and the conversion from a `Code`, and `CanGenericParser`, its counterpart, which reads a
+value back out. Use those directly when the table is only known at run time; `CanGenericLayout` holds the
+offset rules both of them walk.
 
 `ParamDescriptor` itself is not generated: it comes from CANlib's `CanMessageGenericTableFormat.h`, since it
 is the type both ends of the link agree on. Its per-type macros are simply unused once the tables are

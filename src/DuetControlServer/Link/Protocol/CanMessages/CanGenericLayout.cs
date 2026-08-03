@@ -96,4 +96,15 @@ public static class CanGenericLayout
         }
         return position;
     }
+
+    /// <summary>
+    /// Number of payload bytes a generic message has to transmit: the parameters that are present, plus the
+    /// request ID and parameter map that precede them.
+    /// </summary>
+    /// <remarks>
+    /// The send path sizes the payload from this, so a message that reported its struct size instead would
+    /// pad every message out to the full 60-byte data area.
+    /// </remarks>
+    public static uint ActualDataLength(ReadOnlySpan<byte> data, uint paramMap, ImmutableArray<CanParamDescriptor> table) =>
+        CanMessageGeneric.GetActualDataLength((uint)DataLength(data, paramMap, table));
 }

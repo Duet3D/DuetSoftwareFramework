@@ -1,4 +1,6 @@
+using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using DuetAPI.Commands;
 using DuetControlServer.Link.Protocol.Shared;
 
 namespace DuetControlServer.Link.Protocol.CanMessages;
@@ -49,4 +51,46 @@ public interface ICanMessage<TSelf> : ICanMessageBody<TSelf> where TSelf : struc
     /// CAN message type identifying this message (placed in the CAN id)
     /// </summary>
     static abstract CanMessageType MessageType { get; }
+}
+
+/// <summary>
+/// A message whose payload is a <see cref="CanMessageGeneric"/>: the parameters of its table that are being
+/// sent, packed in table order, plus a bitmap saying which those are.
+/// </summary>
+/// <remarks>
+/// These are the messages CANlib defines by a parameter table rather than by a struct, and the generator
+/// gives each one a type of its own so that it is used like any other message: a value with a property per
+/// parameter, which the ordinary typed send path takes because it is still an <see cref="ICanMessage{TSelf}"/>
+/// over the same 64 bytes the expansion board reads.
+/// <para>
+/// Every parameter is optional, so each property is nullable: reading one gives null when the message is not
+/// carrying that parameter, and assigning null takes it back out. The table and the packing rules are the
+/// implementation's business — <see cref="CanGenericWriter"/> and <see cref="CanGenericParser"/> are the
+/// letter-keyed path underneath, for the caller that only knows the table at run time.
+/// </para>
+/// </remarks>
+public interface ICanGenericMessage<TSelf> : ICanMessage<TSelf> where TSelf : struct, ICanGenericMessage<TSelf>
+{
+    /// <summary>
+    /// The parameter table this message is built against, which is the contract between the two ends of the
+    /// link: the sender packs the present parameters in table order and sets the matching bit of the
+    /// message's paramMap, and the receiver walks the same table to find them again.
+    /// </summary>
+    static abstract ImmutableArray<CanParamDescriptor> ParamTable { get; }
+
+    /// <summary>
+    /// Take the parameters of this message from a G-code command, converted to the types the table declares.
+    /// </summary>
+    /// <remarks>
+    /// Parameters the command does not mention are left as they are, so a value set explicitly before the
+    /// call survives one the command does not carry. Use <see cref="Clear"/> to start from an empty message.
+    /// </remarks>
+    /// <param name="code">Command to take the parameter values from.</param>
+    /// <exception cref="CanGenericParamException">
+    /// A value does not fit the parameter it was given for, or the message would overflow.
+    /// </exception>
+    void FromCode(Code code);
+
+    /// <summary>Take every parameter back out of the message, leaving it as newly constructed.</summary>
+    void Clear();
 }

@@ -24,191 +24,226 @@ public sealed class CanGenericParamException(string message) : Exception(message
 /// <item>a string takes its bytes plus a null terminator;</item>
 /// <item>an array takes one length byte followed by that many elements.</item>
 /// </list>
-/// Parameters may be added in any order, so each value is inserted at the position its table entry gives
-/// it rather than appended, shifting whatever follows.
+/// Parameters may be set in any order, so each value is inserted at the position its table entry gives it
+/// rather than appended, shifting whatever follows; setting one that is already present replaces it in
+/// place, and setting it to <c>null</c> takes it out of the message again.
+/// <para>
+/// This is the letter-keyed path, for the caller that only knows the table at run time. Where the parameter
+/// is known at the call site, prefer the generated message types (<see cref="CanMessageM950Fan"/> and
+/// friends), whose properties carry the letter and its type for you.
+/// </para>
 /// </remarks>
-public sealed class CanGenericWriter(ImmutableArray<CanParamDescriptor> table)
+public static partial class CanGenericWriter
 {
-    private CanMessageGeneric _message;
-    private int _dataLength;
-
-    /// <summary>Parameter table this message is being built against.</summary>
-    public ImmutableArray<CanParamDescriptor> Table { get; } = table;
-
-    /// <summary>Number of data bytes written so far, i.e. what the message's parameters occupy.</summary>
-    public int DataLength => _dataLength;
-
-    /// <summary>
-    /// The message as built so far. Only the first <see cref="ActualDataLength"/> bytes are meaningful.
-    /// </summary>
-    public CanMessageGeneric Message => _message;
-
-    /// <summary>
-    /// Number of payload bytes to transmit, i.e. the parameter data plus the request ID and parameter map.
-    /// </summary>
-    public uint ActualDataLength => CanMessageGeneric.GetActualDataLength((uint)_dataLength);
-
-    /// <summary>
-    /// The parameter data written so far, without the request ID or parameter map.
-    /// </summary>
-    /// <remarks>
-    /// <see cref="Message"/> is a copy of a struct, so a span cannot be taken over it; this hands back the
-    /// meaningful part of the data area instead of the whole 60-byte field.
-    /// </remarks>
-    public byte[] GetData()
+    /// <summary>Set or, if <paramref name="value"/> is null, remove an unsigned parameter.</summary>
+    /// <exception cref="CanGenericParamException">The letter is not in the table, the entry is not one of the
+    /// unsigned fixed-size types, or the value does not fit it.</exception>
+    public static void SetUInt(ref CanMessageGeneric message, ImmutableArray<CanParamDescriptor> table, char letter, uint? value)
     {
-        byte[] data = new byte[_dataLength];
-        ((ReadOnlySpan<byte>)_message.Data)[.._dataLength].CopyTo(data);
-        return data;
-    }
+        if (value is not uint number)
+        {
+            Remove(ref message, table, letter);
+            return;
+        }
 
-    /// <summary>Add an unsigned parameter, which must be one of the unsigned fixed-size types.</summary>
-    public void AddUInt(char letter, uint value)
-    {
-        CanGenericSlot slot = Reserve(letter);
-        switch (slot.Descriptor.Type)
+        CanParamDescriptor descriptor = Entry(table, letter);
+        switch (descriptor.Type)
         {
             case CanParamType.UInt32:
-                Insert(slot, Bytes(stackalloc byte[4], value, 4));
+                Set(ref message, table, letter, Bytes(stackalloc byte[4], number, 4));
                 break;
 
             case CanParamType.UInt16 or CanParamType.PwmFreq:
-                Require(value <= ushort.MaxValue, letter, $"{value} does not fit in 16 bits");
-                Insert(slot, Bytes(stackalloc byte[2], value, 2));
+                Require(number <= ushort.MaxValue, letter, $"{number} does not fit in 16 bits");
+                Set(ref message, table, letter, Bytes(stackalloc byte[2], number, 2));
                 break;
 
             case CanParamType.UInt8 or CanParamType.LocalDriver:
-                Require(value <= byte.MaxValue, letter, $"{value} does not fit in 8 bits");
-                Insert(slot, Bytes(stackalloc byte[1], value, 1));
+                Require(number <= byte.MaxValue, letter, $"{number} does not fit in 8 bits");
+                Set(ref message, table, letter, Bytes(stackalloc byte[1], number, 1));
                 break;
 
             case CanParamType.UInt64:
-                Insert(slot, Bytes(stackalloc byte[8], value, 8));
+                Set(ref message, table, letter, Bytes(stackalloc byte[8], number, 8));
                 break;
 
             default:
-                throw WrongType(letter, slot.Descriptor, "an unsigned integer");
+                throw WrongType(letter, descriptor, "an unsigned integer");
         }
     }
 
-    /// <summary>Add a 64-bit unsigned parameter.</summary>
-    public void AddUInt64(char letter, ulong value)
+    /// <summary>Set or, if <paramref name="value"/> is null, remove a 64-bit unsigned parameter.</summary>
+    /// <exception cref="CanGenericParamException">The letter is not in the table, or the entry is not a 64-bit unsigned integer.</exception>
+    public static void SetUInt64(ref CanMessageGeneric message, ImmutableArray<CanParamDescriptor> table, char letter, ulong? value)
     {
-        CanGenericSlot slot = Reserve(letter);
-        if (slot.Descriptor.Type != CanParamType.UInt64)
+        if (value is not ulong number)
         {
-            throw WrongType(letter, slot.Descriptor, "a 64-bit unsigned integer");
+            Remove(ref message, table, letter);
+            return;
+        }
+
+        CanParamDescriptor descriptor = Entry(table, letter);
+        if (descriptor.Type != CanParamType.UInt64)
+        {
+            throw WrongType(letter, descriptor, "a 64-bit unsigned integer");
         }
         Span<byte> bytes = stackalloc byte[8];
-        BinaryPrimitives.WriteUInt64LittleEndian(bytes, value);
-        Insert(slot, bytes);
+        BinaryPrimitives.WriteUInt64LittleEndian(bytes, number);
+        Set(ref message, table, letter, bytes);
     }
 
-    /// <summary>Add a signed parameter, which must be one of the signed fixed-size types.</summary>
-    public void AddInt(char letter, int value)
+    /// <summary>Set or, if <paramref name="value"/> is null, remove a signed parameter.</summary>
+    /// <exception cref="CanGenericParamException">The letter is not in the table, the entry is not one of the
+    /// signed fixed-size types, or the value does not fit it.</exception>
+    public static void SetInt(ref CanMessageGeneric message, ImmutableArray<CanParamDescriptor> table, char letter, int? value)
     {
-        CanGenericSlot slot = Reserve(letter);
-        switch (slot.Descriptor.Type)
+        if (value is not int number)
+        {
+            Remove(ref message, table, letter);
+            return;
+        }
+
+        CanParamDescriptor descriptor = Entry(table, letter);
+        switch (descriptor.Type)
         {
             case CanParamType.Int32:
-                Insert(slot, Bytes(stackalloc byte[4], (uint)value, 4));
+                Set(ref message, table, letter, Bytes(stackalloc byte[4], (uint)number, 4));
                 break;
 
             case CanParamType.Int16:
-                Require(value is >= short.MinValue and <= short.MaxValue, letter, $"{value} does not fit in a signed 16 bits");
-                Insert(slot, Bytes(stackalloc byte[2], (uint)value, 2));
+                Require(number is >= short.MinValue and <= short.MaxValue, letter, $"{number} does not fit in a signed 16 bits");
+                Set(ref message, table, letter, Bytes(stackalloc byte[2], (uint)number, 2));
                 break;
 
             case CanParamType.Int8:
-                Require(value is >= sbyte.MinValue and <= sbyte.MaxValue, letter, $"{value} does not fit in a signed 8 bits");
-                Insert(slot, Bytes(stackalloc byte[1], (uint)value, 1));
+                Require(number is >= sbyte.MinValue and <= sbyte.MaxValue, letter, $"{number} does not fit in a signed 8 bits");
+                Set(ref message, table, letter, Bytes(stackalloc byte[1], (uint)number, 1));
                 break;
 
             default:
-                throw WrongType(letter, slot.Descriptor, "a signed integer");
+                throw WrongType(letter, descriptor, "a signed integer");
         }
     }
 
-    /// <summary>Add a floating-point parameter, as either a float or a half.</summary>
-    public void AddFloat(char letter, float value)
+    /// <summary>Set or, if <paramref name="value"/> is null, remove a floating-point parameter.</summary>
+    /// <exception cref="CanGenericParamException">The letter is not in the table, or the entry is neither a float nor a half.</exception>
+    public static void SetFloat(ref CanMessageGeneric message, ImmutableArray<CanParamDescriptor> table, char letter, float? value)
     {
-        CanGenericSlot slot = Reserve(letter);
-        switch (slot.Descriptor.Type)
+        if (value is not float number)
+        {
+            Remove(ref message, table, letter);
+            return;
+        }
+
+        CanParamDescriptor descriptor = Entry(table, letter);
+        switch (descriptor.Type)
         {
             case CanParamType.Float:
             {
                 Span<byte> bytes = stackalloc byte[4];
-                BinaryPrimitives.WriteSingleLittleEndian(bytes, value);
-                Insert(slot, bytes);
+                BinaryPrimitives.WriteSingleLittleEndian(bytes, number);
+                Set(ref message, table, letter, bytes);
                 break;
             }
 
             case CanParamType.Float16:
             {
                 Span<byte> bytes = stackalloc byte[2];
-                BinaryPrimitives.WriteHalfLittleEndian(bytes, (Half)value);
-                Insert(slot, bytes);
+                BinaryPrimitives.WriteHalfLittleEndian(bytes, (Half)number);
+                Set(ref message, table, letter, bytes);
                 break;
             }
 
             default:
-                throw WrongType(letter, slot.Descriptor, "a floating-point value");
+                throw WrongType(letter, descriptor, "a floating-point value");
         }
     }
 
-    /// <summary>Add a single-character parameter.</summary>
-    public void AddChar(char letter, char value)
+    /// <summary>Set or, if <paramref name="value"/> is null, remove a single-character parameter.</summary>
+    /// <exception cref="CanGenericParamException">The letter is not in the table, the entry is not a character, or the value is not ASCII.</exception>
+    public static void SetChar(ref CanMessageGeneric message, ImmutableArray<CanParamDescriptor> table, char letter, char? value)
     {
-        CanGenericSlot slot = Reserve(letter);
-        if (slot.Descriptor.Type != CanParamType.Char)
+        if (value is not char character)
         {
-            throw WrongType(letter, slot.Descriptor, "a character");
+            Remove(ref message, table, letter);
+            return;
         }
-        Require(value <= 0x7F, letter, $"'{value}' is not an ASCII character");
-        Insert(slot, [(byte)value]);
+
+        CanParamDescriptor descriptor = Entry(table, letter);
+        if (descriptor.Type != CanParamType.Char)
+        {
+            throw WrongType(letter, descriptor, "a character");
+        }
+        Require(character <= 0x7F, letter, $"'{character}' is not an ASCII character");
+        Set(ref message, table, letter, [(byte)character]);
     }
 
     /// <summary>
-    /// Add a string parameter, null-terminated on the wire. A reduced string is expected to have had its
-    /// board address stripped already, exactly as in RepRapFirmware.
+    /// Set or, if <paramref name="value"/> is null, remove a string parameter, null-terminated on the wire.
     /// </summary>
-    public void AddString(char letter, string value)
+    /// <remarks>
+    /// A reduced string is written as given: only <see cref="FromCode"/> strips the board address off one,
+    /// because that is part of reading a port name off a command, not of packing a string.
+    /// </remarks>
+    /// <exception cref="CanGenericParamException">The letter is not in the table, or the entry is not a string.</exception>
+    public static void SetString(ref CanMessageGeneric message, ImmutableArray<CanParamDescriptor> table, char letter, string? value)
     {
-        CanGenericSlot slot = Reserve(letter);
-        if (slot.Descriptor.Type is not (CanParamType.String or CanParamType.ReducedString))
+        if (value is null)
         {
-            throw WrongType(letter, slot.Descriptor, "a string");
+            Remove(ref message, table, letter);
+            return;
+        }
+
+        CanParamDescriptor descriptor = Entry(table, letter);
+        if (descriptor.Type is not (CanParamType.String or CanParamType.ReducedString))
+        {
+            throw WrongType(letter, descriptor, "a string");
         }
 
         int length = Encoding.UTF8.GetByteCount(value);
         Span<byte> bytes = length + 1 <= 64 ? stackalloc byte[length + 1] : new byte[length + 1];
         Encoding.UTF8.GetBytes(value, bytes);
         bytes[length] = 0;
-        Insert(slot, bytes);
+        Set(ref message, table, letter, bytes);
     }
 
-    /// <summary>Add a local driver number, which CANlib carries as a single byte.</summary>
-    public void AddDriverId(char letter, byte localDriver)
+    /// <summary>Set or, if <paramref name="localDriver"/> is null, remove a local driver number, which CANlib carries as a single byte.</summary>
+    /// <exception cref="CanGenericParamException">The letter is not in the table, or the entry is not a driver ID.</exception>
+    public static void SetDriverId(ref CanMessageGeneric message, ImmutableArray<CanParamDescriptor> table, char letter, byte? localDriver)
     {
-        CanGenericSlot slot = Reserve(letter);
-        if (slot.Descriptor.Type != CanParamType.LocalDriver)
+        if (localDriver is not byte driver)
         {
-            throw WrongType(letter, slot.Descriptor, "a driver ID");
+            Remove(ref message, table, letter);
+            return;
         }
-        Insert(slot, [localDriver]);
+
+        CanParamDescriptor descriptor = Entry(table, letter);
+        if (descriptor.Type != CanParamType.LocalDriver)
+        {
+            throw WrongType(letter, descriptor, "a driver ID");
+        }
+        Set(ref message, table, letter, [driver]);
     }
 
-    /// <summary>Add an unsigned array parameter of any of the three unsigned array types.</summary>
-    public void AddUIntArray(char letter, ReadOnlySpan<uint> values)
+    /// <summary>Set or, if <paramref name="values"/> is null, remove an unsigned array parameter.</summary>
+    /// <exception cref="CanGenericParamException">The letter is not in the table, the entry is not an unsigned
+    /// array, there are more elements than it allows, or one of them does not fit the element width.</exception>
+    public static void SetUIntArray(ref CanMessageGeneric message, ImmutableArray<CanParamDescriptor> table, char letter, uint[]? values)
     {
-        CanGenericSlot slot = Reserve(letter);
-        if (slot.Descriptor.Type is not (CanParamType.UInt8Array or CanParamType.UInt16Array or CanParamType.UInt32Array))
+        if (values is null)
         {
-            throw WrongType(letter, slot.Descriptor, "an unsigned array");
+            Remove(ref message, table, letter);
+            return;
         }
-        RequireArrayLength(letter, slot.Descriptor, values.Length);
 
-        int itemSize = slot.Descriptor.ItemSize;
+        CanParamDescriptor descriptor = Entry(table, letter);
+        if (descriptor.Type is not (CanParamType.UInt8Array or CanParamType.UInt16Array or CanParamType.UInt32Array))
+        {
+            throw WrongType(letter, descriptor, "an unsigned array");
+        }
+        RequireArrayLength(letter, descriptor, values.Length);
+
+        int itemSize = descriptor.ItemSize;
         Span<byte> bytes = stackalloc byte[1 + (values.Length * itemSize)];
         bytes[0] = (byte)values.Length;
         for (int i = 0; i < values.Length; i++)
@@ -218,18 +253,26 @@ public sealed class CanGenericWriter(ImmutableArray<CanParamDescriptor> table)
             Require(value <= limit, letter, $"element {i} ({value}) does not fit in {8 * itemSize} bits");
             Bytes(bytes.Slice(1 + (i * itemSize), itemSize), value, itemSize);
         }
-        Insert(slot, bytes);
+        Set(ref message, table, letter, bytes);
     }
 
-    /// <summary>Add a float array parameter.</summary>
-    public void AddFloatArray(char letter, ReadOnlySpan<float> values)
+    /// <summary>Set or, if <paramref name="values"/> is null, remove a float array parameter.</summary>
+    /// <exception cref="CanGenericParamException">The letter is not in the table, the entry is not a float
+    /// array, or there are more elements than it allows.</exception>
+    public static void SetFloatArray(ref CanMessageGeneric message, ImmutableArray<CanParamDescriptor> table, char letter, float[]? values)
     {
-        CanGenericSlot slot = Reserve(letter);
-        if (slot.Descriptor.Type != CanParamType.FloatArray)
+        if (values is null)
         {
-            throw WrongType(letter, slot.Descriptor, "a float array");
+            Remove(ref message, table, letter);
+            return;
         }
-        RequireArrayLength(letter, slot.Descriptor, values.Length);
+
+        CanParamDescriptor descriptor = Entry(table, letter);
+        if (descriptor.Type != CanParamType.FloatArray)
+        {
+            throw WrongType(letter, descriptor, "a float array");
+        }
+        RequireArrayLength(letter, descriptor, values.Length);
 
         Span<byte> bytes = stackalloc byte[1 + (values.Length * sizeof(float))];
         bytes[0] = (byte)values.Length;
@@ -237,46 +280,93 @@ public sealed class CanGenericWriter(ImmutableArray<CanParamDescriptor> table)
         {
             BinaryPrimitives.WriteSingleLittleEndian(bytes.Slice(1 + (i * sizeof(float)), sizeof(float)), values[i]);
         }
-        Insert(slot, bytes);
+        Set(ref message, table, letter, bytes);
     }
 
     /// <summary>
-    /// Locate where a parameter's value belongs. The position is the sum of the sizes of the parameters
-    /// that precede it in the table and are already present, because the receiver finds a value by walking
-    /// the table the same way. The parameter is not marked present yet: <see cref="Insert"/> does that once
-    /// the value has actually been written, so a validation failure in between (wrong width, wrong type,
-    /// message overflow) never leaves <c>paramMap</c> claiming a value that was never stored.
+    /// Take a parameter out of the message, closing the gap its value leaves in the data area.
     /// </summary>
-    private CanGenericSlot Reserve(char letter)
+    /// <returns>False if the message was not carrying the parameter, which is not an error.</returns>
+    /// <exception cref="CanGenericParamException">The letter is not in the table at all.</exception>
+    public static bool Remove(ref CanMessageGeneric message, ImmutableArray<CanParamDescriptor> table, char letter)
     {
-        if (!CanGenericLayout.TryLocate(_message.Data, _message.ParamMap, Table, letter, out CanGenericSlot slot))
+        CanGenericSlot slot = Locate(ref message, table, letter);
+        if (!slot.IsPresent)
+        {
+            return false;
+        }
+
+        Span<byte> data = message.Data;
+        int dataLength = CanGenericLayout.DataLength(data, message.ParamMap, table);
+        Delete(data, slot.Position, CanGenericLayout.SizeAt(data, slot.Position, slot.Descriptor), dataLength);
+        message.ParamMap &= ~(1u << slot.Index);
+        return true;
+    }
+
+    /// <summary>
+    /// Write a value into the slot its table entry gives it, replacing whatever was there before.
+    /// </summary>
+    /// <remarks>
+    /// The room the value needs is checked before anything is moved, so a message that would overflow is
+    /// left exactly as it was rather than losing the value that is being replaced. For the same reason
+    /// <c>paramMap</c> is only touched once the bytes are in place: a map claiming a parameter the data area
+    /// does not contain would shift every later parameter's offset for the receiver.
+    /// </remarks>
+    private static void Set(ref CanMessageGeneric message, ImmutableArray<CanParamDescriptor> table, char letter, ReadOnlySpan<byte> value)
+    {
+        CanGenericSlot slot = Locate(ref message, table, letter);
+        Span<byte> data = message.Data;
+        int dataLength = CanGenericLayout.DataLength(data, message.ParamMap, table);
+        int existing = slot.IsPresent ? CanGenericLayout.SizeAt(data, slot.Position, slot.Descriptor) : 0;
+
+        int required = dataLength - existing + value.Length;
+        if (required > ByteArray60.Length)
+        {
+            throw new CanGenericParamException($"CAN message too long: {required} data bytes, maximum is {ByteArray60.Length}");
+        }
+
+        if (existing > 0)
+        {
+            dataLength = Delete(data, slot.Position, existing, dataLength);
+        }
+        data[slot.Position..dataLength].CopyTo(data[(slot.Position + value.Length)..]);
+        value.CopyTo(data[slot.Position..]);
+        message.ParamMap |= 1u << slot.Index;
+    }
+
+    /// <summary>Close the gap a removed value leaves behind, and report the data length that remains.</summary>
+    private static int Delete(Span<byte> data, int position, int size, int dataLength)
+    {
+        data[(position + size)..dataLength].CopyTo(data[position..]);
+        return dataLength - size;
+    }
+
+    /// <summary>Find where a parameter's value sits, or would sit, insisting that the table declares it.</summary>
+    private static CanGenericSlot Locate(ref CanMessageGeneric message, ImmutableArray<CanParamDescriptor> table, char letter)
+    {
+        if (!CanGenericLayout.TryLocate(message.Data, message.ParamMap, table, letter, out CanGenericSlot slot))
         {
             throw new CanGenericParamException($"'{letter}' is not a parameter of this message");
-        }
-        if (slot.IsPresent)
-        {
-            throw new CanGenericParamException($"parameter '{letter}' has already been set");
         }
         return slot;
     }
 
-    private void Insert(CanGenericSlot slot, ReadOnlySpan<byte> value)
+    /// <summary>The table entry for a letter, which says how the value has to be packed.</summary>
+    private static CanParamDescriptor Entry(ImmutableArray<CanParamDescriptor> table, char letter)
     {
-        if (_dataLength + value.Length > ByteArray60.Length)
+        foreach (CanParamDescriptor descriptor in table)
         {
-            throw new CanGenericParamException($"CAN message too long: {_dataLength + value.Length} data bytes, maximum is {ByteArray60.Length}");
+            if (descriptor.Letter == letter)
+            {
+                return descriptor;
+            }
         }
-
-        Span<byte> data = _message.Data;
-        data[slot.Position.._dataLength].CopyTo(data[(slot.Position + value.Length)..]);
-        value.CopyTo(data[slot.Position..]);
-        _dataLength += value.Length;
-        _message.ParamMap |= 1u << slot.Index;
+        throw new CanGenericParamException($"'{letter}' is not a parameter of this message");
     }
 
     /// <summary>
     /// Write the low <paramref name="size"/> bytes of a value little-endian, via the same
-    /// <see cref="BinaryPrimitives"/> helpers <see cref="AddUInt64"/> and <see cref="AddFloat"/> use, so an
+    /// <see cref="BinaryPrimitives"/> helpers <see cref="SetUInt64"/> and <see cref="SetFloat"/> use, so an
     /// endianness fix to one write path can't miss the others.
     /// </summary>
     private static Span<byte> Bytes(Span<byte> destination, uint value, int size)
@@ -299,7 +389,7 @@ public sealed class CanGenericWriter(ImmutableArray<CanParamDescriptor> table)
         return destination;
     }
 
-    private void RequireArrayLength(char letter, CanParamDescriptor descriptor, int length) =>
+    private static void RequireArrayLength(char letter, CanParamDescriptor descriptor, int length) =>
         Require(length <= descriptor.MaxArrayLength, letter,
             $"{length} elements exceeds the {descriptor.MaxArrayLength} the table allows");
 

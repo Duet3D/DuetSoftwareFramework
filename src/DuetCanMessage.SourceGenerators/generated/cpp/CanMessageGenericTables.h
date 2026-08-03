@@ -19,7 +19,7 @@
 
 // Superseded: M42 and M280 are sent as CanMessageWriteGpio, which has a struct of its own.
 // This table is kept so that the generated header stays a drop-in for CANlib's, but no message
-// type would ever carry it, so no C# message or builder is generated.
+// type would ever carry it, so no C# message is generated.
 constexpr ParamDescriptor M42Params[] =
 {
 	{ 'P', ParamDescriptor::uint16, 0 },
@@ -43,7 +43,7 @@ constexpr ParamDescriptor M150Params[] =
 
 // Superseded: M42 and M280 are sent as CanMessageWriteGpio, which has a struct of its own.
 // This table is kept so that the generated header stays a drop-in for CANlib's, but no message
-// type would ever carry it, so no C# message or builder is generated.
+// type would ever carry it, so no C# message is generated.
 constexpr ParamDescriptor M280Params[] =
 {
 	{ 'P', ParamDescriptor::uint16, 0 },

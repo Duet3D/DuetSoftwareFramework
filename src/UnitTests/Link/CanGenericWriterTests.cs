@@ -1,10 +1,12 @@
+using System.Collections.Immutable;
 using DuetControlServer.Link.Protocol.CanMessages;
 using NUnit.Framework;
 
 namespace UnitTests.Link;
 
 /// <summary>
-/// Tests for packing and unpacking the generic CAN messages.
+/// Tests for packing and unpacking the generic CAN messages through the letter-keyed path, which is what
+/// the generated message types are a typed face over.
 /// </summary>
 /// <remarks>
 /// The expected byte sequences here are worked out from the format CANlib's <c>CanMessageGenericParser</c>
@@ -19,53 +21,58 @@ public class CanGenericWriterTests
     public void PacksParametersInTableOrderWithTheMatchingParamMap()
     {
         // M950FanParams is F:uint16, Q:pwmFreq, C:reducedString, K:float
-        CanGenericWriter writer = new(CanGenericTables.M950FanParams);
-        writer.AddUInt('F', 3);
-        writer.AddUInt('Q', 25000);
-        writer.AddString('C', "out0");
-        writer.AddFloat('K', 2.0f);
+        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M950FanParams;
+        CanMessageGeneric message = default;
+        CanGenericWriter.SetUInt(ref message, table, 'F', 3);
+        CanGenericWriter.SetUInt(ref message, table, 'Q', 25000);
+        CanGenericWriter.SetString(ref message, table, 'C', "out0");
+        CanGenericWriter.SetFloat(ref message, table, 'K', 2.0f);
 
-        Assert.That(writer.Message.ParamMap, Is.EqualTo(0b1111u), "all four parameters present");
-        Assert.That(writer.GetData(), Is.EqualTo(new byte[]
+        Assert.That(message.ParamMap, Is.EqualTo(0b1111u), "all four parameters present");
+        Assert.That(CanGenericParser.GetData(message, table), Is.EqualTo(new byte[]
         {
             0x03, 0x00,                                     // F = 3
             0xA8, 0x61,                                     // Q = 25000
             (byte)'o', (byte)'u', (byte)'t', (byte)'0', 0,  // C = "out0"
             0x00, 0x00, 0x00, 0x40                          // K = 2.0f
         }));
-        Assert.That(writer.ActualDataLength, Is.EqualTo(13u + 4u), "data plus the request ID and param map");
+        Assert.That(CanGenericLayout.ActualDataLength(message.Data, message.ParamMap, table), Is.EqualTo(13u + 4u),
+            "data plus the request ID and param map");
     }
 
     /// <summary>
-    /// The receiver finds a value by its position in the table, so a parameter added out of order has to be
+    /// The receiver finds a value by its position in the table, so a parameter set out of order has to be
     /// inserted at that position rather than appended.
     /// </summary>
     [Test]
     public void InsertsOutOfOrderParametersAtTheirTablePosition()
     {
-        CanGenericWriter inOrder = new(CanGenericTables.M950FanParams);
-        inOrder.AddUInt('F', 3);
-        inOrder.AddString('C', "out0");
-        inOrder.AddFloat('K', 2.0f);
+        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M950FanParams;
 
-        CanGenericWriter reversed = new(CanGenericTables.M950FanParams);
-        reversed.AddFloat('K', 2.0f);
-        reversed.AddString('C', "out0");
-        reversed.AddUInt('F', 3);
+        CanMessageGeneric inOrder = default;
+        CanGenericWriter.SetUInt(ref inOrder, table, 'F', 3);
+        CanGenericWriter.SetString(ref inOrder, table, 'C', "out0");
+        CanGenericWriter.SetFloat(ref inOrder, table, 'K', 2.0f);
 
-        Assert.That(reversed.Message.ParamMap, Is.EqualTo(inOrder.Message.ParamMap));
-        Assert.That(reversed.GetData(), Is.EqualTo(inOrder.GetData()));
+        CanMessageGeneric reversed = default;
+        CanGenericWriter.SetFloat(ref reversed, table, 'K', 2.0f);
+        CanGenericWriter.SetString(ref reversed, table, 'C', "out0");
+        CanGenericWriter.SetUInt(ref reversed, table, 'F', 3);
+
+        Assert.That(reversed.ParamMap, Is.EqualTo(inOrder.ParamMap));
+        Assert.That(CanGenericParser.GetData(reversed, table), Is.EqualTo(CanGenericParser.GetData(inOrder, table)));
     }
 
     [Test]
     public void SetsOnlyTheBitsOfThePresentParameters()
     {
         // Skipping F and Q means C is the third entry, so only bit 2 is set and the data starts with C
-        CanGenericWriter writer = new(CanGenericTables.M950FanParams);
-        writer.AddString('C', "e0heat");
+        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M950FanParams;
+        CanMessageGeneric message = default;
+        CanGenericWriter.SetString(ref message, table, 'C', "e0heat");
 
-        Assert.That(writer.Message.ParamMap, Is.EqualTo(0b0100u));
-        Assert.That(writer.GetData(), Is.EqualTo(new byte[]
+        Assert.That(message.ParamMap, Is.EqualTo(0b0100u));
+        Assert.That(CanGenericParser.GetData(message, table), Is.EqualTo(new byte[]
         {
             (byte)'e', (byte)'0', (byte)'h', (byte)'e', (byte)'a', (byte)'t', 0
         }));
@@ -75,13 +82,14 @@ public class CanGenericWriterTests
     public void PacksArraysAsALengthByteFollowedByElements()
     {
         // M569Params has Y:uint8Array[3] at index 8 and T:floatArray[4] at index 9
-        CanGenericWriter writer = new(CanGenericTables.M569Params);
-        writer.AddDriverId('P', 2);
-        writer.AddUIntArray('Y', [1, 2, 3]);
-        writer.AddFloatArray('T', [1.0f, 0.0f]);
+        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M569Params;
+        CanMessageGeneric message = default;
+        CanGenericWriter.SetDriverId(ref message, table, 'P', 2);
+        CanGenericWriter.SetUIntArray(ref message, table, 'Y', [1, 2, 3]);
+        CanGenericWriter.SetFloatArray(ref message, table, 'T', [1.0f, 0.0f]);
 
-        Assert.That(writer.Message.ParamMap, Is.EqualTo(0b1100000001u));
-        Assert.That(writer.GetData(), Is.EqualTo(new byte[]
+        Assert.That(message.ParamMap, Is.EqualTo(0b1100000001u));
+        Assert.That(CanGenericParser.GetData(message, table), Is.EqualTo(new byte[]
         {
             0x02,                                           // P = driver 2
             0x03, 0x01, 0x02, 0x03,                         // Y = 3 elements
@@ -93,37 +101,37 @@ public class CanGenericWriterTests
     public void RoundTripsEveryParameterTypeThroughTheParser()
     {
         // M308V1Params covers float, int16, uint8, char, reducedString and float16 in one table
-        CanGenericWriter writer = new(CanGenericTables.M308V1Params);
-        writer.AddFloat('T', 100000.0f);
-        writer.AddInt('L', -273);
-        writer.AddUInt('S', 1);
-        writer.AddChar('K', 'B');
-        writer.AddString('Y', "thermistor");
-        writer.AddFloat('U', 0.5f);
+        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M308V1Params;
+        CanMessageGeneric message = default;
+        CanGenericWriter.SetFloat(ref message, table, 'T', 100000.0f);
+        CanGenericWriter.SetInt(ref message, table, 'L', -273);
+        CanGenericWriter.SetUInt(ref message, table, 'S', 1);
+        CanGenericWriter.SetChar(ref message, table, 'K', 'B');
+        CanGenericWriter.SetString(ref message, table, 'Y', "thermistor");
+        CanGenericWriter.SetFloat(ref message, table, 'U', 0.5f);
 
-        CanGenericParser parser = new(writer.Message, CanGenericTables.M308V1Params);
-        Assert.That(parser.GetFloat('T'), Is.EqualTo(100000.0f));
-        Assert.That(parser.GetInt('L'), Is.EqualTo(-273));
-        Assert.That(parser.GetUInt('S'), Is.EqualTo(1u));
-        Assert.That(parser.GetChar('K'), Is.EqualTo('B'));
-        Assert.That(parser.GetString('Y'), Is.EqualTo("thermistor"));
-        Assert.That(parser.GetFloat('U'), Is.EqualTo(0.5f));
+        Assert.That(CanGenericParser.GetFloat(message, table, 'T'), Is.EqualTo(100000.0f));
+        Assert.That(CanGenericParser.GetInt(message, table, 'L'), Is.EqualTo(-273));
+        Assert.That(CanGenericParser.GetUInt(message, table, 'S'), Is.EqualTo(1u));
+        Assert.That(CanGenericParser.GetChar(message, table, 'K'), Is.EqualTo('B'));
+        Assert.That(CanGenericParser.GetString(message, table, 'Y'), Is.EqualTo("thermistor"));
+        Assert.That(CanGenericParser.GetFloat(message, table, 'U'), Is.EqualTo(0.5f));
 
-        Assert.That(parser.Has('B'), Is.False, "a parameter that was not added");
-        Assert.That(parser.GetFloat('B'), Is.Null);
+        Assert.That(CanGenericParser.Has(message, table, 'B'), Is.False, "a parameter that was not set");
+        Assert.That(CanGenericParser.GetFloat(message, table, 'B'), Is.Null);
     }
 
     [Test]
     public void RoundTripsArraysThroughTheParser()
     {
-        CanGenericWriter writer = new(CanGenericTables.M122P1Params);
-        writer.AddFloatArray('T', [-10.0f, 80.0f]);
-        writer.AddFloatArray('V', [11.0f, 25.5f]);
+        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M122P1Params;
+        CanMessageGeneric message = default;
+        CanGenericWriter.SetFloatArray(ref message, table, 'T', [-10.0f, 80.0f]);
+        CanGenericWriter.SetFloatArray(ref message, table, 'V', [11.0f, 25.5f]);
 
-        CanGenericParser parser = new(writer.Message, CanGenericTables.M122P1Params);
-        Assert.That(parser.GetFloatArray('T'), Is.EqualTo(new[] { -10.0f, 80.0f }));
-        Assert.That(parser.GetFloatArray('V'), Is.EqualTo(new[] { 11.0f, 25.5f }));
-        Assert.That(parser.GetFloatArray('W'), Is.Null);
+        Assert.That(CanGenericParser.GetFloatArray(message, table, 'T'), Is.EqualTo(new[] { -10.0f, 80.0f }));
+        Assert.That(CanGenericParser.GetFloatArray(message, table, 'V'), Is.EqualTo(new[] { 11.0f, 25.5f }));
+        Assert.That(CanGenericParser.GetFloatArray(message, table, 'W'), Is.Null);
     }
 
     [Test]
@@ -131,45 +139,101 @@ public class CanGenericWriterTests
     {
         // A string is the only variable-length scalar, so the parameter after one is the case where a
         // parser that did not skip the terminator would go wrong
-        CanGenericWriter writer = new(CanGenericTables.M569Point7Params);
-        writer.AddDriverId('P', 1);
-        writer.AddString('C', "!io2.out");
-        writer.AddFloat('V', 24.0f);
-        writer.AddUInt('S', 200);
+        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M569Point7Params;
+        CanMessageGeneric message = default;
+        CanGenericWriter.SetDriverId(ref message, table, 'P', 1);
+        CanGenericWriter.SetString(ref message, table, 'C', "!io2.out");
+        CanGenericWriter.SetFloat(ref message, table, 'V', 24.0f);
+        CanGenericWriter.SetUInt(ref message, table, 'S', 200);
 
-        CanGenericParser parser = new(writer.Message, CanGenericTables.M569Point7Params);
-        Assert.That(parser.GetUInt('P'), Is.EqualTo(1u));
-        Assert.That(parser.GetString('C'), Is.EqualTo("!io2.out"));
-        Assert.That(parser.GetFloat('V'), Is.EqualTo(24.0f));
-        Assert.That(parser.GetUInt('S'), Is.EqualTo(200u));
+        Assert.That(CanGenericParser.GetUInt(message, table, 'P'), Is.EqualTo(1u));
+        Assert.That(CanGenericParser.GetString(message, table, 'C'), Is.EqualTo("!io2.out"));
+        Assert.That(CanGenericParser.GetFloat(message, table, 'V'), Is.EqualTo(24.0f));
+        Assert.That(CanGenericParser.GetUInt(message, table, 'S'), Is.EqualTo(200u));
     }
 
     [Test]
     public void RejectsAValueThatDoesNotFitItsParameter()
     {
-        CanGenericWriter writer = new(CanGenericTables.M950FanParams);
-        Assert.Throws<CanGenericParamException>(() => writer.AddUInt('F', 0x1_0000), "uint16 parameter");
+        CanMessageGeneric fan = default;
+        Assert.Throws<CanGenericParamException>(() => CanGenericWriter.SetUInt(ref fan, CanGenericTables.M950FanParams, 'F', 0x1_0000), "uint16 parameter");
 
-        CanGenericWriter m915 = new(CanGenericTables.M915Params);
-        Assert.Throws<CanGenericParamException>(() => m915.AddInt('S', 200), "int8 parameter");
+        CanMessageGeneric m915 = default;
+        Assert.Throws<CanGenericParamException>(() => CanGenericWriter.SetInt(ref m915, CanGenericTables.M915Params, 'S', 200), "int8 parameter");
     }
 
     [Test]
     public void RejectsTheWrongTypeForAParameter()
     {
-        CanGenericWriter writer = new(CanGenericTables.M950FanParams);
-        Assert.Throws<CanGenericParamException>(() => writer.AddFloat('F', 1.0f), "F is a uint16");
-        Assert.Throws<CanGenericParamException>(() => writer.AddUInt('C', 1), "C is a string");
+        CanMessageGeneric message = default;
+        Assert.Throws<CanGenericParamException>(() => CanGenericWriter.SetFloat(ref message, CanGenericTables.M950FanParams, 'F', 1.0f), "F is a uint16");
+        Assert.Throws<CanGenericParamException>(() => CanGenericWriter.SetUInt(ref message, CanGenericTables.M950FanParams, 'C', 1), "C is a string");
     }
 
     [Test]
-    public void RejectsUnknownAndDuplicateParameters()
+    public void RejectsALetterTheTableDoesNotDeclare()
     {
-        CanGenericWriter writer = new(CanGenericTables.M950FanParams);
-        Assert.Throws<CanGenericParamException>(() => writer.AddUInt('Z', 1), "not in the table");
+        CanMessageGeneric message = default;
+        Assert.Throws<CanGenericParamException>(() => CanGenericWriter.SetUInt(ref message, CanGenericTables.M950FanParams, 'Z', 1));
+        Assert.Throws<CanGenericParamException>(() => CanGenericWriter.Remove(ref message, CanGenericTables.M950FanParams, 'Z'));
+    }
 
-        writer.AddUInt('F', 1);
-        Assert.Throws<CanGenericParamException>(() => writer.AddUInt('F', 2), "already set");
+    /// <summary>
+    /// Setting a parameter that is already present replaces it, which is what lets a caller override one
+    /// value of a message taken from a command without rebuilding the rest of it. The replacement has to
+    /// keep the parameters after it packed against it, including when its size changes.
+    /// </summary>
+    [Test]
+    public void ReplacesAParameterThatIsAlreadyPresent()
+    {
+        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M950FanParams;
+        CanMessageGeneric message = default;
+        CanGenericWriter.SetUInt(ref message, table, 'F', 3);
+        CanGenericWriter.SetString(ref message, table, 'C', "out0");
+        CanGenericWriter.SetFloat(ref message, table, 'K', 2.0f);
+
+        CanGenericWriter.SetUInt(ref message, table, 'F', 1);
+        Assert.That(CanGenericParser.GetUInt(message, table, 'F'), Is.EqualTo(1u));
+
+        // A longer string has to push K along, and a shorter one pull it back
+        CanGenericWriter.SetString(ref message, table, 'C', "out1234");
+        Assert.That(CanGenericParser.GetString(message, table, 'C'), Is.EqualTo("out1234"));
+        Assert.That(CanGenericParser.GetFloat(message, table, 'K'), Is.EqualTo(2.0f));
+
+        CanGenericWriter.SetString(ref message, table, 'C', "o");
+        Assert.That(CanGenericParser.GetString(message, table, 'C'), Is.EqualTo("o"));
+        Assert.That(CanGenericParser.GetFloat(message, table, 'K'), Is.EqualTo(2.0f));
+
+        Assert.That(message.ParamMap, Is.EqualTo(0b1101u), "F, C and K, each still present exactly once");
+        Assert.That(CanGenericParser.GetData(message, table), Is.EqualTo(new byte[]
+        {
+            0x01, 0x00,                     // F = 1
+            (byte)'o', 0,                   // C = "o"
+            0x00, 0x00, 0x00, 0x40          // K = 2.0f
+        }));
+    }
+
+    /// <summary>
+    /// Assigning null takes a parameter back out, since a generic message says which parameters it carries
+    /// rather than giving every one of them a value.
+    /// </summary>
+    [Test]
+    public void RemovesAParameterSetToNull()
+    {
+        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M950FanParams;
+        CanMessageGeneric message = default;
+        CanGenericWriter.SetUInt(ref message, table, 'F', 3);
+        CanGenericWriter.SetString(ref message, table, 'C', "out0");
+        CanGenericWriter.SetFloat(ref message, table, 'K', 2.0f);
+
+        CanGenericWriter.SetString(ref message, table, 'C', null);
+
+        Assert.That(message.ParamMap, Is.EqualTo(0b1001u), "F and K, no longer C");
+        Assert.That(CanGenericParser.Has(message, table, 'C'), Is.False);
+        Assert.That(CanGenericParser.GetUInt(message, table, 'F'), Is.EqualTo(3u));
+        Assert.That(CanGenericParser.GetFloat(message, table, 'K'), Is.EqualTo(2.0f), "and K moved back to where C was");
+
+        Assert.That(CanGenericWriter.Remove(ref message, table, 'C'), Is.False, "removing an absent parameter is not an error");
     }
 
     /// <summary>
@@ -180,45 +244,52 @@ public class CanGenericWriterTests
     [Test]
     public void AcceptsAParameterThatOnlyTheSenderCanSupply()
     {
-        CanGenericWriter writer = new(CanGenericTables.M915Params);
-        writer.AddUInt('d', 0b101);
-        writer.AddInt('S', -3);
+        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M915Params;
+        CanMessageGeneric message = default;
+        CanGenericWriter.SetUInt(ref message, table, 'd', 0b101);
+        CanGenericWriter.SetInt(ref message, table, 'S', -3);
 
-        Assert.That(writer.Message.ParamMap, Is.EqualTo(0b11u));
-        Assert.That(writer.GetData(), Is.EqualTo(new byte[] { 0x05, 0x00, 0xFD }));
+        Assert.That(message.ParamMap, Is.EqualTo(0b11u));
+        Assert.That(CanGenericParser.GetData(message, table), Is.EqualTo(new byte[] { 0x05, 0x00, 0xFD }));
     }
 
     [Test]
     public void RejectsAnArrayLongerThanTheTableAllows()
     {
-        CanGenericWriter writer = new(CanGenericTables.M569Params);
-        Assert.Throws<CanGenericParamException>(() => writer.AddUIntArray('Y', [1, 2, 3, 4]), "Y allows 3");
+        CanMessageGeneric message = default;
+        Assert.Throws<CanGenericParamException>(() => CanGenericWriter.SetUIntArray(ref message, CanGenericTables.M569Params, 'Y', [1, 2, 3, 4]), "Y allows 3");
     }
 
     [Test]
     public void RejectsAMessageThatWouldOverflowTheDataArea()
     {
-        CanGenericWriter writer = new(CanGenericTables.M655Params);
-        Assert.Throws<CanGenericParamException>(() => writer.AddString('A', new string('x', 60)));
+        CanMessageGeneric message = default;
+        Assert.Throws<CanGenericParamException>(() => CanGenericWriter.SetString(ref message, CanGenericTables.M655Params, 'A', new string('x', 60)));
     }
 
     /// <summary>
     /// A parameter must not be marked present in <c>paramMap</c> until its value has actually been written:
     /// otherwise a rejected value would leave the map claiming a parameter the data area does not contain,
-    /// shifting every later parameter's computed offset for the receiver.
+    /// shifting every later parameter's computed offset for the receiver. A rejected replacement must not
+    /// lose the value it was replacing either.
     /// </summary>
     [Test]
-    public void LeavesTheParamMapUnsetWhenAValueIsRejected()
+    public void LeavesTheMessageAloneWhenAValueIsRejected()
     {
-        CanGenericWriter widthWriter = new(CanGenericTables.M950FanParams);
-        Assert.Throws<CanGenericParamException>(() => widthWriter.AddUInt('F', 0x1_0000), "F is a uint16");
-        Assert.That(widthWriter.Message.ParamMap, Is.Zero, "the rejected value must not be marked present");
-        Assert.That(widthWriter.DataLength, Is.Zero);
-        widthWriter.AddUInt('F', 3);
-        Assert.That(widthWriter.Message.ParamMap, Is.EqualTo(0b1u), "F can still be set correctly afterwards");
+        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M950FanParams;
+        CanMessageGeneric width = default;
+        Assert.Throws<CanGenericParamException>(() => CanGenericWriter.SetUInt(ref width, table, 'F', 0x1_0000), "F is a uint16");
+        Assert.That(width.ParamMap, Is.Zero, "the rejected value must not be marked present");
+        CanGenericWriter.SetUInt(ref width, table, 'F', 3);
+        Assert.That(width.ParamMap, Is.EqualTo(0b1u), "F can still be set correctly afterwards");
 
-        CanGenericWriter overflowWriter = new(CanGenericTables.M655Params);
-        Assert.Throws<CanGenericParamException>(() => overflowWriter.AddString('A', new string('x', 60)));
-        Assert.That(overflowWriter.Message.ParamMap, Is.Zero, "an overflowing write must not be marked present");
+        CanMessageGeneric overflow = default;
+        Assert.Throws<CanGenericParamException>(() => CanGenericWriter.SetString(ref overflow, CanGenericTables.M655Params, 'A', new string('x', 60)));
+        Assert.That(overflow.ParamMap, Is.Zero, "an overflowing write must not be marked present");
+
+        CanGenericWriter.SetString(ref overflow, CanGenericTables.M655Params, 'A', "short");
+        Assert.Throws<CanGenericParamException>(() => CanGenericWriter.SetString(ref overflow, CanGenericTables.M655Params, 'A', new string('x', 60)));
+        Assert.That(CanGenericParser.GetString(overflow, CanGenericTables.M655Params, 'A'), Is.EqualTo("short"),
+            "a replacement that does not fit must leave the value it was replacing in place");
     }
 }

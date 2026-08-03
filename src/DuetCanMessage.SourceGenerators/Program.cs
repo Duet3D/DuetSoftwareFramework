@@ -60,7 +60,7 @@ public static class Program
                 (Path.Combine(repoRoot, e.OutputPath ?? throw new InvalidDataException($"enum {e.Name} has no output path")),
                  csharpEnum.Emit(e))),
             .. schema.ConstantGroups.Select(g => (Path.Combine(repoRoot, g.OutputPath), csharpEnum.Emit(g))),
-            (Path.Combine(csharpDir, "CanGenericBuilders.g.cs"), csharpTables.EmitBuilders()),
+            (Path.Combine(csharpDir, "CanGenericMessages.g.cs"), csharpTables.EmitMessages()),
             (options.GetValueOrDefault("probe-out") ?? Path.Combine(repoRoot, "src/DuetCanMessage.SourceGenerators/generated/cpp/CanMessageLayoutProbe.cpp"),
              conformance.EmitCppProbe(facts)),
             (options.GetValueOrDefault("tables-probe-out") ?? Path.Combine(repoRoot, "src/DuetCanMessage.SourceGenerators/generated/cpp/CanMessageGenericTablesProbe.cpp"),

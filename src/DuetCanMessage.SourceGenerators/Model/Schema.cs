@@ -396,11 +396,11 @@ public sealed class GenericTableDef : IEmittable
     public string? MessageType;
 
     /// <summary>
-    /// The table name with CANlib's "Params" dropped, used to name the generated message and builder.
+    /// The table name with CANlib's "Params" dropped, used to name the generated message.
     /// </summary>
     /// <remarks>
     /// "Params" is not always the end of the name: <c>M569Point6Params_StatusOnly</c> qualifies it, which
-    /// would otherwise give a type called <c>M569Point6Params_StatusOnlyBuilder</c>.
+    /// would otherwise give a type called <c>CanMessageM569Point6Params_StatusOnly</c>.
     /// </remarks>
     public string BaseName => string.Concat(Name.Replace("Params", "", StringComparison.Ordinal)
         .Split('_', StringSplitOptions.RemoveEmptyEntries)
