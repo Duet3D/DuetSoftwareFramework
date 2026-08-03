@@ -16,6 +16,10 @@ namespace DuetControlServer.Codes.Handlers;
 /// </summary>
 /// <remarks>
 /// <para>
+/// These are dispatched from the one switch in <see cref="ProcessAsync"/> like every other M-code;
+/// only their bodies live here, to keep that switch readable as it grows.
+/// </para>
+/// <para>
 /// Everything here writes the object model and nothing else: <c>move.axes[]</c>,
 /// <c>move.extruders[]</c> and <c>move.motionSystems[]</c> are the configuration, and
 /// <see cref="Motion.MotionParameters"/> is rebuilt from them by
@@ -49,30 +53,6 @@ internal partial class MCodeHandler
 
     /// <summary>Seconds per minute, for the object model's mm/min speeds</summary>
     private const float SecondsPerMinute = 60.0f;
-
-    /// <summary>
-    /// Process a machine configuration or motion M-code
-    /// </summary>
-    /// <param name="code">Code to process</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Result of the code, or null if it is not one of these</returns>
-    private async ValueTask<Message?> ProcessMotionCodeAsync(Commands.Code code, CancellationToken cancellationToken)
-    {
-        return code.MajorNumber switch
-        {
-            92 => await HandleStepsPerMmAsync(code, cancellationToken),
-            201 => await HandleAccelerationsAsync(code, cancellationToken),
-            203 => await HandleMaxFeedratesAsync(code, cancellationToken),
-            204 => await HandleMoveAccelerationsAsync(code, cancellationToken),
-            205 or 566 => await HandleJerkAsync(code, cancellationToken),
-            208 => await HandleAxisLimitsAsync(code, cancellationToken),
-            350 => await HandleMicrosteppingAsync(code, cancellationToken),
-            400 => await HandleWaitForMovesAsync(code, cancellationToken),
-            584 => await HandleDriveMappingAsync(code, cancellationToken),
-            906 => await HandleMotorCurrentsAsync(code, cancellationToken),
-            _ => null
-        };
-    }
 
     /// <summary>
     /// M92: set or report the steps per mm of each drive
