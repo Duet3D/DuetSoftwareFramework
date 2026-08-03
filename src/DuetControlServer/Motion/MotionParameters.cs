@@ -201,33 +201,186 @@ internal sealed class MotionParameters
     /// Build the geometry engine described by the object model's kinematics
     /// </summary>
     /// <param name="kinematics">The configured kinematics</param>
-    /// <returns>The engine, falling back to Cartesian if the geometry is not supported yet</returns>
+    /// <returns>The engine, falling back to Cartesian if the geometry cannot be described</returns>
+    /// <remarks>
+    /// The object model does not hold every parameter every geometry has - it reports what
+    /// RepRapFirmware reports, and RepRapFirmware keeps some of it to itself. Where a parameter is
+    /// missing the engine takes the same default RepRapFirmware would have before the M-code that
+    /// sets it has been seen, so a machine that has not been configured behaves as an unconfigured
+    /// machine of that kind rather than as some other kind of machine
+    /// </remarks>
     private static KinematicsEngine BuildGeometry(DuetAPI.ObjectModel.Kinematics kinematics)
     {
-        if (kinematics is CoreKinematics core)
+        switch (kinematics)
         {
-            // The matrix in the object model is authoritative when it is there: M669 can set an
-            // arbitrary one, which is the whole point of the matrix form
-            float[][] inverse = new float[core.InverseMatrix.Count][];
-            for (int i = 0; i < inverse.Length; i++)
-            {
-                inverse[i] = core.InverseMatrix[i];
-            }
-
-            if (inverse.Length > 0)
-            {
-                CoreKinematicsEngine engine = new(core.Name.ToString(), inverse);
-                if (engine.IsValid)
+            case CoreKinematics core:
                 {
-                    return engine;
+                    // The matrix in the object model is authoritative when it is there: M669 can set
+                    // an arbitrary one, which is the whole point of the matrix form
+                    float[][] inverse = new float[core.InverseMatrix.Count][];
+                    for (int i = 0; i < inverse.Length; i++)
+                    {
+                        inverse[i] = core.InverseMatrix[i];
+                    }
+
+                    if (inverse.Length > 0)
+                    {
+                        CoreKinematicsEngine engine = new(core.Name.ToString(), inverse);
+                        if (engine.IsValid)
+                        {
+                            return engine;
+                        }
+                    }
+                    break;
                 }
+
+            case DeltaKinematics delta:
+                return BuildDelta(delta);
+
+            case HangprinterKinematics hangprinter:
+                return BuildHangprinter(hangprinter);
+
+            case ScaraKinematics scara:
+                // Both SCARA geometries share one object model class, because that is how
+                // RepRapFirmware reports them. Only the name tells them apart
+                return scara.Name == KinematicsName.FiveBarScara ? BuildFiveBarScara() : BuildScara(scara);
+
+            case PolarKinematics polar:
+                return BuildPolar(polar);
+        }
+
+        // A rotary delta reports nothing but its name, so there is no derived class to match on
+        if (kinematics.Name == KinematicsName.RotaryDelta)
+        {
+            return new RotaryDeltaKinematicsEngine();
+        }
+
+        return CoreKinematicsEngine.TryCreate(kinematics.Name.ToString())
+               ?? CoreKinematicsEngine.TryCreate("cartesian")!;
+    }
+
+    /// <summary>
+    /// Build a delta geometry from the object model
+    /// </summary>
+    /// <param name="delta">The configured kinematics</param>
+    /// <returns>The engine</returns>
+    private static KinematicsEngine BuildDelta(DeltaKinematics delta)
+    {
+        int numTowers = Math.Clamp(delta.Towers.Count, LinearDeltaKinematicsEngine.UsualNumTowers, LinearDeltaKinematicsEngine.MaxTowers);
+
+        float[] diagonals = new float[numTowers];
+        float[] endstopAdjustments = new float[numTowers];
+        float[] angleCorrections = new float[LinearDeltaKinematicsEngine.UsualNumTowers];
+
+        for (int tower = 0; tower < numTowers; tower++)
+        {
+            DeltaTower? configured = tower < delta.Towers.Count ? delta.Towers[tower] : null;
+            diagonals[tower] = configured is not null && configured.Diagonal > 0.0f
+                ? configured.Diagonal
+                : LinearDeltaKinematicsEngine.DefaultDiagonal;
+            endstopAdjustments[tower] = configured?.EndstopAdjustment ?? 0.0f;
+            if (tower < LinearDeltaKinematicsEngine.UsualNumTowers)
+            {
+                angleCorrections[tower] = configured?.AngleCorrection ?? 0.0f;
             }
         }
 
-        // Delta, SCARA, polar and hangprinter are not ported yet. Falling back to Cartesian keeps
-        // the planner working on a machine it can describe rather than refusing to plan at all
-        return CoreKinematicsEngine.TryCreate(kinematics.Name.ToString())
-               ?? CoreKinematicsEngine.TryCreate("cartesian")!;
+        // A delta radius of zero would put all three towers on top of each other, which is not a
+        // machine - so it means M665 has not run rather than that the towers are really there
+        float radius = delta.DeltaRadius > 0.0f ? delta.DeltaRadius : LinearDeltaKinematicsEngine.DefaultDeltaRadius;
+        float printRadius = delta.PrintRadius > 0.0f ? delta.PrintRadius : LinearDeltaKinematicsEngine.DefaultPrintRadius;
+
+        return new LinearDeltaKinematicsEngine(
+            numTowers, radius, diagonals, angleCorrections, endstopAdjustments,
+            delta.HomedHeight, printRadius, delta.XTilt, delta.YTilt);
+    }
+
+    /// <summary>
+    /// Build a SCARA geometry from the object model
+    /// </summary>
+    /// <param name="scara">The configured kinematics</param>
+    /// <returns>The engine</returns>
+    private static KinematicsEngine BuildScara(ScaraKinematics scara)
+    {
+        float[] thetaLimits = [.. scara.ThetaLimits];
+        float[] psiLimits = [.. scara.PsiLimits];
+        float[] crosstalk = [.. scara.Crosstalk];
+
+        float proximal = scara.ProximalLength > 0.0f ? scara.ProximalLength : ScaraKinematicsEngine.DefaultProximalArmLength;
+        float distal = scara.DistalLength > 0.0f ? scara.DistalLength : ScaraKinematicsEngine.DefaultDistalArmLength;
+
+        // Both limits at zero means the joint cannot turn at all, which is the object model's default
+        // rather than a real configuration
+        if (thetaLimits.Length < 2 || (thetaLimits[0] == 0.0f && thetaLimits[1] == 0.0f))
+        {
+            thetaLimits = [ScaraKinematicsEngine.DefaultMinTheta, ScaraKinematicsEngine.DefaultMaxTheta];
+        }
+        if (psiLimits.Length < 2 || (psiLimits[0] == 0.0f && psiLimits[1] == 0.0f))
+        {
+            psiLimits = [ScaraKinematicsEngine.DefaultMinPsi, ScaraKinematicsEngine.DefaultMaxPsi];
+        }
+
+        return new ScaraKinematicsEngine(
+            proximal, distal, thetaLimits, psiLimits, crosstalk,
+            scara.XOffset, scara.YOffset, scara.MinRadius);
+    }
+
+    /// <summary>
+    /// Build a five-bar parallel SCARA geometry
+    /// </summary>
+    /// <returns>The engine</returns>
+    /// <remarks>
+    /// Nothing in the object model describes this geometry - RepRapFirmware reports only its name -
+    /// so the engine is built with the defaults its M669 documentation gives. Once M669 is handled on
+    /// this side the parameters it carries should be passed through here
+    /// </remarks>
+    private static KinematicsEngine BuildFiveBarScara()
+        => new FiveBarScaraKinematicsEngine(
+            xOrigL: -50.0f, yOrigL: 0.0f, xOrigR: 50.0f, yOrigR: 0.0f,
+            proximalL: 100.0f, proximalR: 100.0f,
+            distalL: 100.0f, distalR: 100.0f);
+
+    /// <summary>
+    /// Build a polar geometry from the object model
+    /// </summary>
+    /// <param name="polar">The configured kinematics</param>
+    /// <returns>The engine</returns>
+    private static KinematicsEngine BuildPolar(PolarKinematics polar)
+    {
+        float clockSquared = MotionLimits.StepClockRate * MotionLimits.StepClockRate;
+
+        float maxRadius = polar.RadiusMax > 0.0f ? polar.RadiusMax : PolarKinematicsEngine.DefaultMaxRadius;
+        float maxSpeed = polar.TTSpeedMax > 0.0f ? polar.TTSpeedMax : PolarKinematicsEngine.DefaultMaxTurntableSpeed;
+        float maxAcceleration = polar.TTAccMax > 0.0f ? polar.TTAccMax : PolarKinematicsEngine.DefaultMaxTurntableAcceleration;
+
+        // The object model keeps the turntable limits per second, as the M669 that sets them does.
+        // The planner works in step clocks, so they convert once here rather than on every move
+        return new PolarKinematicsEngine(
+            polar.RadiusMin, maxRadius, polar.RadiusHomed,
+            maxSpeed / MotionLimits.StepClockRate,
+            maxAcceleration / clockSquared);
+    }
+
+    /// <summary>
+    /// Build a hangprinter geometry from the object model
+    /// </summary>
+    /// <param name="hangprinter">The configured kinematics</param>
+    /// <returns>The engine</returns>
+    private static KinematicsEngine BuildHangprinter(HangprinterKinematics hangprinter)
+    {
+        if (hangprinter.Anchors.Count < 3)
+        {
+            return HangprinterKinematicsEngine.CreateDefault();
+        }
+
+        float[][] anchors = new float[hangprinter.Anchors.Count][];
+        for (int i = 0; i < anchors.Length; i++)
+        {
+            anchors[i] = hangprinter.Anchors[i];
+        }
+
+        float printRadius = hangprinter.PrintRadius > 0.0f ? hangprinter.PrintRadius : HangprinterKinematicsEngine.DefaultPrintRadius;
+        return new HangprinterKinematicsEngine(anchors, printRadius);
     }
 
     /// <summary>
@@ -277,7 +430,11 @@ internal sealed class MotionParameters
             }
             config.AxisDrivers[axis] = AxisDriversConfig.WithDrivers(drivers);
         }
-        config.ContinuousRotationAxes = continuousRotationAxes;
+        // Some geometries have an axis that goes round whether or not M208 said so - a polar bed and
+        // a SCARA joint with more than a full circle of travel both do - so the geometry gets to add
+        // to what the configuration declared, masked to the axes that exist
+        config.ContinuousRotationAxes = (continuousRotationAxes | Geometry.ContinuousRotationAxes)
+                                        & (NumAxes >= 32 ? uint.MaxValue : (1u << NumAxes) - 1);
 
         for (int extruder = 0; extruder < NumExtruders; extruder++)
         {

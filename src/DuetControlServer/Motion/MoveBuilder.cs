@@ -133,7 +133,7 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         if (move.MoveType == 0)
         {
             NativeMovementError error = Parameters.Geometry.CartesianToMotorSteps(
-                move.Coords, stepsPerMm, numAxes, numAxes, _newEndPoints);
+                move.Coords, stepsPerMm, numAxes, numAxes, _newEndPoints, move.IsCoordinated);
             if (error != NativeMovementError.Ok)
             {
                 // Throw the move away rather than moving somewhere else: the endpoints are what the
@@ -363,8 +363,18 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         MoveLimits limits = new() { RequestedSpeed = requestedSpeed, MaxAcceleration = maxAcceleration };
         if (move.MoveType == 0)
         {
+            PlannedMove plannedMove = new()
+            {
+                NormalisedDirectionVector = _normalisedDirection,
+                StartMotorPos = _endPoints,
+                EndMotorPos = _newEndPoints,
+                StepsPerMm = stepsPerMm,
+                NumVisibleAxes = numAxes,
+                TotalDistance = totalDistance,
+                ContinuousRotationShortcut = (flags & MoveFlags.ContinuousRotationShortcut) != 0
+            };
             Parameters.Geometry.LimitSpeedAndAcceleration(
-                ref limits, _normalisedDirection, numAxes, Parameters.MaxFeedrates, _accelerations);
+                ref limits, plannedMove, Parameters.MaxFeedrates, _accelerations);
         }
 
         // --- Write the submission -----------------------------------------------------------------------
