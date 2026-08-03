@@ -96,6 +96,11 @@ namespace Duet::Sbc::Motion
 	// Value of a stopOnInput entry meaning "this drive watches no endstop during this move".
 	inline constexpr uint32_t kNoStopInput = 0xFFFFFFFF;
 
+	// Set in a stopOnInput entry when the axis has one switch per driver rather than one for the
+	// whole axis. The handle's minor field then selects the switch, and the driver's index within the
+	// axis is what selects it - RepRapFirmware pairs port i with driver i the same way.
+	inline constexpr uint32_t kStopInputPerDriver = 0x80000000;
+
 	// Pack the CAN address and RemoteInputHandle of an endstop into a stopOnInput entry.
 	[[nodiscard]] constexpr uint32_t MakeStopInput(uint8_t boardAddress, uint16_t inputHandle) noexcept
 	{
@@ -110,6 +115,23 @@ namespace Duet::Sbc::Motion
 	[[nodiscard]] constexpr uint16_t StopInputHandle(uint32_t stopOnInput) noexcept
 	{
 		return static_cast<uint16_t>(stopOnInput);
+	}
+
+	// The stop input for one driver of an axis.
+	//
+	// An axis with one switch has every driver watching it. An axis with a switch per driver has each
+	// driver watching its own, and the switch is identified by the low 6 bits of the handle - the
+	// minor field - which is the driver's index within the axis.
+	[[nodiscard]] constexpr uint32_t StopInputForDriver(uint32_t stopOnInput, size_t driverIndex) noexcept
+	{
+		if (stopOnInput == kNoStopInput || (stopOnInput & kStopInputPerDriver) == 0)
+		{
+			return stopOnInput;
+		}
+
+		constexpr uint32_t minorMask = 0x3F;			// RemoteInputHandle::minor is 6 bits wide
+		return (stopOnInput & ~(kStopInputPerDriver | minorMask))
+			   | (static_cast<uint32_t>(driverIndex) & minorMask);
 	}
 
 	// Total size of a submission carrying `numDrives` drives.

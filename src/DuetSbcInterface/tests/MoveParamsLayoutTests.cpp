@@ -146,11 +146,43 @@ namespace
 	}
 }
 
+// An axis with a switch per driver pairs port i with driver i, exactly as RepRapFirmware does. That
+// pairing is expressed by rewriting the handle's minor field, and it is the only thing that tells one
+// motor of a gantry from the other - get it wrong and both motors watch one switch, which is the
+// stopAxis behaviour the configuration was trying to avoid.
+void TestStopInputPerDriver() noexcept
+{
+	using namespace Duet::Sbc::Motion;
+
+	// The handle M574 registered: type 1 (endstop) in the top nibble, axis 2 in the major field,
+	// switch 0 in the minor field
+	constexpr uint16_t handle = (1u << 12) | (2u << 6);
+	const uint32_t axisWide = MakeStopInput(3, handle);
+	const uint32_t perDriver = axisWide | kStopInputPerDriver;
+
+	// One switch for the whole axis: every driver watches the switch that was registered
+	CHECK(StopInputForDriver(axisWide, 0) == axisWide, "driver 0 watches the axis' switch");
+	CHECK(StopInputForDriver(axisWide, 1) == axisWide, "driver 1 watches the same switch");
+
+	// A switch per driver: same board and same axis, but each driver watches its own switch
+	for (size_t driver = 0; driver < 4; ++driver)
+	{
+		const uint32_t forDriver = StopInputForDriver(perDriver, driver);
+		CHECK(StopInputBoard(forDriver) == 3, "the board is the same for every switch of the axis");
+		CHECK(StopInputHandle(forDriver) == handle + driver, "the minor field selects the driver's switch");
+		CHECK((forDriver & kStopInputPerDriver) == 0, "the marker does not reach the wire");
+	}
+
+	// A drive with no endstop has to stay without one, or it would start watching switch 0
+	CHECK(StopInputForDriver(kNoStopInput, 1) == kNoStopInput, "a drive watching nothing keeps the sentinel");
+}
+
 int main()
 {
 	std::printf("Motion wire layouts:\n");
 	TestMoveParamsLayout();
 	TestScheduleMoveLayout();
 	TestMoveParamsTails();
+	TestStopInputPerDriver();
 	return TestSupport::Summarise("MoveParams layout");
 }

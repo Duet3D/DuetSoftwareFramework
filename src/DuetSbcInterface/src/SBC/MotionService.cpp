@@ -330,11 +330,21 @@ namespace Duet::Sbc
 				++numReverting;
 
 				// Adopting the position also drops the rest of the move: this drive is not going to
-				// finish it, and the next move is planned as a delta from where this one ended
-				tracker.SetMotorPosition(position);
-				if (endstopMove != nullptr)
+				// finish it, and the next move is planned as a delta from where this one ended.
+				//
+				// An axis with a switch per driver stops them one at a time, and until the last one
+				// has stopped the tracker is still what tells the drivers yet to stop where they
+				// were when their own switch fired, so it is left running
+				const bool driveHasStopped = endstopMove == nullptr
+					|| endstopMove->NoteDriverStopped(drive, move.GetDriverIndexInDrive(drive, driver),
+													  move.GetNumDriversForDrive(drive));
+				if (driveHasStopped)
 				{
-					endstopMove->SetDriveCoordinate(drive, position);
+					tracker.SetMotorPosition(position);
+					if (endstopMove != nullptr)
+					{
+						endstopMove->SetDriveCoordinate(drive, position);
+					}
 				}
 			}
 

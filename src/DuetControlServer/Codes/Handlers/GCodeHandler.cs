@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Motion;
+using DuetControlServer.Motion.Native;
 using DuetControlServer.Motion.Kinematics;
 using Microsoft.Extensions.Logging;
 
@@ -324,7 +325,8 @@ internal sealed class GCodeHandler(
             }
 
             Endstop? endstop = axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null;
-            if (endstop is null || !RemoteEndstops.TryGetStopInput(endstop, axis, out uint stopInput))
+            if (endstop is null ||
+                !RemoteEndstops.TryGetStopInput(endstop, axis, model.Move.Axes[axis].Drivers.Count, out uint stopInput))
             {
                 continue;                       // no endstop, or one no move can stop on
             }
@@ -357,7 +359,10 @@ internal sealed class GCodeHandler(
             }
 
             // Every drive watches the one input, so whichever driver sees the change first, they all
-            // stop. That is what makes this stopAll rather than stopAxis
+            // stop. That is what makes this stopAll rather than stopAxis. A per-driver endstop is
+            // demoted here for the same reason RepRapFirmware demotes it: the drives are coupled, so
+            // letting each one wait for its own switch would keep the others running
+            stopAllInput &= ~MoveParams.StopInputPerDriver;
             for (int drive = 0; drive < move.StopOnInput.Length; drive++)
             {
                 move.StopOnInput[drive] = stopAllInput;

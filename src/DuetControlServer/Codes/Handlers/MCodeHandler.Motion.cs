@@ -2160,6 +2160,11 @@ internal partial class MCodeHandler
                     return new Message(MessageType.Error, "Invalid use of P parameter");
                 }
 
+                if (hasPort && ValidateEndstopPorts(port!, move.Axes[configured[0].Axis]) is string portError)
+                {
+                    return new Message(MessageType.Error, portError);
+                }
+
                 foreach ((int axis, int position) in configured)
                 {
                     if (position == (int)EndstopPosition.None)
@@ -2518,7 +2523,9 @@ internal partial class MCodeHandler
     /// <returns>The description</returns>
     private static string DescribeEndstop(Endstop endstop) => endstop.Type switch
     {
-        EndstopType.InputPin => $"switch connected to pin {endstop.Port ?? "(none)"}",
+        EndstopType.InputPin => RemoteEndstops.PortsOf(endstop) is { Length: > 1 } ports
+                                ? $"switches connected to pins {string.Join(' ', ports)}"
+                                : $"switch connected to pin {endstop.Port ?? "(none)"}",
         EndstopType.ZProbeAsEndstop => "Z probe",
         EndstopType.MotorStallAny => "motor stall (any driver)",
         EndstopType.MotorStallIndividual => "motor stall (individual drivers)",
@@ -2550,9 +2557,50 @@ internal partial class MCodeHandler
     /// Until this is done the input is not reported at all, so an endstop that is configured but not
     /// monitored would silently never trigger
     /// </remarks>
+    /// <summary>
+    /// Check the P parameter of M574 against the axis it is being given to
+    /// </summary>
+    /// <param name="port">Port names, '+'-separated for an axis with a switch per driver</param>
+    /// <param name="axis">The axis</param>
+    /// <returns>The reason the ports were refused, or null if they are usable</returns>
+    private static string? ValidateEndstopPorts(string port, Axis axis)
+    {
+        string[] ports = port.Split(RemoteEndstops.PortSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (ports.Length == 0)
+        {
+            return null;                        // clearing the port is how an endstop is given up
+        }
+
+        if (ports.Length > Motion.Native.MotionLimits.MaxDriversPerAxis)
+        {
+            return $"Axis {axis.Letter} may have at most {Motion.Native.MotionLimits.MaxDriversPerAxis} endstop switches";
+        }
+
+        if (!RemoteEndstops.TrySplitPort(ports[0], out byte board, out _))
+        {
+            return $"Invalid endstop port '{ports[0]}'";
+        }
+
+        for (int i = 1; i < ports.Length; i++)
+        {
+            if (!RemoteEndstops.TrySplitPort(ports[i], out byte otherBoard, out _))
+            {
+                return $"Invalid endstop port '{ports[i]}'";
+            }
+
+            // A move names one board per drive and picks the switch on it by driver index, so
+            // switches spread over two boards could not be told apart when the move is scheduled
+            if (otherBoard != board)
+            {
+                return $"All endstop switches of axis {axis.Letter} must be on the same board";
+            }
+        }
+        return null;
+    }
+
     private async ValueTask<string?> CreateEndstopMonitorAsync(int axis, CancellationToken cancellationToken)
     {
-        string? port;
+        string[] ports;
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
             Endstop? endstop = axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null;
@@ -2560,30 +2608,39 @@ internal partial class MCodeHandler
             {
                 return null;                    // nothing to monitor: not a switch on a pin
             }
-            port = endstop.Port;
+            ports = RemoteEndstops.PortsOf(endstop);
         }
 
-        if (string.IsNullOrWhiteSpace(port))
+        if (ports.Length == 0)
         {
             return null;                        // no port named yet, so there is nothing to ask for
         }
 
-        if (!RemoteEndstops.TrySplitPort(port, out byte board, out string localPort))
+        // An axis with a switch per driver needs one monitor per switch, each under the handle that
+        // driver's moves will name
+        for (int switchIndex = 0; switchIndex < ports.Length; switchIndex++)
         {
-            return $"Invalid endstop port '{port}'";
+            if (!RemoteEndstops.TrySplitPort(ports[switchIndex], out byte board, out string localPort))
+            {
+                return $"Invalid endstop port '{ports[switchIndex]}'";
+            }
+
+            CanMessageCreateInputMonitorV1 message = new()
+            {
+                Handle = RemoteEndstops.HandleFor(axis, switchIndex),
+                Threshold = 0,
+                MinInterval = EndstopMinReportInterval
+            };
+            CanText.SetString(message.PinName, localPort);
+
+            CanResponse response = await linkInterface.SendCanMessageAsync(board, in message, CanMessageType.StandardReply,
+                                                                          cancellationToken: cancellationToken);
+            if (!string.IsNullOrWhiteSpace(response.PayloadString))
+            {
+                return response.PayloadString;
+            }
         }
-
-        CanMessageCreateInputMonitorV1 message = new()
-        {
-            Handle = RemoteEndstops.HandleFor(axis),
-            Threshold = 0,
-            MinInterval = EndstopMinReportInterval
-        };
-        CanText.SetString(message.PinName, localPort);
-
-        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message, CanMessageType.StandardReply,
-                                                                      cancellationToken: cancellationToken);
-        return string.IsNullOrWhiteSpace(response.PayloadString) ? null : response.PayloadString;
+        return null;
     }
 
     /// <summary>

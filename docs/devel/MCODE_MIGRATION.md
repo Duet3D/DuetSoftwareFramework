@@ -884,7 +884,7 @@ move naming X and Y must not be stopped by Z's switch happening to be closed alr
 the states, which the board manager keeps current from the same `InputChanged` messages the
 controller acts on.
 
-### The three stop actions
+### The four stop actions
 
 RepRapFirmware picks one of four actions when an endstop fires, and which one it picks depends on the
 **geometry**, not on the endstop:
@@ -894,7 +894,7 @@ RepRapFirmware picks one of four actions when an endstop fires, and which one it
 | `none` | The axis has no endstop | No stop input is written, so nothing watches |
 | `stopAxis` | The axis is independently driven | Its drive carries the endstop's input; the controller stops that axis' drivers |
 | `stopAll` | Moving the axis needs drives other than its own | **Every** drive in the move carries that one input, so whichever driver sees the change first, they all stop |
-| `stopDriver` | Several switches on one axis, one per driver | Not supported: M574 takes one port per axis, and the handle's minor field is always zero |
+| `stopDriver` | The axis has as many switches as drivers | Each drive entry carries the same board but a handle whose minor field is the driver's index, so each driver stops on its own switch |
 
 `stopAll` is the one that matters for correctness rather than tidiness. On a CoreXY, holding X still
 needs both motors, so stopping only "X's drivers" would leave the other motor running and drag the
@@ -906,6 +906,49 @@ Because a drive can carry only one stop input, a `stopAll` axis cannot be armed 
 else - the second endstop would have nowhere to live. `G1 H1` rejects that combination rather than
 silently arming one of them, which also matches how a CoreXY `homeall.g` is written in practice: the
 coupled axes are homed one at a time.
+
+### `stopDriver`: a switch per driver
+
+`stopDriver` is what squares a gantry. An axis driven by two motors is given two switches -
+`M574 Y1 S1 P"1.io1.in+1.io2.in"` - and each motor runs on until it reaches *its own* switch, so a
+gantry that started skewed ends up square against the two switches. Stopping both motors on the first
+trigger would preserve the skew, which is why this is a separate action rather than a variation of
+`stopAxis`.
+
+RepRapFirmware pairs port *i* with driver *i* of the axis and chooses `stopDriver` only when the two
+counts are equal (`SwitchEndstop::PrimeAxis`); any other count falls back to stopping the whole axis
+on the first trigger. That fallback is what makes a dual-motor axis with one switch safe, because the
+motor with no switch of its own would otherwise never stop. Both rules are reproduced here.
+
+The pairing is carried on the wire without widening anything. A drive's stop input already packs a CAN
+address and a `RemoteInputHandle`, and the handle's low 6 bits are its minor field, which is the switch
+within the axis. `MoveParams` marks a per-driver endstop with a private flag bit (`kStopInputPerDriver`,
+bit 31, above the packed address) and `StopInputForDriver` rewrites the minor field from the driver's
+index as `DDA::Prepare` emits each driver's movement. The flag never reaches the wire. M574 registers
+one input monitor per port under the matching handle, so the handles a move names are the ones the
+board is already watching.
+
+Two consequences follow from there being one CAN address per **drive** rather than per driver:
+
+- **All of an axis' switches must be on one board.** M574 rejects a port list that spans boards, and
+  `RemoteEndstops.TryGetStopInput` refuses one too, so a mis-typed config fails at configuration time
+  instead of producing a move that watches the wrong board. RepRapFirmware allows the spread; nothing
+  in the standard dual-motor wiring needs it, and lifting it means one address per driver on the wire.
+- **`stopAll` outranks `stopDriver`.** On coupled kinematics the flag is cleared before the input is
+  copied to every drive, for the same reason RepRapFirmware's `stopAll` test comes first: waiting for
+  each motor's own switch would leave the coupled drives running.
+
+The drive tracker complicates matters slightly. Adopting a stopped driver's position freezes the
+tracker, and the tracker is exactly what tells the *remaining* drivers where they were when their own
+switch fired - freezing it on the first trigger would revert the second motor to the first motor's
+position and undo the squaring. So `DDA::NoteDriverStopped` records which drivers of a drive have
+stopped, and the position is only adopted once the last of them has. Each driver's
+`CanMessageRevertPosition` is still computed as it is reported, from the live tracker at that driver's
+own trigger time.
+
+Not carried over: RepRapFirmware sets the axis to its low or high limit when the *last* switch of a
+`stopDriver` axis fires (`setAxisLow` / `setAxisHigh`). Nothing sets an axis position from an endstop
+here yet - that belongs with G28, which is the next step.
 
 `Motion/RemoteEndstops.cs` holds the naming the three places have to agree on: M574 when it asks for
 the monitor, the move when it says what stops it, and the receiver when a change comes back. They

@@ -18,6 +18,7 @@
 # include <CAN/CanMotion.h>
 #endif
 
+#include <algorithm>
 #include <limits>
 
 #ifdef DUET_NG
@@ -313,6 +314,8 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 			m_stopOnInput[drive] = kNoStopInput;
 		}
 	}
+
+	std::fill(std::begin(m_driversStopped), std::end(m_driversStopped), uint8_t{0});
 
 	m_totalDistance = params.totalDistance;
 	m_maxAcceleration = params.maxAcceleration;
@@ -665,6 +668,18 @@ void DDA::SetDriveCoordinate(size_t drive, int32_t ep) noexcept
 	m_endPoint[drive] = ep;
 }
 
+bool DDA::NoteDriverStopped(size_t drive, size_t driverIndex, size_t numDrivers) noexcept
+{
+	if (drive >= maxAxesPlusExtruders || numDrivers == 0 || driverIndex >= 8)
+	{
+		return true;					// nothing to wait for: an extruder, or a driver off the end
+	}
+
+	m_driversStopped[drive] |= static_cast<uint8_t>(1u << driverIndex);
+	const uint8_t all = static_cast<uint8_t>((numDrivers >= 8) ? 0xFF : ((1u << numDrivers) - 1));
+	return (m_driversStopped[drive] & all) == all;
+}
+
 // Dispatch this DDA to the move segment queue for execution.
 // This must not be called with interrupts disabled, because it calls Platform::EnableDrive.
 void DDA::Prepare(DDARing& ring,
@@ -840,7 +855,10 @@ void DDA::Prepare(DDARing& ring,
 							const DriverId driver = config.driverNumbers[i];
 							if (driver.IsRemote())
 							{
-								CanMotion::AddAxisMovement(params, driver, delta, m_stopOnInput[drive]);
+								// Port i of an endstop belongs to driver i of the axis, so the
+								// switch this driver watches follows from its index
+								CanMotion::AddAxisMovement(params, driver, delta,
+																		   Duet::Sbc::Motion::StopInputForDriver(m_stopOnInput[drive], i));
 							}
 						}
 #endif

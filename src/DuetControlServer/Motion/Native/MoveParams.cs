@@ -122,6 +122,15 @@ internal static class MoveParams
     public const uint NoStopInput = 0xFFFFFFFF;
 
     /// <summary>
+    /// Set when the axis has one switch per driver rather than one for the whole axis
+    /// </summary>
+    /// <remarks>
+    /// The native side then replaces the handle's minor field with the driver's index within the
+    /// axis, which is the switch it watches. RepRapFirmware pairs port i with driver i the same way
+    /// </remarks>
+    public const uint StopInputPerDriver = 0x80000000;
+
+    /// <summary>
     /// Pack the CAN address and input handle of an endstop into a stop input entry
     /// </summary>
     /// <param name="boardAddress">CAN address of the board carrying the input</param>

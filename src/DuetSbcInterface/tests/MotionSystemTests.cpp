@@ -256,6 +256,28 @@ static void TestConfigureIsVisibleThroughAccessors()
 	CHECK(reprap.GetGCodes().GetNumExtruders() == 1, "including the extruder count");
 }
 
+// An axis with a switch per driver needs each driver's index within its axis, because the index is
+// the switch that driver watches. Getting it from the configuration is the only thing that keeps that
+// pairing the same as the one M574 registered the switches under.
+static void TestDriverIndexWithinAnAxis()
+{
+	MotionConfig config = BasicConfig();
+	constexpr size_t zAxis = 2;
+	config.axisDrivers[zAxis].numDrivers = 2;
+	config.axisDrivers[zAxis].driverNumbers[0] = DriverId((CanAddress)1, 2);
+	config.axisDrivers[zAxis].driverNumbers[1] = DriverId((CanAddress)1, 5);
+
+	MotionSystem& move = FreshSystem(config);
+
+	CHECK(move.GetNumDriversForDrive(zAxis) == 2, "a dual-motor axis reports both drivers");
+	CHECK(move.GetDriverIndexInDrive(zAxis, DriverId((CanAddress)1, 2)) == 0, "the first driver watches switch 0");
+	CHECK(move.GetDriverIndexInDrive(zAxis, DriverId((CanAddress)1, 5)) == 1, "the second driver watches switch 1");
+
+	// An extruder is not listed among the axis drivers, but it still has the one driver it is
+	// configured with, and a stop report for it must not be left waiting for a second
+	CHECK(move.GetNumDriversForDrive(maxAxesPlusExtruders - 1) == 1, "an extruder has one driver");
+}
+
 int main()
 {
 	TestNoBacklashLeavesDeltasAlone();
@@ -266,6 +288,7 @@ int main()
 	TestAreDrivesStopped();
 	TestCancelSteppingAbandonsPendingMotion();
 	TestConfigureIsVisibleThroughAccessors();
+	TestDriverIndexWithinAnAxis();
 
 	return TestSupport::Summarise("motion system");
 }

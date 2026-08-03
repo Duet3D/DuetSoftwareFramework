@@ -138,6 +138,32 @@ namespace Duet::Sbc::Motion
 			return maxAxesPlusExtruders;
 		}
 
+		// How many drivers a logical drive has. An extruder has the one driver that is not listed in
+		// axisDrivers, so it answers 1 rather than 0
+		[[nodiscard]] size_t GetNumDriversForDrive(size_t drive) const noexcept
+		{
+			return (drive < maxAxes) ? m_config.axisDrivers[drive].numDrivers : 1;
+		}
+
+		// Where a driver sits in the list of the drive's drivers, which is also the endstop switch it
+		// watches when the axis has a switch per driver. RepRapFirmware pairs port i with driver i
+		// the same way
+		[[nodiscard]] size_t GetDriverIndexInDrive(size_t drive, DriverId driver) const noexcept
+		{
+			if (drive < maxAxes)
+			{
+				const AxisDriversConfig& config = m_config.axisDrivers[drive];
+				for (size_t i = 0; i < config.numDrivers; ++i)
+				{
+					if (config.driverNumbers[i] == driver)
+					{
+						return i;
+					}
+				}
+			}
+			return 0;
+		}
+
 		// Hand one drive's share of a prepared move to its tracker. This is what DDA::Prepare calls
 		// in place of the firmware's Move::AddLinearSegments.
 		void AddLinearSegments(size_t drive, uint32_t startTime, const MoveProfile& profile,

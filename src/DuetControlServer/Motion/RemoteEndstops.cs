@@ -16,22 +16,39 @@ namespace DuetControlServer.Motion;
 internal static class RemoteEndstops
 {
     /// <summary>
-    /// The input handle an axis' endstop is monitored under
+    /// Separator between the ports of an axis that has one switch per driver
+    /// </summary>
+    public const char PortSeparator = '+';
+
+    /// <summary>
+    /// The input handle an axis' endstop switch is monitored under
     /// </summary>
     /// <param name="axis">Axis number</param>
+    /// <param name="switchIndex">Which switch of that axis, which is also the driver it belongs to</param>
     /// <returns>The handle</returns>
     /// <remarks>
-    /// Minor is the switch within the axis. Only one switch per axis is supported so far, so it is
-    /// always zero; RepRapFirmware uses it for the second switch of a dual-motor axis
+    /// Major is the axis and minor the switch within it. An axis with one switch uses minor zero for
+    /// every driver; an axis with a switch per driver pairs port i with driver i, which is how
+    /// RepRapFirmware pairs them too
     /// </remarks>
-    public static RemoteInputHandle HandleFor(int axis)
+    public static RemoteInputHandle HandleFor(int axis, int switchIndex = 0)
     {
         RemoteInputHandle handle = default;
         handle.Type = (byte)RemoteInputHandle.TypeEndstop;
         handle.Major = (byte)axis;
-        handle.Minor = 0;
+        handle.Minor = (byte)switchIndex;
         return handle;
     }
+
+    /// <summary>
+    /// The ports of an endstop, in driver order
+    /// </summary>
+    /// <param name="endstop">The endstop</param>
+    /// <returns>The ports, empty if it has none</returns>
+    public static string[] PortsOf(Endstop endstop)
+        => string.IsNullOrWhiteSpace(endstop.Port)
+            ? []
+            : endstop.Port.Split(PortSeparator, System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries);
 
     /// <summary>
     /// Split a port name into the board that carries it and the port on that board
@@ -67,22 +84,54 @@ internal static class RemoteEndstops
     /// </summary>
     /// <param name="endstop">The axis' endstop</param>
     /// <param name="axis">Axis number</param>
+    /// <param name="numDrivers">How many drivers the axis has</param>
     /// <param name="stopInput">Receives the packed board and handle</param>
     /// <returns>True if the axis has an endstop a move can stop on</returns>
     /// <remarks>
+    /// <para>
     /// Only a switch on an input pin qualifies. A stall endstop is detected by the driver rather than
-    /// by an input, and a Z probe standing in for an endstop needs M558, which is not ported
+    /// by an input, and a Z probe standing in for an endstop needs M558, which is not ported.
+    /// </para>
+    /// <para>
+    /// An axis with as many switches as drivers stops each driver on its own switch, which is
+    /// RepRapFirmware's <c>stopDriver</c>. Any other count - one switch for a dual-motor axis, or
+    /// more switches than drivers - stops the whole axis on the first trigger, which is what
+    /// RepRapFirmware does when the two counts disagree
+    /// </para>
     /// </remarks>
-    public static bool TryGetStopInput(Endstop endstop, int axis, out uint stopInput)
+    public static bool TryGetStopInput(Endstop endstop, int axis, int numDrivers, out uint stopInput)
     {
         stopInput = MoveParams.NoStopInput;
-        if (endstop.Type != EndstopType.InputPin || string.IsNullOrWhiteSpace(endstop.Port) ||
-            !TrySplitPort(endstop.Port, out byte board, out _))
+        if (endstop.Type != EndstopType.InputPin)
         {
             return false;
         }
 
+        string[] ports = PortsOf(endstop);
+        if (ports.Length == 0 || !TrySplitPort(ports[0], out byte board, out _))
+        {
+            return false;
+        }
+
+        bool perDriver = numDrivers > 1 && ports.Length == numDrivers;
+        if (perDriver)
+        {
+            // Every switch of the axis has to be on one board, because a move carries one CAN address
+            // per drive and the driver index only selects the switch
+            foreach (string port in ports)
+            {
+                if (!TrySplitPort(port, out byte portBoard, out _) || portBoard != board)
+                {
+                    return false;
+                }
+            }
+        }
+
         stopInput = MoveParams.MakeStopInput(board, HandleFor(axis).All);
+        if (perDriver)
+        {
+            stopInput |= MoveParams.StopInputPerDriver;
+        }
         return true;
     }
 }
