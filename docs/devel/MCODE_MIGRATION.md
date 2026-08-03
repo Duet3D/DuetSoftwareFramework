@@ -118,7 +118,7 @@ what the machine half now does (or does not yet) do.
 |---|---|---|---|
 | §5.1 Motion — drives and axes | 26 | 0 | 26 |
 | §5.2 Motion — kinematics and geometry | 8 | 0 | 12 |
-| §5.3 Motion — compensation and probing | 2 | 0 | 14 |
+| §5.3 Motion — compensation and probing | 12 | 0 | 14 |
 | §5.4 Motion — queue, sync and shaping | 3 | 1 | 9 |
 | §5.5 Heat | 0 | 0 | 19 |
 | §5.6 Fans | 0 | 0 | 3 |
@@ -127,7 +127,7 @@ what the machine half now does (or does not yet) do.
 | §5.9 Job, files and SD | 17 | 4 | 29 |
 | §5.10 Network | 4 | 1 | 13 |
 | §5.11 I/O, expansion and miscellaneous | 6 | 5 | 38 |
-| **Total** | **67** | **11** | **186** |
+| **Total** | **77** | **11** | **186** |
 
 Update these counts as boxes are ticked.
 
@@ -226,26 +226,26 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M671 | 4152 | Z leadscrew positions | `move.kinematics.tiltCorrection` | no | ✅ |
 | M673 | 4168 | Align plane on rotary axis | `move.rotation` | yes | ⬜ blocked: needs homing |
 | M674 | 4275 | Set Z to centre point | — | yes | ⬜ blocked: needs probe points |
-| M675 | 4311 | Find centre of cavity | — | yes | ⬜ blocked: needs probing |
+| M675 | 4311 | Find centre of cavity | — | yes | ⬜ blocked: needs G30 |
 
 ### 5.3 Motion — compensation and probing
 
 | M-code | RRF | Purpose | Object model home | Standstill | Status |
 |---|---|---|---|---|---|
 | M119 | 2206 | Report endstop status | `sensors.endstops[]` | no | ✅ |
-| M374 | 3089 | Save height map to file | `move.compensation.file` | no | ⬜ |
-| M375 | 3093 | Load height map and enable compensation | `move.compensation` | no | ⬜ |
-| M376 | 3102 | Set taper height | `move.compensation.fadeHeight` | no | ⬜ |
-| M401 | 3131 | Deploy Z probe | `sensors.probes[]` | no | ⬜ blocked |
-| M402 | 3144 | Retract Z probe | `sensors.probes[]` | no | ⬜ blocked |
-| M557 | 3686 | Probe grid definition | `move.compensation.probeGrid` | no | ⬜ |
-| M558 | 3690 | Z probe type/configuration; `.1`/`.2` scanning probe calibration | `sensors.probes[]` | no | ⬜ blocked |
-| M561 | 3730 | Identity transform, disable height map | `move.compensation.type` | no | ⬜ |
+| M374 | 3089 | Save height map to file | `move.compensation.file` | no | ✅ |
+| M375 | 3093 | Load height map and enable compensation | `move.compensation` | no | ✅ |
+| M376 | 3102 | Set taper height | `move.compensation.fadeHeight` | no | ✅ |
+| M401 | 3131 | Deploy Z probe | `sensors.probes[]` | no | ✅ |
+| M402 | 3144 | Retract Z probe | `sensors.probes[]` | no | ✅ |
+| M557 | 3686 | Probe grid definition | `move.compensation.probeGrid` | no | ✅ |
+| M558 | 3690 | Z probe type/configuration; `.1`/`.2` scanning probe calibration | `sensors.probes[]` | no | ✅ |
+| M561 | 3730 | Identity transform, disable height map | `move.compensation.type` | no | ✅ |
 | M574 | 3897 | Endstop configuration | `sensors.endstops[]` | no | ✅ |
-| M577 | 3919 | Wait for endstop trigger | `sensors.endstops[]` | no | ⬜ blocked |
-| M585 | 3960 | Probe tool | `sensors.probes[]`, tools | yes | ⬜ blocked |
+| M577 | 3919 | Wait for endstop trigger | `sensors.endstops[]` | no | ✅ |
+| M585 | 3960 | Probe tool | `sensors.probes[]`, tools | yes | ⬜ blocked: needs G30 |
 | M672 | 4164 | Program Z probe | CAN to the probe's board | no | ⬜ blocked |
-| M851 | 4357 | Z probe offset (Marlin compatibility) | `sensors.probes[].offsets` | no | ⬜ blocked |
+| M851 | 4357 | Z probe offset (Marlin compatibility) | `sensors.probes[].offsets` | no | ✅ |
 
 ### 5.4 Motion — queue, sync and shaping
 
@@ -957,6 +957,62 @@ here yet - that belongs with G28, which is the next step.
 the monitor, the move when it says what stops it, and the receiver when a change comes back. They
 agree because the handle is derived from the axis rather than allocated, so nothing has to remember
 or look up an allocation.
+
+### The Z probe (M558, G31, M401, M402, M851)
+
+A probe here is an input monitor with a trigger height attached. RepRapFirmware's `ZProbe` hierarchy
+exists mostly to separate probes on the main board from probes on an expansion board; only the second
+kind exists here, so what is left is `RemoteZProbe` and there is no hierarchy. `Motion/RemoteProbes.cs`
+derives the handle from the probe number the same way `RemoteEndstops` derives one from the axis.
+
+The types an expansion board can express are RepRapFirmware's: 1 (analog), 8 (unfiltered digital),
+9 (BLTouch) and 11 (scanning analog), plus 0 (none) and 10 (motor stall), which watch no input at all.
+Anything else is refused with the reason rather than accepted and quietly ignored.
+
+Everything a probe knows is in `sensors.probes[]`, including the port, so a machine can be rebuilt
+from the object model. Two fields were added for that: `port`, for the same reason the endstop gained
+one, and `sensor`, which is the temperature sensor G31 H names. RepRapFirmware keeps the sensor on the
+probe but neither reports nor saves it; without it, a machine that used temperature compensation could
+not be recreated from the object model alone.
+
+M401 and M402 run `deployprobe<K>.g`, falling back to `deployprobe.g`. RepRapFirmware passes the probe
+number to the unnumbered macro in a `K` variable; meta G-code variables are not ported, so the
+unnumbered macro runs without it. `deployedByUser` behaves as it does in RepRapFirmware - it is what
+stops a probe the user deployed on purpose from being retracted by something else.
+
+### Bed compensation (M557, M374, M375, M376, M561)
+
+`move.compensation.probeGrid` is what M557 defines and `move.compensation.liveGrid` is what is
+actually loaded; they differ whenever a map was measured over a grid that has since been redefined.
+The heights themselves are in `heightmap.csv` rather than the object model, which is where
+RepRapFirmware keeps them and where Duet Web Control reads them from.
+
+`Motion/HeightMap.cs` reads and writes that file, including the two older label lines, so a bed
+measured before this migration reloads afterwards. A point that was never probed is a bare `0` with no
+decimal point, which is how the format distinguishes it from a measurement of zero; that distinction
+is kept on the way in and on the way out, so a partial map stays partial.
+
+`Motion/BedCompensation.cs` holds the loaded map and produces the Z correction.
+`GCodeHandler.BuildRawMove` adds it and `CommitPositions` takes it back off, in the same place
+babystepping is added and removed, so a client reads back the coordinate it asked for. The taper is
+what makes the second of those more than a subtraction: below the taper height the correction is
+scaled by how far up it the move is, so inverting it means solving for the requested height rather
+than subtracting the correction. Both directions are RepRapFirmware's `BedTransform` and
+`InverseBedTransform`.
+
+### What is left in phase 5
+
+Everything here configures a probe or applies a map. What is missing is the move that uses one:
+
+- **G30** - probe the bed at a point. Needs a probing move, which is an endstop move that stops on a
+  probe handle instead of an endstop handle. The mechanism is already there; what is missing is
+  selecting the probe, the dive-and-retry loop, and setting the axis position from the trigger height.
+- **G29** - probe the grid. A loop of G30s over `probeGrid`, which is what produces a height map in
+  the first place. Until it exists, M375 loads a map measured elsewhere and M374 has nothing to save
+  unless one was loaded.
+- **M585** and **M675** are blocked on G30 for the same reason.
+- **M558.1** and **M558.2** calibrate a scanning probe, which needs the probe read back over CAN while
+  it moves.
 
 Still not reachable: **G28**. Homing runs `homeall.g` or `home<axis>.g`, which needs the homing
 macros and the `G1 H` moves inside them - the macros work now, so this is the next step rather than a

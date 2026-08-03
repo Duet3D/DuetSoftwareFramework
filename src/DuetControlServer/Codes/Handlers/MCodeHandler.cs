@@ -43,6 +43,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="loggerFactory">Logger factory</param>
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="macroRunner">Runs macro files</param>
+/// <param name="bedCompensation">The height map in effect</param>
 /// <param name="stateStack">Interpreter state saved by M120 and restored by M121</param>
 /// <param name="planner">Where G-codes become queued moves, and what holds the machine description</param>
 /// <param name="settings">Settings</param>
@@ -62,6 +63,7 @@ internal partial class MCodeHandler(
     ILoggerFactory loggerFactory,
     IHostApplicationLifetime lifetime,
     MacroRunner macroRunner,
+    Motion.BedCompensation bedCompensation,
     InterpreterStateStack stateStack,
     MovePlanner planner,
     IOptions<Settings> settings) : ICodeHandler
@@ -208,6 +210,21 @@ internal partial class MCodeHandler(
             584 => await HandleDriveMappingAsync(code, cancellationToken),
             // Configure nonlinear extrusion
             592 => await HandleNonlinearExtrusionAsync(code, cancellationToken),
+            // Save and load the height map, and set the compensation taper
+            374 => await HandleSaveHeightMapAsync(code, cancellationToken),
+            375 => await HandleLoadHeightMapAsync(code, cancellationToken),
+            376 => await HandleTaperHeightAsync(code, cancellationToken),
+            // Deploy and retract the Z probe
+            401 => await HandleDeployProbeAsync(code, cancellationToken),
+            402 => await HandleRetractProbeAsync(code, cancellationToken),
+            // Define the mesh compensation grid
+            557 => await HandleProbeGridAsync(code, cancellationToken),
+            // Configure a Z probe
+            558 => await HandleProbeConfigAsync(code, cancellationToken),
+            // Stop applying bed compensation
+            561 => await HandleClearCompensationAsync(code, cancellationToken),
+            // Wait for an endstop or input to reach a state
+            577 => await HandleWaitForInputAsync(code, cancellationToken),
             // Configure the endstops
             574 => await HandleEndstopConfigAsync(code, cancellationToken),
             // Configure input shaping
@@ -226,6 +243,8 @@ internal partial class MCodeHandler(
             671 => await HandleLeadscrewsAsync(code, cancellationToken),
             // Set motor currents, current percentage and standstill current percentage
             906 or 913 or 917 => await HandleMotorCurrentsAsync(code, cancellationToken),
+            // Z probe offset, for Marlin compatibility
+            851 => await HandleProbeOffsetAsync(code, cancellationToken),
             // Configure stall detection
             915 => await HandleStallDetectionAsync(code, cancellationToken),
             // Configure phase stepping

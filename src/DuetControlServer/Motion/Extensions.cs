@@ -27,6 +27,9 @@ public static partial class ServiceCollectionExtensions
             // Where G-codes become queued moves. Shared with the code handlers, which is the whole
             // point of it: every move has to be built in the order it was commanded
             .AddSingleton<MovePlanner>()
+            // The height map in effect. Shared between the codes that load it and the move builder
+            // that applies it, which is why it is not simply a field of either
+            .AddSingleton<BedCompensation>()
             .AddHostedService<MotionService>();
     }
 }

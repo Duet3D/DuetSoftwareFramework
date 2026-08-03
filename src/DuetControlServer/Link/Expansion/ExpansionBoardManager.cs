@@ -4,6 +4,7 @@ using DuetControlServer.Link.Protocol.Shared;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -412,6 +413,43 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
     /// docs/devel/MCODE_MIGRATION.md
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// Reading reported for a triggered digital probe
+    /// </summary>
+    /// <remarks>
+    /// A digital probe has no reading of its own, but <c>sensors.probes[].value</c> is an analog
+    /// scale and a client compares it against the threshold. The top of the scale is what
+    /// RepRapFirmware reports for a closed digital probe
+    /// </remarks>
+    private const int MaxProbeReading = 1000;
+
+    /// <summary>
+    /// Which switches of each endstop are currently closed, one bit per switch
+    /// </summary>
+    /// <remarks>
+    /// An axis with a switch per driver has several switches under one endstop, and each reports
+    /// separately. The object model has one flag for the endstop, so the switches are tracked here
+    /// and the flag is whether any of them is closed - which is what
+    /// <c>SwitchEndstop::Stopped</c> answers in RepRapFirmware
+    /// </remarks>
+    private readonly Dictionary<int, uint> _endstopSwitches = [];
+
+    /// <summary>
+    /// Record the state of one switch of an endstop
+    /// </summary>
+    /// <param name="axis">Axis the endstop belongs to</param>
+    /// <param name="switchIndex">Which switch of that endstop</param>
+    /// <param name="closed">Whether it is now closed</param>
+    /// <returns>Whether any switch of the endstop is closed</returns>
+    private bool NoteEndstopSwitch(int axis, int switchIndex, bool closed)
+    {
+        _endstopSwitches.TryGetValue(axis, out uint switches);
+        uint bit = 1u << (switchIndex & 31);
+        switches = closed ? switches | bit : switches & ~bit;
+        _endstopSwitches[axis] = switches;
+        return switches != 0;
+    }
+
     private async ValueTask ApplyInputChangedAsync(ushort states, byte numHandles, Func<uint, RemoteInputHandle> getHandle,
                                                    CancellationToken cancellationToken)
     {
@@ -436,13 +474,33 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
                 }
                 else if (handle.Type == RemoteInputHandle.TypeEndstop)
                 {
-                    // Major is the axis the endstop belongs to, which is how M574 registered it
+                    // Major is the axis the endstop belongs to, which is how M574 registered it. An
+                    // axis with a switch per driver reports each switch under its own minor, and any
+                    // of them being closed is the axis being stopped, which is how RepRapFirmware's
+                    // SwitchEndstop::Stopped reads it too
                     Endstop? endstop = handle.Major < model.Sensors.Endstops.Count
                         ? model.Sensors.Endstops[handle.Major]
                         : null;
                     if (endstop is not null)
                     {
-                        endstop.Triggered = active;
+                        endstop.Triggered = NoteEndstopSwitch(handle.Major, handle.Minor, active);
+                    }
+                }
+                else if (handle.Type == RemoteInputHandle.TypeZprobe)
+                {
+                    // Major is the probe number, which is how M558 registered it. The board sends the
+                    // level of a digital probe and the reading of an analog one; both arrive here as
+                    // one bit, so a digital probe reads as the extremes of the analog range
+                    Probe? probe = handle.Major < model.Sensors.Probes.Count
+                        ? model.Sensors.Probes[handle.Major]
+                        : null;
+                    if (probe is not null)
+                    {
+                        while (probe.Value.Count < 1)
+                        {
+                            probe.Value.Add(0);
+                        }
+                        probe.Value[0] = active ? MaxProbeReading : 0;
                     }
                 }
             }

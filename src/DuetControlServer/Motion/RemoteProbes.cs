@@ -1,0 +1,38 @@
+using DuetControlServer.Link.Protocol.CanMessages;
+
+namespace DuetControlServer.Motion;
+
+/// <summary>
+/// How a Z probe configured by M558 is named on the CAN bus
+/// </summary>
+/// <remarks>
+/// The same arrangement as <see cref="RemoteEndstops"/>, and for the same reason: M558 asks a board
+/// to watch an input under a handle, and the receiver turns an incoming change back into a probe. The
+/// handle is derived from the probe number rather than allocated, so neither side has to remember an
+/// allocation
+/// </remarks>
+internal static class RemoteProbes
+{
+    /// <summary>
+    /// How many probes may be configured, as in RepRapFirmware's <c>MaxZProbes</c>
+    /// </summary>
+    public const int MaxProbes = 4;
+
+    /// <summary>
+    /// The input handle a probe is monitored under
+    /// </summary>
+    /// <param name="probeNumber">Probe number</param>
+    /// <returns>The handle</returns>
+    /// <remarks>
+    /// Major is the probe. Minor is unused: RepRapFirmware's <c>RemoteZProbe</c> leaves it zero too,
+    /// because a probe is one input where an endstop may be one per driver
+    /// </remarks>
+    public static RemoteInputHandle HandleFor(int probeNumber)
+    {
+        RemoteInputHandle handle = default;
+        handle.Type = (byte)RemoteInputHandle.TypeZprobe;
+        handle.Major = (byte)probeNumber;
+        handle.Minor = 0;
+        return handle;
+    }
+}

@@ -2232,7 +2232,10 @@ internal partial class MCodeHandler
                 string state = endstop is null ? "no endstop" : endstop.Triggered ? "at min stop" : "not stopped";
                 builder.Append(CultureInfo.InvariantCulture, $"{model.Move.Axes[axis].Letter}: {state}, ");
             }
-            builder.Append("Z probe: ").Append(model.Sensors.Probes.Count > 0 ? "not stopped" : "not stopped");
+            // RepRapFirmware reports the currently selected probe here; there is only ever probe 0
+            // to select until G30 exists to select another
+            Probe? probe = model.Sensors.Probes.Count > 0 ? model.Sensors.Probes[0] : null;
+            builder.Append("Z probe: ").Append(DescribeProbeState(probe));
         }
         return new Message(MessageType.Success, builder.ToString());
     }
@@ -2521,6 +2524,22 @@ internal partial class MCodeHandler
     /// </summary>
     /// <param name="endstop">The endstop</param>
     /// <returns>The description</returns>
+    /// <summary>
+    /// How M119 reports the state of a Z probe
+    /// </summary>
+    /// <param name="probe">The probe, or null if none is configured</param>
+    /// <returns>The state</returns>
+    private static string DescribeProbeState(Probe? probe)
+    {
+        if (probe is null || probe.Type == ProbeType.None)
+        {
+            return "not stopped";
+        }
+
+        int reading = probe.Value.Count > 0 ? probe.Value[0] : 0;
+        return reading >= probe.Threshold ? "at min stop" : "not stopped";
+    }
+
     private static string DescribeEndstop(Endstop endstop) => endstop.Type switch
     {
         EndstopType.InputPin => RemoteEndstops.PortsOf(endstop) is { Length: > 1 } ports

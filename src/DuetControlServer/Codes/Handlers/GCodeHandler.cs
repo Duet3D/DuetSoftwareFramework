@@ -28,9 +28,10 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="model">Object model</param>
 /// <param name="planner">Where G-codes become queued moves</param>
 /// <param name="logger">Logger</param>
-internal sealed class GCodeHandler(
+internal sealed partial class GCodeHandler(
     Model.ObjectModel model,
     MovePlanner planner,
+    BedCompensation bedCompensation,
     ILogger<GCodeHandler> logger) : ICodeHandler
 {
     /// <summary>
@@ -74,6 +75,10 @@ internal sealed class GCodeHandler(
                     input.DrivesRelative = code.MajorNumber == 91;
                 }, cancellationToken);
                 return new Message();
+
+            // Set or report the Z probe trigger height, offsets and threshold
+            case 31:
+                return await HandleProbeParametersAsync(code, cancellationToken);
 
             // Set position without moving
             case 92:
@@ -236,6 +241,8 @@ internal sealed class GCodeHandler(
             move.Coords[axis] += model.Move.Axes[axis].Babystep;
         }
 
+        ApplyBedCompensation(move, numAxes);
+
         ApplyExtrusion(code, input, move, unitScale);
 
         // F persists across codes, which is why it is stored on the channel rather than the move
@@ -381,12 +388,16 @@ internal sealed class GCodeHandler(
         MotionParameters parameters = planner.Parameters;
         int numAxes = Math.Min(parameters.NumAxes, model.Move.Axes.Count);
 
+        RemoveBedCompensation(move, numAxes);
+
         for (int axis = 0; axis < numAxes; axis++)
         {
             Axis axisConfig = model.Move.Axes[axis];
 
             // The babystep offset is invisible to the reported coordinates, so it comes back off
-            // whatever was actually commanded
+            // whatever was actually commanded. So does the bed correction, which is why the height
+            // map is inverted first: the correction depends on where the nozzle is, so removing it
+            // has to happen before anything else that shifts the same coordinate
             float commanded = move.Coords[axis] - axisConfig.Babystep;
             axisConfig.MachinePosition = commanded;
             axisConfig.UserPosition = commanded - WorkplaceOffset(axisConfig, model.Move.WorkplaceNumber);
