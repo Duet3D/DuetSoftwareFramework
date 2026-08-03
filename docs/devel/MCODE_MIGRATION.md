@@ -107,10 +107,10 @@ what the machine half now does (or does not yet) do.
 
 | Group | ✅ Done | 🔵 SBC half | Rows (excl. ⛔) |
 |---|---|---|---|
-| §5.1 Motion — drives and axes | 11 | 0 | 26 |
+| §5.1 Motion — drives and axes | 20 | 0 | 26 |
 | §5.2 Motion — kinematics and geometry | 0 | 0 | 12 |
 | §5.3 Motion — compensation and probing | 0 | 0 | 14 |
-| §5.4 Motion — queue, sync and shaping | 0 | 1 | 9 |
+| §5.4 Motion — queue, sync and shaping | 3 | 1 | 9 |
 | §5.5 Heat | 0 | 0 | 19 |
 | §5.6 Fans | 0 | 0 | 3 |
 | §5.7 Tools and filament | 0 | 0 | 14 |
@@ -118,7 +118,7 @@ what the machine half now does (or does not yet) do.
 | §5.9 Job, files and SD | 17 | 4 | 29 |
 | §5.10 Network | 4 | 1 | 13 |
 | §5.11 I/O, expansion and miscellaneous | 5 | 5 | 38 |
-| **Total** | **37** | **11** | **186** |
+| **Total** | **49** | **11** | **186** |
 
 Update these counts as boxes are ticked.
 
@@ -148,11 +148,11 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 
 | M-code | RRF | Purpose | Object model home | Standstill | Status |
 |---|---|---|---|---|---|
-| M17 | 910 | Motors on | `move.axes[].drivers` → CAN `MultipleDrivesRequestDriverStateControl` | no | ⬜ |
-| M18 / M84 | 911 | Motors off, set idle timeout | `move.idle.timeout`, `move.idle.factor` | yes | ⬜ |
+| M17 | 910 | Motors on | `move.axes[].drivers` → CAN `MultipleDrivesRequestDriverStateControl` | no | ✅ |
+| M18 / M84 | 911 | Motors off, set idle timeout | `move.idle.timeout`, `move.idle.factor` | yes | ✅ |
 | M82 | 1600 | Absolute extruder positioning | `inputs[].drivesRelative = false` | no | ⬜ |
 | M83 | 1605 | Relative extruder positioning | `inputs[].drivesRelative = true` | no | ⬜ |
-| M85 | 1612 | Set inactive time | `move.idle.timeout` | no | ⬜ |
+| M85 | 1612 | Set inactive time | `move.idle.timeout` | no | ✅ |
 | M92 | 1615 | Steps per mm | `move.axes[].stepsPerMm`, `move.extruders[].stepsPerMm` → CAN `MultipleDrivesRequestStepsPerUnitAndMicrostepping` | yes | ✅ |
 | M114 | 1945 | Report position | reads `move.axes[].machinePosition` / `userPosition` | no | ⬜ |
 | M120 | 2210 | Push machine state | `inputs[].stack` | no | ⬜ |
@@ -167,13 +167,13 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M221 | 2734 | Extrusion factor override | `move.extruders[].factor` | no | ⬜ |
 | M350 | 2996 | Microstepping | `move.axes[].microstepping` → CAN `MultipleDrivesRequestStepsPerUnitAndMicrostepping` | yes | ✅ |
 | M400 | 3120 | Wait for moves to finish | — (flush and drain) | n/a | ✅ |
-| M569 | 3878 | Driver configuration (direction, mode, timings) | `boards[].drivers[]` → CAN generic `M569Params` (+ `.1`/`.2`/`.4`/`.6`/`.7`) | yes | ⬜ |
+| M569 | 3878 | Driver configuration (direction, mode, timings) | `boards[].drivers[]` → CAN generic `M569Params` (+ `.1`/`.2`/`.4`/`.6`/`.7`) | yes | ✅ |
 | M584 | 3956 | Axis/extruder → driver mapping | `move.axes[].drivers`, `move.extruders[].driver` | yes | ✅ |
 | M906 | 4377 | Motor currents | `move.axes[].current` → CAN `MultipleDrivesRequestMotorCurrents` | no | ✅ |
-| M913 | 4378 | Motor current percentage | `move.axes[].percentCurrent` | no | ⬜ |
-| M915 | 4539 | Stall detection | `boards[].drivers[]` → CAN generic `M915Params`, `CanMessageEnableStallEndstop` | no | ⬜ |
-| M917 | 4380 | Standstill current percentage | `move.axes[].percentStstCurrent` → CAN `MultipleDrivesRequestStandstillCurrentFactor` | no | ⬜ |
-| M970 | 4639 | Phase stepping mode | `move.axes[].phaseStep` → CAN generic `M959Params` | yes | ⬜ |
+| M913 | 4378 | Motor current percentage | `move.axes[].percentCurrent` | no | ✅ |
+| M915 | 4539 | Stall detection | `boards[].drivers[]` → CAN generic `M915Params`, `CanMessageEnableStallEndstop` | no | ✅ |
+| M917 | 4380 | Standstill current percentage | `move.axes[].percentStstCurrent` → CAN `MultipleDrivesRequestStandstillCurrentFactor` | no | ✅ |
+| M970 | 4639 | Phase stepping mode | — | n/a | ✅ reports unsupported, see §8 |
 
 ### 5.2 Motion — kinematics and geometry
 
@@ -215,9 +215,9 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 
 | M-code | RRF | Purpose | Object model home | Standstill | Status |
 |---|---|---|---|---|---|
-| M572 | 3891 | Pressure advance | `move.extruders[].pressureAdvance` → CAN `MultipleDrivesRequestPressureAdvanceV1` | yes | ⬜ |
-| M592 | 3992 | Nonlinear extrusion | `move.extruders[].nonlinear` | yes | ⬜ |
-| M593 | 3997 | Input shaping | `move.shaping` → CAN `CanMessageSetInputShapingV1` | yes | ⬜ |
+| M572 | 3891 | Pressure advance | `move.extruders[].pressureAdvance` → CAN `MultipleDrivesRequestPressureAdvanceV1` | yes | ✅ |
+| M592 | 3992 | Nonlinear extrusion | `move.extruders[].nonlinear` | yes | ✅ |
+| M593 | 3997 | Input shaping | `move.shaping` → CAN `CanMessageSetInputShapingV1` | yes | ✅ |
 | M595 | 4007 | Movement queue size | `move.queue[]` | yes | ⬜ |
 | M596 | 4016 | Select movement queue | `inputs[].motionSystem`, `move.motionSystems[]` | no | ⬜ only a post-execution OM re-sync exists |
 | M597 | 4020 | Collision avoidance | needs new field — §6 | no | ⬜ |
@@ -416,8 +416,8 @@ Each phase leaves the tree in a state where the machine is more usable than befo
 1. ~~**Phase 1 — make an axis movable.** M92, M201, M203, M204, M205/M566, M208, M350, M400, M584,
    M906.~~ **Done** — see §8. Lives in
    [MCodeHandler.Motion.cs](../../src/DuetControlServer/Codes/Handlers/MCodeHandler.Motion.cs).
-2. **Phase 2 — driver detail.** M17, M18/M84, M85, M569, M913, M915, M917, M970, M572, M593, M592.
-   All of these are CAN-message-shaped and the generated helpers already exist.
+2. ~~**Phase 2 — driver detail.** M17, M18/M84, M85, M569, M913, M915, M917, M970, M572, M593, M592.~~
+   **Done** — see §8.
 3. **Phase 3 — interpreter state and reporting.** M82, M83, M114, M120, M121, M220, M221, M290, M425,
    M556, M564.
 4. **Phase 4 — geometry.** M667, M669 (Cartesian and CoreXY first), M671, M673-M675; then the delta
@@ -478,6 +478,35 @@ than extending an already long switch. Nothing outside the assembly referenced i
 the S-curve flag (`SUPPORT_3RD_ORDER`), M584's `MinVisibleAxes` lower bound, and M350/M92's
 recalculation of backlash steps (`UpdateBacklashSteps`) — backlash arrives with M425 in phase 3.
 M906's `I` and `T` set `move.idle`, but nothing acts on idle current yet; that needs M18/M84 in phase 2.
+
+### Phase 2 (M17, M18/M84, M85, M569, M572, M592, M593, M913, M915, M917, M970)
+
+**M970 can never work here and now says so.** RepRapFirmware refuses phase stepping for any axis
+with a remote driver (`Move::SetStepMode` returns false the moment it sees one), because the mode
+drives the motor coils directly from the main board. Every driver is remote in this architecture, so
+the code reports that phase stepping is not supported on CAN-connected drivers rather than pretending
+to configure it. The mapping this document previously gave for it was wrong twice over: `M959Params`
+is the expansion board *connection timeout*, not phase stepping.
+
+**M569 is repackaged rather than reimplemented.** Every parameter of it belongs to the driver, so the
+code is turned straight into the CAN message its parameter table describes — the generated
+`ICanGenericMessage.FromCode` does that — and answered by the board that owns the driver. The
+sub-codes `.1`, `.2`, `.4`, `.6` and `.7` are separate message types over the same mechanism. Nothing
+is mirrored into the object model: the driver's configuration is the board's, and what this side
+records is the mapping M584 wrote.
+
+**M906, M913 and M917 are one handler.** They differ only in which current they address, which is
+also true in RepRapFirmware. M913 is a percentage of the configured current rather than a setting of
+its own on the driver, so both M906 and M913 send the resulting current in mA; only M917 has a
+message of its own.
+
+**M915's driver bitmap is set here, not taken from the code.** Its parameter table names the bitmap
+`d` in lowercase precisely so `FromCode` never picks it up from a G-code — it is the board's own
+driver numbering, which only this side can work out after grouping the drivers by board.
+
+**M593 writes the configuration, not the impulses.** `move.shaping` carries type, frequency and
+damping; the amplitudes and delays are the motion engine's to derive. Naming a frequency or damping
+without a type switches the shaper on, as in RRF.
 
 ### Removing the DSF/RRF split
 

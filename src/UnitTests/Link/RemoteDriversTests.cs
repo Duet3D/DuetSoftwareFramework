@@ -83,6 +83,23 @@ public class RemoteDriversTests
     }
 
     [Test]
+    public void TheGroupingCarriesWhateverValueTypeAMessageNeeds()
+    {
+        // Driver state control sends a mode and an idle percentage per driver rather than one number,
+        // so the grouping has to order a composite value by driver just as it does a scalar
+        RemoteDrivers.DriverValue<(ushort Mode, ushort Idle)>[] states =
+        [
+            new(new DriverId(2, 1), (2, 60)),
+            new(new DriverId(2, 0), (0, 30))
+        ];
+
+        (byte board, ushort bitmap, (ushort Mode, ushort Idle)[] values) = RemoteDrivers.GroupByBoard(states).Single();
+        Assert.That(board, Is.EqualTo(2));
+        Assert.That(bitmap, Is.EqualTo(0b011));
+        Assert.That(values, Is.EqualTo(new[] { ((ushort)0, (ushort)30), ((ushort)2, (ushort)60) }));
+    }
+
+    [Test]
     public void NoDriversProducesNoMessages()
     {
         Assert.That(RemoteDrivers.GroupByBoard<int>([]), Is.Empty);

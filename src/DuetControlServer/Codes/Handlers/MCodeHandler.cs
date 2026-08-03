@@ -124,6 +124,10 @@ internal partial class MCodeHandler(
             38 => await HandleFileChecksumAsync(code, cancellationToken),
             // Report SD card information
             39 => await HandleSDCardInfoAsync(code, cancellationToken),
+            // Motors on / motors off
+            17 or 18 or 84 => await HandleDriverStateAsync(code, cancellationToken),
+            // Set the idle timeout
+            85 => await HandleIdleTimeoutAsync(code, cancellationToken),
             // Set steps per mm
             92 => await HandleStepsPerMmAsync(code, cancellationToken),
             // Flag current macro file as (not) pausable
@@ -174,14 +178,26 @@ internal partial class MCodeHandler(
             552 => await HandleSetIPAddressAsync(code, cancellationToken),
             // Configure external trigger
             581 => await HandleConfigureTriggerAsync(code, cancellationToken),
+            // Configure a stepper driver
+            569 => await HandleDriverConfigAsync(code, cancellationToken),
+            // Set pressure advance
+            572 => await HandlePressureAdvanceAsync(code, cancellationToken),
             // Map axes and extruders onto stepper drivers
             584 => await HandleDriveMappingAsync(code, cancellationToken),
+            // Configure nonlinear extrusion
+            592 => await HandleNonlinearExtrusionAsync(code, cancellationToken),
+            // Configure input shaping
+            593 => await HandleInputShapingAsync(code, cancellationToken),
             // Configure network protocols
             586 => await HandleNetworkProtocolsAsync(code, cancellationToken),
             // Fork input reader
             606 => await HandleForkInputReaderAsync(code, cancellationToken),
-            // Set motor currents
-            906 => await HandleMotorCurrentsAsync(code, cancellationToken),
+            // Set motor currents, current percentage and standstill current percentage
+            906 or 913 or 917 => await HandleMotorCurrentsAsync(code, cancellationToken),
+            // Configure stall detection
+            915 => await HandleStallDetectionAsync(code, cancellationToken),
+            // Configure phase stepping
+            970 => await HandlePhaseSteppingAsync(code, cancellationToken),
             // Start/stop event logging to SD card
             929 => await HandleEventLoggingAsync(code, cancellationToken),
             // Configure CAN

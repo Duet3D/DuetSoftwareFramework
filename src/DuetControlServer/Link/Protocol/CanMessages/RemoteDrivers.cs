@@ -104,6 +104,89 @@ internal static class RemoteDrivers
     }
 
     /// <summary>
+    /// Enable, idle or disable a number of drivers (M17, M18, M84)
+    /// </summary>
+    /// <param name="linkInterface">Link interface</param>
+    /// <param name="values">Drivers and the state to put each in, with the idle current percentage</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>What the boards reported, empty if they were all happy</returns>
+    public static async ValueTask<IList<string>> SetDriverStatesAsync(LinkInterface linkInterface,
+                                                                     IEnumerable<DriverValue<(ushort Mode, ushort IdlePercent)>> values,
+                                                                     CancellationToken cancellationToken = default)
+    {
+        List<string> replies = [];
+        foreach ((byte board, ushort bitmap, (ushort Mode, ushort IdlePercent)[] ordered) in GroupByBoard(values))
+        {
+            CanMessageMultipleDrivesRequestDriverStateControl message = new()
+            {
+                DriversToUpdate = bitmap
+            };
+            for (int i = 0; i < ordered.Length; i++)
+            {
+                message.Values[i].Set(ordered[i].Mode, ordered[i].IdlePercent);
+            }
+
+            await SendAsync(linkInterface, board, message, replies, cancellationToken);
+        }
+        return replies;
+    }
+
+    /// <summary>
+    /// Set the standstill current percentage of a number of drivers (M917)
+    /// </summary>
+    /// <param name="linkInterface">Link interface</param>
+    /// <param name="values">Drivers and their standstill current percentages</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>What the boards reported, empty if they were all happy</returns>
+    public static async ValueTask<IList<string>> SetStandstillCurrentFactorAsync(LinkInterface linkInterface,
+                                                                                IEnumerable<DriverValue<float>> values,
+                                                                                CancellationToken cancellationToken = default)
+    {
+        List<string> replies = [];
+        foreach ((byte board, ushort bitmap, float[] ordered) in GroupByBoard(values))
+        {
+            CanMessageMultipleDrivesRequestStandstillCurrentFactor message = new()
+            {
+                DriversToUpdate = bitmap
+            };
+            for (int i = 0; i < ordered.Length; i++)
+            {
+                message.Values[i] = ordered[i];
+            }
+
+            await SendAsync(linkInterface, board, message, replies, cancellationToken);
+        }
+        return replies;
+    }
+
+    /// <summary>
+    /// Set the pressure advance of a number of extruder drivers (M572)
+    /// </summary>
+    /// <param name="linkInterface">Link interface</param>
+    /// <param name="values">Drivers and their pressure advance in seconds</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>What the boards reported, empty if they were all happy</returns>
+    public static async ValueTask<IList<string>> SetPressureAdvanceAsync(LinkInterface linkInterface, IEnumerable<DriverValue<float>> values,
+                                                                        CancellationToken cancellationToken = default)
+    {
+        List<string> replies = [];
+        foreach ((byte board, ushort bitmap, float[] ordered) in GroupByBoard(values))
+        {
+            CanMessageMultipleDrivesRequestPressureAdvanceV1 message = new()
+            {
+                DriversToUpdate = bitmap
+            };
+            for (int i = 0; i < ordered.Length; i++)
+            {
+                message.Values[i] = ordered[i];
+            }
+
+            await SendAsync(linkInterface, board, message, replies, cancellationToken);
+        }
+        return replies;
+    }
+
+    /// <summary>
     /// Send one message and collect anything the board said about it
     /// </summary>
     /// <typeparam name="TMessage">Type of the CAN message</typeparam>

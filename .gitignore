@@ -292,3 +292,5 @@ src/DuetAPI/Generated
 aot/out
 
 build/
+# Claude Code worktrees are local scratch, not part of the repository
+.claude/worktrees/

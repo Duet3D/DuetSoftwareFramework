@@ -1,6 +1,8 @@
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Link.Protocol.CanMessages;
+using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Link;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -53,6 +55,12 @@ internal partial class MCodeHandler
 
     /// <summary>Seconds per minute, for the object model's mm/min speeds</summary>
     private const float SecondsPerMinute = 60.0f;
+
+    /// <summary>Lowest input shaping frequency RepRapFirmware accepts, in Hz</summary>
+    private const float MinShapingFrequency = 1.0f;
+
+    /// <summary>Highest input shaping frequency RepRapFirmware accepts, in Hz</summary>
+    private const float MaxShapingFrequency = 1000.0f;
 
     /// <summary>
     /// M92: set or report the steps per mm of each drive
@@ -655,8 +663,12 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
-    /// M906: set or report the motor current of each drive, and how it is reduced when idle
+    /// M906, M913 and M917: set or report the motor currents
     /// </summary>
+    /// <remarks>
+    /// The three differ only in which current they address: M906 the current in mA, M913 that as a
+    /// percentage of normal, and M917 the percentage held while the motor is standing still
+    /// </remarks>
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
@@ -671,6 +683,7 @@ internal partial class MCodeHandler
             throw new OperationCanceledException();
         }
 
+        int which = code.MajorNumber ?? 906;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             Move move = model.Move;
@@ -679,10 +692,10 @@ internal partial class MCodeHandler
             {
                 if (code.TryGetFloat(axis.Letter, out float value))
                 {
-                    axis.Current = (int)MathF.Round(MathF.Max(value, 0.0f));
+                    SetCurrent(axis, which, value);
                     foreach (DriverId driver in axis.Drivers)
                     {
-                        toUpdate.Add(new RemoteDrivers.DriverValue<float>(driver, axis.Current));
+                        toUpdate.Add(new RemoteDrivers.DriverValue<float>(driver, CurrentToSend(axis, which)));
                     }
                     seen = true;
                 }
@@ -693,34 +706,46 @@ internal partial class MCodeHandler
                 for (int i = 0; i < extruderValues.Length; i++)
                 {
                     Extruder extruder = move.Extruders[i];
-                    extruder.Current = (int)MathF.Round(MathF.Max(extruderValues[i], 0.0f));
+                    SetCurrent(extruder, which, extruderValues[i]);
                     if (extruder.Driver is not null)
                     {
-                        toUpdate.Add(new RemoteDrivers.DriverValue<float>(extruder.Driver, extruder.Current));
+                        toUpdate.Add(new RemoteDrivers.DriverValue<float>(extruder.Driver, CurrentToSend(extruder, which)));
                     }
                 }
                 seen = true;
             }
 
-            if (code.TryGetFloatLimited('I', 0.0f, 100.0f, out float idleFactor))
+            if (which == 906)
             {
-                move.Idle.Factor = idleFactor / 100.0f;
-                seen = true;
-            }
-            if (code.TryGetFloat('T', out float idleTimeout))
-            {
-                move.Idle.Timeout = MathF.Max(idleTimeout, 0.0f);
-                seen = true;
+                if (code.TryGetFloatLimited('I', 0.0f, 100.0f, out float idleFactor))
+                {
+                    move.Idle.Factor = idleFactor / 100.0f;
+                    seen = true;
+                }
+                if (code.TryGetFloat('T', out float idleTimeout))
+                {
+                    move.Idle.Timeout = MathF.Max(idleTimeout, 0.0f);
+                    seen = true;
+                }
             }
 
             if (!seen)
             {
-                report = ReportPerDrive(move, "Motor current (mA) - ",
-                                        axis => axis.Current.ToString(CultureInfo.InvariantCulture),
-                                        extruder => extruder.Current.ToString(CultureInfo.InvariantCulture),
-                                        axisSeparator: ":", extruderHeader: "E", firstExtruderSeparator: ":")
-                         + string.Format(CultureInfo.InvariantCulture, ", idle factor {0}%, timeout {1:F1} sec",
-                                         (int)(move.Idle.Factor * 100.0f), move.Idle.Timeout);
+                string prefix = which switch
+                {
+                    913 => "Motor current % of normal - ",
+                    917 => "Motor standstill current % of normal - ",
+                    _ => "Motor current (mA) - "
+                };
+                report = ReportPerDrive(move, prefix,
+                                        axis => CurrentOf(axis, which).ToString(CultureInfo.InvariantCulture),
+                                        extruder => CurrentOf(extruder, which).ToString(CultureInfo.InvariantCulture),
+                                        axisSeparator: ":", extruderHeader: "E", firstExtruderSeparator: ":");
+                if (which == 906)
+                {
+                    report += string.Format(CultureInfo.InvariantCulture, ", idle factor {0}%, timeout {1:F1} sec",
+                                            (int)(move.Idle.Factor * 100.0f), move.Idle.Timeout);
+                }
             }
         }
 
@@ -728,7 +753,458 @@ internal partial class MCodeHandler
         {
             return new Message(MessageType.Success, report!);
         }
-        return await UpdateRemoteDriversAsync(toUpdate, cancellationToken);
+
+        // The standstill percentage is its own setting on the driver; the other two both end up as
+        // the current the driver should run at
+        IList<string> replies = which == 917
+            ? await RemoteDrivers.SetStandstillCurrentFactorAsync(linkInterface, toUpdate, cancellationToken)
+            : await RemoteDrivers.SetMotorCurrentsAsync(linkInterface, toUpdate, cancellationToken);
+        return replies.Count > 0 ? new Message(MessageType.Warning, string.Join('\n', replies)) : new Message();
+    }
+
+    /// <summary>
+    /// M17, M18 and M84: energise or de-energise the motors, and set the idle timeout
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// Naming no drive applies the code to every drive, which is what makes a bare M18 turn the whole
+    /// machine off. A de-energised axis is no longer known to be where it says it is, so it stops
+    /// counting as homed
+    /// </remarks>
+    private async ValueTask<Message?> HandleDriverStateAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        bool enable = code.MajorNumber == 17;
+        List<RemoteDrivers.DriverValue<(ushort, ushort)>> toUpdate = [];
+
+        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
+        {
+            throw new OperationCanceledException();
+        }
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Move move = model.Move;
+
+            if (code.TryGetFloat('S', out float idleTimeout))
+            {
+                move.Idle.Timeout = MathF.Max(idleTimeout, 0.0f);
+            }
+
+            ushort mode = enable ? DriverStateControl.DriverActive : DriverStateControl.DriverDisabled;
+            ushort idlePercent = (ushort)Math.Clamp((int)MathF.Round(move.Idle.Factor * 100.0f), 0, 100);
+
+            bool named = false;
+            foreach (Axis axis in move.Axes)
+            {
+                if (code.HasParameter(axis.Letter))
+                {
+                    named = true;
+                    ApplyDriverState(toUpdate, axis.Drivers, mode, idlePercent);
+                    if (!enable)
+                    {
+                        axis.Homed = false;
+                    }
+                }
+            }
+
+            if (code.TryGetIntArray('E', out int[]? extruders) && extruders.Length > 0)
+            {
+                named = true;
+                foreach (int extruder in extruders)
+                {
+                    if (extruder < 0 || extruder >= move.Extruders.Count)
+                    {
+                        return new Message(MessageType.Error, $"Invalid extruder number specified: {extruder}");
+                    }
+                    AddDriverState(toUpdate, move.Extruders[extruder].Driver, mode, idlePercent);
+                }
+            }
+
+            if (!named)
+            {
+                // No drive named, so this is about all of them
+                foreach (Axis axis in move.Axes)
+                {
+                    ApplyDriverState(toUpdate, axis.Drivers, mode, idlePercent);
+                    if (!enable)
+                    {
+                        axis.Homed = false;
+                    }
+                }
+                foreach (Extruder extruder in move.Extruders)
+                {
+                    AddDriverState(toUpdate, extruder.Driver, mode, idlePercent);
+                }
+            }
+        }
+
+        if (toUpdate.Count == 0)
+        {
+            return new Message();
+        }
+
+        IList<string> replies = await RemoteDrivers.SetDriverStatesAsync(linkInterface, toUpdate, cancellationToken);
+        return replies.Count > 0 ? new Message(MessageType.Warning, string.Join('\n', replies)) : new Message();
+    }
+
+    /// <summary>
+    /// M85: set the idle timeout
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    private async ValueTask<Message?> HandleIdleTimeoutAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (!code.TryGetFloat('S', out float timeout))
+            {
+                return new Message(MessageType.Success,
+                                   string.Format(CultureInfo.InvariantCulture, "Idle timeout {0:F1} sec", model.Move.Idle.Timeout));
+            }
+            model.Move.Idle.Timeout = MathF.Max(timeout, 0.0f);
+        }
+        return new Message();
+    }
+
+    /// <summary>
+    /// M569: configure a stepper driver
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// Every parameter of this code belongs to the driver rather than to this side, so the whole code
+    /// is repackaged into the CAN message its table describes and answered by the board that owns the
+    /// driver. The sub-codes are separate message types over the same mechanism
+    /// </remarks>
+    private async ValueTask<Message?> HandleDriverConfigAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        if (!code.TryGetDriverId('P', out DriverId? driver))
+        {
+            return new Message(MessageType.Error, "Missing P parameter");
+        }
+
+        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
+        {
+            throw new OperationCanceledException();
+        }
+
+        // The driver's own configuration is the board's to keep, so nothing is mirrored here. What
+        // this side records is the mapping, which M584 wrote
+        CanResponse response;
+        try
+        {
+            response = code.MinorNumber switch
+            {
+                <= 0 => await SendDriverConfigAsync<CanMessageM569>(driver, code, cancellationToken),
+                1 => await SendDriverConfigAsync<CanMessageM569Point1>(driver, code, cancellationToken),
+                2 => await SendDriverConfigAsync<CanMessageM569Point2>(driver, code, cancellationToken),
+                4 => await SendDriverConfigAsync<CanMessageM569Point4>(driver, code, cancellationToken),
+                6 => await SendDriverConfigAsync<CanMessageM569Point6>(driver, code, cancellationToken),
+                7 => await SendDriverConfigAsync<CanMessageM569Point7>(driver, code, cancellationToken),
+                _ => throw new NotSupportedException($"M569.{code.MinorNumber} is not supported")
+            };
+        }
+        catch (NotSupportedException e)
+        {
+            return new Message(MessageType.Error, e.Message);
+        }
+        catch (CanGenericParamException e)
+        {
+            return new Message(MessageType.Error, e.Message);
+        }
+
+        return new Message(MessageType.Success, response.PayloadString);
+    }
+
+    /// <summary>
+    /// Repackage a code as a generic CAN message and send it to the board carrying the driver
+    /// </summary>
+    /// <typeparam name="TMessage">Type of the CAN message</typeparam>
+    /// <param name="driver">Driver the code addresses</param>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>What the board replied</returns>
+    private async ValueTask<CanResponse> SendDriverConfigAsync<TMessage>(DriverId driver, Commands.Code code, CancellationToken cancellationToken)
+        where TMessage : struct, ICanGenericMessage<TMessage>
+    {
+        TMessage message = default;
+        message.FromCode(code);
+        return await linkInterface.SendCanMessageAsync((byte)driver.Board, in message, CanMessageType.StandardReply,
+                                                       cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// M915: configure stall detection
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// The drivers may be named directly with P or by the axes they belong to, and either way they
+    /// have to be grouped by the board that carries them before the message can go out
+    /// </remarks>
+    private async ValueTask<Message?> HandleStallDetectionAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        List<DriverId> drivers = [];
+
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            if (code.TryGetDriverIdArray('P', out DriverId[]? named))
+            {
+                drivers.AddRange(named);
+            }
+
+            foreach (Axis axis in model.Move.Axes)
+            {
+                if (code.HasParameter(axis.Letter))
+                {
+                    drivers.AddRange(axis.Drivers);
+                }
+            }
+        }
+
+        if (drivers.Count == 0)
+        {
+            return new Message(MessageType.Error, "No drivers specified");
+        }
+
+        List<string> replies = [];
+        foreach (IGrouping<int, DriverId> board in drivers.GroupBy(driver => driver.Board))
+        {
+            CanMessageM915 message = default;
+            try
+            {
+                message.FromCode(code);
+            }
+            catch (CanGenericParamException e)
+            {
+                return new Message(MessageType.Error, e.Message);
+            }
+
+            // 'd' is lowercase in the table so that it is never taken from the code: it is the bitmap
+            // of the board's own driver numbers, which only this side can work out
+            ushort bitmap = 0;
+            foreach (DriverId driver in board)
+            {
+                bitmap |= (ushort)(1 << driver.Port);
+            }
+            message.d = bitmap;
+
+            CanResponse response = await linkInterface.SendCanMessageAsync((byte)board.Key, in message, CanMessageType.StandardReply,
+                                                                           cancellationToken: cancellationToken);
+            if (!string.IsNullOrWhiteSpace(response.PayloadString))
+            {
+                replies.Add(response.PayloadString);
+            }
+        }
+        return new Message(MessageType.Success, string.Join('\n', replies));
+    }
+
+    /// <summary>
+    /// M970: configure phase stepping
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// Phase stepping drives the motor coils directly from the main board and cannot be done over
+    /// CAN, which RepRapFirmware enforces by refusing the mode for any axis with a remote driver.
+    /// Every driver is remote here, so there is nothing this can ever do
+    /// </remarks>
+    private ValueTask<Message?> HandlePhaseSteppingAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        _ = code;
+        _ = cancellationToken;
+        return ValueTask.FromResult<Message?>(new Message(MessageType.Error,
+            "Phase stepping is not supported on CAN-connected drivers"));
+    }
+
+    /// <summary>
+    /// M572: set or report the pressure advance of each extruder
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    private async ValueTask<Message?> HandlePressureAdvanceAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        if (!code.TryGetFloat('S', out float pressureAdvance))
+        {
+            using (await model.AccessReadOnlyAsync(cancellationToken))
+            {
+                StringBuilder report = new("Pressure advance ");
+                string separator = string.Empty;
+                foreach (Extruder extruder in model.Move.Extruders)
+                {
+                    report.Append(separator).Append(extruder.PressAdv.K0.ToString("F3", CultureInfo.InvariantCulture));
+                    separator = ":";
+                }
+                return new Message(MessageType.Success, report.Append(" sec").ToString());
+            }
+        }
+
+        if (pressureAdvance < 0.0f)
+        {
+            return new Message(MessageType.Error, "pressure advance values must be non-negative");
+        }
+
+        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
+        {
+            throw new OperationCanceledException();
+        }
+
+        List<RemoteDrivers.DriverValue<float>> toUpdate = [];
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Move move = model.Move;
+
+            // D names the extruders to change; without it every extruder is set
+            bool hasSelection = code.TryGetIntArray('D', out int[]? selected);
+            for (int extruder = 0; extruder < move.Extruders.Count; extruder++)
+            {
+                if (hasSelection && !selected!.Contains(extruder))
+                {
+                    continue;
+                }
+
+                Extruder e = move.Extruders[extruder];
+                e.PressAdv.K0 = pressureAdvance;
+                if (e.Driver is not null)
+                {
+                    toUpdate.Add(new RemoteDrivers.DriverValue<float>(e.Driver, pressureAdvance));
+                }
+            }
+        }
+
+        await planner.ReconfigureAsync(cancellationToken);
+
+        if (toUpdate.Count == 0)
+        {
+            return new Message();
+        }
+
+        IList<string> replies = await RemoteDrivers.SetPressureAdvanceAsync(linkInterface, toUpdate, cancellationToken);
+        return replies.Count > 0 ? new Message(MessageType.Warning, string.Join('\n', replies)) : new Message();
+    }
+
+    /// <summary>
+    /// M592: configure nonlinear extrusion
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    private async ValueTask<Message?> HandleNonlinearExtrusionAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        if (!code.TryGetInt('D', out int extruderNumber))
+        {
+            return new Message(MessageType.Error, "Missing D parameter");
+        }
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (extruderNumber < 0 || extruderNumber >= model.Move.Extruders.Count)
+            {
+                return new Message(MessageType.Error, $"Invalid extruder number '{extruderNumber}'");
+            }
+
+            ExtruderNonlinear nonlinear = model.Move.Extruders[extruderNumber].Nonlinear;
+            bool seen = false;
+            if (code.TryGetFloat('A', out float a))
+            {
+                nonlinear.A = a;
+                seen = true;
+            }
+            if (code.TryGetFloat('B', out float b))
+            {
+                nonlinear.B = b;
+                seen = true;
+            }
+            if (code.TryGetFloat('L', out float limit))
+            {
+                nonlinear.UpperLimit = limit;
+                seen = true;
+            }
+
+            if (!seen)
+            {
+                return new Message(MessageType.Success,
+                                   string.Format(CultureInfo.InvariantCulture,
+                                                 "Extruder {0} nonlinear extrusion A={1:F3} B={2:F3}, limit {3:F2}",
+                                                 extruderNumber, nonlinear.A, nonlinear.B, nonlinear.UpperLimit));
+            }
+        }
+        return new Message();
+    }
+
+    /// <summary>
+    /// M593: configure input shaping
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// The shaper's impulses are computed by the motion engine from the type, frequency and damping,
+    /// so what this writes is the configuration rather than the impulses themselves
+    /// </remarks>
+    private async ValueTask<Message?> HandleInputShapingAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        bool seen = false;
+        string? report = null;
+
+        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
+        {
+            throw new OperationCanceledException();
+        }
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            InputShaping shaping = model.Move.Shaping;
+
+            if (code.TryGetString('P', out string? typeName))
+            {
+                if (!Enum.TryParse(typeName, true, out InputShapingType type))
+                {
+                    return new Message(MessageType.Error, $"Unknown input shaper type '{typeName}'");
+                }
+                shaping.Type = type;
+                seen = true;
+            }
+            if (code.TryGetFloatLimited('F', MinShapingFrequency, MaxShapingFrequency, out float frequency))
+            {
+                shaping.Frequency = frequency;
+                seen = true;
+            }
+            if (code.TryGetFloatLimited('S', 0.0f, 0.99f, out float damping))
+            {
+                shaping.Damping = damping;
+                seen = true;
+            }
+
+            // Naming a frequency or damping without a type is how a shaper gets switched on
+            if (seen && shaping.Type == InputShapingType.None)
+            {
+                shaping.Type = InputShapingType.ZVD;
+            }
+
+            if (!seen)
+            {
+                report = shaping.Type == InputShapingType.None
+                    ? "Input shaping is disabled"
+                    : string.Format(CultureInfo.InvariantCulture, "Input shaping '{0}' at {1:F1}Hz damping factor {2:F2}",
+                                    shaping.Type.ToString().ToLowerInvariant(), shaping.Frequency, shaping.Damping);
+            }
+        }
+
+        if (!seen)
+        {
+            return new Message(MessageType.Success, report!);
+        }
+
+        await planner.ReconfigureAsync(cancellationToken);
+        return new Message();
     }
 
     #region Helpers
@@ -888,6 +1364,119 @@ internal partial class MCodeHandler
             return false;
         }
         return true;
+    }
+
+    /// <summary>
+    /// Apply one of the three current settings to an axis
+    /// </summary>
+    /// <param name="axis">The axis</param>
+    /// <param name="which">906, 913 or 917</param>
+    /// <param name="value">The value as given</param>
+    private static void SetCurrent(Axis axis, int which, float value)
+    {
+        switch (which)
+        {
+            case 913: axis.PercentCurrent = ClampPercent(value); break;
+            case 917: axis.PercentStstCurrent = ClampPercent(value); break;
+            default: axis.Current = (int)MathF.Round(MathF.Max(value, 0.0f)); break;
+        }
+    }
+
+    /// <summary>
+    /// Apply one of the three current settings to an extruder
+    /// </summary>
+    /// <param name="extruder">The extruder</param>
+    /// <param name="which">906, 913 or 917</param>
+    /// <param name="value">The value as given</param>
+    private static void SetCurrent(Extruder extruder, int which, float value)
+    {
+        switch (which)
+        {
+            case 913: extruder.PercentCurrent = ClampPercent(value); break;
+            case 917: extruder.PercentStstCurrent = ClampPercent(value); break;
+            default: extruder.Current = (int)MathF.Round(MathF.Max(value, 0.0f)); break;
+        }
+    }
+
+    /// <summary>Read back whichever current setting a code addresses on an axis</summary>
+    /// <param name="axis">The axis</param>
+    /// <param name="which">906, 913 or 917</param>
+    /// <returns>The value</returns>
+    private static int CurrentOf(Axis axis, int which) => which switch
+    {
+        913 => axis.PercentCurrent,
+        917 => axis.PercentStstCurrent ?? 0,
+        _ => axis.Current
+    };
+
+    /// <summary>Read back whichever current setting a code addresses on an extruder</summary>
+    /// <param name="extruder">The extruder</param>
+    /// <param name="which">906, 913 or 917</param>
+    /// <returns>The value</returns>
+    private static int CurrentOf(Extruder extruder, int which) => which switch
+    {
+        913 => extruder.PercentCurrent,
+        917 => extruder.PercentStstCurrent ?? 0,
+        _ => extruder.Current
+    };
+
+    /// <summary>
+    /// The value to send to a driver after a current setting changed
+    /// </summary>
+    /// <param name="axis">The axis</param>
+    /// <param name="which">906, 913 or 917</param>
+    /// <returns>Standstill percentage for M917, otherwise the current in mA</returns>
+    /// <remarks>
+    /// M913 is a percentage of the configured current rather than a setting of its own on the driver,
+    /// so what goes out for both M906 and M913 is the resulting current
+    /// </remarks>
+    private static float CurrentToSend(Axis axis, int which)
+        => which == 917 ? axis.PercentStstCurrent ?? 0 : axis.Current * axis.PercentCurrent / 100.0f;
+
+    /// <summary>
+    /// The value to send to an extruder's driver after a current setting changed
+    /// </summary>
+    /// <param name="extruder">The extruder</param>
+    /// <param name="which">906, 913 or 917</param>
+    /// <returns>Standstill percentage for M917, otherwise the current in mA</returns>
+    private static float CurrentToSend(Extruder extruder, int which)
+        => which == 917 ? extruder.PercentStstCurrent ?? 0 : extruder.Current * extruder.PercentCurrent / 100.0f;
+
+    /// <summary>Clamp a percentage to the range a driver accepts</summary>
+    /// <param name="value">The value as given</param>
+    /// <returns>The clamped percentage</returns>
+    private static int ClampPercent(float value) => Math.Clamp((int)MathF.Round(value), 0, 100);
+
+    /// <summary>
+    /// Note that every driver of an axis needs to be put into a given state
+    /// </summary>
+    /// <param name="toUpdate">List being built</param>
+    /// <param name="drivers">The axis' drivers</param>
+    /// <param name="mode">Driver state to apply</param>
+    /// <param name="idlePercent">Idle current percentage</param>
+    private static void ApplyDriverState(List<RemoteDrivers.DriverValue<(ushort, ushort)>> toUpdate, IEnumerable<DriverId> drivers,
+                                         ushort mode, ushort idlePercent)
+    {
+        foreach (DriverId driver in drivers)
+        {
+            AddDriverState(toUpdate, driver, mode, idlePercent);
+        }
+    }
+
+    /// <summary>
+    /// Note that one driver needs to be put into a given state
+    /// </summary>
+    /// <param name="toUpdate">List being built</param>
+    /// <param name="driver">The driver, or null if the drive has none assigned</param>
+    /// <param name="mode">Driver state to apply</param>
+    /// <param name="idlePercent">Idle current percentage</param>
+    private static void AddDriverState(List<RemoteDrivers.DriverValue<(ushort, ushort)>> toUpdate, DriverId? driver,
+                                       ushort mode, ushort idlePercent)
+    {
+        if (driver is not null)
+        {
+            toUpdate.Add(new RemoteDrivers.DriverValue<(ushort, ushort)>(driver, (mode, idlePercent)));
+        }
     }
 
     /// <summary>
