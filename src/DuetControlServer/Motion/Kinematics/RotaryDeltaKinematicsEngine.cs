@@ -342,4 +342,32 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
             _rodSquaredMinusArmSquared[tower] = _rodSquared[tower] - (_armLengths[tower] * _armLengths[tower]);
         }
     }
+
+    /// <summary>
+    /// Which macro to run next to home some of a set of axes
+    /// </summary>
+    /// <param name="toBeHomed">Axes still to home, as a bitmap</param>
+    /// <param name="alreadyHomed">Axes already homed, as a bitmap</param>
+    /// <param name="axisLetters">Letter of each axis, in axis order</param>
+    /// <param name="fileName">The macro to run</param>
+    /// <returns>Axes that have to be homed first, always none here</returns>
+    /// <remarks>
+    /// Homing one tower of a delta is meaningless: no carriage moves without the other two, and the
+    /// effector is only where the three of them put it. So any of X, Y or Z homes all of them
+    /// </remarks>
+    public override uint GetHomingFileName(uint toBeHomed, uint alreadyHomed, ReadOnlySpan<char> axisLetters,
+                                           out string fileName)
+    {
+        const uint xyz = 0b111;
+        if ((toBeHomed & xyz) != 0)
+        {
+            fileName = "homedelta.g";
+            return 0;
+        }
+        return base.GetHomingFileName(toBeHomed, alreadyHomed, axisLetters, out fileName);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>All three towers, because a delta has no axis that moves a motor of its own</remarks>
+    public override uint AxesToHomeBeforeProbing => 0b111;
 }

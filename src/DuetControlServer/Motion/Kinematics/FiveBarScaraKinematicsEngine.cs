@@ -579,4 +579,24 @@ internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
     /// <remarks>Twice the signed area of the triangle, which is the cross product of the two legs</remarks>
     private static float Turn(float x1, float y1, float x2, float y2, float x3, float y3)
         => ((x2 - x1) * (y3 - y1)) - ((y2 - y1) * (x3 - x1));
+
+    /// <summary>
+    /// Which macro to run next to home some of a set of axes
+    /// </summary>
+    /// <param name="toBeHomed">Axes still to home, as a bitmap</param>
+    /// <param name="alreadyHomed">Axes already homed, as a bitmap</param>
+    /// <param name="axisLetters">Letter of each axis, in axis order</param>
+    /// <param name="fileName">The macro to run</param>
+    /// <returns>Axes that have to be homed first</returns>
+    /// <remarks>
+    /// The two arms are linked through the bar between them, so neither can be homed on its own. One
+    /// macro homes the mechanism however much of it was asked for
+    /// </remarks>
+    public override uint GetHomingFileName(uint toBeHomed, uint alreadyHomed, ReadOnlySpan<char> axisLetters,
+                                           out string fileName)
+    {
+        uint mustHomeFirst = base.GetHomingFileName(toBeHomed, alreadyHomed, axisLetters, out fileName);
+        fileName = "home5barscara.g";
+        return mustHomeFirst;
+    }
 }

@@ -156,4 +156,88 @@ public class HeightMapTests
             Assert.That(deviation, Is.GreaterThan(0.0f));
         });
     }
+
+    [Test]
+    public void AGridBecomesTheRightNumberOfPoints()
+    {
+        // The point count is derived from the range and spacing rather than given, so a grid that
+        // does not divide evenly still has to come out with the points that fit inside it
+        HeightMap map = HeightMap.Over(['X', 'Y'], [0.0f, 0.0f], [20.0f, 25.0f], [10.0f, 10.0f], -1.0f);
+        Assert.Multiple(() =>
+        {
+            Assert.That(map.Nums, Is.EqualTo(new[] { 3, 3 }), "25mm at 10mm spacing fits three points");
+            Assert.That(map.IsValid, Is.True);
+            Assert.That(map.MeasuredPoints, Is.Zero, "a fresh grid has been probed nowhere");
+        });
+    }
+
+    [Test]
+    public void TheCornersOfACircularBedAreNotProbed()
+    {
+        // A round bed is described as a rectangle and a radius. The corners of that rectangle are off
+        // the bed, so probing there would drive the nozzle at nothing
+        HeightMap map = HeightMap.Over(['X', 'Y'], [-100.0f, -100.0f], [100.0f, 100.0f], [100.0f, 100.0f], 100.0f);
+        Assert.Multiple(() =>
+        {
+            Assert.That(map.CanProbePoint(1, 1), Is.True, "the centre");
+            Assert.That(map.CanProbePoint(0, 0), Is.False, "a corner is outside the radius");
+            Assert.That(map.CanProbePoint(0, 1), Is.False, "and so is a point exactly on it");
+        });
+    }
+
+    [Test]
+    public void EveryPointOfARectangularGridCanBeProbed()
+    {
+        HeightMap map = HeightMap.Over(['X', 'Y'], [0.0f, 0.0f], [20.0f, 20.0f], [10.0f, 10.0f], -1.0f);
+        Assert.That(map.CanProbePoint(0, 0), Is.True);
+        Assert.That(map.CanProbePoint(2, 2), Is.True);
+    }
+
+    [Test]
+    public void UnprobedPointsAreFilledInFromTheOnesThatWereProbed()
+    {
+        // The interpolation reads all four corners of whichever cell a move lands in, so an unprobed
+        // corner would drag the correction towards zero right where the bed is furthest from flat
+        HeightMap map = HeightMap.Over(['X', 'Y'], [0.0f, 0.0f], [20.0f, 20.0f], [10.0f, 10.0f], -1.0f);
+
+        // A bed tilted along X: height is 0.01 per mm, so 0.0, 0.1, 0.2 across each row
+        for (int y = 0; y < 3; y++)
+        {
+            for (int x = 0; x < 3; x++)
+            {
+                if (x == 2 && y == 2)
+                {
+                    continue;                   // leave one corner unprobed
+                }
+                map.SetHeight(x, y, x * 0.1f);
+            }
+        }
+
+        map.ExtrapolateMissing();
+        Assert.Multiple(() =>
+        {
+            Assert.That(map.MeasuredPoints, Is.EqualTo(8), "extrapolating does not claim a point was probed");
+            Assert.That(map.GetInterpolatedHeightError(20.0f, 20.0f), Is.EqualTo(0.2f).Within(1e-2f),
+                        "the missing corner sits on the plane the rest of the bed describes");
+        });
+    }
+
+    [Test]
+    public void AMeasuredMapCanBeWrittenAndReloaded()
+    {
+        HeightMap map = HeightMap.Over(['X', 'Y'], [0.0f, 0.0f], [20.0f, 20.0f], [10.0f, 10.0f], -1.0f);
+        map.SetHeight(0, 0, 0.05f);
+        map.SetHeight(2, 2, -0.05f);
+
+        StringWriter writer = new();
+        map.Write(writer, new DateTime(2026, 1, 1, 12, 0, 0));
+
+        HeightMap reloaded = Read(writer.ToString());
+        Assert.Multiple(() =>
+        {
+            Assert.That(reloaded.Nums, Is.EqualTo(new[] { 3, 3 }));
+            Assert.That(reloaded.MeasuredPoints, Is.EqualTo(2), "only the two points that were set");
+            Assert.That(reloaded.GetInterpolatedHeightError(0.0f, 0.0f), Is.EqualTo(0.05f).Within(1e-4f));
+        });
+    }
 }

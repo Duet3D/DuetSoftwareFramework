@@ -375,4 +375,34 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
         _cachedArmMode = armMode;
         return true;
     }
+
+    /// <summary>
+    /// Which macro to run next to home some of a set of axes
+    /// </summary>
+    /// <param name="toBeHomed">Axes still to home, as a bitmap</param>
+    /// <param name="alreadyHomed">Axes already homed, as a bitmap</param>
+    /// <param name="axisLetters">Letter of each axis, in axis order</param>
+    /// <param name="fileName">The macro to run</param>
+    /// <returns>Axes that have to be homed first</returns>
+    /// <remarks>
+    /// X and Y are the two arm joints rather than two directions, so the macros are named after the
+    /// joints. RepRapFirmware falls back to <c>homeall.g</c> when the joint macro is missing, because
+    /// some SCARA arms cannot be homed one joint at a time; that fallback is the caller's, which is
+    /// the one that knows whether the file exists
+    /// </remarks>
+    public override uint GetHomingFileName(uint toBeHomed, uint alreadyHomed, ReadOnlySpan<char> axisLetters,
+                                           out string fileName)
+    {
+        uint mustHomeFirst = base.GetHomingFileName(toBeHomed, alreadyHomed, axisLetters, out fileName);
+        if (mustHomeFirst == 0)
+        {
+            fileName = fileName switch
+            {
+                "homex.g" => "homeproximal.g",
+                "homey.g" => "homedistal.g",
+                _ => fileName
+            };
+        }
+        return mustHomeFirst;
+    }
 }

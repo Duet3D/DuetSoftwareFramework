@@ -21,7 +21,7 @@ namespace DuetControlServer.Motion;
 /// partial map reloads as the partial map it was
 /// </para>
 /// </remarks>
-internal sealed class HeightMap
+public sealed class HeightMap
 {
     /// <summary>
     /// First line of a height map file, which is also its version marker
@@ -103,6 +103,189 @@ internal sealed class HeightMap
             }
             return count;
         }
+    }
+
+    /// <summary>
+    /// An empty map over a grid, ready to be filled in point by point
+    /// </summary>
+    /// <param name="axes">Letters of the two axes the grid spans</param>
+    /// <param name="mins">Lowest coordinate of each axis</param>
+    /// <param name="maxs">Highest coordinate of each axis</param>
+    /// <param name="spacings">Point spacing along each axis</param>
+    /// <param name="radius">Radius the grid is limited to, or negative if it is not circular</param>
+    /// <returns>The map, invalid if the grid has fewer than two points along an axis</returns>
+    public static HeightMap Over(char[] axes, float[] mins, float[] maxs, float[] spacings, float radius)
+    {
+        HeightMap map = new()
+        {
+            Axes = [axes[0], axes[1]],
+            Mins = [mins[0], mins[1]],
+            Maxs = [maxs[0], maxs[1]],
+            Spacings = [spacings[0], spacings[1]],
+            Radius = radius
+        };
+
+        for (int i = 0; i < 2; i++)
+        {
+            map.Nums[i] = spacings[i] > 0.0f
+                ? (int)MathF.Floor((maxs[i] - mins[i]) / spacings[i]) + 1
+                : 0;
+        }
+
+        if (map.HasUsableGrid)
+        {
+            map._heights = new float[map.Nums[0] * map.Nums[1]];
+            map._measured = new bool[map._heights.Length];
+        }
+        return map;
+    }
+
+    /// <summary>
+    /// Where one point of the grid is
+    /// </summary>
+    /// <param name="index0">Index along the first axis</param>
+    /// <param name="index1">Index along the second</param>
+    /// <returns>The coordinates</returns>
+    public (float Axis0, float Axis1) GetCoordinates(int index0, int index1)
+        => (Mins[0] + (index0 * Spacings[0]), Mins[1] + (index1 * Spacings[1]));
+
+    /// <summary>
+    /// Whether a point of the grid is one that can be probed
+    /// </summary>
+    /// <param name="index0">Index along the first axis</param>
+    /// <param name="index1">Index along the second</param>
+    /// <returns>True if it is inside the grid's radius</returns>
+    /// <remarks>
+    /// A circular bed is described by a rectangle and a radius, so the corners of the rectangle are
+    /// off the bed. Probing there would drive the nozzle at nothing
+    /// </remarks>
+    public bool CanProbePoint(int index0, int index1)
+    {
+        if (Radius < 0.0f)
+        {
+            return true;
+        }
+
+        (float axis0, float axis1) = GetCoordinates(index0, index1);
+        return (axis0 * axis0) + (axis1 * axis1) < Radius * Radius;
+    }
+
+    /// <summary>
+    /// Record the height measured at one point of the grid
+    /// </summary>
+    /// <param name="index0">Index along the first axis</param>
+    /// <param name="index1">Index along the second</param>
+    /// <param name="height">How much higher the bed is there than nominal</param>
+    public void SetHeight(int index0, int index1, float height)
+    {
+        if (index0 < 0 || index0 >= Nums[0] || index1 < 0 || index1 >= Nums[1])
+        {
+            return;
+        }
+
+        int index = (index1 * Nums[0]) + index0;
+        _heights[index] = height;
+        _measured[index] = true;
+    }
+
+    /// <summary>
+    /// Fill in the points that were never probed from the ones that were
+    /// </summary>
+    /// <remarks>
+    /// A circular bed leaves the corners of its grid unprobed, and the interpolation reads all four
+    /// corners of whichever cell it lands in. Least squares over the measured points gives those
+    /// corners a plane to sit on, which is what RepRapFirmware's <c>ExtrapolateMissing</c> does.
+    /// The points stay marked unmeasured, so saving the map still says which were guessed
+    /// </remarks>
+    public void ExtrapolateMissing()
+    {
+        // Fit z = a*axis0 + b*axis1 + c through the measured points
+        double sum0 = 0.0, sum1 = 0.0, sumZ = 0.0, sum00 = 0.0, sum01 = 0.0, sum11 = 0.0, sum0Z = 0.0, sum1Z = 0.0;
+        int count = 0;
+
+        for (int index1 = 0; index1 < Nums[1]; index1++)
+        {
+            for (int index0 = 0; index0 < Nums[0]; index0++)
+            {
+                if (!_measured[(index1 * Nums[0]) + index0])
+                {
+                    continue;
+                }
+
+                (float axis0, float axis1) = GetCoordinates(index0, index1);
+                float height = _heights[(index1 * Nums[0]) + index0];
+                sum0 += axis0;
+                sum1 += axis1;
+                sumZ += height;
+                sum00 += (double)axis0 * axis0;
+                sum01 += (double)axis0 * axis1;
+                sum11 += (double)axis1 * axis1;
+                sum0Z += (double)axis0 * height;
+                sum1Z += (double)axis1 * height;
+                count++;
+            }
+        }
+
+        if (count < 3)
+        {
+            return;                             // not enough points to define a plane
+        }
+
+        // Solve the three normal equations by Cramer's rule
+        double[,] matrix =
+        {
+            { sum00, sum01, sum0 },
+            { sum01, sum11, sum1 },
+            { sum0, sum1, count }
+        };
+        double determinant = Determinant(matrix);
+        if (Math.Abs(determinant) < 1e-12)
+        {
+            return;                             // the measured points are collinear
+        }
+
+        double a = Determinant(Replace(matrix, 0, sum0Z, sum1Z, sumZ)) / determinant;
+        double b = Determinant(Replace(matrix, 1, sum0Z, sum1Z, sumZ)) / determinant;
+        double c = Determinant(Replace(matrix, 2, sum0Z, sum1Z, sumZ)) / determinant;
+
+        for (int index1 = 0; index1 < Nums[1]; index1++)
+        {
+            for (int index0 = 0; index0 < Nums[0]; index0++)
+            {
+                int index = (index1 * Nums[0]) + index0;
+                if (_measured[index])
+                {
+                    continue;
+                }
+
+                (float axis0, float axis1) = GetCoordinates(index0, index1);
+                _heights[index] = (float)((a * axis0) + (b * axis1) + c);
+            }
+        }
+    }
+
+    /// <summary>Determinant of a three by three matrix</summary>
+    /// <param name="m">The matrix</param>
+    /// <returns>Its determinant</returns>
+    private static double Determinant(double[,] m)
+        => (m[0, 0] * ((m[1, 1] * m[2, 2]) - (m[1, 2] * m[2, 1])))
+           - (m[0, 1] * ((m[1, 0] * m[2, 2]) - (m[1, 2] * m[2, 0])))
+           + (m[0, 2] * ((m[1, 0] * m[2, 1]) - (m[1, 1] * m[2, 0])));
+
+    /// <summary>Replace one column of a matrix with the right-hand side, for Cramer's rule</summary>
+    /// <param name="m">The matrix</param>
+    /// <param name="column">Column to replace</param>
+    /// <param name="first">First element of the right-hand side</param>
+    /// <param name="second">Second element</param>
+    /// <param name="third">Third element</param>
+    /// <returns>The new matrix</returns>
+    private static double[,] Replace(double[,] m, int column, double first, double second, double third)
+    {
+        double[,] result = (double[,])m.Clone();
+        result[0, column] = first;
+        result[1, column] = second;
+        result[2, column] = third;
+        return result;
     }
 
     /// <summary>

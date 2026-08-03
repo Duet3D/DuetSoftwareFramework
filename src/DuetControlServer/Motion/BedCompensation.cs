@@ -49,7 +49,20 @@ public sealed class BedCompensation(Model.ObjectModel model)
         }
 
         _map = map;
-        (float mean, float deviation, _, _) = map!.GetStatistics();
+        await PublishAsync(map!, fileName, cancellationToken);
+        return null;
+    }
+
+    /// <summary>
+    /// Say in the object model what is now being applied
+    /// </summary>
+    /// <param name="map">The map</param>
+    /// <param name="fileName">Where it came from, or null if it was just measured</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>An awaitable task</returns>
+    private async ValueTask PublishAsync(HeightMap map, string? fileName, CancellationToken cancellationToken)
+    {
+        (float mean, float deviation, _, _) = map.GetStatistics();
 
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -73,7 +86,18 @@ public sealed class BedCompensation(Model.ObjectModel model)
             live.Radius = map.Radius;
             compensation.LiveGrid = live;
         }
-        return null;
+    }
+
+    /// <summary>
+    /// Start applying a map that was just measured
+    /// </summary>
+    /// <param name="map">The map</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>An awaitable task</returns>
+    public async ValueTask AdoptAsync(HeightMap map, CancellationToken cancellationToken)
+    {
+        _map = map;
+        await PublishAsync(map, fileName: null, cancellationToken);
     }
 
     /// <summary>

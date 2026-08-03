@@ -226,7 +226,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M671 | 4152 | Z leadscrew positions | `move.kinematics.tiltCorrection` | no | ✅ |
 | M673 | 4168 | Align plane on rotary axis | `move.rotation` | yes | ⬜ blocked: needs homing |
 | M674 | 4275 | Set Z to centre point | — | yes | ⬜ blocked: needs probe points |
-| M675 | 4311 | Find centre of cavity | — | yes | ⬜ blocked: needs G30 |
+| M675 | 4311 | Find centre of cavity | — | yes | ⬜ blocked: needs G30 P |
 
 ### 5.3 Motion — compensation and probing
 
@@ -243,7 +243,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M561 | 3730 | Identity transform, disable height map | `move.compensation.type` | no | ✅ |
 | M574 | 3897 | Endstop configuration | `sensors.endstops[]` | no | ✅ |
 | M577 | 3919 | Wait for endstop trigger | `sensors.endstops[]` | no | ✅ |
-| M585 | 3960 | Probe tool | `sensors.probes[]`, tools | yes | ⬜ blocked: needs G30 |
+| M585 | 3960 | Probe tool | `sensors.probes[]`, tools | yes | ⬜ blocked: needs G30 P |
 | M672 | 4164 | Program Z probe | CAN to the probe's board | no | ⬜ blocked |
 | M851 | 4357 | Z probe offset (Marlin compatibility) | `sensors.probes[].offsets` | no | ✅ |
 
@@ -1000,20 +1000,66 @@ scaled by how far up it the move is, so inverting it means solving for the reque
 than subtracting the correction. Both directions are RepRapFirmware's `BedTransform` and
 `InverseBedTransform`.
 
+### Homing (G28 and the `G1 H` moves inside it)
+
+A homing move is an ordinary move that the controller cuts short. What makes it homing is what happens
+afterwards: `GCodeHandler.FinishHomingMoveAsync` waits for the move, resynchronises the planner from
+the engine's snapshot - which is where the drives actually are after the revert, not where the move was
+planned to end - and then sets each axis that triggered to the coordinate of its switch. Only an axis
+whose endstop actually triggered is homed, so a move that ran its full length leaves the axis unhomed
+rather than confidently wrong.
+
+Every other move is committed at its planned endpoint and the next code interpreted immediately, which
+is what keeps the queue full. A homing move is the exception because it is where the machine finds out
+where it is.
+
+G28 itself knows nothing about homing. The machine's macros do, and G28 runs them: ask the kinematics
+which macro comes next, run it, see which axes it homed, ask again. That loop is RepRapFirmware's
+`homing1` and `homing2` states, and it is a loop rather than a list because a macro may home more axes
+than it was asked for. A pass that homes nothing ends with an error, or a missing switch would spin
+forever.
+
+`KinematicsEngine.GetHomingFileName` carries the rules: `homeall.g` for everything, `home<letter>.g`
+for the lowest axis otherwise, and a lower-case letter written as `home'a.g`. Homing Z with a probe
+means driving the nozzle at the bed, so it waits until the axes named by `AxesToHomeBeforeProbing` are
+homed - X and Y usually, all three towers on a delta, which has no axis that moves a motor of its own.
+Delta homes every tower whichever axis was asked for, SCARA names its macros after the arm joints, and
+polar names the radius arm.
+
+### Probing (G30 and G29)
+
+A probing move is a homing move armed on a probe handle instead of an endstop handle, so the mechanism
+is the one the endstop work already built. Every drive watches the probe rather than only Z's: on a
+delta the effector only comes down because all three towers do, so stopping one would tip it.
+
+Around that is the tapping loop. A probe does not give the same answer twice, so G30 taps until two
+consecutive readings agree within `M558 S`, and averages the two that agreed - earlier taps were the
+probe settling and would drag the average towards them. Running out of taps is not an error; the mean
+of what was collected is used, as in RepRapFirmware.
+
+What G30 does with the result is the S parameter:
+
+| S | Meaning |
+|---|---|
+| none, or ≤ -4 | The probe is trusted and Z is not, so Z is redefined: the nozzle is at the trigger height now, whatever the axis thought. This is what levels a machine |
+| -1 | Report the stopped height and change nothing |
+| -2 | Set the tool Z offset - refused, because tools are not ported |
+| -3 | Z is trusted and the probe is not, so the probe takes the height the axis says it stopped at. This calibrates a probe against a homed machine |
+
+G29 walks the grid in a serpentine so the head does not fly back across the bed between rows, skips the
+points outside a circular grid's radius, and fills those in afterwards by least squares over the points
+that were probed - the interpolation reads all four corners of whichever cell a move lands in, so an
+unprobed corner would drag the correction to zero right where the bed is furthest from flat. The points
+stay marked unmeasured, so the saved file still says which were guessed.
+
+`G29 S1`, `S2` and `S3` are what M375, M561 and M374 already do; G29 says so rather than carrying a
+second implementation of each. Without S it runs `mesh.g` if the machine has one, so that a bed needing
+preparation can say so, and probes directly only if there is no such file.
+
 ### What is left in phase 5
 
-Everything here configures a probe or applies a map. What is missing is the move that uses one:
-
-- **G30** - probe the bed at a point. Needs a probing move, which is an endstop move that stops on a
-  probe handle instead of an endstop handle. The mechanism is already there; what is missing is
-  selecting the probe, the dive-and-retry loop, and setting the axis position from the trigger height.
-- **G29** - probe the grid. A loop of G30s over `probeGrid`, which is what produces a height map in
-  the first place. Until it exists, M375 loads a map measured elsewhere and M374 has nothing to save
-  unless one was loaded.
-- **M585** and **M675** are blocked on G30 for the same reason.
+- **G30 P** - probing into the bed levelling and mesh tables, which M671 and the multi-point levelling
+  use. The tables themselves are not ported.
+- **M585** and **M675** probe against a workpiece rather than the bed; both need G30 P.
 - **M558.1** and **M558.2** calibrate a scanning probe, which needs the probe read back over CAN while
   it moves.
-
-Still not reachable: **G28**. Homing runs `homeall.g` or `home<axis>.g`, which needs the homing
-macros and the `G1 H` moves inside them - the macros work now, so this is the next step rather than a
-blocker.

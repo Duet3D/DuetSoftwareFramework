@@ -1,4 +1,6 @@
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.CanMessages;
+using DuetControlServer.Motion.Native;
 
 namespace DuetControlServer.Motion;
 
@@ -34,5 +36,29 @@ internal static class RemoteProbes
         handle.Major = (byte)probeNumber;
         handle.Minor = 0;
         return handle;
+    }
+
+    /// <summary>
+    /// Fill in the switch a probing move should stop on
+    /// </summary>
+    /// <param name="probe">The probe</param>
+    /// <param name="probeNumber">Probe number</param>
+    /// <param name="stopInput">Entry to fill in; left watching nothing if the probe cannot stop a move</param>
+    /// <returns>True if the probe has an input a move can stop on</returns>
+    /// <remarks>
+    /// A probe of type none is a placeholder for manual probing and a motor stall probe is detected
+    /// by the driver, so neither has an input a move can be armed on
+    /// </remarks>
+    public static bool TryGetStopInput(Probe probe, int probeNumber, MoveStopInput stopInput)
+    {
+        stopInput.Clear();
+        if (probe.Type is ProbeType.None or ProbeType.ZMotorStall || string.IsNullOrWhiteSpace(probe.Port) ||
+            !RemoteEndstops.TrySplitPort(probe.Port, out byte board, out _))
+        {
+            return false;
+        }
+
+        stopInput.SetShared(HandleFor(probeNumber).All, board);
+        return true;
     }
 }

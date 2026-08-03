@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using DuetControlServer.Motion.Native;
 
 namespace DuetControlServer.Motion;
@@ -60,6 +61,16 @@ internal sealed class RawMove
     /// </para>
     /// </remarks>
     public Native.MoveStopInput[] StopOnInput { get; } = CreateStopInputs();
+
+    /// <summary>
+    /// Axes this move is homing, i.e. the ones whose own endstop it was armed on
+    /// </summary>
+    /// <remarks>
+    /// Not the same as the drives that carry a stop input. An axis on coupled kinematics arms every
+    /// drive with its one endstop, because they all have to stop together, but only that axis ends up
+    /// at a known position
+    /// </remarks>
+    public List<int> HomingAxes { get; } = [];
 
     /// <summary>
     /// A stop input array with nothing being watched

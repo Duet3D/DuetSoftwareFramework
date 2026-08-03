@@ -32,6 +32,7 @@ internal sealed partial class GCodeHandler(
     Model.ObjectModel model,
     MovePlanner planner,
     BedCompensation bedCompensation,
+    Files.MacroRunner macroRunner,
     ILogger<GCodeHandler> logger) : ICodeHandler
 {
     /// <summary>
@@ -76,6 +77,18 @@ internal sealed partial class GCodeHandler(
                 }, cancellationToken);
                 return new Message();
 
+            // Home the machine
+            case 28:
+                return await HandleHomeAsync(code, cancellationToken);
+
+            // Probe the grid and build a height map
+            case 29:
+                return await HandleProbeGridAsync(code, cancellationToken);
+
+            // Probe the bed
+            case 30:
+                return await HandleProbeAsync(code, cancellationToken);
+
             // Set or report the Z probe trigger height, offsets and threshold
             case 31:
                 return await HandleProbeParametersAsync(code, cancellationToken);
@@ -118,6 +131,7 @@ internal sealed partial class GCodeHandler(
         while (!cancellationToken.IsCancellationRequested)
         {
             MoveSubmitResult result;
+            List<int> homingAxes = [];
 
             using (await model.AccessReadWriteAsync(cancellationToken))
             {
@@ -137,6 +151,7 @@ internal sealed partial class GCodeHandler(
                     return endstopError;
                 }
 
+                homingAxes = move.HomingAxes;
                 result = planner.QueueMove(move);
 
                 if (result is MoveSubmitResult.Queued or MoveSubmitResult.NoMovement)
@@ -152,6 +167,14 @@ internal sealed partial class GCodeHandler(
             {
                 case MoveSubmitResult.Queued:
                 case MoveSubmitResult.NoMovement:
+                    if (homingAxes.Count > 0)
+                    {
+                        // A homing move is where the machine finds out where it is, so the code has
+                        // to wait for it rather than queue it and move on. Every other move is
+                        // committed at its planned endpoint and the next code interpreted straight
+                        // away, which is what keeps the queue full
+                        await FinishHomingMoveAsync(homingAxes, cancellationToken);
+                    }
                     return new Message();
 
                 case MoveSubmitResult.Rejected:
@@ -349,10 +372,12 @@ internal sealed partial class GCodeHandler(
                 }
                 stopAllAxis = axis;
                 stopAllInput.CopyFrom(move.StopOnInput[axis]);
+                move.HomingAxes.Add(axis);
             }
             else
             {
                 perAxisCount++;
+                move.HomingAxes.Add(axis);
             }
         }
 

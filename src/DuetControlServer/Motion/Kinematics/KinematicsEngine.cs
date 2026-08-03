@@ -208,6 +208,103 @@ internal abstract class KinematicsEngine
     public virtual uint ContinuousRotationAxes => 0;
 
     /// <summary>
+    /// Macro that homes everything, as in RepRapFirmware's <c>HomeAllFileName</c>
+    /// </summary>
+    public const string HomeAllFile = "homeall.g";
+
+    /// <summary>
+    /// Which macro to run next to home some of a set of axes
+    /// </summary>
+    /// <param name="toBeHomed">Axes still to home, as a bitmap</param>
+    /// <param name="alreadyHomed">Axes already homed, as a bitmap</param>
+    /// <param name="axisLetters">Letter of each axis, in axis order</param>
+    /// <param name="fileName">The macro to run, meaningless if any axes must be homed first</param>
+    /// <returns>Axes that have to be homed before any of <paramref name="toBeHomed"/> can be</returns>
+    /// <remarks>
+    /// <para>
+    /// Homing is a sequence of macros rather than one operation because only the machine's own
+    /// configuration knows how to home it. The caller runs whichever macro comes back, sees which
+    /// axes it homed, and asks again - so this only has to name the next step, not plan the whole
+    /// sequence.
+    /// </para>
+    /// <para>
+    /// Asking for every axis runs <c>homeall.g</c>; asking for some runs <c>home&lt;letter&gt;.g</c>
+    /// for the lowest of them. The exception is a Z axis homed with a probe, which cannot be homed
+    /// until the probe can be positioned over the bed - that is what the returned bitmap says
+    /// </para>
+    /// </remarks>
+    public virtual uint GetHomingFileName(uint toBeHomed, uint alreadyHomed, ReadOnlySpan<char> axisLetters,
+                                          out string fileName)
+    {
+        uint allAxes = axisLetters.Length >= 32 ? uint.MaxValue : (1u << axisLetters.Length) - 1;
+        if ((toBeHomed & allAxes) == allAxes)
+        {
+            fileName = HomeAllFile;
+            return 0;
+        }
+
+        // Homing Z with a probe means driving the nozzle at the bed, so it is only safe once the
+        // probe can be put somewhere the bed actually is
+        bool homeZLast = (toBeHomed & (1u << ZAxis)) != 0 && HomesZWithProbe;
+        uint homeFirst = AxesToHomeBeforeProbing;
+
+        for (int axis = 0; axis < axisLetters.Length; axis++)
+        {
+            if ((toBeHomed & (1u << axis)) == 0)
+            {
+                continue;
+            }
+
+            if (axis == ZAxis && homeZLast && (alreadyHomed & homeFirst) != homeFirst)
+            {
+                continue;
+            }
+
+            fileName = HomingFileFor(axisLetters[axis]);
+            return 0;
+        }
+
+        // Nothing can be homed yet, which can only be the Z-with-a-probe case
+        fileName = HomeAllFile;
+        return homeFirst & ~alreadyHomed;
+    }
+
+    /// <summary>
+    /// The macro that homes one axis
+    /// </summary>
+    /// <param name="letter">The axis letter</param>
+    /// <returns>The macro name</returns>
+    /// <remarks>
+    /// A lower case axis letter is written with a leading apostrophe, as everywhere else in
+    /// RepRapFirmware, so that <c>home'a.g</c> and <c>homea.g</c> are different files
+    /// </remarks>
+    protected static string HomingFileFor(char letter)
+        => char.IsLower(letter) ? $"home'{letter}.g" : $"home{char.ToLowerInvariant(letter)}.g";
+
+    /// <summary>
+    /// Index of the Z axis, which is fixed in the kinematics even where the axis letters are not
+    /// </summary>
+    protected const int ZAxis = 2;
+
+    /// <summary>
+    /// Whether Z is homed by driving the nozzle at the bed until the probe triggers
+    /// </summary>
+    /// <remarks>
+    /// Set by the caller from the Z endstop's type: RepRapFirmware treats an axis with no endstop as
+    /// probing too, because a machine with no Z switch has nothing else to home with
+    /// </remarks>
+    public bool HomesZWithProbe { get; set; }
+
+    /// <summary>
+    /// Axes that must be homed before the bed can be probed
+    /// </summary>
+    /// <remarks>
+    /// X and Y on most machines: the probe has to be somewhere over the bed before it is driven down.
+    /// A delta has to home all three towers first, because none of its axes moves a motor of its own
+    /// </remarks>
+    public virtual uint AxesToHomeBeforeProbing => 0b011;
+
+    /// <summary>
     /// Round a millimetre position to microsteps, reporting a position too far from the origin
     /// </summary>
     /// <param name="value">Position in microsteps as a real number</param>

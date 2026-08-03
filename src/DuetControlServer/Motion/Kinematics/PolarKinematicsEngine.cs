@@ -223,4 +223,27 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
         float radiusSquared = (x * x) + (y * y);
         return radiusSquared >= MinRadius * MinRadius && radiusSquared <= MaxRadius * MaxRadius;
     }
+
+    /// <summary>
+    /// Which macro to run next to home some of a set of axes
+    /// </summary>
+    /// <param name="toBeHomed">Axes still to home, as a bitmap</param>
+    /// <param name="alreadyHomed">Axes already homed, as a bitmap</param>
+    /// <param name="axisLetters">Letter of each axis, in axis order</param>
+    /// <param name="fileName">The macro to run</param>
+    /// <returns>Axes that have to be homed first</returns>
+    /// <remarks>
+    /// X is the radius arm and Y is the turntable. The turntable has nowhere to home to, so only the
+    /// radius has a macro of its own
+    /// </remarks>
+    public override uint GetHomingFileName(uint toBeHomed, uint alreadyHomed, ReadOnlySpan<char> axisLetters,
+                                           out string fileName)
+    {
+        uint mustHomeFirst = base.GetHomingFileName(toBeHomed, alreadyHomed, axisLetters, out fileName);
+        if (mustHomeFirst == 0 && fileName == "homex.g")
+        {
+            fileName = "homeradius.g";
+        }
+        return mustHomeFirst;
+    }
 }
