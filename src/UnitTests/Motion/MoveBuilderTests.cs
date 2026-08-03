@@ -479,4 +479,40 @@ public class MoveBuilderTests
         (_, Submission? move) = Build(builder, LinearMove(4242, 10.0f, 0.0f, 0.0f));
         Assert.That(move!.Header.MoveId, Is.EqualTo(4242u));
     }
+
+    [Test]
+    public void TheEndstopSwitchesReachTheRecordInDriverOrder()
+    {
+        // The native side reads these back by pointer arithmetic, so the bytes have to land where
+        // MoveStopInput says they do. A misplaced board means a homing move watching another board's
+        // switch, which the boards themselves cannot detect
+        MoveBuilder builder = NewBuilder(CartesianMachine());
+        RawMove move = LinearMove(1, 10.0f, 0.0f, 0.0f);
+        move.CheckEndstops = true;
+        move.StopOnInput[0].SetShared(0x1042, 3);
+        move.StopOnInput[1].SetPerDriver(0x1080, [1, 4]);
+
+        byte[] buffer = new byte[MoveParams.Length(NumDrives)];
+        MoveBuildResult result = builder.Build(move, buffer);
+        Assert.That(result.HasMove, Is.True);
+
+        int stopsAt = Marshal.SizeOf<MoveParamsHeader>() + (NumDrives * (sizeof(int) + sizeof(float)));
+        byte[] x = buffer[stopsAt..(stopsAt + MoveStopInput.Length)];
+        byte[] y = buffer[(stopsAt + MoveStopInput.Length)..(stopsAt + (2 * MoveStopInput.Length))];
+        byte[] z = buffer[(stopsAt + (2 * MoveStopInput.Length))..(stopsAt + (3 * MoveStopInput.Length))];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(BitConverter.ToUInt16(x), Is.EqualTo(0x1042), "X's handle");
+            Assert.That(x[2], Is.EqualTo(1), "X watches one switch for the whole axis");
+            Assert.That(x[3], Is.EqualTo(3), "on board 3");
+
+            Assert.That(BitConverter.ToUInt16(y), Is.EqualTo(0x1080), "Y's handle");
+            Assert.That(y[2], Is.EqualTo(2), "Y watches a switch per driver");
+            Assert.That(y[3], Is.EqualTo(1), "the first motor's board");
+            Assert.That(y[4], Is.EqualTo(4), "the second motor's board, which need not be the first's");
+
+            Assert.That(z[2], Is.Zero, "a drive with no endstop watches nothing");
+        });
+    }
 }

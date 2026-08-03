@@ -222,10 +222,10 @@ private:
 
 	int32_t m_endPoint[maxAxesPlusExtruders]{};  		// Machine coordinates of the endpoint
 	float m_directionVector[maxAxesPlusExtruders]{};	// The normalised direction vector - first 3 are XYZ Cartesian coordinates even on a delta
-	// Which input stops each drive, packed by Motion::MakeStopInput, or Motion::NoStopInput. Only
-	// meaningful when checkEndstops is set. Carried per drive so one move can home several axes at
-	// once, each stopping on its own endstop
-	uint32_t m_stopOnInput[maxAxesPlusExtruders]{};
+	// Which switches stop each drive, and how its drivers share them. Only meaningful when
+	// checkEndstops is set. Carried per drive so one move can home several axes at once, each
+	// stopping on its own endstop
+	Duet::Sbc::Motion::MoveStopInput m_stopOnInput[maxAxesPlusExtruders]{};
 
 	// Which drivers of each drive have already stopped on an endstop, one bit per driver of the
 	// axis. An axis with a switch per driver stops them one at a time - that is the point of it,

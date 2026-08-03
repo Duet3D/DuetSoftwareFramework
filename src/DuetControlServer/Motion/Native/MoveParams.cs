@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 
 namespace DuetControlServer.Motion.Native;
@@ -106,45 +107,110 @@ internal static class MoveFlags
 }
 
 /// <summary>
+/// Which switches stop one drive during a move, and how its drivers share them
+/// </summary>
+/// <remarks>
+/// <para>
+/// This is RepRapFirmware's <c>SwitchEndstop</c> reduced to what a move needs. That class holds a
+/// board number per port and derives the handle from the axis and the port index, so the board is
+/// the only part that differs between one switch of an axis and the next; the handle follows from
+/// which switch it is. The switches of an axis may be spread over several boards, as they may in the
+/// firmware.
+/// </para>
+/// <para>
+/// <see cref="NumSwitches"/> says how the drivers share them, exactly as
+/// <c>SwitchEndstop::PrimeAxis</c> decides it: zero means the drive watches nothing, one means every
+/// driver of the drive watches <c>Boards[0]</c> so the first trigger stops the axis, and n means
+/// driver i watches <c>Boards[i]</c> so each motor runs on to its own switch
+/// </para>
+/// </remarks>
+internal sealed class MoveStopInput
+{
+    /// <summary>
+    /// Serialised size of one entry, which must match the native <c>MoveStopInput</c>
+    /// </summary>
+    public const int Length = 2 + 1 + MotionLimits.MaxDriversPerAxis + 1;
+
+    /// <summary>
+    /// Remote input handle the switches are registered under, with a minor field of zero
+    /// </summary>
+    /// <remarks>Driver i watches minor i, which is why only one handle has to be carried</remarks>
+    public ushort Handle { get; set; }
+
+    /// <summary>How many switches the drive watches</summary>
+    public byte NumSwitches { get; set; }
+
+    /// <summary>CAN address of each switch, in driver order</summary>
+    public byte[] Boards { get; } = new byte[MotionLimits.MaxDriversPerAxis];
+
+    /// <summary>Stop watching anything, which is what every drive of an ordinary move carries</summary>
+    public void Clear()
+    {
+        Handle = 0;
+        NumSwitches = 0;
+        Array.Clear(Boards);
+    }
+
+    /// <summary>
+    /// Watch one switch on behalf of the whole drive, so the first trigger stops every driver
+    /// </summary>
+    /// <param name="handle">Handle the switch is registered under</param>
+    /// <param name="board">CAN address of the board carrying it</param>
+    public void SetShared(ushort handle, byte board)
+    {
+        Clear();
+        Handle = handle;
+        NumSwitches = 1;
+        Boards[0] = board;
+    }
+
+    /// <summary>
+    /// Give each driver of the drive its own switch, in driver order
+    /// </summary>
+    /// <param name="handle">Handle the first switch is registered under; driver i uses minor i</param>
+    /// <param name="boards">CAN address of each switch</param>
+    /// <exception cref="ArgumentException">More switches than an axis can have drivers</exception>
+    public void SetPerDriver(ushort handle, ReadOnlySpan<byte> boards)
+    {
+        if (boards.Length > MotionLimits.MaxDriversPerAxis)
+        {
+            throw new ArgumentException($"An axis may have at most {MotionLimits.MaxDriversPerAxis} endstop switches, got {boards.Length}");
+        }
+
+        Clear();
+        Handle = handle;
+        NumSwitches = (byte)boards.Length;
+        boards.CopyTo(Boards);
+    }
+
+    /// <summary>Copy another entry over this one</summary>
+    /// <param name="other">The entry to copy</param>
+    public void CopyFrom(MoveStopInput other)
+    {
+        Handle = other.Handle;
+        NumSwitches = other.NumSwitches;
+        other.Boards.CopyTo(Boards, 0);
+    }
+}
+
+/// <summary>
 /// Builds the byte layout of a move submission: the header followed by its three arrays
 /// </summary>
 /// <remarks>
 /// The arrays are <c>int endPoint[NumDrives]</c>, <c>float directionVector[NumDrives]</c> and
-/// <c>uint stopOnInput[NumDrives]</c>. <c>NumDrives</c> is the configured number of logical drives
+/// <c>MoveStopInput stopOnInput[NumDrives]</c>. <c>NumDrives</c> is the configured number of logical drives
 /// rather than the number that actually move, because the native lookahead and preparation index
 /// densely by logical drive
 /// </remarks>
 internal static class MoveParams
 {
     /// <summary>
-    /// Value of a stop input entry meaning the drive watches no endstop during this move
-    /// </summary>
-    public const uint NoStopInput = 0xFFFFFFFF;
-
-    /// <summary>
-    /// Set when the axis has one switch per driver rather than one for the whole axis
-    /// </summary>
-    /// <remarks>
-    /// The native side then replaces the handle's minor field with the driver's index within the
-    /// axis, which is the switch it watches. RepRapFirmware pairs port i with driver i the same way
-    /// </remarks>
-    public const uint StopInputPerDriver = 0x80000000;
-
-    /// <summary>
-    /// Pack the CAN address and input handle of an endstop into a stop input entry
-    /// </summary>
-    /// <param name="boardAddress">CAN address of the board carrying the input</param>
-    /// <param name="inputHandle">Remote input handle of the endstop</param>
-    /// <returns>The packed entry</returns>
-    public static uint MakeStopInput(byte boardAddress, ushort inputHandle) => ((uint)boardAddress << 16) | inputHandle;
-
-    /// <summary>
     /// Total size of a submission carrying the given number of drives
     /// </summary>
     /// <param name="numDrives">Number of logical drives</param>
     /// <returns>Size in bytes</returns>
     public static int Length(int numDrives)
-        => Marshal.SizeOf<MoveParamsHeader>() + (numDrives * (sizeof(int) + sizeof(float) + sizeof(uint)));
+        => Marshal.SizeOf<MoveParamsHeader>() + (numDrives * (sizeof(int) + sizeof(float) + MoveStopInput.Length));
 
     /// <summary>
     /// Write a move submission into <paramref name="destination"/>
@@ -153,11 +219,11 @@ internal static class MoveParams
     /// <param name="header">Fixed part of the submission; its NumDrives must match the arrays</param>
     /// <param name="endPoints">Machine position each drive ends at, in microsteps</param>
     /// <param name="directionVector">Normalised direction, first three entries Cartesian</param>
-    /// <param name="stopOnInput">Which input stops each drive, or <see cref="NoStopInput"/></param>
+    /// <param name="stopOnInput">Which switches stop each drive</param>
     /// <returns>Number of bytes written</returns>
     /// <exception cref="ArgumentException">The buffer is too small, or the arrays disagree with the header</exception>
     public static int Write(Span<byte> destination, MoveParamsHeader header, ReadOnlySpan<int> endPoints,
-                            ReadOnlySpan<float> directionVector, ReadOnlySpan<uint> stopOnInput)
+                            ReadOnlySpan<float> directionVector, ReadOnlySpan<MoveStopInput> stopOnInput)
     {
         int numDrives = header.NumDrives;
         if (endPoints.Length != numDrives || directionVector.Length != numDrives || stopOnInput.Length != numDrives)
@@ -175,7 +241,19 @@ internal static class MoveParams
         MemoryMarshal.Write(destination, in header);
         MemoryMarshal.AsBytes(endPoints).CopyTo(destination[headerSize..]);
         MemoryMarshal.AsBytes(directionVector).CopyTo(destination[(headerSize + (numDrives * sizeof(int)))..]);
-        MemoryMarshal.AsBytes(stopOnInput).CopyTo(destination[(headerSize + (numDrives * (sizeof(int) + sizeof(float))))..]);
+
+        // Field by field rather than as one block: the entries hold an array each, so there is no
+        // blittable managed type to copy out of
+        Span<byte> stops = destination[(headerSize + (numDrives * (sizeof(int) + sizeof(float))))..];
+        for (int drive = 0; drive < numDrives; drive++)
+        {
+            Span<byte> entry = stops.Slice(drive * MoveStopInput.Length, MoveStopInput.Length);
+            MoveStopInput stop = stopOnInput[drive];
+            BinaryPrimitives.WriteUInt16LittleEndian(entry, stop.Handle);
+            entry[2] = stop.NumSwitches;
+            stop.Boards.CopyTo(entry[3..]);
+            entry[^1] = 0;              // padding, declared natively so this can match it
+        }
         return total;
     }
 }

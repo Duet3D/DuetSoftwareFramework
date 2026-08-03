@@ -63,9 +63,11 @@ public class RemoteEndstopsTests
     {
         // The controller matches an incoming change on both, so losing either stops the wrong drive
         Endstop endstop = new() { Type = EndstopType.InputPin, Port = "3.io2.in" };
-        Assert.That(RemoteEndstops.TryGetStopInput(endstop, 1, 1, out uint stopInput), Is.True);
-        Assert.That(stopInput >> 16, Is.EqualTo(3), "the board survives");
-        Assert.That(stopInput & 0xFFFF, Is.EqualTo(RemoteEndstops.HandleFor(1).All), "the handle survives");
+        MoveStopInput stopInput = new();
+        Assert.That(RemoteEndstops.TryGetStopInput(endstop, 1, 1, stopInput), Is.True);
+        Assert.That(stopInput.NumSwitches, Is.EqualTo(1), "the whole axis stops on the one switch");
+        Assert.That(stopInput.Boards[0], Is.EqualTo(3), "the board survives");
+        Assert.That(stopInput.Handle, Is.EqualTo(RemoteEndstops.HandleFor(1).All), "the handle survives");
     }
 
     [Test]
@@ -75,9 +77,9 @@ public class RemoteEndstopsTests
         // in for an endstop needs M558. Neither can be expressed as an input to watch
         Assert.Multiple(() =>
         {
-            Assert.That(RemoteEndstops.TryGetStopInput(new Endstop { Type = EndstopType.MotorStallAny, Port = "0.io1.in" }, 0, 1, out _), Is.False);
-            Assert.That(RemoteEndstops.TryGetStopInput(new Endstop { Type = EndstopType.ZProbeAsEndstop }, 0, 1, out _), Is.False);
-            Assert.That(RemoteEndstops.TryGetStopInput(new Endstop { Type = EndstopType.InputPin }, 0, 1, out _), Is.False, "no port named");
+            Assert.That(RemoteEndstops.TryGetStopInput(new Endstop { Type = EndstopType.MotorStallAny, Port = "0.io1.in" }, 0, 1, new MoveStopInput()), Is.False);
+            Assert.That(RemoteEndstops.TryGetStopInput(new Endstop { Type = EndstopType.ZProbeAsEndstop }, 0, 1, new MoveStopInput()), Is.False);
+            Assert.That(RemoteEndstops.TryGetStopInput(new Endstop { Type = EndstopType.InputPin }, 0, 1, new MoveStopInput()), Is.False, "no port named");
         });
     }
 
@@ -119,28 +121,36 @@ public class RemoteEndstopsTests
         // The fallback is what makes a dual-motor axis with a single switch safe: neither motor can
         // be left running because its own switch never fires
         Endstop two = new() { Type = EndstopType.InputPin, Port = "1.io1.in+1.io2.in" };
-        Assert.That(RemoteEndstops.TryGetStopInput(two, 2, 2, out uint perDriver), Is.True);
-        Assert.That(perDriver & MoveParams.StopInputPerDriver, Is.Not.Zero, "two switches, two drivers");
+        MoveStopInput stop = new();
 
-        Assert.That(RemoteEndstops.TryGetStopInput(two, 2, 3, out uint tooFew), Is.True);
-        Assert.That(tooFew & MoveParams.StopInputPerDriver, Is.Zero, "a driver with no switch would never stop");
+        Assert.That(RemoteEndstops.TryGetStopInput(two, 2, 2, stop), Is.True);
+        Assert.That(stop.NumSwitches, Is.EqualTo(2), "two switches, two drivers");
+
+        Assert.That(RemoteEndstops.TryGetStopInput(two, 2, 3, stop), Is.True);
+        Assert.That(stop.NumSwitches, Is.EqualTo(1), "a driver with no switch would never stop");
 
         Endstop one = new() { Type = EndstopType.InputPin, Port = "1.io1.in" };
-        Assert.That(RemoteEndstops.TryGetStopInput(one, 2, 2, out uint shared), Is.True);
-        Assert.That(shared & MoveParams.StopInputPerDriver, Is.Zero, "one switch stops the whole axis");
+        Assert.That(RemoteEndstops.TryGetStopInput(one, 2, 2, stop), Is.True);
+        Assert.That(stop.NumSwitches, Is.EqualTo(1), "one switch stops the whole axis");
 
-        Assert.That(RemoteEndstops.TryGetStopInput(one, 2, 1, out uint single), Is.True);
-        Assert.That(single & MoveParams.StopInputPerDriver, Is.Zero, "a single-motor axis has nothing to split");
+        Assert.That(RemoteEndstops.TryGetStopInput(one, 2, 1, stop), Is.True);
+        Assert.That(stop.NumSwitches, Is.EqualTo(1), "a single-motor axis has nothing to split");
     }
 
     [Test]
-    public void ThePerDriverSwitchesHaveToShareABoard()
+    public void ThePerDriverSwitchesNeedNotShareABoard()
     {
-        // A move names one board per drive and picks the switch on it by driver index, so switches
-        // spread over two boards cannot be told apart once the move is scheduled. M574 refuses this
-        // outright; refusing it here too keeps a move from silently watching the wrong board
+        // Each switch carries its own CAN address, as RepRapFirmware's SwitchEndstop keeps a board
+        // number per port. A gantry whose two motors sit on two expansion boards is wired this way
         Endstop split = new() { Type = EndstopType.InputPin, Port = "1.io1.in+2.io1.in" };
-        Assert.That(RemoteEndstops.TryGetStopInput(split, 2, 2, out _), Is.False);
+        MoveStopInput stop = new();
+        Assert.That(RemoteEndstops.TryGetStopInput(split, 2, 2, stop), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(stop.NumSwitches, Is.EqualTo(2));
+            Assert.That(stop.Boards[0], Is.EqualTo(1), "the first motor's switch");
+            Assert.That(stop.Boards[1], Is.EqualTo(2), "the second motor's switch, on another board");
+        });
     }
 
     [Test]
@@ -158,7 +168,9 @@ public class RemoteEndstopsTests
     {
         // The caller writes the result into the move either way, so a refusal has to be the value
         // that means "watch nothing" rather than a stale one
-        RemoteEndstops.TryGetStopInput(new Endstop { Type = EndstopType.MotorStallAny }, 0, 1, out uint stopInput);
-        Assert.That(stopInput, Is.EqualTo(DuetControlServer.Motion.Native.MoveParams.NoStopInput));
+        MoveStopInput stopInput = new();
+        stopInput.SetShared(0x1234, 5);
+        RemoteEndstops.TryGetStopInput(new Endstop { Type = EndstopType.MotorStallAny }, 0, 1, stopInput);
+        Assert.That(stopInput.NumSwitches, Is.Zero, "a refused endstop leaves the drive watching nothing");
     }
 }

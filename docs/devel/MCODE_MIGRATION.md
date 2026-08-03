@@ -920,23 +920,26 @@ counts are equal (`SwitchEndstop::PrimeAxis`); any other count falls back to sto
 on the first trigger. That fallback is what makes a dual-motor axis with one switch safe, because the
 motor with no switch of its own would otherwise never stop. Both rules are reproduced here.
 
-The pairing is carried on the wire without widening anything. A drive's stop input already packs a CAN
-address and a `RemoteInputHandle`, and the handle's low 6 bits are its minor field, which is the switch
-within the axis. `MoveParams` marks a per-driver endstop with a private flag bit (`kStopInputPerDriver`,
-bit 31, above the packed address) and `StopInputForDriver` rewrites the minor field from the driver's
-index as `DDA::Prepare` emits each driver's movement. The flag never reaches the wire. M574 registers
-one input monitor per port under the matching handle, so the handles a move names are the ones the
-board is already watching.
+A move carries the switches per drive as a `MoveStopInput`, which is `SwitchEndstop` reduced to what a
+move needs:
 
-Two consequences follow from there being one CAN address per **drive** rather than per driver:
+| Field | Meaning |
+|---|---|
+| `handle` | The `RemoteInputHandle` the switches are registered under, minor field zero |
+| `numSwitches` | 0 = this drive watches nothing; 1 = every driver watches `boards[0]`; n = driver *i* watches `boards[i]` |
+| `boards[]` | CAN address of each switch, in driver order |
 
-- **All of an axis' switches must be on one board.** M574 rejects a port list that spans boards, and
-  `RemoteEndstops.TryGetStopInput` refuses one too, so a mis-typed config fails at configuration time
-  instead of producing a move that watches the wrong board. RepRapFirmware allows the spread; nothing
-  in the standard dual-motor wiring needs it, and lifting it means one address per driver on the wire.
-- **`stopAll` outranks `stopDriver`.** On coupled kinematics the flag is cleared before the input is
-  copied to every drive, for the same reason RepRapFirmware's `stopAll` test comes first: waiting for
-  each motor's own switch would leave the coupled drives running.
+Only the board differs from one switch of an axis to the next - the handle follows from which switch
+it is, because `RemoteInputHandle`'s minor field is the switch index and RepRapFirmware derives it the
+same way. `StopInputForDriver` rebuilds the pair as `DDA::Prepare` emits each driver's movement, and
+M574 registers one input monitor per port under the matching handle, so the handles a move names are
+the ones the board is already watching. **The switches of an axis may be on different boards**, as
+they may in the firmware: each carries its own CAN address.
+
+One rule does not come from RepRapFirmware's endstop code at all: **`stopAll` outranks `stopDriver`**.
+On coupled kinematics the drive's entry is rewritten to the axis' first switch before it is copied to
+every drive, for the same reason RepRapFirmware's `stopAll` test comes first - waiting for each motor's
+own switch would leave the coupled drives running.
 
 The drive tracker complicates matters slightly. Adopting a stopped driver's position freezes the
 tracker, and the tracker is exactly what tells the *remaining* drivers where they were when their own

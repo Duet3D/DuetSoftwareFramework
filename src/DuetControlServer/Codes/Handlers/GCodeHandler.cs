@@ -314,8 +314,8 @@ internal sealed class GCodeHandler(
         KinematicsEngine geometry = planner.Parameters.Geometry;
 
         int stopAllAxis = -1;
-        uint stopAllInput = 0;
-        List<(int Axis, uint StopInput)> perAxis = [];
+        MoveStopInput stopAllInput = new();
+        int perAxisCount = 0;
 
         for (int axis = 0; axis < numAxes; axis++)
         {
@@ -326,7 +326,7 @@ internal sealed class GCodeHandler(
 
             Endstop? endstop = axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null;
             if (endstop is null ||
-                !RemoteEndstops.TryGetStopInput(endstop, axis, model.Move.Axes[axis].Drivers.Count, out uint stopInput))
+                !RemoteEndstops.TryGetStopInput(endstop, axis, model.Move.Axes[axis].Drivers.Count, move.StopOnInput[axis]))
             {
                 continue;                       // no endstop, or one no move can stop on
             }
@@ -341,38 +341,32 @@ internal sealed class GCodeHandler(
                         + "on this kinematics either endstop has to stop every drive");
                 }
                 stopAllAxis = axis;
-                stopAllInput = stopInput;
+                stopAllInput.CopyFrom(move.StopOnInput[axis]);
             }
             else
             {
-                perAxis.Add((axis, stopInput));
+                perAxisCount++;
             }
         }
 
         if (stopAllAxis >= 0)
         {
-            if (perAxis.Count > 0)
+            if (perAxisCount > 0)
             {
                 return new Message(MessageType.Error,
                     $"Cannot home {model.Move.Axes[stopAllAxis].Letter} with another axis: "
                     + "its endstop has to stop every drive, which would disarm the others");
             }
 
-            // Every drive watches the one input, so whichever driver sees the change first, they all
+            // Every drive watches the one switch, so whichever driver sees the change first, they all
             // stop. That is what makes this stopAll rather than stopAxis. A per-driver endstop is
-            // demoted here for the same reason RepRapFirmware demotes it: the drives are coupled, so
-            // letting each one wait for its own switch would keep the others running
-            stopAllInput &= ~MoveParams.StopInputPerDriver;
+            // demoted to its first switch here for the same reason RepRapFirmware demotes it: the
+            // drives are coupled, so letting each motor wait for its own switch would keep the
+            // others running
             for (int drive = 0; drive < move.StopOnInput.Length; drive++)
             {
-                move.StopOnInput[drive] = stopAllInput;
+                move.StopOnInput[drive].SetShared(stopAllInput.Handle, stopAllInput.Boards[0]);
             }
-            return null;
-        }
-
-        foreach ((int axis, uint stopInput) in perAxis)
-        {
-            move.StopOnInput[axis] = stopInput;
         }
         return null;
     }

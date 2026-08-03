@@ -93,13 +93,8 @@ namespace Duet::Sbc::Motion
 	static_assert(offsetof(MoveParamsHeader, totalDistance) == 12 );
 	static_assert(offsetof(MoveParamsHeader, ringNumber) == 24 );
 
-	// Value of a stopOnInput entry meaning "this drive watches no endstop during this move".
+	// Value of a stopOnInput entry meaning "this driver watches no endstop during this move".
 	inline constexpr uint32_t kNoStopInput = 0xFFFFFFFF;
-
-	// Set in a stopOnInput entry when the axis has one switch per driver rather than one for the
-	// whole axis. The handle's minor field then selects the switch, and the driver's index within the
-	// axis is what selects it - RepRapFirmware pairs port i with driver i the same way.
-	inline constexpr uint32_t kStopInputPerDriver = 0x80000000;
 
 	// Pack the CAN address and RemoteInputHandle of an endstop into a stopOnInput entry.
 	[[nodiscard]] constexpr uint32_t MakeStopInput(uint8_t boardAddress, uint16_t inputHandle) noexcept
@@ -117,27 +112,63 @@ namespace Duet::Sbc::Motion
 		return static_cast<uint16_t>(stopOnInput);
 	}
 
-	// The stop input for one driver of an axis.
+	// Which switch, if any, stops each driver of a drive during this move.
 	//
-	// An axis with one switch has every driver watching it. An axis with a switch per driver has each
-	// driver watching its own, and the switch is identified by the low 6 bits of the handle - the
-	// minor field - which is the driver's index within the axis.
-	[[nodiscard]] constexpr uint32_t StopInputForDriver(uint32_t stopOnInput, size_t driverIndex) noexcept
+	// This is RepRapFirmware's SwitchEndstop reduced to what a move needs. That class holds a board
+	// number per port and derives the handle from the axis and the port index, so the board is the
+	// only part that differs between one switch of an axis and the next; the handle follows from
+	// which switch it is. The switches of an axis may be spread over several boards, as they may in
+	// the firmware.
+	//
+	// numSwitches says how the drivers share them, exactly as SwitchEndstop::PrimeAxis decides it:
+	//   0  this drive watches nothing during this move
+	//   1  every driver of the drive watches boards[0], so the first to trigger stops the axis
+	//   n  driver i watches boards[i], so each motor runs on to its own switch
+	struct MoveStopInput
 	{
-		if (stopOnInput == kNoStopInput || (stopOnInput & kStopInputPerDriver) == 0)
+		// RemoteInputHandle the switches are registered under, with a minor field of zero. Driver i
+		// watches minor i, which is why only one handle has to be carried
+		uint16_t handle;
+		uint8_t numSwitches;
+		uint8_t boards[maxDriversPerAxis];		// CAN address of each switch, in driver order
+		uint8_t padding;						// declared so the C# mirror can match it
+	};
+
+	static_assert(sizeof(MoveStopInput) == 4 + maxDriversPerAxis, "MoveStopInput layout");
+	static_assert(offsetof(MoveStopInput, boards) == 3);
+
+	// A drive that watches nothing, which is what every drive of an ordinary move carries.
+	inline constexpr MoveStopInput kNoStopSwitches{};
+
+	// The packed board and handle that one driver of a drive watches, or kNoStopInput.
+	//
+	// A driver past the end of a per-driver list watches nothing rather than falling back to the
+	// first switch: it has no switch of its own, and stopping it on another motor's would defeat the
+	// point of giving each motor one.
+	[[nodiscard]] constexpr uint32_t StopInputForDriver(const MoveStopInput& stop, size_t driverIndex) noexcept
+	{
+		if (stop.numSwitches == 0)
 		{
-			return stopOnInput;
+			return kNoStopInput;
+		}
+		if (stop.numSwitches == 1)
+		{
+			return MakeStopInput(stop.boards[0], stop.handle);
+		}
+		if (driverIndex >= stop.numSwitches || driverIndex >= maxDriversPerAxis)
+		{
+			return kNoStopInput;
 		}
 
-		constexpr uint32_t minorMask = 0x3F;			// RemoteInputHandle::minor is 6 bits wide
-		return (stopOnInput & ~(kStopInputPerDriver | minorMask))
-			   | (static_cast<uint32_t>(driverIndex) & minorMask);
+		constexpr uint16_t minorMask = 0x3F;			// RemoteInputHandle::minor is 6 bits wide
+		const auto handle = static_cast<uint16_t>((stop.handle & ~minorMask) | (driverIndex & minorMask));
+		return MakeStopInput(stop.boards[driverIndex], handle);
 	}
 
 	// Total size of a submission carrying `numDrives` drives.
 	[[nodiscard]] constexpr size_t MoveParamsLength(size_t numDrives) noexcept
 	{
-		return sizeof(MoveParamsHeader) + (numDrives * (sizeof(int32_t) + sizeof(float) + sizeof(uint32_t)));
+		return sizeof(MoveParamsHeader) + (numDrives * (sizeof(int32_t) + sizeof(float) + sizeof(MoveStopInput)));
 	}
 
 	// The two trailing arrays. Both are read straight out of the record, so callers must not assume
@@ -163,18 +194,18 @@ namespace Duet::Sbc::Motion
 		return {first, header.numDrives};
 	}
 
-	// Which input, if any, stops each drive during this move. Only meaningful when the move carries
-	// MoveFlags::checkEndstops; every entry is kNoStopInput otherwise.
+	// Which switches, if any, stop each drive during this move. Only meaningful when the move carries
+	// MoveFlags::checkEndstops; every entry has numSwitches zero otherwise.
 	//
 	// It is per drive rather than per move so that one move can home several axes at once, each
 	// stopping on its own endstop. The entries travel all the way down to the controller, which is
 	// what actually watches for the input change: it is the only place close enough to the CAN bus
 	// for the axis not to overrun before the stop takes effect.
-	[[nodiscard]] inline std::span<const uint32_t> MoveParamsStopInputs(const MoveParamsHeader& header) noexcept
+	[[nodiscard]] inline std::span<const MoveStopInput> MoveParamsStopInputs(const MoveParamsHeader& header) noexcept
 	{
 		const std::span<const float> directionVector = MoveParamsDirectionVector(header);
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
-		const auto *const first = reinterpret_cast<const uint32_t *>(directionVector.data() + directionVector.size());
+		const auto *const first = reinterpret_cast<const MoveStopInput *>(directionVector.data() + directionVector.size());
 		return {first, header.numDrives};
 	}
 
@@ -195,11 +226,11 @@ namespace Duet::Sbc::Motion
 		return {first, header.numDrives};
 	}
 
-	[[nodiscard]] inline std::span<uint32_t> MoveParamsStopInputs(MoveParamsHeader& header) noexcept
+	[[nodiscard]] inline std::span<MoveStopInput> MoveParamsStopInputs(MoveParamsHeader& header) noexcept
 	{
 		const std::span<float> directionVector = MoveParamsDirectionVector(header);
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
-		auto *const first = reinterpret_cast<uint32_t *>(directionVector.data() + directionVector.size());
+		auto *const first = reinterpret_cast<MoveStopInput *>(directionVector.data() + directionVector.size());
 		return {first, header.numDrives};
 	}
 }

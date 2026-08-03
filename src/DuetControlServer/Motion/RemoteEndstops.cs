@@ -1,3 +1,4 @@
+using System;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Motion.Native;
@@ -48,7 +49,7 @@ internal static class RemoteEndstops
     public static string[] PortsOf(Endstop endstop)
         => string.IsNullOrWhiteSpace(endstop.Port)
             ? []
-            : endstop.Port.Split(PortSeparator, System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries);
+            : endstop.Port.Split(PortSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     /// <summary>
     /// Split a port name into the board that carries it and the port on that board
@@ -80,12 +81,12 @@ internal static class RemoteEndstops
     }
 
     /// <summary>
-    /// The stop input entry a homing move should carry for an axis
+    /// Fill in the switches a homing move should stop an axis on
     /// </summary>
     /// <param name="endstop">The axis' endstop</param>
     /// <param name="axis">Axis number</param>
     /// <param name="numDrivers">How many drivers the axis has</param>
-    /// <param name="stopInput">Receives the packed board and handle</param>
+    /// <param name="stopInput">Entry to fill in; left watching nothing if the axis cannot be stopped</param>
     /// <returns>True if the axis has an endstop a move can stop on</returns>
     /// <remarks>
     /// <para>
@@ -93,44 +94,42 @@ internal static class RemoteEndstops
     /// by an input, and a Z probe standing in for an endstop needs M558, which is not ported.
     /// </para>
     /// <para>
-    /// An axis with as many switches as drivers stops each driver on its own switch, which is
-    /// RepRapFirmware's <c>stopDriver</c>. Any other count - one switch for a dual-motor axis, or
-    /// more switches than drivers - stops the whole axis on the first trigger, which is what
-    /// RepRapFirmware does when the two counts disagree
+    /// An axis with as many switches as drivers stops each driver on its own switch, which is what
+    /// squares a gantry. Any other count - one switch for a dual-motor axis, or more switches than
+    /// drivers - stops the whole axis on the first trigger, which is what RepRapFirmware does when
+    /// the two counts disagree and what keeps a driver with no switch of its own from running on
     /// </para>
     /// </remarks>
-    public static bool TryGetStopInput(Endstop endstop, int axis, int numDrivers, out uint stopInput)
+    public static bool TryGetStopInput(Endstop endstop, int axis, int numDrivers, MoveStopInput stopInput)
     {
-        stopInput = MoveParams.NoStopInput;
+        stopInput.Clear();
         if (endstop.Type != EndstopType.InputPin)
         {
             return false;
         }
 
         string[] ports = PortsOf(endstop);
-        if (ports.Length == 0 || !TrySplitPort(ports[0], out byte board, out _))
+        if (ports.Length == 0)
         {
             return false;
         }
 
-        bool perDriver = numDrivers > 1 && ports.Length == numDrivers;
-        if (perDriver)
+        Span<byte> boards = stackalloc byte[ports.Length];
+        for (int i = 0; i < ports.Length; i++)
         {
-            // Every switch of the axis has to be on one board, because a move carries one CAN address
-            // per drive and the driver index only selects the switch
-            foreach (string port in ports)
+            if (!TrySplitPort(ports[i], out boards[i], out _))
             {
-                if (!TrySplitPort(port, out byte portBoard, out _) || portBoard != board)
-                {
-                    return false;
-                }
+                return false;
             }
         }
 
-        stopInput = MoveParams.MakeStopInput(board, HandleFor(axis).All);
-        if (perDriver)
+        if (numDrivers > 1 && ports.Length == numDrivers)
         {
-            stopInput |= MoveParams.StopInputPerDriver;
+            stopInput.SetPerDriver(HandleFor(axis).All, boards);
+        }
+        else
+        {
+            stopInput.SetShared(HandleFor(axis).All, boards[0]);
         }
         return true;
     }

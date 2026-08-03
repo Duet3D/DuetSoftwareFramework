@@ -104,7 +104,7 @@ namespace
 		constexpr uint8_t numDrives = 4;
 		constexpr size_t length = MoveParamsLength(numDrives);
 		Report("MoveParams(4 drives)", length);
-		CHECK(length == 28 + (4 * 12), "a four-drive submission is the header plus three four-entry arrays");
+		CHECK(length == 28 + (4 * (4 + 4 + 12)), "a four-drive submission is the header plus three four-entry arrays");
 
 		alignas(uint32_t) char record[MoveParamsLength(numDrives)]{};
 		auto *const header = reinterpret_cast<MoveParamsHeader *>(record);
@@ -114,7 +114,7 @@ namespace
 		// round trip rather than a restatement of the same arithmetic twice.
 		const std::span<int32_t> endPoints = MoveParamsEndPoints(*header);
 		const std::span<float> directions = MoveParamsDirectionVector(*header);
-		const std::span<uint32_t> stopInputs = MoveParamsStopInputs(*header);
+		const std::span<Duet::Sbc::Motion::MoveStopInput> stopInputs = MoveParamsStopInputs(*header);
 		CHECK(endPoints.size() == numDrives, "the endpoint span covers the drives the header claims");
 		CHECK(directions.size() == numDrives, "the direction span covers the drives the header claims");
 		CHECK(stopInputs.size() == numDrives, "the stop input span covers the drives the header claims");
@@ -122,7 +122,9 @@ namespace
 		{
 			endPoints[i] = 1000 + i;
 			directions[i] = 0.25F * (float)(i + 1);
-			stopInputs[i] = Duet::Sbc::Motion::MakeStopInput((uint8_t)(i + 1), (uint16_t)(0x100 + i));
+			stopInputs[i].handle = (uint16_t)(0x100 + i);
+			stopInputs[i].numSwitches = 1;
+			stopInputs[i].boards[0] = (uint8_t)(i + 1);
 		}
 
 		// A byte past the end would be a buffer overrun in the transfer, so check the span ends
@@ -132,7 +134,7 @@ namespace
 
 		const std::span<const int32_t> readEndPoints = MoveParamsEndPoints(*header);
 		const std::span<const float> readDirections = MoveParamsDirectionVector(*header);
-		const std::span<const uint32_t> readStopInputs = MoveParamsStopInputs(*header);
+		const std::span<const Duet::Sbc::Motion::MoveStopInput> readStopInputs = MoveParamsStopInputs(*header);
 		for (uint8_t i = 0; i < numDrives; ++i)
 		{
 			CHECK(readEndPoints[i] == 1000 + i, "endpoints read back as written");
@@ -140,16 +142,16 @@ namespace
 
 			// The board and handle have to survive the round trip separately: they are matched
 			// against an incoming input change one field at a time
-			CHECK(Duet::Sbc::Motion::StopInputBoard(readStopInputs[i]) == i + 1, "the stop input board reads back as written");
-			CHECK(Duet::Sbc::Motion::StopInputHandle(readStopInputs[i]) == 0x100 + i, "the stop input handle reads back as written");
+			const uint32_t forDriver = Duet::Sbc::Motion::StopInputForDriver(readStopInputs[i], 0);
+			CHECK(Duet::Sbc::Motion::StopInputBoard(forDriver) == i + 1, "the stop input board reads back as written");
+			CHECK(Duet::Sbc::Motion::StopInputHandle(forDriver) == 0x100 + i, "the stop input handle reads back as written");
 		}
 	}
 }
 
 // An axis with a switch per driver pairs port i with driver i, exactly as RepRapFirmware does. That
-// pairing is expressed by rewriting the handle's minor field, and it is the only thing that tells one
-// motor of a gantry from the other - get it wrong and both motors watch one switch, which is the
-// stopAxis behaviour the configuration was trying to avoid.
+// pairing is the only thing that tells one motor of a gantry from the other - get it wrong and both
+// motors watch one switch, which is the behaviour the configuration was trying to avoid.
 void TestStopInputPerDriver() noexcept
 {
 	using namespace Duet::Sbc::Motion;
@@ -157,24 +159,40 @@ void TestStopInputPerDriver() noexcept
 	// The handle M574 registered: type 1 (endstop) in the top nibble, axis 2 in the major field,
 	// switch 0 in the minor field
 	constexpr uint16_t handle = (1u << 12) | (2u << 6);
-	const uint32_t axisWide = MakeStopInput(3, handle);
-	const uint32_t perDriver = axisWide | kStopInputPerDriver;
 
-	// One switch for the whole axis: every driver watches the switch that was registered
-	CHECK(StopInputForDriver(axisWide, 0) == axisWide, "driver 0 watches the axis' switch");
-	CHECK(StopInputForDriver(axisWide, 1) == axisWide, "driver 1 watches the same switch");
-
-	// A switch per driver: same board and same axis, but each driver watches its own switch
-	for (size_t driver = 0; driver < 4; ++driver)
+	// One switch for the whole axis: every driver watches it, whichever driver it is
+	MoveStopInput shared{};
+	shared.handle = handle;
+	shared.numSwitches = 1;
+	shared.boards[0] = 3;
+	for (size_t driver = 0; driver < 3; ++driver)
 	{
-		const uint32_t forDriver = StopInputForDriver(perDriver, driver);
-		CHECK(StopInputBoard(forDriver) == 3, "the board is the same for every switch of the axis");
-		CHECK(StopInputHandle(forDriver) == handle + driver, "the minor field selects the driver's switch");
-		CHECK((forDriver & kStopInputPerDriver) == 0, "the marker does not reach the wire");
+		const uint32_t forDriver = StopInputForDriver(shared, driver);
+		CHECK(StopInputBoard(forDriver) == 3, "every driver watches the axis' board");
+		CHECK(StopInputHandle(forDriver) == handle, "and the axis' switch");
 	}
 
+	// A switch per driver: the handle follows the driver's index, and the board is whichever board
+	// that switch happens to be wired to - they need not be the same one
+	MoveStopInput perDriver{};
+	perDriver.handle = handle;
+	perDriver.numSwitches = 3;
+	perDriver.boards[0] = 1;
+	perDriver.boards[1] = 4;
+	perDriver.boards[2] = 0;
+	for (size_t driver = 0; driver < perDriver.numSwitches; ++driver)
+	{
+		const uint32_t forDriver = StopInputForDriver(perDriver, driver);
+		CHECK(StopInputBoard(forDriver) == perDriver.boards[driver], "each switch keeps its own board");
+		CHECK(StopInputHandle(forDriver) == handle + driver, "the minor field selects the driver's switch");
+	}
+
+	// A driver with no switch of its own must not fall back to another motor's, which would stop it
+	// at the wrong place and defeat the point of giving each motor one
+	CHECK(StopInputForDriver(perDriver, 3) == kNoStopInput, "a driver past the last switch watches nothing");
+
 	// A drive with no endstop has to stay without one, or it would start watching switch 0
-	CHECK(StopInputForDriver(kNoStopInput, 1) == kNoStopInput, "a drive watching nothing keeps the sentinel");
+	CHECK(StopInputForDriver(kNoStopSwitches, 1) == kNoStopInput, "a drive watching nothing keeps the sentinel");
 }
 
 int main()

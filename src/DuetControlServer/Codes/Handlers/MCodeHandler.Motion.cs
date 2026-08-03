@@ -2576,23 +2576,13 @@ internal partial class MCodeHandler
             return $"Axis {axis.Letter} may have at most {Motion.Native.MotionLimits.MaxDriversPerAxis} endstop switches";
         }
 
-        if (!RemoteEndstops.TrySplitPort(ports[0], out byte board, out _))
+        foreach (string switchPort in ports)
         {
-            return $"Invalid endstop port '{ports[0]}'";
-        }
-
-        for (int i = 1; i < ports.Length; i++)
-        {
-            if (!RemoteEndstops.TrySplitPort(ports[i], out byte otherBoard, out _))
+            // The switches of an axis need not share a board: a move carries the address of each one
+            // separately, as RepRapFirmware's SwitchEndstop keeps a board number per port
+            if (!RemoteEndstops.TrySplitPort(switchPort, out _, out _))
             {
-                return $"Invalid endstop port '{ports[i]}'";
-            }
-
-            // A move names one board per drive and picks the switch on it by driver index, so
-            // switches spread over two boards could not be told apart when the move is scheduled
-            if (otherBoard != board)
-            {
-                return $"All endstop switches of axis {axis.Letter} must be on the same board";
+                return $"Invalid endstop port '{switchPort}'";
             }
         }
         return null;

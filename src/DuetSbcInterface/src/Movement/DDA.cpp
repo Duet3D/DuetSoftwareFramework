@@ -296,7 +296,7 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 	// previous DDA's endpoint, so a stale entry moves the drive by the whole difference.
 	const std::span<const int32_t> endPoints = MoveParamsEndPoints(params);
 	const std::span<const float> directions = MoveParamsDirectionVector(params);
-	const std::span<const uint32_t> stopInputs = MoveParamsStopInputs(params);
+	const std::span<const Duet::Sbc::Motion::MoveStopInput> stopInputs = MoveParamsStopInputs(params);
 	for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)
 	{
 		// The bound comes from the spans rather than from numDrives again: they were built from it
@@ -311,7 +311,7 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 		{
 			m_endPoint[drive] = m_prev->m_endPoint[drive];
 			m_directionVector[drive] = 0.0;
-			m_stopOnInput[drive] = kNoStopInput;
+			m_stopOnInput[drive] = Duet::Sbc::Motion::kNoStopSwitches;
 		}
 	}
 
@@ -858,7 +858,7 @@ void DDA::Prepare(DDARing& ring,
 								// Port i of an endstop belongs to driver i of the axis, so the
 								// switch this driver watches follows from its index
 								CanMotion::AddAxisMovement(params, driver, delta,
-																		   Duet::Sbc::Motion::StopInputForDriver(m_stopOnInput[drive], i));
+														   Duet::Sbc::Motion::StopInputForDriver(m_stopOnInput[drive], i));
 							}
 						}
 #endif

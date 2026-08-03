@@ -44,13 +44,13 @@ internal sealed class RawMove
     public bool CheckEndstops { get; set; }
 
     /// <summary>
-    /// Which input stops each drive during this move, by logical drive
+    /// Which switches stop each drive during this move, by logical drive
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Each entry is the CAN address and remote input handle of an endstop packed by
-    /// <see cref="Native.MoveParams.MakeStopInput"/>, or <see cref="Native.MoveParams.NoStopInput"/>
-    /// for a drive that watches nothing. Only meaningful when <see cref="CheckEndstops"/> is set.
+    /// Only meaningful when <see cref="CheckEndstops"/> is set; every entry watches nothing
+    /// otherwise. An entry names one switch for the whole drive, or one per driver when the axis has
+    /// as many switches as drivers - see <see cref="Native.MoveStopInput"/>.
     /// </para>
     /// <para>
     /// It is per drive rather than per move so that one move can home several axes at once, each
@@ -59,16 +59,19 @@ internal sealed class RawMove
     /// would already have been overrun
     /// </para>
     /// </remarks>
-    public uint[] StopOnInput { get; } = CreateStopInputs();
+    public Native.MoveStopInput[] StopOnInput { get; } = CreateStopInputs();
 
     /// <summary>
     /// A stop input array with nothing being watched
     /// </summary>
     /// <returns>The array</returns>
-    private static uint[] CreateStopInputs()
+    private static Native.MoveStopInput[] CreateStopInputs()
     {
-        uint[] inputs = new uint[MotionLimits.MaxAxesPlusExtruders];
-        Array.Fill(inputs, Native.MoveParams.NoStopInput);
+        Native.MoveStopInput[] inputs = new Native.MoveStopInput[MotionLimits.MaxAxesPlusExtruders];
+        for (int i = 0; i < inputs.Length; i++)
+        {
+            inputs[i] = new Native.MoveStopInput();
+        }
         return inputs;
     }
 
