@@ -70,6 +70,7 @@ class DataTransfer
 	bool WriteCodeBufferUpdate(uint16_t bufferSpace) noexcept;
 	bool WriteCodeReply(MessageType type, OutputBuffer*& response) noexcept;
 	bool WritePrintPaused(FilePosition position, FilePosition position2, PrintPausedReason reason) noexcept;
+	bool WriteMotionStopped(const MotionStoppedHeader& header, const MotionStoppedDriver* drivers) noexcept;
 	bool WriteCANResponse(const CANResponseHeader& header,
 						  const char* _ecv_null payload) noexcept; // Forward a received CAN message to the SBC
 	void WriteMasterClock() noexcept; // Write the master clock packet (must be the first packet of a transfer)

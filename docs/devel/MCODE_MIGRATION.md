@@ -753,3 +753,126 @@ was silently inert**. It now runs the file, which means config.g takes effect an
 inventory above becomes reachable rather than dead. Expect a machine's config.g to report errors for
 the codes still on the ⬜ list in §5 — that is the visible-error change from §2 doing its job, not a
 regression in macro handling.
+
+---
+
+## 10. Endstops: stopping a move short
+
+Phase 5's architecture, written down here because it spans four components and no one of them shows
+the whole shape.
+
+RepRapFirmware does all of this on one board: it generates the steps, so it knows when an endstop
+fired and where every drive was at that instant. Here the drives are on CAN-connected expansion
+boards, DuetSbcInterface plans the motion, DuetCANMaster bridges SPI to CAN, and no single component
+knows all of it. What follows is what that forces.
+
+### The stop is decided on the controller
+
+An expansion board reports an input change as `CanMessageInputChangedV2`. The move has to stop *now*:
+an axis at 100 mm/s covers a millimetre every 10 ms, so a round trip out to DuetControlServer and
+back would overrun the endstop visibly.
+
+So **DuetCANMaster decides the stop**, being the only component close enough to the bus. It needs no
+notion of what an endstop is: each move tells it which input stops which driver, and it matches an
+incoming change against that directly. The message is still forwarded to DCS, because the object
+model has to see the input change whether or not anything was moving.
+
+An endstop already triggered when the move starts is handled as RepRapFirmware handles it - the
+driver is simply given no steps before the move goes out (`StopDriverWhenProvisional`).
+
+### The stop identity travels with the move, per driver
+
+Each driver in a move carries the CAN address and `RemoteInputHandle` of the input that stops it -
+exactly the two fields that arrive in `CanMessageInputChangedV2`, so matching needs no lookup table.
+
+**Per driver rather than per move.** That is what lets one move home several axes at once, each
+stopping on its own endstop, and what stops a driver that watches nothing from being stopped by its
+neighbour's endstop.
+
+| Stage | Where it lives |
+|---|---|
+| DCS plans the move | `RawMove.StopOnInput[drive]` |
+| DCS → DuetSbcInterface | `MoveParams` third trailing array, `stopOnInput[numDrives]` |
+| Held while queued | `DDA::m_stopOnInput[]` |
+| DuetSbcInterface → DuetCANMaster | `ScheduleMoveDriver::stopOnBoard` and `stopOnHandle` |
+
+`Motion::kNoStopInput` and `SbcProtocol::NoEndstopBoard` are the sentinels; every non-endstop move
+carries them.
+
+### Stopping and correcting are different jobs
+
+The controller stops the drives but cannot say where they should *end up*: it never generated the
+steps and does not know how far each had travelled. Undoing the overshoot needs the position at the
+instant the endstop fired, which only DuetSbcInterface can answer - it planned the motion and
+evaluates the same segment chain anyway to report live positions (`Motion::DriveTracker`).
+
+```
+board          controller                        DuetSbcInterface
+  |                |                                    |
+  |-- InputChanged->|                                   |
+  |                 |-- stop matching drivers           |
+  |<- StopMovement -|                                   |
+  |                 |-- MotionStopped (SPI) ----------->|
+  |                 |                    position at whenTriggered
+  |                 |                    correct DriveTracker + DDA endpoint
+  |<---------------- CanMessageRevertPosition ----------|
+```
+
+`FirmwareRequest::MotionStopped` carries the trigger timestamp and the stopped drivers. It was
+already reserved in the protocol with no struct and an empty `case`; `MotionStoppedHeader` and
+`MotionStoppedDriver` fill it in.
+
+**Why the calculation is not in DuetControlServer.** Considered and rejected: nothing in
+`DuetControlServer/Motion` evaluates a velocity profile at a timestamp - `MoveBuilder` tracks
+endpoints and live positions come *from* the engine - so putting it there means reimplementing
+`DriveTracker`'s segment evaluation in C#, or calling back into native for it. And the native
+correction is required regardless, because DCS plans each move as a delta from the engine's
+endpoints, so emitting the revert from the same place keeps one operation atomic rather than opening
+a window where the trackers and the boards disagree.
+
+The cost is worth knowing: this is the **only** native-originated CAN message. Every other one goes
+DCS → `DuetSbc_QueueCanMessage` → link, and that invariant is why DuetSbcInterface had no CANlib
+dependency before this work.
+
+**The correction has to reach the DDA, not just the tracker.** `MotionService::OnMoveRetired` reports
+`dda.DriveCoordinates()` for endstop moves, which is `DDA::m_endPoint` - the *planned* endpoints.
+Correcting only the tracker would leave DCS being told the move finished where it intended, planning
+the next move from a position the machine was never at. Silent, and it would present as a homing
+offset. `HandleMotionStopped` therefore also calls `DDA::SetDriveCoordinate`, finding the move by
+scanning the rings for one with `IsCheckingEndstops()` - an endstop move is always isolated, so at
+most one can be running.
+
+### What the controller no longer does
+
+`DriversStopList::stopSteps` and the whole revert path - `RevertStoppedDrivers`,
+`FinishedStoppingDrivers`, `revertAll`/`revertedAll`, `sentRevertRequest` - were inherited from
+RepRapFirmware, had no callers, and are gone. `GetUrgentMessage` now only sends stop messages, and
+`StopDriverWhenExecuting` no longer takes a step count.
+
+### Building CANlib for the SBC
+
+DuetSbcInterface needs the CAN message definitions so both ends of the link describe a message with
+the same declaration. `lib/CANlib/CANlib.cmake` gained an `MCU HOST` variant mirroring the one in
+`RRFLibraries.cmake`. Two things were not obvious:
+
+- **`-fsingle-precision-constant` must stay on.** It is not a diagnostic flag: it decides whether a
+  literal like `0.01` is float or double. Dropping it changes what `HeaterModel` computes relative to
+  the firmware, and fills the build with `-Wdouble-promotion` warnings saying so. `-nostdlib` and
+  `-Werror` *are* dropped for HOST, because those affect linking and diagnostics rather than results.
+- **`float16_t` must stay 16 bits.** `Compat/Float16Compat.h` maps it to `float`, which is right for
+  RRFLibraries - there it appears only in a field that never crosses the link. CANlib puts it *in the
+  messages* (`ShortMinCurMax`, pressure advance), so widening it changes a message's size and trips
+  CANlib's own "CAN message too big" assertion. `Compat/CoreN2G/CoreTypes.h` resolves it to
+  `_Float16`, or `__fp16` where that is the available spelling. That header is itself a compat shim:
+  CANlib includes it, it comes from CoreN2G, and building all of that for one header of typedefs
+  would be the wrong trade.
+
+### Known limits
+
+- **`CanMessageInputChangedV1` carries no timestamp.** Only V2 has `GetWhen`. A board on the older
+  message is stopped where the message found it and keeps its overshoot. Inherent to the format.
+- **`HandleMotionStopped` is not covered by tests.** It needs a `MotionService`, populated rings and
+  a link, which the harness does not stand up. The ring scan and the forced DDA endpoint are verified
+  by inspection only, and are the first things to exercise on hardware.
+- **Nothing sets `RawMove.StopOnInput` yet.** M574 is what will; the path above is complete but not
+  yet reachable from a G-code.

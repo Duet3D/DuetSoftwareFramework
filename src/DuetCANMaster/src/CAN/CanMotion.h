@@ -62,16 +62,20 @@ namespace CanMotion
 	//
 	// Returns true if anything was stopped, in which case the caller should wake the async sender.
 	// Called from the CAN receiver task
-	// whenTriggered is the master-clock time the endstop reported, used to revert the drives to
-	// where they were at that instant rather than where the stop message found them
-	bool StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle, uint32_t whenTriggered) noexcept;
+	// `stopped` receives the drivers that were stopped, so the caller can report them to the SBC.
+	// Returns how many were written, which is at most `stopped.size()`
+	size_t StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle,
+									std::span<duet::spi::protocol::MotionStoppedDriver> stopped) noexcept;
 #  endif
 
-	// The next 4 functions may be called from the step ISR, so they can't send CAN messages directly
+	// These may be called from the CAN receiver task, so they can't send CAN messages directly.
+	//
+	// Neither records where the drive should end up. Correcting for the overshoot between the
+	// endstop firing and the stop taking effect needs the position at the trigger instant, and that
+	// is worked out on the SBC, which evaluates the same motion anyway to report live positions.
+	// The SBC sends the revert itself; see FirmwareRequest::MotionStopped
 	void StopDriverWhenProvisional(DriverId driver) noexcept pre(driver.IsRemote());
-	bool StopDriverWhenExecuting(DriverId driver, int32_t netStepsTaken) noexcept pre(driver.IsRemote());
-	void FinishedStoppingDrivers() noexcept;
-	bool RevertStoppedDrivers() noexcept;
+	bool StopDriverWhenExecuting(DriverId driver) noexcept pre(driver.IsRemote());
 } // namespace CanMotion
 
 #endif

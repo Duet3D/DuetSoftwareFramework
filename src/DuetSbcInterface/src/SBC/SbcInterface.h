@@ -45,6 +45,12 @@ namespace Duet::Sbc
 		// through the ring would add exactly the scheduling noise it exists to measure.
 		using RequestServedCallback = std::function<void(int64_t latencyNs)>;
 
+		// Called when the controller reports that an endstop cut a move short. The motion side
+		// registers this, because it owns the drive trackers that have to be corrected; this class
+		// only knows how to take the report off the link
+		using MotionStoppedCallback =
+			std::function<void(uint32_t whenTriggered, std::span<const duet::spi::protocol::MotionStoppedDriver>)>;
+
 		explicit SbcInterface(const Config& config);
 		~SbcInterface();
 
@@ -119,6 +125,7 @@ namespace Duet::Sbc
 		bool WaitForInbound(int timeoutMs);
 
 		void SetRequestServedCallback(RequestServedCallback cb) { m_onRequestServed = std::move(cb); }
+		void SetMotionStoppedCallback(MotionStoppedCallback cb) { m_onMotionStopped = std::move(cb); }
 
 		SbcTransfer& Transfer() noexcept { return m_transfer; }
 
@@ -187,6 +194,7 @@ namespace Duet::Sbc
 		std::atomic<bool> m_consumerWaiting{false};
 
 		RequestServedCallback m_onRequestServed;
+		MotionStoppedCallback m_onMotionStopped;
 	};
 
 } // namespace Duet::Sbc

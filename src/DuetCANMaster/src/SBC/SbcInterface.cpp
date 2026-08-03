@@ -75,6 +75,8 @@ SbcInterface::SbcInterface() noexcept
 
 	, m_canResponseHead(0)
 	, m_canResponseTail(0)
+	, m_motionStoppedHead(0)
+	, m_motionStoppedTail(0)
 #  ifdef TRACK_FILE_CODES
 	, fileCodesRead(0)
 	, fileCodesHandled(0)
@@ -194,7 +196,10 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 					// (no SPI transfer has happened yet). Fold the new data into the armed buffer and
 					// re-arm - without advancing the sequence number - so SbcDataAvailable goes high and
 					// the SBC pulls it on the next clock.
-					if (ProcessCanResponses())
+					// Motion-stopped reports first: a move is already stopped and waiting for the
+					// SBC to say where it should end up, so it should not queue behind status traffic
+					const bool wroteEverything = ProcessMotionStopped() & ProcessCanResponses();
+					if (wroteEverything)
 					{
 						m_transfer.StartNextTransfer(true);
 					}
@@ -338,6 +343,49 @@ bool SbcInterface::EnqueueCanResponse(const CANResponseHeader& header, const cha
 
 	// const bool timeCritical = header.msgType <= CanMessageType::inputStateChangedV2;
 	EventOccurred(true);
+	return true;
+}
+
+bool SbcInterface::ReportMotionStopped(uint32_t whenTriggered,
+									   std::span<const duet::spi::protocol::MotionStoppedDriver> stopped) noexcept
+{
+	if (stopped.empty())
+	{
+		return true;
+	}
+
+	const TaskCriticalSectionLocker lock;
+	const size_t next = (m_motionStoppedHead + 1) % NumMotionStoppedBuffers;
+	if (next == m_motionStoppedTail)
+	{
+		return false;						// queue full; the move will stop but keep its overshoot
+	}
+
+	MotionStoppedBuffer& item = m_motionStoppedRing[m_motionStoppedHead];
+	const auto count = min<size_t>(stopped.size(), ARRAY_SIZE(item.drivers));
+	item.header.whenTriggered = whenTriggered;
+	item.header.numDrivers = (uint8_t)count;
+	memset(item.header.padding, 0, sizeof(item.header.padding));
+	memcpy(item.drivers, stopped.data(), count * sizeof(item.drivers[0]));
+	m_motionStoppedHead = next;
+
+	EventOccurred(true);
+	return true;
+}
+
+// Write any queued motion-stopped reports into the current transfer.
+// Returns false when the transfer is full, in which case the rest go next time.
+bool SbcInterface::ProcessMotionStopped() noexcept
+{
+	while (m_motionStoppedTail != m_motionStoppedHead)
+	{
+		const MotionStoppedBuffer& item = m_motionStoppedRing[m_motionStoppedTail];
+		if (!m_transfer.WriteMotionStopped(item.header, item.drivers))
+		{
+			return false;
+		}
+		m_motionStoppedTail = (m_motionStoppedTail + 1) % NumMotionStoppedBuffers;
+	}
 	return true;
 }
 
@@ -635,6 +683,7 @@ void SbcInterface::ExchangeData() noexcept
 #  endif
 
 	// Forward any CAN responses queued by the CAN receiver tasks
+	ProcessMotionStopped();
 	ProcessCanResponses();
 }
 

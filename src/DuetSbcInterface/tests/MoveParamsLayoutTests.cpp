@@ -75,12 +75,22 @@ namespace
 		CHECK_OFFSET(ScheduleMoveHeader, flags, 53);
 
 		Report("ScheduleMoveDriver", sizeof(ScheduleMoveDriver));
-		CHECK(sizeof(ScheduleMoveDriver) == 12, "ScheduleMoveDriver is 12 bytes");
+		CHECK(sizeof(ScheduleMoveDriver) == 16, "ScheduleMoveDriver is 16 bytes");
 		CHECK_OFFSET(ScheduleMoveDriver, boardAddress, 0);
 		CHECK_OFFSET(ScheduleMoveDriver, driverNumber, 1);
 		CHECK_OFFSET(ScheduleMoveDriver, isExtruder, 2);
+		CHECK_OFFSET(ScheduleMoveDriver, stopOnBoard, 3);
 		CHECK_OFFSET(ScheduleMoveDriver, steps, 4);
 		CHECK_OFFSET(ScheduleMoveDriver, extrusion, 8);
+		CHECK_OFFSET(ScheduleMoveDriver, stopOnHandle, 12);
+
+		// The controller matches an incoming input change against these two, so they are the only
+		// thing standing between an endstop firing and the right drive being stopped
+		Report("MotionStoppedHeader", sizeof(duet::spi::protocol::MotionStoppedHeader));
+		CHECK(sizeof(duet::spi::protocol::MotionStoppedHeader) == 8, "MotionStoppedHeader is 8 bytes");
+		CHECK_OFFSET(duet::spi::protocol::MotionStoppedHeader, whenTriggered, 0);
+		CHECK_OFFSET(duet::spi::protocol::MotionStoppedHeader, numDrivers, 4);
+		CHECK(sizeof(duet::spi::protocol::MotionStoppedDriver) == 4, "MotionStoppedDriver is 4 bytes");
 
 		// numDrivers is a byte, so a packet can never ask for more drivers than the SBC can put in
 		// one. If MaxScheduleMoveDrivers ever grows past 255 the field has to grow with it.
@@ -94,7 +104,7 @@ namespace
 		constexpr uint8_t numDrives = 4;
 		constexpr size_t length = MoveParamsLength(numDrives);
 		Report("MoveParams(4 drives)", length);
-		CHECK(length == 28 + (4 * 8), "a four-drive submission is the header plus two four-entry arrays");
+		CHECK(length == 28 + (4 * 12), "a four-drive submission is the header plus three four-entry arrays");
 
 		alignas(uint32_t) char record[MoveParamsLength(numDrives)]{};
 		auto *const header = reinterpret_cast<MoveParamsHeader *>(record);
@@ -104,25 +114,34 @@ namespace
 		// round trip rather than a restatement of the same arithmetic twice.
 		const std::span<int32_t> endPoints = MoveParamsEndPoints(*header);
 		const std::span<float> directions = MoveParamsDirectionVector(*header);
+		const std::span<uint32_t> stopInputs = MoveParamsStopInputs(*header);
 		CHECK(endPoints.size() == numDrives, "the endpoint span covers the drives the header claims");
 		CHECK(directions.size() == numDrives, "the direction span covers the drives the header claims");
+		CHECK(stopInputs.size() == numDrives, "the stop input span covers the drives the header claims");
 		for (uint8_t i = 0; i < numDrives; ++i)
 		{
 			endPoints[i] = 1000 + i;
 			directions[i] = 0.25F * (float)(i + 1);
+			stopInputs[i] = Duet::Sbc::Motion::MakeStopInput((uint8_t)(i + 1), (uint16_t)(0x100 + i));
 		}
 
 		// A byte past the end would be a buffer overrun in the transfer, so check the span ends
 		// exactly where the record does.
-		const char *const lastByte = reinterpret_cast<const char *>(directions.data() + directions.size());
-		CHECK(lastByte == record + length, "the direction vector ends exactly at the end of the record");
+		const char *const lastByte = reinterpret_cast<const char *>(stopInputs.data() + stopInputs.size());
+		CHECK(lastByte == record + length, "the stop inputs end exactly at the end of the record");
 
 		const std::span<const int32_t> readEndPoints = MoveParamsEndPoints(*header);
 		const std::span<const float> readDirections = MoveParamsDirectionVector(*header);
+		const std::span<const uint32_t> readStopInputs = MoveParamsStopInputs(*header);
 		for (uint8_t i = 0; i < numDrives; ++i)
 		{
 			CHECK(readEndPoints[i] == 1000 + i, "endpoints read back as written");
 			CHECK_NEAR(readDirections[i], 0.25 * (i + 1), 1e-9, "direction vector reads back as written");
+
+			// The board and handle have to survive the round trip separately: they are matched
+			// against an incoming input change one field at a time
+			CHECK(Duet::Sbc::Motion::StopInputBoard(readStopInputs[i]) == i + 1, "the stop input board reads back as written");
+			CHECK(Duet::Sbc::Motion::StopInputHandle(readStopInputs[i]) == 0x100 + i, "the stop input handle reads back as written");
 		}
 	}
 }

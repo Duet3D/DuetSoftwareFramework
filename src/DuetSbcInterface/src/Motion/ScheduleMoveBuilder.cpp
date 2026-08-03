@@ -54,7 +54,7 @@ void ScheduleMoveBuilder::AddAxisMovement(const MoveProfile& profileToUse, Drive
 
 	// The controller watches for this input and stops this driver itself. Only an endstop move
 	// carries one; every other move leaves the sentinel NewDriver already wrote
-	if (stopOnInput != Duet::Sbc::Motion::NoStopInput)
+	if (stopOnInput != Duet::Sbc::Motion::kNoStopInput)
 	{
 		d.stopOnBoard = Duet::Sbc::Motion::StopInputBoard(stopOnInput);
 		d.stopOnHandle = Duet::Sbc::Motion::StopInputHandle(stopOnInput);

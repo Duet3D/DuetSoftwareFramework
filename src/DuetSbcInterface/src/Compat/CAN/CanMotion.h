@@ -29,7 +29,7 @@ namespace CanMotion
 
 	// Add one axis driver's share of the move, in net microsteps.
 	// stopOnInput is the endstop that stops this driver, packed by Motion::MakeStopInput, or
-	// Motion::NoStopInput. The controller does the watching; see Motion/MoveParams.h
+	// Motion::kNoStopInput. The controller does the watching; see Motion/MoveParams.h
 	void AddAxisMovement(const PrepParams& params, DriverId canDriver, int32_t steps, uint32_t stopOnInput) noexcept;
 
 	// Add one extruder driver's share, in microsteps including fractional parts.

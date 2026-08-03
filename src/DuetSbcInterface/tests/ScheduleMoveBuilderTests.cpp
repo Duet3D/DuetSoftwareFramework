@@ -5,6 +5,7 @@
 // the two ways this can go wrong quietly: a field dropped or converted (the boards move the wrong
 // distance) and a partially-sent move (some drives move and others do not).
 
+#include <Motion/MoveParams.h>
 #include <Motion/ScheduleMoveBuilder.h>
 
 #include <TestSupport.h>
@@ -92,7 +93,7 @@ namespace
 
 		const MoveProfile profile = SampleProfile();
 		builder.StartMovement();
-		builder.AddAxisMovement(profile, DriverId(board1, 0), 1234);
+		builder.AddAxisMovement(profile, DriverId(board1, 0), 1234, Duet::Sbc::Motion::kNoStopInput);
 		const uint32_t clocks = builder.FinishMovement(7, 0xDEADBEEF, false, false, true);
 
 		CHECK(clocks == 3500, "FinishMovement returns the total clocks of the profile");
@@ -127,6 +128,8 @@ namespace
 		CHECK(d.driverNumber == 0, "the driver keeps its number on that board");
 		CHECK(d.isExtruder == 0, "an axis driver is not an extruder");
 		CHECK(d.steps == 1234, "axis steps survive");
+		CHECK(d.stopOnBoard == duet::spi::protocol::NoEndstopBoard,
+			  "a move that watches nothing carries the no-endstop sentinel");
 		CHECK_NEAR(d.extrusion, 0.0, 0.0, "the unused field of an axis driver is zero");
 	}
 
@@ -138,7 +141,7 @@ namespace
 
 		const MoveProfile profile = SampleProfile();
 		builder.StartMovement();
-		builder.AddAxisMovement(profile, DriverId(board1, 0), 100);
+		builder.AddAxisMovement(profile, DriverId(board1, 0), 100, Duet::Sbc::Motion::kNoStopInput);
 		builder.AddExtruderMovement(profile, DriverId(board2, 3), 12.5F, true);
 		(void)builder.FinishMovement(1, 0, false, true, false);
 
@@ -175,14 +178,14 @@ namespace
 		// Simulating: the move is planned so that the time it takes is known, but no board runs it.
 		const MoveProfile profile = SampleProfile();
 		builder.StartMovement();
-		builder.AddAxisMovement(profile, DriverId(board1, 0), 500);
+		builder.AddAxisMovement(profile, DriverId(board1, 0), 500, Duet::Sbc::Motion::kNoStopInput);
 		CHECK(builder.FinishMovement(2, 0, true, false, false) == 0, "a simulated move reports no clocks");
 		CHECK(sink.packets.empty(), "a simulated move sends nothing");
 
 		// ...and having discarded it, the builder is clean for the next move rather than carrying
 		// the simulated move's drivers into it.
 		builder.StartMovement();
-		builder.AddAxisMovement(profile, DriverId(board1, 1), 600);
+		builder.AddAxisMovement(profile, DriverId(board1, 1), 600, Duet::Sbc::Motion::kNoStopInput);
 		(void)builder.FinishMovement(3, 0, false, false, false);
 		CHECK(sink.packets.size() == 1, "the move after a simulated one is sent");
 		if (!sink.packets.empty())
@@ -199,10 +202,10 @@ namespace
 
 		const MoveProfile profile = SampleProfile();
 		builder.StartMovement();
-		builder.AddAxisMovement(profile, DriverId(board1, 0), 111);
+		builder.AddAxisMovement(profile, DriverId(board1, 0), 111, Duet::Sbc::Motion::kNoStopInput);
 		// No FinishMovement: Prepare bailed out. The next move must not inherit that driver.
 		builder.StartMovement();
-		builder.AddAxisMovement(profile, DriverId(board1, 1), 222);
+		builder.AddAxisMovement(profile, DriverId(board1, 1), 222, Duet::Sbc::Motion::kNoStopInput);
 		(void)builder.FinishMovement(4, 0, false, false, false);
 
 		CHECK(sink.packets.size() == 1, "the second move is sent");
@@ -227,7 +230,7 @@ namespace
 		builder.StartMovement();
 		for (size_t i = 0; i < total; ++i)
 		{
-			builder.AddAxisMovement(profile, DriverId((uint8_t)(i / 4), (uint8_t)(i % 4)), (int32_t)i + 1);
+			builder.AddAxisMovement(profile, DriverId((uint8_t)(i / 4), (uint8_t)(i % 4)), (int32_t)i + 1, Duet::Sbc::Motion::kNoStopInput);
 		}
 		const uint32_t clocks = builder.FinishMovement(9, 12345, false, false, false);
 
@@ -275,7 +278,7 @@ namespace
 		builder.StartMovement();
 		for (size_t i = 0; i < MaxScheduleMoveDrivers * 3; ++i)
 		{
-			builder.AddAxisMovement(profile, DriverId(1, (uint8_t)(i % 4)), (int32_t)i + 1);
+			builder.AddAxisMovement(profile, DriverId(1, (uint8_t)(i % 4)), (int32_t)i + 1, Duet::Sbc::Motion::kNoStopInput);
 		}
 		const uint32_t clocks = builder.FinishMovement(11, 0, false, false, false);
 
@@ -297,6 +300,36 @@ namespace
 	}
 }
 
+// The controller matches an incoming input change against these two fields to decide which drives to
+// stop, so a wrong or missing value means the wrong motor stops - or none does.
+void TestEndstopReachesTheWire() noexcept
+{
+	RecordingSink sink;
+	ScheduleMoveBuilder builder;
+	builder.SetSink(&sink);
+
+	const MoveProfile profile = SampleProfile();
+	builder.StartMovement();
+	builder.AddAxisMovement(profile, DriverId(board1, 0), 1234, Duet::Sbc::Motion::MakeStopInput(3, 0x0142));
+	builder.AddAxisMovement(profile, DriverId(board1, 1), 500, Duet::Sbc::Motion::kNoStopInput);
+	(void)builder.FinishMovement(1, 100, false, true, true);
+
+	CHECK(sink.packets.size() == 1, "one packet");
+	if (sink.packets.empty())
+	{
+		return;
+	}
+	const ScheduleMoveDriver& watching = sink.packets[0].Driver(0);
+	CHECK(watching.stopOnBoard == 3, "the endstop's board survives");
+	CHECK(watching.stopOnHandle == 0x0142, "the endstop's input handle survives");
+
+	// Per driver rather than per move, so one move can home several axes at once - and a driver in
+	// the same move that watches nothing must not inherit its neighbour's endstop
+	const ScheduleMoveDriver& notWatching = sink.packets[0].Driver(1);
+	CHECK(notWatching.stopOnBoard == duet::spi::protocol::NoEndstopBoard,
+		  "a driver watching nothing keeps the sentinel");
+}
+
 int main()
 {
 	TestProfileReachesTheWire();
@@ -306,5 +339,6 @@ int main()
 	TestSplitAcrossPackets();
 	TestRefusedPacketStopsTheMove();
 	TestCanPrepareMove();
+	TestEndstopReachesTheWire();
 	return TestSupport::Summarise("ScheduleMoveBuilder");
 }

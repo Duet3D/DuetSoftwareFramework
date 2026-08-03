@@ -26,12 +26,6 @@ struct PrepParams;
 
 namespace CanInterface
 {
-	// Convert a 16-bit timestamp in a received message to 32 bits.
-	//
-	// The stamp is expected to be at most a few milliseconds old. Anything older is not a stamp we
-	// can place on the master clock with confidence, so the current time is returned instead: a
-	// slightly late correction is recoverable, a wildly wrong one is not
-	uint32_t Convert16bitReceivedTimeStampTo32bits(uint16_t ts) noexcept;
 
 	// Note: GetCanAddress() in this namespace is now declared in RepRapFirmware.h to overcome ordering issues
 	constexpr uint32_t UsualResponseTimeout = 1000; // how long we normally wait for a response, in milliseconds

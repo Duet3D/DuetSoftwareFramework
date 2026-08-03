@@ -654,7 +654,29 @@ namespace Duet::Sbc
 			break;
 		}
 		case proto::FirmwareRequest::MotionStopped:
+		{
+			if (dataLength < sizeof(proto::MotionStoppedHeader))
+			{
+				break;
+			}
+			proto::MotionStoppedHeader header{};
+			std::memcpy(&header, data, sizeof(header));
+
+			const size_t driversBytes = header.numDrivers * sizeof(proto::MotionStoppedDriver);
+			if (dataLength < sizeof(header) + driversBytes ||
+				header.numDrivers > proto::MaxMotionStoppedDrivers)
+			{
+				break;
+			}
+
+			proto::MotionStoppedDriver drivers[proto::MaxMotionStoppedDrivers];
+			std::memcpy(drivers, data + sizeof(header), driversBytes);
+			if (m_onMotionStopped)
+			{
+				m_onMotionStopped(header.whenTriggered, std::span{drivers, header.numDrivers});
+			}
 			break;
+		}
 		default:
 		{
 			// Unrecognised request: hand the raw bytes up so the caller can dump them for diagnostics

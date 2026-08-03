@@ -110,6 +110,34 @@ namespace Duet::Sbc::Motion
 
 		[[nodiscard]] DriveTracker& GetDriveTracker(size_t drive) noexcept { return m_trackers[drive]; }
 
+		// The logical drive a CAN-connected driver belongs to, or maxAxesPlusExtruders if none does.
+		//
+		// The controller only ever knows drivers, so anything it reports back has to be mapped
+		// through the configuration that placed them before it can be applied here
+		[[nodiscard]] size_t GetLogicalDriveForDriver(DriverId driver) const noexcept
+		{
+			for (size_t axis = 0; axis < maxAxes; ++axis)
+			{
+				const AxisDriversConfig& config = m_config.axisDrivers[axis];
+				for (size_t i = 0; i < config.numDrivers; ++i)
+				{
+					if (config.driverNumbers[i] == driver)
+					{
+						return axis;
+					}
+				}
+			}
+
+			for (size_t extruder = 0; extruder < maxExtruders; ++extruder)
+			{
+				if (m_config.extruderDrivers[extruder] == driver)
+				{
+					return ExtruderToLogicalDrive(extruder);
+				}
+			}
+			return maxAxesPlusExtruders;
+		}
+
 		// Hand one drive's share of a prepared move to its tracker. This is what DDA::Prepare calls
 		// in place of the firmware's Move::AddLinearSegments.
 		void AddLinearSegments(size_t drive, uint32_t startTime, const MoveProfile& profile,

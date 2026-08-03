@@ -10,6 +10,8 @@
 
 #include <RepRapFirmware.h>
 
+#include <span>
+
 #if HAS_SBC_INTERFACE
 
 #  include "RTOSIface/RTOSIface.h"
@@ -57,6 +59,12 @@ class SbcInterface
 	void HandleGCodeReply(MessageType mt, OutputBuffer* buffer) noexcept; // accessed by Platform
 
 	bool EnqueueCanResponse(const CANResponseHeader& header, const char* _ecv_null data) noexcept;
+
+	// Tell the SBC that an endstop cut a move short. The controller stops the drives itself, but only
+	// the SBC can say where they should have ended up, so it takes the trigger timestamp from here
+	// and sends the revert. Called from the CAN receiver task
+	bool ReportMotionStopped(uint32_t whenTriggered,
+							 std::span<const duet::spi::protocol::MotionStoppedDriver> stopped) noexcept;
 	void EnqueueCanTextReply(
 		uint16_t txToken,
 		CanRequestId requestId,
@@ -94,6 +102,19 @@ class SbcInterface
 		m_canResponseTail; // head = next slot to write, tail = next slot to read; empty when equal
 
 	bool ProcessCanResponses() noexcept; // Write queued CAN responses into the current transfer
+
+	// Ring of motion-stopped reports waiting to go to the SBC. Endstop stops are rare, so this is
+	// much smaller than the CAN response ring
+	static constexpr size_t NumMotionStoppedBuffers = 4;
+	struct MotionStoppedBuffer
+	{
+		duet::spi::protocol::MotionStoppedHeader header;
+		duet::spi::protocol::MotionStoppedDriver drivers[duet::spi::protocol::MaxMotionStoppedDrivers];
+	};
+	MotionStoppedBuffer m_motionStoppedRing[NumMotionStoppedBuffers]{};
+	volatile size_t m_motionStoppedHead, m_motionStoppedTail;
+
+	bool ProcessMotionStopped() noexcept; // Write queued motion-stopped reports into the current transfer
 
 #  ifdef TRACK_FILE_CODES
 	volatile size_t fileCodesRead, fileCodesHandled, fileMacrosRunning, fileMacrosClosing;

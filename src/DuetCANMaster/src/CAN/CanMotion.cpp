@@ -159,18 +159,13 @@ namespace CanMotion
 		DriversStopList* next;
 		CanAddress boardAddress;
 		uint8_t numDrivers{};
-		bool sentRevertRequest{false};
 		volatile DriverStopState stopStates[MaxLinearDriversPerCanSlave]{};
-		volatile int32_t stopSteps[MaxLinearDriversPerCanSlave]{};
 	};
 
 	static CanMessageBuffer urgentMessageBuffer;
 	static CanMessageBuffer* _ecv_null movementBufferList = nullptr;
 	static DriversStopList* volatile _ecv_null stopList = nullptr;
 	static uint32_t currentMoveClocks;
-	static volatile bool revertAll = false;
-	static volatile bool revertedAll = false;
-	static volatile uint32_t whenRevertedAll;
 	static Mutex stopListMutex;
 	static uint8_t nextSeq[CanId::MaxCanAddress + 1] = {0};
 
@@ -205,8 +200,6 @@ void CanMotion::StartMovement() noexcept
 	// Free up any stop list items left over from the previous move
 	const MutexLocker lock(stopListMutex);
 
-	revertedAll = false;
-	revertAll = false;
 	for (;;)
 	{
 		DriversStopList* _ecv_null p = stopList;
@@ -408,77 +401,18 @@ namespace CanMotion
 	// Which input stops which driver, for the move being accumulated or executed. One entry per
 	// driver that watches something, which is at most the drivers a move can carry.
 	//
-	// totalSteps is kept because correcting for message latency needs it: the endstop reports when it
-	// triggered, and the position to revert to is the fraction of this driver's steps that had been
-	// taken by that instant
+	// Only the stop is decided here. Where the drive should end up is worked out on the SBC, which
+	// already evaluates the same motion to report live positions (Motion::DriveTracker), so the
+	// velocity profile is not duplicated on this side
 	struct EndstopWatch
 	{
 		DriverId driver;
-		uint8_t inputBoard;
-		uint16_t inputHandle;
-		int32_t totalSteps;
+		uint8_t inputBoard{};
+		uint16_t inputHandle{};
 	};
 
 	static EndstopWatch endstopWatches[SbcProtocol::MaxScheduleMoveDrivers];
 	static size_t numEndstopWatches = 0;
-
-	// The velocity profile of the move the watches belong to, needed to work out how far it had got
-	// when the endstop triggered. Distances are normalised so that the whole move is 1.0, which is
-	// how the profile reaches the boards
-	struct EndstopMoveProfile
-	{
-		uint32_t whenToExecute;
-		uint32_t accelClocks;
-		uint32_t steadyClocks;
-		uint32_t decelClocks;
-		float acceleration;						// per unit distance, positive
-		float deceleration;						// per unit distance, positive
-	};
-
-	static EndstopMoveProfile endstopProfile{};
-
-	// Fraction of the move completed `clocks` after it started, in the range 0..1.
-	//
-	// This is the controller's equivalent of the firmware's DriveMovement::GetCurrentPosition: the
-	// controller does not generate the steps, so it cannot ask a drive how far it has gone, but it
-	// planned the profile and can evaluate it at the instant the endstop reported
-	static float FractionCompletedAt(uint32_t clocks) noexcept
-	{
-		const EndstopMoveProfile& p = endstopProfile;
-		const uint32_t totalClocks = p.accelClocks + p.steadyClocks + p.decelClocks;
-		if (totalClocks == 0)
-		{
-			return 0.0;
-		}
-		if (clocks >= totalClocks)
-		{
-			return 1.0;
-		}
-
-		// The profile carries the phase durations and the accelerations but not the speeds, so the
-		// top speed is recovered from the fact that the three phases cover unit distance
-		const float a = p.acceleration, d = p.deceleration;
-		const float A = (float)p.accelClocks, S = (float)p.steadyClocks, D = (float)p.decelClocks;
-		const float denominator = A + S + D;
-		const float topSpeed = (1.0 + (0.5 * a * fsquare(A)) + (0.5 * d * fsquare(D))) / denominator;
-
-		if (clocks <= p.accelClocks)
-		{
-			// Starting speed is topSpeed - a*A, so the distance is the area under the ramp
-			const float t = (float)clocks;
-			const float startSpeed = topSpeed - (a * A);
-			return (startSpeed * t) + (0.5 * a * fsquare(t));
-		}
-
-		const float accelDistance = (topSpeed * A) - (0.5 * a * fsquare(A));
-		if (clocks <= p.accelClocks + p.steadyClocks)
-		{
-			return accelDistance + (topSpeed * (float)(clocks - p.accelClocks));
-		}
-
-		const float t = (float)(clocks - p.accelClocks - p.steadyClocks);
-		return accelDistance + (topSpeed * S) + (topSpeed * t) - (0.5 * d * fsquare(t));
-	}
 } // namespace CanMotion
 
 void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
@@ -493,8 +427,6 @@ void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
 		sbcMoveId = header.moveId;
 		sbcMoveInProgress = true;
 		numEndstopWatches = 0;			// the watches belong to the move being abandoned, not the new one
-		endstopProfile = EndstopMoveProfile{header.whenToExecute, header.accelClocks, header.steadyClocks,
-											header.decelClocks, header.acceleration, -header.deceleration};
 	}
 
 	// Rebuild PrepParams from the packet. The SBC plans second-order moves - it has no S-curve
@@ -557,7 +489,6 @@ void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
 			endstopWatches[numEndstopWatches].driver = driver;
 			endstopWatches[numEndstopWatches].inputBoard = d.stopOnBoard;
 			endstopWatches[numEndstopWatches].inputHandle = d.stopOnHandle;
-			endstopWatches[numEndstopWatches].totalSteps = d.steps;
 			++numEndstopWatches;
 		}
 	}
@@ -583,70 +514,31 @@ bool CanMotion::CanPrepareMove() noexcept
 // now been stopped and they need to revert to the requested stop position.
 CanMessageBuffer* _ecv_null CanMotion::GetUrgentMessage() noexcept
 {
-	if (!revertedAll)
+	const MutexLocker lock(stopListMutex);	// make sure the list isn't being changed while we traverse it
+
+	// The links won't change while we hold the mutex, but the receiver task may still move a driver
+	// to StopRequested as we scan
+	for (DriversStopList* _ecv_null sl = stopList; sl != nullptr; sl = sl->next)
 	{
-		const MutexLocker lock(stopListMutex); // make sure the list isn't being changed while we traverse it
-
-		// We have to be careful of race conditions here. The stop list links won't change while we are scanning it
-		// because we hold the mutex, but ISR may change the stop states to StopRequested up until the time at which it
-		// changes revertAll from false to true.
-		const bool revertingAll = revertAll;
-		for (DriversStopList* _ecv_null sl = stopList; sl != nullptr; sl = sl->next)
+		uint16_t driversToStop = 0;
+		for (size_t driver = 0; driver < sl->numDrivers; ++driver)
 		{
-			if (!sl->sentRevertRequest) // if we've already reverted the drivers on this board, no more to do
+			if (sl->stopStates[driver] == DriverStopState::StopRequested)
 			{
-				// Set up a reversion message in case we are going to revert the drivers on this board
-				auto revertMsg = urgentMessageBuffer.SetupRequestMessageNoRid<CanMessageRevertPosition>(
-					CanInterface::GetCanAddress(), sl->boardAddress);
-				uint16_t driversToStop = 0;
-				uint16_t driversToRevert = 0;
-				size_t numDriversReverted = 0;
-				for (size_t driver = 0; driver < sl->numDrivers; ++driver)
-				{
-					const DriverStopState ss = sl->stopStates[driver];
-					if (ss == DriverStopState::StopRequested)
-					{
-						driversToStop |= 1u << driver;
-						sl->stopStates[driver] = DriverStopState::StopSent;
-					}
-					else if (revertingAll && ss == DriverStopState::StopSent)
-					{
-						driversToRevert |= 1u << driver;
-						revertMsg->finalStepCounts[numDriversReverted++] = sl->stopSteps[driver];
-					}
-				}
-
-				// Stop messages take priority over revert messages
-				if (driversToStop != 0)
-				{
-					auto stopMsg = urgentMessageBuffer.SetupRequestMessageNoRid<CanMessageStopMovement>(
-						CanInterface::GetCanAddress(), sl->boardAddress);
-					stopMsg->whichDrives = driversToStop;
-					// debugPrintf("Stopping drivers %u on board %u\n", driversToStop, sl->boardAddress);
-					return &urgentMessageBuffer;
-				}
-
-				if (driversToRevert != 0)
-				{
-					sl->sentRevertRequest = true;
-					revertMsg->whichDrives = driversToRevert;
-					revertMsg->clocksAllowed = MillisToStepClocks(BasicDriverPositionRevertMillis);
-					urgentMessageBuffer.dataLength = CanMessageRevertPosition::GetActualDataLength(numDriversReverted);
-					// debugPrintf("Reverting drivers %u by %" PRIi32 " on board %u\n",
-					// driversToRevert,revertMsg->finalStepCounts[0], sl->boardAddress);
-					return &urgentMessageBuffer;
-				}
+				driversToStop |= 1u << driver;
+				sl->stopStates[driver] = DriverStopState::StopSent;
 			}
 		}
 
-		// We found nothing to send
-		if (revertingAll)
+		if (driversToStop != 0)
 		{
-			// All drivers have been stopped and reverted where requested
-			whenRevertedAll = millis();
-			revertedAll = true;
+			auto stopMsg = urgentMessageBuffer.SetupRequestMessageNoRid<CanMessageStopMovement>(
+				CanInterface::GetCanAddress(), sl->boardAddress);
+			stopMsg->whichDrives = driversToStop;
+			return &urgentMessageBuffer;
 		}
 	}
+
 	return nullptr;
 }
 
@@ -671,16 +563,10 @@ void CanMotion::StopDriverWhenProvisional(DriverId driver) noexcept
 
 #  if HAS_SBC_INTERFACE
 
-bool CanMotion::StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle, uint32_t whenTriggered) noexcept
+size_t CanMotion::StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle,
+										   std::span<SbcProtocol::MotionStoppedDriver> stopped) noexcept
 {
-	// How far into the move the endstop actually fired. The message took time to arrive, so the
-	// drives have run on past that point; this is what the revert corrects for
-	const uint32_t elapsed = whenTriggered - endstopProfile.whenToExecute;
-	const float fractionDone =
-		((int32_t)elapsed < 0) ? 0.0							// triggered before the move started
-			: FractionCompletedAt(elapsed);
-
-	bool stoppedAnything = false;
+	size_t numStopped = 0;
 	for (size_t i = 0; i < numEndstopWatches; ++i)
 	{
 		const EndstopWatch& watch = endstopWatches[i];
@@ -689,33 +575,37 @@ bool CanMotion::StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandl
 			continue;
 		}
 
+		bool didStop = false;
 		if (sbcMoveInProgress)
 		{
 			// The move has not gone out yet, so the driver can simply be given no steps. This is the
-			// case RepRapFirmware calls an endstop already triggered at the start of the move
+			// case RepRapFirmware calls an endstop already triggered at the start of the move, and
+			// it needs no correction afterwards because the drive never moved
 			StopDriverWhenProvisional(watch.driver);
-			stoppedAnything = true;
 		}
 		else
 		{
-			// The move is running on the boards, so the position to revert to is where this driver
-			// had got to when the endstop fired, not where it is now. That is the whole point of the
-			// timestamp: without it the drive would be sent back to the start of the move
-			const int32_t netStepsTaken = lrintf(fractionDone * (float)watch.totalSteps);
-			if (StopDriverWhenExecuting(watch.driver, netStepsTaken))
-			{
-				stoppedAnything = true;
-			}
+			// The move is running on the boards. Stopping it is this side's whole job; where the
+			// drive should end up is the SBC's, which is why it is reported below
+			didStop = StopDriverWhenExecuting(watch.driver);
+		}
+
+		if (didStop && numStopped < stopped.size())
+		{
+			stopped[numStopped].boardAddress = watch.driver.boardAddress;
+			stopped[numStopped].driverNumber = watch.driver.localDriver;
+			stopped[numStopped].padding = 0;
+			++numStopped;
 		}
 	}
-	return stoppedAnything;
+	return numStopped;
 }
 
 #  endif
 
 // Tell a CAN-connected driver to stop moving after we have sent the movement message.
 // Return true if we found it, we hadn't already requested a stop, and now we have.
-bool CanMotion::StopDriverWhenExecuting(DriverId driver, int32_t netStepsTaken) noexcept
+bool CanMotion::StopDriverWhenExecuting(DriverId driver) noexcept
 {
 	DriversStopList* _ecv_null sl = stopList;
 	while (sl != nullptr)
@@ -725,7 +615,6 @@ bool CanMotion::StopDriverWhenExecuting(DriverId driver, int32_t netStepsTaken) 
 			if (driver.localDriver < sl->numDrivers &&
 				sl->stopStates[driver.localDriver] == DriverStopState::Active) // if active and stop not yet requested
 			{
-				sl->stopSteps[driver.localDriver] = netStepsTaken; // must assign this one first
 				sl->stopStates[driver.localDriver] = DriverStopState::StopRequested;
 				return true;
 			}
@@ -734,18 +623,6 @@ bool CanMotion::StopDriverWhenExecuting(DriverId driver, int32_t netStepsTaken) 
 		sl = sl->next;
 	}
 	return false;
-}
-
-// Revert any stopped drivers that we haven't already and return true when there are no drivers to revert
-bool CanMotion::RevertStoppedDrivers() noexcept
-{
-	if (!revertAll && !revertedAll) // if not started reverting yet
-	{
-		revertAll = true;
-		CanInterface::WakeAsyncSender();
-		return false;
-	}
-	return !revertAll || (revertedAll && millis() - whenRevertedAll >= TotalDriverPositionRevertMillis);
 }
 
 #endif

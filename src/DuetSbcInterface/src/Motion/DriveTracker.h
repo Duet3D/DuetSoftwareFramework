@@ -51,6 +51,15 @@ namespace Duet::Sbc::Motion
 		// exact at a standstill.
 		[[nodiscard]] int32_t GetMotorPosition() const noexcept { return m_currentMotorPosition; }
 
+		// Where this drive was when the most recently added move started.
+		//
+		// A revert message tells a board the net steps its last move should have taken, so undoing an
+		// endstop overshoot needs the move to be measured from somewhere. This is the firmware's
+		// DriveMovement::positionAtMoveStart. It describes the last move added rather than the one
+		// executing, which is the same move whenever it matters: a move that watches endstops is
+		// always an isolated move, so nothing is queued behind it
+		[[nodiscard]] int32_t GetPositionAtMoveStart() const noexcept { return m_positionAtMoveStart; }
+
 		// Force the position, discarding any pending motion. For homing, and for resynchronising
 		// after a move that an endstop cut short.
 		void SetMotorPosition(int32_t position) noexcept;
@@ -82,6 +91,7 @@ namespace Duet::Sbc::Motion
 		motioncalc_t m_distanceCarriedForwards = 0;	// the fraction of a step left over from the last segment
 
 		int32_t m_currentMotorPosition = 0;			// microsteps, as of the last retired segment
+		int32_t m_positionAtMoveStart = 0;			// position when the most recent move was added
 		int32_t m_positionAtSegmentStart = 0;			// position when the current segment was entered
 		int32_t m_netStepsThisSegment = 0;			// what the current segment will add to the position
 		int32_t m_movementAccumulator = 0;

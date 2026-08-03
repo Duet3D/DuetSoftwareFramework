@@ -59,6 +59,8 @@ using CANResponseHeader = SbcProtocol::CanResponseHeader;
 using CodeBufferUpdateHeader = SbcProtocol::CodeBufferUpdateHeader;
 using ScheduleMoveHeader = SbcProtocol::ScheduleMoveHeader;
 using ScheduleMoveDriver = SbcProtocol::ScheduleMoveDriver;
+using MotionStoppedHeader = SbcProtocol::MotionStoppedHeader;
+using MotionStoppedDriver = SbcProtocol::MotionStoppedDriver;
 namespace ScheduleMoveFlags = SbcProtocol::ScheduleMoveFlags;
 using MasterClockHeader = SbcProtocol::MasterClockHeader;
 

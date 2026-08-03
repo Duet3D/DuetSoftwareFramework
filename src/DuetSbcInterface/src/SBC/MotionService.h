@@ -27,6 +27,7 @@
 
 #include "LinkScheduleMoveSink.h"
 
+#include <DuetSpiProtocol/MessageFormats.h>
 #include <Motion/MotionConfig.h>
 #include <Motion/MoveParams.h>
 #include <Movement/DDARing.h>
@@ -80,6 +81,19 @@ namespace Duet::Sbc
 
 		// Force motor positions, after homing or a move that was cut short.
 		static void SetMotorPositions(uint32_t driveMask, std::span<const int32_t> positions);
+
+		// Correct the drives an endstop cut short, and tell the boards where to end up.
+		//
+		// The controller stops the drives itself, because only it is close enough to the CAN bus for
+		// the latency to be acceptable, but it cannot say where they should stop: it never generated
+		// the steps. This side did, and evaluates the same motion anyway to report live positions, so
+		// it works out where each drive was when the endstop reported, adopts that as the position,
+		// and sends CanMessageRevertPosition so the boards wind back the overshoot.
+		//
+		// `whenTriggered` is zero when the report came from a board using the older message, which
+		// carries no timestamp; the drives are then left where the stop found them
+		void HandleMotionStopped(uint32_t whenTriggered,
+								 std::span<const duet::spi::protocol::MotionStoppedDriver> drivers);
 
 		// What DCS decides from its own state each cycle, stored rather than called: the motion
 		// thread must never wait on the managed side to answer a question.

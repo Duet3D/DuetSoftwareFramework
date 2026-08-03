@@ -212,6 +212,36 @@ static void TestAccumulatorReportsNetMovement()
 	CHECK(t.GetAndClearAccumulatedMovement() == 0, "opposing moves net to zero");
 }
 
+// An endstop cuts a move short, and the boards are then told to revert to where the drive was when
+// the endstop fired. A revert is expressed as the net steps the move should have amounted to, so
+// undoing the overshoot needs somewhere to measure the move from.
+static void TestPositionAtMoveStartMeasuresTheCurrentMove()
+{
+	DriveTracker t;
+	t.Init(0);
+	CHECK(t.GetPositionAtMoveStart() == 0, "an idle drive has not started a move");
+
+	const MoveProfile profile = TrapezoidProfile(400, 400, 400, 2.0, 0.25, 0.25);
+	t.AddMove(0, profile, (motioncalc_t)100.0, PlainFlags());
+	CHECK(t.GetPositionAtMoveStart() == 0, "the first move starts from the origin");
+	t.Advance(profile.TotalClocks());
+	CHECK(t.GetMotorPosition() == 100, "the move completes where it was told to");
+
+	// The second move starts where the first one left off, which is what makes the difference
+	// between the two the net steps of that move alone rather than of everything so far
+	t.AddMove(profile.TotalClocks(), profile, (motioncalc_t)40.0, PlainFlags());
+	CHECK(t.GetPositionAtMoveStart() == 100, "a later move starts from where the previous one ended");
+
+	// Stopping part way through: the net steps for the revert are measured from the move's start,
+	// not from the origin
+	const uint32_t partWay = profile.TotalClocks() + (profile.TotalClocks() / 2);
+	t.Advance(partWay);
+	const int32_t stoppedAt = lrintf(t.GetCurrentPosition(partWay));
+	CHECK(stoppedAt > 100 && stoppedAt < 140, "the drive is part way through the second move");
+	CHECK(stoppedAt - t.GetPositionAtMoveStart() == stoppedAt - 100,
+		  "net steps for the revert count only this move");
+}
+
 // An emergency stop abandons pending motion on the boards; the tracker has to do the same without
 // pretending the drive completed the move.
 static void TestClearMovementPending()
@@ -278,6 +308,7 @@ int main()
 	TestNoDriftOverManyMoves();
 	TestReverseMove();
 	TestAccumulatorReportsNetMovement();
+	TestPositionAtMoveStartMeasuresTheCurrentMove();
 	TestClearMovementPending();
 	TestOverlappingMoveInvalidatesCachedSegment();
 

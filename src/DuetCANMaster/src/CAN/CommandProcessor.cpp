@@ -10,6 +10,7 @@
 #if SUPPORT_CAN_EXPANSION
 
 #  include "CanInterface.h"
+#  include "CanMotion.h"
 #  include "ExpansionManager.h"
 #  include <CanMessageBuffer.h>
 #  include <Platform/Event.h>
@@ -154,13 +155,20 @@ static void HandleFirmwareBlockRequest(CanMessageBuffer& buf) noexcept
 
 // Forward a received CAN message to the SBC. If it is a response to a request we sent on behalf of the SBC, map the
 // request ID back to the SBC's txToken and collate multi-fragment standard replies into a single response.
-// Stop whatever the move said this input stops. The two message versions differ in the size of their
-// per-handle entries, so each is read as itself; reading one as the other shifts every handle.
+// Stop whatever the move said this input stops, and tell the SBC what was stopped.
+//
+// The two message versions differ in the size of their per-handle entries, so each is read as
+// itself; reading one as the other shifts every handle. Only V2 carries the trigger timestamp, which
+// is what lets the SBC undo the overshoot; a V1 board can only be stopped where the message found it
 static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) noexcept
 {
 #if HAS_SBC_INTERFACE
 	const CanAddress src = buf.id.Src();
-	bool stoppedAnything = false;
+	SbcProtocol::MotionStoppedDriver stopped[SbcProtocol::MaxMotionStoppedDrivers];
+	size_t numStopped = 0;
+	// V1 carries no trigger timestamp; zero tells the SBC to correct from where the message
+	// found the drives instead, which keeps the overshoot V2 exists to remove
+	uint32_t whenTriggered = 0;
 
 	if (id == CanMessageType::inputStateChangedV2)
 	{
@@ -170,34 +178,44 @@ static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) no
 			// Bit i of states is the level of the i'th handle. Only a handle that went active stops
 			// anything; a release is just as much a change, and stopping on one would end the move
 			// the moment the axis backed off the endstop
-			if ((msg.states & (1u << i)) != 0
-				&& CanMotion::StopDriversWatchingInput(src, msg.results[i].handle.asU16(),
-													   CanInterface::Convert16bitReceivedTimeStampTo32bits(msg.GetWhen(i))))
+			if ((msg.states & (1u << i)) == 0)
 			{
-				stoppedAnything = true;
+				continue;
+			}
+
+			const size_t added = CanMotion::StopDriversWatchingInput(
+				src, msg.results[i].handle.asU16(),
+				std::span{stopped + numStopped, ARRAY_SIZE(stopped) - numStopped});
+			if (added != 0)
+			{
+				whenTriggered = msg.GetWhen(i);
+				numStopped += added;
 			}
 		}
 	}
 	else
 	{
-		// V1 carries no trigger timestamp, so the best that can be done is to treat the stop as
-		// having happened now. The drives then revert to where the message found them rather than to
-		// where the endstop fired, which is the overshoot V2 exists to remove
 		const CanMessageInputChangedV1& msg = buf.msg.inputChangedV1;
 		for (unsigned int i = 0; i < msg.numHandles && i < ARRAY_SIZE(msg.results); ++i)
 		{
-			if ((msg.states & (1u << i)) != 0
-				&& CanMotion::StopDriversWatchingInput(src, msg.results[i].handle.asU16(), StepTimer::GetTimerTicks()))
+			if ((msg.states & (1u << i)) == 0)
 			{
-				stoppedAnything = true;
+				continue;
 			}
+
+			numStopped += CanMotion::StopDriversWatchingInput(
+				src, msg.results[i].handle.asU16(),
+				std::span{stopped + numStopped, ARRAY_SIZE(stopped) - numStopped});
 		}
 	}
 
-	if (stoppedAnything)
+	if (numStopped != 0)
 	{
 		// The stop messages are built but not sent from this task; the async sender does that
 		CanInterface::WakeAsyncSender();
+
+		// The SBC works out where the drives should have ended up and sends the revert itself
+		reprap.GetSbcInterface().ReportMotionStopped(whenTriggered, std::span{stopped, numStopped});
 	}
 #else
 	(void)buf;

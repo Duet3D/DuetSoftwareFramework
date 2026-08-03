@@ -17,6 +17,7 @@ void DriveTracker::Init(size_t logicalDrive) noexcept
 	m_u = 0;
 	m_distanceCarriedForwards = 0;
 	m_currentMotorPosition = 0;
+	m_positionAtMoveStart = 0;
 	m_positionAtSegmentStart = 0;
 	m_netStepsThisSegment = 0;
 	m_movementAccumulator = 0;
@@ -27,6 +28,10 @@ void DriveTracker::Init(size_t logicalDrive) noexcept
 void DriveTracker::AddMove(uint32_t startTime, const MoveProfile& profile, motioncalc_t steps,
 						   MovementFlags moveFlags, motioncalc_t pressureAdvanceClocks) noexcept
 {
+	// Where this move starts from, so that a revert can express its progress as net steps. Taken
+	// before the segments are added, while the position still describes only what came before
+	m_positionAtMoveStart = m_currentMotorPosition;
+
 	m_segments = SegmentBuilder::AddLinearSegments(m_segments, startTime, profile, steps, moveFlags,
 												 pressureAdvanceClocks);
 

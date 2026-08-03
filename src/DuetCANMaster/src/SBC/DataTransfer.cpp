@@ -1245,6 +1245,28 @@ bool DataTransfer::WriteCANResponse(const CANResponseHeader& header, const char*
 	return true;
 }
 
+// Tell the SBC which drives an endstop stopped and when it fired, so it can work out where they
+// should end up and send the revert.
+// Returns false if there isn't enough room in this transfer, in which case the caller should try again next time.
+bool DataTransfer::WriteMotionStopped(const MotionStoppedHeader& header, const MotionStoppedDriver* drivers) noexcept
+{
+	const size_t driversBytes = header.numDrivers * sizeof(MotionStoppedDriver);
+	if (!CanWritePacket(sizeof(MotionStoppedHeader) + driversBytes))
+	{
+		return false;
+	}
+
+	(void)WritePacketHeader(FirmwareRequest::MotionStopped, sizeof(MotionStoppedHeader) + driversBytes);
+
+	auto* hdr = WriteDataHeader<MotionStoppedHeader>();
+	*hdr = header;
+	if (driversBytes != 0)
+	{
+		WriteData(reinterpret_cast<const char*>(drivers), driversBytes);
+	}
+	return true;
+}
+
 // Write the master clock packet. This must be the first packet of every transfer so the SBC processes it first.
 void DataTransfer::WriteMasterClock() noexcept
 {

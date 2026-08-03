@@ -94,7 +94,7 @@ namespace Duet::Sbc::Motion
 	static_assert(offsetof(MoveParamsHeader, ringNumber) == 24 );
 
 	// Value of a stopOnInput entry meaning "this drive watches no endstop during this move".
-	inline constexpr uint32_t NoStopInput = 0xFFFFFFFF;
+	inline constexpr uint32_t kNoStopInput = 0xFFFFFFFF;
 
 	// Pack the CAN address and RemoteInputHandle of an endstop into a stopOnInput entry.
 	[[nodiscard]] constexpr uint32_t MakeStopInput(uint8_t boardAddress, uint16_t inputHandle) noexcept
@@ -142,7 +142,7 @@ namespace Duet::Sbc::Motion
 	}
 
 	// Which input, if any, stops each drive during this move. Only meaningful when the move carries
-	// MoveFlags::checkEndstops; every entry is NoStopInput otherwise.
+	// MoveFlags::checkEndstops; every entry is kNoStopInput otherwise.
 	//
 	// It is per drive rather than per move so that one move can home several axes at once, each
 	// stopping on its own endstop. The entries travel all the way down to the controller, which is

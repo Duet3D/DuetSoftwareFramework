@@ -310,7 +310,7 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 		{
 			m_endPoint[drive] = m_prev->m_endPoint[drive];
 			m_directionVector[drive] = 0.0;
-			m_stopOnInput[drive] = NoStopInput;
+			m_stopOnInput[drive] = kNoStopInput;
 		}
 	}
 

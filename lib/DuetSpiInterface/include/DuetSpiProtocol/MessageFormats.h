@@ -267,6 +267,33 @@ struct MasterClockHeader {
 };
 
 // CAN bus message received by the SBC (FirmwareRequests/CanResponse.cs)
+// One driver whose motion an endstop cut short (FirmwareRequest::MotionStopped).
+struct MotionStoppedDriver {
+    uint8_t boardAddress;  // CAN address of the board carrying the driver
+    uint8_t driverNumber;  // driver number on that board
+    uint16_t padding;
+};
+
+// Drives the controller stopped because an endstop fired, and when the endstop reported it.
+//
+// The controller does the stopping because it is the only place close enough to the CAN bus for the
+// latency to be acceptable, but it cannot say where the drives should end up: it never generated the
+// steps, so it does not know how far each one had travelled. The SBC does, because it evaluates the
+// same motion anyway to report live positions, so it takes the timestamp from here, works out where
+// each drive was at that instant, corrects its own position and sends CanMessageRevertPosition to the
+// boards. That is what removes the overshoot between the endstop firing and the stop taking effect.
+//
+// MotionStoppedDriver records follow this header, numDrivers of them.
+struct MotionStoppedHeader {
+    uint32_t whenTriggered;  // master step-clock time the endstop reported
+    uint8_t numDrivers;      // MotionStoppedDriver records that follow this header
+    uint8_t padding[3];
+};
+
+// Most drivers one MotionStopped packet may carry. A move cannot watch more endstops than it has
+// drivers, so this matches the schedule packet's own limit.
+inline constexpr size_t MaxMotionStoppedDrivers = MaxScheduleMoveDrivers;
+
 struct CanResponseHeader {
     uint16_t txToken;    // Token mapping the response back to its request (0 if unsolicited)
     uint16_t msgType;    // CanMessageType of the received message
@@ -298,6 +325,9 @@ static_assert(sizeof(ScheduleMoveHeader) == 56, "ScheduleMoveHeader must be 56 b
 static_assert(offsetof(ScheduleMoveHeader, acceleration) == 16, "");
 static_assert(offsetof(ScheduleMoveHeader, moveId) == 48, "");
 static_assert(offsetof(ScheduleMoveHeader, numDrivers) == 52, "");
+static_assert(sizeof(MotionStoppedHeader) == 8, "MotionStoppedHeader must be 8 bytes");
+static_assert(offsetof(MotionStoppedHeader, numDrivers) == 4, "");
+static_assert(sizeof(MotionStoppedDriver) == 4, "MotionStoppedDriver must be 4 bytes");
 static_assert(sizeof(ScheduleMoveDriver) == 16, "ScheduleMoveDriver must be 16 bytes");
 static_assert(offsetof(ScheduleMoveDriver, stopOnBoard) == 3, "");
 static_assert(offsetof(ScheduleMoveDriver, steps) == 4, "");
