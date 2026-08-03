@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<IsPackable>false</IsPackable>
+		<RootNamespace>DuetCanMessage.SourceGenerators</RootNamespace>
+		<InvariantGlobalization>true</InvariantGlobalization>
+		<!-- This is a build-time tool that DCS runs on the host, not something it links against or ships
+		     (see the ProjectReference in DuetControlServer.csproj). Without this the SDK rejects the
+		     reference with NETSDK1150 when DCS is published self-contained or AOT, because a framework-
+		     dependent executable cannot be referenced by a self-contained one - a rule that only makes
+		     sense for executables that get deployed alongside the referencing app. -->
+		<ShouldBeValidatedAsExecutableReference>false</ShouldBeValidatedAsExecutableReference>
+	</PropertyGroup>
+	<ItemGroup>
+	  <PackageReference Include="JsonSchema.Net" Version="9.4.0" />
+	</ItemGroup>
+</Project>

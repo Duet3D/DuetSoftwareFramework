@@ -50,8 +50,7 @@
             "options": [
                 "Yes",
                 "No"
-            ],
-            "default": "No"
+            ]
         },
         {
             "id": "canmaster_target",

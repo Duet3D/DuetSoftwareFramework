@@ -88,7 +88,7 @@ public class CanMessages
 
         Assert.That(request.FileOffset, Is.EqualTo(0x123456));
         Assert.That(request.BootloaderVersion, Is.EqualTo(0x01));
-        Assert.That(request.UsesUf2Binary, Is.False);
+        Assert.That(request.Uf2Format, Is.False);
         Assert.That(request.FileWanted, Is.EqualTo(0x00));
         Assert.That(request.LengthRequested, Is.EqualTo(0x345678));
         Assert.That(request.BoardVersion, Is.EqualTo(0x00));

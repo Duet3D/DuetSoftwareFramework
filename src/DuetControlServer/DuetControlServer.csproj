@@ -46,9 +46,165 @@
 		<ProjectReference Include="..\DuetAPIClient\DuetAPIClient.csproj" />
 		<ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
 		<ProjectReference Include="..\DuetSharedLibrary\DuetSharedLibrary.csproj" />
+		<!-- The generator writes the checked-in CAN message files under Link/Protocol, so building it with
+		     DCS keeps the two in step. Its output is a build-time tool, not something DCS links against:
+		     ReferenceOutputAssembly="false" keeps it off the compile references and Private="false" keeps
+		     its apphost, deps.json and runtimeconfig.json out of the DCS output directory.
+
+		     GlobalPropertiesToRemove keeps DCS's target from reaching it. A tool that runs during the build
+		     has to be built for the machine doing the building, but `dotnet publish -r linux-arm64` (see
+		     scripts/build.sh) would otherwise cross-build it for the Pi, and CheckCanMessagesUpToDate would
+		     then try to execute an arm64 assembly on the host. The same goes for the AOT and self-contained
+		     switches, which would only slow the tool's build down. -->
+		<ProjectReference Include="..\DuetCanMessage.SourceGenerators\DuetCanMessage.SourceGenerators.csproj"
+		                  ReferenceOutputAssembly="false" Private="false"
+		                  GlobalPropertiesToRemove="$(CanMessageGeneratorHostProperties)" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<InternalsVisibleTo Include="UnitTests" />
 	</ItemGroup>
+
+	<!--
+	  The CAN message files under Link/Protocol are generated from the schema and checked in, so a build does
+	  not rewrite them: editing can-messages.json otherwise leaves them stale, and nothing says so until CI
+	  runs `make can-messages-check`. Running that same check here turns it into a build failure instead,
+	  naming the files and telling you to run `make can-messages`. It deliberately does not regenerate: a
+	  build that rewrites tracked source files would do so during every publish and deploy too, and the point
+	  of checking the output in is that neither this build nor CANlib's needs the generator to have run.
+
+	  Pass -p:SkipCanMessageCheck=true to bypass it.
+	-->
+	<PropertyGroup>
+		<CanMessageGeneratorDir>$(MSBuildThisFileDirectory)..\DuetCanMessage.SourceGenerators\</CanMessageGeneratorDir>
+		<CanMessageLibDir>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', '..', 'lib'))</CanMessageLibDir>
+		<!-- Exec commands are passed to the shell verbatim, so the path has to be separator-normalised
+		     here rather than left for MSBuild to fix up as it does for Include and Exists. -->
+		<CanMessageVerifyScript>$([MSBuild]::NormalizePath('$(CanMessageGeneratorDir)', 'verify-cpp-layout.sh'))</CanMessageVerifyScript>
+		<!-- Global properties that must not reach the generator: they describe what DCS is being built for,
+		     and the generator is built to run here. Both the ProjectReference and the GetTargetPath query
+		     below remove the same set, or MSBuild would treat them as two different builds of the project
+		     and the path returned would not be the one that was built. -->
+		<CanMessageGeneratorHostProperties>RuntimeIdentifier;SelfContained;PublishAot;AotPublish;PublishTrimmed;PublishReadyToRun;PublishSingleFile</CanMessageGeneratorHostProperties>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- Anything that can make the checked-in output stale: the schema, the emitters that render it, and
+		     the output itself. -->
+		<CanMessageCheckInput Include="$(CanMessageGeneratorDir)Schema\can-messages.json" />
+		<CanMessageCheckInput Include="$(CanMessageGeneratorDir)**\*.cs"
+		                      Exclude="$(CanMessageGeneratorDir)bin\**\*.cs;$(CanMessageGeneratorDir)obj\**\*.cs" />
+		<CanMessageCheckInput Include="$(MSBuildThisFileDirectory)Link\Protocol\CanMessages\Generated\*.g.cs" />
+		<CanMessageCheckInput Include="$(MSBuildThisFileDirectory)Link\Protocol\Shared\*.g.cs" />
+	</ItemGroup>
+
+	<Target Name="CheckCanMessagesUpToDate"
+	        BeforeTargets="CoreCompile"
+	        DependsOnTargets="ResolveProjectReferences"
+	        Condition="'$(SkipCanMessageCheck)' != 'true' AND '$(DesignTimeBuild)' != 'true'"
+	        Inputs="@(CanMessageCheckInput)"
+	        Outputs="$(IntermediateOutputPath)can-messages.check.stamp">
+		<!-- GetTargetPath only reports where the generator was built; the ProjectReference above is what
+		     builds it, and it has already done so by the time ResolveProjectReferences is done. -->
+		<MSBuild Projects="$(CanMessageGeneratorDir)DuetCanMessage.SourceGenerators.csproj"
+		         Targets="GetTargetPath"
+		         Properties="Configuration=$(Configuration)"
+		         RemoveProperties="$(CanMessageGeneratorHostProperties)">
+			<Output TaskParameter="TargetOutputs" ItemName="CanMessageGeneratorAssembly" />
+		</MSBuild>
+		<!-- dotnet exec, not dotnet run: the assembly is already built by the ProjectReference, and
+		     `dotnet run` would start a second, nested build of the same project inside this one.
+
+		     The exit code is handled below rather than by Exec itself, so that the generator's own output -
+		     which files are stale, or where the schema does not match can-messages.schema.json - is carried
+		     into the error. MSB3073 alone says only that a command failed, and the terminal logger `dotnet
+		     build` uses by default shows nothing else. -->
+		<Exec Command="dotnet exec &quot;%(CanMessageGeneratorAssembly.FullPath)&quot; --check"
+		      ConsoleToMSBuild="true" IgnoreExitCode="true"
+		      StandardOutputImportance="high" StandardErrorImportance="high">
+			<Output TaskParameter="ConsoleOutput" ItemName="CanMessageCheckOutput" />
+			<Output TaskParameter="ExitCode" PropertyName="CanMessageCheckExitCode" />
+		</Exec>
+		<Error Condition="'$(CanMessageCheckExitCode)' != '0'"
+		       Code="CANMSG001"
+		       Text="The checked-in CAN message files no longer match Schema/can-messages.json:%0A@(CanMessageCheckOutput->'  %(Identity)', '%0A')" />
+		<Touch Files="$(IntermediateOutputPath)can-messages.check.stamp" AlwaysCreate="true" />
+		<ItemGroup>
+			<FileWrites Include="$(IntermediateOutputPath)can-messages.check.stamp" />
+		</ItemGroup>
+	</Target>
+
+	<!--
+	  The check above only proves the checked-in output still matches the schema. It cannot prove the
+	  schema still matches CANlib: schema and output would agree happily on a message format the firmware
+	  never used. verify-cpp-layout.sh (`make can-messages-verify`) closes that gap by compiling the
+	  generated layout probe against CANlib's own hand-written headers, so building DCS runs it too.
+
+	  Unlike the check, it cannot always run: it needs bash, python3, a host C++ compiler and the CANlib,
+	  RRFLibraries and CoreN2G submodules, none of which a plain `dotnet build` can assume - the release
+	  builds in scripts/build.sh run in containers without a C++ toolchain, and the submodules are only
+	  checked out on demand. So a missing prerequisite skips the verification and says which one, on every
+	  build until it is resolved, rather than failing a build that never asked for a C++ compiler. Where
+	  the tooling is present the layouts really are compared, and a mismatch fails the build.
+
+	  Pass -p:SkipCanMessageVerify=true to bypass it.
+	-->
+	<ItemGroup>
+		<!-- Both sides of the comparison, plus the scripts that perform it. -->
+		<CanMessageVerifyInput Include="$(CanMessageGeneratorDir)Schema\can-messages.json" />
+		<CanMessageVerifyInput Include="$(CanMessageGeneratorDir)generated\cpp\*" />
+		<CanMessageVerifyInput Include="$(CanMessageGeneratorDir)verify-cpp-layout.sh" />
+		<CanMessageVerifyInput Include="$(CanMessageGeneratorDir)*.py" />
+		<CanMessageVerifyInput Include="$(CanMessageLibDir)CANlib\src\*.h;$(CanMessageLibDir)CANlib\src\*.cpp" />
+	</ItemGroup>
+
+	<PropertyGroup>
+		<CanMessageVerifySubmodules Condition="Exists('$(CanMessageLibDir)CANlib\src') AND Exists('$(CanMessageLibDir)RRFLibraries\src') AND Exists('$(CanMessageLibDir)CoreN2G\src')">true</CanMessageVerifySubmodules>
+	</PropertyGroup>
+
+	<Target Name="VerifyCanMessageLayouts"
+	        BeforeTargets="CoreCompile"
+	        DependsOnTargets="CheckCanMessagesUpToDate"
+	        Condition="'$(SkipCanMessageVerify)' != 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(OS)' != 'Windows_NT'"
+	        Inputs="@(CanMessageVerifyInput)"
+	        Outputs="$(IntermediateOutputPath)can-messages.verify.stamp">
+		<!-- The same fallback the script uses, so that setting CXX to a cross compiler is not reported
+		     here as g++ being absent. -->
+		<Exec Command="command -v bash >/dev/null 2>&amp;1 &amp;&amp; command -v python3 >/dev/null 2>&amp;1 &amp;&amp; command -v &quot;${CXX:-g++}&quot; >/dev/null 2>&amp;1"
+		      Condition="'$(CanMessageVerifySubmodules)' == 'true'"
+		      IgnoreExitCode="true" EchoOff="true" StandardOutputImportance="low">
+			<Output TaskParameter="ExitCode" PropertyName="CanMessageVerifyToolsExitCode" />
+		</Exec>
+
+		<Message Importance="high" Condition="'$(CanMessageVerifySubmodules)' != 'true'"
+		         Text="Skipping the CAN message layout verification: lib/CANlib, lib/RRFLibraries or lib/CoreN2G is not checked out. Enable it with 'git submodule update --init lib/CANlib lib/RRFLibraries lib/CoreN2G'." />
+		<Message Importance="high" Condition="'$(CanMessageVerifySubmodules)' == 'true' AND '$(CanMessageVerifyToolsExitCode)' != '0'"
+		         Text="Skipping the CAN message layout verification: it needs bash, python3 and a host C++ compiler (CXX, or g++)." />
+
+		<PropertyGroup>
+			<CanMessageVerifyEnabled Condition="'$(CanMessageVerifySubmodules)' == 'true' AND '$(CanMessageVerifyToolsExitCode)' == '0'">true</CanMessageVerifyEnabled>
+		</PropertyGroup>
+
+		<!-- As with the check above, the exit code is handled here rather than by Exec so that the
+		     script's own output - which struct, member or bitfield disagrees - reaches the error instead
+		     of a bare MSB3073. It is quiet on success, where the progress lines are just noise. -->
+		<Exec Command="bash &quot;$(CanMessageVerifyScript)&quot;"
+		      Condition="'$(CanMessageVerifyEnabled)' == 'true'"
+		      ConsoleToMSBuild="true" IgnoreExitCode="true"
+		      StandardOutputImportance="low" StandardErrorImportance="low">
+			<Output TaskParameter="ConsoleOutput" ItemName="CanMessageVerifyOutput" />
+			<Output TaskParameter="ExitCode" PropertyName="CanMessageVerifyExitCode" />
+		</Exec>
+		<Error Condition="'$(CanMessageVerifyEnabled)' == 'true' AND '$(CanMessageVerifyExitCode)' != '0'"
+		       Code="CANMSG002"
+		       Text="The generated CAN message layouts do not match CANlib's headers in lib/CANlib/src:%0A@(CanMessageVerifyOutput->'  %(Identity)', '%0A')" />
+
+		<!-- Only a verification that actually ran is worth remembering; a skipped one must be retried on
+		     the next build, once the submodules or the compiler are there. -->
+		<Touch Condition="'$(CanMessageVerifyEnabled)' == 'true'"
+		       Files="$(IntermediateOutputPath)can-messages.verify.stamp" AlwaysCreate="true" />
+		<ItemGroup>
+			<FileWrites Include="$(IntermediateOutputPath)can-messages.verify.stamp" />
+		</ItemGroup>
+	</Target>
 </Project>

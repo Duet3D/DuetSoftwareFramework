@@ -23,7 +23,7 @@ public static class CanMessageSerializer
     /// <returns>Deserialized message body.</returns>
     /// <exception cref="InvalidOperationException">Thrown if <typeparamref name="T"/> is not blittable.</exception>
     /// <exception cref="ArgumentException">Thrown if payload is longer than the target type.</exception>
-    public static T Deserialize<T>(ReadOnlySpan<byte> payload) where T : struct, ICanMessage<T>
+    public static T Deserialize<T>(ReadOnlySpan<byte> payload) where T : struct, ICanMessageBody<T>
     {
         if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
@@ -46,13 +46,13 @@ public static class CanMessageSerializer
     /// </summary>
     /// <remarks>
     /// Variable-length messages report fewer bytes than <c>sizeof(T)</c> via
-    /// <see cref="ICanMessage{TSelf}.GetActualDataLength"/>; only that many leading bytes are written.
-    /// <paramref name="destination"/> must be exactly <see cref="ICanMessage{TSelf}.GetActualDataLength"/> bytes long.
+    /// <see cref="ICanMessageBody{TSelf}.GetActualDataLength"/>; only that many leading bytes are written.
+    /// <paramref name="destination"/> must be exactly <see cref="ICanMessageBody{TSelf}.GetActualDataLength"/> bytes long.
     /// </remarks>
     /// <typeparam name="T">CAN message body type.</typeparam>
     /// <param name="message">Message body to serialize.</param>
     /// <param name="destination">Buffer to write into.</param>
-    public static void Serialize<T>(in T message, Span<byte> destination) where T : struct, ICanMessage<T>
+    public static void Serialize<T>(in T message, Span<byte> destination) where T : struct, ICanMessageBody<T>
     {
         ReadOnlySpan<byte> source = MemoryMarshal.AsBytes(new ReadOnlySpan<T>(in message));
         source[..destination.Length].CopyTo(destination);

@@ -168,7 +168,23 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Mark workspace as a safe git directory
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        run: git config --global --add safe.directory '*'
+
+      # The generated CAN message formats are checked in, so neither build depends on the generator.
+      # That also means a schema edited without re-running it would ship silently, hence this check.
+      - name: Check that the generated CAN message formats are up to date
+        run: make can-messages-check
+
+      # can-messages-verify compiles the layout probe against CANlib's own header, which is the only
+      # check that the schema still describes the real message formats rather than merely being
+      # self-consistent. It needs these three submodules and a host compiler.
+      - name: Check out the CAN libraries
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git submodule update --init --depth 1 lib/CANlib lib/RRFLibraries lib/CoreN2G
+
+      - name: Verify the CAN message layouts against CANlib
+        run: make can-messages-verify
 
       # UnitTests.HttpClient talks to a real Duet/SBC at a hard-coded hostname, so it cannot run here
       - name: Run unit tests

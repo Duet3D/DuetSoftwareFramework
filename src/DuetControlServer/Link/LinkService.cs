@@ -605,7 +605,7 @@ internal sealed class LinkService(
 
     private async void HandleFirmwareBlockRequestAsync(CanMessageFirmwareUpdateRequest request, byte srcAddress, CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("Received firmware block request: FileOffset={FileOffset}, BootloaderVersion={BootloaderVersion}, UsesUf2Binary={UsesUf2Binary}, FileWanted={FileWanted}, LengthRequested={LengthRequested}, BoardType={BoardType}", request.FileOffset, request.BootloaderVersion, request.UsesUf2Binary, request.FileWanted, request.LengthRequested, request.BoardType);
+        logger.LogInformation("Received firmware block request: FileOffset={FileOffset}, BootloaderVersion={BootloaderVersion}, Uf2Format={Uf2Format}, FileWanted={FileWanted}, LengthRequested={LengthRequested}, BoardType={BoardType}", request.FileOffset, request.BootloaderVersion, request.Uf2Format, request.FileWanted, request.LengthRequested, request.BoardType);
 
         if (request.BootloaderVersion == CanMessageFirmwareUpdateRequest.BootloaderVersion0 && (request.FileWanted == 0 || request.FileWanted == 3))
         {
@@ -621,7 +621,7 @@ internal sealed class LinkService(
             filename += request.BoardTypeString;
 
             // Add file extension
-            filename += request.UsesUf2Binary ? ".uf2" : ".bin";
+            filename += request.Uf2Format ? ".uf2" : ".bin";
             uint fileOffset = request.FileOffset;
             uint lengthRequested = request.LengthRequested;
 
@@ -641,9 +641,9 @@ internal sealed class LinkService(
                 {
                     FileOffset = fileOffset,
                     DataLength = 0,
-                    Err = CanMessageFirmwareUpdateResponse.ErrBadOffset,
+                    Err = (byte)CanMessageFirmwareUpdateResponse.ErrBadOffset,
                     FileLength = (uint)fs.Length,
-                    Data = new CanMessageFirmwareUpdateResponseDataBuffer()
+                    Data = new ByteArray56()
                 },
                 isResponse: true,
                 cancellationToken: cancellationToken);
@@ -658,7 +658,7 @@ internal sealed class LinkService(
 
             for (;;)
             {
-                uint lengthToSend = Math.Min(lengthRequested, CanMessageFirmwareUpdateResponseDataBuffer.Length);
+                uint lengthToSend = Math.Min(lengthRequested, ByteArray56.Length);
 
                 byte[] buffer = new byte[lengthToSend];
                 int bytesRead = fs.Read(buffer, 0, buffer.Length);
@@ -669,10 +669,10 @@ internal sealed class LinkService(
                     await linkInterface.SendCanMessageAsync(srcAddress, new CanMessageFirmwareUpdateResponse
                     {
                         DataLength = 0,
-                        Err = CanMessageFirmwareUpdateResponse.ErrOther,
+                        Err = (byte)CanMessageFirmwareUpdateResponse.ErrOther,
                         FileLength = (uint)fs.Length,
                         FileOffset = 0,
-                        Data = new CanMessageFirmwareUpdateResponseDataBuffer()
+                        Data = new ByteArray56()
                     },
                     isResponse: true,
                     cancellationToken: cancellationToken);
@@ -683,11 +683,11 @@ internal sealed class LinkService(
                 // Send the requested block back to the firmware
                 CanMessageFirmwareUpdateResponse response = new()
                 {
-                    DataLength = (uint)bytesRead,
-                    Err = CanMessageFirmwareUpdateResponse.ErrNone,
+                    DataLength = (byte)bytesRead,
+                    Err = (byte)CanMessageFirmwareUpdateResponse.ErrNone,
                     FileLength = (uint)fs.Length,
                     FileOffset = fileOffset,
-                    Data = new CanMessageFirmwareUpdateResponseDataBuffer()
+                    Data = new ByteArray56()
                 };
                 buffer.AsSpan(0, bytesRead).CopyTo(response.Data);
 

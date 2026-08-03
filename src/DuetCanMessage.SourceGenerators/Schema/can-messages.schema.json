@@ -1,0 +1,883 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Duet3D/DuetSoftwareFramework/v3.6-dev/src/DuetCanMessage.SourceGenerators/Schema/can-messages.schema.json",
+  "title": "Duet 3 CAN message schema",
+  "description": "Neutral description of the Duet 3 CAN message formats, from which DuetCanMessage.SourceGenerators generates CANlib's C++ headers and DuetControlServer's C# message types. See ../README.md for the prose version of everything described here.\n\nThe generator ignores keys it does not know, so a misspelt key silently does nothing; this schema exists to make that a visible error instead. It also pins down which values are written as JSON strings rather than numbers, since the loader reads several numeric-looking fields (a constant's value, an array's length) as strings and throws on a number.",
+
+  "type": "object",
+  "required": ["cppHeaders", "csharpNamespace", "csharpSharedNamespace", "structs"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "$comment": { "$ref": "#/$defs/docText" },
+
+    "cppHeaderGuard": {
+      "type": "string",
+      "description": "Include guard of the main generated C++ header. Superseded by the per-header \"guard\" in cppHeaders; kept for compatibility.",
+      "default": "SRC_CAN_CANMESSAGEFORMATS_H_"
+    },
+    "cppTablesHeaderGuard": {
+      "type": "string",
+      "description": "Include guard of the generated CanMessageGenericTables.h.",
+      "default": "SRC_CANMESSAGEGENERICTABLES_H_"
+    },
+    "cppIncludes": {
+      "type": "array",
+      "description": "Includes for the generated tables header, each written with its own quotes or angle brackets.",
+      "items": { "type": "string" }
+    },
+
+    "csharpNamespace": {
+      "type": "string",
+      "description": "Namespace of the generated C# message structs.",
+      "examples": ["DuetControlServer.Link.Protocol.CanMessages"]
+    },
+    "csharpSharedNamespace": {
+      "type": "string",
+      "description": "Namespace of the types the messages share, such as the CanMessageType enum.",
+      "examples": ["DuetControlServer.Link.Protocol.Shared"]
+    },
+    "csharpUsings": {
+      "type": "array",
+      "description": "Extra using directives added to every generated C# file.",
+      "items": { "type": "string" }
+    },
+
+    "constants": {
+      "type": "object",
+      "description": "Schema-wide integer constants. They may be used wherever an array length or an expression names a value, and are emitted into both languages.",
+      "additionalProperties": { "type": "integer" }
+    },
+
+    "cppHeaders": {
+      "type": "array",
+      "description": "The generated C++ headers. CANlib spreads these types over more than one header, and a generated header is only a drop-in if it holds exactly what the original did.",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/cppHeader" }
+    },
+
+    "structs": {
+      "type": "array",
+      "description": "Every message format and payload type. Member order decides the wire layout and must not be changed without bumping the message type.",
+      "items": { "$ref": "#/$defs/struct" }
+    },
+
+    "enums": {
+      "type": "array",
+      "description": "Enums whose values travel on the wire, so that a value disagreeing with CANlib is caught here rather than producing a well-formed message that means something else.",
+      "items": { "$ref": "#/$defs/enum" }
+    },
+
+    "constantGroups": {
+      "type": "array",
+      "description": "Groups of related constants CANlib declares, such as the CAN addresses, masks and shifts.",
+      "items": { "$ref": "#/$defs/constantGroup" }
+    },
+
+    "genericTables": {
+      "type": "array",
+      "description": "Parameter tables for the messages that share CanMessageGeneric. The table is the contract between the two ends: the sender packs the parameters it is sending in table order and sets the matching paramMap bit, and the receiver walks the same table to find them again.",
+      "items": { "$ref": "#/$defs/genericTable" }
+    },
+
+    "messageUnion": {
+      "$ref": "#/$defs/messageUnion",
+      "description": "The union of every message format, used to receive a message before its type is known."
+    }
+  },
+
+  "$defs": {
+    "docText": {
+      "description": "Documentation, as a single line or an array of lines.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ]
+    },
+
+    "emit": {
+      "type": "array",
+      "description": "Which languages get this element. Omitted means both.",
+      "items": { "enum": ["cpp", "csharp"] },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+
+    "typeName": {
+      "type": "string",
+      "description": "A primitive of the neutral schema (u8, i8, u16, i16, u32, i32, u64, i64, f16, f32, f64, char, bool, CanRequestId, or usize for method signatures only) or the name of another struct in this file.",
+      "minLength": 1
+    },
+
+    "bitfieldStorage": {
+      "description": "Declared storage type of a bitfield group. It does not affect the layout - bitfields pack with no regard for it, straddling byte and storage-unit boundaries - but it is what the generated C++ declares, so it has to match CANlib.",
+      "enum": ["u8", "i8", "u16", "i16", "u32", "i32", "u64", "i64"],
+      "default": "u32"
+    },
+
+    "expression": {
+      "type": "string",
+      "description": "An expression in the neutral language: ordinary C-like infix, plus the intrinsics sizeof, countof, elem, strnlen, popcount, loadLE, the casts u8(x)/u32(x)/... and `self`.",
+      "minLength": 1
+    },
+
+    "cppHeader": {
+      "type": "object",
+      "required": ["name", "guard", "output"],
+      "additionalProperties": false,
+      "properties": {
+        "$comment": { "$ref": "#/$defs/docText" },
+        "name": {
+          "type": "string",
+          "description": "File name, which is also what a struct's \"cppHeader\" refers to.",
+          "examples": ["CanMessageFormats.h", "CanSettings.h"]
+        },
+        "guard": {
+          "type": "string",
+          "description": "Include guard, which must be CANlib's own so the generated header stays a drop-in."
+        },
+        "output": {
+          "type": "string",
+          "description": "Where the header is written, relative to the repository root."
+        },
+        "includes": {
+          "type": "array",
+          "description": "Includes, each written with its own quotes or angle brackets.",
+          "items": { "type": "string" }
+        },
+        "preamble": {
+          "type": "array",
+          "description": "Lines emitted after the includes, such as the forward declarations CANlib has there.",
+          "items": { "type": "string" }
+        },
+        "postamble": {
+          "type": "array",
+          "description": "Lines emitted after the types, for anything that has to be sized from one of them.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "constant": {
+      "type": "object",
+      "description": "A named constant. Its value is a string even when it is a number, because it is emitted verbatim into both languages.",
+      "required": ["name", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "$comment": { "$ref": "#/$defs/docText" },
+        "name": { "type": "string" },
+        "type": { "$ref": "#/$defs/typeName", "default": "u32" },
+        "value": {
+          "type": "string",
+          "description": "The value, written as a string: \"8\", \"0x7F\", or an expression over other constants."
+        },
+        "doc": { "$ref": "#/$defs/docText" }
+      }
+    },
+
+    "constantGroup": {
+      "type": "object",
+      "required": ["name", "output", "values"],
+      "additionalProperties": false,
+      "properties": {
+        "$comment": { "$ref": "#/$defs/docText" },
+        "name": { "type": "string", "description": "Name of the generated C# class." },
+        "cppHeader": {
+          "type": "string",
+          "description": "CANlib header the constants are declared in, relative to its src directory. compare-constants.py checks the two against each other.",
+          "examples": ["CanId.h"]
+        },
+        "cppScope": {
+          "type": "string",
+          "description": "Class the constants sit inside in CANlib, where they are not at file scope."
+        },
+        "output": {
+          "type": "string",
+          "description": "Where the generated file is written, relative to the repository root."
+        },
+        "doc": { "$ref": "#/$defs/docText" },
+        "values": { "type": "array", "items": { "$ref": "#/$defs/constant" } }
+      }
+    },
+
+    "enum": {
+      "type": "object",
+      "required": ["name", "cppHeader", "values"],
+      "additionalProperties": false,
+      "properties": {
+        "$comment": { "$ref": "#/$defs/docText" },
+        "name": {
+          "type": "string",
+          "description": "Name of the enum in CANlib, which is what the drift check looks for.",
+          "examples": ["CanMessageType", "GCodeResult"]
+        },
+        "csharpName": {
+          "type": "string",
+          "description": "Name of the generated C# enum, where DCS calls it something else. Defaults to \"name\"."
+        },
+        "cppHeader": {
+          "type": "string",
+          "description": "CANlib header the enum is declared in, relative to its src directory.",
+          "examples": ["CanId.h", "GCodeResult.h", "Duet3Common.h"]
+        },
+        "underlyingType": {
+          "type": "string",
+          "description": "Underlying C# integer type.",
+          "enum": ["byte", "sbyte", "short", "ushort", "int", "uint", "long", "ulong"],
+          "default": "ushort"
+        },
+        "output": {
+          "type": "string",
+          "description": "Where the generated enum is written, relative to the repository root. Not used when checkOnly is set."
+        },
+        "checkOnly": {
+          "type": "boolean",
+          "description": "The enum has to agree with CANlib but is generated elsewhere, so it is only compared. Used for TemperatureError, which is part of DuetAPI's published object model.",
+          "default": false
+        },
+        "csharpSource": {
+          "type": "string",
+          "description": "Where the C# counterpart lives, for a checkOnly enum. The checker parses this file and compares its ordinals."
+        },
+        "doc": { "$ref": "#/$defs/docText" },
+        "values": { "type": "array", "items": { "$ref": "#/$defs/enumEntry" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "checkOnly": { "const": true } }, "required": ["checkOnly"] },
+          "then": {
+            "required": ["csharpSource"],
+            "$comment": "A checkOnly enum is compared against an existing file, so it has to say which one."
+          },
+          "else": {
+            "required": ["output"],
+            "$comment": "An enum that is generated has to say where it is written."
+          }
+        }
+      ]
+    },
+
+    "enumEntry": {
+      "description": "Either a section heading or an enumerator.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "section heading",
+          "required": ["section"],
+          "additionalProperties": false,
+          "properties": {
+            "$comment": { "$ref": "#/$defs/docText" },
+            "section": { "type": "string", "description": "Heading that groups the entries after it." }
+          }
+        },
+        {
+          "type": "object",
+          "title": "enumerator",
+          "required": ["name", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "$comment": { "$ref": "#/$defs/docText" },
+            "name": { "type": "string", "description": "Written as CANlib spells it; C# gets the PascalCase form." },
+            "value": {
+              "description": "The id, as a number or as a string holding a decimal or hex literal, or the name of another enumerator to alias it. An entry starting with a digit is a literal; anything else is an alias, and it has to resolve or the generated enum would not compile.",
+              "oneOf": [
+                { "type": "integer", "minimum": 0 },
+                { "type": "string", "pattern": "^(0[xX][0-9a-fA-F]+|[0-9]+|[A-Za-z_][A-Za-z0-9_]*)$" }
+              ]
+            },
+            "retired": {
+              "type": "boolean",
+              "description": "An id that is no longer used. It is emitted as a comment rather than dropped, because the comment is the record that the number is spent: reusing one would have an expansion board on older firmware act on a message that now means something else.",
+              "default": false
+            },
+            "doc": { "$ref": "#/$defs/docText" },
+            "emit": { "$ref": "#/$defs/emit" }
+          }
+        }
+      ]
+    },
+
+    "genericTable": {
+      "type": "object",
+      "required": ["name", "params"],
+      "additionalProperties": false,
+      "properties": {
+        "$comment": { "$ref": "#/$defs/docText" },
+        "name": {
+          "type": "string",
+          "description": "CANlib's name for the table. Dropping \"Params\" from it names the generated message and builder.",
+          "examples": ["M950FanParams"]
+        },
+        "doc": { "$ref": "#/$defs/docText" },
+        "messageType": {
+          "type": "string",
+          "description": "The CanMessageType enumerator a message built from this table is sent under. Required unless the table is emitted for C++ alone."
+        },
+        "emit": { "$ref": "#/$defs/emit" },
+        "params": {
+          "type": "array",
+          "description": "The parameters, in the order they are packed. A new parameter must be added at the end, or the paramMap bits and offsets of every existing one shift. No table may have more parameters than CanMessageGeneric's paramMap bitfield is wide.",
+          "items": { "$ref": "#/$defs/genericParam" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "not": { "required": ["messageType"] } },
+          "then": {
+            "required": ["emit"],
+            "properties": { "emit": { "type": "array", "items": { "const": "cpp" } } },
+            "$comment": "A generic message that cannot name its own type would go out as UnusedMessageType, so a table reaching C# needs a messageType. Set \"emit\": [\"cpp\"] for a table that nothing sends."
+          }
+        }
+      ]
+    },
+
+    "genericParam": {
+      "type": "object",
+      "required": ["letter", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "$comment": { "$ref": "#/$defs/docText" },
+        "letter": {
+          "type": "string",
+          "description": "The G-code letter that supplies this parameter. Exactly one character, unique within the table even ignoring case. A letter outside A..Z cannot come from a command: CANlib uses that both to retire an entry while keeping its position and to reserve a parameter the sender fills in itself.",
+          "minLength": 1,
+          "maxLength": 1
+        },
+        "type": {
+          "description": "One of ParamDescriptor::ParamType's enumerators, under its schema name.",
+          "enum": [
+            "uint8", "uint16", "uint32", "uint64",
+            "int8", "int16", "int32",
+            "float", "float16", "pwmFreq",
+            "char", "string", "reducedString", "localDriver",
+            "uint8Array", "uint16Array", "uint32Array", "floatArray"
+          ]
+        },
+        "maxLength": {
+          "type": "integer",
+          "description": "Number of elements. Required for the array types and rejected for every other type.",
+          "minimum": 1
+        },
+        "doc": { "$ref": "#/$defs/docText" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "enum": ["uint8Array", "uint16Array", "uint32Array", "floatArray"] } },
+            "required": ["type"]
+          },
+          "then": { "required": ["maxLength"] },
+          "else": { "not": { "required": ["maxLength"] } }
+        }
+      ]
+    },
+
+    "struct": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "$comment": { "$ref": "#/$defs/docText" },
+        "name": {
+          "type": "string",
+          "description": "Type name, shared by both languages. A name starting with \"CanMessage\" marks a sendable message, which then needs either a messageType or bodyOnly."
+        },
+        "doc": { "$ref": "#/$defs/docText" },
+        "packed": {
+          "type": "boolean",
+          "description": "Whether the struct is packed. False gives natural alignment, as HeaterModel, MinCurMax and ShapingPair have.",
+          "default": true
+        },
+        "isUnion": {
+          "type": "boolean",
+          "description": "All members sit at offset 0.",
+          "default": false
+        },
+        "messageType": {
+          "type": "string",
+          "description": "The CanMessageType enumerator this message is sent under, written as the schema spells it; C# gets the PascalCase form."
+        },
+        "bodyOnly": {
+          "type": "boolean",
+          "description": "The message is never sent under its own name and so has no message type. Stated rather than inferred from a missing messageType, because that omission is exactly the mistake worth catching.",
+          "default": false
+        },
+        "nestedIn": {
+          "type": "string",
+          "description": "C++ nests the struct inside this parent; C# emits it at the top level."
+        },
+        "templateParam": {
+          "type": "string",
+          "description": "Makes the struct a C++ template over this parameter. C# gets one concrete struct per entry in \"instantiations\"."
+        },
+        "instantiations": {
+          "type": "array",
+          "description": "The concrete expansions of a template struct.",
+          "items": { "$ref": "#/$defs/instantiation" }
+        },
+        "emit": { "$ref": "#/$defs/emit" },
+        "existing": {
+          "$ref": "#/$defs/existing",
+          "description": "Where a type this file does not emit can already be found in each language."
+        },
+        "size": {
+          "type": "integer",
+          "description": "Declared size in bytes, for a type the generator does not emit and so cannot lay out itself.",
+          "minimum": 0
+        },
+        "constants": {
+          "type": "array",
+          "description": "Constants declared inside the struct.",
+          "items": { "$ref": "#/$defs/constant" }
+        },
+        "members": {
+          "type": "array",
+          "description": "The members, in layout order.",
+          "items": { "$ref": "#/$defs/member" }
+        },
+        "methods": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/method" }
+        },
+        "constructors": {
+          "type": "array",
+          "description": "C++ constructors. They are never emitted for C#, where a struct cannot reproduce a zero-initialising parameterless constructor because default and array allocation bypass it.",
+          "items": { "$ref": "#/$defs/constructor" }
+        },
+        "requestIdField": {
+          "type": "string",
+          "description": "Name of the request ID field. Generates SetRequestId; a message without one gets ClearReservedFields instead. Which fields those zero is derived from \"reserved\", never written out, so the two languages cannot disagree about it."
+        },
+        "setRequestIdAlsoClears": {
+          "type": "array",
+          "description": "Extra non-reserved fields that SetRequestId also zeroes.",
+          "items": { "type": "string" }
+        },
+        "clearAlsoClears": {
+          "type": "array",
+          "description": "Extra non-reserved fields that ClearReservedFields also zeroes.",
+          "items": { "type": "string" }
+        },
+        "clearReservedFields": {
+          "type": "boolean",
+          "description": "Forces ClearReservedFields onto a struct that is not itself a message.",
+          "default": false
+        },
+        "cppHeader": {
+          "type": "string",
+          "description": "Which of the declared cppHeaders this struct belongs in; the first one when unset. It must name a declared header, or the struct would be emitted into none of them."
+        },
+        "cppClass": {
+          "type": "boolean",
+          "description": "Emit as a C++ class rather than a struct.",
+          "default": false
+        },
+        "cppFinal": {
+          "type": "boolean",
+          "description": "Emit the C++ type as final.",
+          "default": false
+        },
+        "cppStaticAsserts": {
+          "type": "array",
+          "description": "Extra static_asserts copied into the C++ header verbatim.",
+          "items": { "type": "string" }
+        },
+        "csharpPartial": {
+          "type": "boolean",
+          "description": "Emit the C# struct as partial, so hand-written code can add what the expression language cannot express. The generated half still owns the layout, which is what the probe checks.",
+          "default": false
+        }
+      }
+    },
+
+    "existing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "$comment": { "$ref": "#/$defs/docText" },
+        "cpp": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "header": { "type": "string", "description": "Header that declares the type, included by the generated one." },
+            "name": { "type": "string", "description": "Name of the type in C++, where it differs from the schema name." }
+          }
+        },
+        "csharp": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "namespace": { "type": "string" },
+            "name": { "type": "string", "description": "Name of the type in C#, where it differs from the schema name." }
+          }
+        }
+      }
+    },
+
+    "instantiation": {
+      "type": "object",
+      "required": ["suffix", "arg"],
+      "additionalProperties": false,
+      "properties": {
+        "$comment": { "$ref": "#/$defs/docText" },
+        "suffix": { "type": "string", "description": "Appended to the template's name to name the C# struct." },
+        "arg": { "$ref": "#/$defs/typeName", "description": "The concrete type substituted for the template parameter." },
+        "messageType": {
+          "type": "string",
+          "description": "The CanMessageType this expansion is sent under. A payload sent under more than one type gets one expansion per type, because a struct can only name one."
+        },
+        "bodyOnly": {
+          "type": "boolean",
+          "description": "This expansion is never sent, so it needs no message type.",
+          "default": false
+        },
+        "doc": { "$ref": "#/$defs/docText" }
+      }
+    },
+
+    "member": {
+      "type": "object",
+      "description": "A member of a struct. A bit cursor runs through the members in order: a bitfield is placed at the cursor with no padding, and anything else first rounds the cursor up to the next byte.",
+      "additionalProperties": false,
+      "properties": {
+        "$comment": { "$ref": "#/$defs/docText" },
+        "kind": {
+          "enum": ["field", "array", "bitfield", "union"],
+          "default": "field"
+        },
+        "name": { "type": "string" },
+        "type": { "$ref": "#/$defs/typeName" },
+        "doc": { "$ref": "#/$defs/docText" },
+        "length": {
+          "type": "string",
+          "description": "Number of elements of an array member, written as a string: a literal like \"56\" or the name of a schema constant."
+        },
+        "storage": { "$ref": "#/$defs/bitfieldStorage" },
+        "fields": {
+          "type": "array",
+          "description": "The bitfields of a bitfield group, in order.",
+          "items": { "$ref": "#/$defs/bitField" }
+        },
+        "anonymous": {
+          "type": "boolean",
+          "description": "The union has no name of its own; its alternatives are reached directly.",
+          "default": false
+        },
+        "alternatives": {
+          "type": "array",
+          "description": "The arms of a union member, all of which sit at the same offset.",
+          "items": { "$ref": "#/$defs/member" }
+        },
+        "unaligned": {
+          "type": "boolean",
+          "description": "The field is not naturally aligned, so the C++ side reaches it through the LoadLE/StoreLE helpers.",
+          "default": false
+        },
+        "reserved": {
+          "type": "boolean",
+          "description": "A spare field that must be zeroed. It gets no public accessor, and the generated SetRequestId or ClearReservedFields clears it.",
+          "default": false
+        },
+        "cppPrivate": {
+          "type": "boolean",
+          "description": "C++ keeps the field private (because it is unaligned) and exposes it through accessors, so the C++ probe cannot take its offset.",
+          "default": false
+        },
+        "cppAccessPath": {
+          "type": "string",
+          "description": "How CANlib reaches the member, where it does so through a sub-struct that the flat schema view does not have. Affects only the C++ probe."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "field" } } },
+          "then": { "required": ["name", "type"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "array" } }, "required": ["kind"] },
+          "then": { "required": ["name", "type", "length"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "bitfield" } }, "required": ["kind"] },
+          "then": { "required": ["fields"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "union" } }, "required": ["kind"] },
+          "then": { "required": ["alternatives"] }
+        }
+      ]
+    },
+
+    "bitField": {
+      "type": "object",
+      "required": ["name", "width"],
+      "additionalProperties": false,
+      "properties": {
+        "$comment": { "$ref": "#/$defs/docText" },
+        "name": { "type": "string" },
+        "width": {
+          "type": "integer",
+          "description": "Width in bits. The field is placed at the running bit cursor and advances it by this much, so it may straddle byte and storage-unit boundaries.",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "bool": {
+          "type": "boolean",
+          "description": "Expose as a bool property in C#.",
+          "default": false
+        },
+        "signed": {
+          "type": "boolean",
+          "description": "Sign-extend the value on read.",
+          "default": false
+        },
+        "reserved": {
+          "type": "boolean",
+          "description": "A spare bit that the generated SetRequestId or ClearReservedFields zeroes.",
+          "default": false
+        },
+        "doc": { "$ref": "#/$defs/docText" }
+      }
+    },
+
+    "method": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "$comment": { "$ref": "#/$defs/docText" },
+        "name": { "type": "string" },
+        "returnType": {
+          "type": "string",
+          "description": "A schema type, or \"void\".",
+          "default": "void"
+        },
+        "params": { "type": "array", "items": { "$ref": "#/$defs/param" } },
+        "body": {
+          "type": "array",
+          "description": "The body, written once in the neutral statement language and rendered into both targets.",
+          "items": { "$ref": "#/$defs/statement" }
+        },
+        "static": { "type": "boolean", "default": false },
+        "const": {
+          "type": "boolean",
+          "description": "Whether the C++ method is const. Set it to false for a method that writes to the struct.",
+          "default": true
+        },
+        "constexpr": {
+          "type": "boolean",
+          "description": "Whether the C++ method is constexpr. Static methods always are.",
+          "default": false
+        },
+        "declarationOnly": {
+          "type": "boolean",
+          "description": "Only a declaration is emitted; the definition lives in hand-written code, such as CanMessageFormats.cpp.",
+          "default": false
+        },
+        "cppSignature": {
+          "type": "string",
+          "description": "Verbatim C++ declaration, for the few signatures the neutral language cannot express."
+        },
+        "emit": { "$ref": "#/$defs/emit" },
+        "doc": { "$ref": "#/$defs/docText" }
+      }
+    },
+
+    "constructor": {
+      "type": "object",
+      "description": "A C++ constructor. It is named after its struct, so it carries no name or return type of its own.",
+      "additionalProperties": false,
+      "properties": {
+        "$comment": { "$ref": "#/$defs/docText" },
+        "params": { "type": "array", "items": { "$ref": "#/$defs/param" } },
+        "init": {
+          "type": "array",
+          "description": "Member initialiser list.",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+              "$comment": { "$ref": "#/$defs/docText" },
+              "name": { "type": "string", "description": "Member to initialise." },
+              "value": { "$ref": "#/$defs/expression", "default": "0" }
+            }
+          }
+        },
+        "body": {
+          "type": "array",
+          "description": "An ordinary body, instead of or as well as an initialiser list.",
+          "items": { "$ref": "#/$defs/statement" }
+        },
+        "explicit": {
+          "type": "boolean",
+          "description": "Whether a single-argument constructor is declared explicit.",
+          "default": false
+        },
+        "doc": { "$ref": "#/$defs/docText" }
+      }
+    },
+
+    "param": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "$comment": { "$ref": "#/$defs/docText" },
+        "name": { "type": "string" },
+        "type": { "$ref": "#/$defs/typeName" },
+        "default": {
+          "type": "string",
+          "description": "Default argument, C++ only."
+        }
+      }
+    },
+
+    "statement": {
+      "description": "One statement of the neutral language. Each form is recognised by its leading key.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "return",
+          "required": ["return"],
+          "additionalProperties": false,
+          "properties": {
+            "$comment": { "$ref": "#/$defs/docText" },
+            "return": {
+              "type": "string",
+              "description": "The expression to return, or \"\" for a bare return."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "set ... to",
+          "required": ["set", "to"],
+          "additionalProperties": false,
+          "properties": {
+            "$comment": { "$ref": "#/$defs/docText" },
+            "set": { "$ref": "#/$defs/expression", "description": "Assignment target." },
+            "to": { "$ref": "#/$defs/expression" }
+          }
+        },
+        {
+          "type": "object",
+          "title": "orWith ... value",
+          "required": ["orWith", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "$comment": { "$ref": "#/$defs/docText" },
+            "orWith": { "$ref": "#/$defs/expression", "description": "Target of |=." },
+            "value": { "$ref": "#/$defs/expression" }
+          }
+        },
+        {
+          "type": "object",
+          "title": "storeLE ... to",
+          "required": ["storeLE", "to"],
+          "additionalProperties": false,
+          "properties": {
+            "$comment": { "$ref": "#/$defs/docText" },
+            "storeLE": {
+              "$ref": "#/$defs/expression",
+              "description": "Unaligned field to write. C++ goes through StoreLE; C# writes the field directly, since Pack = 1 already handles it."
+            },
+            "to": { "$ref": "#/$defs/expression" }
+          }
+        },
+        {
+          "type": "object",
+          "title": "incr",
+          "required": ["incr"],
+          "additionalProperties": false,
+          "properties": {
+            "$comment": { "$ref": "#/$defs/docText" },
+            "incr": { "$ref": "#/$defs/expression", "description": "Target of ++." }
+          }
+        },
+        {
+          "type": "object",
+          "title": "let",
+          "required": ["let", "type", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "$comment": { "$ref": "#/$defs/docText" },
+            "let": { "type": "string", "description": "Name of the local." },
+            "type": { "$ref": "#/$defs/typeName" },
+            "value": { "$ref": "#/$defs/expression" }
+          }
+        },
+        {
+          "type": "object",
+          "title": "if ... then ... else",
+          "required": ["if", "then"],
+          "additionalProperties": false,
+          "properties": {
+            "$comment": { "$ref": "#/$defs/docText" },
+            "if": { "$ref": "#/$defs/expression", "description": "Condition." },
+            "then": { "type": "array", "items": { "$ref": "#/$defs/statement" } },
+            "else": { "type": "array", "items": { "$ref": "#/$defs/statement" } }
+          }
+        },
+        {
+          "type": "object",
+          "title": "forRange",
+          "required": ["forRange", "body"],
+          "additionalProperties": false,
+          "properties": {
+            "$comment": { "$ref": "#/$defs/docText" },
+            "forRange": {
+              "type": "object",
+              "required": ["var", "from", "to"],
+              "additionalProperties": false,
+              "properties": {
+                "var": { "type": "string", "description": "Loop variable." },
+                "from": { "$ref": "#/$defs/expression" },
+                "to": { "$ref": "#/$defs/expression", "description": "Exclusive upper bound." }
+              }
+            },
+            "body": { "type": "array", "items": { "$ref": "#/$defs/statement" } }
+          }
+        }
+      ]
+    },
+
+    "messageUnion": {
+      "type": "object",
+      "required": ["members"],
+      "additionalProperties": false,
+      "properties": {
+        "$comment": { "$ref": "#/$defs/docText" },
+        "name": { "type": "string", "default": "CanMessage" },
+        "doc": { "$ref": "#/$defs/docText" },
+        "maxSize": {
+          "type": "integer",
+          "description": "Size of the union in bytes, which is the largest message the link carries.",
+          "default": 64,
+          "minimum": 1
+        },
+        "members": { "type": "array", "items": { "$ref": "#/$defs/unionMember" } }
+      }
+    },
+
+    "unionMember": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "$comment": { "$ref": "#/$defs/docText" },
+        "name": { "type": "string" },
+        "type": { "$ref": "#/$defs/typeName" },
+        "csharpType": {
+          "type": "string",
+          "description": "The C# type of this arm, where it differs from the schema type - as it does for the expansions of a template struct."
+        },
+        "length": {
+          "type": "string",
+          "description": "Number of elements, for an arm that is an array. Written as a string, like a member's length."
+        }
+      }
+    }
+  }
+}
