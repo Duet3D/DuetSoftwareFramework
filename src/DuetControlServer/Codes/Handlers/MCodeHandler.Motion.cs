@@ -892,8 +892,6 @@ internal partial class MCodeHandler
             throw new OperationCanceledException();
         }
 
-        // The driver's own configuration is the board's to keep, so nothing is mirrored here. What
-        // this side records is the mapping, which M584 wrote
         CanResponse response;
         try
         {
@@ -917,7 +915,109 @@ internal partial class MCodeHandler
             return new Message(MessageType.Error, e.Message);
         }
 
+        if (code.MinorNumber <= 0)
+        {
+            await RecordDriverConfigAsync(driver, code, cancellationToken);
+        }
         return new Message(MessageType.Success, response.PayloadString);
+    }
+
+    /// <summary>
+    /// Record what M569 just set on a driver
+    /// </summary>
+    /// <param name="driver">The driver</param>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// Only the parameters the code actually carried are written, so a code that sets one thing does
+    /// not reset the rest to their defaults
+    /// </remarks>
+    private async ValueTask RecordDriverConfigAsync(DriverId driver, Commands.Code code, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            DriverConfig config = GetOrCreateDriver(driver).Config;
+
+            if (code.TryGetInt('S', out int direction))
+            {
+                config.Direction = direction != 0;
+            }
+            if (code.TryGetInt('R', out int enablePolarity))
+            {
+                config.EnablePolarity = enablePolarity;
+            }
+            if (code.TryGetInt('D', out int mode))
+            {
+                config.Mode = Enum.IsDefined((DriverMode)mode) ? (DriverMode)mode : DriverMode.Unknown;
+            }
+            if (code.TryGetInt('F', out int offTime))
+            {
+                config.OffTime = offTime;
+            }
+            if (code.TryGetInt('B', out int blankingTime))
+            {
+                config.BlankingTime = blankingTime;
+            }
+            if (code.TryGetInt('V', out int stealthChopThreshold))
+            {
+                config.StealthChopThreshold = stealthChopThreshold;
+            }
+            if (code.TryGetInt('H', out int coolStepThreshold))
+            {
+                config.CoolStepThreshold = coolStepThreshold;
+            }
+            if (code.TryGetInt('U', out int currentScaler))
+            {
+                config.CurrentScaler = currentScaler;
+            }
+            if (code.TryGetIntArray('Y', out int[]? hysteresis) && hysteresis.Length > 0)
+            {
+                config.Hysteresis.Start = hysteresis[0];
+                if (hysteresis.Length > 1)
+                {
+                    config.Hysteresis.End = hysteresis[1];
+                }
+                if (hysteresis.Length > 2)
+                {
+                    config.Hysteresis.Decrement = hysteresis[2];
+                }
+            }
+            if (code.TryGetFloatArray('T', out float[]? timings) && timings.Length > 0)
+            {
+                // A single value sets all four timings, which is how most configurations are written
+                config.StepTiming.Clear();
+                for (int i = 0; i < 4; i++)
+                {
+                    config.StepTiming.Add(timings.Length == 1 ? timings[0] : i < timings.Length ? timings[i] : 0.0f);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Find a driver in the object model, adding the board and the driver if they are not there yet
+    /// </summary>
+    /// <param name="driver">The driver</param>
+    /// <returns>The driver's object model entry</returns>
+    /// <remarks>
+    /// config.g configures drivers before the boards carrying them have necessarily announced
+    /// themselves, so the entry has to be created on demand rather than waited for
+    /// </remarks>
+    private Driver GetOrCreateDriver(DriverId driver)
+    {
+        Board? board = model.Boards.FirstOrDefault(b => b.CanAddress == driver.Board);
+        if (board is null)
+        {
+            board = new Board { CanAddress = driver.Board };
+            model.Boards.Add(board);
+        }
+
+        board.Drivers ??= [];
+        while (board.Drivers.Count <= driver.Port)
+        {
+            board.Drivers.Add(new Driver());
+        }
+        return board.Drivers[driver.Port];
     }
 
     /// <summary>
@@ -1001,7 +1101,47 @@ internal partial class MCodeHandler
                 replies.Add(response.PayloadString);
             }
         }
+
+        await RecordStallDetectionAsync(drivers, code, cancellationToken);
         return new Message(MessageType.Success, string.Join('\n', replies));
+    }
+
+    /// <summary>
+    /// Record what M915 just set on a set of drivers
+    /// </summary>
+    /// <param name="drivers">Drivers the code addressed</param>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    private async ValueTask RecordStallDetectionAsync(IEnumerable<DriverId> drivers, Commands.Code code, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            foreach (DriverId driver in drivers)
+            {
+                DriverStallDetection stall = GetOrCreateDriver(driver).Config.StallDetection;
+
+                if (code.TryGetInt('S', out int threshold))
+                {
+                    stall.Threshold = threshold;
+                }
+                if (code.TryGetInt('F', out int filter))
+                {
+                    stall.Filter = filter != 0;
+                }
+                if (code.TryGetInt('H', out int minimumSpeed))
+                {
+                    stall.MinimumSpeed = minimumSpeed;
+                }
+                if (code.TryGetInt('T', out int coolStep))
+                {
+                    stall.CoolStep = coolStep;
+                }
+                if (code.TryGetInt('R', out int raiseEvent))
+                {
+                    stall.RaiseEvent = raiseEvent != 0;
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -1031,7 +1171,7 @@ internal partial class MCodeHandler
     /// <returns>The result</returns>
     private async ValueTask<Message?> HandlePressureAdvanceAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!code.TryGetFloat('S', out float pressureAdvance))
+        if (!code.TryGetFloatArray('S', out float[]? given) || given.Length == 0)
         {
             using (await model.AccessReadOnlyAsync(cancellationToken))
             {
@@ -1046,9 +1186,21 @@ internal partial class MCodeHandler
             }
         }
 
-        if (pressureAdvance < 0.0f)
+        // S may carry a second coefficient, which applies above the extrusion speed named by L
+        float k0 = given[0], k1 = given.Length > 1 ? given[1] : given[0];
+        if (k0 < 0.0f || k1 < 0.0f)
         {
             return new Message(MessageType.Error, "pressure advance values must be non-negative");
+        }
+
+        float? dk = null;
+        if (given.Length > 1)
+        {
+            if (!code.TryGetFloat('L', out float transition) || transition < 0.0f)
+            {
+                return new Message(MessageType.Error, "a second pressure advance coefficient needs a non-negative L parameter");
+            }
+            dk = transition;
         }
 
         if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
@@ -1071,10 +1223,14 @@ internal partial class MCodeHandler
                 }
 
                 Extruder e = move.Extruders[extruder];
-                e.PressAdv.K0 = pressureAdvance;
+                e.PressAdv.K0 = k0;
+                e.PressAdv.K1 = k1;
+                e.PressAdv.D = dk;
                 if (e.Driver is not null)
                 {
-                    toUpdate.Add(new RemoteDrivers.DriverValue<float>(e.Driver, pressureAdvance));
+                    // The message carries the first coefficient; the second and its transition point
+                    // are held here until the wider pressure advance message is ported
+                    toUpdate.Add(new RemoteDrivers.DriverValue<float>(e.Driver, k0));
                 }
             }
         }

@@ -17,10 +17,19 @@ These rules come from the architecture already established on this branch — se
 [MotionParameters.cs](src/DuetControlServer/Motion/MotionParameters.cs) and
 [GCodeHandler.cs](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs) — they are not new inventions.
 
-1. **The object model is the configuration.** An M-code that configures the machine writes
-   `move.axes[]`, `move.extruders[]`, `move.kinematics`, `boards[].drivers[]`, `sensors.*` and so on.
-   Nothing keeps a private authoritative copy. If the object model has nowhere to put a value,
-   extend the object model (§6) rather than storing it beside it.
+1. **The object model is the configuration, and it must hold enough to recreate the machine.** An
+   M-code that configures the machine writes `move.axes[]`, `move.extruders[]`, `move.kinematics`,
+   `boards[].drivers[]`, `sensors.*` and so on. Nothing keeps a private authoritative copy. If the
+   object model has nowhere to put a value, extend the object model (§6) rather than storing it
+   beside it.
+
+   **Sending a setting to an expansion board is not storing it.** A configuration code that forwards
+   its parameters over CAN and records nothing leaves the object model unable to describe the
+   machine, which breaks M500 writing config-override.g, breaks what the interfaces can show, and
+   leaves no way to reconfigure a board that reconnects. The test to apply is: if the process
+   restarted and had to rebuild the machine from `model` alone, would anything be lost? Whatever
+   would be lost belongs in the object model. Transient state - whether a driver is currently
+   energised, where an axis is right now - is exempt; configuration is not.
 
 2. **Derived state is rebuilt, never edited.** `MotionParameters.FromObjectModel()` snapshots the
    object model for the planner and `MovePlanner.ReconfigureAsync()` pushes it down to the native
@@ -535,6 +544,30 @@ driver numbering, which only this side can work out after grouping the drivers b
 **M593 writes the configuration, not the impulses.** `move.shaping` carries type, frequency and
 damping; the amplitudes and delays are the motion engine's to derive. Naming a frequency or damping
 without a type switches the shaper on, as in RRF.
+
+### Audit against "the object model must recreate the machine"
+
+Rule §1.1 was tightened after the phase 2 review, and three ports failed it.
+
+**M569 stored nothing.** I had reasoned that the driver's configuration belongs to the board that
+acts on it, so sending it over CAN was enough. That was wrong, and the object model already said so:
+`DriverConfig`'s summary reads "Configured (M569) settings of a driver". It now records direction,
+enable polarity, mode, off time, blanking time, the stealthChop and coolStep thresholds, current
+scaler, spreadCycle hysteresis and step timings, writing only the parameters the code carried so a
+code setting one thing does not reset the rest. `DriverConfig` was extended for all but the first two.
+
+**M915 stored nothing.** Stall detection had no home at all, so `DriverStallDetection` was added under
+`boards[].drivers[].config.stallDetection`, holding threshold, filter, minimum speed, coolStep and
+whether a stall raises an event.
+
+**M572 stored a third of itself.** `S` may carry two coefficients with `L` naming the extrusion speed
+they transition at, and only the first was kept. `pressAdv.K0`, `.K1` and `.D` are now all written.
+The CAN message still carries only the first coefficient — the wider one is not ported — so the
+second and its transition point are held here alone, which is exactly what the rule is for.
+
+Both codes create the board and driver entries on demand: config.g configures drivers before the
+boards carrying them have necessarily announced themselves, so waiting for an announcement would
+lose the configuration.
 
 ### Removing the DSF/RRF split
 
